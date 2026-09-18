@@ -521,10 +521,16 @@
 
     if (ctx.offended) add({ text: P('P_SORRY'), tone: 'polite', act: 'sorry' });
     if (ctx.type === 'photo') add({ text: P('P_PHOTO'), tone: 'neutral', act: 'photo' });
-    if (ctx.type === 'voice') add({ text: P('P_VOICE'), tone: 'neutral', act: 'voice' });
+    if (ctx.type === 'voice') {
+      if (Math.random() < 0.4) add({ text: P('P_VOICE'), tone: 'neutral', act: 'voice' });
+      else add({ text: P('P_VOICE2'), tone: 'neutral', act: 'voiceText' });
+    }
     if (ctx.type === 'transfer') add({ text: P('P_TRANSFER'), tone: 'neutral', act: 'transferQ' });
     if (ctx.type === 'readonly') add({ text: P('P_PING'), tone: 'neutral', act: 'ping' });
-    if (ctx.type === 'short') add({ text: P('P_SHORT', { s: ctx.s.replace(/[.!…,].*$/, '') }), tone: 'neutral', act: 'shortQ', arg: ctx.s });
+    if (ctx.type === 'short') {
+      if (TIMEY.test(ctx.s)) add({ text: P('P_SHORT', { s: ctx.s.replace(/[.!…,].*$/, '') }), tone: 'neutral', act: 'shortQ', arg: ctx.s });
+      else add({ text: P('P_SHORT2'), tone: 'neutral', act: 'short2' });
+    }
     if (ctx.type === 'idle') add({ text: PL('IDLE_Q', L.IDLE_Q), tone: 'polite', act: 'idleReply' });
     if (ctx.type === 'sticker') add({ text: PL('STICKER_Q', L.STICKER_Q), tone: 'neutral', act: 'stickerQ' });
     if (ctx.type === 'fwd') add({ text: PL('FWD_Q', L.FWD_Q), tone: 'neutral', act: 'fwdQ' });
@@ -534,13 +540,15 @@
     if (ctx.when) add({ text: P('P_WHEN', { t: ctx.when, T: cap(ctx.when) }), tone: 'neutral', act: 'promiseCheck', arg: ctx.when });
     if (ctx.rel) {
       if (draw('RELQ', [0, 1])) add({ text: P('P_WHY_REL', { n: ctx.rel.n }), tone: 'neutral', act: 'whyRel', arg: ctx.rel });
+      else if (ctx.sad) add({ text: P('P_CONDOLE'), tone: 'polite', act: 'condole' });
       else add({ text: P('P_CONGRATS'), tone: 'polite', act: 'congrats', arg: ctx.rel });
     }
     if (ctx.constr) add({ text: P('P_DOUBT'), tone: 'neutral', act: 'defend' });
     const late = S.promises.filter((p) => p.due != null && p.due < S.day && !p.asked);
     if (late.length && Math.random() < 0.35) {
       const i = S.promises.indexOf(late[rnd(late.length)]);
-      add({ text: P('P_PREV', { t: S.promises[i].t, date: fmtDate(S.promises[i].made) }), tone: 'neutral', act: 'prev', arg: i });
+      const made = dateOf(S.promises[i].made).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+      add({ text: P('P_PREV', { t: S.promises[i].t, date: made }), tone: 'neutral', act: 'prev', arg: i });
     }
     if (ctx.group) add({ text: PL('GQ', ['Алик, я всё видел.', 'Алик, что это было?!', 'Я там всё прочитал.', '«Пусть закаляется»?!', 'Алик, это был семейный чат?']), tone: 'neutral', act: 'group' });
     if (ctx.wrong) add({ text: PL('WQ', AR.WRONG_Q), tone: 'neutral', act: 'wrong' });
@@ -575,6 +583,8 @@
   }
 
   // ---------- gameplay ----------
+  const SAD = /похорон|поминк|умер|реанимац|заболел|потоп|пожар|затопил|сломал|потерял|утонул|упало|сбежал|развод|похитил|застрял|сорвалась|отменили/;
+  const TIMEY = /^(Завтра|Скоро|Вечером|Щас|Минуту|Уже почти|Сейчас не могу|Перезвоню|Наберу)/;
   const THREAT_RE = /суд|полиц|заявлен|прокур|юрист|адвокат|коллектор/i;
   function classify(text) {
     if (/коров|му{2,}|мыч/i.test(text)) return 'cow';
@@ -691,6 +701,9 @@
         return;
       }
       case 'photo': await say([uniq(X.photo)]); S.ctx = null; return;
+      case 'condole': mood(1); await say([pair('CONDOLE_A', D.CONDOLE_A, 'CONDOLE_B', D.CONDOLE_B)]); S.ctx = null; return;
+      case 'voiceText': await say([pair('VOICE_A', D.VOICE_A, 'VOICE_B', D.VOICE_B)]); S.ctx = null; return;
+      case 'short2': await say([pair('SHORT2_A', D.SHORT2_A, 'SHORT2_B', D.SHORT2_B)]); S.ctx = null; return;
       case 'voice': await say([uniq(X.cow)]); S.ctx = null; return;
       case 'transferQ': await say([uniq(X.transferQ)]); S.ctx = null; return;
       case 'legendQ': mood(1); await say([uniq(X.legendQ)]); S.ctx = null; return;
@@ -756,6 +769,7 @@
       push({ kind: 'sys', text: `Алик вычел из долга ${v.total.toLocaleString('ru-RU')} ₽ по акту.` });
     }
     if (n.a2) await say([variant('a2', n.a2)], false, n.who2);
+    if (n.sys2) { await sleep(700); push({ kind: 'sys', text: gen('sys2', n.sys2)() }); }
     if (n.then === 'moo') { await sleep(400); moo(); }
     if (n.then === 'transfer') await transfer();
     if (n.then === 'promise') await promiseLine();
@@ -895,7 +909,7 @@
       return;
     }
 
-    if (Math.random() < 0.22) await periodLine();
+    if (S.stats.sent - (S.periodAt || -99) >= 12 && Math.random() < 0.35) { S.periodAt = S.stats.sent; await periodLine(); }
 
     const r = Math.random();
     const trChance = 0.02 + S.mood * 0.006;
@@ -939,7 +953,7 @@
       if (ex.legendary) unlock('legend');
       recordPromise(ex.p);
       const msgs = await say(ex.texts, ex.legendary);
-      S.ctx = { when: ex.p && ex.p.t, rel: ex.r, constr: ex.constr, legendary: ex.legendary };
+      S.ctx = { when: ex.p && ex.p.t, rel: ex.r, sad: SAD.test(ex.ev || ''), constr: ex.constr, legendary: ex.legendary };
       if (Math.random() < 0.09) await editLast(msgs[msgs.length - 1], ex.p);
     }
     if (Math.random() < 0.04) await deletedMsg();
