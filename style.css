@@ -223,3 +223,14 @@ body {
   60% { transform: translateX(-6px); }
   80% { transform: translateX(5px); }
 }
+
+.msg.doc { background: #fffdf3 !important; color: #222; font-family: "Courier New", monospace; font-size: 12px; min-width: 250px; }
+.doc-title { font-weight: 800; text-align: center; margin-bottom: 6px; border-bottom: 1px dashed #999; padding-bottom: 4px; }
+.doc-row { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
+.doc-row b { white-space: nowrap; }
+.doc-total { border-top: 1px dashed #999; margin-top: 4px; padding-top: 4px; font-weight: 800; }
+.doc-stamp {
+  margin: 6px 0 0 auto; width: max-content; color: #c0392b; border: 2px solid #c0392b; border-radius: 6px;
+  padding: 1px 6px; transform: rotate(-8deg); font-weight: 800;
+}
+.msg.doc .meta { color: #888; }

@@ -62,6 +62,15 @@
     dead: ['Телефон сел', 'Разрядил телефон на Алика'],
     away: ['Непрочитанные', 'Вернулся к пачке сообщений от Алика'],
     nightowl: ['Сова', 'Писал Алику ночью'],
+    forgive: ['Прощение', 'Простил умирающего Алика'],
+    invoice: ['Взаимозачёт', 'Получил счёт от Алика'],
+    loan: ['Кредитная история', 'Узнал о кредите на своё имя'],
+    heir: ['Наследство', 'Теперь тебе должен баран'],
+    threat: ['Правосудие', 'Пригрозил Алику судом'],
+    arc_death: ['Воскрешение', 'Пережил похороны Алика'],
+    arc_garik: ['Фундамент', 'Досмотрел сагу о Гарике в фундаменте'],
+    arc_tile: ['Орудие преступления', 'Твоя плитка прошла суд'],
+    arc_grandpa: ['Бессмертный', 'Дедушка Грачик всё ещё жив'],
   };
   const TIERS = [
     [250, '📈 Отмазки Алика вышли на международный уровень'],
@@ -84,7 +93,9 @@
   function load() {
     try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); return s && s.msgs ? { ...fresh(), ...s } : null; } catch { return null; }
   }
+  let resetting = false;
   function save() {
+    if (resetting) return;
     try {
       S.msgs = S.msgs.slice(-150);
       S.lastSeen = Date.now();
@@ -354,6 +365,12 @@
     } else if (m.kind === 'fwd') {
       el.classList.add('fwd');
       body.innerHTML = `<div class="fwd-from">↪ Переслано от: ${esc(m.f)}</div><div>${esc(m.text)}</div>`;
+    } else if (m.kind === 'doc') {
+      el.classList.add('doc');
+      body.innerHTML = `<div class="doc-title">📄 ${esc(m.title)}</div>` +
+        m.rows.map(([n, v]) => `<div class="doc-row"><span>${esc(n)}</span><b>−${v.toLocaleString('ru-RU')} ₽</b></div>`).join('') +
+        `<div class="doc-row doc-total"><span>Итого в пользу Алика</span><b>${m.total.toLocaleString('ru-RU')} ₽</b></div>` +
+        '<div class="doc-stamp">🐏 УТВЕРЖДАЮ</div>';
     } else if (m.kind === 'job') {
       body.textContent = m.text;
       if (!m.answered) {
@@ -558,6 +575,7 @@
   }
 
   // ---------- gameplay ----------
+  const THREAT_RE = /суд|полиц|заявлен|прокур|юрист|адвокат|коллектор/i;
   function classify(text) {
     if (/коров|му{2,}|мыч/i.test(text)) return 'cow';
     if (/[А-ЯЁA-Z]{4,}/.test(text) || /!!|верни|обман|врать|врёшь|суд|полиц|заявлен|приеду/i.test(text)) return 'rude';
@@ -571,7 +589,8 @@
     clearTimeout(idleT);
     idleCount = 0;
     clearUnread();
-    const tone = opt.tone || classify(opt.text);
+    let tone = opt.tone || classify(opt.text);
+    if (tone === 'rude' && !opt.scene && THREAT_RE.test(opt.text)) tone = 'threat';
     tick(1 + rnd(5));
     const mine = push({ from: 'me', kind: 'text', text: opt.text, time: fmtTime(S.clock) });
     markSeen(opt.text);
@@ -579,7 +598,7 @@
     unlock('first');
     if (isNight()) unlock('nightowl');
     if (tone === 'polite') { if (++S.politeStreak >= 10) unlock('saint'); } else S.politeStreak = 0;
-    if (tone === 'rude' && !opt.scene) { unlock('rude'); shake(); }
+    if ((tone === 'rude' || tone === 'threat') && !opt.scene) { unlock(tone); shake(); }
     if (tone === 'cow') unlock('cow');
     S.choices = null;
     drain(1);
@@ -621,6 +640,10 @@
         'Вы полежали на полу 15 минут. Терпение восстановлено.', 'Вы вышли на балкон и посчитали голубей. Терпение восстановлено.',
         'Вы съели целую пачку гречки. Терпение восстановлено.', 'Вы посмотрели видео с котиками. Терпение восстановлено.',
         'Вы поорали в подушку. Терпение восстановлено.', 'Вы открыли сайт вакансий и закрыли. Терпение восстановлено.',
+        'Вы продали микроволновку. Терпение восстановлено.', 'Вы написали завещание: всё — Алику, пусть подавится. Терпение восстановлено.',
+        'Вы сдали кровь за деньги. Терпение восстановлено, гемоглобин — нет.', 'Вы подрались с голубем за хлеб и победили. Терпение восстановлено.',
+        'Вы съели доширак без специй — специи на чёрный день. Терпение восстановлено.', 'Вы примерили гроб в ритуальном салоне. Удобно. Терпение восстановлено.',
+        'Вы позвонили маме. Мама спросила про Алика. Терпение восстановлено не полностью.',
       ]) });
       S.patience = MAX_PATIENCE;
       unlock('floor');
@@ -722,10 +745,17 @@
     if (fx.debt) S.debt += fx.debt;
     if (fx.mood) mood(fx.mood);
     if (fx.barter) { S.debt -= v.v; S.items.push(v.n); }
+    if (fx.invoice) S.debt -= v.total;
     if (fx.ach) unlock(fx.ach);
     if (n.sys) { await sleep(700); push({ kind: 'sys', text: gen('sys', n.sys)() }); }
     if (n.a) await say([variant('a', n.a)], false, n.who);
-    if (n.a2) await say([variant('a2', n.a2)], false, n.who);
+    if (n.doc) {
+      await typing(2000, 'отправляет документ…');
+      alikMsg({ kind: 'doc', title: `АКТ ВЗАИМОЗАЧЁТА № ${100 + rnd(900)}`, rows: v.rows, total: v.total });
+      await sleep(600);
+      push({ kind: 'sys', text: `Алик вычел из долга ${v.total.toLocaleString('ru-RU')} ₽ по акту.` });
+    }
+    if (n.a2) await say([variant('a2', n.a2)], false, n.who2);
     if (n.then === 'moo') { await sleep(400); moo(); }
     if (n.then === 'transfer') await transfer();
     if (n.then === 'promise') await promiseLine();
@@ -743,7 +773,7 @@
   function nextArc() {
     const ids = Object.keys(AR.ARCS).filter((id) => {
       const st = S.arcs[id];
-      return !st || (st.i < AR.ARCS[id].eps.length && S.day - st.last >= 6);
+      return st ? st.i < AR.ARCS[id].eps.length && S.day - st.last >= 6 : S.day >= (AR.ARCS[id].minDay || 0);
     });
     return ids.length ? ids[rnd(ids.length)] : null;
   }
@@ -753,6 +783,8 @@
     st.i++; st.last = S.day;
     S.ctx = { arc: id };
     await say(ep.m);
+    if (ep.fx && ep.fx.debt) S.debt += ep.fx.debt;
+    if (ep.sys) { await sleep(500); push({ kind: 'sys', text: ep.sys }); }
     if (ep.fx && ep.fx.ach) unlock(ep.fx.ach);
     if (ep.then === 'promise') await promiseLine();
   }
@@ -847,6 +879,13 @@
       return;
     }
     if (tone === 'cow') { await say([uniq(X.cow)]); return; }
+    if (tone === 'threat') {
+      mood(-1);
+      await say([uniq(X.threat)]);
+      S.offlineDays = 1 + rnd(3);
+      S.ctx = { offended: true };
+      return;
+    }
 
     if (Math.random() < 0.04) {
       await sleep(1200);
@@ -1050,7 +1089,8 @@
   }
   async function idleAction() {
     const r = Math.random();
-    if (S.offlineDays > 0 || r < 0.15) { randomNotif(); return; }
+    // посреди сцены (Алик «умирает», торгуется…) не перебиваем её — только уведомления телефона
+    if (S.offlineDays > 0 || S.scene || r < 0.15) { randomNotif(); return; }
     await sleep(300);
     if (r < 0.5) {
       const text = addrLine('IDLE', L.IDLE);
@@ -1193,6 +1233,7 @@
   $('#notif').onclick = () => $('#notif').classList.remove('show');
   $('#resetBtn').onclick = () => {
     if (!confirm('Стереть всё и начать заново?')) return;
+    resetting = true;
     try { localStorage.removeItem(SAVE_KEY); } catch { /* ignore */ }
     location.reload();
   };
@@ -1205,5 +1246,5 @@
   restStatus();
   if (S.battery === 0) die(); else { armIdle(); armStatus(); }
   save();
-  window.__alik = { S, moo, SC, notify, awayBurst }; // для отладки
+  window.__alik = { S, moo, SC, notify, awayBurst, reset: () => { resetting = true; localStorage.removeItem(SAVE_KEY); location.reload(); } }; // для отладки
 })();
