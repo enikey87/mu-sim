@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Алик, где деньги?</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐄</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="phone">
+    <div class="statusbar"><span id="clock">09:41</span><span id="gameDate"></span><span>📶 🔋</span></div>
+
+    <header class="chat-head">
+      <div class="avatar" id="avatar">А</div>
+      <div class="who">
+        <div class="name">Алик Воздухонесян</div>
+        <div class="status" id="status">был недавно</div>
+      </div>
+      <button class="icon-btn" id="muteBtn" title="Звук">🔊</button>
+      <button class="icon-btn" id="infoBtn" title="Обещания и ачивки">📋</button>
+    </header>
+
+    <div class="stats">
+      <span>Долг: <b id="debt"></b></span>
+      <span>Дней после сдачи: <b id="days"></b></span>
+      <span title="Настроение Алика" id="mood"></span>
+      <span title="Терпение" id="patience"></span>
+    </div>
+
+    <main class="chat" id="chat">
+      <div class="moo-layer" id="mooLayer"></div>
+    </main>
+
+    <div class="choices" id="choices"></div>
+    <form class="composer" id="composer">
+      <input id="input" autocomplete="off" placeholder="Сообщение…" maxlength="300">
+      <button type="submit" id="sendBtn">➤</button>
+    </form>
+
+    <div class="sheet hidden" id="sheet">
+      <div class="sheet-inner">
+        <div class="sheet-head"><b>Досье на Алика</b><button class="icon-btn" id="closeSheet">✕</button></div>
+        <h3>Журнал обещаний</h3>
+        <ul id="promises" class="list"></ul>
+        <h3>Сериалы</h3>
+        <ul id="arcs" class="list"></ul>
+        <h3>Трофеи</h3>
+        <ul id="items" class="list"></ul>
+        <h3>Ачивки <span id="achCount"></span></h3>
+        <ul id="achList" class="list"></ul>
+        <button class="danger" id="resetBtn">Начать заново</button>
+      </div>
+    </div>
+
+    <div class="toast hidden" id="toast"></div>
+  </div>
+
+  <script src="src/excuses.js"></script>
+  <script src="src/scenes.js"></script>
+  <script src="src/arcs.js"></script>
+  <script src="src/game.js"></script>
+</body>
+</html>
