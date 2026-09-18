@@ -1,7 +1,10 @@
 (function () {
   const $ = (s) => document.querySelector(s);
   const rnd = (n) => Math.floor(Math.random() * n);
-  const SPEED = /[?&]fast/.test(location.search) ? 0.03 : 1; // ?fast — для тестов
+  const Q = new URLSearchParams(location.search);
+  const SPEED = Q.has('fast') ? 0.03 : 1; // ?fast — паузы в ~30 раз короче (для тестов)
+  const HOUR = Q.has('hour') ? +Q.get('hour') : null; // ?hour=3 — подменить реальный час
+  const AWAY = Q.has('away') ? +Q.get('away') : null; // ?away=90 — будто игрока не было 90 минут
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms * SPEED));
 
   const HANDOVER = new Date(2026, 2, 18); // дата сдачи объекта
@@ -49,6 +52,16 @@
     tier1: ['Международный уровень', 'Отмазки вышли за границу'],
     tier2: ['Исторический уровень', 'Отмазки ушли в древность'],
     tier3: ['Космический уровень', 'Отмазки покинули Землю'],
+    idle: ['Он скучает', 'Алик написал первым'],
+    deleted: ['Я успел прочитать', 'Увидел удалённое сообщение'],
+    edited: ['Изменено', 'Алик отредактировал обещание'],
+    typo: ['Автозамена', 'Алик опечатался'],
+    sticker: ['Стикерпак', 'Получил стикер вместо ответа'],
+    fwd: ['Дзен-открытка', 'Алик переслал мудрость'],
+    react: ['👍', 'Алик ответил только реакцией'],
+    dead: ['Телефон сел', 'Разрядил телефон на Алика'],
+    away: ['Непрочитанные', 'Вернулся к пачке сообщений от Алика'],
+    nightowl: ['Сова', 'Писал Алику ночью'],
   };
   const TIERS = [
     [250, '📈 Отмазки Алика вышли на международный уровень'],
@@ -56,6 +69,7 @@
     [450, '🌌 Отмазки Алика вышли на космический уровень'],
   ];
   const AR = window.Arcs;
+  const L = window.Life;
 
   // ---------- state ----------
   function fresh() {
@@ -64,23 +78,25 @@
       msgs: [], ach: {}, promises: [], seen: [], bags: {}, items: [],
       stats: { moo: 0, fifty: 0, sent: 0 },
       offlineDays: 0, ram: false, muted: false, scene: null, ctx: null, choices: null, arcs: {}, tier: 0,
+      battery: 100, money: 12400, lastSeen: 0,
     };
   }
   function load() {
-    try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); return s && s.msgs ? s : null; } catch { return null; }
+    try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); return s && s.msgs ? { ...fresh(), ...s } : null; } catch { return null; }
   }
   function save() {
     try {
       S.msgs = S.msgs.slice(-150);
+      S.lastSeen = Date.now();
       localStorage.setItem(SAVE_KEY, JSON.stringify(S));
     } catch { /* нет storage — играем без сохранения */ }
   }
   let S = load() || fresh();
   let seen = new Set(S.seen);
   let busy = false;
+  let dead = false;
 
   // ---------- колоды без повторов ----------
-  // Каждый элемент выпадает один раз за цикл; после исчерпания колода тасуется заново (или null, если noRefill).
   function draw(key, arr, noRefill) {
     let b = S.bags[key];
     if (!b || b.n !== arr.length) b = S.bags[key] = { n: arr.length, left: null, last: -1 };
@@ -102,7 +118,7 @@
   }
   const hash = (s) => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return h; };
   // Тексты, которых ещё не было в этой игре. decorate — перефразирование, если варианты кончились.
-  const keyOf = (t) => (typeof t === 'string' ? t : t.texts ? t.texts.join('|') : t.text);
+  const keyOf = (t) => (typeof t === 'string' ? t : t.texts ? t.texts.join('|') : t.text ?? t.t ?? JSON.stringify(t));
   const isSeen = (t) => seen.has(hash(keyOf(t)));
   function markSeen(t) { const h = hash(keyOf(t)); if (!seen.has(h)) { seen.add(h); S.seen.push(h); } }
   function pickFresh(gen, decorate) {
@@ -123,12 +139,13 @@
     return pre + (pre.endsWith(', ') ? X.low(t) : t);
   }
   function uniq(gen) { const t = pickFresh(gen, alikDecor); markSeen(t); return t; }
+  const addrLine = (key, arr) => uniq(() => `${X.g('ADDR')}, ${draw(key, arr)}`);
 
   const X = window.Excuses.make(draw, () => S.tier);
   const SC = window.Scenes.make(X);
   const { D, cap, low, fill } = X;
 
-  // ---------- time ----------
+  // ---------- игровое время ----------
   const dateOf = (day) => new Date(HANDOVER.getTime() + day * 864e5);
   const fmtDate = (day) => dateOf(day).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
   const fmtTime = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
@@ -148,22 +165,39 @@
     }
   }
 
+  // ---------- реальное время: режим дня Алика ----------
+  function realHour() { return HOUR ?? new Date().getHours(); }
+  function period() {
+    const h = realHour(), dow = new Date().getDay();
+    if (h < 6) return 'night';
+    if (h < 10) return 'morning';
+    if (h >= 12 && h < 15) return 'lunch';
+    if (h >= 18 && dow === 5) return 'friday';
+    if (h >= 18) return 'evening';
+    return 'day';
+  }
+  const isNight = () => period() === 'night';
+  const realHHMM = () => { const d = new Date(); return `${String(HOUR ?? d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+
   // ---------- audio ----------
-  let ac;
-  const audio = () => (ac = ac || new (window.AudioContext || window.webkitAudioContext)());
+  // звук и вибрация — только после первого касания (иначе браузер блокирует)
+  let ac, gestured = false;
+  const audio = () => {
+    if (!gestured) throw new Error('no gesture');
+    return (ac = ac || new (window.AudioContext || window.webkitAudioContext)());
+  };
+  function tone(freq, dur, vol, type = 'sine', at = 0) {
+    const c = audio(), t = c.currentTime + at;
+    const o = c.createOscillator(), g = c.createGain();
+    o.frequency.value = freq; o.type = type;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(c.destination); o.start(t); o.stop(t + dur + 0.02);
+  }
   function beep() {
     if (S.muted) return;
-    try {
-      const c = audio(), t = c.currentTime;
-      [0, 0.12].forEach((d) => {
-        const o = c.createOscillator(), g = c.createGain();
-        o.frequency.value = 1320; o.type = 'sine';
-        g.gain.setValueAtTime(0.0001, t + d);
-        g.gain.exponentialRampToValueAtTime(0.15, t + d + 0.01);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.1);
-        o.connect(g).connect(c.destination); o.start(t + d); o.stop(t + d + 0.12);
-      });
-    } catch { /* ignore */ }
+    try { tone(1320, 0.1, 0.15, 'sine', 0); tone(1320, 0.1, 0.15, 'sine', 0.12); } catch { /* ignore */ }
   }
   function cowSynth(vol) {
     const c = audio(), t = c.currentTime, dur = 1.4 + Math.random() * 1.2;
@@ -186,6 +220,14 @@
       o.start(t); o.stop(t + dur);
     });
   }
+  function speak(text, { pitch = 1, rate = 1, volume = 0.5 } = {}) {
+    if (S.muted || !gestured) return;
+    try {
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'ru-RU'; u.pitch = pitch; u.rate = rate; u.volume = volume;
+      speechSynthesis.speak(u);
+    } catch { /* нет синтеза речи */ }
+  }
   function moo() {
     S.stats.moo++;
     if (S.stats.moo >= 10) unlock('moo10');
@@ -198,69 +240,141 @@
     setTimeout(() => el.remove(), 3100);
     if (S.muted) return;
     try { cowSynth(0.25); } catch { /* ignore */ }
-    try {
-      const u = new SpeechSynthesisUtterance('М' + 'у'.repeat(5 + rnd(6)));
-      u.lang = 'ru-RU'; u.pitch = 0.1; u.rate = 0.55; u.volume = 0.35;
-      speechSynthesis.speak(u);
-    } catch { /* нет синтеза речи */ }
+    speak('М' + 'у'.repeat(5 + rnd(6)), { pitch: 0.1, rate: 0.55, volume: 0.35 });
   }
   function feast() {
-    if (S.muted) return;
-    try {
-      const u = new SpeechSynthesisUtterance(draw('FEAST', ['Ну, за объект!', 'Вай, какой хаш!', 'Алик, иди сюда, тост!', 'За маму!', 'Алик, кто там пишет? Положи телефон!', 'Ещё по одной!']));
-      u.lang = 'ru-RU'; u.rate = 1.2; u.volume = 0.5;
-      speechSynthesis.speak(u);
-    } catch { /* ignore */ }
+    speak(draw('FEAST', ['Ну, за объект!', 'Вай, какой хаш!', 'Алик, иди сюда, тост!', 'За маму!', 'Алик, кто там пишет? Положи телефон!', 'Ещё по одной!']), { rate: 1.2 });
   }
-  const mooChance = () => (S.stats.sent > 50 ? 0.15 : 0.07);
+  function alikVoice() {
+    speak(draw('VOICE', L.VOICE), { pitch: 0.55, rate: 0.8, volume: 0.6 });
+    if (Math.random() < 0.3) setTimeout(moo, 2500);
+  }
+  const mooChance = () => (S.stats.sent > 50 ? 0.15 : 0.07) * (period() === 'friday' ? 1.5 : 1);
+  function vibrate(p) { if (!S.muted && gestured) try { navigator.vibrate && navigator.vibrate(p); } catch { /* ignore */ } }
+
+  // фоновая атмосфера: днём стройка, вечером дудук, ночью сверчки
+  const DUDUK = [293.66, 311.13, 369.99, 392, 440, 466.16];
+  function hammer() { const c = audio(); for (let i = 0; i < 3 + rnd(3); i++) noiseHit(c, i * 0.35); }
+  function noiseHit(c, at) {
+    const t = c.currentTime + at, len = 0.06;
+    const buf = c.createBuffer(1, c.sampleRate * len, c.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+    const src = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+    src.buffer = buf; f.type = 'bandpass'; f.frequency.value = 1800; g.gain.value = 0.05;
+    src.connect(f).connect(g).connect(c.destination); src.start(t);
+  }
+  function duduk() {
+    const c = audio(); let t = c.currentTime;
+    for (let i = 0; i < 4 + rnd(3); i++) {
+      const dur = 0.6 + Math.random() * 0.9, f0 = DUDUK[rnd(DUDUK.length)];
+      const o = c.createOscillator(), lfo = c.createOscillator(), lg = c.createGain(), lp = c.createBiquadFilter(), g = c.createGain();
+      o.type = 'sawtooth'; o.frequency.value = f0; lfo.frequency.value = 5; lg.gain.value = 4;
+      lfo.connect(lg).connect(o.frequency);
+      lp.type = 'lowpass'; lp.frequency.value = 1100;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.035, t + 0.15);
+      g.gain.setValueAtTime(0.035, t + dur - 0.2); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(lp).connect(g).connect(c.destination);
+      o.start(t); lfo.start(t); o.stop(t + dur); lfo.stop(t + dur);
+      t += dur;
+    }
+  }
+  function crickets() { for (let i = 0; i < 6; i++) tone(4200 + rnd(300), 0.04, 0.012, 'sine', i * 0.09); }
+  let ambientOn = false;
+  function startAmbient() {
+    if (ambientOn) return;
+    ambientOn = true;
+    setInterval(() => {
+      if (S.muted || document.hidden || dead) return;
+      try {
+        const p = period();
+        if (p === 'night') { if (Math.random() < 0.25) crickets(); }
+        else if (p === 'evening' || p === 'friday') { if (Math.random() < 0.12) duduk(); }
+        else if (Math.random() < 0.15) hammer();
+      } catch { /* ignore */ }
+    }, 6000);
+  }
+  const onGesture = () => {
+    if (gestured) return;
+    gestured = true;
+    try { audio().resume(); } catch { /* ignore */ }
+    startAmbient();
+  };
+  document.addEventListener('pointerdown', onGesture);
+  document.addEventListener('keydown', onGesture);
 
   // ---------- render ----------
   const chat = $('#chat');
+  const els = new WeakMap();
   function push(m) {
     S.msgs.push(m);
-    render(m);
-    return m;
-  }
-  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  function render(m) {
-    const el = document.createElement('div');
-    if (m.kind === 'sep') { el.className = 'sep'; el.textContent = m.text; }
-    else if (m.kind === 'sys') { el.className = 'sys'; el.textContent = m.text; }
-    else {
-      el.className = `msg ${m.from}` + (m.legend ? ' legend' : '');
-      if (m.kind === 'text') el.textContent = m.text;
-      if (m.who && AR.CAST[m.who]) {
-        const c = AR.CAST[m.who], n = document.createElement('div');
-        n.className = 'who-name'; n.textContent = c.name; n.style.color = c.color;
-        el.prepend(n);
-      }
-      else if (m.kind === 'transfer') {
-        el.classList.add('transfer');
-        el.innerHTML = `<div>💸 Вам перевод</div><div class="sum">50 ₽</div><div>«${esc(m.text)}»</div>`;
-      } else if (m.kind === 'voice') {
-        el.innerHTML = `<div class="voice"><div class="play">▶</div><div class="wave">▂▃▅▂▇▃▂▅▆▃▂▅▃▇▂</div><div>0:${m.len}</div></div>`;
-        el.querySelector('.voice').onclick = () => (m.feast ? feast() : moo());
-      } else if (m.kind === 'photo') {
-        el.classList.add('photo');
-        el.innerHTML = `${esc(m.text)}${PHOTO}<div class="cap">платёжка.jpg</div>`;
-      } else if (m.kind === 'job') {
-        el.textContent = m.text;
-        if (!m.answered) {
-          const b = document.createElement('div'); b.className = 'job-btns';
-          b.innerHTML = '<button>Ладно, сделаю</button><button>Нет, сначала деньги</button>';
-          const [yes, no] = b.querySelectorAll('button');
-          yes.onclick = () => answerJob(m, true, b);
-          no.onclick = () => answerJob(m, false, b);
-          el.appendChild(b);
-        }
-      }
-      const meta = document.createElement('div');
-      meta.className = 'meta';
-      meta.textContent = m.time + (m.from === 'me' ? ' ✓✓' : '');
-      el.appendChild(meta);
-    }
+    const el = build(m);
+    els.set(m, el);
     chat.appendChild(el);
     chat.scrollTop = chat.scrollHeight;
+    return m;
+  }
+  function rerender(m) {
+    const old = els.get(m);
+    if (!old) return;
+    const el = build(m);
+    els.set(m, el);
+    old.replaceWith(el);
+  }
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function build(m) {
+    const el = document.createElement('div');
+    if (m.kind === 'sep') { el.className = 'sep'; el.textContent = m.text; return el; }
+    if (m.kind === 'sys') { el.className = 'sys' + (m.unread ? ' unread' : ''); el.textContent = m.text; return el; }
+
+    el.className = `msg ${m.from}` + (m.legend ? ' legend' : '');
+    if (m.who && AR.CAST[m.who]) {
+      const c = AR.CAST[m.who], n = document.createElement('div');
+      n.className = 'who-name'; n.textContent = c.name; n.style.color = c.color;
+      el.appendChild(n);
+    }
+    const body = document.createElement('div');
+    el.appendChild(body);
+    if (m.deleted) {
+      el.classList.add('deleted');
+      body.textContent = '🚫 Сообщение удалено';
+    } else if (m.kind === 'text') {
+      body.textContent = m.text;
+    } else if (m.kind === 'transfer') {
+      el.classList.add('transfer');
+      body.innerHTML = `<div>💸 Вам перевод</div><div class="sum">50 ₽</div><div>«${esc(m.text)}»</div>`;
+    } else if (m.kind === 'voice') {
+      body.innerHTML = `<div class="voice"><div class="play">▶</div><div class="wave">▂▃▅▂▇▃▂▅▆▃▂▅▃▇▂</div><div>0:${m.len}</div></div>`;
+      body.querySelector('.voice').onclick = () => (m.feast ? feast() : Math.random() < 0.5 ? alikVoice() : moo());
+    } else if (m.kind === 'photo') {
+      el.classList.add('photo');
+      body.innerHTML = `${esc(m.text)}${PHOTO}<div class="cap">платёжка.jpg</div>`;
+    } else if (m.kind === 'sticker') {
+      el.classList.add('sticker');
+      body.innerHTML = `<div class="st-e">${m.e}</div><div class="st-c">${esc(m.c)}</div>`;
+    } else if (m.kind === 'fwd') {
+      el.classList.add('fwd');
+      body.innerHTML = `<div class="fwd-from">↪ Переслано от: ${esc(m.f)}</div><div>${esc(m.text)}</div>`;
+    } else if (m.kind === 'job') {
+      body.textContent = m.text;
+      if (!m.answered) {
+        const b = document.createElement('div'); b.className = 'job-btns';
+        b.innerHTML = '<button>Ладно, сделаю</button><button>Нет, сначала деньги</button>';
+        const [yes, no] = b.querySelectorAll('button');
+        yes.onclick = () => answerJob(m, true, b);
+        no.onclick = () => answerJob(m, false, b);
+        body.appendChild(b);
+      }
+    }
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = (m.edited ? 'изменено ' : '') + m.time + (m.from === 'me' ? ' ✓✓' : '');
+    el.appendChild(meta);
+    if (m.react) {
+      const r = document.createElement('div');
+      r.className = 'react'; r.textContent = m.react;
+      el.appendChild(r);
+    }
+    return el;
   }
 
   const PHOTO = `<svg viewBox="0 0 220 150" xmlns="http://www.w3.org/2000/svg">
@@ -287,6 +401,9 @@
     $('#gameDate').textContent = dateOf(S.day).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
     $('#clock').textContent = fmtTime(S.clock);
     $('#muteBtn').textContent = S.muted ? '🔇' : '🔊';
+    const bat = $('#bat');
+    bat.textContent = `${S.battery}% ${S.battery <= 15 ? '🪫' : '🔋'}`;
+    bat.classList.toggle('low', S.battery <= 15);
     const av = $('#avatar');
     av.textContent = S.ram ? '🐏' : 'А';
     av.classList.toggle('ram', S.ram);
@@ -294,6 +411,12 @@
   }
   function setStatus(text, cls = '') {
     const s = $('#status'); s.textContent = text; s.className = 'status ' + cls;
+  }
+  // статус «после ответа»: ночью — «был(а) в 03:14»
+  function restStatus() {
+    if (S.offlineDays > 0) setStatus('был давно');
+    else if (isNight()) setStatus(`был(а) в ${realHHMM()}`);
+    else setStatus(Math.random() < 0.5 ? 'был недавно' : 'в сети', 'online');
   }
 
   let toastT;
@@ -307,6 +430,59 @@
     toastT = setTimeout(() => t.classList.add('hidden'), 2600);
   }
   const mood = (d) => { S.mood = Math.max(0, Math.min(10, S.mood + d)); };
+
+  // ---------- уведомления телефона ----------
+  let notifT;
+  function notify(icon, app, text) {
+    const n = $('#notif');
+    n.innerHTML = `<div class="n-icon">${icon}</div><div class="n-body"><div class="n-head"><b>${esc(app)}</b><span>сейчас</span></div><div>${esc(text)}</div></div>`;
+    n.classList.remove('hidden');
+    n.classList.remove('show'); void n.offsetWidth; n.classList.add('show');
+    clearTimeout(notifT);
+    notifT = setTimeout(() => n.classList.remove('show'), 4200 * Math.max(SPEED, 0.3));
+    vibrate(30);
+  }
+  function randomNotif() {
+    const [icon, app, t] = draw('NOTIF', L.NOTIF);
+    let text = t;
+    if (typeof t === 'function') {
+      const spend = 90 + rnd(40) * 10;
+      S.money = Math.max(0, S.money - spend);
+      text = t({ spend, what: draw('SPEND', L.SPEND), money: S.money });
+    }
+    notify(icon, app, text);
+  }
+
+  // ---------- батарея ----------
+  function drain(n = 1) {
+    if (dead) return;
+    const before = S.battery;
+    S.battery = Math.max(0, S.battery - n);
+    if (before > 15 && S.battery <= 15) notify('🪫', 'Система', `Низкий заряд батареи: ${S.battery}%`);
+    renderHud();
+    if (S.battery === 0) die();
+  }
+  function die() {
+    dead = true;
+    clearTimeout(idleT); clearTimeout(statusT);
+    unlock('dead');
+    save();
+    $('#deadScreen').classList.remove('hidden');
+    $('#deadScreen').innerHTML = '<div class="dead-in"><div class="dead-icon">🔌</div><div>Телефон сел</div><button id="chargeBtn">Поставить на зарядку</button></div>';
+    $('#chargeBtn').onclick = charge;
+  }
+  async function charge() {
+    const ds = $('#deadScreen');
+    ds.innerHTML = '<div class="dead-in"><div class="dead-icon">⚡</div><div id="chg">1%</div></div>';
+    for (let p = 1; p <= 100; p += 9) { $('#chg').textContent = p + '%'; await sleep(120); }
+    S.battery = 100;
+    ds.classList.add('hidden');
+    dead = false;
+    setBusy(false);
+    renderHud();
+    await awayBurst(2 + rnd(3), 1 + rnd(2), 'Пока телефон заряжался');
+    armIdle(); armStatus();
+  }
 
   // ---------- выбор реплик игрока ----------
   // Опция: { text, tone, act?, arg?, scene?, go? }
@@ -322,6 +498,7 @@
     const ctx = S.ctx || {};
     const P = (k, map) => pickFresh(() => fill(draw(k, D[k]), map || {}), playerDecor);
     const P2 = (a, b) => pickFresh(() => `${draw(a, D[a])} ${draw(b, D[b])}`, playerDecor);
+    const PL = (key, arr) => pickFresh(() => draw(key, arr), playerDecor);
     const out = [];
     const add = (o) => out.length < 2 && out.push(o);
 
@@ -331,6 +508,11 @@
     if (ctx.type === 'transfer') add({ text: P('P_TRANSFER'), tone: 'neutral', act: 'transferQ' });
     if (ctx.type === 'readonly') add({ text: P('P_PING'), tone: 'neutral', act: 'ping' });
     if (ctx.type === 'short') add({ text: P('P_SHORT', { s: ctx.s.replace(/[.!…,].*$/, '') }), tone: 'neutral', act: 'shortQ', arg: ctx.s });
+    if (ctx.type === 'idle') add({ text: PL('IDLE_Q', L.IDLE_Q), tone: 'polite', act: 'idleReply' });
+    if (ctx.type === 'sticker') add({ text: PL('STICKER_Q', L.STICKER_Q), tone: 'neutral', act: 'stickerQ' });
+    if (ctx.type === 'fwd') add({ text: PL('FWD_Q', L.FWD_Q), tone: 'neutral', act: 'fwdQ' });
+    if (ctx.type === 'reactOnly') add({ text: PL('REACT_Q', L.REACT_Q), tone: 'neutral', act: 'reactQ' });
+    if (ctx.deleted) add({ text: PL('DEL_Q', L.DEL_Q), tone: 'neutral', act: 'deletedQ' });
     if (ctx.legendary) add({ text: P('P_LEGEND'), tone: 'polite', act: 'legendQ' });
     if (ctx.when) add({ text: P('P_WHEN', { t: ctx.when, T: cap(ctx.when) }), tone: 'neutral', act: 'promiseCheck', arg: ctx.when });
     if (ctx.rel) {
@@ -343,7 +525,6 @@
       const i = S.promises.indexOf(late[rnd(late.length)]);
       add({ text: P('P_PREV', { t: S.promises[i].t, date: fmtDate(S.promises[i].made) }), tone: 'neutral', act: 'prev', arg: i });
     }
-    const PL = (key, arr) => pickFresh(() => draw(key, arr), playerDecor);
     if (ctx.group) add({ text: PL('GQ', ['Алик, я всё видел.', 'Алик, что это было?!', 'Я там всё прочитал.', '«Пусть закаляется»?!', 'Алик, это был семейный чат?']), tone: 'neutral', act: 'group' });
     if (ctx.wrong) add({ text: PL('WQ', AR.WRONG_Q), tone: 'neutral', act: 'wrong' });
     const arcId = ctx.arc || (Math.random() < 0.2 && Object.keys(S.arcs).find((id) => S.arcs[id].i < AR.ARCS[id].eps.length));
@@ -385,23 +566,43 @@
   }
 
   async function send(opt) {
-    if (busy || !opt.text.trim()) return;
+    if (busy || dead || !opt.text.trim()) return;
     setBusy(true);
+    clearTimeout(idleT);
+    idleCount = 0;
+    clearUnread();
     const tone = opt.tone || classify(opt.text);
     tick(1 + rnd(5));
-    push({ from: 'me', kind: 'text', text: opt.text, time: fmtTime(S.clock) });
+    const mine = push({ from: 'me', kind: 'text', text: opt.text, time: fmtTime(S.clock) });
     markSeen(opt.text);
     S.stats.sent++;
     unlock('first');
+    if (isNight()) unlock('nightowl');
     if (tone === 'polite') { if (++S.politeStreak >= 10) unlock('saint'); } else S.politeStreak = 0;
-    if (tone === 'rude' && !opt.scene) unlock('rude');
+    if (tone === 'rude' && !opt.scene) { unlock('rude'); shake(); }
     if (tone === 'cow') unlock('cow');
     S.choices = null;
+    drain(1);
     renderHud(); save();
+    if (dead) return;
 
-    await sleep(500 + rnd(700));
+    await sleep((500 + rnd(700)) * (isNight() ? 2 : 1));
     setStatus('прочитано');
-    if (opt.scene) {
+
+    // реакция на сообщение игрока; иногда — вместо ответа
+    let reactOnly = false;
+    if (!opt.scene && Math.random() < 0.18) {
+      await sleep(600);
+      mine.react = draw('R_' + tone, L.REACT[tone] || L.REACT.neutral);
+      rerender(mine);
+      vibrate(20);
+      reactOnly = !opt.act && tone !== 'rude' && !S.scene && Math.random() < 0.3;
+    }
+
+    if (reactOnly) {
+      unlock('react');
+      S.ctx = { type: 'reactOnly' };
+    } else if (opt.scene) {
       await enterNode(opt.scene, opt.go);
     } else if (S.scene) {
       // свой текст посреди сцены — сцена прерывается
@@ -429,12 +630,19 @@
       push({ kind: 'sys', text: 'Алик Воздухонесян сменил фото профиля' });
       unlock('ram');
     }
+    if (Math.random() < 0.12) randomNotif();
     renderHud(); save();
-    if (S.offlineDays > 0) setStatus('был давно');
-    else setStatus(Math.random() < 0.5 ? 'был недавно' : 'в сети', 'online');
+    restStatus();
     setBusy(false);
     renderChoices();
     save();
+    armIdle();
+  }
+
+  function shake() {
+    const p = $('.phone');
+    p.classList.remove('shake'); void p.offsetWidth; p.classList.add('shake');
+    vibrate([80, 40, 80]);
   }
 
   function recordPromise(p) {
@@ -442,6 +650,8 @@
     S.promises.push({ t: p.text, made: S.day, due: p.d == null ? null : S.day + p.d });
     if (S.promises.length >= 20) unlock('promises20');
   }
+
+  const pair = (ka, a, kb, b) => uniq(() => `${draw(ka, a)} ${draw(kb, b)}`);
 
   // Ответы на контекстные реплики
   async function contextual(act, arg) {
@@ -477,14 +687,21 @@
       case 'arc': {
         const st = S.arcs[arg];
         if (st && st.i < AR.ARCS[arg].eps.length) return playArc(arg);
-        await say([uniq(() => `${draw('NN_A', AR.NO_NEWS_A)} ${draw('NN_B', AR.NO_NEWS_B)}`)]);
+        await say([pair('NN_A', AR.NO_NEWS_A, 'NN_B', AR.NO_NEWS_B)]);
         S.ctx = null;
         return;
       }
-      case 'group': mood(-1); await say([uniq(() => `${draw('GS_A', AR.GROUP_SEEN_A)} ${draw('GS_B', AR.GROUP_SEEN_B)}`)]); S.ctx = null; return;
-      case 'wrong': await say([uniq(() => `${draw('WA', AR.WRONG_A)} ${draw('WB', AR.WRONG_B)}`)]); S.ctx = null; return;
+      case 'group': mood(-1); await say([pair('GS_A', AR.GROUP_SEEN_A, 'GS_B', AR.GROUP_SEEN_B)]); S.ctx = null; return;
+      case 'wrong': await say([pair('WA', AR.WRONG_A, 'WB', AR.WRONG_B)]); S.ctx = null; return;
       case 'prev': {
-        if (S.promises[arg]) S.promises[arg].asked = true; const r = uniq(X.prev); recordPromise(r.p); await say([r.text]); S.ctx = { when: r.p.t }; return; }
+        if (S.promises[arg]) S.promises[arg].asked = true;
+        const r = uniq(X.prev); recordPromise(r.p); await say([r.text]); S.ctx = { when: r.p.t }; return;
+      }
+      case 'idleReply': S.ctx = null; await say([uniq(() => draw('IDLE_A', L.IDLE_A))]); await promiseLine(); return;
+      case 'stickerQ': S.ctx = null; await say([uniq(() => draw('STICKER_A', L.STICKER_A))]); return;
+      case 'fwdQ': S.ctx = null; await say([uniq(() => draw('FWD_A', L.FWD_A))]); return;
+      case 'reactQ': S.ctx = null; await say([uniq(() => draw('REACT_A', L.REACT_A))]); await promiseLine(); return;
+      case 'deletedQ': S.ctx = null; await say([uniq(() => draw('DEL_A', L.DEL_A))]); return;
     }
   }
 
@@ -565,8 +782,44 @@
     S.ctx = { wrong: true };
   }
 
+  // Стикер, пересылка, удалённое сообщение
+  async function sticker() {
+    await typing(900, 'выбирает стикер…');
+    const s = draw('STICKERS', L.STICKERS);
+    alikMsg({ kind: 'sticker', e: s.e, c: s.c });
+    unlock('sticker');
+    S.ctx = { type: 'sticker' };
+  }
+  async function forward() {
+    await typing(700);
+    const f = pickFresh(() => draw('FWD', L.FWD), (x) => x);
+    markSeen(f.t);
+    alikMsg({ kind: 'fwd', f: f.f, text: f.t });
+    unlock('fwd');
+    if (Math.random() < 0.5) await say([uniq(() => draw('FWD_NOTE', L.FWD_NOTE))]);
+    S.ctx = { type: 'fwd' };
+  }
+  async function deletedMsg() {
+    await typing(700);
+    const m = alikMsg({ kind: 'text', text: pickFresh(() => draw('DELETED', L.DELETED), (x) => x) });
+    markSeen(m.text);
+    await sleep(1300);
+    m.deleted = true;
+    rerender(m);
+    unlock('deleted');
+    S.ctx = { ...(S.ctx || {}), deleted: true };
+  }
+
   async function closingLine() {
     await say([uniq(X.short)]);
+  }
+
+  // Реплика по времени суток (реальному)
+  async function periodLine() {
+    const p = period();
+    if (p === 'day' || !L.PERIOD[p]) return;
+    await say([addrLine('PER_' + p, L.PERIOD[p])]);
+    if (p === 'friday' && Math.random() < 0.5) feast();
   }
 
   async function alikTurn(tone) {
@@ -583,6 +836,10 @@
 
     if (tone === 'rude') {
       mood(-2);
+      if (Math.random() < 0.3) {
+        await typing(900, 'выбирает стикер…');
+        alikMsg({ kind: 'sticker', e: '🏠🔥', c: 'Всё горит' });
+      }
       await say([uniq(X.offended)]);
       S.offlineDays = Math.max(2, 3 + rnd(8) - Math.floor(S.mood / 3));
       setStatus('был давно');
@@ -599,23 +856,29 @@
       return;
     }
 
+    if (Math.random() < 0.22) await periodLine();
+
     const r = Math.random();
     const trChance = 0.02 + S.mood * 0.006;
     const arc = S.stats.sent >= 2 ? nextArc() : null;
     let c = 0;
     const at = (p) => r < (c += p);
-    if (S.stats.sent >= 3 && at(0.14)) {
+    if (S.stats.sent >= 3 && at(0.13)) {
       const sid = draw('SCENES', Object.keys(SC));
       await enterNode(sid, SC[sid].start);
-    } else if (arc && at(0.16)) {
+    } else if (arc && at(0.15)) {
       await playArc(arc);
     } else if (S.stats.sent >= 8 && at(0.03)) {
       await groupChat();
     } else if (S.stats.sent >= 5 && at(0.035)) {
       await wrongChat();
+    } else if (at(0.04)) {
+      await sticker();
+    } else if (at(0.04)) {
+      await forward();
     } else if (at(trChance)) {
       await transfer();
-    } else if (at(0.07)) {
+    } else if (at(0.06)) {
       const text = uniq(() => draw('JOBS', D.JOBS));
       await typing(text.length * 20);
       alikMsg({ kind: 'job', text });
@@ -625,7 +888,7 @@
       S.ctx = { type: 'photo' };
     } else if (at(0.04)) {
       await typing(3000, 'записывает голосовое…');
-      alikMsg({ kind: 'voice', len: 10 + rnd(50), feast: Math.random() < 0.3 });
+      alikMsg({ kind: 'voice', len: 10 + rnd(50), feast: period() === 'friday' || Math.random() < 0.25 });
       S.ctx = { type: 'voice' };
     } else if (at(0.06)) {
       const s = uniq(X.short);
@@ -636,14 +899,35 @@
       const ex = uniq(() => X.excuse({ preferLong: S.politeStreak >= 3 }));
       if (ex.legendary) unlock('legend');
       recordPromise(ex.p);
-      await say(ex.texts, ex.legendary);
+      const msgs = await say(ex.texts, ex.legendary);
       S.ctx = { when: ex.p && ex.p.t, rel: ex.r, constr: ex.constr, legendary: ex.legendary };
+      if (Math.random() < 0.09) await editLast(msgs[msgs.length - 1], ex.p);
     }
+    if (Math.random() < 0.04) await deletedMsg();
+  }
+
+  // Правка: «переведу завтра» → «переведу завтрашней весной»
+  async function editLast(m, p) {
+    if (!m || m.kind !== 'text') return;
+    await sleep(1800);
+    const w = draw('EDIT_WHEN', L.EDIT_WHEN);
+    if (p && m.text.includes(p.t)) {
+      m.text = m.text.replace(p.t, w);
+      const rec = S.promises[S.promises.length - 1];
+      if (rec && rec.t.includes(p.t)) { rec.t = rec.t.replace(p.t, w); rec.due = null; }
+      S.ctx = { ...S.ctx, when: w };
+    } else {
+      m.text = m.text.replace(/[.!]?$/, draw('EDIT_SUFFIX', L.EDIT_SUFFIX) + '.');
+    }
+    m.edited = true;
+    rerender(m);
+    unlock('edited');
   }
 
   async function transfer() {
     await typing(1200);
     S.debt -= 50;
+    S.money += 50;
     if (++S.stats.fifty >= 5) unlock('fifty5');
     alikMsg({ kind: 'transfer', text: draw('TRANSFER_NOTE', D.TRANSFER_NOTE) });
     S.ctx = { type: 'transfer' };
@@ -655,7 +939,7 @@
     bubble.innerHTML = '<span></span><span></span><span></span>';
     const show = () => { setStatus(label, 'typing'); chat.appendChild(bubble); chat.scrollTop = chat.scrollHeight; };
     const hide = () => { bubble.remove(); setStatus('в сети', 'online'); };
-    ms = Math.min(5000, Math.max(800, ms));
+    ms = Math.min(5000, Math.max(800, ms)) * (isNight() ? 1.5 : 1);
     show();
     if (Math.random() < 0.2) {
       await sleep(ms * 0.6); hide(); await sleep(1000 + rnd(1200)); show();
@@ -664,30 +948,62 @@
     hide();
   }
 
-  // texts: строки (от Алика или who) или { w, t } — от другого участника
+  // Опечатка или автозамена: { text, fix } или null
+  function typo(text) {
+    const auto = shuffle(L.AUTO.slice()).find(([w]) => new RegExp(`(^|[^а-яё])${w}([^а-яё]|$)`, 'i').test(text));
+    if (auto && Math.random() < 0.7) {
+      const [w, bad] = auto;
+      let orig = w, badCased = bad;
+      const out = text.replace(new RegExp(`(^|[^а-яё])(${w})(?=[^а-яё]|$)`, 'i'), (_, pre, word) => {
+        const upper = word[0] !== word[0].toLowerCase();
+        orig = upper ? cap(w) : w; badCased = upper ? cap(bad) : bad;
+        return pre + badCased;
+      });
+      return { text: out, fix: draw('FIX', L.FIX_FMT).replace('{w}', orig).replace('{b}', badCased) };
+    }
+    const words = text.match(/[а-яё]{6,}/gi);
+    if (!words) return null;
+    const w = words[rnd(words.length)], i = 1 + rnd(w.length - 3);
+    const bad = w.slice(0, i) + w[i + 1] + w[i] + w.slice(i + 2);
+    return { text: text.replace(w, bad), fix: draw('FIX', L.FIX_FMT).replace('{w}', w).replace('{b}', bad) };
+  }
+
+  // texts: строки (от Алика или who) или { w, t } — от другого участника. Возвращает сообщения.
   async function say(texts, legend = false, who) {
+    const out = [];
     for (const x of texts) {
-      const text = typeof x === 'string' ? x : x.t;
+      let text = typeof x === 'string' ? x : x.t;
+      const from = typeof x === 'string' ? who : x.w;
+      let fix = null;
+      if (!from && Math.random() < (isNight() ? 0.2 : 0.06)) {
+        const t = typo(text);
+        if (t) ({ text, fix } = t);
+      }
       await typing(600 + text.length * 22);
-      alikMsg({ kind: 'text', text, legend, who: typeof x === 'string' ? who : x.w });
+      out.push(alikMsg({ kind: 'text', text, legend, who: from }));
+      if (fix) { await typing(500); alikMsg({ kind: 'text', text: fix }); unlock('typo'); }
       await sleep(250);
     }
+    return out;
   }
 
   function alikMsg(m) {
     tick(1 + rnd(3));
-    push({ from: 'alik', time: fmtTime(S.clock), ...m });
+    const msg = push({ from: 'alik', time: fmtTime(S.clock), ...m });
     if (m.kind === 'text' && /брат джан/i.test(m.text)) unlock('brat');
     beep();
+    vibrate(40);
     if (Math.random() < mooChance()) setTimeout(moo, 300 + rnd(900));
     renderHud();
+    return msg;
   }
 
   async function answerJob(m, yes, btns) {
-    if (busy || m.answered) return;
+    if (busy || dead || m.answered) return;
     m.answered = true;
     btns.remove();
     setBusy(true);
+    clearTimeout(idleT);
     const reply = pickFresh(() => (yes
       ? draw('JY', ['Ладно, сделаю', 'Хорошо, сделаю', 'Ну ладно…', 'Сделаю. Но это последний раз.', 'Ладно. Ради тёти.', 'Эх… Хорошо.'])
       : draw('JN', ['Нет, сначала деньги', 'Сначала оплата, Алик', 'Нет. Хватит.', 'Не-а. Деньги вперёд.', 'Алик, нет.'])), playerDecor);
@@ -709,7 +1025,114 @@
     renderHud(); save();
     setBusy(false);
     renderChoices();
+    armIdle();
   }
+
+  // ---------- Алик живёт сам: пишет первым, меняет статус ----------
+  let idleT, statusT, idleCount = 0;
+  function armIdle() {
+    clearTimeout(idleT);
+    if (dead || idleCount >= 3) return;
+    idleT = setTimeout(onIdle, (20000 + rnd(40000)) * (idleCount + 1) * SPEED);
+  }
+  async function onIdle() {
+    if (busy || dead || document.hidden || !$('#sheet').classList.contains('hidden')) return armIdle();
+    idleCount++;
+    setBusy(true);
+    drain(1);
+    if (!dead) {
+      await idleAction();
+      S.choices = null;
+      save();
+    }
+    setBusy(false);
+    if (!dead) { restStatus(); renderChoices(); armIdle(); }
+  }
+  async function idleAction() {
+    const r = Math.random();
+    if (S.offlineDays > 0 || r < 0.15) { randomNotif(); return; }
+    await sleep(300);
+    if (r < 0.5) {
+      const text = addrLine('IDLE', L.IDLE);
+      await say([text]);
+      unlock('idle');
+      S.ctx = { type: 'idle' };
+    } else if (r < 0.62) await sticker();
+    else if (r < 0.76) await forward();
+    else if (r < 0.86) { S.ctx = null; await deletedMsg(); }
+    else if (r < 0.94) {
+      await typing(3000, 'записывает голосовое…');
+      alikMsg({ kind: 'voice', len: 10 + rnd(50), feast: period() === 'friday' });
+      S.ctx = { type: 'voice' };
+    } else await periodLine();
+  }
+  function armStatus() {
+    clearTimeout(statusT);
+    if (dead) return;
+    statusT = setTimeout(async () => {
+      if (!busy && !dead && S.offlineDays === 0 && !document.hidden) {
+        const r = Math.random();
+        if (r < 0.2) {
+          // «печатает…» — и ничего не приходит
+          const b = document.createElement('div');
+          b.className = 'typing-bubble'; b.innerHTML = '<span></span><span></span><span></span>';
+          setStatus('печатает…', 'typing'); chat.appendChild(b); chat.scrollTop = chat.scrollHeight;
+          await sleep(1500 + rnd(2500));
+          b.remove();
+          if (!busy) setStatus('в сети', 'online');
+        } else if (isNight()) setStatus(`был(а) в ${realHHMM()}`);
+        else setStatus(draw('WANDER', ['в сети', 'был(а) только что', 'был недавно', 'в сети', 'был(а) 5 минут назад']), 'online');
+      }
+      armStatus();
+    }, (7000 + rnd(9000)) * SPEED);
+  }
+
+  // ---------- возвращение после паузы: непрочитанные ----------
+  let unread = 0;
+  function clearUnread() {
+    unread = 0;
+    document.title = 'Алик, где деньги?';
+  }
+  // Сообщения, которые «пришли, пока тебя не было» — без печатания, пачкой
+  function awayMsg() {
+    const r = Math.random();
+    tick(20 + rnd(200));
+    const base = { from: 'alik', time: fmtTime(S.clock) };
+    if (r < 0.35) return push({ ...base, kind: 'text', text: addrLine('IDLE', L.IDLE) });
+    if (r < 0.5) { const s = draw('STICKERS', L.STICKERS); return push({ ...base, kind: 'sticker', e: s.e, c: s.c }); }
+    if (r < 0.65) { const f = pickFresh(() => draw('FWD', L.FWD), (x) => x); markSeen(f.t); return push({ ...base, kind: 'fwd', f: f.f, text: f.t }); }
+    if (r < 0.75) return push({ ...base, kind: 'text', text: '', deleted: true });
+    if (r < 0.85) return push({ ...base, kind: 'voice', len: 10 + rnd(50) });
+    if (r < 0.92) { S.debt -= 50; S.money += 50; S.stats.fifty++; return push({ ...base, kind: 'transfer', text: draw('TRANSFER_NOTE', D.TRANSFER_NOTE) }); }
+    const ex = uniq(() => X.excuse());
+    recordPromise(ex.p);
+    return push({ ...base, kind: 'text', text: ex.texts.join(' ') });
+  }
+  async function awayBurst(n, days, why) {
+    nextDay(days);
+    push({ kind: 'sys', text: `${why ? why + ' — ' : ''}непрочитанные сообщения`, unread: true });
+    for (let i = 0; i < n; i++) awayMsg();
+    unread = n;
+    document.title = `(${n}) Алик, где деньги?`;
+    unlock('away');
+    notify('💬', 'Алик Воздухонесян', `${n} ${n < 5 ? 'новых сообщения' : 'новых сообщений'}`);
+    beep();
+    S.ctx = { type: 'idle' };
+    S.choices = null;
+    renderHud(); renderChoices(); save();
+  }
+  function checkAway() {
+    const gapMin = AWAY ?? (S.lastSeen ? (Date.now() - S.lastSeen) / 60000 : 0);
+    if (gapMin < 15 || !S.stats.sent) return;
+    if (gapMin > 120) S.battery = 100; // телефон заряжался
+    awayBurst(Math.min(5, 1 + Math.floor(gapMin / 30)), Math.min(10, 1 + Math.floor(gapMin / 120)));
+  }
+  let hiddenAt = 0;
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { hiddenAt = Date.now(); save(); return; }
+    const gapMin = (Date.now() - hiddenAt) / 60000;
+    if (hiddenAt && gapMin >= 3 && !busy && !dead && S.stats.sent) awayBurst(Math.min(4, 1 + Math.floor(gapMin / 10)), 1);
+  });
 
   // ---------- sheet ----------
   function openSheet() {
@@ -767,14 +1190,20 @@
   $('#infoBtn').onclick = openSheet;
   $('#closeSheet').onclick = () => $('#sheet').classList.add('hidden');
   $('#sheet').onclick = (e) => { if (e.target.id === 'sheet') $('#sheet').classList.add('hidden'); };
+  $('#notif').onclick = () => $('#notif').classList.remove('show');
   $('#resetBtn').onclick = () => {
     if (!confirm('Стереть всё и начать заново?')) return;
     try { localStorage.removeItem(SAVE_KEY); } catch { /* ignore */ }
     location.reload();
   };
 
-  if (!S.msgs.length) { seed(); save(); } else S.msgs.forEach(render);
+  if (!S.msgs.length) { seed(); save(); } else S.msgs.forEach((m) => { const el = build(m); els.set(m, el); chat.appendChild(el); });
+  chat.scrollTop = chat.scrollHeight;
   renderHud();
+  checkAway();
   renderChoices();
-  window.__alik = { S, moo, SC }; // для отладки
+  restStatus();
+  if (S.battery === 0) die(); else { armIdle(); armStatus(); }
+  save();
+  window.__alik = { S, moo, SC, notify, awayBurst }; // для отладки
 })();

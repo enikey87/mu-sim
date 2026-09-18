@@ -176,3 +176,50 @@ body {
   transition: opacity .3s; white-space: nowrap;
 }
 .hidden { display: none !important; }
+
+/* ---- живость ---- */
+#bat.low { color: var(--danger); }
+.msg.deleted { font-style: italic; color: var(--muted); }
+.msg .react {
+  position: absolute; bottom: -10px; left: -6px; background: var(--panel); border-radius: 12px;
+  padding: 0 5px; font-size: 14px; box-shadow: 0 1px 3px rgba(0, 0, 0, .2); animation: pop .25s ease-out;
+}
+.msg.me:has(.react) { margin-bottom: 10px; }
+.msg.sticker { background: none !important; box-shadow: none; text-align: center; padding: 0; }
+.st-e { font-size: 64px; line-height: 1.1; }
+.st-c {
+  display: inline-block; font-size: 12px; font-weight: 800; background: #fff; color: #222;
+  border: 2px solid #222; border-radius: 10px; padding: 1px 8px; transform: rotate(-3deg);
+}
+.fwd-from { font-size: 12px; color: var(--accent); margin-bottom: 3px; font-weight: 600; }
+.msg.fwd { border-left: 3px solid var(--accent); }
+.sys.unread { background: var(--accent); }
+.notif {
+  position: absolute; left: 8px; right: 8px; top: 6px; z-index: 30; display: flex; gap: 10px;
+  background: rgba(245, 245, 247, .96); color: #111; border-radius: 16px; padding: 10px 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .25); font-size: 13px; cursor: pointer;
+  transform: translateY(-130%); transition: transform .35s ease;
+}
+@media (prefers-color-scheme: dark) { .notif { background: rgba(40, 44, 52, .96); color: #eee; } }
+.notif.show { transform: translateY(0); }
+.n-icon { font-size: 24px; }
+.n-body { flex: 1; min-width: 0; }
+.n-head { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 2px; }
+.n-head span { color: var(--muted); }
+.dead {
+  position: absolute; inset: 0; z-index: 40; background: #000; color: #ccc;
+  display: flex; align-items: center; justify-content: center; text-align: center;
+}
+.dead-in { display: flex; flex-direction: column; gap: 14px; align-items: center; font-size: 16px; }
+.dead-icon { font-size: 56px; }
+.dead button {
+  border: 0; border-radius: 12px; padding: 10px 16px; background: var(--accent); color: #fff; font: inherit; cursor: pointer;
+}
+.phone.shake { animation: shake .45s; }
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px) rotate(-1deg); }
+  40% { transform: translateX(8px) rotate(1deg); }
+  60% { transform: translateX(-6px); }
+  80% { transform: translateX(5px); }
+}

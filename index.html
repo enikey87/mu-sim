@@ -9,7 +9,7 @@
 </head>
 <body>
   <div class="phone">
-    <div class="statusbar"><span id="clock">09:41</span><span id="gameDate"></span><span>📶 🔋</span></div>
+    <div class="statusbar"><span id="clock">09:41</span><span id="gameDate"></span><span>📶 <span id="bat">100% 🔋</span></span></div>
 
     <header class="chat-head">
       <div class="avatar" id="avatar">А</div>
@@ -54,11 +54,14 @@
     </div>
 
     <div class="toast hidden" id="toast"></div>
+    <div class="notif" id="notif"></div>
+    <div class="dead hidden" id="deadScreen"></div>
   </div>
 
   <script src="src/excuses.js"></script>
   <script src="src/scenes.js"></script>
   <script src="src/arcs.js"></script>
+  <script src="src/life.js"></script>
   <script src="src/game.js"></script>
 </body>
 </html>
