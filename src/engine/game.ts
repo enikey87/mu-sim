@@ -269,6 +269,10 @@ export class Game {
     return periodOf(this.realHour(), dateOf(this.S.day).getDay())
   }
   isNight = (): boolean => this.period() === 'night'
+  /** Время суток игрока в минутах: новый день переписки начинается «сейчас». */
+  realMinutes(): number {
+    return this.realHour() * 60 + new Date(this.clock.now()).getMinutes()
+  }
   realHHMM(): string {
     const d = new Date(this.clock.now())
     return `${String(this.realHour()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
@@ -279,7 +283,7 @@ export class Game {
   }
   nextDay(n: number): void {
     this.S.day += n
-    this.S.clock = this.realHour() * 60 + new Date(this.clock.now()).getMinutes()
+    this.S.clock = this.realMinutes()
     this.push({ kind: 'sep', text: fmtDate(this.S.day) })
     const t = tierOf(this.S.day)
     if (t > this.S.tier) {
@@ -1273,7 +1277,8 @@ export class Game {
     this.push({ kind: 'text', from: 'me', time: '18:05', text: st.reply })
     this.sys(st.gap.replace('{d}', String(this.S.day)))
     this.push({ kind: 'sep', text: fmtDate(this.S.day) })
-    if (st.first) this.push({ kind: 'text', from: 'alik', time: '09:40', text: st.first })
+    this.S.clock = this.realMinutes()
+    if (st.first) this.push({ kind: 'text', from: 'alik', time: fmtTime(this.S.clock), text: st.first })
   }
 
   // для отображения
