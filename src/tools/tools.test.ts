@@ -26,7 +26,9 @@ const RARE = new Set(['Due_Cosmic', 'Tone_Cow', 'Says_catchLie_liekind_grandpa',
   // «Мууу» в симуляции без таймеров не звучит; пропажа Алика теперь короткая — редко совпадает с тишиной игрока
   'Opt_Cow', 'Idle_Offline', 'Says_catchLie_liekind_sent',
   // первый сериал обычно запускает ход Алика раньше сюжетного хода; пропажа Алика короткая
-  'Beat_FirstArc', 'Says_WhileOffline'])
+  'Beat_FirstArc', 'Says_WhileOffline',
+  // «толкни „Ниву“» — эпизод сериала «Нива», только пока она «не заводится»
+  'Quest_q_niva'])
 
 describe('покрытие правил', () => {
   it('за 10 партий (2 — с грубым игроком) срабатывают все правила, кроме заведомо редких', async () => {

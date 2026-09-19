@@ -1,6 +1,6 @@
 // Правила новых возможностей: выбор сцен, наступившие обещания, хор персонажей, состояния мира.
 import type { Game } from '../../engine/game'
-import { type Rule, type Facts, gte, lte, is, add, of } from '../../engine/rules'
+import { type Rule, type Facts, eq, gte, lte, is, add, of } from '../../engine/rules'
 import { CHORUS_LEGEND } from '../legends'
 import { PROMISE_DUE, PROMISE_DUE_COSMIC, PROMISE_DUE_KEPT, CHORUS, CHORUS_FED_UP, WEDDING_NOISE, BORIS_SICK, DEAD_KARINE, DEAD_ALIK } from '../world'
 
@@ -23,15 +23,21 @@ export const sceneRules: R[] = [
   scene('invoice', [gte('day', 215)]),
   scene('loan', [gte('day', 230)]),
   scene('deathbed', [gte('day', 240), lte('mood', 6)], 2), // умирать Алик начинает, когда дела плохи
-  { ...scene('heir', [gte('arc.grandpa', 4)], 3), once: true }, // наследство — один раз, после того как дедушка переписал завещание
+  { ...scene('heir', [gte('arc.grandpa', 4), gte('arc.boris', 1)], 3), once: true }, // «долг перешёл Борису» — когда Борис уже есть // наследство — один раз, после того как дедушка переписал завещание
 ]
 
 // ---- мини-квесты (PickQuest): свой слот в ходе Алика, каждый — один раз за игру ----
 // квест — один раз за игру: во второй раз та же история уже не смешная
 const quest = (id: string, when: R['when'] = []): R => ({ ...scene(id, when), name: `Quest_${id}`, event: 'PickQuest', once: true, cooldown: undefined })
+/** Условия квестов — общие для слота квестов и для запуска из разговора. */
+export const QUEST_WHEN: Record<string, R['when']> = {
+  q_niva: [eq('legend', 'niva_stuck')], // «толкни „Ниву“» — эпизод сериала «Нива», а не его повторная завязка
+  q_crypto: [gte('day', 200)],
+  q_witness: [gte('day', 210)],
+}
 export const questRules: R[] = [
-  quest('q_hash'), quest('q_niva'), quest('q_tamada'), quest('q_lottery'), quest('q_parking'),
-  quest('q_mama'), quest('q_crypto', [gte('day', 200)]), quest('q_photo'), quest('q_witness', [gte('day', 210)]), quest('q_goat'),
+  quest('q_hash'), quest('q_niva', QUEST_WHEN.q_niva), quest('q_tamada'), quest('q_lottery'), quest('q_parking'),
+  quest('q_mama'), quest('q_crypto', QUEST_WHEN.q_crypto), quest('q_photo'), quest('q_witness', QUEST_WHEN.q_witness), quest('q_goat'),
 ]
 
 // ---- обещание наступило (PromiseDue — отложенное событие на день срока) ----

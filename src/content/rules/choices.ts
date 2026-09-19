@@ -53,7 +53,7 @@ export const choiceRules: R[] = [
   // извиниться после грубости
   offer({ name: 'Sorry', when: [is('ctx.offended')], act: 'sorry', tone: 'polite', bonus: 5, text: (g) => fromD(g, 'P_SORRY') }),
   // лестница грубости: заблокирован — извиниться можно только через Бориса; ссора горячая — можно мычать
-  offer({ name: 'ViaBoris', when: [is('blocked')], act: 'viaBoris', tone: 'polite', bonus: 7, text: (g) => fromArr(g, 'P_VIA_BORIS', ['Борис, передай Алику: прости меня', 'Попросить Бориса передать извинения', 'Борис, скажи ему «бее» от меня. Мирное']) }),
+  offer({ name: 'ViaBoris', when: [is('blocked')], act: 'viaBoris', tone: 'polite', bonus: 7, text: (g) => fromArr(g, 'P_VIA_BORIS', ['Борис, передай Алику: прости меня', 'Попросить Бориса передать извинения', 'Борис, скажи ему «бее» от меня. Мирное', 'Карине, передайте Алику: я извиняюсь']) }),
   offer({ name: 'Moo', when: [is('ctx.offended'), gte('rude.heat', 1)], odds: 0.5, act: 'moo', tone: 'neutral', bonus: 4, text: (g) => fromArr(g, 'P_MOO', ['Мууу.', 'Мууууу 🐄', 'Му. (Это значит «мир».)']) }),
 
   // ответ на то, ЧТО прислал Алик
@@ -112,7 +112,8 @@ export const choiceRules: R[] = [
 
   // сериалы: про текущий — всегда, про любой незаконченный — иногда
   offer({
-    name: 'Arc', slot: 'arc', when: [exists('ctx.arc')], act: 'arc', tone: 'polite', bonus: 1,
+    // вопрос про сериал — только если он к чему-то приведёт (иначе «Как Нуне?» трижды подряд → «пока без новостей»)
+    name: 'Arc', slot: 'arc', when: [exists('ctx.arc'), is('ctx.arcCanAdvance')], act: 'arc', tone: 'polite', bonus: 1,
     text: (g, f) => fromArr(g, 'F_' + f['ctx.arc'], ARCS[String(f['ctx.arc'])].follow), arg: (_g, f) => String(f['ctx.arc']),
   }),
   offer({
