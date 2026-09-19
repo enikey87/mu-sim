@@ -10,7 +10,10 @@ export const MAX_PATIENCE = 5
 export const START_DAY = 184
 
 export type Tone = 'polite' | 'neutral' | 'rude' | 'threat' | 'cow'
-export type InputCategory = 'threat' | 'request' | 'apology' | 'gratitude' | 'greeting' | 'rude' | 'cow' | 'neutral'
+export type InputCategory =
+  | 'threat' | 'violent-threat' | 'intimidation'
+  | 'insult' | 'accusation' | 'anger' | 'rude'
+  | 'request' | 'apology' | 'gratitude' | 'greeting' | 'cow' | 'neutral'
 
 interface MsgBase { id: number; time?: string }
 export type Msg =

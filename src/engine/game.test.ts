@@ -65,6 +65,19 @@ describe('Game: начало и ход', () => {
     expect(game.S.mem['count.rude']).toBe(1)
     expect(game.S.mem['rude.heat']).toBe(1)
   })
+  it('насилие и запугивание из поля ввода не попадают в судебную ветку', async () => {
+    const violence = makeGame().game
+    await violence.send('Я тебя убью')
+    expect(violence.S.mem['count.violence']).toBe(1)
+    expect(violence.S.mem['rude.heat']).toBe(2)
+    expect(violence.S.mem.court).toBeUndefined()
+
+    const intimidation = makeGame().game
+    await intimidation.send('Знаю, где ты живёшь')
+    expect(intimidation.S.mem['count.intimidation']).toBe(1)
+    expect(intimidation.S.mem['rude.heat']).toBe(1)
+    expect(intimidation.S.mem.court).toBeUndefined()
+  })
   it('свой текст посреди сцены прерывает её и продолжает обычный цикл', async () => {
     const { game } = makeGame({ debug: true })
     await game.enterNode('toast', 'ask')

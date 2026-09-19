@@ -22,6 +22,8 @@ const CASES: Record<string, Case> = {
   Beat_FirstArc: { event: 'StoryBeat', setup: (g) => { g.S.stats.sent = 5 } },
   Says_WhileOffline: { event: 'PlayerSays', facts: { intent: 'photo' }, setup: (g) => { g.S.offlineDays = 2 } },
   Says_request: { event: 'PlayerSays', facts: { intent: 'request' } },
+  Tone_ViolentThreat: { event: 'PlayerMessage', facts: { tone: 'rude', category: 'violent-threat' } },
+  Tone_Intimidation: { event: 'PlayerMessage', facts: { tone: 'rude', category: 'intimidation' } },
   Turn_WhileDead: { event: 'AlikTurn', setup: (g) => { g.S.mem.alik_dead = true } },
   Scene_wife: { event: 'PickScene', setup: (g) => { g.S.mem['count.rude'] = 1 } },
   Scene_tax: { event: 'PickScene', setup: (g) => { g.S.mem['count.threat'] = 1 } },
