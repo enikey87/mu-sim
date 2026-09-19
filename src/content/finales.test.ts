@@ -189,6 +189,7 @@ describe('концовки игры', () => {
       alik: (g) => { g.S.mem['finale.garik'] = 'cutter'; g.S.ach.fence = 190 },
       honest: (g) => Object.assign(g.S.mem, { 'finale.boris': 'brigadir', 'finale.grant': 'ally', 'finale.niva': 'chose' }),
       multiverse: (g) => { g.S.day = 800; g.S.stats.sent = 300 },
+      vendetta: (g) => { g.S.mem.vendetta = true },
     }
     expect(Object.keys(setups).sort()).toEqual(ENDINGS.map((e) => e.id).sort())
     for (const [id, setup] of Object.entries(setups)) {

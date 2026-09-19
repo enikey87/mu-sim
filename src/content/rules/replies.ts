@@ -3,6 +3,7 @@
 import type { Game } from '../../engine/game'
 import { type Rule, eq, ne, is, gte, add } from '../../engine/rules'
 import { AlikOffline, ThickJournal } from './criteria'
+import { cooldown } from './rude'
 import { D, low, cap } from '../excuses'
 import { ARCS, NO_NEWS_A, NO_NEWS_B, GROUP_SEEN_A, GROUP_SEEN_B, WRONG_A, WRONG_B } from '../arcs'
 import * as L from '../life'
@@ -18,6 +19,7 @@ const says = (intent: string, rest: Partial<R> & Pick<R, 'respond'>, extra: R['w
 })
 
 async function sorry(game: Game, line: string): Promise<void> {
+  cooldown(game, 1) // извинение остужает ссору
   game.mood(3)
   game.unlock('sorry')
   const wasOff = game.S.offlineDays

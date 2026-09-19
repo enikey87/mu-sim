@@ -17,7 +17,8 @@ export interface CoverageReport {
   events: Record<string, { total: number; generic: number }>
 }
 
-export async function ruleCoverage(seeds: number[], turns: number, hours = [14, 3, 20, 8, 20, 13, 9]): Promise<CoverageReport> {
+/** grumpy — номера партий (с конца), где бот много грубит: иначе лестница грубости не проходится. */
+export async function ruleCoverage(seeds: number[], turns: number, hours = [14, 3, 20, 8, 20, 13, 9], grumpy = 0): Promise<CoverageReport> {
   const fired: Record<string, number> = {}
   const events: CoverageReport['events'] = {}
   let total = 0
@@ -41,7 +42,7 @@ export async function ruleCoverage(seeds: number[], turns: number, hours = [14, 
       }
     }
     for (let k = 0; k < turns; k++) {
-      await botTurn(game)
+      { const g = i >= seeds.length - grumpy; await botTurn(game, g ? 0.15 : 0.7, g ? 0.6 : 0.06) } // грубый бот почти не извиняется
       // события «игрок молчит» бот сам не вызывает — дёргаем их иногда
       if (k % 7 === 0 && !game.busy && !game.dead) await game.fire('AlikIdle')
       total++
