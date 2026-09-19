@@ -44,6 +44,36 @@ describe('Game: начало и ход', () => {
     expect(game.classify('Здравствуйте, извините')).toBe('polite')
     expect(game.classify('ну что там')).toBe('neutral')
   })
+  it('ввод встраивается в правила: просьба — отмазка, извинение — примирение', async () => {
+    const { game } = makeGame({ debug: true })
+    await game.send('Алик, пожалуйста, переведите деньги')
+    expect(game.trace.some((entry) => entry.event === 'PlayerSays' && entry.chosen.includes('Says_request'))).toBe(true)
+    expect(game.S.ctx).toMatchObject({ when: expect.any(String) })
+
+    game.S.mem['rude.heat'] = 2
+    await game.send('Извини, я погорячился')
+    expect(game.S.mem['rude.heat']).toBe(1)
+    expect(game.S.mem['count.sorry']).toBe(1)
+  })
+  it('угроза и грубая просьба из поля ввода двигают разные ветки', async () => {
+    const { game } = makeGame()
+    await game.send('Если не заплатишь, подам в суд')
+    expect(game.S.mem.court).toBe(1)
+    expect(game.S.mem['count.threat']).toBe(1)
+    game.S.offlineDays = 0
+    await game.send('ВЕРНИ ДЕНЬГИ!!!')
+    expect(game.S.mem['count.rude']).toBe(1)
+    expect(game.S.mem['rude.heat']).toBe(1)
+  })
+  it('свой текст посреди сцены прерывает её и продолжает обычный цикл', async () => {
+    const { game } = makeGame({ debug: true })
+    await game.enterNode('toast', 'ask')
+    expect(game.S.scene).not.toBeNull()
+    await game.send('Когда вы оплатите долг?')
+    expect(game.S.scene).toBeNull()
+    expect(game.trace.some((entry) => entry.chosen.includes('Says_request'))).toBe(true)
+    expect(game.busy).toBe(false)
+  })
   it('пустое сообщение и повторная отправка во время ответа игнорируются', async () => {
     const { game } = makeGame()
     await game.send('   ')

@@ -24,6 +24,7 @@ import { MENTION_RE } from '../content/world'
 import { type Clock, realClock } from './clock'
 import { type Audio, silentAudio } from './audio'
 import { typo } from './typo'
+import { classifyUserInput, type ClassifiedInput } from './input'
 import { calendarDays, dateOf, fmtDate, fmtTime, periodOf, tierOf, TIERS, type Period } from './time'
 import {
   type GameState, type Msg, type NewMsg, type Choice, type Ctx, type Tone, type Storage,
@@ -52,8 +53,7 @@ export interface TraceEntry extends Trace { id: number; day: number }
 export interface Notif { id: number; icon: string; app: string; text: string }
 export interface Moo { id: number; text: string; left: number; top: number }
 
-// Регулярки классификации текста игрока и событий
-export const THREAT_RE = /суд|полиц|заявлен|прокур|юрист|адвокат|коллектор/i
+// Регулярки событий в тексте Алика; ввод игрока классифицирует engine/input.ts.
 export const TIMEY = /^(Завтра|Скоро|Вечером|Щас|Минуту|Уже почти|Сейчас не могу|Перезвоню|Наберу)/
 export const SAD = /похорон|поминк|умер|реанимац|заболел|потоп|пожар|затопил|сломал|потерял|утонул|упало|сбежал|развод|похитил|застрял|сорвалась|отменили/
 export const REVIVED = /встал|встаёт|воскрес|вернулась/
@@ -571,7 +571,7 @@ export class Game {
     return this.S.day < Number(m['topicMute.' + k] ?? -1) || (m.topicLast === k && Number(m.topicRun ?? 0) >= 2)
   }
   saysFacts(o: Choice): Facts {
-    const f: Facts = { intent: o.act, arg: o.arg, greet: !!o.text && !o.text.includes('?') }
+    const f: Facts = { intent: o.act, arg: o.arg, category: o.category, greet: !!o.text && !o.text.includes('?') }
     if (o.act === 'arc' && typeof o.arg === 'string' && ARCS[o.arg]) f.argArcDone = (this.S.arcs[o.arg]?.i ?? 0) >= ARCS[o.arg].eps.length
     return f
   }
@@ -638,16 +638,16 @@ export class Game {
     return (this.S.choices ??= this.buildChoices())
   }
 
-  classify(text: string): Tone {
-    if (/коров|му{2,}|мыч/i.test(text)) return 'cow'
-    if (/[А-ЯЁA-Z]{4,}/.test(text) || /!!|верни|обман|врать|врёшь|суд|полиц|заявлен|приеду/i.test(text)) return THREAT_RE.test(text) ? 'threat' : 'rude'
-    if (/пожалуйста|извин|прост|добр|здравств|спасибо|🙏/i.test(text)) return 'polite'
-    return 'neutral'
-  }
+  classifyInput(text: string): ClassifiedInput { return classifyUserInput(text) }
+  /** Совместимый шорткат для тестов и отладки из консоли. */
+  classify(text: string): Tone { return this.classifyInput(text).tone }
 
   // ---------- ход игрока ----------
   async send(opt: Choice | string): Promise<void> {
-    const o: Choice = typeof opt === 'string' ? { text: opt, tone: this.classify(opt) } : opt
+    const parsed = typeof opt === 'string' ? this.classifyInput(opt) : null
+    const o: Choice = parsed
+      ? { text: opt as string, tone: parsed.tone, category: parsed.category, act: parsed.intent }
+      : opt as Choice
     if (this.busy || this.dead || !o.text.trim()) return
     const S = this.S
     this.busy = true
@@ -656,7 +656,8 @@ export class Game {
     this.clearUnread()
     if (o.act !== 'catchLie') this.forgetLie() // не поймал сразу — момент упущен
     let tone = o.tone
-    if (tone === 'rude' && !o.scene && THREAT_RE.test(o.text)) tone = 'threat'
+    // Готовая кнопка может быть помечена как rude, но текст с судом всё равно двигает ветку угроз.
+    if (tone === 'rude' && !o.scene && this.classifyInput(o.text).category === 'threat') tone = 'threat'
     this.tick(1 + this.rnd(5))
     const mine = this.push({ kind: 'text', from: 'me', text: o.text, time: fmtTime(S.clock) })
     this.seen.mark(o.text)
@@ -697,9 +698,9 @@ export class Game {
       await this.fire('PlayerSays', this.saysFacts(o))
     } else if (S.scene) {
       S.scene = null // свой текст посреди сцены — сцена прерывается
-      await this.alikTurn(tone)
+      await this.alikTurn(tone, o.category)
     } else {
-      await this.alikTurn(tone)
+      await this.alikTurn(tone, o.category)
     }
 
     await this.afterTurn()
@@ -761,7 +762,7 @@ export class Game {
   }
 
   // ---------- ход Алика ----------
-  async alikTurn(tone: Tone): Promise<void> {
+  async alikTurn(tone: Tone, category?: Choice['category']): Promise<void> {
     const S = this.S
     S.ctx = null
     if (S.offlineDays > 0) {
@@ -773,7 +774,7 @@ export class Game {
     } else if (this.chance(0.65)) {
       this.nextDay(1 + this.rnd(3))
     }
-    await this.fire('PlayerMessage', { tone })
+    await this.fire('PlayerMessage', { tone, category })
   }
 
   /** Обычный ход: иногда «прочитано и молчит», иногда реплика по времени суток, потом взвешенный выбор. */
