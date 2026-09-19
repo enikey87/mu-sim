@@ -129,7 +129,7 @@ describe('ответы Алика (PlayerSays)', () => {
     const { game } = makeGame()
     game.S.arcs.beton = { i: 1, last: game.S.day - 2 }
     const t = await reply(game, { text: 'Как бетон?', tone: 'polite', act: 'arc', arg: 'beton' })
-    expect(t.join(' ')).toMatch(/Кран извинился/)
+    expect(t.join(' ')).toMatch(/Место отметили/)
     expect(game.S.arcs.beton.i).toBe(2)
   })
   it('на вопрос после серии — следующая серия, второй вопрос подряд в тот же день — «пока без новостей»', async () => {

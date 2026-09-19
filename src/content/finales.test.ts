@@ -14,8 +14,9 @@ const said = (game: Game, from: number) => game.S.msgs.slice(from).filter((m) =>
 const SETUP: Record<string, (g: Game) => void> = {
   'boris.brigadir': (g) => { g.S.mem['asked.boris'] = 6 },
   'boris.toyou': (g) => { g.S.items.push('баран Борис') },
-  'beton.divorce': (g) => { g.S.ach.redo = 190 },
-  'beton.guilty': (g) => { g.S.mem['count.rude'] = 2 },
+  'beton.opened': (g) => { g.S.mem['count.rude'] = 2 },
+  'beton.corner': (g) => { g.S.ach.redo = 190 },
+  'beton.ledger': (g) => { g.S.mem.caught = 2 },
   'samvel.tamada': (g) => { g.S.ach.toast = 190 },
   'samvel.groom': (g) => { g.S.ach.saint = 190 },
   'niva.chose': (g) => { g.S.items.push('«Нива» 1987 года') },
@@ -26,6 +27,11 @@ const SETUP: Record<string, (g: Game) => void> = {
   'garik.cutter': (g) => { g.S.ach.newjob = 190 },
   'tile.lost': (g) => { g.S.mem['count.threat'] = 1 },
   'grandpa.revoke': (g) => { g.S.ach.heir = 190 },
+  'rubik.bribe': (g) => { g.S.ach.redo = 190 },
+  'rubik.karine': (g) => { g.S.ach.wife = 190 },
+  'razmik.union': (g) => { g.S.ach.customer = 190 },
+  'razmik.swap': (g) => { g.S.mem['count.rude'] = 3 },
+  'razmik.shift': (g) => { g.S.ach.fence = 190 },
 }
 
 describe('финалы сериалов: контент', () => {
@@ -151,6 +157,64 @@ describe('финалы сериалов: выбор', () => {
     const from = game.S.msgs.length
     await game.fire('PlayerSays', { intent: 'arc', arg: 'boris', argArcDone: true })
     expect(FINALES.boris[0].done).toContain(said(game, from).at(-1))
+  })
+})
+
+describe('новые сериалы: фундамент, Рубик, Размик', () => {
+  // серия → легенда после неё (цепочка «где деньги и что мешает»)
+  const CHAIN: Record<string, Array<string | undefined>> = {
+    beton: ['beton_money', 'beton_money', 'beton_money', 'beton_law', 'beton_law', 'beton_goar', 'beton_goar', undefined],
+    rubik: ['inspect', 'inspect', 'inspect', 'inspect', 'inspect', 'inspect_karine', 'inspect_karine', 'frozen'],
+    razmik: ['crane_queue', 'crane_queue', 'crane_queue', 'crane_queue', 'crane_queue', 'crane_wedding', 'crane_wedding', undefined],
+  }
+  it('каждый проигрывается до конца: легенды по цепочке, обычный финал, ачивка', async () => {
+    for (const [id, chain] of Object.entries(CHAIN)) {
+      const { game } = makeGame()
+      game.S.day = 300
+      expect(chain.length, id).toBe(ARCS[id].eps.length)
+      for (const want of chain) {
+        await game.playArc(id)
+        expect(game.legend(), `${id} серия ${game.S.arcs[id].i}`).toBe(want)
+      }
+      expect(game.S.mem['finale.' + id]).toBe('default')
+      expect(game.S.ach[ARCS[id].eps.at(-1)!.fx!.ach!]).toBeDefined()
+    }
+  })
+  it('Рубик и Размик — с середины игры, не раньше', () => {
+    const { game } = makeGame()
+    game.S.day = 200
+    expect(game.availableArcs()).not.toContain('rubik')
+    expect(game.availableArcs()).not.toContain('razmik')
+    game.S.day = 230
+    expect(game.availableArcs()).toEqual(expect.arrayContaining(['rubik', 'razmik']))
+  })
+  it('свадьба на кране — состояние мира «свадьба»', async () => {
+    const { game } = makeGame()
+    game.S.arcs.razmik = { i: 5, last: -99 }
+    await game.playArc('razmik')
+    expect(game.S.mem.wedding).toBe(true)
+  })
+  it('запасные условия: угроза судом вскрывает фундамент, новый объект сажает в кабину крана', async () => {
+    const a = makeGame().game
+    a.S.mem['count.threat'] = 1
+    toLast(a, 'beton')
+    await a.playArc('beton')
+    expect(a.S.mem['finale.beton']).toBe('opened')
+    expect(a.S.items).toContain('Записка «остальное потом»')
+
+    const b = makeGame().game
+    b.S.ach.newjob = 190
+    toLast(b, 'razmik')
+    const debt = b.S.debt
+    await b.playArc('razmik')
+    expect(b.S.mem['finale.razmik']).toBe('shift')
+    expect(b.S.debt).toBe(debt + 6000)
+  })
+  it('«деньги в фундаменте» противоречит «банке с огурцами»', () => {
+    const { game } = makeGame()
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в банке с огурцами.' })
+    game.alikMsg({ kind: 'text', from: 'alik', text: lines(ARCS.beton.eps[0])[1] })
+    expect(game.S.mem['lie.old']).toBe('money_jar')
   })
 })
 
