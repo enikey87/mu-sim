@@ -103,6 +103,7 @@ describe('лестница грубости: ступени', () => {
   })
   it('S4 — семейный суд в группе (один раз): прелюдия, голосование, приговор — 10 дней вежливости', async () => {
     const { game } = makeGame()
+    game.S.arcs.boris = { i: 1, last: 0 } // Борис уже в сюжете — он свидетель в суде
     heat(game, 4)
     const { r, n } = await fire(game, 'rude')
     expect(r).toBe('Rude_Tribunal')

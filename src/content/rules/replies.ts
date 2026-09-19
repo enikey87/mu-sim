@@ -6,6 +6,7 @@ import { AlikOffline, ThickJournal } from './criteria'
 import { cooldown } from './rude'
 import { TOPICS, TOPIC_FALLBACK, TOPIC_NAME, TOPIC_OBSESSED } from '../topics'
 import { D, low, cap } from '../excuses'
+import { GREET_A, WHEN_COND } from '../misc'
 import { ARCS, NO_NEWS_A, NO_NEWS_B, GROUP_SEEN_A, GROUP_SEEN_B, WRONG_A, WRONG_B } from '../arcs'
 import * as L from '../life'
 import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER } from '../misc'
@@ -58,7 +59,15 @@ export const replyRules: R[] = [
 
   says('promiseCheck', { respond: async ({ game, facts }) => { await game.say([game.uniq(() => game.X.promiseCheck(String(facts.arg ?? '')))]); game.setCtx(null) } }),
   // срок «когда-нибудь» — переспрашивать бессмысленно, и Алик это честно признаёт
-  says('promiseCheck', { respond: async ({ game }) => { await game.say([game.line('PROMISE_NEVER', PROMISE_NEVER, { repeat: true, cooldown: { turns: 25 }, fallback: () => game.draw('PROMISE_NEVER', PROMISE_NEVER) })!]); game.setCtx(null) } }, [is('ctx.whenNever')]),
+  says('promiseCheck', {
+    respond: async ({ game, facts }) => {
+      // общие «философские» ответы — по разу; дальше — про само условие, с его текстом (не повторяется)
+      const t = String(facts['ctx.when'] ?? '')
+      const cond = () => game.draw('WHEN_COND', WHEN_COND).replace('{t}', t).replace('{T}', cap(t))
+      await game.say([game.line('PROMISE_NEVER', PROMISE_NEVER, { fallback: cond })!])
+      game.setCtx(null)
+    },
+  }, [is('ctx.whenNever')]),
 
   says('condole', { respond: async ({ game }) => { game.mood(1); await game.say([game.pair('CONDOLE_A', D.CONDOLE_A, 'CONDOLE_B', D.CONDOLE_B)]); game.setCtx(null) } }),
   // соболезнуешь, а покойник уже встал и говорит тост
@@ -117,7 +126,8 @@ export const replyRules: R[] = [
       const st = game.S.arcs[id]
       // на вопрос — следующая серия; второй вопрос подряд в тот же день — «пока без новостей» (не проглатывать сериал)
       if (st && ARCS[id] && st.i < ARCS[id].eps.length && !(st.byAsk && game.S.day === st.last)) { await game.playArc(id); game.S.arcs[id].byAsk = true; return }
-      await game.say([game.pair('NN_A', NO_NEWS_A, 'NN_B', NO_NEWS_B)])
+      // «Передавайте привет Борису» — не вопрос: «пока без новостей» на него звучит невпопад
+      await game.say([facts.greet ? game.uniq(() => game.draw('GREET_A', GREET_A)) : game.pair('NN_A', NO_NEWS_A, 'NN_B', NO_NEWS_B)])
       game.setCtx(null)
     },
   }),
@@ -125,6 +135,7 @@ export const replyRules: R[] = [
   says('arc', {
     respond: async ({ game, facts }) => {
       const id = String(facts.arg ?? '')
+      game.S.mem['doneAsked.' + id] = game.S.day
       const lines = game.arcDoneLines(id) ?? NO_NEWS_A
       await game.say([game.uniq(() => game.draw(`DONE_${id}_${game.S.mem['finale.' + id] ?? ''}`, lines))])
       game.setCtx(null)
@@ -142,7 +153,8 @@ export const replyRules: R[] = [
       mem.topicLast = k
       // некоторые вопросы сразу превращаются в мини-квест («Приеду поесть» → хаш в 7 утра)
       const quest = TOPICS[k]?.quest?.[Number(i)]
-      if (quest && game.scenes[quest]) return game.enterNode(quest, game.scenes[quest].start)
+      // квест из разговора — по тем же условиям, что и сам квест, и один раз за игру
+      if (quest && game.scenes[quest] && game.questAllowed(quest)) return game.enterNode(quest, game.scenes[quest].start)
       const a = TOPICS[k]?.a[Number(i)]
       // ответ Алика — тоже тема: разговор может продолжиться
       if (a && !game.seen.has(a)) { game.seen.mark(a); game.markTopical(await game.say([a])) } else await game.say([game.uniq(() => game.draw('TOPIC_FB', TOPIC_FALLBACK))])

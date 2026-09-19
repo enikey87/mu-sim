@@ -30,6 +30,7 @@ describe('сцены выбираются по сюжету', () => {
   it('«наследство» — после того как дедушка переписал завещание; «если спросят» — после угроз судом', () => {
     const { game } = makeGame()
     game.S.arcs.grandpa = { i: 4, last: 0 }
+    game.S.arcs.boris = { i: 1, last: 0 } // «долг перешёл Борису» — когда Борис уже есть
     game.S.mem['count.threat'] = 1
     const seen = new Set<string>()
     for (let i = 0; i < 400; i++) seen.add(pickScene(game)!)

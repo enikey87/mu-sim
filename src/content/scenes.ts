@@ -600,8 +600,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
         },
         moo: {
           fx: { mood: 1, ach: 'tribunal', during: { key: 'polite', days: 10 }, set: { 'rude.heat': 0, blocked: false } },
-          who: 'boris', a: ['Бее.'],
-          who2: 'samvel', a2: ['Суд выслушал корову и барана. Переводчик Борис говорит: «помиловать». Приговор: десять дней вежливости.'],
+          who: 'samvel', a: ['Суд выслушал мычание. Корова говорит «помиловать». Суд с коровой согласен. Приговор: десять дней вежливости.'],
           sys2: 'Самвел удалил вас из группы',
         },
       },

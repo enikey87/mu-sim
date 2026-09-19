@@ -160,11 +160,11 @@ export const rudeSaysRules: R[] = [
   { name: 'Says_moo', event: 'PlayerSays', when: [eq('intent', 'moo')], respond: async ({ game }) => { await game.say([freshOr(game, 'MOO_ODD', T.MOO_ODD, game.X.cow)]); game.setCtx(null) } },
   {
     name: 'Says_sorry_blocked', event: 'PlayerSays', when: [eq('intent', 'sorry'), is('blocked')], bonus: 6,
-    respond: async ({ game }) => { game.sys(T.NOT_DELIVERED); await game.sleep(700); await game.say([{ w: 'boris', t: game.line('BORIS_HINT', T.BORIS_HINT, { repeat: true, cooldown: { turns: 5 }, fallback: () => 'Бее.' })! }]) },
+    respond: async ({ game }) => { game.sys(T.NOT_DELIVERED); await game.sleep(700); await game.say([game.S.arcs.boris ? { w: 'boris', t: game.line('BORIS_HINT', T.BORIS_HINT, { repeat: true, cooldown: { turns: 5 }, fallback: () => 'Бее.' })! } : { w: 'karine', t: T.KARINE_HINT }]) },
   },
   {
     name: 'Says_viaBoris', event: 'PlayerSays', when: [eq('intent', 'viaBoris')], remember: [set('blocked', false), add('count.sorry')],
-    respond: async ({ game }) => { cooldown(game, 1); for (const [w, t] of T.VIA_BORIS) await game.say([w === 'alik' ? t : { w, t }]); game.sys('Алик Воздухонесян разблокировал вас'); game.setCtx(null) },
+    respond: async ({ game }) => { cooldown(game, 1); for (const [w, t] of game.S.arcs.boris ? T.VIA_BORIS : T.VIA_KARINE) await game.say([w === 'alik' ? t : { w, t }]); game.sys('Алик Воздухонесян разблокировал вас'); game.setCtx(null) },
   },
   {
     name: 'Says_sorry_ritual', event: 'PlayerSays', when: [eq('intent', 'sorry'), gte(HEAT, 3)], bonus: 3, remember: [add('count.sorry')],

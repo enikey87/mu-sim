@@ -67,11 +67,11 @@ describe('начало игры и сериалы', () => {
 })
 
 describe('сцены: реплики персонажей', () => {
-  it('реплика Бориса в сцене не получает обращение Алика, даже если уже звучала', async () => {
+  it('реплика персонажа в сцене не получает обращение Алика, даже если уже звучала', async () => {
     const { game } = makeGame()
-    game.seen.mark('Бее. (протокольно)')
+    game.seen.mark('Ме-е-е. (Это коза. Она свидетель.)')
     await game.enterNode('court', 'moo')
-    const boris = game.S.msgs.flatMap((m) => (m.kind === 'text' && m.who === 'boris' ? [m.text] : []))
-    expect(boris.at(-1)).toBe('Бее. (протокольно)')
+    const goat = game.S.msgs.flatMap((m) => (m.kind === 'text' && m.who === 'goar' ? [m.text] : []))
+    expect(goat.at(-1)).toBe('Ме-е-е. (Это коза. Она свидетель.)')
   })
 })
