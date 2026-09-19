@@ -112,7 +112,7 @@ describe('App', () => {
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByText(/финал «Жених»/)).toBeInTheDocument()
     expect(within(dialog).getByText('Породнились')).toBeInTheDocument()
-    expect(within(dialog).getByText('1/6')).toBeInTheDocument()
+    expect(within(dialog).getByText('1/7')).toBeInTheDocument()
   })
 
   it('телефон сел → зарядка', async () => {

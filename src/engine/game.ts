@@ -2,6 +2,7 @@
 // что сделать Алику — принимает система правил (engine/rules/, content/rules/*).
 import { make, D, low, cap, type ExcuseApi, type Promise3 } from '../content/excuses'
 import { makeScenes, type Scene, type Line } from '../content/scenes'
+import { TRIBUNAL } from '../content/rude'
 import { FINALES, ENDINGS, DEFAULT_FINALE, type Finale } from '../content/finales'
 import { ARCS, ARC_DONE, CAST, type Episode, GROUP, GROUP_OOPS, WRONG_TO, WRONG_WHAT, WRONG_OOPS } from '../content/arcs'
 import * as L from '../content/life'
@@ -409,6 +410,8 @@ export class Game {
       // ачивки и трофеи — условия для финалов сериалов и концовок
       ...Object.fromEntries(Object.keys(S.ach).map((k) => ['ach.' + k, true])),
       items: S.items.length,
+      // температура ссоры не уходит ниже нуля (после примирения ещё тикают отложенные «остывания»)
+      'rude.heat': Math.max(0, Number(S.mem['rude.heat'] ?? 0)),
       'has.boris': S.items.some((n) => /Борис/.test(n)),
       'has.niva': S.items.some((n) => /Нива/.test(n)),
       promiseLive: !!pr && pr.due != null,
@@ -847,6 +850,16 @@ export class Game {
     return this.finaleOf(id)?.done ?? ARC_DONE[id]
   }
 
+  // ---------- лестница грубости ----------
+  /** Семейный суд в групповом чате: прелюдия, потом сцена «приговор». */
+  async tribunal(): Promise<void> {
+    await this.sleep(600)
+    this.sys('Дядя Самвел добавил вас в группу «Стройка под ключ 🏗️ Семья». Тема: «Дело №1. Плиточник против уважения»')
+    for (const [w, t] of TRIBUNAL) await this.say([{ w, t }])
+    this.sys(`Голосование «Простить плиточника?» — Да: 1 (Гарик). Нет: ${5 + this.rnd(4)}. Бее: 1.`)
+    await this.enterNode('tribunal', 'verdict')
+  }
+
   // ---------- концовки ----------
   async reachEnding(id: string): Promise<void> {
     const e = ENDINGS.find((x) => x.id === id)!
@@ -888,6 +901,8 @@ export class Game {
     if (fx.barter) { S.debt -= v.v; S.items.push(v.n) }
     if (fx.invoice) S.debt -= v.total
     if (fx.ach) this.unlock(fx.ach)
+    if (fx.set) this.rules.applyOps(Object.entries(fx.set).map(([key, value]) => ({ key, op: '=' as const, value })), {})
+    if (fx.during) this.rules.applyOps([{ key: fx.during.key, op: '=', value: true, forDays: fx.during.days }], {})
     if (n.sys) { await this.sleep(700); this.sys(gen('sys', n.sys)()) }
     if (n.a) await this.say([variant('a', n.a)], false, n.who)
     if (n.doc) {

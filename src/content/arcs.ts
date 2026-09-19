@@ -23,6 +23,8 @@ export const CAST: Record<string, { name: string; color: string }> = {
   arsen: { name: 'Арсен', color: '#5b7c1f' },
   mkrtich: { name: 'Прораб Мкртич', color: '#9a6a2a' },
   niva: { name: '«Нива» 🚙', color: '#4d6b3a' },
+  mama: { name: 'Мама Алика', color: '#c0567a' },
+  intercom: { name: 'Домофон тёти Гоар', color: '#6b6b6b' },
 };
 
 export const ARCS: Record<string, Arc> = {

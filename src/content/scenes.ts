@@ -9,7 +9,11 @@ import type { Rng } from '../engine/rng'
 export type Vars = Record<string, any>
 export type Line = string | ((v: Vars) => string)
 export interface SceneOpt { t: Line | string[]; go: string | null; tone?: 'polite' | 'neutral' | 'rude' }
-export interface SceneFx { days?: number; debt?: number; mood?: number; ach?: string; barter?: boolean; invoice?: boolean }
+export interface SceneFx {
+  days?: number; debt?: number; mood?: number; ach?: string; barter?: boolean; invoice?: boolean
+  /** Записать факты в память мира; during — факт = true на N дней. */
+  set?: Record<string, number | boolean>; during?: { key: string; days: number }
+}
 export interface SceneNode {
   a?: Line[]; a2?: Line[]; who?: string; who2?: string
   sys?: Line | Line[]; sys2?: Line | Line[]
@@ -562,6 +566,68 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
           who: 'boris',
           a: ['Бее-бее.'],
           a2: ['Он просит отсрочку. Уважь барана, он старый.'],
+        },
+      },
+    },
+
+    // ---- лестница грубости: сцены не выпадают случайно, их запускают правила ----
+    // семейный суд — после прелюдии в группе (game.tribunal); любой приговор — «вежливость на 10 дней»
+    tribunal: {
+      start: 'verdict',
+      nodes: {
+        verdict: {
+          who: 'samvel',
+          a: ['Суд удаляется на совещание. Совещание — это хаш. Последнее слово подсудимого?'],
+          opts: [
+            { t: 'Признаю. Больше не буду кричать.', go: 'guilty', tone: 'polite' },
+            { t: 'Требую адвоката!', go: 'lawyer', tone: 'neutral' },
+            { t: 'Мууу.', go: 'moo', tone: 'neutral' },
+          ],
+        },
+        guilty: {
+          fx: { mood: 2, ach: 'tribunal', during: { key: 'polite', days: 10 }, set: { 'rude.heat': 0, blocked: false } },
+          who: 'samvel', a: ['Приговор: прощён. Условно. Алик десять дней будет с тобой вежливым. Это страшнее, поверь.'],
+          sys2: 'Самвел удалил вас из группы',
+        },
+        lawyer: {
+          fx: { ach: 'tribunal', during: { key: 'polite', days: 10 }, set: { 'rude.heat': 0, blocked: false } },
+          who: 'samvel', a: ['Адвокат есть. Это Алик. Он уже признал тебя виновным. Приговор: десять дней вежливости от Алика.'],
+          sys2: 'Самвел удалил вас из группы',
+        },
+        moo: {
+          fx: { mood: 1, ach: 'tribunal', during: { key: 'polite', days: 10 }, set: { 'rude.heat': 0, blocked: false } },
+          who: 'boris', a: ['Бее.'],
+          who2: 'samvel', a2: ['Суд выслушал корову и барана. Переводчик Борис говорит: «помиловать». Приговор: десять дней вежливости.'],
+          sys2: 'Самвел удалил вас из группы',
+        },
+      },
+    },
+    // ритуал примирения — извинение после серии криков текстом не принимается
+    ritual: {
+      start: 'ask',
+      nodes: {
+        ask: {
+          a: ['Извинения в тексте не принимаются. Только очно: хаш в 7 утра, три тоста, одна слеза.', 'После такого «извини» не работает, брат. Нужен ритуал: хаш, тост, объятие. Или Борис не поймёт.'],
+          opts: [
+            { t: 'Хорошо, приеду на хаш', go: 'hash', tone: 'polite' },
+            { t: 'Может, просто текстом?', go: 'text', tone: 'neutral' },
+            { t: 'Мууу 🙏', go: 'moo', tone: 'polite' },
+          ],
+        },
+        hash: {
+          fx: { days: 1, mood: 3, ach: 'blood_brother', set: { 'rude.heat': 0 } },
+          sys: 'Хаш в 7 утра. Три тоста. Одна слеза — не твоя.',
+          a: ['Теперь мы кровные братья. Ну как кровные: я порезался о твою плитку. Брату деньги не отдают, брату отдают себя.'],
+          then: 'promise',
+        },
+        text: {
+          fx: { mood: 1, set: { 'rude.heat': 1 } },
+          a: ['Текстом — только через Карине.'],
+          who2: 'karine', a2: ['Я одобрила мир. Условие: переложите нам ванную. Бесплатно. Вы же теперь почти брат.'],
+        },
+        moo: {
+          fx: { mood: 2, ach: 'blood_brother', set: { 'rude.heat': 0 } },
+          a: ['Мууу с молитвой… Брат, это самое искреннее извинение в моей жизни. Корова тоже прослезилась. Мир.'],
         },
       },
     },

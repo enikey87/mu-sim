@@ -2,7 +2,7 @@
 // Берутся два самых приоритетных (специфичность + bonus); из одного слота — только одна.
 import type { Game } from '../../engine/game'
 import type { Choice, Tone } from '../../engine/state'
-import { type Rule, type Facts, type Criterion, eq, is, exists, gt } from '../../engine/rules'
+import { type Rule, type Facts, type Criterion, eq, is, exists, gt, gte } from '../../engine/rules'
 import { D, cap } from '../excuses'
 import { ARCS, WRONG_Q } from '../arcs'
 import * as L from '../life'
@@ -50,6 +50,9 @@ export const choiceRules: R[] = [
   }),
   // извиниться после грубости
   offer({ name: 'Sorry', when: [is('ctx.offended')], act: 'sorry', tone: 'polite', bonus: 5, text: (g) => fromD(g, 'P_SORRY') }),
+  // лестница грубости: заблокирован — извиниться можно только через Бориса; ссора горячая — можно мычать
+  offer({ name: 'ViaBoris', when: [is('blocked')], act: 'viaBoris', tone: 'polite', bonus: 7, text: (g) => fromArr(g, 'P_VIA_BORIS', ['Борис, передай Алику: прости меня', 'Попросить Бориса передать извинения', 'Борис, скажи ему «бее» от меня. Мирное']) }),
+  offer({ name: 'Moo', when: [gte('rude.heat', 1)], odds: 0.5, tone: 'cow', bonus: 4, text: (g) => fromArr(g, 'P_MOO', ['Мууу.', 'Мууууу 🐄', 'Му. (Это значит «мир».)']) }),
 
   // ответ на то, ЧТО прислал Алик
   offer({ name: 'Photo', when: [eq('ctx.type', 'photo')], act: 'photo', tone: 'neutral', bonus: 3, text: (g) => fromD(g, 'P_PHOTO') }),

@@ -2,28 +2,15 @@
 import type { Game } from '../../engine/game'
 import { type Rule, eq, ne, gte, is, add } from '../../engine/rules'
 import { AlikOffline } from './criteria'
-import { RUDE_AGAIN, THREAT_AGAIN } from '../misc'
+import { THREAT_AGAIN } from '../misc'
 import { IDLE } from '../life'
 
 type R = Rule<Game>
 
-async function offended(game: Game, line?: string): Promise<void> {
-  game.mood(-2)
-  if (game.chance(0.3)) await game.sticker({ e: '🏠🔥', c: 'Всё горит' })
-  await game.say([line ?? game.uniq(game.X.offended)])
-  game.goOffline(Math.max(2, 3 + game.rnd(8) - Math.floor(game.S.mood / 3)))
-}
-
 // Событие PlayerMessage { tone } — как Алик реагирует на тон
 export const toneRules: R[] = [
   { name: 'Tone_Default', event: 'PlayerMessage', when: [], respond: ({ game }) => game.turnRoll() },
-  { name: 'Tone_Rude', event: 'PlayerMessage', when: [eq('tone', 'rude')], remember: [add('count.rude')], respond: ({ game }) => offended(game) },
-  {
-    // память: кричишь не в первый раз — Алик это помнит
-    name: 'Tone_Rude_Again', event: 'PlayerMessage', when: [eq('tone', 'rude'), gte('count.rude', 2)],
-    remember: [add('count.rude')],
-    respond: async ({ game }) => { game.unlock('memory'); await offended(game, game.uniq(() => game.draw('RUDE_AGAIN', RUDE_AGAIN))) },
-  },
+  // грубость — лестница эскалации в rude.ts
   {
     name: 'Tone_Threat', event: 'PlayerMessage', when: [eq('tone', 'threat')], remember: [add('count.threat')],
     respond: async ({ game }) => { game.mood(-1); await game.say([game.uniq(game.X.threat)]); game.goOffline(1 + game.rnd(3)) },

@@ -159,18 +159,20 @@ describe('ответы Алика (PlayerSays)', () => {
 })
 
 describe('тон сообщения (PlayerMessage)', () => {
-  it('грубость — обида и пропажа; третья грубость — Алик помнит', async () => {
+  it('грубость — обида и пропажа; крик после остывания ссоры — Алик помнит', async () => {
     const { game } = makeGame()
     const rude: Choice = { text: 'АЛИК!!! Хватит врать!!!', tone: 'rude' }
     const first = await reply(game, rude)
     expect(game.S.offlineDays).toBeGreaterThan(0)
+    expect(game.S.offlineDays).toBeLessThanOrEqual(2) // обида больше не перематывает игру на недели
     expect(first.length).toBeGreaterThan(0)
-    game.S.offlineDays = 0
-    await reply(game, rude)
-    game.S.offlineDays = 0
-    const third = await reply(game, rude)
-    expect(oneOf(RUDE_AGAIN.map(frag), third.join(' '))).toBe(true)
+    for (let i = 0; i < 2; i++) { game.S.offlineDays = 0; game.nextDay(21); await game.afterTurn(); await reply(game, rude) }
     expect(game.S.mem['count.rude']).toBe(3)
+    game.S.offlineDays = 0
+    game.nextDay(21)
+    await game.afterTurn()
+    const fourth = await reply(game, rude)
+    expect(oneOf(RUDE_AGAIN.map(frag), fourth.join(' '))).toBe(true)
   })
   it('угроза судом — отдельный ответ, повторная — «Алик помнит»', async () => {
     const { game } = makeGame()
