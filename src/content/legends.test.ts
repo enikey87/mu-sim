@@ -67,7 +67,7 @@ describe('легенда денег', () => {
   })
   it('легенда стареет через 30 дней', () => {
     const { game } = makeGame()
-    game.setLegend('beton', 'beton')
+    game.setLegend('beton_money', 'beton')
     game.S.day += 31
     expect(game.legend()).toBeUndefined()
   })
