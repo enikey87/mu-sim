@@ -35,9 +35,11 @@ describe('scenes', () => {
     }
   })
   it('every node says or shows something; achievements exist', () => {
-    const vars = { v: 1, n: 'баран', p: 'x', rows: [['a', 1]], total: 1, r: ['a', 'b', 'c'] }
-    const txt = (l: Line) => (typeof l === 'function' ? l(vars) : l)
+    const base = { v: 1, n: 'баран', p: 'x', rows: [['a', 1]], total: 1, r: ['a', 'b', 'c'] }
+    const all = <T,>(arr: readonly Entry<T>[]) => arr.map(valueOf)
     for (const [sid, sc] of Object.entries(scenes)) {
+      const vars = { ...base, ...sc.init?.(seededRng(1), all) }
+      const txt = (l: Line) => (typeof l === 'function' ? l(vars) : l)
       for (const [nid, n] of Object.entries(sc.nodes)) {
         const has = n.a || n.a2 || n.sys || n.sys2 || n.opts || n.then || n.doc || n.hook
         expect(has, `${sid}.${nid}`).toBeTruthy()
