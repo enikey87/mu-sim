@@ -24,7 +24,9 @@ export const courtRules: R[] = [
       const stage = Number(game.S.mem.court) - 1 // память уже сдвинута на следующую ступень
       game.unlock('memory')
       if (stage === 3) return game.enterNode('court', game.scenes.court.start)
-      await saySaid(game, COURT[stage])
+      // Арсен уже писал (племянник, «сам такой») — не «здравствуйте, это Арсен» второй раз
+      const known = !!game.S.mem['intro.arsen']
+      await saySaid(game, COURT[stage].map(([w, t]) => [w, known && w === 'arsen' ? t.replace(/^Здравствуйте, это Арсен, юрист Алика\./, 'Это снова Арсен. Теперь официально — юрист Алика.') : t] as const))
       if (stage === 5) game.unlock('strasbourg')
     },
   },

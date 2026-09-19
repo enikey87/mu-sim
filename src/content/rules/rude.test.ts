@@ -45,6 +45,7 @@ describe('лестница грубости: ступени', () => {
   })
   it('S1 — второй крик подряд: вместо Алика пишет родня, у каждого свой перерыв', async () => {
     const { game } = makeGame()
+    game.S.mem['intro.arsen'] = true // Арсен уже появился (иначе пишут двое)
     heat(game, 1)
     const seen = new Set<string>()
     for (let i = 0; i < 3; i++) {
@@ -104,6 +105,7 @@ describe('лестница грубости: ступени', () => {
   it('S4 — семейный суд в группе (один раз): прелюдия, голосование, приговор — 10 дней вежливости', async () => {
     const { game } = makeGame()
     game.S.arcs.boris = { i: 1, last: 0 } // Борис уже в сюжете — он свидетель в суде
+    game.S.mem['intro.dekret'] = true // и Нуне уже в декрете
     heat(game, 4)
     const { r, n } = await fire(game, 'rude')
     expect(r).toBe('Rude_Tribunal')
@@ -219,6 +221,7 @@ describe('лестница грубости: ветки', () => {
     const got: string[] = []
     for (let i = 0; i < 200 && got.length < T.COLD_WAR.length; i++) {
       game.S.stats.sent += 3
+      game.S.ctx = { offended: true } // пересланное / стикер между ними меняют контекст — игрок всё ещё молчит обиженно
       const n = game.S.msgs.length
       if ((await game.fire('AlikIdle'))?.name === 'Idle_ColdWar') got.push(...texts(game, n).filter((t) => T.COLD_WAR.includes(t)))
     }
@@ -231,12 +234,15 @@ describe('лестница грубости: ветки', () => {
     expect((await fire(game, 'polite')).r).not.toBe('Tone_MissRude') // только что кричал — не скучает
     heat(game, 0)
     let missed = false
+    const rs: string[] = []
     for (let i = 0; i < 40 && !missed; i++) {
       game.S.stats.sent += 10
+      game.S.scene = null // ход Алика мог начать сцену — в сцене тон игрока не разбирается
       const { r, n } = await fire(game, 'polite')
+      rs.push(String(r))
       if (r === 'Tone_MissRude') { missed = true; expect(T.MISS_RUDE).toContain(texts(game, n)[0]) }
     }
-    expect(missed).toBe(true)
+    expect(missed, rs.join(',')).toBe(true)
     expect(game.S.ach.habit).toBeDefined()
   })
 })

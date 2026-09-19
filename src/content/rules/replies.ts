@@ -6,7 +6,8 @@ import { AlikOffline, ThickJournal } from './criteria'
 import { cooldown } from './rude'
 import { TOPICS, TOPIC_FALLBACK, TOPIC_NAME, TOPIC_OBSESSED } from '../topics'
 import { D, low, cap } from '../excuses'
-import { GREET_A, WHEN_COND } from '../misc'
+import { GREET_A, WHEN_COND, SWING } from '../misc'
+import { type TalkKind, talkPairs, talkId } from '../talk'
 import { ARCS, NO_NEWS_A, NO_NEWS_B, GROUP_SEEN_A, GROUP_SEEN_B, WRONG_A, WRONG_B } from '../arcs'
 import * as L from '../life'
 import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER } from '../misc'
@@ -48,6 +49,28 @@ export const replyRules: R[] = [
       return sorry(game, game.line('SORRY_AGAIN', SORRY_AGAIN, { fallback: game.X.sorry })!)
     },
   }, [gte('count.sorry', 2)]),
+  // третий «мир» за 6 ходов — «качели»: Алик замечает, и ссору это уже не остужает
+  says('sorry', {
+    remember: [add('count.sorry')], bonus: 3,
+    respond: async ({ game }) => {
+      game.unlock('memory')
+      game.mood(1) // мир всё-таки, хоть и качели
+      await game.say([game.line('SWING', SWING, { fallback: game.X.sorry })!])
+      game.setCtx(null)
+    },
+  }, [gte('sorrySwing', 3)]),
+
+  // ответ на реплику легенды / персонажа / воспоминание: отвечает тот, к кому обратились
+  says('talk', {
+    respond: async ({ game, facts }) => {
+      const [kind, sub, i] = String(facts.arg).split('|') as [TalkKind, string, string]
+      const pair = talkPairs(kind, sub)[Number(i)]
+      game.setCtx(null)
+      if (!pair) return false
+      game.lines.mark(talkId(kind, sub, Number(i)))
+      await game.say([kind === 'chorus' ? { w: sub, t: pair[1] } : pair[1]])
+    },
+  }),
 
   simple('photo', (g) => g.uniq(g.X.photo)),
   simple('voice', (g) => g.uniq(g.X.cow)),
@@ -125,7 +148,7 @@ export const replyRules: R[] = [
       game.S.mem['asked.' + id] = Number(game.S.mem['asked.' + id] ?? 0) + 1 // для финалов: «спрашивал про Бориса 3+ раз»
       const st = game.S.arcs[id]
       // на вопрос — следующая серия; второй вопрос подряд в тот же день — «пока без новостей» (не проглатывать сериал)
-      if (st && ARCS[id] && st.i < ARCS[id].eps.length && !(st.byAsk && game.S.day === st.last)) { await game.playArc(id); game.S.arcs[id].byAsk = true; return }
+      if (st && ARCS[id] && game.arcCanAdvance(id, true)) { await game.playArc(id); game.S.arcs[id].byAsk = true; return }
       // «Передавайте привет Борису» — не вопрос: «пока без новостей» на него звучит невпопад
       await game.say([facts.greet ? game.uniq(() => game.draw('GREET_A', GREET_A)) : game.pair('NN_A', NO_NEWS_A, 'NN_B', NO_NEWS_B)])
       game.setCtx(null)

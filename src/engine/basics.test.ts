@@ -174,3 +174,18 @@ describe('typo', () => {
     expect(typo('Да.', seededRng(1), decks)).toBeNull()
   })
 })
+
+describe('срок по календарю', () => {
+  it('«в среду» — до ближайшей среды, «до Нового года» — до 1 января, иначе — как в колоде', async () => {
+    const { calendarDays, dateOf } = await import('./time')
+    const day = 200
+    const dow = dateOf(day).getDay()
+    const wed = calendarDays('в среду утром — закину', day, 3)
+    expect(dateOf(day + wed).getDay()).toBe(3)
+    expect(wed).toBeGreaterThanOrEqual(1)
+    expect(wed).toBeLessThanOrEqual(7)
+    expect(dateOf(day + calendarDays('до Нового года — всё', day, 90)).getMonth()).toBe(0)
+    expect(calendarDays('завтра — отдам', day, 1)).toBe(1)
+    expect(dow).toBeGreaterThanOrEqual(0)
+  })
+})

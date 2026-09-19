@@ -4,6 +4,7 @@ import type { Game } from '../../engine/game'
 import type { Choice, Tone } from '../../engine/state'
 import { type Rule, type Facts, type Criterion, eq, is, exists, missing, gt, gte, lte } from '../../engine/rules'
 import { D, cap } from '../excuses'
+import { talkPairs, talkId } from '../talk'
 import { ARCS, WRONG_Q } from '../arcs'
 import * as L from '../life'
 import { GROUP_Q } from '../misc'
@@ -30,6 +31,8 @@ interface OfferSpec {
 const fromD = (game: Game, key: string, map: Record<string, string> = {}) =>
   game.playerLine(() => game.X.fill(game.draw(key, D[key]), map))
 const fromArr = (game: Game, key: string, arr: readonly string[]) => game.playerLine(() => game.draw(key, arr))
+
+const yours = (n: string) => n.replace(/^(мой|моя|моё|мои)(?![а-яё])/i, (m) => ({ мой: 'ваш', моя: 'ваша', моё: 'ваше', мои: 'ваши' } as Record<string, string>)[m.toLowerCase()])
 
 const offer = (o: OfferSpec): R => ({
   name: `Opt_${o.name}`,
@@ -71,7 +74,8 @@ export const choiceRules: R[] = [
   offer({ name: 'Idle', when: [eq('ctx.type', 'idle')], act: 'idleReply', tone: 'polite', bonus: 3, text: (g) => fromArr(g, 'IDLE_Q', L.IDLE_Q) }),
   offer({ name: 'Sticker', when: [eq('ctx.type', 'sticker')], act: 'stickerQ', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'STICKER_Q', L.STICKER_Q) }),
   offer({ name: 'Fwd', when: [eq('ctx.type', 'fwd')], act: 'fwdQ', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'FWD_Q', L.FWD_Q) }),
-  offer({ name: 'ReactOnly', when: [eq('ctx.type', 'reactOnly')], act: 'reactQ', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'REACT_Q', L.REACT_Q) }),
+  offer({ name: 'ReactOnly', when: [eq('ctx.type', 'reactOnly')], act: 'reactQ', tone: 'neutral', bonus: 3, // «👍 — это да или нет?» — с той реакцией, что Алик поставил на самом деле
+    text: (g) => { const m = [...g.S.msgs].reverse().find((x) => x.kind === 'text' && x.from === 'me'); const r = (m?.kind === 'text' && m.react) || '👍'; return fromArr(g, 'REACT_Q', L.REACT_Q).replace('👍', r) } }),
   offer({ name: 'Deleted', when: [is('ctx.deleted')], act: 'deletedQ', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'DEL_Q', L.DEL_Q) }),
   offer({ name: 'Group', when: [is('ctx.group')], act: 'group', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'GQ', GROUP_Q) }),
   offer({ name: 'Wrong', when: [is('ctx.wrong')], act: 'wrong', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'WQ', WRONG_Q) }),
@@ -86,7 +90,8 @@ export const choiceRules: R[] = [
   // родственник: спросить «при чём тут он» / поздравить / посочувствовать — одна кнопка на слот
   offer({
     name: 'WhyRel', slot: 'rel', specificity: 2, weight: 1, when: [exists('ctx.rel')], act: 'whyRel', tone: 'neutral',
-    text: (g, f) => fromD(g, 'P_WHY_REL', { n: String(f['ctx.rel']) }),
+    // родственник назван словами Алика («мой шофёр Гриша») — игрок говорит «ваш»
+    text: (g, f) => fromD(g, 'P_WHY_REL', { n: yours(String(f['ctx.rel'])) }),
   }),
   offer({ name: 'Congrats', slot: 'rel', specificity: 2, weight: 1, when: [exists('ctx.rel'), is('ctx.festive')], act: 'congrats', tone: 'polite', text: (g) => fromD(g, 'P_CONGRATS') }),
   offer({ name: 'Condole', slot: 'rel', specificity: 2, weight: 1, when: [exists('ctx.rel'), is('ctx.sad')], act: 'condole', tone: 'polite', text: (g) => fromD(g, 'P_CONDOLE') }),
@@ -124,9 +129,25 @@ export const choiceRules: R[] = [
   // дело в суде открыто — игрок может его продолжить (угроза двигает линию суда)
   offer({
     name: 'Court', when: [gte('court', 1), lte('court', 6)], odds: 0.35, tone: 'threat',
-    text: (g) => fromArr(g, 'P_COURT', ['Увидимся в суде, Алик.', 'Я подаю в суд. Серьёзно.', 'Мой адвокат с вами свяжется.', 'Жду повестку, Алик.', 'До встречи в зале суда.', 'Суд всё решит.']),
+    text: (g) => fromArr(g, 'P_COURT', ['Увидимся в суде, Алик.', 'Я подаю в суд. Серьёзно.', 'Мой адвокат с вами свяжется.', 'Жду повестку, Алик.', 'До встречи в зале суда.', 'Суд всё решит.', 'Передайте Арсену: я готов.', 'Я иду до конца. До самого Страсбурга.', 'Готовьте документы, Алик.', 'Суд — не свадьба, там не отмажешься.', 'Я нашёл юриста. Настоящего, с дипломом.', 'Иск готов. Осталось распечатать.']),
   }),
   // «Это корова?» — только сразу после «Мууу», а не всю игру
+  // ответить на то, что только что прозвучало: реплику легенды денег, вмешавшегося персонажа, воспоминание Алика
+  ...(['legend', 'chorus', 'memory'] as const).map((kind) => {
+    let arg = ''
+    return offer({
+      name: 'Talk_' + kind, when: [kind === 'memory' ? is('ctx.memory') : exists('ctx.' + kind)], act: 'talk', tone: 'neutral', bonus: 2, odds: 0.8,
+      text: (g, f) => {
+        const sub = kind === 'memory' ? '' : String(f['ctx.' + kind])
+        const said = g.S.msgs.slice(-6).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : [])).join(' ')
+        const i = talkPairs(kind, sub).findIndex((p, j) => !g.lines.has(talkId(kind, sub, j)) && g.known(p[0]) && g.known(p[1]) && (p[2]?.(g.S, said) ?? true))
+        if (i < 0) return ''
+        arg = `${kind}|${sub}|${i}`
+        return talkPairs(kind, sub)[i][0]
+      },
+      arg: () => arg,
+    })
+  }),
   offer({ name: 'Cow', when: [is('mooFresh')], odds: 0.8, bonus: 2, tone: 'cow', text: (g) => fromD(g, 'P_COW') }),
   // ответ по теме: игрок цепляется за то, что Алик только что сказал (после серии сериала — вопрос про сериал важнее)
   offer({

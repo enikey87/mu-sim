@@ -40,14 +40,16 @@ async function offended(game: Game, text?: string, away = true): Promise<void> {
 }
 
 const family = (who: string): R => ({
-  name: `Rude_Family_${who}`, event: 'PlayerMessage', when: [rude, gte(HEAT, 1)], bonus: 1, cooldown: { days: 4 }, remember: cools, trigger: cool,
+  // Арсен пишет, только когда уже появился в переписке (юрист, «племянник дяди Алика»)
+  name: `Rude_Family_${who}`, event: 'PlayerMessage', when: [rude, gte(HEAT, 1), ...(who === 'arsen' ? [is('intro.arsen')] : who === 'karine' ? [ne('finale.rubik', 'karine')] : [])], bonus: 1, cooldown: { days: 4 }, remember: cools, trigger: cool,
   respond: async ({ game }) => {
     game.mood(-1)
     // у родственника кончились новые фразы — пишет сам Алик
     const t = game.line('RF_' + who, T.RUDE_FAMILY[who])
     if (!t) { await game.say([game.uniq(game.X.offended)]); game.setCtx({ offended: true }); return }
     await game.say([{ w: who, t }])
-    if (game.chance(0.6)) { await game.sleep(700); await game.say([freshOr(game, 'RF_ALIK', T.RUDE_FAMILY_ALIK, game.X.offended)]) }
+    // «я забрала у Алика телефон» — значит, сам Алик следом не пишет
+    if (!/забрала у Алика телефон/.test(t) && game.chance(0.6)) { await game.sleep(700); await game.say([freshOr(game, 'RF_ALIK', T.RUDE_FAMILY_ALIK, game.X.offended)]) }
     game.setCtx({ offended: true })
   },
 })
