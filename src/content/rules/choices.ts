@@ -2,7 +2,7 @@
 // Берутся два самых приоритетных (специфичность + bonus); из одного слота — только одна.
 import type { Game } from '../../engine/game'
 import type { Choice, Tone } from '../../engine/state'
-import { type Rule, type Facts, type Criterion, eq, is, exists, missing, gt, gte } from '../../engine/rules'
+import { type Rule, type Facts, type Criterion, eq, is, exists, missing, gt, gte, lte } from '../../engine/rules'
 import { D, cap } from '../excuses'
 import { ARCS, WRONG_Q } from '../arcs'
 import * as L from '../life'
@@ -54,7 +54,7 @@ export const choiceRules: R[] = [
   offer({ name: 'Sorry', when: [is('ctx.offended')], act: 'sorry', tone: 'polite', bonus: 5, text: (g) => fromD(g, 'P_SORRY') }),
   // лестница грубости: заблокирован — извиниться можно только через Бориса; ссора горячая — можно мычать
   offer({ name: 'ViaBoris', when: [is('blocked')], act: 'viaBoris', tone: 'polite', bonus: 7, text: (g) => fromArr(g, 'P_VIA_BORIS', ['Борис, передай Алику: прости меня', 'Попросить Бориса передать извинения', 'Борис, скажи ему «бее» от меня. Мирное']) }),
-  offer({ name: 'Moo', when: [is('ctx.offended'), gte('rude.heat', 1)], odds: 0.5, tone: 'cow', bonus: 4, text: (g) => fromArr(g, 'P_MOO', ['Мууу.', 'Мууууу 🐄', 'Му. (Это значит «мир».)']) }),
+  offer({ name: 'Moo', when: [is('ctx.offended'), gte('rude.heat', 1)], odds: 0.5, act: 'moo', tone: 'neutral', bonus: 4, text: (g) => fromArr(g, 'P_MOO', ['Мууу.', 'Мууууу 🐄', 'Му. (Это значит «мир».)']) }),
 
   // ответ на то, ЧТО прислал Алик
   offer({ name: 'Photo', when: [eq('ctx.type', 'photo')], act: 'photo', tone: 'neutral', bonus: 3, text: (g) => fromD(g, 'P_PHOTO') }),
@@ -88,7 +88,7 @@ export const choiceRules: R[] = [
     name: 'WhyRel', slot: 'rel', specificity: 2, weight: 1, when: [exists('ctx.rel')], act: 'whyRel', tone: 'neutral',
     text: (g, f) => fromD(g, 'P_WHY_REL', { n: String(f['ctx.rel']) }),
   }),
-  offer({ name: 'Congrats', slot: 'rel', specificity: 2, weight: 1, when: [exists('ctx.rel'), eq('ctx.sad', false)], act: 'congrats', tone: 'polite', text: (g) => fromD(g, 'P_CONGRATS') }),
+  offer({ name: 'Congrats', slot: 'rel', specificity: 2, weight: 1, when: [exists('ctx.rel'), is('ctx.festive')], act: 'congrats', tone: 'polite', text: (g) => fromD(g, 'P_CONGRATS') }),
   offer({ name: 'Condole', slot: 'rel', specificity: 2, weight: 1, when: [exists('ctx.rel'), is('ctx.sad')], act: 'condole', tone: 'polite', text: (g) => fromD(g, 'P_CONDOLE') }),
 
   offer({ name: 'Doubt', when: [is('ctx.constr')], act: 'defend', tone: 'neutral', bonus: 1, text: (g) => fromD(g, 'P_DOUBT') }),
@@ -120,11 +120,29 @@ export const choiceRules: R[] = [
     text: (g, f) => fromArr(g, 'F_' + f.arcUnfinished, ARCS[String(f.arcUnfinished)].follow), arg: (_g, f) => String(f.arcUnfinished),
   }),
 
+  // дело в суде открыто — игрок может его продолжить (угроза двигает линию суда)
+  offer({
+    name: 'Court', when: [gte('court', 1), lte('court', 6)], odds: 0.35, tone: 'threat',
+    text: (g) => fromArr(g, 'P_COURT', ['Увидимся в суде, Алик.', 'Я подаю в суд. Серьёзно.', 'Мой адвокат с вами свяжется.', 'Жду повестку, Алик.', 'До встречи в зале суда.', 'Суд всё решит.']),
+  }),
   // «Это корова?» — только сразу после «Мууу», а не всю игру
   offer({ name: 'Cow', when: [is('mooFresh')], odds: 0.8, bonus: 2, tone: 'cow', text: (g) => fromD(g, 'P_COW') }),
   // ответ по теме: игрок цепляется за то, что Алик только что сказал (после серии сериала — вопрос про сериал важнее)
   offer({
     name: 'Topic', when: [exists('ctx.topic'), missing('ctx.arc')], act: 'topic', tone: 'neutral', odds: 0.85,
-    text: (g, f) => g.freshPlayer('PT_' + f['ctx.topic'], TOPICS[String(f['ctx.topic'])].p) ?? '', arg: (_g, f) => String(f['ctx.topic']),
+    ...(() => {
+      let arg = ''
+      return {
+        // вопрос и ответ идут парой: p[i] ↔ a[i]
+        text: (g: Game, f: Facts) => {
+          const t = TOPICS[String(f['ctx.topic'])]
+          const fits = t.p.filter((_, i) => !t.need?.[i] || t.need[i].test(g.topicText))
+          const q = g.freshPlayer('PT_' + f['ctx.topic'], fits)
+          arg = q ? `${f['ctx.topic']}:${t.p.indexOf(q)}` : ''
+          return q ?? ''
+        },
+        arg: () => arg,
+      }
+    })(),
   }),
 ]

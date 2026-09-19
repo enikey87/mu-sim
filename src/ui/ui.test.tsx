@@ -16,7 +16,8 @@ describe('App', () => {
     expect(screen.getByText('Алик Воздухонесян')).toBeInTheDocument()
     expect(screen.getByText(/240\s000 ₽/)).toBeInTheDocument()
     expect(document.querySelectorAll('.choices button').length).toBeGreaterThanOrEqual(3)
-    expect(screen.getByText(/Деньги в пятницу/)).toBeInTheDocument()
+    const intro = game.S.msgs[1]
+    expect(screen.getByText(intro.kind === 'text' ? intro.text : '')).toBeInTheDocument()
   })
 
   it('клик по варианту — сообщение игрока и ответ Алика', async () => {

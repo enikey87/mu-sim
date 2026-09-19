@@ -4,6 +4,7 @@
 // go: 'node' | 'scene:node' | null (конец). Нет opts — сцена закончилась.
 import type { ExcuseApi } from './excuses'
 import type { Rng } from '../engine/rng'
+import { QUESTS, COURT_SCENE } from './quests'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Vars = Record<string, any>
@@ -631,6 +632,9 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
         },
       },
     },
+    // мини-квесты и заседание суда
+    ...QUESTS,
+    court: COURT_SCENE,
   };
 }
 

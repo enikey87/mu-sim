@@ -25,6 +25,7 @@ export const CAST: Record<string, { name: string; color: string }> = {
   niva: { name: '«Нива» 🚙', color: '#4d6b3a' },
   mama: { name: 'Мама Алика', color: '#c0567a' },
   intercom: { name: 'Домофон тёти Гоар', color: '#6b6b6b' },
+  judge: { name: 'Судья Ашот', color: '#3f4a5a' },
 };
 
 export const ARCS: Record<string, Arc> = {

@@ -140,9 +140,10 @@ describe('состояния мира со сроком', () => {
   it('серия «свадьба Самвела» включает свадьбу на 8 дней — она окрашивает ходы, потом проходит', async () => {
     const { game } = makeGame()
     await game.playArc('samvel')
+    game.S.arcs.beton = { i: 1, last: 0 } // второй сериал уже идёт — ходы не перехватывает «второй сериал»
     expect(game.S.mem.wedding).toBe(true)
     let noise = 0
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 150; i++) {
       game.S.stats.sent += 4
       if (game.rules.match({ event: 'AlikTurn' }, game.facts())?.name === 'Turn_Wedding') noise++
     }

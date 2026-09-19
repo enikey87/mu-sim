@@ -4,7 +4,7 @@ import type { Game } from '../../engine/game'
 import { type Rule, eq, ne, is, gte, add } from '../../engine/rules'
 import { AlikOffline, ThickJournal } from './criteria'
 import { cooldown } from './rude'
-import { TOPICS, TOPIC_FALLBACK } from '../topics'
+import { TOPICS, TOPIC_FALLBACK, TOPIC_NAME, TOPIC_OBSESSED } from '../topics'
 import { D, low, cap } from '../excuses'
 import { ARCS, NO_NEWS_A, NO_NEWS_B, GROUP_SEEN_A, GROUP_SEEN_B, WRONG_A, WRONG_B } from '../arcs'
 import * as L from '../life'
@@ -36,12 +36,19 @@ const simple = (intent: string, line: (g: Game) => string, after?: (g: Game) => 
 
 export const replyRules: R[] = [
   // Алик «пропал» после грубости — на любой вопрос, кроме извинения, отвечает, когда вернётся
-  { name: 'Says_WhileOffline', event: 'PlayerSays', when: [AlikOffline, ne('intent', 'sorry')], bonus: 5, respond: ({ game }) => game.alikTurn('neutral') },
+  { name: 'Says_WhileOffline', event: 'PlayerSays', when: [AlikOffline, ne('intent', 'sorry'), ne('intent', 'moo')], bonus: 5, respond: ({ game }) => game.alikTurn('neutral') },
 
   says('sorry', { remember: [add('count.sorry')], respond: ({ game }) => sorry(game, game.uniq(game.X.sorry)) }),
   says('sorry', {
     remember: [add('count.sorry')],
-    respond: ({ game }) => { game.unlock('memory'); return sorry(game, game.uniq(() => game.draw('SORRY_AGAIN', SORRY_AGAIN))) },
+    respond: ({ game }) => {
+      game.unlock('memory')
+      // свежая фраза «опять мир?», а кончились — обычное прощение из генератора
+      const t = game.seen.pickFresh(() => game.draw('SORRY_AGAIN', SORRY_AGAIN), (x) => x)
+      if (game.seen.has(t)) return sorry(game, game.uniq(game.X.sorry))
+      game.seen.mark(t)
+      return sorry(game, t)
+    },
   }, [gte('count.sorry', 2)]),
 
   simple('photo', (g) => g.uniq(g.X.photo)),
@@ -111,8 +118,8 @@ export const replyRules: R[] = [
       const id = String(facts.arg ?? '')
       game.S.mem['asked.' + id] = Number(game.S.mem['asked.' + id] ?? 0) + 1 // для финалов: «спрашивал про Бориса 3+ раз»
       const st = game.S.arcs[id]
-      // новая серия — не чаще раза в 2 дня, иначе сериал проглатывается за десять вопросов подряд
-      if (st && ARCS[id] && st.i < ARCS[id].eps.length && game.S.day - st.last >= 2) return game.playArc(id)
+      // на вопрос — следующая серия; второй вопрос подряд в тот же день — «пока без новостей» (не проглатывать сериал)
+      if (st && ARCS[id] && st.i < ARCS[id].eps.length && !(st.byAsk && game.S.day === st.last)) { await game.playArc(id); game.S.arcs[id].byAsk = true; return }
       await game.say([game.pair('NN_A', NO_NEWS_A, 'NN_B', NO_NEWS_B)])
       game.setCtx(null)
     },
@@ -128,11 +135,28 @@ export const replyRules: R[] = [
   }, [is('argArcDone')]),
 
   // ответ по теме (бетон, «Нива», свадьба…): свой пул у каждой темы, исчерпан — общий
+  // ответ по теме: вопрос и ответ парой (p[i] ↔ a[i]); ответ уже был — общий
   says('topic', {
     respond: async ({ game, facts }) => {
-      const t = TOPICS[String(facts.arg ?? '')]
-      const line = t ? game.seen.pickFresh(() => game.draw('TA_' + facts.arg, t.a), (x) => x) : ''
-      if (t && !game.seen.has(line)) { game.seen.mark(line); await game.say([line]) } else await game.say([game.uniq(() => game.draw('TOPIC_FB', TOPIC_FALLBACK))])
+      const [k, i] = String(facts.arg ?? '').split(':')
+      const mem = game.S.mem
+      const n = (mem['topic.' + k] = Number(mem['topic.' + k] ?? 0) + 1)
+      mem.topicRun = mem.topicLast === k ? Number(mem.topicRun ?? 0) + 1 : 1
+      mem.topicLast = k
+      // некоторые вопросы сразу превращаются в мини-квест («Приеду поесть» → хаш в 7 утра)
+      const quest = TOPICS[k]?.quest?.[Number(i)]
+      if (quest && game.scenes[quest]) return game.enterNode(quest, game.scenes[quest].start)
+      const a = TOPICS[k]?.a[Number(i)]
+      // ответ Алика — тоже тема: разговор может продолжиться
+      if (a && !game.seen.has(a)) { game.seen.mark(a); game.markTopical(await game.say([a])) } else await game.say([game.uniq(() => game.draw('TOPIC_FB', TOPIC_FALLBACK))])
+      // третий вопрос про одно и то же — Алик замечает и замолкает на эту тему на 20 дней
+      if (n >= 3 && TOPIC_NAME[k]) {
+        await game.sleep(600)
+        await game.say([game.uniq(() => game.draw('TOPIC_OBS', TOPIC_OBSESSED).replace('{n}', TOPIC_NAME[k]))])
+        game.unlock('memory')
+        mem['topic.' + k] = 0
+        mem['topicMute.' + k] = game.S.day + 20
+      }
       game.setCtx(null)
       if (game.chance(0.35)) await game.promiseLine()
     },
