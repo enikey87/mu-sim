@@ -10,7 +10,7 @@ import * as L from '../life'
 import { GROUP_Q } from '../misc'
 import { P_LIE } from '../lies'
 import { TOPICS } from '../topics'
-import { WORLD } from '../world'
+import { WORLD, SPEAKS } from '../world'
 import { fmtDayMonth } from '../../engine/time'
 
 type R = Rule<Game>
@@ -58,7 +58,7 @@ export const choiceRules: R[] = [
   offer({ name: 'Sorry', when: [is('ctx.offended')], act: 'sorry', tone: 'polite', bonus: 5, text: (g) => fromD(g, 'P_SORRY') }),
   // лестница грубости: заблокирован — извиниться можно только через Бориса; ссора горячая — можно мычать
   // посредник — лучший из тех, кто есть: Борис, Карине, мама Алика (один вариант на слот)
-  offer({ name: 'Via_boris', slot: 'via', when: [is('blocked'), WORLD.boris], act: 'via', arg: () => 'boris', tone: 'polite', bonus: 7, text: (g) => fromArr(g, 'P_VIA_BORIS', ['Борис, передай Алику: прости меня', 'Попросить Бориса передать извинения', 'Борис, скажи ему «бее» от меня. Мирное']) }),
+  offer({ name: 'Via_boris', slot: 'via', when: [is('blocked'), SPEAKS.boris], act: 'via', arg: () => 'boris', tone: 'polite', bonus: 7, text: (g) => fromArr(g, 'P_VIA_BORIS', ['Борис, передай Алику: прости меня', 'Попросить Бориса передать извинения', 'Борис, скажи ему «бее» от меня. Мирное']) }),
   offer({ name: 'Via_karine', slot: 'via', when: [is('blocked'), WORLD.karineHome], act: 'via', arg: () => 'karine', tone: 'polite', bonus: 6, text: (g) => fromArr(g, 'P_VIA_KARINE', ['Карине, передайте Алику: я извиняюсь', 'Попросить Карине передать извинения']) }),
   offer({ name: 'Via_mama', slot: 'via', when: [is('blocked')], act: 'via', arg: () => 'mama', tone: 'polite', bonus: 6, text: (g) => fromArr(g, 'P_VIA_MAMA', ['Попросить маму Алика передать извинения']) }),
   offer({ name: 'Moo', when: [is('ctx.offended'), gte('rude.heat', 1)], odds: 0.5, act: 'moo', tone: 'neutral', bonus: 4, text: (g) => fromArr(g, 'P_MOO', ['Мууу.', 'Мууууу 🐄', 'Му. (Это значит «мир».)']) }),

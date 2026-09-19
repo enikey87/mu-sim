@@ -161,7 +161,7 @@ function corpus(): Found[] {
       // исход Дня выплаты звучит по своему правилу — его условия известны
       else if (at === 'payday.OUTCOME') for (const [id, x] of Object.entries(v as object)) strings(x, `${at}.${id}`, expand(atoms(paydayRules.find((r) => r.name === 'Payday_' + id)?.when ?? [])), out)
       // посредники разблокировки — по своим правилам: Борис, пока он есть; Карине, пока она жена Алика
-      else if (at === 'rude.VIA_BORIS') strings(v, at, atoms([WORLD.boris]), out)
+      else if (at === 'rude.VIA_BORIS') strings(v, at, atoms([SPEAKS.boris]), out)
       else if (at === 'rude.VIA_KARINE' || at === 'rude.KARINE_HINT') strings(v, at, atoms([WORLD.karineHome]), out)
       else if (typeof v !== 'function') strings(v, at, [], out)
     }
@@ -199,7 +199,7 @@ describe('упоминания в контенте', () => {
   it('проверка ловит упоминание без требования и принимает требование, серию и финал', () => {
     const bare = strings(['Кран уехал.', 'Гарик на рынке.', ['boris', 'Бее.'], { w: 'karine', t: 'Алик!' }], 'x', [], [])
     expect(problems(bare)).toHaveLength(4)
-    expect(problems(strings([new Gated([WORLD.boris], ['boris', 'Бее.'])], 'x', [], []))).toEqual([])
+    expect(problems(strings([new Gated([SPEAKS.boris], ['boris', 'Бее.'])], 'x', [], []))).toEqual([])
     expect(problems(strings([new Gated([WORLD.crane], 'Кран уехал.')], 'x', [], []))).toEqual([])
     expect(problems(strings({ t: 'Гарик на рынке.', when: [WORLD.garikFree] }, 'x', [], []))).toEqual([])
     expect(problems(strings('Размик слез с крана.', 'x', finale('razmik'), []))).toEqual([])

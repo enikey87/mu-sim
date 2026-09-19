@@ -86,6 +86,13 @@ describe('лестница грубости: ступени', () => {
     expect(b.r).toBe('Rude_WhileBlocked') // блок важнее суда
     expect(texts(game, b.n)[0]).toBe(T.NOT_DELIVERED)
     expect(game.rules.match({ event: 'AlikTurn' }, game.facts())?.name).toBe('Turn_Blocked')
+    // не доходит и вежливое, и «Мууу»
+    const p = await fire(game, 'polite')
+    expect(p.r).toBe('Tone_WhileBlocked')
+    expect(texts(game, p.n)[0]).toBe(T.NOT_DELIVERED)
+    const m = await says(game, 'moo')
+    expect(m.r).toBe('Says_WhileBlocked')
+    expect(texts(game, m.n)[0]).toBe(T.NOT_DELIVERED)
     game.nextDay(4)
     await game.afterTurn()
     expect(game.S.mem.blocked).toBeUndefined()
@@ -108,7 +115,7 @@ describe('лестница грубости: ступени', () => {
   it('посредник — лучший из тех, кто есть: Борис, если он уже в истории; мама, если Карине ушла к Рубику', async () => {
     const { game } = makeGame()
     game.S.mem.blocked = true
-    game.S.arcs.boris = { i: 1, last: 0 }
+    game.S.arcs.boris = { i: 4, last: 0 } // Борис уже пишет сам
     expect(fresh(game).find((c) => c.act === 'via')?.arg).toBe('boris')
     expect((await says(game, 'sorry')).r).toBe('Says_sorry_blocked_boris')
     delete game.S.arcs.boris
@@ -118,7 +125,7 @@ describe('лестница грубости: ступени', () => {
   })
   it('S4 — семейный суд в группе (один раз): прелюдия, голосование, приговор — 10 дней вежливости', async () => {
     const { game } = makeGame()
-    game.S.arcs.boris = { i: 1, last: 0 } // Борис уже в сюжете — он свидетель в суде
+    game.S.arcs.boris = { i: 4, last: 0 } // Борис уже пишет — он свидетель в суде
     game.S.arcs.nune = { i: 1, last: 0 } // и Нуне уже в декрете
     heat(game, 4)
     const { r, n } = await fire(game, 'rude')

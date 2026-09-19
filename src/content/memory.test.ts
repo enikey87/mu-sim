@@ -21,7 +21,7 @@ describe('память Алика', () => {
   })
   it('конкретное событие важнее общей статистики', () => {
     const { game } = makeGame()
-    game.S.day = 320 // «триста дней» — приоритет 0
+    game.S.day = 301 // «триста дней» — приоритет 0
     game.S.ach.court = 190 // суд — приоритет 1
     expect(game.line('MEMORY', MEMORY)).toMatch(/Судья Ашот/)
     expect(game.line('MEMORY', MEMORY)).toMatch(/Триста дней/)

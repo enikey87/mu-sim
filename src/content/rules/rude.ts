@@ -94,6 +94,15 @@ export const rudeRules: R[] = [
     name: 'Rude_WhileBlocked', event: 'PlayerMessage', when: [rude, is('blocked')], bonus: 7, remember: cools, trigger: cool,
     respond: async ({ game }) => { game.sys(T.NOT_DELIVERED); await game.sleep(900); await sayFresh(game, 'ALT', T.RUDE_ALT); game.setCtx({ offended: true }) },
   },
+  // в чёрном списке не доходит ничего: ни вежливое, ни «Мууу», ни вопрос — Алик пишет с чужих номеров, не отвечая на сказанное
+  {
+    name: 'Tone_WhileBlocked', event: 'PlayerMessage', when: [is('blocked')], bonus: 6,
+    respond: async ({ game }) => { game.sys(T.NOT_DELIVERED); await game.sleep(900); await sayFresh(game, 'ALT', T.RUDE_ALT) },
+  },
+  {
+    name: 'Says_WhileBlocked', event: 'PlayerSays', when: [is('blocked'), ne('intent', 'via'), ne('intent', 'sorry')], bonus: 6,
+    respond: async ({ game }) => { game.sys(T.NOT_DELIVERED); await game.sleep(900); await sayFresh(game, 'ALT', T.RUDE_ALT) },
+  },
   // S4 — семейный суд в групповом чате, один раз за игру
   { name: 'Rude_Tribunal', event: 'PlayerMessage', when: [rude, gte(HEAT, 4)], bonus: 6, once: true, priority: 'cinematic', remember: cools, trigger: cool, respond: ({ game }) => game.tribunal() },
   // S5 — после суда 10 дней вежливости: на крик — ответ «в рамках регламента»
@@ -163,7 +172,7 @@ export const rudeSaysRules: R[] = [
   { name: 'Says_moo', event: 'PlayerSays', when: [eq('intent', 'moo')], respond: async ({ game }) => { await game.say([freshOr(game, 'MOO_ODD', T.MOO_ODD, game.X.cow)]); game.setCtx(null) } },
   // заблокирован — извинение не доходит; подсказывает посредник: Борис, Карине, иначе мама
   {
-    name: 'Says_sorry_blocked_boris', event: 'PlayerSays', when: [eq('intent', 'sorry'), is('blocked'), WORLD.boris], bonus: 6,
+    name: 'Says_sorry_blocked_boris', event: 'PlayerSays', when: [eq('intent', 'sorry'), is('blocked'), SPEAKS.boris], bonus: 6,
     respond: async ({ game }) => { game.sys(T.NOT_DELIVERED); await game.sleep(700); await game.say([{ w: 'boris', t: game.line('BORIS_HINT', T.BORIS_HINT, { repeat: true, cooldown: { turns: 5 }, fallback: () => 'Бее.' })! }]) },
   },
   {

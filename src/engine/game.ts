@@ -11,7 +11,7 @@ import { FINALES, ENDINGS, DEFAULT_FINALE, type Finale } from '../content/finale
 import { ARCS, ARC_DONE, CAST, type Episode, GROUP, GROUP_OOPS, WRONG_TO, WRONG_WHAT, WRONG_OOPS } from '../content/arcs'
 import * as L from '../content/life'
 import { ACH } from '../content/achievements'
-import { WORLD, SPEAKS, meet } from '../content/world'
+import { SPEAKS, meet } from '../content/world'
 import { FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_WANDER, OATH_FORMS } from '../content/misc'
 import { STARTS } from '../content/quests'
 import { allRules } from '../content/rules'
@@ -264,8 +264,9 @@ export class Game {
   realHour(): number {
     return this.hour ?? new Date(this.clock.now()).getHours()
   }
+  /** Время суток — настоящее (как в мессенджере), день недели — по календарю игры. */
   period(): Period {
-    return periodOf(this.realHour(), new Date(this.clock.now()).getDay())
+    return periodOf(this.realHour(), dateOf(this.S.day).getDay())
   }
   isNight = (): boolean => this.period() === 'night'
   realHHMM(): string {
@@ -278,7 +279,7 @@ export class Game {
   }
   nextDay(n: number): void {
     this.S.day += n
-    this.S.clock = 8 * 60 + this.rnd(180)
+    this.S.clock = this.realHour() * 60 + new Date(this.clock.now()).getMinutes()
     this.push({ kind: 'sep', text: fmtDate(this.S.day) })
     const t = tierOf(this.S.day)
     if (t > this.S.tier) {
@@ -424,14 +425,16 @@ export class Game {
     this.emit()
   }
   randomNotif(): void {
-    const [icon, app, t] = this.draw('NOTIF', L.NOTIF)
-    let text: string
-    if (typeof t === 'function') {
+    const p = this.linePicked('NOTIF', L.NOTIF)
+    if (!p) return
+    const n = p.spec as L.Notif
+    let text = p.text
+    if (n.spend) {
       const spend = 90 + this.rnd(40) * 10
       this.S.money = Math.max(0, this.S.money - spend)
-      text = t({ spend, what: this.draw('SPEND', L.SPEND), money: this.S.money })
-    } else text = t
-    this.notify(icon, app, text)
+      text = this.X.fill(text, { spend: String(spend), what: this.draw('SPEND', L.SPEND), money: this.S.money.toLocaleString('ru-RU') })
+    }
+    this.notify(n.icon, n.app, text)
   }
   drain(n = 1): void {
     if (this.dead) return
@@ -497,6 +500,7 @@ export class Game {
     const pr = extra.promise !== undefined ? S.promises[Number(extra.promise)] : undefined
     return {
       day: S.day, tier: S.tier, mood: S.mood, sent: S.stats.sent, moo: S.stats.moo, patience: S.patience,
+      dow: dateOf(S.day).getDay(), month: dateOf(S.day).getMonth() + 1,
       // прогресс сериалов: arc.grandpa = номер серии
       ...Object.fromEntries(Object.entries(S.arcs).map(([id, st]) => ['arc.' + id, st.i])),
       // ачивки и трофеи — условия для финалов сериалов и концовок
@@ -670,7 +674,8 @@ export class Game {
 
     // реакция на сообщение игрока; иногда — вместо ответа
     let reactOnly = false
-    if (!o.scene && this.chance(0.18) && mine.kind === 'text') {
+    // заблокировал — значит, не видит: реакции на недоставленное не бывает
+    if (!o.scene && !S.mem.blocked && this.chance(0.18) && mine.kind === 'text') {
       await this.sleep(600)
       mine.react = this.draw('R_' + tone, L.REACT[tone] ?? L.REACT.neutral)
       this.audio.vibrate(20)
@@ -784,7 +789,7 @@ export class Game {
 
   async readOnly(): Promise<void> {
     await this.sleep(1200)
-    this.sys(`Прочитано в ${this.draw('READ_ONLY_TIMES', D.READ_ONLY_TIMES)}`)
+    this.sys(`Прочитано в ${fmtTime(this.S.clock)}`)
     this.unlock('night')
     this.S.ctx = { type: 'readonly' }
   }
@@ -1061,7 +1066,7 @@ export class Game {
     await this.sleep(600)
     this.sys('Дядя Самвел добавил вас в группу «Стройка под ключ 🏗️ Семья». Тема: «Дело №1. Плиточник против уважения»')
     for (const [w, t] of this.open(TRIBUNAL)) await this.say([{ w, t }])
-    this.sys(`Голосование «Простить плиточника?» — Да: 1 (Гарик). Нет: ${5 + this.rnd(4)}.${this.holds(WORLD.boris) ? ' Бее: 1.' : ''}`)
+    this.sys(`Голосование «Простить плиточника?» — Да: 1 (Гарик). Нет: ${5 + this.rnd(4)}.${this.canSpeak('boris') ? ' Бее: 1.' : ''}`)
     await this.enterNode('tribunal', 'verdict')
   }
 

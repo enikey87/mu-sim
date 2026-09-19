@@ -7,6 +7,8 @@ import { type Criterion, type Entry, named, exists, is, eq, gte, ne, missing, se
 // Текст игра не разбирает; полноту разметки проверяет mentions.test.ts.
 export const WORLD = {
   boris: named('boris', exists('arc.boris')),
+  /** Борис научился писать (серия «Это Борис тебе написал. Сам!»). */
+  borisWrites: named('borisWrites', gte('arc.boris', 4)),
   /** Бараны как тема разговора: Борис, «фото платёжки» с бараном. */
   baran: named('baran', is('intro.baran')),
   razmik: named('razmik', exists('arc.razmik')),
@@ -34,7 +36,7 @@ export const needs = (...keys: WorldKey[]) => gate(...keys.map((k) => WORLD[k]))
 export const meet = (...ids: string[]) => ids.map((id) => set('intro.' + id, true))
 
 /** Кто пишет в чат сам (хор, семейный чат, родня на крик) только при условии; остальные — всегда. */
-export const SPEAKS: Record<string, Criterion> = { boris: WORLD.boris, arsen: WORLD.arsen, karine: WORLD.karineHome, razmik: WORLD.razmik, rubik: WORLD.rubik }
+export const SPEAKS: Record<string, Criterion> = { boris: WORLD.borisWrites, arsen: WORLD.arsen, karine: WORLD.karineHome, razmik: WORLD.razmik, rubik: WORLD.rubik }
 
 // --- обещание наступило: Алик пишет сам, до игрока ({t} — текст обещания)
 export const PROMISE_DUE = [

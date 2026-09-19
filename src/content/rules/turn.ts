@@ -1,6 +1,6 @@
 // Ход Алика в ответ на обычное сообщение игрока.
 import type { Game } from '../../engine/game'
-import { type Rule, eq, ne, gte, lte, is, exists } from '../../engine/rules'
+import { type Rule, eq, ne, gte, lte, is, exists, missing } from '../../engine/rules'
 import { meet } from '../world'
 import { AlikOffline } from './criteria'
 import { IDLE } from '../life'
@@ -70,7 +70,8 @@ export const turnRules: R[] = [
   },
   // память: Алик вспоминает, что было в этой партии (реплики с условиями, каждая один раз)
   { name: 'Turn_Memory', event: 'AlikTurn', when: [gte('sent', 8)], specificity: 0, weight: 7, cooldown: { turns: 4 }, respond: async ({ game }) => { const t = game.line('MEMORY', MEMORY); if (t) { await game.say([t]); game.unlock('memory') } else await game.excuseTurn() } },
-  { name: 'Turn_Callback', event: 'AlikTurn', when: [is('callbackReady')], specificity: 0, weight: 6, cooldown: { days: 5 }, respond: ({ game }) => game.callback() },
+  // «помнишь, деньги в сейфе?» — после Дня выплаты деньги «отданы», старые версии уже не продолжаются
+  { name: 'Turn_Callback', event: 'AlikTurn', when: [is('callbackReady'), missing('payday.chain')], specificity: 0, weight: 6, cooldown: { days: 5 }, respond: ({ game }) => game.callback() },
   { name: 'Turn_Sticker', event: 'AlikTurn', when: [], specificity: 0, weight: W.sticker, respond: ({ game }) => game.sticker() },
   { name: 'Turn_Forward', event: 'AlikTurn', when: [], specificity: 0, weight: W.fwd, respond: ({ game }) => game.forward() },
   { name: 'Turn_Transfer', event: 'AlikTurn', when: [], specificity: 0, weight: transferW, respond: ({ game }) => game.transfer() },

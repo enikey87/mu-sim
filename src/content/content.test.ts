@@ -103,10 +103,10 @@ describe('dictionaries', () => {
     for (const k of ['IDLE', 'STICKERS', 'FWD', 'DELETED', 'EDIT_WHEN', 'IDLE_Q', 'IDLE_A', 'VOICE', 'NOTIF', 'SPEND'] as const) {
       expect((L[k] as unknown[]).length, k).toBeGreaterThan(0)
     }
-    for (const [icon, app, t] of L.NOTIF.map(valueOf)) {
-      expect(icon && app).toBeTruthy()
-      const text = typeof t === 'function' ? t({ spend: 100, what: 'Гречка', money: 500 }) : t
-      expect(text).not.toMatch(/undefined|NaN/)
+    for (const n of L.NOTIF) {
+      expect(n.icon && n.app, n.t).toBeTruthy()
+      // подстановки — только у трат с карты
+      expect(/\{\w+\}/.test(n.t), n.t).toBe(!!n.spend)
     }
   })
   it('player templates only use known placeholders', () => {
