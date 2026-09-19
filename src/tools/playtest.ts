@@ -1,0 +1,117 @@
+// Плейтест для поиска несостыковок: бот со своим seeded-генератором играет партию, каждое действие записывается.
+// Та же версия кода + тот же seed = та же партия; запись действий проигрывается заново (replay) и сверяется.
+import { Game } from '../engine/game'
+import { manualClock } from '../engine/clock'
+import { seededRng, type Rng } from '../engine/rng'
+import { CAST } from '../content/arcs'
+import type { Choice, Msg } from '../engine/state'
+
+export type Style = 'curious' | 'polite' | 'hothead'
+export const STYLES: Style[] = ['curious', 'polite', 'hothead']
+const HOURS = [14, 20, 9, 2, 17, 12]
+
+/** Что бот сделал за ход: выбрал вариант i из offered, ответил на допработу, зарядил телефон, промолчал. */
+export type Act =
+  | { kind: 'send'; i: number; offered: string[]; at: number }
+  | { kind: 'job'; yes: boolean }
+  | { kind: 'charge' }
+  | { kind: 'idle' }
+
+/** moos — индексы сообщений, перед которыми на фоне прозвучало «Мууу» (в чате его нет, игрок его слышит и видит). */
+export interface Played { seed: number; style: Style; hour: number; acts: Act[]; moos: number[]; game: Game }
+
+/** Характер бота: доля контекстных вариантов, доля грубости, шанс промолчать (Алик пишет сам). */
+const PROFILE: Record<Style, { ctx: number; rude: number; idle: number; polite: number }> = {
+  curious: { ctx: 0.75, rude: 0.03, idle: 0.06, polite: 0 },
+  polite: { ctx: 0.4, rude: 0, idle: 0.04, polite: 0.7 },
+  hothead: { ctx: 0.4, rude: 0.3, idle: 0.03, polite: 0 },
+}
+
+function pick(rng: Rng, style: Style, cs: Choice[]): number {
+  const p = PROFILE[style]
+  const idx = (f: (c: Choice) => boolean) => cs.map((c, i) => (f(c) ? i : -1)).filter((i) => i >= 0)
+  const any = (ids: number[]) => ids[Math.floor(rng.random() * ids.length)]
+  const ctx = idx((c) => !!(c.act || c.scene))
+  if (ctx.length && rng.random() < p.ctx) return any(ctx)
+  const rude = idx((c) => c.tone === 'rude' || c.tone === 'threat')
+  if (rude.length && rng.random() < p.rude) return any(rude)
+  const polite = idx((c) => c.tone === 'polite')
+  if (polite.length && rng.random() < p.polite) return any(polite)
+  const safe = idx((c) => c.tone !== 'rude' && c.tone !== 'threat')
+  return safe.length ? any(safe) : 0
+}
+
+/** Сыграть партию ботом (или повторить записанные действия replay). */
+export async function playtest(seed: number, turns: number, replay?: Act[]): Promise<Played> {
+  const style = STYLES[seed % STYLES.length]
+  const hour = HOURS[seed % HOURS.length]
+  const clock = manualClock(Date.parse('2026-09-14T12:00:00Z') + (seed % 7) * 864e5)
+  const game = new Game({ storage: null, clock, rng: seededRng(seed), noTimers: true, hour })
+  const bot = seededRng(seed * 7919 + 17)
+  const acts: Act[] = []
+  const moos: number[] = []
+  const next = (): Act => {
+    if (game.dead) return { kind: 'charge' }
+    const job = game.S.msgs.find((m) => m.kind === 'job' && !m.answered)
+    if (job) return { kind: 'job', yes: bot.random() < 0.5 }
+    if (game.S.stats.sent >= 5 && bot.random() < PROFILE[style].idle) return { kind: 'idle' }
+    const offered = game.choices.map((c) => c.text)
+    return { kind: 'send', i: pick(bot, style, game.choices), offered, at: game.S.msgs.length }
+  }
+  for (let k = 0; k < (replay?.length ?? turns); k++) {
+    const a = replay ? replay[k] : next()
+    if (a.kind === 'send' && replay) {
+      const now = game.choices.map((c) => c.text)
+      if (now.join('\n') !== a.offered.join('\n')) throw new Error(`replay разошёлся на ходу ${k}: ${JSON.stringify(now)}`)
+    }
+    acts.push(a)
+    if (a.kind === 'charge') await game.charge()
+    else if (a.kind === 'job') { const job = game.S.msgs.find((m) => m.kind === 'job' && !m.answered)!; await game.answerJob(job.id, a.yes) }
+    else if (a.kind === 'idle') await game.onIdle()
+    else {
+      await game.send(game.choices[a.i])
+      // перед репликой игрока может встать разделитель дня — варианты привязываем к самой реплике
+      if (!replay) a.at = game.S.msgs.findIndex((m, i) => i >= a.at && m.kind === 'text' && m.from === 'me')
+    }
+    const moo = game.S.stats.moo
+    clock.runTimers() // «Мууу» и прочее отложенное
+    if (game.S.stats.moo > moo) moos.push(game.S.msgs.length)
+  }
+  return { seed, style, hour, acts, moos, game }
+}
+
+function line(m: Msg): string {
+  const t = m.time ? `[${m.time}] ` : ''
+  switch (m.kind) {
+    case 'sep': return `\n—— ${m.text} ——`
+    case 'sys': return `[система] ${m.text}`
+    case 'text': {
+      const who = m.from === 'me' ? 'Я' : m.who ? (CAST[m.who]?.name ?? m.who) : 'Алик'
+      const marks = [m.deleted && 'удалено', m.edited && 'изменено', m.react && `реакция Алика ${m.react}`].filter(Boolean)
+      return `${t}${who}: ${m.text}${marks.length ? `  (${marks.join(', ')})` : ''}`
+    }
+    case 'transfer': return `${t}Алик: 💸 перевод 50 ₽ — «${m.text}»`
+    case 'voice': return `${t}Алик: 🎤 голосовое 0:${String(m.len).padStart(2, '0')}${m.feast ? ' (шум застолья)' : ''}`
+    case 'photo': return `${t}Алик: 📷 фото «платёжки» — ${m.text}`
+    case 'sticker': return `${t}Алик: [стикер ${m.e} ${m.c}]`
+    case 'fwd': return `${t}Алик: ↪ переслано от «${m.f}»: ${m.text}`
+    case 'doc': return `${t}Алик: 📄 ${m.title}: ${m.rows.map(([r, n]) => `${r} — ${n} ₽`).join('; ')}. Итого ${m.total} ₽`
+    case 'job': return `${t}Алик: 🛠 допработа: ${m.text}${m.answered ? '' : ' (без ответа)'}`
+  }
+}
+
+/** Переписка партии как текст: сообщения по порядку, перед репликой игрока — варианты, из которых он выбирал. */
+export function transcript(p: Played): string {
+  const offers = new Map<number, string>()
+  for (const a of p.acts) if (a.kind === 'send') offers.set(a.at, a.offered.map((o, i) => `${i === a.i ? '▶' : ' '} ${o}`).join('\n    '))
+  const out = [`Партия ${p.seed}: сообщений игрока — ${p.game.S.stats.sent}, в конце — ${p.game.S.day}-й день ожидания денег`]
+  const moo = new Set(p.moos)
+  p.game.S.msgs.forEach((m, i) => {
+    if (moo.has(i)) out.push('(на фоне кто-то протяжно: «Мууууу»)')
+    const o = offers.get(i)
+    if (o && m.kind === 'text' && m.from === 'me') out.push(`    варианты:\n    ${o}`)
+    out.push(line(m))
+  })
+  if (moo.has(p.game.S.msgs.length)) out.push('(на фоне кто-то протяжно: «Мууууу»)')
+  return out.join('\n')
+}

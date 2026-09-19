@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "rules:report": "RULES_REPORT=1 vitest run src/tools/tools.test.ts",
-    "test:rules": "vitest run src/engine/rules --coverage"
+    "test:rules": "vitest run src/engine/rules --coverage",
+    "playtest": "vitest run src/tools/playtest.test.ts"
   },
   "dependencies": {
     "react": "19.3.0",
