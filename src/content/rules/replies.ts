@@ -1,0 +1,128 @@
+// Событие PlayerSays { intent, arg } — ответ Алика на контекстную реплику игрока.
+// Общее правило по intent + более специфичные для частных случаев (память, контекст).
+import type { Game } from '../../engine/game'
+import { type Rule, eq, ne, is, gte, add } from '../../engine/rules'
+import { D, low } from '../excuses'
+import { ARCS, ARC_DONE, NO_NEWS_A, NO_NEWS_B, GROUP_SEEN_A, GROUP_SEEN_B, WRONG_A, WRONG_B } from '../arcs'
+import * as L from '../life'
+import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER } from '../misc'
+
+type R = Rule<Game>
+const says = (intent: string, rest: Partial<R> & Pick<R, 'respond'>, extra: R['when'] = []): R => ({
+  name: `Says_${intent}${extra.length ? '_' + extra.map((c) => c.key.replace(/\W/g, '')).join('_') : ''}`,
+  event: 'PlayerSays',
+  when: [eq('intent', intent), ...extra],
+  ...rest,
+})
+
+async function sorry(game: Game, line: string): Promise<void> {
+  game.mood(3)
+  game.unlock('sorry')
+  const wasOff = game.S.offlineDays
+  game.S.offlineDays = Math.floor(game.S.offlineDays / 3)
+  if (wasOff && game.S.offlineDays) game.nextDay(game.S.offlineDays)
+  game.S.offlineDays = 0
+  await game.say([line])
+  game.setCtx(null)
+}
+
+const simple = (intent: string, line: (g: Game) => string, after?: (g: Game) => void | Promise<void>): R =>
+  says(intent, { respond: async ({ game }) => { await game.say([line(game)]); game.setCtx(null); await after?.(game) } })
+
+export const replyRules: R[] = [
+  // Алик «пропал» после грубости — на любой вопрос, кроме извинения, отвечает, когда вернётся
+  { name: 'Says_WhileOffline', event: 'PlayerSays', when: [is('offline'), ne('intent', 'sorry')], bonus: 5, respond: ({ game }) => game.alikTurn('neutral') },
+
+  says('sorry', { remember: [add('count.sorry')], respond: ({ game }) => sorry(game, game.uniq(game.X.sorry)) }),
+  says('sorry', {
+    remember: [add('count.sorry')],
+    respond: ({ game }) => { game.unlock('memory'); return sorry(game, game.uniq(() => game.draw('SORRY_AGAIN', SORRY_AGAIN))) },
+  }, [gte('count.sorry', 2)]),
+
+  simple('photo', (g) => g.uniq(g.X.photo)),
+  simple('voice', (g) => g.uniq(g.X.cow)),
+  simple('voiceText', (g) => g.pair('VOICE_A', D.VOICE_A, 'VOICE_B', D.VOICE_B)),
+  simple('transferQ', (g) => g.uniq(g.X.transferQ)),
+  says('legendQ', { respond: async ({ game }) => { game.mood(1); await game.say([game.uniq(game.X.legendQ)]); game.setCtx(null) } }),
+  says('shortQ', { respond: async ({ game, facts }) => { await game.say([game.uniq(() => game.X.shortQ(String(facts.arg ?? '')))]); game.setCtx(null) } }),
+  simple('short2', (g) => g.pair('SHORT2_A', D.SHORT2_A, 'SHORT2_B', D.SHORT2_B)),
+
+  says('promiseCheck', { respond: async ({ game, facts }) => { await game.say([game.uniq(() => game.X.promiseCheck(String(facts.arg ?? '')))]); game.setCtx(null) } }),
+  // срок «когда-нибудь» — переспрашивать бессмысленно, и Алик это честно признаёт
+  says('promiseCheck', { respond: async ({ game }) => { await game.say([game.uniq(() => game.draw('PROMISE_NEVER', PROMISE_NEVER))]); game.setCtx(null) } }, [is('ctx.whenNever')]),
+
+  says('condole', { respond: async ({ game }) => { game.mood(1); await game.say([game.pair('CONDOLE_A', D.CONDOLE_A, 'CONDOLE_B', D.CONDOLE_B)]); game.setCtx(null) } }),
+  // соболезнуешь, а покойник уже встал и говорит тост
+  says('condole', { respond: async ({ game }) => { await game.say([game.uniq(() => game.draw('CONDOLE_REVIVED', CONDOLE_REVIVED))]); game.setCtx(null) } }, [is('ctx.revived')]),
+
+  says('congrats', {
+    respond: async ({ game }) => {
+      const rel = game.ctx?.rel
+      game.mood(2)
+      if (rel) await game.say([game.uniq(() => game.X.congrats(rel))])
+      if (game.chance(0.25 + game.S.mood * 0.03)) { await game.transfer(); return }
+      const r = game.uniq(game.X.ping)
+      game.recordPromise(r.p)
+      await game.say([`Про деньги — ${low(r.p.text)}.`])
+      game.setCtx(game.ctxFromPromise(r.p))
+    },
+  }),
+
+  says('whyRel', {
+    respond: async ({ game }) => {
+      const rel = game.ctx?.rel ?? { n: 'он', g: 'него' }
+      const r = game.uniq(() => game.X.whyRel(rel))
+      game.recordPromise(r.p)
+      await game.say([r.text])
+      game.setCtx({ ...game.ctxFromPromise(r.p), constr: true })
+    },
+  }),
+  says('defend', { respond: async ({ game }) => { const r = game.uniq(game.X.defend); game.recordPromise(r.p); await game.say([r.text]); game.setCtx(game.ctxFromPromise(r.p)) } }),
+  says('ping', { respond: async ({ game }) => { const r = game.uniq(game.X.ping); game.recordPromise(r.p); await game.say([r.text]); game.setCtx(game.ctxFromPromise(r.p)) } }),
+
+  says('prev', {
+    respond: async ({ game, facts }) => {
+      const i = Number(facts.arg)
+      if (game.S.promises[i]) game.S.promises[i].asked = true
+      const r = game.uniq(game.X.prev)
+      game.recordPromise(r.p)
+      await game.say([r.text])
+      game.setCtx(game.ctxFromPromise(r.p))
+    },
+  }),
+  // обещаний накопилось много — Алик и сам это понимает
+  says('prev', {
+    respond: async ({ game, facts }) => {
+      const i = Number(facts.arg)
+      if (game.S.promises[i]) game.S.promises[i].asked = true
+      game.unlock('memory')
+      await game.promiseLine(game.uniq(() => game.draw('PREV_MANY', PREV_MANY)))
+    },
+  }, [gte('lateCount', 5)]),
+
+  says('arc', {
+    respond: async ({ game, facts }) => {
+      const id = String(facts.arg ?? '')
+      const st = game.S.arcs[id]
+      if (st && ARCS[id] && st.i < ARCS[id].eps.length) return game.playArc(id)
+      await game.say([game.pair('NN_A', NO_NEWS_A, 'NN_B', NO_NEWS_B)])
+      game.setCtx(null)
+    },
+  }),
+  // сериал закончился — у каждого свой финальный ответ вместо общего «без новостей»
+  says('arc', {
+    respond: async ({ game, facts }) => {
+      const id = String(facts.arg ?? '')
+      await game.say([game.uniq(() => game.draw('DONE_' + id, ARC_DONE[id] ?? NO_NEWS_A))])
+      game.setCtx(null)
+    },
+  }, [is('argArcDone')]),
+
+  says('group', { respond: async ({ game }) => { game.mood(-1); await game.say([game.pair('GS_A', GROUP_SEEN_A, 'GS_B', GROUP_SEEN_B)]); game.setCtx(null) } }),
+  simple('wrong', (g) => g.pair('WA', WRONG_A, 'WB', WRONG_B)),
+  says('idleReply', { respond: async ({ game }) => { game.setCtx(null); await game.say([game.uniq(() => game.draw('IDLE_A', L.IDLE_A))]); await game.promiseLine() } }),
+  simple('stickerQ', (g) => g.uniq(() => g.draw('STICKER_A', L.STICKER_A))),
+  simple('fwdQ', (g) => g.uniq(() => g.draw('FWD_A', L.FWD_A))),
+  says('reactQ', { respond: async ({ game }) => { game.setCtx(null); await game.say([game.uniq(() => game.draw('REACT_A', L.REACT_A))]); await game.promiseLine() } }),
+  simple('deletedQ', (g) => g.uniq(() => g.draw('DEL_A', L.DEL_A))),
+]
