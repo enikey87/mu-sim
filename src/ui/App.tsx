@@ -3,7 +3,7 @@ import type { Game } from '../engine/game'
 import { GameContext, useGame } from './useGame'
 import { StatusBar, ChatHeader, StatsBar } from './Header'
 import { Chat } from './Chat'
-import { Choices } from './Input'
+import { Choices, Composer } from './Input'
 import { Sheet } from './Sheet'
 import { Toast, Notification, DeadScreen, EndingScreen } from './Overlays'
 import { DebugPanel } from './DebugPanel'
@@ -65,6 +65,7 @@ function Phone({ onReset }: { onReset: () => void }) {
       <StatsBar />
       <Chat />
       <Choices />
+      <Composer />
       {sheet && <Sheet onClose={() => setSheetOpen(false)} onReset={reset} />}
       <Toast />
       <Notification />

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, act, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { App } from './App'
 import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
@@ -52,10 +53,49 @@ describe('App', () => {
     for (const t of texts) expect(screen.getAllByText(t).some((el) => el.closest('.choices'))).toBe(true)
   })
 
-  it('поля ввода и индикаторов настроения/терпения нет', () => {
+  it('свой текст отправляется, обрезается по краям, а поле очищается', async () => {
     const { game } = makeGame()
     renderApp(game)
-    expect(screen.queryByLabelText('Сообщение')).toBeNull()
+    const user = userEvent.setup()
+    const input = screen.getByLabelText('Сообщение') as HTMLInputElement
+    expect(screen.getByLabelText('Отправить')).toBeDisabled()
+    await user.type(input, '  Алик, когда оплата?  ')
+    await act(async () => { await user.click(screen.getByLabelText('Отправить')) })
+    expect(game.S.msgs.some((m) => m.kind === 'text' && m.from === 'me' && m.text === 'Алик, когда оплата?')).toBe(true)
+    expect(input.value).toBe('')
+    expect(game.S.stats.sent).toBe(1)
+  })
+
+  it('пустой ввод не отправляется; во время ответа поле блокируется и сохраняет черновик', async () => {
+    const { game } = makeGame()
+    renderApp(game)
+    const user = userEvent.setup()
+    const input = screen.getByLabelText('Сообщение') as HTMLInputElement
+    await user.type(input, '   ')
+    expect(screen.getByLabelText('Отправить')).toBeDisabled()
+    fireEvent.submit(document.querySelector('#composer')!)
+    expect(game.S.stats.sent).toBe(0)
+
+    await user.clear(input)
+    await user.type(input, 'Черновик')
+    act(() => { game.busy = true; game.emit() })
+    expect(input).toBeDisabled()
+    expect(screen.getByLabelText('Отправить')).toBeDisabled()
+    expect(input.value).toBe('Черновик')
+    fireEvent.submit(document.querySelector('#composer')!)
+    expect(game.S.stats.sent).toBe(0)
+  })
+
+  it('в сцене подсказывает, что можно выбрать вариант или написать свой', async () => {
+    const { game } = makeGame()
+    await game.enterNode('toast', 'ask')
+    renderApp(game)
+    expect(screen.getByLabelText('Сообщение')).toHaveAttribute('placeholder', expect.stringMatching(/выберите ответ/i))
+  })
+
+  it('индикаторов настроения и терпения по-прежнему нет', () => {
+    const { game } = makeGame()
+    renderApp(game)
     expect(document.querySelector('#mood, #patience')).toBeNull()
   })
 
