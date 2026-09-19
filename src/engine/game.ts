@@ -264,9 +264,9 @@ export class Game {
   realHour(): number {
     return this.hour ?? new Date(this.clock.now()).getHours()
   }
-  /** Время суток — настоящее (как в мессенджере), день недели — по календарю игры. */
+  /** Время суток — по часам переписки (день начинается с настоящего времени), день недели — по календарю игры. */
   period(): Period {
-    return periodOf(this.realHour(), dateOf(this.S.day).getDay())
+    return periodOf(Math.floor(this.S.clock / 60), dateOf(this.S.day).getDay())
   }
   isNight = (): boolean => this.period() === 'night'
   /** Время суток игрока в минутах: новый день переписки начинается «сейчас». */
@@ -1223,7 +1223,6 @@ export class Game {
   }
   private awayMsg(): void {
     const r = this.rng.random()
-    this.tick(20 + this.rnd(200))
     const base = { from: 'alik' as const, time: fmtTime(this.S.clock) }
     if (r < 0.35) { this.push({ ...base, kind: 'text', text: this.addrLine('IDLE', L.IDLE) }); return }
     if (r < 0.5) { const s = this.draw('STICKERS', L.STICKERS); this.push({ ...base, kind: 'sticker', e: s.e, c: s.c }); return }
@@ -1247,7 +1246,11 @@ export class Game {
   awayBurst(n: number, days: number, why?: string): void {
     this.nextDay(days)
     this.push({ kind: 'sys', text: `${why ? why + ' — ' : ''}непрочитанные сообщения`, unread: true })
-    for (let i = 0; i < n; i++) this.awayMsg()
+    // пришли, пока игрока не было, — до «сейчас»: иначе часы переписки убегают вперёд настоящих
+    const now = this.S.clock
+    const times = Array.from({ length: n }, () => now - this.rnd(Math.min(now, 360) + 1)).sort((a, b) => a - b)
+    for (const t of times) { this.S.clock = t; this.awayMsg() }
+    this.S.clock = now
     this.unread = n
     this.title = `(${n}) Алик, где деньги?`
     this.unlock('away')

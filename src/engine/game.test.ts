@@ -5,6 +5,7 @@ import { manualClock } from './clock'
 import { Game } from './game'
 import { seededRng } from './rng'
 import { SAVE_KEY } from './state'
+import { fmtTime } from './time'
 import { ARCS } from '../content/arcs'
 
 describe('Game: начало и ход', () => {
@@ -142,6 +143,16 @@ describe('Game: возвращение после паузы', () => {
     expect(g2.title).toMatch(/^\(\d\)/)
     expect(g2.S.battery).toBe(100)
     expect(g2.S.ach.away).toBeDefined()
+  })
+  it('непрочитанные пришли до «сейчас»: время суток в репликах совпадает с часами переписки', () => {
+    const { game } = makeGame({ hour: 2 })
+    game.awayBurst(5, 1)
+    const now = fmtTime(game.S.clock)
+    expect(now.startsWith('02:')).toBe(true)
+    expect(game.S.msgs.slice(-5).every((m) => m.time! <= now)).toBe(true)
+    expect(game.period()).toBe('night')
+    game.tick(9 * 60) // переписка дошла до 11 утра — уже не «почему не спишь»
+    expect(game.period()).toBe('day')
   })
   it('короткая пауза и новая игра — без непрочитанных', () => {
     const { game } = makeGame({ away: 5 })
