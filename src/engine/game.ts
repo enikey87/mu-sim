@@ -680,8 +680,8 @@ export class Game {
 
     // реакция на сообщение игрока; иногда — вместо ответа
     let reactOnly = false
-    // заблокировал — значит, не видит: реакции на недоставленное не бывает
-    if (!o.scene && !S.mem.blocked && this.chance(0.18) && mine.kind === 'text') {
+    // реакция — Алика: не бывает, когда он не видит (заблокирован) или телефон у Карине
+    if (!o.scene && !S.mem.blocked && !S.mem['phone.karine'] && this.chance(0.18) && mine.kind === 'text') {
       await this.sleep(600)
       mine.react = this.draw('R_' + tone, L.REACT[tone] ?? L.REACT.neutral)
       this.audio.vibrate(20)

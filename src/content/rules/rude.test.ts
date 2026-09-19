@@ -70,6 +70,17 @@ describe('лестница грубости: ступени', () => {
     game.nextDay(1)
     expect((await fire(game, 'neutral')).r).not.toMatch(/Karine/)
   })
+  it('пока телефон у Карине, реакций Алика на сообщения нет', async () => {
+    const { game } = makeGame()
+    const mine: Msg[] = []
+    for (let i = 0; i < 30; i++) {
+      game.S.mem['phone.karine'] = true
+      const n = game.S.msgs.length
+      await game.send('Алик, извините, есть новости?')
+      mine.push(game.S.msgs[n])
+    }
+    expect(mine.some((m) => m.kind === 'text' && m.react)).toBe(false)
+  })
   it('S2 — пропущенные от мамы и голосовое с расшифровкой', async () => {
     const { game } = makeGame()
     heat(game, 2)
