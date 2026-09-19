@@ -334,6 +334,8 @@ export class Game {
   /** Реплики Алика (или участника { w, t }). Иногда с опечаткой и исправлением. */
   async say(items: SayItem[], legend = false, who?: string): Promise<Msg[]> {
     if (this.S.ctx?.type === 'reactOnly') this.S.ctx = null // Алик ответил словами — «а ответить словами?» уже не к месту
+    // ответить можно на последнее сказанное: воспоминание, реплика легенды или персонажа ставятся после своей реплики
+    if (this.S.ctx) { delete this.S.ctx.memory; delete this.S.ctx.legend; delete this.S.ctx.chorus }
     const out: Msg[] = []
     for (const x of items) {
       let text = typeof x === 'string' ? x : x.t

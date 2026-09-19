@@ -82,6 +82,7 @@ export const replyRules: R[] = [
   simple('short2', (g) => g.pair('SHORT2_A', D.SHORT2_A, 'SHORT2_B', D.SHORT2_B)),
 
   says('promiseCheck', { respond: async ({ game, facts }) => { await game.say([game.uniq(() => game.X.promiseCheck(String(facts.arg ?? '')))]); game.setCtx(null) } }),
+  says('promiseOk', { respond: async ({ game }) => { await game.say([game.uniq(() => game.draw('PROMISE_OK', D.PROMISE_OK))]); game.setCtx(null) } }),
   // срок «когда-нибудь» — переспрашивать бессмысленно, и Алик это честно признаёт
   says('promiseCheck', {
     respond: async ({ game, facts }) => {

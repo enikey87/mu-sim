@@ -168,6 +168,16 @@ describe('ответы Алика (PlayerSays)', () => {
     const t = await reply(game, { text: 'Точно?', tone: 'neutral', act: 'promiseCheck', arg: 'в среду утром' })
     expect(t.join(' ').toLowerCase()).toContain('в среду утром')
   })
+  it('на срок — либо вопрос, либо согласие; на согласие Алик не клянётся заново, а подтверждает', async () => {
+    const { game } = makeGame()
+    const acts = new Set<string>()
+    for (let i = 0; i < 40; i++) { game.S.ctx = { when: 'в среду утром' }; game.S.choices = null; for (const c of game.choices) if (c.act) acts.add(c.act) }
+    expect(acts).toContain('promiseCheck')
+    expect(acts).toContain('promiseOk')
+    game.S.ctx = { when: 'в среду утром' }
+    const t = await reply(game, { text: 'Запомнил: в среду утром. Не подведите.', tone: 'polite', act: 'promiseOk' })
+    expect((D.PROMISE_OK as string[]).some((p) => t.join(' ').includes(p))).toBe(true)
+  })
 })
 
 describe('тон сообщения (PlayerMessage)', () => {

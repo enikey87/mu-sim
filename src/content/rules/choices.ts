@@ -84,10 +84,14 @@ export const choiceRules: R[] = [
   offer({ name: 'Wrong', when: [is('ctx.wrong')], act: 'wrong', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'WQ', WRONG_Q) }),
   offer({ name: 'Legend', when: [is('ctx.legendary')], act: 'legendQ', tone: 'polite', bonus: 2, text: (g) => fromD(g, 'P_LEGEND') }),
 
-  // срок обещания
+  // срок обещания: переспросить (Алик клянётся) или принять к сведению (Алик подтверждает)
   offer({
-    name: 'When', when: [exists('ctx.when')], act: 'promiseCheck', tone: 'neutral', bonus: 1,
+    name: 'When', slot: 'when', weight: 0.6, when: [exists('ctx.when')], act: 'promiseCheck', tone: 'neutral', bonus: 1,
     text: (g, f) => fromD(g, 'P_WHEN', { t: String(f['ctx.when']), T: cap(String(f['ctx.when'])) }), arg: (_g, f) => String(f['ctx.when']),
+  }),
+  offer({
+    name: 'WhenOk', slot: 'when', weight: 0.4, when: [exists('ctx.when')], act: 'promiseOk', tone: 'polite', bonus: 1,
+    text: (g, f) => fromD(g, 'P_WHEN_OK', { t: String(f['ctx.when']), T: cap(String(f['ctx.when'])) }),
   }),
 
   // родственник: спросить «при чём тут он» / поздравить / посочувствовать — одна кнопка на слот
