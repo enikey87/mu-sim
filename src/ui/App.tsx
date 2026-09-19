@@ -6,8 +6,9 @@ import { Chat } from './Chat'
 import { Choices, Composer } from './Input'
 import { Sheet } from './Sheet'
 import { Toast, Notification, DeadScreen } from './Overlays'
+import { DebugPanel } from './DebugPanel'
 
-export function App({ game, onReset }: { game: Game; onReset: () => void }) {
+export function App({ game, onReset, debug = false }: { game: Game; onReset: () => void; debug?: boolean }) {
   // звук разрешается первым касанием; «вернулся к вкладке» — пачка непрочитанных
   useEffect(() => {
     const gesture = () => game.gesture()
@@ -24,7 +25,11 @@ export function App({ game, onReset }: { game: Game; onReset: () => void }) {
 
   return (
     <GameContext.Provider value={game}>
-      <Phone onReset={onReset} />
+      {debug ? (
+        <div className="debug-layout"><Phone onReset={onReset} /><DebugPanel /></div>
+      ) : (
+        <Phone onReset={onReset} />
+      )}
     </GameContext.Provider>
   )
 }

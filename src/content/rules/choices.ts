@@ -7,6 +7,7 @@ import { D, cap } from '../excuses'
 import { ARCS, WRONG_Q } from '../arcs'
 import * as L from '../life'
 import { GROUP_Q } from '../misc'
+import { P_LIE } from '../lies'
 import { fmtDayMonth } from '../../engine/time'
 
 type R = Rule<Game>
@@ -42,7 +43,12 @@ const offer = (o: OfferSpec): R => ({
 })
 
 export const choiceRules: R[] = [
-  // извиниться после грубости — важнее всего
+  // поймать на лжи — важнее всего: момент уходит со следующей репликой
+  offer({
+    name: 'CatchLie', when: [exists('lie.old')], act: 'catchLie', tone: 'neutral', bonus: 6,
+    text: (g) => { const l = g.lie()!; return g.playerLine(() => g.X.fill(g.draw('P_LIE', P_LIE), { old: l.old.say, new: l.new.say })) },
+  }),
+  // извиниться после грубости
   offer({ name: 'Sorry', when: [is('ctx.offended')], act: 'sorry', tone: 'polite', bonus: 5, text: (g) => fromD(g, 'P_SORRY') }),
 
   // ответ на то, ЧТО прислал Алик

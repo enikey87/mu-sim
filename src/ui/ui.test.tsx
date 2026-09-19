@@ -120,4 +120,14 @@ describe('App', () => {
     expect(game.S.muted).toBe(true)
     expect(screen.getByTitle('Звук')).toHaveTextContent('🔇')
   })
+
+  it('отладочная панель показывает выборы правил и память', async () => {
+    const { game } = makeGame({ debug: true })
+    render(<App game={game} onReset={vi.fn()} debug />)
+    await act(async () => { await game.send(game.choices.find((c) => c.tone === 'polite')!) })
+    const panel = screen.getByRole('complementary', { name: 'Отладка правил' })
+    expect(within(panel).getAllByText('PlayerMessage').length + within(panel).getAllByText('BuildChoices').length).toBeGreaterThan(0)
+    fireEvent.click(within(panel).getAllByText('BuildChoices')[0])
+    expect(within(panel).getAllByText('выбрано').length).toBeGreaterThan(0)
+  })
 })
