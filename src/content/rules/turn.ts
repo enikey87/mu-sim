@@ -1,6 +1,7 @@
 // Ход Алика в ответ на обычное сообщение игрока.
 import type { Game } from '../../engine/game'
-import { type Rule, eq, gte, is, exists, add } from '../../engine/rules'
+import { type Rule, eq, ne, gte, is, add } from '../../engine/rules'
+import { AlikOffline } from './criteria'
 import { RUDE_AGAIN, THREAT_AGAIN } from '../misc'
 import { IDLE } from '../life'
 
@@ -43,11 +44,10 @@ export const ignoreRules: R[] = [
   { name: 'Ignore_ReadOnly', event: 'AlikIgnores', when: [], odds: 0.04, respond: ({ game }) => game.readOnly() },
 ]
 
-// Событие PeriodLine — реплика по реальному времени суток, не чаще раза в 12 ходов
-export const periodRules: R[] = (['night', 'morning', 'lunch', 'friday', 'evening'] as const).map((p) => ({
-  name: `Period_${p}`, event: 'PeriodLine', when: [eq('period', p), gte('sincePeriod', 12)], odds: 0.35,
-  respond: ({ game }: { game: Game }) => game.periodLine(p),
-}))
+// Событие PeriodLine — реплика по реальному времени суток, не чаще раза в 12 ходов (перерыв правила)
+export const periodRules: R[] = [
+  { name: 'PeriodLine', event: 'PeriodLine', when: [ne('period', 'day')], odds: 0.35, cooldown: { turns: 12 }, priority: 'chatter', respond: ({ game }) => game.periodLine(game.period()) },
+]
 
 // Событие AlikTurn — взвешенный выбор, что Алик сделает. Специфичность у всех одна (0),
 // условия лишь отсекают недоступное; веса повторяют вероятности оригинала.
@@ -59,7 +59,7 @@ export const turnRules: R[] = [
   { name: 'Turn_Group', event: 'AlikTurn', when: [gte('sent', 8)], specificity: 0, weight: W.group, respond: ({ game }) => game.groupChat() },
   { name: 'Turn_Wrong', event: 'AlikTurn', when: [gte('sent', 5)], specificity: 0, weight: W.wrong, respond: ({ game }) => game.wrongChat() },
   // бухгалтерия лжи: Алик сам возвращается к своему старому вранью
-  { name: 'Turn_Callback', event: 'AlikTurn', when: [is('callbackReady')], specificity: 0, weight: 6, respond: ({ game }) => game.callback() },
+  { name: 'Turn_Callback', event: 'AlikTurn', when: [is('callbackReady')], specificity: 0, weight: 6, cooldown: { days: 5 }, respond: ({ game }) => game.callback() },
   { name: 'Turn_Sticker', event: 'AlikTurn', when: [], specificity: 0, weight: W.sticker, respond: ({ game }) => game.sticker() },
   { name: 'Turn_Forward', event: 'AlikTurn', when: [], specificity: 0, weight: W.fwd, respond: ({ game }) => game.forward() },
   { name: 'Turn_Transfer', event: 'AlikTurn', when: [], specificity: 0, weight: transferW, respond: ({ game }) => game.transfer() },
@@ -83,12 +83,12 @@ export const turnRules: R[] = [
 // Событие AlikIdle — Алик пишет сам, если игрок молчит
 const idleW = { notif: 15, text: 35, sticker: 12, fwd: 14, deleted: 10, voice: 8, period: 6 }
 export const idleRules: R[] = [
-  // посреди сцены (Алик «умирает», торгуется…) и пока он «пропал» — не перебиваем, только уведомления телефона
-  { name: 'Idle_DuringScene', event: 'AlikIdle', when: [exists('scene')], respond: ({ game }) => game.randomNotif() },
-  { name: 'Idle_Offline', event: 'AlikIdle', when: [is('offline')], respond: ({ game }) => game.randomNotif() },
-  { name: 'Idle_Notif', event: 'AlikIdle', when: [], specificity: 0, weight: idleW.notif, respond: ({ game }) => game.randomNotif() },
+  // пока Алик «пропал» — только уведомления телефона. Посреди сцены болтовня Алика (приоритет chatter)
+  // отклоняется порогом приоритета, остаются уведомления (system) — отдельное правило больше не нужно
+  { name: 'Idle_Offline', event: 'AlikIdle', when: [AlikOffline], priority: 'system', respond: ({ game }) => game.randomNotif() },
+  { name: 'Idle_Notif', event: 'AlikIdle', when: [], specificity: 0, weight: idleW.notif, priority: 'system', respond: ({ game }) => game.randomNotif() },
   {
-    name: 'Idle_Text', event: 'AlikIdle', when: [], specificity: 0, weight: idleW.text,
+    name: 'Idle_Text', event: 'AlikIdle', when: [], specificity: 0, priority: 'chatter', weight: idleW.text,
     respond: async ({ game }) => {
       await game.sleep(300)
       await game.say([game.addrLine('IDLE', IDLE)])
@@ -96,9 +96,9 @@ export const idleRules: R[] = [
       game.setCtx({ type: 'idle' })
     },
   },
-  { name: 'Idle_Sticker', event: 'AlikIdle', when: [], specificity: 0, weight: idleW.sticker, respond: ({ game }) => game.sticker() },
-  { name: 'Idle_Forward', event: 'AlikIdle', when: [], specificity: 0, weight: idleW.fwd, respond: ({ game }) => game.forward() },
-  { name: 'Idle_Deleted', event: 'AlikIdle', when: [], specificity: 0, weight: idleW.deleted, respond: async ({ game }) => { game.setCtx(null); await game.deletedMsg() } },
-  { name: 'Idle_Voice', event: 'AlikIdle', when: [], specificity: 0, weight: idleW.voice, respond: ({ game }) => game.voice() },
-  { name: 'Idle_Period', event: 'AlikIdle', when: [], specificity: 0, weight: (f) => (f.period === 'day' ? 0 : idleW.period), respond: ({ game }) => game.periodLine(game.period()) },
+  { name: 'Idle_Sticker', event: 'AlikIdle', when: [], specificity: 0, priority: 'chatter', weight: idleW.sticker, respond: ({ game }) => game.sticker() },
+  { name: 'Idle_Forward', event: 'AlikIdle', when: [], specificity: 0, priority: 'chatter', weight: idleW.fwd, respond: ({ game }) => game.forward() },
+  { name: 'Idle_Deleted', event: 'AlikIdle', when: [], specificity: 0, priority: 'chatter', weight: idleW.deleted, respond: async ({ game }) => { game.setCtx(null); await game.deletedMsg() } },
+  { name: 'Idle_Voice', event: 'AlikIdle', when: [], specificity: 0, priority: 'chatter', weight: idleW.voice, respond: ({ game }) => game.voice() },
+  { name: 'Idle_Period', event: 'AlikIdle', when: [], specificity: 0, priority: 'chatter', weight: (f) => (f.period === 'day' ? 0 : idleW.period), respond: ({ game }) => game.periodLine(game.period()) },
 ]

@@ -2,6 +2,7 @@
 // Общее правило по intent + более специфичные для частных случаев (память, контекст).
 import type { Game } from '../../engine/game'
 import { type Rule, eq, ne, is, gte, add } from '../../engine/rules'
+import { AlikOffline, ThickJournal } from './criteria'
 import { D, low, cap } from '../excuses'
 import { ARCS, ARC_DONE, NO_NEWS_A, NO_NEWS_B, GROUP_SEEN_A, GROUP_SEEN_B, WRONG_A, WRONG_B } from '../arcs'
 import * as L from '../life'
@@ -32,7 +33,7 @@ const simple = (intent: string, line: (g: Game) => string, after?: (g: Game) => 
 
 export const replyRules: R[] = [
   // Алик «пропал» после грубости — на любой вопрос, кроме извинения, отвечает, когда вернётся
-  { name: 'Says_WhileOffline', event: 'PlayerSays', when: [is('offline'), ne('intent', 'sorry')], bonus: 5, respond: ({ game }) => game.alikTurn('neutral') },
+  { name: 'Says_WhileOffline', event: 'PlayerSays', when: [AlikOffline, ne('intent', 'sorry')], bonus: 5, respond: ({ game }) => game.alikTurn('neutral') },
 
   says('sorry', { remember: [add('count.sorry')], respond: ({ game }) => sorry(game, game.uniq(game.X.sorry)) }),
   says('sorry', {
@@ -91,16 +92,16 @@ export const replyRules: R[] = [
       game.setCtx(game.ctxFromPromise(r.p))
     },
   }),
-  // обещаний накопилось много — Алик и сам это понимает (изредка: иначе к середине игры это единственный ответ)
+  // обещаний накопилось много — Алик и сам это понимает (не чаще раза в 20 дней: иначе к середине игры это единственный ответ)
   says('prev', {
-    odds: 0.3,
+    cooldown: { days: 20 },
     respond: async ({ game, facts }) => {
       const i = Number(facts.arg)
       if (game.S.promises[i]) game.S.promises[i].asked = true
       game.unlock('memory')
       await game.promiseLine(game.uniq(() => game.draw('PREV_MANY', PREV_MANY)))
     },
-  }, [gte('lateCount', 5)]),
+  }, [ThickJournal]),
 
   says('arc', {
     respond: async ({ game, facts }) => {

@@ -42,7 +42,7 @@ function Entry({ t, open, onToggle }: { t: TraceEntry; open: boolean; onToggle: 
   return (
     <li className={'debug-entry' + (t.chosen.length ? '' : ' none')}>
       <button className="debug-row" onClick={onToggle} aria-expanded={open}>
-        <span className="ev">{t.event}</span>
+        <span className="ev">{t.event}{t.target ? ` → ${t.target}` : ''}</span>
         <span className="win">{t.chosen.length ? t.chosen.join(', ') : t.mode === 'collect' ? '— только общие реплики' : '— ничего не подошло'}</span>
         <span className="cnt">{passed.length}/{t.candidates.length}</span>
       </button>
