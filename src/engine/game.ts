@@ -512,6 +512,7 @@ export class Game {
       ...Object.fromEntries(Object.entries(S.arcs).map(([id, st]) => ['arc.' + id, st.i])),
       // ачивки и трофеи — условия для финалов сериалов и концовок
       ...Object.fromEntries(Object.keys(S.ach).map((k) => ['ach.' + k, true])),
+      ...Object.fromEntries(Object.entries(S.ach).map(([k, day]) => ['since.' + k, S.day - day])),
       items: S.items.length,
       legend: this.legend(),
       'ctx.topic': this.topicOfLast(),

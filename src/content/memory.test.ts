@@ -13,9 +13,11 @@ describe('память Алика', () => {
     const { game } = makeGame()
     expect(game.line('MEMORY', MEMORY)).toBeNull()
   })
-  it('был квест «хаш» — Алик его вспоминает, один раз', () => {
+  it('был квест «хаш» — Алик его вспоминает, один раз и не в тот же день («тогда» — о прошлом)', () => {
     const { game } = makeGame()
-    game.S.ach.q_hash = 190
+    game.S.ach.q_hash = game.S.day
+    expect(game.line('MEMORY', MEMORY)).toBeNull()
+    game.S.ach.q_hash = game.S.day - 1
     expect(game.line('MEMORY', MEMORY)).toMatch(/хаш/)
     expect(game.line('MEMORY', MEMORY)).toBeNull()
   })
@@ -39,11 +41,12 @@ describe('память Алика', () => {
     const again = makeGame({ storage }).game
     expect(again.line('MEMORY', MEMORY)).toBeNull()
   })
-  it('реплики про Бориса — только когда Борис в сюжете', () => {
+  it('«Борис до сих пор пишет тебе» — только когда Борис уже писал сам', () => {
     const { game } = makeGame()
-    game.S.ach.blocked = 190
-    expect(game.line('MEMORY', MEMORY)).toBeNull()
+    game.S.ach.blocked = 180
     game.S.arcs.boris = { i: 1, last: 0 }
+    expect(game.line('MEMORY', MEMORY)).toBeNull()
+    game.S.arcs.boris = { i: 4, last: 0 }
     expect(game.line('MEMORY', MEMORY)).toMatch(/Борис/)
   })
   it('у каждой реплики памяти есть условие', () => {
