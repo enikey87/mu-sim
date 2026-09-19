@@ -89,8 +89,9 @@ describe('поймать на лжи', () => {
       game.S.offlineDays = 0
       replies.push(await catchLie(game))
     }
-    expect(oneOf(LIE_THIRD, replies[2])).toBe(true)
-    expect(oneOf(LIE_NOCRED, replies[3])).toBe(true)
+    // начало фразы: дальше может быть опечатка Алика («борат»)
+    expect(oneOf(LIE_THIRD.map((x) => x.slice(0, 12)), replies[2]), replies[2]).toBe(true)
+    expect(oneOf(LIE_NOCRED.map((x) => x.slice(0, 12)), replies[3]), replies[3]).toBe(true)
     expect(game.S.ach.liar3).toBeDefined()
   })
   it('противоречие от другого персонажа: Грант «всё заплатил»', () => {

@@ -1,7 +1,6 @@
 import { useGame } from './useGame'
 import { ENDINGS } from '../content/finales'
 import { ARCS } from '../content/arcs'
-import { START_DAY } from '../engine/state'
 
 export function Toast() {
   const game = useGame()
@@ -64,7 +63,7 @@ export function EndingScreen({ onReset }: { onReset: () => void }) {
         <h2>{e.title}</h2>
         <p>{e.text}</p>
         <ul className="ending-stats">
-          <li>День {S.day - START_DAY} после сдачи объекта</li>
+          <li>{S.day} дней после сдачи объекта</li>
           <li>Долг Алика: {S.debt.toLocaleString('ru-RU')} ₽</li>
           <li>Обещаний в журнале: {S.promises.length}</li>
           {finales.map((id) => <li key={id}>{ARCS[id].title}: «{game.finaleTitle(id)}»</li>)}

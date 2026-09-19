@@ -8,7 +8,8 @@ import type { Msg } from '../../engine/state'
 
 const pickScene = (game: Game) => game.rules.match({ event: 'PickScene' }, game.facts())?.name
 const texts = (msgs: Msg[]) => msgs.filter((m) => m.kind === 'text').map((m) => (m.kind === 'text' ? m.text : ''))
-const has = (arr: string[], all: string[]) => all.some((t) => arr.some((a) => t.includes(a.slice(0, 25))))
+// фраза могла получить обращение в начале («Эээ, брат, …») — сверяем по середине
+const has = (pool: string[], said: string[]) => pool.some((t) => said.some((a) => a.includes(t.slice(6, 26)) || t.includes(a.slice(0, 25))))
 
 describe('сцены выбираются по сюжету', () => {
   it('«смертный одр» — только после 240-го дня и при плохом настроении', () => {
@@ -158,13 +159,12 @@ describe('состояния мира со сроком', () => {
     await game.playArc('boris')
     expect(game.S.actors.boris.sick).toBe(true)
     let said = false
-    for (let i = 0; i < 80 && !said; i++) {
+    for (let i = 0; i < 150 && !said; i++) {
       game.S.stats.sent += 4
       const from = game.S.msgs.length
-      if (game.rules.match({ event: 'AlikTurn' }, game.facts())?.name === 'Turn_BorisSick') {
-        await game.fire('AlikTurn')
-        said = has(BORIS_SICK, alikTexts(game.S.msgs.slice(from)))
-      }
+      game.S.scene = null // выпавшая сцена подняла бы порог приоритета и заглушила ходы
+      // выбор по весам: match и fire бросают кости отдельно — проверяем то, что реально сработало
+      if ((await game.fire('AlikTurn'))?.name === 'Turn_BorisSick') said = has(BORIS_SICK, alikTexts(game.S.msgs.slice(from)))
     }
     expect(said).toBe(true)
     game.S.day += 10
