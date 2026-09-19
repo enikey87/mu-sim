@@ -7,10 +7,11 @@ import * as L from '../content/life'
 import { ACH } from '../content/achievements'
 import { FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_WANDER, SEED_INTRO, SEED_REPLY } from '../content/misc'
 import { allRules } from '../content/rules'
+import { CLAIMS, claimByKey, conflicts, pairKey, CALLBACK_OPEN, type Claim } from '../content/lies'
 import { type Rng, mathRng, rndInt, shuffle, chance } from './rng'
 import { Decks } from './deck'
 import { Seen, type Keyed } from './uniq'
-import { RuleSet, type Facts, type Rule } from './rules'
+import { RuleSet, type Facts, type Rule, type Trace } from './rules'
 import { type Clock, realClock } from './clock'
 import { type Audio, silentAudio } from './audio'
 import { typo } from './typo'
@@ -31,7 +32,11 @@ export interface GameOptions {
   away?: number | null
   /** Не запускать фоновые таймеры (для тестов) */
   noTimers?: boolean
+  /** Записывать, какое правило выбрано и почему (?debug) */
+  debug?: boolean
 }
+
+export interface TraceEntry extends Trace { id: number; day: number }
 
 export interface Notif { id: number; icon: string; app: string; text: string }
 export interface Moo { id: number; text: string; left: number; top: number }
@@ -68,6 +73,8 @@ export class Game {
   unread = 0
   shakeId = 0
   title = 'Алик, где деньги?'
+  /** Последние выборы правил — для отладочной панели (?debug). */
+  trace: TraceEntry[] = []
 
   private storage: Storage | null
   private hour: number | null
@@ -97,6 +104,11 @@ export class Game {
     this.X = make((k, a, nr) => this.decks.draw(k, a, nr), () => this.S.tier, this.rng)
     this.scenes = makeScenes(this.X)
     this.rules = new RuleSet<Game>(this.rng, this.S.mem).add(...allRules)
+    if (opts.debug) {
+      this.rules.tracer = (t) => {
+        this.trace = [{ ...t, id: this.seq++, day: this.S.day }, ...this.trace].slice(0, 40)
+      }
+    }
     this.audio.setMuted(this.S.muted)
 
     if (!this.S.msgs.length) this.seed()
@@ -209,6 +221,7 @@ export class Game {
     this.tick(1 + this.rnd(3))
     const msg = this.push({ from: 'alik', time: fmtTime(this.S.clock), ...m } as NewMsg)
     if (msg.kind === 'text' && /брат джан/i.test(msg.text)) this.unlock('brat')
+    if (msg.kind === 'text' || msg.kind === 'photo') this.noteClaims(msg.text)
     this.audio.beep()
     this.audio.vibrate(40)
     if (this.chance(this.mooChance())) this.clock.setTimeout(() => this.moo(), 300 + this.rnd(900))
@@ -384,6 +397,7 @@ export class Game {
       sincePeriod: S.stats.sent - Number(S.mem.periodAt ?? -99),
       lateCount: this.lateCount(),
       arcAvailable: this.availableArcs().length > 0,
+      callbackReady: !!this.callbackCandidate(),
       arcUnfinished: this.unfinishedArc(),
       'ctx.type': c.type, 'ctx.s': c.s, 'ctx.shortTimey': c.s ? TIMEY.test(c.s) : false,
       'ctx.when': c.when, 'ctx.whenNever': c.whenNever, 'ctx.rel': c.rel?.n, 'ctx.sad': c.sad, 'ctx.revived': c.revived,
@@ -407,11 +421,14 @@ export class Game {
     const S = this.S
     if (S.scene) {
       const n = this.scenes[S.scene.id].nodes[S.scene.node]
-      return (n.opts ?? []).map((o, i) => {
+      // поймать на лжи можно и посреди сцены — это её прерывает
+      const catchLie = this.rules.collect('BuildChoices', this.facts()).find((r) => r.name === 'Opt_CatchLie')
+      const lieOpt = catchLie ? [catchLie.offer!({ game: this, facts: this.facts(), rule: catchLie }) as Choice] : []
+      return [...lieOpt, ...(n.opts ?? []).map((o, i) => {
         const gen = (): string => (typeof o.t === 'function' ? o.t(S.scene!.vars) : Array.isArray(o.t) ? this.draw<string>(`${S.scene!.id}.${S.scene!.node}.o${i}`, o.t) : o.t)
         const t = gen().length > 8 ? this.playerLine(gen) : gen()
-        return { text: t, tone: o.tone ?? 'polite', scene: S.scene!.id, go: o.go }
-      })
+        return { text: t, tone: o.tone ?? 'polite', scene: S.scene!.id, go: o.go } as Choice
+      })]
     }
     // контекстные варианты — правила события BuildChoices (самые специфичные первыми)
     const facts = this.facts()
@@ -447,6 +464,7 @@ export class Game {
     this.clock.clearTimeout(this.idleT)
     this.idleCount = 0
     this.clearUnread()
+    if (o.act !== 'catchLie') this.forgetLie() // не поймал сразу — момент упущен
     let tone = o.tone
     if (tone === 'rude' && !o.scene && THREAT_RE.test(o.text)) tone = 'threat'
     this.tick(1 + this.rnd(5))
@@ -481,11 +499,12 @@ export class Game {
       S.ctx = { type: 'reactOnly' }
     } else if (o.scene) {
       await this.enterNode(o.scene, o.go ?? null)
+    } else if (o.act) {
+      S.scene = null // контекстная реплика посреди сцены (например, «Поймать на лжи») прерывает её
+      await this.fire('PlayerSays', this.saysFacts(o))
     } else if (S.scene) {
       S.scene = null // свой текст посреди сцены — сцена прерывается
       await this.alikTurn(tone)
-    } else if (o.act) {
-      await this.fire('PlayerSays', this.saysFacts(o))
     } else {
       await this.alikTurn(tone)
     }
@@ -694,6 +713,57 @@ export class Game {
     this.S.mem.periodAt = this.S.stats.sent
     await this.say([this.addrLine('PER_' + p, L.PERIOD[p])])
     if (p === 'friday' && this.chance(0.5)) this.audio.feast((a) => this.draw('FEAST', a))
+  }
+
+  // ---------- бухгалтерия лжи ----------
+  /** Запомнить, что Алик «заявил»; если это противоречит сказанному раньше — дать игроку поймать его. */
+  noteClaims(text: string): void {
+    const mem = this.S.mem
+    const found = CLAIMS.filter((c) => c.re.test(text))
+    for (const c of found) {
+      const old = CLAIMS.find((o) => mem['said.' + o.key] !== undefined && conflicts(o.key, c.key) && !mem['caught.' + pairKey(o.key, c.key)])
+      if (old) {
+        mem['lie.old'] = old.key
+        mem['lie.new'] = c.key
+        mem['lie.kind'] = old.group === 'money' ? 'money' : ({ grandpa_dead: 'grandpa', grandpa_alive: 'grandpa', customer_owes: 'customer', customer_paid: 'customer', sent: 'sent', no_money: 'sent' } as Record<string, string>)[c.key] ?? 'other'
+      }
+    }
+    for (const c of found) if (mem['said.' + c.key] === undefined) mem['said.' + c.key] = this.S.day
+  }
+  lie(): { old: Claim; new: Claim } | null {
+    const o = claimByKey(String(this.S.mem['lie.old'] ?? '')), n = claimByKey(String(this.S.mem['lie.new'] ?? ''))
+    return o && n ? { old: o, new: n } : null
+  }
+  forgetLie(): void {
+    delete this.S.mem['lie.old']
+    delete this.S.mem['lie.new']
+    delete this.S.mem['lie.kind']
+  }
+  /** Алик пойман: запомнить пару, отдать реплику, счётчик растёт. */
+  async caught(line: string): Promise<void> {
+    const l = this.lie()
+    if (l) this.S.mem['caught.' + pairKey(l.old.key, l.new.key)] = true
+    this.forgetLie()
+    const n = Number(this.S.mem.caught ?? 0)
+    this.unlock('liar')
+    if (n >= 3) this.unlock('liar3')
+    this.mood(-1)
+    await this.say([line])
+    this.S.ctx = null
+  }
+  /** Утверждение, к которому Алик может сам вернуться: сказано 10+ дней назад, ещё не вспоминал. */
+  callbackCandidate(): Claim | undefined {
+    const mem = this.S.mem
+    return CLAIMS.find((c) => c.updates && mem['said.' + c.key] !== undefined && this.S.day - Number(mem['said.' + c.key]) >= 10 && !mem['cb.' + c.key])
+  }
+  async callback(): Promise<void> {
+    const c = this.callbackCandidate()
+    if (!c) return this.excuseTurn()
+    this.S.mem['cb.' + c.key] = this.S.day
+    const upd = this.draw('CB_' + c.key, c.updates!)
+    await this.say([this.uniq(() => `${this.X.g('ADDR')}, ${this.draw('CB_OPEN', CALLBACK_OPEN)} ${c.say}? ${upd}`)])
+    this.unlock('memory')
+    await this.promiseLine()
   }
 
   // ---------- сериалы ----------

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { RuleSet, eq, ne, gt, gte, lt, lte, exists, missing, matches, is, set, add, test, specificityOf, applyFactOps, type Rule, type Facts } from './rules'
+import { RuleSet, eq, ne, gt, gte, lt, lte, exists, missing, matches, is, set, add, test, specificityOf, applyFactOps, describeCriterion, type Rule, type Facts, type Trace } from './rules'
 import { seededRng } from './rng'
 
 type G = { log: string[] }
@@ -136,5 +136,39 @@ describe('RuleSet.fire', () => {
     const rs = mk().add({ name: 'A', event: 'E', when: [eq('x', 1)], respond })
     expect(await rs.fire('E', { log: [] }, (x) => x)).toBeNull()
     expect(respond).not.toHaveBeenCalled()
+  })
+})
+
+describe('трассировка', () => {
+  it('объясняет выбор: кто подошёл, кто нет и почему', () => {
+    const traces: Trace[] = []
+    const rs = mk().add(
+      say('General', 'Hit', []),
+      say('Axe', 'Hit', [eq('weapon', 'axe')]),
+      say('Lucky', 'Hit', [eq('weapon', 'axe'), gte('dmg', 10)], { odds: 0 }),
+      say('Sword', 'Hit', [eq('weapon', 'sword')]),
+    )
+    rs.tracer = (t) => traces.push(t)
+    rs.match('Hit', { weapon: 'axe', dmg: 20 })
+    const t = traces[0]
+    expect(t.chosen).toEqual(['Axe'])
+    const by = Object.fromEntries(t.candidates.map((c) => [c.name, c]))
+    expect(by.Lucky.blocked).toBe('odds')
+    expect(by.Sword.failed).toEqual(['weapon == "sword"'])
+    expect(by.General.failed).toEqual(['проиграло по специфичности'])
+  })
+  it('сборщик пишет выбранные по порядку; без tracer ничего не пишется', () => {
+    const traces: Trace[] = []
+    const rs = mk().add({ name: 'A', event: 'C', when: [], slot: 'x' }, { name: 'B', event: 'C', when: [eq('a', 1)], slot: 'y' })
+    rs.collect('C', { a: 1 })
+    expect(traces).toHaveLength(0)
+    rs.tracer = (t) => traces.push(t)
+    rs.collect('C', { a: 1 })
+    expect(traces[0]).toMatchObject({ mode: 'collect', chosen: ['B', 'A'] })
+  })
+  it('описание условий', () => {
+    expect(describeCriterion(exists('x'))).toBe('x')
+    expect(describeCriterion(missing('x'))).toBe('!x')
+    expect(describeCriterion(matches('s', /ab/))).toBe('s match ab')
   })
 })

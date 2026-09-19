@@ -6,7 +6,8 @@ import { browserAudio } from './engine/audio'
 import { App } from './ui/App'
 import './styles.css'
 
-// Параметры адреса для тестов: ?fast — паузы в ~30 раз короче, ?hour=3 — подменить час, ?away=90 — «не было 90 минут»
+// Параметры адреса: ?fast — паузы в ~30 раз короче, ?hour=3 — подменить час, ?away=90 — «не было 90 минут»,
+// ?debug — панель «какое правило выбрано и почему»
 const q = new URLSearchParams(location.search)
 const newGame = () => {
   const game = new Game({
@@ -14,6 +15,7 @@ const newGame = () => {
     audio: browserAudio(),
     hour: q.has('hour') ? Number(q.get('hour')) : null,
     away: q.has('away') ? Number(q.get('away')) : null,
+    debug: q.has('debug'),
   })
   ;(window as unknown as { __alik: Game }).__alik = game // для отладки из консоли
   return game
@@ -28,7 +30,7 @@ function Root() {
     game.dispose()
     setState({ game: newGame(), n: n + 1 }) // новый key — сбросить и состояние интерфейса (открытое досье и т.п.)
   }
-  return <App key={n} game={game} onReset={onReset} />
+  return <App key={n} game={game} onReset={onReset} debug={q.has('debug')} />
 }
 
 createRoot(document.getElementById('root')!).render(

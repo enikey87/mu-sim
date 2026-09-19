@@ -2,14 +2,15 @@
 // Общее правило по intent + более специфичные для частных случаев (память, контекст).
 import type { Game } from '../../engine/game'
 import { type Rule, eq, ne, is, gte, add } from '../../engine/rules'
-import { D, low } from '../excuses'
+import { D, low, cap } from '../excuses'
 import { ARCS, ARC_DONE, NO_NEWS_A, NO_NEWS_B, GROUP_SEEN_A, GROUP_SEEN_B, WRONG_A, WRONG_B } from '../arcs'
 import * as L from '../life'
 import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER } from '../misc'
+import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_SENT, LIE_THIRD, LIE_NOCRED } from '../lies'
 
 type R = Rule<Game>
 const says = (intent: string, rest: Partial<R> & Pick<R, 'respond'>, extra: R['when'] = []): R => ({
-  name: `Says_${intent}${extra.length ? '_' + extra.map((c) => c.key.replace(/\W/g, '')).join('_') : ''}`,
+  name: `Says_${intent}${extra.length ? '_' + extra.map((c) => (c.key + (typeof c.value === 'string' ? '_' + c.value : c.value === true || c.value === undefined ? '' : c.value)).replace(/[^\wа-я]/gi, '')).join('_') : ''}`,
   event: 'PlayerSays',
   when: [eq('intent', intent), ...extra],
   ...rest,
@@ -90,8 +91,9 @@ export const replyRules: R[] = [
       game.setCtx(game.ctxFromPromise(r.p))
     },
   }),
-  // обещаний накопилось много — Алик и сам это понимает
+  // обещаний накопилось много — Алик и сам это понимает (изредка: иначе к середине игры это единственный ответ)
   says('prev', {
+    odds: 0.3,
     respond: async ({ game, facts }) => {
       const i = Number(facts.arg)
       if (game.S.promises[i]) game.S.promises[i].asked = true
@@ -125,4 +127,20 @@ export const replyRules: R[] = [
   simple('fwdQ', (g) => g.uniq(() => g.draw('FWD_A', L.FWD_A))),
   says('reactQ', { respond: async ({ game }) => { game.setCtx(null); await game.say([game.uniq(() => game.draw('REACT_A', L.REACT_A))]); await game.promiseLine() } }),
   simple('deletedQ', (g) => g.uniq(() => g.draw('DEL_A', L.DEL_A))),
+
+  // --- пойман на лжи: общий ответ, частные по теме и по тому, сколько раз уже ловили
+  says('catchLie', {
+    remember: [add('caught')],
+    respond: ({ game }) => {
+      const l = game.lie()
+      const map = l ? { old: l.old.say, new: l.new.say, Old: cap(l.old.say), New: cap(l.new.say) } : { old: 'одно', new: 'другое', Old: 'Одно', New: 'Другое' }
+      return game.caught(game.uniq(() => `${game.draw('LIE_OPEN', LIE_OPEN)} ${game.X.fill(game.draw('LIE_EXPLAIN', LIE_EXPLAIN), map)}`))
+    },
+  }),
+  says('catchLie', { remember: [add('caught')], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_GRANDPA', LIE_GRANDPA))) }, [eq('lie.kind', 'grandpa')]),
+  says('catchLie', { remember: [add('caught')], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_CUSTOMER', LIE_CUSTOMER))) }, [eq('lie.kind', 'customer')]),
+  says('catchLie', { remember: [add('caught')], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_SENT', LIE_SENT))) }, [eq('lie.kind', 'sent')]),
+  // третий раз пойман — признаётся (по-своему); дальше — Алику уже никто не верит
+  { ...says('catchLie', { remember: [add('caught')], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_THIRD', LIE_THIRD))) }, [gte('caught', 2)]), bonus: 1 },
+  { ...says('catchLie', { remember: [add('caught')], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_NOCRED', LIE_NOCRED))) }, [gte('caught', 3)]), bonus: 2 },
 ]

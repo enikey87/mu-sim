@@ -63,6 +63,9 @@ describe('arcs and cast', () => {
       for (const ep of a.eps) for (const m of ep.m) if (typeof m !== 'string') expect(CAST[m.w], `${id} who ${m.w}`).toBeDefined()
     }
     for (const w of Object.keys(GROUP)) expect(CAST[w], `group ${w}`).toBeDefined()
+    // реплики семейного чата не совпадают с репликами сериалов (иначе — повтор в переписке)
+    const arcLines = new Set(Object.values(ARCS).flatMap((a) => a.eps.flatMap((e) => e.m.map((m) => (typeof m === 'string' ? m : m.t)))))
+    for (const t of Object.values(GROUP).flat()) expect(arcLines.has(t), t).toBe(false)
   })
 })
 
