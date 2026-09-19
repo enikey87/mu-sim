@@ -1,6 +1,6 @@
 // Состояние игры (сохраняется целиком) и сообщения чата.
 import type { Bags } from './deck'
-import type { Facts } from './rules'
+import { type Facts, type RuleState, freshRuleState } from './rules'
 import type { Rel } from '../content/excuses'
 import type { Vars } from '../content/scenes'
 
@@ -81,8 +81,15 @@ export interface GameState {
   battery: number
   money: number
   lastSeen: number
-  /** Память системы правил: счётчики, отметки once, прочие факты. */
+  /** Память мира для системы правил: счётчики, факты, временные состояния. */
   mem: Facts
+  /** Доски памяти персонажей (Карине, Борис, Гарик…). */
+  actors: Record<string, Facts>
+  /** Состояние движка правил: once, перерывы, расписание, группы. */
+  rules: RuleState
+  /** Полученные концовки: id → день; ending — концовка, экран которой сейчас открыт. */
+  endings: Record<string, number>
+  ending: string | null
 }
 
 export function freshState(): GameState {
@@ -91,7 +98,7 @@ export function freshState(): GameState {
     msgs: [], nextId: 1, ach: {}, promises: [], seen: [], bags: {}, items: [],
     stats: { moo: 0, fifty: 0, sent: 0 },
     offlineDays: 0, ram: false, muted: false, scene: null, ctx: null, choices: null, arcs: {}, tier: 0,
-    battery: 100, money: 12400, lastSeen: 0, mem: {},
+    battery: 100, money: 12400, lastSeen: 0, mem: {}, actors: {}, rules: freshRuleState(), endings: {}, ending: null,
   }
 }
 

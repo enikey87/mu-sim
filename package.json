@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "rules:report": "RULES_REPORT=1 vitest run src/tools/tools.test.ts"
+    "rules:report": "RULES_REPORT=1 vitest run src/tools/tools.test.ts",
+    "test:rules": "vitest run src/engine/rules --coverage"
   },
   "dependencies": {
     "react": "19.3.0",
@@ -24,6 +25,7 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.1",
+    "@vitest/coverage-v8": "5.0.1",
     "jsdom": "29.1.1",
     "typescript": "7.0.2",
     "vite": "8.3.0",

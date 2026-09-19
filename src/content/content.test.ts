@@ -4,6 +4,7 @@ import { make, D } from './excuses'
 import { makeScenes, type Line } from './scenes'
 import { ARCS, ARC_DONE, CAST, GROUP } from './arcs'
 import { ACH } from './achievements'
+import { FINALES, ENDINGS } from './finales'
 import * as L from './life'
 import { allRules } from './rules'
 import { Decks } from '../engine/deck'
@@ -76,6 +77,8 @@ describe('achievements', () => {
     for (const m of allSource.matchAll(/ach: '(\w+)'/g)) used.add(m[1])
     for (const t of [1, 2, 3]) used.add('tier' + t) // unlock('tier' + t)
     used.add('rude').add('threat') // unlock(tone) в Game.send
+    for (const [arc, fs] of Object.entries(FINALES)) for (const f of fs) used.add(`fin_${arc}_${f.id}`) // unlock в playFinale
+    for (const e of ENDINGS) used.add('end_' + e.id) // unlock в reachEnding
     for (const k of used) expect(ACH[k], `unknown achievement ${k}`).toBeDefined()
     for (const k of Object.keys(ACH)) expect(used.has(k), `unreachable achievement ${k}`).toBe(true)
   })

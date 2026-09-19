@@ -1,4 +1,7 @@
 // Ачивки: ключ → [название, описание]
+import { ARCS } from './arcs'
+import { FINALES, ENDINGS } from './finales'
+
 export const ACH: Record<string, readonly [string, string]> = {
   first: ['Первый шаг', 'Написал Алику'],
   brat: ['Брат джан', 'Алик назвал тебя «брат джан»'],
@@ -62,4 +65,7 @@ export const ACH: Record<string, readonly [string, string]> = {
   memory: ['Он всё помнит', 'Алик вспомнил, что было раньше'],
   liar: ['Поймал на лжи', 'Уличил Алика в противоречии'],
   liar3: ['Следователь', 'Поймал Алика на лжи три раза'],
+  // разные финалы сериалов и концовки игры
+  ...Object.fromEntries(Object.entries(FINALES).flatMap(([arc, fs]) => fs.map((f) => [`fin_${arc}_${f.id}`, [f.title, `Другой финал: «${ARCS[arc].title}»`] as const]))),
+  ...Object.fromEntries(ENDINGS.map((e) => [`end_${e.id}`, [`${e.icon} ${e.title}`, 'Концовка игры'] as const])),
 }

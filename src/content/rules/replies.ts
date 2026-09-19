@@ -2,8 +2,9 @@
 // Общее правило по intent + более специфичные для частных случаев (память, контекст).
 import type { Game } from '../../engine/game'
 import { type Rule, eq, ne, is, gte, add } from '../../engine/rules'
+import { AlikOffline, ThickJournal } from './criteria'
 import { D, low, cap } from '../excuses'
-import { ARCS, ARC_DONE, NO_NEWS_A, NO_NEWS_B, GROUP_SEEN_A, GROUP_SEEN_B, WRONG_A, WRONG_B } from '../arcs'
+import { ARCS, NO_NEWS_A, NO_NEWS_B, GROUP_SEEN_A, GROUP_SEEN_B, WRONG_A, WRONG_B } from '../arcs'
 import * as L from '../life'
 import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER } from '../misc'
 import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_SENT, LIE_THIRD, LIE_NOCRED } from '../lies'
@@ -32,7 +33,7 @@ const simple = (intent: string, line: (g: Game) => string, after?: (g: Game) => 
 
 export const replyRules: R[] = [
   // Алик «пропал» после грубости — на любой вопрос, кроме извинения, отвечает, когда вернётся
-  { name: 'Says_WhileOffline', event: 'PlayerSays', when: [is('offline'), ne('intent', 'sorry')], bonus: 5, respond: ({ game }) => game.alikTurn('neutral') },
+  { name: 'Says_WhileOffline', event: 'PlayerSays', when: [AlikOffline, ne('intent', 'sorry')], bonus: 5, respond: ({ game }) => game.alikTurn('neutral') },
 
   says('sorry', { remember: [add('count.sorry')], respond: ({ game }) => sorry(game, game.uniq(game.X.sorry)) }),
   says('sorry', {
@@ -91,22 +92,24 @@ export const replyRules: R[] = [
       game.setCtx(game.ctxFromPromise(r.p))
     },
   }),
-  // обещаний накопилось много — Алик и сам это понимает (изредка: иначе к середине игры это единственный ответ)
+  // обещаний накопилось много — Алик и сам это понимает (не чаще раза в 20 дней: иначе к середине игры это единственный ответ)
   says('prev', {
-    odds: 0.3,
+    cooldown: { days: 20 },
     respond: async ({ game, facts }) => {
       const i = Number(facts.arg)
       if (game.S.promises[i]) game.S.promises[i].asked = true
       game.unlock('memory')
       await game.promiseLine(game.uniq(() => game.draw('PREV_MANY', PREV_MANY)))
     },
-  }, [gte('lateCount', 5)]),
+  }, [ThickJournal]),
 
   says('arc', {
     respond: async ({ game, facts }) => {
       const id = String(facts.arg ?? '')
+      game.S.mem['asked.' + id] = Number(game.S.mem['asked.' + id] ?? 0) + 1 // для финалов: «спрашивал про Бориса 3+ раз»
       const st = game.S.arcs[id]
-      if (st && ARCS[id] && st.i < ARCS[id].eps.length) return game.playArc(id)
+      // новая серия — не чаще раза в 2 дня, иначе сериал проглатывается за десять вопросов подряд
+      if (st && ARCS[id] && st.i < ARCS[id].eps.length && game.S.day - st.last >= 2) return game.playArc(id)
       await game.say([game.pair('NN_A', NO_NEWS_A, 'NN_B', NO_NEWS_B)])
       game.setCtx(null)
     },
@@ -115,7 +118,8 @@ export const replyRules: R[] = [
   says('arc', {
     respond: async ({ game, facts }) => {
       const id = String(facts.arg ?? '')
-      await game.say([game.uniq(() => game.draw('DONE_' + id, ARC_DONE[id] ?? NO_NEWS_A))])
+      const lines = game.arcDoneLines(id) ?? NO_NEWS_A
+      await game.say([game.uniq(() => game.draw(`DONE_${id}_${game.S.mem['finale.' + id] ?? ''}`, lines))])
       game.setCtx(null)
     },
   }, [is('argArcDone')]),

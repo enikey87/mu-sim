@@ -1,6 +1,7 @@
 import { useGame } from './useGame'
 import { ACH } from '../content/achievements'
 import { ARCS } from '../content/arcs'
+import { ENDINGS } from '../content/finales'
 import { fmtDate } from '../engine/time'
 
 /** Досье на Алика: обещания, сериалы, трофеи, ачивки, сброс. */
@@ -32,9 +33,16 @@ export function Sheet({ onClose, onReset }: { onClose: () => void; onReset: () =
           {Object.entries(ARCS).map(([id, a]) => {
             const i = S.arcs[id]?.i ?? 0
             return i
-              ? <li key={id}>{i >= a.eps.length ? '✅' : '📺'} <b>{a.title}</b> — серия {i}/{a.eps.length}</li>
+              ? <li key={id}>{i >= a.eps.length ? '✅' : '📺'} <b>{a.title}</b> — {game.finaleTitle(id) ? `финал «${game.finaleTitle(id)}»` : `серия ${i}/${a.eps.length}`}</li>
               : <li key={id} className="locked">🔒 ???</li>
           })}
+        </ul>
+
+        <h3>Концовки <span id="endCount">{Object.keys(S.endings).length}/{ENDINGS.length}</span></h3>
+        <ul id="endings" className="list">
+          {ENDINGS.map((e) => (
+            <li key={e.id} className={S.endings[e.id] ? '' : 'locked'}>{S.endings[e.id] ? <>{e.icon} <b>{e.title}</b></> : '🔒 ???'}</li>
+          ))}
         </ul>
 
         <h3>Трофеи</h3>

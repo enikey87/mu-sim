@@ -1,0 +1,206 @@
+// Разные финалы сериалов и концовки игры: выбор по поведению игрока, память, эффекты.
+import { describe, it, expect } from 'vitest'
+import { makeGame, alikTexts } from '../test/helpers'
+import { ARCS, ARC_DONE, CAST } from './arcs'
+import { ACH } from './achievements'
+import { FINALES, ENDINGS, DEFAULT_FINALE } from './finales'
+import type { Game } from '../engine/game'
+
+const lines = (ep: { m: Array<string | { t: string }> }) => ep.m.map((m) => (typeof m === 'string' ? m : m.t))
+const toLast = (game: Game, id: string) => { game.S.arcs[id] = { i: ARCS[id].eps.length - 1, last: -99 } }
+const said = (game: Game, from: number) => game.S.msgs.slice(from).filter((m) => m.kind === 'text').map((m) => (m.kind === 'text' ? m.text : ''))
+
+// условия каждого частного финала — как их выполнил бы игрок
+const SETUP: Record<string, (g: Game) => void> = {
+  'boris.brigadir': (g) => { g.S.mem['asked.boris'] = 6 },
+  'boris.toyou': (g) => { g.S.items.push('баран Борис') },
+  'beton.divorce': (g) => { g.S.ach.redo = 190 },
+  'beton.guilty': (g) => { g.S.mem['count.rude'] = 2 },
+  'samvel.tamada': (g) => { g.S.ach.toast = 190 },
+  'samvel.groom': (g) => { g.S.ach.saint = 190 },
+  'niva.chose': (g) => { g.S.items.push('«Нива» 1987 года') },
+  'nune.ledger': (g) => { g.S.mem.caught = 2 },
+  'grant.ally': (g) => { g.S.ach.customer = 190 },
+  'alik_death.will': (g) => { g.S.ach.forgive = 190; g.S.mem['asked.alik_death'] = 1 },
+  'alik_death.sulk': () => {},
+  'garik.cutter': (g) => { g.S.ach.newjob = 190 },
+  'tile.lost': (g) => { g.S.mem['count.threat'] = 1 },
+  'grandpa.revoke': (g) => { g.S.ach.heir = 190 },
+}
+
+describe('финалы сериалов: контент', () => {
+  it('у каждого сериала есть название обычного финала; частные финалы — к существующим сериалам', () => {
+    for (const id of Object.keys(ARCS)) expect(DEFAULT_FINALE[id], id).toBeTruthy()
+    for (const [arc, fs] of Object.entries(FINALES)) {
+      expect(ARCS[arc], arc).toBeDefined()
+      expect(new Set(fs.map((f) => f.id)).size).toBe(fs.length)
+      for (const f of fs) {
+        expect(f.done.length, `${arc}.${f.id}`).toBeGreaterThanOrEqual(2)
+        expect(ACH[f.fx?.ach ?? ''], `${arc}.${f.id} ach`).toBeDefined()
+        expect(ACH[`fin_${arc}_${f.id}`]).toBeDefined()
+        expect(SETUP[`${arc}.${f.id}`], `нет теста на ${arc}.${f.id}`).toBeDefined()
+        for (const m of f.m) if (typeof m !== 'string') expect(CAST[m.w], m.w).toBeDefined()
+      }
+    }
+  })
+  it('у каждой концовки есть текст, условия и ачивка', () => {
+    for (const e of ENDINGS) {
+      expect(e.when.length, e.id).toBeGreaterThan(0)
+      expect(e.text.length).toBeGreaterThan(40)
+      expect(ACH['end_' + e.id]).toBeDefined()
+    }
+  })
+})
+
+describe('финалы сериалов: выбор', () => {
+  it('без особых условий — обычный финал (последняя серия), как раньше', async () => {
+    for (const id of Object.keys(ARCS)) {
+      const { game } = makeGame()
+      game.S.day = 300
+      game.S.mem['asked.alik_death'] = 1 // иначе у похорон «Обиделся»
+      toLast(game, id)
+      const from = game.S.msgs.length
+      await game.playArc(id)
+      expect(said(game, from), id).toEqual(expect.arrayContaining(lines(ARCS[id].eps.at(-1)!)))
+      expect(game.S.mem['finale.' + id]).toBe('default')
+      expect(game.finaleTitle(id)).toBe(DEFAULT_FINALE[id])
+      expect(game.arcDoneLines(id)).toBe(ARC_DONE[id])
+      expect(game.S.arcs[id].i).toBe(ARCS[id].eps.length)
+    }
+  })
+  it('условия выполнены — частный финал: свои реплики, память, ачивка, ответы «Как там…?»', async () => {
+    for (const [arc, fs] of Object.entries(FINALES)) {
+      for (const f of fs) {
+        const { game } = makeGame()
+        game.S.day = 300
+        SETUP[`${arc}.${f.id}`](game)
+        toLast(game, arc)
+        const from = game.S.msgs.length
+        await game.playArc(arc)
+        expect(game.S.mem['finale.' + arc], `${arc}.${f.id}`).toBe(f.id)
+        expect(said(game, from)).toEqual(expect.arrayContaining(lines(f)))
+        expect(game.S.ach[`fin_${arc}_${f.id}`]).toBeDefined()
+        expect(game.S.ach[f.fx!.ach!]).toBeDefined()
+        expect(game.finaleTitle(arc)).toBe(f.title)
+        expect(game.arcDoneLines(arc)).toBe(f.done)
+      }
+    }
+  })
+  it('частные финалы не случаются раньше последней серии', async () => {
+    const { game } = makeGame()
+    SETUP['boris.brigadir'](game)
+    await game.playArc('boris')
+    expect(game.S.mem['finale.boris']).toBeUndefined()
+    expect(alikTexts(game.S.msgs).join(' ')).toContain(lines(ARCS.boris.eps[0])[0])
+  })
+  it('эффекты: Борис платит по-настоящему, «Нива» приезжает трофеем, обиженный Алик пропадает', async () => {
+    const { game } = makeGame()
+    SETUP['boris.brigadir'](game)
+    toLast(game, 'boris')
+    const [debt, money] = [game.S.debt, game.S.money]
+    await game.playArc('boris')
+    expect(game.S.debt).toBe(debt - 500)
+    expect(game.S.money).toBe(money + 500)
+
+    const b = makeGame().game
+    SETUP['niva.chose'](b)
+    toLast(b, 'niva')
+    await b.playArc('niva')
+    expect(b.S.items).toContain('«Нива» (сама приехала)')
+
+    const c = makeGame().game
+    c.S.day = 300
+    toLast(c, 'alik_death')
+    await c.playArc('alik_death')
+    expect(c.S.mem['finale.alik_death']).toBe('sulk')
+    expect(c.S.offlineDays).toBe(20)
+  })
+  it('два финала подходят — побеждает более специфичный («Жених» перекрывает «Тамаду»)', async () => {
+    const { game } = makeGame()
+    SETUP['samvel.tamada'](game)
+    SETUP['samvel.groom'](game)
+    toLast(game, 'samvel')
+    await game.playArc('samvel')
+    expect(game.S.mem['finale.samvel']).toBe('groom')
+    expect(game.S.mem.wedding).toBe(true)
+  })
+  it('грубил хоть раз — в женихи не берут', async () => {
+    const { game } = makeGame()
+    SETUP['samvel.groom'](game)
+    game.S.mem['count.rude'] = 1
+    toLast(game, 'samvel')
+    await game.playArc('samvel')
+    expect(game.S.mem['finale.samvel']).toBe('default')
+  })
+  it('запасное условие: «Нива» выбирает того, кто о ней спрашивал', async () => {
+    const { game } = makeGame()
+    game.S.mem['asked.niva'] = 5
+    toLast(game, 'niva')
+    await game.playArc('niva')
+    expect(game.S.mem['finale.niva']).toBe('chose')
+  })
+  it('вопрос «Как там…?» считается и после финала отвечает репликами этого финала', async () => {
+    const { game } = makeGame()
+    game.S.arcs.boris = { i: 1, last: -99 }
+    for (let i = 0; i < 6; i++) await game.fire('PlayerSays', { intent: 'arc', arg: 'boris' })
+    expect(game.S.mem['asked.boris']).toBe(6)
+    expect(game.S.arcs.boris.i).toBe(2) // подряд — одна новая серия, дальше «пока без новостей»
+    toLast(game, 'boris')
+    await game.playArc('boris')
+    expect(game.S.mem['finale.boris']).toBe('brigadir')
+    const from = game.S.msgs.length
+    await game.fire('PlayerSays', { intent: 'arc', arg: 'boris', argArcDone: true })
+    expect(FINALES.boris[0].done).toContain(said(game, from).at(-1))
+  })
+})
+
+describe('концовки игры', () => {
+  const check = async (game: Game) => { await game.fire('CheckEnding'); return game.S.ending }
+  const late = () => { const t = makeGame(); t.game.S.day = 320; return t }
+  it('нет финалов — нет концовки', async () => {
+    const { game } = makeGame()
+    expect(await check(game)).toBeNull()
+  })
+  it('финал «Жених» → концовка «Породнились»: экран, запись, ачивка — один раз', async () => {
+    const { game } = late()
+    game.S.mem['finale.samvel'] = 'groom'
+    expect(await check(game)).toBe('family')
+    expect(game.S.endings.family).toBe(game.S.day)
+    expect(game.S.ach.end_family).toBeDefined()
+    game.closeEnding()
+    expect(game.S.ending).toBeNull()
+    expect(await check(game)).toBeNull()
+  })
+  it('до ~300-го дня концовок нет: это развязка, а не начало', async () => {
+    const { game } = makeGame()
+    game.S.mem['finale.samvel'] = 'groom'
+    expect(await check(game)).toBeNull()
+  })
+  it('редкое сочетание побеждает: «Честные деньги» раньше частичных', async () => {
+    const { game } = late()
+    Object.assign(game.S.mem, { 'finale.boris': 'brigadir', 'finale.grant': 'ally', 'finale.niva': 'chose' })
+    expect(await check(game)).toBe('honest')
+  })
+  it('каждую концовку можно получить', async () => {
+    const setups: Record<string, (g: Game) => void> = {
+      family: (g) => { g.S.mem['finale.samvel'] = 'groom' },
+      heir: (g) => { g.S.mem['finale.alik_death'] = 'will' },
+      ram: (g) => { g.S.mem['finale.boris'] = 'toyou'; g.S.items.push('баран Борис', '½ фундамента') },
+      alik: (g) => { g.S.mem['finale.garik'] = 'cutter'; g.S.ach.fence = 190 },
+      honest: (g) => Object.assign(g.S.mem, { 'finale.boris': 'brigadir', 'finale.grant': 'ally', 'finale.niva': 'chose' }),
+      multiverse: (g) => { g.S.day = 800; g.S.stats.sent = 300 },
+    }
+    expect(Object.keys(setups).sort()).toEqual(ENDINGS.map((e) => e.id).sort())
+    for (const [id, setup] of Object.entries(setups)) {
+      const { game } = late()
+      setup(game)
+      expect(await check(game), id).toBe(id)
+    }
+  })
+  it('концовка проверяется после каждого хода игрока', async () => {
+    const { game } = late()
+    game.S.mem['finale.alik_death'] = 'will'
+    await game.send({ text: 'Алик, добрый день', tone: 'polite' })
+    expect(game.S.ending).toBe('heir')
+  })
+})

@@ -5,7 +5,7 @@ import { StatusBar, ChatHeader, StatsBar } from './Header'
 import { Chat } from './Chat'
 import { Choices, Composer } from './Input'
 import { Sheet } from './Sheet'
-import { Toast, Notification, DeadScreen } from './Overlays'
+import { Toast, Notification, DeadScreen, EndingScreen } from './Overlays'
 import { DebugPanel } from './DebugPanel'
 
 export function App({ game, onReset, debug = false }: { game: Game; onReset: () => void; debug?: boolean }) {
@@ -70,6 +70,7 @@ function Phone({ onReset }: { onReset: () => void }) {
       <Toast />
       <Notification />
       <DeadScreen />
+      <EndingScreen onReset={reset} />
     </div>
   )
 }
