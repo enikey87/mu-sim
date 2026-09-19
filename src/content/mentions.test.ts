@@ -42,9 +42,12 @@ export const STATE: Array<[string, RegExp, string[]]> = [
 
 const atoms = (cs: readonly Criterion[]): Criterion[] => cs.flatMap((c) => (c.op === 'all' ? [c, ...atoms(c.all ?? [])] : [c]))
 const num = (c: Criterion) => (typeof c.value === 'number' ? c.value : NaN)
-/** Серии arc до n-й что-то ставят в память (remember): факты «есть с этой серии». */
-const setBy = (arc: string, n: number): string[] =>
-  (ARCS[arc]?.eps ?? []).slice(0, n).flatMap((e) => (e.remember ?? []).filter((o) => o.op === '=' && o.value === true).map((o) => o.key))
+/** Что серии arc до n-й оставили в памяти (remember, последняя запись побеждает): true — факт есть, false — снят. */
+function setBy(arc: string, n: number): Criterion[] {
+  const last = new Map<string, unknown>()
+  for (const e of (ARCS[arc]?.eps ?? []).slice(0, n)) for (const o of e.remember ?? []) if (o.op === '=') last.set(o.key, o.value)
+  return [...last].flatMap(([key, v]): Criterion[] => (v === true ? [{ key, op: '==', value: true }] : v === false ? [{ key, op: '!exist' }] : []))
+}
 /** Условие c следует из известного known: то же самое или сильнее (серия дальше, финал — после всех серий, факт поставила серия). */
 function implied(c: Criterion, known: Criterion[]): boolean {
   const arc = c.key.startsWith('arc.') ? c.key.slice(4) : null
@@ -52,7 +55,7 @@ function implied(c: Criterion, known: Criterion[]): boolean {
     || (arc !== null && (c.op === 'exist' || c.op === '>=') && (
       k.key === 'finale.' + arc && (k.op === 'exist' || k.op === '==')
       || k.key === c.key && k.op === '>=' && num(k) >= (c.op === 'exist' ? 1 : num(c))))
-    || (c.op === '==' && c.value === true && k.key.startsWith('arc.') && k.op === '>=' && setBy(k.key.slice(4), num(k)).includes(c.key))
+    || (k.key.startsWith('arc.') && k.op === '>=' && setBy(k.key.slice(4), num(k)).some((f) => describeCriterion(f) === describeCriterion(c)))
     || (c.op === '!=' && k.key === c.key && k.op === '!exist'))
 }
 const holds = (key: WorldKey, known: Criterion[]) => atoms([WORLD[key]]).filter((a) => a.op !== 'all').every((a) => implied(a, known))
@@ -97,10 +100,9 @@ function strings(v: unknown, path: string, known: Criterion[], out: Found[]): Fo
   return out
 }
 
-const setFacts = (id: string, n: number): Criterion[] => setBy(id, n).map((key) => ({ key, op: '==', value: true }))
 /** Серия k идёт, финала ещё нет (факт финала ставится после его реплик). */
-const arcAt = (id: string, k: number): Criterion[] => [{ key: 'arc.' + id, op: '>=', value: k + 1 }, { key: 'finale.' + id, op: '!exist' }, ...setFacts(id, k + 1)]
-const finale = (id: string): Criterion[] => [{ key: 'finale.' + id, op: 'exist' }, { key: 'arc.' + id, op: '>=', value: ARCS[id].eps.length }, ...setFacts(id, ARCS[id].eps.length)]
+const arcAt = (id: string, k: number): Criterion[] => [{ key: 'arc.' + id, op: '>=', value: k + 1 }, { key: 'finale.' + id, op: '!exist' }, ...setBy(id, k + 1)]
+const finale = (id: string): Criterion[] => [{ key: 'finale.' + id, op: 'exist' }, { key: 'arc.' + id, op: '>=', value: ARCS[id].eps.length }, ...setBy(id, ARCS[id].eps.length)]
 // легенду могут ставить разные серии — известно только общее для всех
 const legendSets: Record<string, Criterion[][]> = {}
 for (const [id, a] of Object.entries(ARCS)) a.eps.forEach((e, k) => { if (typeof e.legend === 'string') (legendSets[e.legend] ??= []).push(arcAt(id, k)) })

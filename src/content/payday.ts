@@ -4,7 +4,7 @@
 // Реплики — пулы с условиями и приоритетом (game.line): звучит то, что было в этой партии.
 import { type Line, type LineSpec, type Entry, is, eq, exists, gte, gate, missing } from '../engine/rules'
 import type { Scene } from './scenes'
-import { needs } from './world'
+import { needs, WORLD } from './world'
 
 export const ANNOUNCE = [
   needs('karineHome')('Брат. Завтра. Всё. Честно. Я не шучу. Даже Карине не шутит.'),
@@ -24,7 +24,7 @@ export const SOURCES: Source[] = [
   { t: 'Помнишь конверт из фундамента? У него было двойное дно. 40 000 — чьи, не знаю, теперь наши.', when: [exists('finale.beton')], prio: 2, amount: 40000 },
   { t: 'Грант перевёл! Сказал: «За ровную плитку и за то, что я близнец». 70 000.', when: [exists('finale.grant')], prio: 2, amount: 70000 },
   { t: 'Дедушка Грачик выдал из шаурмичной кассы. 30 000 и шаурму. Шаурму тоже тебе.', when: [exists('finale.grandpa')], prio: 1, amount: 30000 },
-  { t: 'Гарика достали из фундамента. В кармане у него — 25 000. Говорит, копил там два года.', when: [exists('finale.garik')], prio: 1, amount: 25000 },
+  { t: 'Гарик принёс 25 000. Копил, пока сидел в фундаменте: там не на что тратить.', when: [exists('finale.garik')], prio: 1, amount: 25000 },
   { t: 'Самвел раздал свадебные конверты. Сорок свадеб — сорок конвертов. 60 000.', when: [exists('finale.samvel')], prio: 1, amount: 60000 },
   { t: 'Размик слез с крана и вернул аванс. Сказал: «Брату плиточнику — нужнее». 45 000.', when: [exists('finale.razmik')], prio: 1, amount: 45000 },
   { t: 'Инспектор Рубик подписал акт! Грант оплатил объект. 55 000 — твои.', when: [exists('finale.rubik')], prio: 1, amount: 55000 },
@@ -54,7 +54,7 @@ export const ROLL: Entry<Call>[] = [
   { who: 'judge', t: 'Присутствую неофициально. С хашем.', when: [is('met.judge')], prio: 1 },
   needs('razmikUp')({ who: 'razmik', t: 'Я с крана вижу — всё честно. Пока.', when: [is('met.razmik')], prio: 1 }),
   needs('rubik')({ who: 'rubik', t: 'Проверяю подлинность купюр. Все — подозрительно ровные.', when: [is('met.rubik')], prio: 1 }),
-  gate(exists('arc.garik'), missing('garik.concrete'))({ who: 'garik', t: 'Я только что из фундамента. Что пропустил?', when: [is('met.garik')], prio: 1 }),
+  gate(exists('arc.garik'), missing('garik.concrete'), WORLD.garikOnline)({ who: 'garik', t: 'Я только что из фундамента. Что пропустил?', when: [is('met.garik')], prio: 1 }),
   { who: 'mama', t: 'Сынок, покушай сначала. Деньги не убегут. Хотя от Алика — убегут.', when: [is('met.mama')], prio: 1 },
   needs('arsen')({ who: 'arsen', t: 'Я как юрист фиксирую: выплата — прецедент. Внесу в диплом.', when: [is('met.arsen')], prio: 1 }),
   { who: 'samvel', t: 'Кто пригласил плиточника? А, это его выплата. Садись, дорогой, во главу стола.' },
