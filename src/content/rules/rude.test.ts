@@ -2,13 +2,15 @@
 import { describe, it, expect } from 'vitest'
 import { makeGame } from '../../test/helpers'
 import type { Game } from '../../engine/game'
+import type { Facts } from '../../engine/rules'
 import type { Msg } from '../../engine/state'
 import * as T from '../rude'
 import { HEAT } from './rude'
 
 const texts = (game: Game, from: number) => game.S.msgs.slice(from).map((m) => (m.kind === 'text' || m.kind === 'sys' ? m.text : m.kind === 'sticker' ? m.e : ''))
 const whos = (game: Game, from: number) => game.S.msgs.slice(from).filter((m): m is Extract<Msg, { kind: 'text' }> => m.kind === 'text').map((m) => m.who ?? 'alik')
-const fire = async (game: Game, tone: string) => { const n = game.S.msgs.length; const r = await game.fire('PlayerMessage', { tone }); return { r: r?.name, n } }
+const fireFacts = async (game: Game, facts: Facts) => { const n = game.S.msgs.length; const r = await game.fire('PlayerMessage', facts); return { r: r?.name, n } }
+const fire = (game: Game, tone: string) => fireFacts(game, { tone })
 const says = async (game: Game, intent: string) => { const n = game.S.msgs.length; const r = await game.fire('PlayerSays', { intent }); return { r: r?.name, n } }
 const heat = (game: Game, h: number) => { game.S.mem[HEAT] = h }
 const fresh = (game: Game) => { game.S.choices = null; return game.choices }
@@ -16,6 +18,31 @@ const offered = (game: Game) => { for (let i = 0; i < 20; i++) if (fresh(game).s
 const all = (pool: readonly T.Said[]) => pool.map(([, t]) => t)
 
 describe('лестница грубости: ступени', () => {
+  it('угроза насилием ускоряет ссору на две ступени и не запускает суд', async () => {
+    const { game } = makeGame()
+    const { r, n } = await fireFacts(game, { tone: 'rude', category: 'violent-threat' })
+    expect(r).toBe('Tone_ViolentThreat')
+    expect(T.VIOLENT_THREAT).toContain(texts(game, n).at(-1))
+    expect(game.facts()[HEAT]).toBe(2)
+    expect(game.S.mem['count.violence']).toBe(1)
+    expect(game.S.mem['count.rude']).toBe(1)
+    expect(game.S.mem['count.threat']).toBeUndefined()
+    expect(game.S.ach.court).toBeUndefined()
+  })
+  it('завуалированное запугивание нагревает ссору и получает отдельный ответ', async () => {
+    const { game } = makeGame()
+    const { r, n } = await fireFacts(game, { tone: 'rude', category: 'intimidation' })
+    expect(r).toBe('Tone_Intimidation')
+    expect(T.INTIMIDATION).toContain(texts(game, n).at(-1))
+    expect(game.facts()[HEAT]).toBe(1)
+    expect(game.S.mem['count.intimidation']).toBe(1)
+    expect(game.S.mem['count.rude']).toBe(1)
+  })
+  it('блок важнее отдельной реакции на угрозу', async () => {
+    const { game } = makeGame()
+    game.S.mem.blocked = true
+    expect((await fireFacts(game, { tone: 'rude', category: 'violent-threat' })).r).toBe('Rude_WhileBlocked')
+  })
   it('S0 — обида: коротко пропадает; температура +1 и через 20 дней остывает', async () => {
     const { game } = makeGame()
     expect((await fire(game, 'rude')).r).toBe('Tone_Rude')
