@@ -44,10 +44,7 @@ export const replyRules: R[] = [
     respond: ({ game }) => {
       game.unlock('memory')
       // свежая фраза «опять мир?», а кончились — обычное прощение из генератора
-      const t = game.seen.pickFresh(() => game.draw('SORRY_AGAIN', SORRY_AGAIN), (x) => x)
-      if (game.seen.has(t)) return sorry(game, game.uniq(game.X.sorry))
-      game.seen.mark(t)
-      return sorry(game, t)
+      return sorry(game, game.line('SORRY_AGAIN', SORRY_AGAIN, { fallback: game.X.sorry })!)
     },
   }, [gte('count.sorry', 2)]),
 
@@ -61,7 +58,7 @@ export const replyRules: R[] = [
 
   says('promiseCheck', { respond: async ({ game, facts }) => { await game.say([game.uniq(() => game.X.promiseCheck(String(facts.arg ?? '')))]); game.setCtx(null) } }),
   // срок «когда-нибудь» — переспрашивать бессмысленно, и Алик это честно признаёт
-  says('promiseCheck', { respond: async ({ game }) => { await game.say([game.uniq(() => game.draw('PROMISE_NEVER', PROMISE_NEVER))]); game.setCtx(null) } }, [is('ctx.whenNever')]),
+  says('promiseCheck', { respond: async ({ game }) => { await game.say([game.line('PROMISE_NEVER', PROMISE_NEVER, { repeat: true, cooldown: { turns: 25 }, fallback: () => game.draw('PROMISE_NEVER', PROMISE_NEVER) })!]); game.setCtx(null) } }, [is('ctx.whenNever')]),
 
   says('condole', { respond: async ({ game }) => { game.mood(1); await game.say([game.pair('CONDOLE_A', D.CONDOLE_A, 'CONDOLE_B', D.CONDOLE_B)]); game.setCtx(null) } }),
   // соболезнуешь, а покойник уже встал и говорит тост

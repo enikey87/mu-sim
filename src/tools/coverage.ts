@@ -3,7 +3,8 @@
 import { Game } from '../engine/game'
 import { manualClock } from '../engine/clock'
 import { seededRng } from '../engine/rng'
-import { specificityOf } from '../engine/rules'
+import { specificityOf, lineId, spec } from '../engine/rules'
+import { MEMORY } from '../content/memory'
 import { botTurn } from './bot'
 
 export interface CoverageReport {
@@ -13,6 +14,8 @@ export interface CoverageReport {
   /** Сколько раз правило было выбрано (match) или попало в выбранные (collect). */
   fired: Record<string, number>
   never: string[]
+  /** Реплики памяти, которые ни разу не прозвучали (условие не наступило или пул не дошёл). */
+  unsaid: string[]
   /** По событиям: сколько выборов и какая доля досталась самым общим правилам события. */
   events: Record<string, { total: number; generic: number }>
 }
@@ -24,6 +27,7 @@ export async function ruleCoverage(seeds: number[], turns: number, hours = [14, 
   let total = 0
   let names: string[] = []
   let weighted: string[] = []
+  const said = new Set<string>()
   for (const [i, seed] of seeds.entries()) {
     // разные часы и дни недели — чтобы срабатывали утро, обед, вечер, пятница
     const clock = manualClock(Date.parse('2026-09-14T12:00:00Z') + (i % 7) * 864e5)
@@ -47,8 +51,10 @@ export async function ruleCoverage(seeds: number[], turns: number, hours = [14, 
       if (k % 7 === 0 && !game.busy && !game.dead) await game.fire('AlikIdle')
       total++
     }
+    for (const id of Object.keys(game.S.rules.said)) said.add(id)
   }
-  return { turns: total, weighted, fired, never: names.filter((n) => !fired[n]), events }
+  const unsaid = MEMORY.map(spec).filter((l) => !said.has(l.id ?? lineId('MEMORY', l.t))).map((l) => l.t)
+  return { turns: total, weighted, fired, never: names.filter((n) => !fired[n]), events, unsaid }
 }
 
 export function formatCoverage(r: CoverageReport): string {
@@ -56,6 +62,7 @@ export function formatCoverage(r: CoverageReport): string {
   for (const [e, v] of Object.entries(r.events).sort((a, b) => b[1].total - a[1].total))
     lines.push(`${e.padEnd(22)} ${(r.weighted.includes(e) ? '— (по весам)' : Math.round((v.generic / v.total) * 100) + '%').padStart(12)}   ${String(v.total).padStart(8)}`)
   lines.push('', `Ни разу не сработали (${r.never.length}):`, ...r.never.map((n) => '  ' + n))
+  lines.push('', `Память: не прозвучали (${r.unsaid.length}):`, ...r.unsaid.map((t) => '  ' + t.slice(0, 80)))
   lines.push('', 'Самые частые:', ...Object.entries(r.fired).sort((a, b) => b[1] - a[1]).slice(0, 15).map(([n, c]) => `  ${String(c).padStart(5)}  ${n}`))
   return lines.join('\n')
 }

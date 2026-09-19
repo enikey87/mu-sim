@@ -3,7 +3,7 @@
 // S0 обида → S1 семья пишет в личку → S2 звонки мамы → S3 блок и чужие номера → S4 семейный суд → S5 вежливость-убийца;
 // сбоку — «Мууу»-дипломатия, встречный иск, ритуал примирения, холодная война, привыкание; финал — вендетта.
 import type { Game } from '../../engine/game'
-import { type Rule, eq, ne, gte, lte, is, add, set } from '../../engine/rules'
+import { type Rule, type Line, eq, ne, gte, lte, is, add, set } from '../../engine/rules'
 import * as T from '../rude'
 import { RUDE_AGAIN } from '../misc'
 
@@ -25,14 +25,10 @@ export async function sayFresh(game: Game, key: string, pool: readonly T.Said[])
 }
 /** Остудить ссору на n, не ниже нуля. */
 export const cooldown = (game: Game, n: number) => { game.S.mem[HEAT] = Math.max(0, Number(game.S.mem[HEAT] ?? 0) - n) }
-const line = (game: Game, key: string, arr: string[]) => game.uniq(() => game.draw(key, arr))
-/** Свежая реплика из пула; пул исчерпан — отвечает генератор отмазок (тысячи вариантов), а не повтор. */
-const freshOr = (game: Game, key: string, arr: readonly string[], fallback: () => string) => {
-  const t = game.seen.pickFresh(() => game.draw(key, arr), (x) => x)
-  if (game.seen.has(t)) return game.uniq(fallback)
-  game.seen.mark(t)
-  return t
-}
+/** Повторяемая реплика (вежливый режим, вендетта): не чаще раза в 6 ходов, свежие — раньше. */
+const line = (game: Game, key: string, arr: readonly Line[]) => game.line(key, arr, { repeat: true, cooldown: { turns: 6 }, fallback: game.X.offended })!
+/** Реплика по правилам Hades (условия, приоритет, один раз); пул исчерпан — генератор, а не повтор. */
+const freshOr = (game: Game, key: string, arr: readonly Line[], fallback: () => string) => game.line(key, arr, { fallback })!
 
 async function offended(game: Game, text?: string, away = true): Promise<void> {
   game.mood(-2)
@@ -48,9 +44,8 @@ const family = (who: string): R => ({
   respond: async ({ game }) => {
     game.mood(-1)
     // у родственника кончились новые фразы — пишет сам Алик
-    const t = game.seen.pickFresh(() => game.draw('RF_' + who, T.RUDE_FAMILY[who]), (x) => x)
-    if (game.seen.has(t)) { await game.say([game.uniq(game.X.offended)]); game.setCtx({ offended: true }); return }
-    game.seen.mark(t)
+    const t = game.line('RF_' + who, T.RUDE_FAMILY[who])
+    if (!t) { await game.say([game.uniq(game.X.offended)]); game.setCtx({ offended: true }); return }
     await game.say([{ w: who, t }])
     if (game.chance(0.6)) { await game.sleep(700); await game.say([freshOr(game, 'RF_ALIK', T.RUDE_FAMILY_ALIK, game.X.offended)]) }
     game.setCtx({ offended: true })
@@ -132,7 +127,7 @@ export const rudeRules: R[] = [
   {
     // ссора остыла (давно не кричал), но за игру накричал много
     name: 'Tone_MissRude', event: 'PlayerMessage', when: [ne('tone', 'rude'), ne('tone', 'threat'), gte('count.rude', 15), lte(HEAT, 0), gte('sinceRude', 8)], odds: 0.35, cooldown: { turns: 8 },
-    respond: async ({ game }) => { const t = game.seen.pickFresh(() => game.draw('MISS_RUDE', T.MISS_RUDE), (x) => x); if (game.seen.has(t)) return game.turnRoll(); game.seen.mark(t); await game.say([t]); game.unlock('habit'); await game.turnRoll() },
+    respond: async ({ game }) => { const t = game.line('MISS_RUDE', T.MISS_RUDE); if (!t) return game.turnRoll(); await game.say([t]); game.unlock('habit'); await game.turnRoll() },
   },
 
   // состояния: блок, вежливость, вендетта перекрывают обычный ход
@@ -165,7 +160,7 @@ export const rudeSaysRules: R[] = [
   { name: 'Says_moo', event: 'PlayerSays', when: [eq('intent', 'moo')], respond: async ({ game }) => { await game.say([freshOr(game, 'MOO_ODD', T.MOO_ODD, game.X.cow)]); game.setCtx(null) } },
   {
     name: 'Says_sorry_blocked', event: 'PlayerSays', when: [eq('intent', 'sorry'), is('blocked')], bonus: 6,
-    respond: async ({ game }) => { game.sys(T.NOT_DELIVERED); await game.sleep(700); await game.say([{ w: 'boris', t: 'Бее. (Борис намекает: попроси через него.)' }]) },
+    respond: async ({ game }) => { game.sys(T.NOT_DELIVERED); await game.sleep(700); await game.say([{ w: 'boris', t: game.line('BORIS_HINT', T.BORIS_HINT, { repeat: true, cooldown: { turns: 5 }, fallback: () => 'Бее.' })! }]) },
   },
   {
     name: 'Says_viaBoris', event: 'PlayerSays', when: [eq('intent', 'viaBoris')], remember: [set('blocked', false), add('count.sorry')],

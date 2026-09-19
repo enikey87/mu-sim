@@ -1,20 +1,31 @@
 import { useGame } from './useGame'
 
-/** Варианты реплик: контекстные подсвечены, грубые — красным. */
+/** Сколько «?» на скрытой кнопке: 2–4, стабильно по индексу. */
+const MARKS = [3, 2, 4, 3, 2, 4]
+
+/** Варианты реплик: контекстные подсвечены, грубые — красным. Пока Алик отвечает — дёргающиеся «?», чтобы не раскрыть варианты. */
 export function Choices() {
   const game = useGame()
+  const locked = game.busy || game.dead
   return (
-    <div className="choices" id="choices">
-      {game.choices.map((o, i) => (
-        <button
-          key={i + o.text}
-          className={[o.tone === 'rude' ? 'rude' : '', o.scene || o.act ? 'ctx' : ''].join(' ').trim()}
-          disabled={game.busy || game.dead}
-          onClick={() => void game.send(o)}
-        >
-          {o.text}
-        </button>
-      ))}
+    <div className="choices" id="choices" aria-busy={locked}>
+      {game.choices.map((o, i) =>
+        locked ? (
+          <button key={'locked' + i} className="locked" disabled aria-label="Варианты скрыты, Алик отвечает">
+            {Array.from({ length: MARKS[i % MARKS.length] }, (_, j) => (
+              <span key={j} className="q" aria-hidden="true" style={{ animationDelay: `${-((i * 3 + j * 7) % 10) * 0.09}s` }}>?</span>
+            ))}
+          </button>
+        ) : (
+          <button
+            key={i + o.text}
+            className={[o.tone === 'rude' ? 'rude' : '', o.scene || o.act ? 'ctx' : ''].join(' ').trim()}
+            onClick={() => void game.send(o)}
+          >
+            {o.text}
+          </button>
+        ),
+      )}
     </div>
   )
 }

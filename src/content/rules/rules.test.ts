@@ -1,6 +1,7 @@
 // Сценарии правил: именно те места, где в оригинале были нелогичные ответы.
 import { describe, it, expect } from 'vitest'
 import { makeGame, alikTexts } from '../../test/helpers'
+import { spec } from '../../engine/rules'
 import type { Game } from '../../engine/game'
 import type { Choice, Ctx } from '../../engine/state'
 import { D } from '../excuses'
@@ -115,7 +116,7 @@ describe('ответы Алика (PlayerSays)', () => {
     const { game } = makeGame()
     for (let i = 0; i < 2; i++) await reply(game, { text: 'Прости', tone: 'polite', act: 'sorry' })
     const t = await reply(game, { text: 'Прости ещё раз', tone: 'polite', act: 'sorry' })
-    expect(oneOf(SORRY_AGAIN.map(frag), t.join(' '))).toBe(true)
+    expect(oneOf(SORRY_AGAIN.map((l) => frag(spec(l).t)), t.join(' '))).toBe(true)
     expect(game.S.ach.memory).toBeDefined()
   })
   it('сериал закончился — финальный ответ этого сериала, а не «без новостей»', async () => {
@@ -175,7 +176,7 @@ describe('тон сообщения (PlayerMessage)', () => {
     game.nextDay(21)
     await game.afterTurn()
     const fourth = await reply(game, rude)
-    expect(oneOf(RUDE_AGAIN.map(frag), fourth.join(' '))).toBe(true)
+    expect(oneOf(RUDE_AGAIN.map((l) => frag(spec(l).t)), fourth.join(' '))).toBe(true)
   })
   it('угроза судом — насмешка, дальше линия суда: юрист, претензия', async () => {
     const { game } = makeGame()

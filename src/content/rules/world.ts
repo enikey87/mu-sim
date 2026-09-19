@@ -1,6 +1,7 @@
 // Правила новых возможностей: выбор сцен, наступившие обещания, хор персонажей, состояния мира.
 import type { Game } from '../../engine/game'
 import { type Rule, type Facts, gte, lte, is, add, of } from '../../engine/rules'
+import { CHORUS_LEGEND } from '../legends'
 import { PROMISE_DUE, PROMISE_DUE_COSMIC, PROMISE_DUE_KEPT, CHORUS, CHORUS_FED_UP, WEDDING_NOISE, BORIS_SICK, DEAD_KARINE, DEAD_ALIK } from '../world'
 
 type R = Rule<Game>
@@ -18,15 +19,16 @@ export const sceneRules: R[] = [
   scene('lend', [gte('mood', 4)]),
   scene('toast', [], eveningBoost), // застолье — чаще вечером и в пятницу
   scene('tax', [gte('count.threat', 1)], 2), // «если спросят — ты у меня не работал» — после угроз судом
-  scene('wife', [gte('count.rude', 1)]), // Карине замечает, что на мужа кричат
+  { ...scene('wife', [gte('count.rude', 1)]), once: true }, // Карине знакомится один раз: «Вы кто такой?» дважды — нелепо
   scene('invoice', [gte('day', 215)]),
   scene('loan', [gte('day', 230)]),
   scene('deathbed', [gte('day', 240), lte('mood', 6)], 2), // умирать Алик начинает, когда дела плохи
-  scene('heir', [gte('arc.grandpa', 4)], 3), // наследство — после того как дедушка переписал завещание
+  { ...scene('heir', [gte('arc.grandpa', 4)], 3), once: true }, // наследство — один раз, после того как дедушка переписал завещание
 ]
 
-// ---- мини-квесты (PickQuest): свой слот в ходе Алика, у каждого перерыв 25 дней ----
-const quest = (id: string, when: R['when'] = []): R => ({ ...scene(id, when), name: `Quest_${id}`, event: 'PickQuest' })
+// ---- мини-квесты (PickQuest): свой слот в ходе Алика, каждый — один раз за игру ----
+// квест — один раз за игру: во второй раз та же история уже не смешная
+const quest = (id: string, when: R['when'] = []): R => ({ ...scene(id, when), name: `Quest_${id}`, event: 'PickQuest', once: true, cooldown: undefined })
 export const questRules: R[] = [
   quest('q_hash'), quest('q_niva'), quest('q_tamada'), quest('q_lottery'), quest('q_parking'),
   quest('q_mama'), quest('q_crypto', [gte('day', 200)]), quest('q_photo'), quest('q_witness', [gte('day', 210)]), quest('q_goat'),
@@ -62,9 +64,9 @@ const chorus = (who: string): R => ({
   name: `Chorus_${who}`, event: 'Mentioned', target: who, when: [], odds: 0.3, cooldown: { turns: 12 }, priority: 'chatter',
   remember: [add('interjections', 1, { scope: 'target' })],
   respond: async ({ game }) => {
-    const t = game.seen.pickFresh(() => game.draw('CH_' + who, CHORUS[who]), (x) => x)
-    if (game.seen.has(t)) return false // новых реплик нет — молчит
-    game.seen.mark(t)
+    // сначала реплики в рамках легенды денег (Нуне не скажет «денег нет», пока деньги в сейфе)
+    const t = game.line('CH_' + who, [...(CHORUS_LEGEND[who] ?? []), ...CHORUS[who]])
+    if (!t) return false // новых реплик нет — молчит
     await game.say([{ w: who, t }])
   },
 })

@@ -1,8 +1,10 @@
 // Ход Алика в ответ на обычное сообщение игрока.
 import type { Game } from '../../engine/game'
-import { type Rule, eq, ne, gte, lte, is } from '../../engine/rules'
+import { type Rule, eq, ne, gte, lte, is, exists } from '../../engine/rules'
 import { AlikOffline } from './criteria'
 import { IDLE } from '../life'
+import { MEMORY } from '../memory'
+import { LEGENDS } from '../legends'
 
 type R = Rule<Game>
 
@@ -20,6 +22,12 @@ export const storyRules: R[] = [
   { name: 'Beat_FirstArc', event: 'StoryBeat', when: [gte('sent', 3), lte('arcsStarted', 0), is('arcAvailable')], odds: 0.5, priority: 'chatter', respond: async ({ game }) => { const id = game.nextArc(); if (id) await game.playArc(id) } },
   // идущие сериалы продолжаются и между «обычными» ходами — не реже серии в ~8 ходов
   { name: 'Beat_Arc', event: 'StoryBeat', when: [gte('arcsStarted', 1), is('arcAvailable')], specificity: 0, odds: 0.14, cooldown: { turns: 4 }, priority: 'chatter', respond: async ({ game }) => { const id = game.nextArc(); if (id) await game.playArc(id) } },
+  // легенда денег продолжается и между «обычными» ходами
+  {
+    name: 'Beat_Legend', event: 'StoryBeat', when: [exists('legend')], specificity: 0, odds: 0.12, cooldown: { turns: 5 }, priority: 'chatter',
+    respond: async ({ game, facts }) => { const t = game.line('LEG_' + facts.legend, LEGENDS[String(facts.legend)].lines); if (!t) return false; game.markTopical(await game.say([t])) },
+  },
+  { name: 'Beat_Memory', event: 'StoryBeat', when: [gte('sent', 10)], specificity: 0, odds: 0.08, cooldown: { turns: 6 }, priority: 'chatter', respond: async ({ game }) => { const t = game.line('MEMORY', MEMORY); if (!t) return false; await game.say([t]); game.unlock('memory') } },
   { name: 'Beat_Quest', event: 'StoryBeat', when: [gte('sent', 6)], specificity: 0, odds: 0.06, cooldown: { turns: 8 }, priority: 'chatter', respond: ({ game }) => game.fire('PickQuest').then((r) => !!r) },
 ]
 
@@ -48,6 +56,18 @@ export const turnRules: R[] = [
   { name: 'Turn_Group', event: 'AlikTurn', when: [gte('sent', 8)], specificity: 0, weight: W.group, respond: ({ game }) => game.groupChat() },
   { name: 'Turn_Wrong', event: 'AlikTurn', when: [gte('sent', 5)], specificity: 0, weight: W.wrong, respond: ({ game }) => game.wrongChat() },
   // бухгалтерия лжи: Алик сам возвращается к своему старому вранью
+  // легенда денег: пока деньги «в сейфе, а ключ в малыше», ход Алика продолжает эту линию, а не случайную отмазку
+  {
+    name: 'Turn_Legend', event: 'AlikTurn', when: [exists('legend')], specificity: 0, weight: 22, cooldown: { turns: 2 },
+    respond: async ({ game, facts }) => {
+      const t = game.line('LEG_' + facts.legend, LEGENDS[String(facts.legend)].lines)
+      if (!t) return game.excuseTurn()
+      game.markTopical(await game.say([t]))
+      if (game.chance(0.6)) await game.promiseLine(undefined, true)
+    },
+  },
+  // память: Алик вспоминает, что было в этой партии (реплики с условиями, каждая один раз)
+  { name: 'Turn_Memory', event: 'AlikTurn', when: [gte('sent', 8)], specificity: 0, weight: 7, cooldown: { turns: 4 }, respond: async ({ game }) => { const t = game.line('MEMORY', MEMORY); if (t) { await game.say([t]); game.unlock('memory') } else await game.excuseTurn() } },
   { name: 'Turn_Callback', event: 'AlikTurn', when: [is('callbackReady')], specificity: 0, weight: 6, cooldown: { days: 5 }, respond: ({ game }) => game.callback() },
   { name: 'Turn_Sticker', event: 'AlikTurn', when: [], specificity: 0, weight: W.sticker, respond: ({ game }) => game.sticker() },
   { name: 'Turn_Forward', event: 'AlikTurn', when: [], specificity: 0, weight: W.fwd, respond: ({ game }) => game.forward() },
@@ -61,7 +81,7 @@ export const turnRules: R[] = [
     name: 'Turn_Excuse', event: 'AlikTurn', when: [], specificity: 0,
     weight: (f) => {
       const sent = Number(f.sent ?? 0)
-      const active = (sent >= 3 ? W.scene + W.quest : 0) + (sent >= 2 && f.arcAvailable ? W.arc : 0) + (sent >= 8 ? W.group : 0) + (sent >= 5 ? W.wrong : 0)
+      const active = (sent >= 3 ? W.scene + W.quest : 0) + (sent >= 8 ? 7 : 0) + (sent >= 2 && f.arcAvailable ? W.arc : 0) + (sent >= 8 ? W.group : 0) + (sent >= 5 ? W.wrong : 0)
         + W.sticker + W.fwd + W.job + W.photo + W.voice + W.short + transferW(f)
       return Math.max(20, 100 - active)
     },

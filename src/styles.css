@@ -141,6 +141,16 @@ body {
 .choices button.ctx { background: rgba(47, 158, 92, .16); }
 .choices button.rude { color: var(--danger); }
 .choices button:disabled { opacity: .45; cursor: default; }
+.choices button.locked, .choices button.locked:hover { background: rgba(127, 127, 127, .15); color: var(--muted); letter-spacing: 2px; }
+.choices button.locked .q { display: inline-block; font-weight: 600; margin-right: 3px; animation: q-jitter .9s steps(1, end) infinite; }
+@keyframes q-jitter {
+  0% { transform: translate(0, 0) rotate(0); }
+  20% { transform: translate(1px, -1px) rotate(8deg); }
+  40% { transform: translate(-1px, 1px) rotate(-6deg); }
+  60% { transform: translate(0, -1px) rotate(4deg); }
+  80% { transform: translate(1px, 1px) rotate(-8deg); }
+}
+@media (prefers-reduced-motion: reduce) { .choices button.locked .q { animation: none; } }
 
 .sheet {
   position: absolute; inset: 0; background: rgba(0, 0, 0, .4); z-index: 10;

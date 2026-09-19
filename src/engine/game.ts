@@ -3,6 +3,7 @@
 import { make, D, low, cap, type ExcuseApi, type Promise3 } from '../content/excuses'
 import { makeScenes, type Scene, type Line } from '../content/scenes'
 import { TRIBUNAL } from '../content/rude'
+import { LEGENDS } from '../content/legends'
 import { TOPICS, P_NEU_B_LATE, P_RUDE_BLOCKED, P_RUDE_POLITE, P_POL_POLITE, P_NIGHT, P_FRIDAY } from '../content/topics'
 import { FINALES, ENDINGS, DEFAULT_FINALE, type Finale } from '../content/finales'
 import { ARCS, ARC_DONE, CAST, type Episode, GROUP, GROUP_OOPS, WRONG_TO, WRONG_WHAT, WRONG_OOPS } from '../content/arcs'
@@ -15,7 +16,7 @@ import { CLAIMS, claimByKey, conflicts, pairKey, CALLBACK_OPEN, type Claim } fro
 import { type Rng, mathRng, rndInt, shuffle, chance } from './rng'
 import { Decks } from './deck'
 import { Seen, type Keyed } from './uniq'
-import { RuleSet, makeHub, type Facts, type Rule, type Trace, type Query, type Priority } from './rules'
+import { RuleSet, makeHub, Lines, resolver, type Facts, type Rule, type Trace, type Query, type Priority, type Line as PoolLine, type LineOpts } from './rules'
 import { MENTION_RE } from '../content/world'
 import { type Clock, realClock } from './clock'
 import { type Audio, silentAudio } from './audio'
@@ -68,6 +69,8 @@ export class Game {
   readonly X: ExcuseApi
   readonly scenes: Record<string, Scene>
   readonly rules: RuleSet<Game>
+  /** Выбор реплик как в Hades: требования, приоритет, «уже сказано». */
+  readonly lines: Lines
   readonly D = D
 
   // --- состояние интерфейса (не сохраняется)
@@ -114,6 +117,8 @@ export class Game {
     this.seen = new Seen(this.S.seen)
     this.X = make((k, a, nr) => this.decks.draw(k, a, nr), () => this.S.tier, this.rng)
     this.scenes = makeScenes(this.X)
+    this.S.rules.said ??= {} // старые сохранения
+    this.lines = new Lines(this.S.rules.said, this.rng, () => ({ turn: this.S.stats.sent, day: this.S.day }))
     this.rules = new RuleSet<Game>({
       rng: this.rng,
       hub: makeHub(this.S.mem, this.S.actors),
@@ -165,6 +170,23 @@ export class Game {
 
   // ---------- helpers ----------
   draw = <T>(key: string, arr: readonly T[]): T => this.decks.draw(key, this.fitWorld(arr))
+  /**
+   * Реплика из пула по правилам Hades: подходящие условия, не сказанные, верхний приоритет.
+   * Пул исчерпан — fallback (обычно генератор отмазок) или null.
+   */
+  line(key: string, pool: readonly PoolLine[], o: LineOpts & { fallback?: () => string } = {}): string | null {
+    const facts = resolver(this.rules.hub, { event: 'line' }, this.facts())
+    const p = this.lines.pick(key, pool, facts, { ...o, filter: (l) => this.known(l.t) && (o.filter?.(l) ?? true) })
+    if (!p) return o.fallback ? this.uniq(o.fallback) : null
+    this.lines.mark(p.id)
+    this.seen.mark(p.text)
+    if (p.spec.remember) this.rules.applyOps(p.spec.remember, {})
+    return p.text
+  }
+  /** Текст не упоминает того, чего в мире ещё нет (Борис — только с первой серии своего сериала). */
+  known(t: string): boolean {
+    return !!this.S.arcs.boris || !/Борис/.test(t)
+  }
   /** Не упоминать то, чего в мире игры ещё нет: Борис появляется только с первой серией своего сериала. */
   fitWorld<T>(arr: readonly T[]): readonly T[] {
     if (this.S.arcs.boris) return arr
@@ -446,6 +468,7 @@ export class Game {
       // ачивки и трофеи — условия для финалов сериалов и концовок
       ...Object.fromEntries(Object.keys(S.ach).map((k) => ['ach.' + k, true])),
       items: S.items.length,
+      legend: this.legend(),
       'ctx.topic': this.topicOfLast(),
       // «Мууу» прозвучало после последнего сообщения игрока — только тогда про корову и спрашивают
       mooFresh: S.mem.mooAt === S.stats.sent,
@@ -661,9 +684,16 @@ export class Game {
     if (this.S.promises.length >= 20) this.unlock('promises20')
   }
   /** «Клянусь мамой, завтра — всё отдам» + запись в журнал. */
-  async promiseLine(prefix?: string): Promise<void> {
+  /** Обещание. Пока жива легенда денег — срок чаще вытекает из неё («как ключ выйдет»); legend = true — всегда из неё. */
+  async promiseLine(prefix?: string, legend?: boolean): Promise<void> {
+    const until = this.legend() ? LEGENDS[this.legend()!]?.until : undefined
+    // срок из легенды — после серии обязательно, дальше изредка: одна и та же клятва «как „Нива“ заведётся» приедается
+    const recent = this.S.stats.sent - Number(this.S.mem.legendPromiseAt ?? -99) < 4
+    const fromLegend = !!until && (legend || (!recent && this.chance(0.4)))
+    if (fromLegend) this.S.mem.legendPromiseAt = this.S.stats.sent
     const p = this.uniq(() => {
       const q = this.X.promise()
+      if (fromLegend) { q.text = q.text.replace(q.t, until!); q.t = until!; q.d = 3 + this.rnd(5) } // у срока из легенды есть день: «сегодня срок по „как ключ выйдет“»
       return { text: prefix ? `${prefix} ${low(q.text)}.` : `${this.X.g('OATH')}, ${q.text}.`, q }
     })
     this.recordPromise(p.q)
@@ -911,9 +941,12 @@ export class Game {
     this.S.ctx = { arc: id }
     // последнюю серию выбирают правила ArcFinale: частный финал перекрывает обычный
     if (last && (await this.fire('ArcFinale', { arc: id }))) return
-    await this.playEpisode(ep)
+    await this.playEpisode(ep, id)
   }
-  async playEpisode(ep: Episode): Promise<void> {
+  async playEpisode(ep: Episode, arc?: string): Promise<void> {
+    if (ep.legend !== undefined) this.setLegend(ep.legend, arc)
+    // серия без своей легенды возвращает легенду своего сериала: свадьба идёт — значит, деньги «после свадьбы»
+    else if (arc && this.S.mem['legend.of.' + arc]) this.setLegend(String(this.S.mem['legend.of.' + arc]), arc)
     for (const m of ep.m) this.seen.mark(typeof m === 'string' ? m : m.t)
     this.markTopical(await this.say(ep.m))
     if (ep.fx?.debt) this.S.debt += ep.fx.debt
@@ -923,12 +956,34 @@ export class Game {
     if (ep.sys) { await this.sleep(500); this.sys(ep.sys) }
     if (ep.fx?.ach) this.unlock(ep.fx.ach)
     if (ep.fx?.offline) this.goOffline(ep.fx.offline)
-    if (ep.then === 'promise') await this.promiseLine()
+    if (ep.then === 'promise') await this.promiseLine(undefined, !!ep.legend)
+  }
+  /** Легенда денег — факт на доске мира: где деньги и что мешает. Живёт 30 дней или до следующей серии. */
+  setLegend(id: string | null, arc?: string): void {
+    const m = this.S.mem
+    if (id === null) {
+      if (arc) delete m['legend.of.' + arc]
+      if (!arc || m['legend.arc'] === arc) { delete m['legend.id']; delete m['legend.arc'] }
+      return
+    }
+    if (arc) m['legend.of.' + arc] = id
+    m['legend.id'] = id
+    m['legend.day'] = this.S.day
+    if (arc) m['legend.arc'] = arc
+  }
+  /** Текущая легенда (если не устарела). */
+  legend(): string | undefined {
+    const m = this.S.mem
+    const id = m['legend.id'] as string | undefined
+    return id && this.S.day - Number(m['legend.day'] ?? -99) <= 30 ? id : undefined
   }
   /** Финал сериала: обычный (последний эпизод) или частный из FINALES. */
   async playFinale(id: string, f: Finale | null): Promise<void> {
     this.S.mem['finale.' + id] = f?.id ?? 'default'
-    await this.playEpisode(f ?? ARCS[id].eps.at(-1)!)
+    const ep = f ?? ARCS[id].eps.at(-1)!
+    // финал закрывает легенду своего сериала («ключ не тот» → «мы должны всем»)
+    if (ep.legend === undefined) this.setLegend(null, id)
+    await this.playEpisode(ep, id)
     if (f) this.unlock(`fin_${id}_${f.id}`)
   }
   finaleOf(id: string): Finale | undefined {
@@ -999,14 +1054,15 @@ export class Game {
     if (fx.set) this.rules.applyOps(Object.entries(fx.set).map(([key, value]) => ({ key, op: '=' as const, value })), {})
     if (fx.during) this.rules.applyOps([{ key: fx.during.key, op: '=', value: true, forDays: fx.during.days }], {})
     if (n.sys) { await this.sleep(700); this.sys(gen('sys', n.sys)()) }
-    if (n.a) await this.say([variant('a', n.a)], false, n.who)
+    // обращение «Брат мой, …» — манера Алика; реплики других персонажей (Борис: «Бее.») не украшаем
+    if (n.a) await this.say([n.who ? gen('a', n.a)() : variant('a', n.a)], false, n.who)
     if (n.doc) {
       await this.typingFor(2000, 'отправляет документ…')
       this.alikMsg({ kind: 'doc', from: 'alik', title: `АКТ ВЗАИМОЗАЧЁТА № ${100 + this.rnd(900)}`, rows: v.rows, total: v.total })
       await this.sleep(600)
       this.sys(`Алик вычел из долга ${v.total.toLocaleString('ru-RU')} ₽ по акту.`)
     }
-    if (n.a2) await this.say([variant('a2', n.a2)], false, n.who2)
+    if (n.a2) await this.say([n.who2 ? gen('a2', n.a2)() : variant('a2', n.a2)], false, n.who2)
     if (n.sys2) { await this.sleep(700); this.sys(gen('sys2', n.sys2)()) }
     if (n.then === 'moo') { await this.sleep(400); this.moo() }
     if (n.then === 'transfer') await this.transfer()
