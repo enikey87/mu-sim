@@ -232,6 +232,18 @@ describe('память: немедленно, с задержкой, на вре
     rs.due()
     expect(world.wedding).toBeUndefined()
   })
+  it('settle: наступившие записи и откаты — сразу, события ждут due()', () => {
+    const { rs, clock, world, state } = mk()
+    rs.applyOps([during('phone', 1), set('late', true, { delay: 1 })], {})
+    rs.schedule({ at: clock.day + 1, kind: 'event', event: 'Due' })
+    rs.schedule({ at: clock.day + 5, kind: 'event', event: 'Later' })
+    clock.day += 2
+    rs.settle()
+    expect(world.phone).toBeUndefined()
+    expect(world.late).toBe(true)
+    expect(state.schedule.map((s) => s.kind === 'event' && s.event)).toEqual(['Due', 'Later'])
+    expect(rs.due().map((e) => e.event)).toEqual(['Due'])
+  })
   it('откат для персонажа, которого нет — пропускается', () => {
     const { rs, clock, state } = mk()
     state.schedule.push({ at: clock.day, kind: 'restore', key: 'x', scope: 'sender', value: 1 })

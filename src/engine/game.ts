@@ -283,6 +283,7 @@ export class Game {
   }
   nextDay(n: number): void {
     this.S.day += n
+    this.rules.settle()
     this.S.clock = this.realMinutes()
     this.push({ kind: 'sep', text: fmtDate(this.S.day) })
     const t = tierOf(this.S.day)

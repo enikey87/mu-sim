@@ -187,16 +187,28 @@ export class RuleSet<G> {
     this.state.schedule.sort((a, b) => a.at - b.at)
   }
 
-  /** Отложенные события, которые наступили к текущему дню (записи и откаты применяются сразу). */
-  due(): Array<Extract<Scheduled, { kind: 'event' }>> {
+  /** Записи и откаты, наступившие к текущему дню, — сразу (при смене дня мир уже другой); события ждут due(). */
+  settle(): void {
     const day = this.now().day
-    const events: Array<Extract<Scheduled, { kind: 'event' }>> = []
-    while (this.state.schedule.length && this.state.schedule[0].at <= day) {
-      const it = this.state.schedule.shift()!
-      if (it.kind === 'event') events.push(it)
-      else if (it.kind === 'ops') this.applyOps(it.ops, it)
+    const ready = this.state.schedule.filter((it): it is Exclude<Scheduled, { kind: 'event' }> => it.at <= day && it.kind !== 'event')
+    this.state.schedule = this.state.schedule.filter((it) => it.at > day || it.kind === 'event')
+    for (const it of ready) {
+      if (it.kind === 'ops') this.applyOps(it.ops, it)
       else this.restore(it.scope, it.actor, it.key, it.value)
     }
+  }
+
+  /** Отложенные события, которые наступили к текущему дню (записи и откаты применяются сразу). */
+  due(): Array<Extract<Scheduled, { kind: 'event' }>> {
+    this.settle()
+    const day = this.now().day
+    const events: Array<Extract<Scheduled, { kind: 'event' }>> = []
+    const later: Scheduled[] = []
+    for (const it of this.state.schedule) {
+      if (it.at <= day && it.kind === 'event') events.push(it)
+      else later.push(it)
+    }
+    this.state.schedule = later
     return events
   }
 

@@ -5,7 +5,7 @@ import type { Game } from '../../engine/game'
 import type { Msg } from '../../engine/state'
 import * as T from '../rude'
 import { HEAT } from './rude'
-import { valueOf, spec, type Entry } from '../../engine/rules'
+import { valueOf, spec, during, type Entry } from '../../engine/rules'
 
 const texts = (game: Game, from: number) => game.S.msgs.slice(from).map((m) => (m.kind === 'text' || m.kind === 'sys' ? m.text : m.kind === 'sticker' ? m.e : ''))
 const whos = (game: Game, from: number) => game.S.msgs.slice(from).filter((m): m is Extract<Msg, { kind: 'text' }> => m.kind === 'text').map((m) => m.who ?? 'alik')
@@ -62,6 +62,13 @@ describe('лестница грубости: ступени', () => {
     expect(seen.size).toBe(3) // все трое по очереди: каждый на перерыве 4 дня
     expect(game.S.offlineDays).toBe(0)
     expect(game.S.ctx?.offended).toBe(true) // можно извиниться
+  })
+  it('Карине забрала телефон до конца дня: назавтра с первой реплики снова отвечает Алик', async () => {
+    const { game } = makeGame()
+    game.rules.applyOps([during('phone.karine', 1)], {})
+    expect((await fire(game, 'neutral')).r).toBe('Phone_Karine_PlayerMessage')
+    game.nextDay(1)
+    expect((await fire(game, 'neutral')).r).not.toMatch(/Karine/)
   })
   it('S2 — пропущенные от мамы и голосовое с расшифровкой', async () => {
     const { game } = makeGame()
