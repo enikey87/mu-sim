@@ -5,6 +5,7 @@
 import type { ExcuseApi } from './excuses'
 import type { Rng } from '../engine/rng'
 import { QUESTS, COURT_SCENE } from './quests'
+import { PAYDAY_SCENE } from './payday'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Vars = Record<string, any>
@@ -20,6 +21,8 @@ export interface SceneNode {
   sys?: Line | Line[]; sys2?: Line | Line[]
   fx?: SceneFx; doc?: boolean
   then?: 'promise' | 'transfer' | 'moo'
+  /** Шаг, который собирается на лету (например, «утро Дня выплаты» из событий партии). */
+  hook?: string
   opts?: SceneOpt[]
 }
 export interface Scene { start: string; init?: (rng: Rng) => Vars; nodes: Record<string, SceneNode> }
@@ -635,6 +638,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
     // мини-квесты и заседание суда
     ...QUESTS,
     court: COURT_SCENE,
+    payday: PAYDAY_SCENE,
   };
 }
 

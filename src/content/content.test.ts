@@ -37,7 +37,7 @@ describe('scenes', () => {
     const txt = (l: Line) => (typeof l === 'function' ? l(vars) : l)
     for (const [sid, sc] of Object.entries(scenes)) {
       for (const [nid, n] of Object.entries(sc.nodes)) {
-        const has = n.a || n.a2 || n.sys || n.sys2 || n.opts || n.then || n.doc
+        const has = n.a || n.a2 || n.sys || n.sys2 || n.opts || n.then || n.doc || n.hook
         expect(has, `${sid}.${nid}`).toBeTruthy()
         for (const l of [...(n.a ?? []), ...(n.a2 ?? [])]) expect(txt(l).length, `${sid}.${nid}`).toBeGreaterThan(1)
         if (n.fx?.ach) expect(ACH[n.fx.ach], `${sid}.${nid} ach`).toBeDefined()

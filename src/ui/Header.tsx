@@ -34,6 +34,9 @@ export function StatsBar() {
     <div className="stats">
       <span>Долг: <b id="debt">{S.debt.toLocaleString('ru-RU')} ₽</b></span>
       <span>Дней после сдачи: <b id="days">{S.day}</b></span>
+      {/* День выплаты: отсчёт накануне и счётчик «к выплате», который тает на глазах */}
+      {S.scene?.id === 'payday' && Number(S.mem['payday.at']) > S.day && <span id="paydayAt">До выплаты: <b>1 день</b></span>}
+      {S.scene?.id === 'payday' && S.mem['payday.sum'] !== undefined && <span id="paydaySum" className="payday-sum">К выплате: <b>{Number(S.mem['payday.sum']).toLocaleString('ru-RU')} ₽</b></span>}
     </div>
   )
 }

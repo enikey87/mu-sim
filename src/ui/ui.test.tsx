@@ -130,7 +130,24 @@ describe('App', () => {
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByText(/финал «Жених»/)).toBeInTheDocument()
     expect(within(dialog).getByText('Породнились')).toBeInTheDocument()
-    expect(within(dialog).getByText('1/7')).toBeInTheDocument()
+    expect(within(dialog).getByText('1/14')).toBeInTheDocument()
+  })
+
+  it('День выплаты: счётчик «к выплате» в шапке; на экране итогов — великая отмазка и «Скопировать»', async () => {
+    const { game } = makeGame()
+    game.S.scene = { id: 'payday', node: 'split', vars: {} }
+    game.S.mem['payday.sum'] = 120000
+    const { unmount } = renderApp(game)
+    expect(document.querySelector('#paydaySum')?.textContent).toMatch(/К выплате: 120\s000 ₽/)
+    unmount()
+    game.S.scene = null
+    game.S.day = 340
+    Object.assign(game.S.mem, { payday: 'coins', 'payday.chain': 'Эти пятьдесят рублей лежали в сейфе.' })
+    await game.fire('CheckEnding')
+    renderApp(game)
+    const end = screen.getByRole('dialog', { name: /День выплаты/ })
+    expect(within(end).getByText(/лежали в сейфе/)).toBeInTheDocument()
+    expect(within(end).getByText('Скопировать великую отмазку')).toBeInTheDocument()
   })
 
   it('телефон сел → зарядка', async () => {
