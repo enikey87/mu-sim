@@ -1048,11 +1048,12 @@ export class Game {
   }
   /** Финал сериала: обычный (последний эпизод) или частный из FINALES. */
   async playFinale(id: string, f: Finale | null): Promise<void> {
-    this.S.mem['finale.' + id] = f?.id ?? 'default'
     const ep = f ?? ARCS[id].eps.at(-1)!
     // финал закрывает легенду своего сериала («ключ не тот» → «мы должны всем»)
     if (ep.legend === undefined) this.setLegend(null, id)
     await this.playEpisode(ep, id)
+    // реплики финала звучат в мире до него: «Нуне уволена. Из декрета» — пока она ещё в декрете
+    this.S.mem['finale.' + id] = f?.id ?? 'default'
     if (f) this.unlock(`fin_${id}_${f.id}`)
   }
   finaleOf(id: string): Finale | undefined {

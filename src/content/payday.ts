@@ -2,7 +2,7 @@
 // Анонс → утро (линии партии отдают деньги) → все в сборе → дележ (сумма тает) → великая отмазка из событий партии →
 // перевёртыш (деньги приходят в невозможной форме) → кнопка на следующий день.
 // Реплики — пулы с условиями и приоритетом (game.line): звучит то, что было в этой партии.
-import { type Line, type LineSpec, type Entry, is, eq, exists, gte, gate, missing } from '../engine/rules'
+import { type Line, type LineSpec, type Entry, is, eq, ne, exists, gte, gate, missing } from '../engine/rules'
 import type { Scene } from './scenes'
 import { needs, WORLD } from './world'
 
@@ -125,7 +125,7 @@ export const GRAND: Record<Slot, Line[]> = {
     { t: 'судья Ашот признал их неотделимым улучшением,', when: [is('ach.court')], prio: 2 },
     { t: 'дело ушло в Страсбург,', when: [is('ach.strasbourg')], prio: 2 },
     { t: 'семейный суд проголосовал: «Бее — 1, остальные против»,', when: [is('ach.tribunal')], prio: 2 },
-    { t: 'Нуне из декрета провела их по ведомости как «прочее»,', when: [exists('finale.nune')], prio: 2 },
+    { t: 'Нуне из декрета провела их по ведомости как «прочее»,', when: [exists('finale.nune'), ne('finale.nune', 'ledger')], prio: 2 },
     { t: 'суд по твоей плитке присудил их пострадавшему полу,', when: [exists('finale.tile')], prio: 2 },
     { t: 'налоговая, где ты был свидетелем, заморозила их из уважения к тебе,', when: [is('ach.q_witness')], prio: 2 },
   ],

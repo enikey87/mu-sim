@@ -9,7 +9,7 @@ import * as L from './life'
 import { allRules } from './rules'
 import { Decks } from '../engine/deck'
 import { seededRng } from '../engine/rng'
-import { valueOf, type Entry } from '../engine/rules'
+import { Gated, valueOf, type Entry } from '../engine/rules'
 
 const sources = import.meta.glob(['../**/*.ts', '../**/*.tsx', '!../**/*.test.*'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>
 const allSource = Object.values(sources).join('\n')
@@ -60,6 +60,9 @@ describe('scenes', () => {
 })
 
 describe('arcs and cast', () => {
+  it('у каждого сериала есть вопрос «Как там…?», уместный при любом положении', () => {
+    for (const [id, a] of Object.entries(ARCS)) expect(a.follow.some((f) => !(f instanceof Gated)), id).toBe(true)
+  })
   it('arcs are well-formed, last episode unlocks an existing achievement, done-lines exist', () => {
     for (const [id, a] of Object.entries(ARCS)) {
       expect(a.eps.length, id).toBeGreaterThanOrEqual(5)
