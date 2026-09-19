@@ -58,3 +58,37 @@ describe('группы ответов', () => {
     expect(new Groups({ z: { n: 2, left: null, last: -1 } }, seededRng(1)).remaining('z', 2, 'sequential')).toBe(2)
   })
 })
+
+describe('группы ответов с условием «уместно сейчас»', () => {
+  const odd = (x: number) => x % 2 === 1
+  it('shuffle: неуместные не выпадают, но остаются в цикле и выпадают, когда станут уместны', () => {
+    const { g } = mk()
+    const items = [1, 2, 3, 4, 5, 6]
+    const first = [1, 2, 3].map(() => g.next('k', items, { eligible: odd })!)
+    expect([...first].sort()).toEqual([1, 3, 5])
+    // все уместные этого цикла вышли — чётные ещё в колоде и выпадают без нового цикла
+    const rest = [1, 2, 3].map(() => g.next('k', items)!)
+    expect([...rest].sort()).toEqual([2, 4, 6])
+  })
+  it('shuffle: уместные кончились в цикле — новый цикл; с noRepeat — null', () => {
+    const { g } = mk()
+    const items = [1, 2, 3]
+    g.next('k', items, { eligible: (x) => x === 2 })
+    expect(g.next('k', items, { eligible: (x) => x === 2 })).toBe(2)
+    g.next('n', items, { eligible: (x) => x === 2, noRepeat: true })
+    expect(g.next('n', items, { eligible: (x) => x === 2, noRepeat: true })).toBeNull()
+  })
+  it('ни одного уместного — null, состояние не трогается', () => {
+    const { g, state } = mk()
+    expect(g.next('k', [2, 4], { eligible: odd })).toBeNull()
+    expect(state.k).toBeUndefined()
+  })
+  it('random и sequential тоже выбирают только уместные', () => {
+    const { g } = mk()
+    for (let i = 0; i < 20; i++) expect(g.next('r', [1, 2, 3], { mode: 'random', eligible: odd })).not.toBe(2)
+    const seq = [1, 2, 3, 4].map(() => g.next('s', ['a', 'b', 'c'], { mode: 'sequential', eligible: (x) => x !== 'b' }))
+    expect(seq).toEqual(['a', 'c', 'a', 'c'])
+    expect(g.next('sn', ['a', 'b'], { mode: 'sequential', noRepeat: true, eligible: (x) => x === 'a' })).toBe('a')
+    expect(g.next('sn', ['a', 'b'], { mode: 'sequential', noRepeat: true, eligible: (x) => x === 'a' })).toBeNull()
+  })
+})

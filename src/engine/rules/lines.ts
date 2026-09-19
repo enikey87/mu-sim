@@ -2,6 +2,7 @@
 // 1) условия по фактам и памяти → 2) не сказанные и не на перерыве → 3) верхний приоритет → 4) случайно.
 // Строка без полей — реплика без условий, приоритет 0, звучит один раз.
 import { type Resolver, test } from './criteria'
+import { Gated } from './gated'
 import type { Criterion, Facts, FactOp } from './types'
 import { type Rng, rndInt } from '../rng'
 
@@ -19,7 +20,7 @@ export interface LineSpec {
   /** Что запомнить, когда реплика прозвучала. */
   remember?: FactOp[]
 }
-export type Line = string | LineSpec
+export type Line = string | LineSpec | Gated<string | LineSpec>
 
 export interface LineOpts {
   /** Все реплики пула повторяемые (по умолчанию — один раз каждая). */
@@ -39,7 +40,10 @@ export function lineId(key: string, t: string): string {
   return `${key}#${(h >>> 0).toString(36)}`
 }
 
-export const spec = (l: Line): LineSpec => (typeof l === 'string' ? { t: l } : l)
+export const spec = (l: Line): LineSpec => {
+  if (l instanceof Gated) { const s = spec(l.v); return { ...s, when: [...l.when, ...(s.when ?? [])] } }
+  return typeof l === 'string' ? { t: l } : l
+}
 
 export class Lines {
   constructor(
