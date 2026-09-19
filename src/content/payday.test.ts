@@ -80,7 +80,7 @@ describe('День выплаты', () => {
     const pick = async (setup: (g: Game) => void) => { const { game } = makeGame(); setup(game); return (await game.fire('PaydayOutcome'))?.name }
     expect(await pick(() => {})).toBe('Payday_default')
     expect(await pick((g) => { g.S.mem['payday.caught'] = true })).toBe('Payday_coins')
-    expect(await pick((g) => { g.S.mem['payday.caught'] = true; g.S.ach.q_crypto = 1 })).toBe('Payday_lavash')
+    expect(await pick((g) => { g.S.mem['payday.caught'] = true; g.S.mem['crypto.hodl'] = true })).toBe('Payday_lavash') // деньги оставлены в «Лаваш-коине»
     expect(await pick((g) => { g.S.mem['finale.niva'] = 'chose' })).toBe('Payday_niva')
     expect(await pick((g) => { g.S.ach.strasbourg = 1 })).toBe('Payday_strasbourg')
     expect(await pick((g) => { g.S.mem['finale.razmik'] = 'default'; g.S.mem['count.rude'] = 8 })).toBe('Payday_notyou')

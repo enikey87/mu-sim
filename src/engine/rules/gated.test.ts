@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { Gated, gate, isOpen, valueOf } from './gated'
+import { Gated, gate, isOpen, valueOf, mapEntry } from './gated'
 import { is, gte } from './criteria'
 
 describe('элементы пула с требованиями', () => {
@@ -18,5 +18,13 @@ describe('элементы пула с требованиями', () => {
     expect(both.v).toEqual({ t: 'x', d: null })
     expect(isOpen(both, { a: true, day: 100 })).toBe(false)
     expect(isOpen(both, { a: true, day: 250 })).toBe(true)
+  })
+  it('mapEntry сохраняет требования', () => {
+    const said = gate(is('a'))(['boris', 'Бее'] as const)
+    const text = mapEntry(said, ([, t]) => t)
+    expect(text).toBeInstanceOf(Gated)
+    expect(valueOf(text)).toBe('Бее')
+    expect(isOpen(text, {})).toBe(false)
+    expect(mapEntry(['alik', 'Брат'] as const, ([, t]) => t)).toBe('Брат')
   })
 })

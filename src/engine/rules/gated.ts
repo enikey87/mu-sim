@@ -14,3 +14,6 @@ export const gate = (...when: Criterion[]) => <T>(v: Entry<T>): Gated<T> =>
 export const isOpen = <T>(e: Entry<T>, facts: Facts | Resolver): boolean => !(e instanceof Gated) || e.when.every((c) => test(c, facts))
 
 export const valueOf = <T>(e: Entry<T>): T => (e instanceof Gated ? e.v : e)
+
+/** Другое значение с теми же требованиями: из пула пар [кто, текст] — пул текстов. */
+export const mapEntry = <T, U>(e: Entry<T>, f: (v: T) => U): Entry<U> => (e instanceof Gated ? new Gated(e.when, f(e.v)) : f(e))

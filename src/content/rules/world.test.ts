@@ -5,11 +5,12 @@ import { ARCS } from '../arcs'
 import { CHORUS, CHORUS_FED_UP, WEDDING_NOISE, BORIS_SICK, DEAD_KARINE, DEAD_ALIK, PROMISE_DUE } from '../world'
 import type { Game } from '../../engine/game'
 import type { Msg } from '../../engine/state'
+import { valueOf, type Entry } from '../../engine/rules'
 
 const pickScene = (game: Game) => game.rules.match({ event: 'PickScene' }, game.facts())?.name
 const texts = (msgs: Msg[]) => msgs.filter((m) => m.kind === 'text').map((m) => (m.kind === 'text' ? m.text : ''))
 // фраза могла получить обращение в начале («Эээ, брат, …») — сверяем по середине
-const has = (pool: string[], said: string[]) => pool.some((t) => said.some((a) => a.includes(t.slice(6, 26)) || t.includes(a.slice(0, 25))))
+const has = (pool: readonly Entry<string>[], said: string[]) => pool.map(valueOf).some((t) => said.some((a) => a.includes(t.slice(6, 26)) || t.includes(a.slice(0, 25))))
 
 describe('сцены выбираются по сюжету', () => {
   it('«смертный одр» — только после 240-го дня и при плохом настроении', () => {
@@ -91,7 +92,7 @@ describe('обещания наступают', () => {
     expect(kept).toBe(true)
   })
   it('у реплик — свой текст обещания', () => {
-    expect(PROMISE_DUE.every((t) => t.includes('{t}') || t.includes('тот самый'))).toBe(true)
+    expect(PROMISE_DUE.map(valueOf).every((t) => t.includes('{t}') || t.includes('тот самый'))).toBe(true)
   })
 })
 

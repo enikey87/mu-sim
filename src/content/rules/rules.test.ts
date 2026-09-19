@@ -1,7 +1,7 @@
 // Сценарии правил: именно те места, где в оригинале были нелогичные ответы.
 import { describe, it, expect } from 'vitest'
 import { makeGame, alikTexts } from '../../test/helpers'
-import { spec } from '../../engine/rules'
+import { spec, valueOf } from '../../engine/rules'
 import type { Game } from '../../engine/game'
 import type { Choice, Ctx } from '../../engine/state'
 import { D } from '../excuses'
@@ -124,7 +124,7 @@ describe('ответы Алика (PlayerSays)', () => {
     for (let i = 0; i < 2; i++) await reply(game, { text: 'Прости', tone: 'polite', act: 'sorry' })
     game.S.mem['rude.heat'] = 1 // на высокой температуре своё правило лестницы («только очно: хаш…»)
     const t = await reply(game, { text: 'Прости ещё раз', tone: 'polite', act: 'sorry' })
-    expect(oneOf(SWING.map(frag), t.join(' ')), t.join(' | ')).toBe(true)
+    expect(oneOf(SWING.map(valueOf).map(frag), t.join(' ')), t.join(' | ')).toBe(true)
     expect(game.S.mem['rude.heat']).toBe(1)
   })
   it('сериал закончился — финальный ответ этого сериала, а не «без новостей»', async () => {
@@ -160,7 +160,7 @@ describe('ответы Алика (PlayerSays)', () => {
     const { game } = makeGame()
     game.S.ctx = { when: 'когда Арарат вернут', whenNever: true }
     const t = await reply(game, { text: 'Точно?', tone: 'neutral', act: 'promiseCheck', arg: 'когда Арарат вернут' })
-    expect(oneOf(PROMISE_NEVER.map(frag), t.join(' '))).toBe(true)
+    expect(oneOf(PROMISE_NEVER.map(valueOf).map(frag), t.join(' '))).toBe(true)
   })
   it('переспросить обычный срок — клятва и тот же срок', async () => {
     const { game } = makeGame()

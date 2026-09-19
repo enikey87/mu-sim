@@ -1,6 +1,7 @@
 // Ход Алика в ответ на обычное сообщение игрока.
 import type { Game } from '../../engine/game'
 import { type Rule, eq, ne, gte, lte, is, exists } from '../../engine/rules'
+import { meet } from '../world'
 import { AlikOffline } from './criteria'
 import { IDLE } from '../life'
 import { MEMORY } from '../memory'
@@ -74,7 +75,8 @@ export const turnRules: R[] = [
   { name: 'Turn_Forward', event: 'AlikTurn', when: [], specificity: 0, weight: W.fwd, respond: ({ game }) => game.forward() },
   { name: 'Turn_Transfer', event: 'AlikTurn', when: [], specificity: 0, weight: transferW, respond: ({ game }) => game.transfer() },
   { name: 'Turn_Job', event: 'AlikTurn', when: [], specificity: 0, weight: W.job, respond: ({ game }) => game.job() },
-  { name: 'Turn_Photo', event: 'AlikTurn', when: [], specificity: 0, weight: W.photo, respond: ({ game }) => game.photo() },
+  // на «фото платёжки» — баран на фоне Арарата: с этого момента бараны — знакомая тема
+  { name: 'Turn_Photo', event: 'AlikTurn', when: [], specificity: 0, weight: W.photo, remember: meet('baran'), respond: ({ game }) => game.photo() },
   { name: 'Turn_Voice', event: 'AlikTurn', when: [], specificity: 0, weight: W.voice, respond: ({ game }) => game.voice() },
   { name: 'Turn_Short', event: 'AlikTurn', when: [], specificity: 0, weight: W.short, respond: ({ game }) => game.shortReply() },
   {

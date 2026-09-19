@@ -31,7 +31,7 @@ describe('покрытие правил', () => {
     if (process.env.RULES_REPORT) process.stdout.write('\n' + formatCoverage(r) + '\n')
     // финалы, концовки и лестница грубости зависят от стиля игры (одно извинение сбрасывает ссору) —
     // их проверяют отдельные детерминированные тесты: finales.test.ts, rude.test.ts; тишину «умер»/«в чёрном списке» — dialog.test.ts
-    const ladder = new Set([...rudeRules, ...rudeSaysRules].map((x) => x.name).concat('Opt_ViaBoris', 'Opt_Moo'))
+    const ladder = new Set([...rudeRules, ...rudeSaysRules].map((x) => x.name).concat('Opt_Via_boris', 'Opt_Via_karine', 'Opt_Via_mama', 'Opt_Moo'))
     expect(r.never.filter((n) => !RARE.has(n) && !ladder.has(n) && !/^(Finale|Ending|Payday|Quiet)_/.test(n))).toEqual([])
   }, 300_000)
 })

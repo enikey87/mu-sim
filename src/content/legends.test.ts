@@ -16,7 +16,7 @@ describe('легенда денег', () => {
       expect(l.lines.length, id).toBeGreaterThan(0)
       expect(lintLines('LEG_' + id, l.lines)).toEqual([])
     }
-    for (const lines of Object.values(CHORUS_LEGEND)) for (const l of lines) expect(LEGENDS[String(spec(l).when?.[0].value)]).toBeDefined()
+    for (const lines of Object.values(CHORUS_LEGEND)) for (const l of lines) expect(LEGENDS[String(spec(l).when?.find((c) => c.key === 'legend')?.value)]).toBeDefined()
   })
   it('«малыш проглотил ключ» → срок «как ключ выйдет», а не обычная клятва на понедельник', async () => {
     const { game } = makeGame()

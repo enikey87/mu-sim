@@ -2,7 +2,7 @@
 // Берутся два самых приоритетных (специфичность + bonus); из одного слота — только одна.
 import type { Game } from '../../engine/game'
 import type { Choice, Tone } from '../../engine/state'
-import { type Rule, type Facts, type Criterion, eq, is, exists, missing, gt, gte, lte } from '../../engine/rules'
+import { type Rule, type Facts, type Criterion, type Entry, eq, is, exists, missing, gt, gte, lte, isOpen, valueOf } from '../../engine/rules'
 import { D, cap } from '../excuses'
 import { talkPairs, talkId } from '../talk'
 import { ARCS, WRONG_Q } from '../arcs'
@@ -10,6 +10,7 @@ import * as L from '../life'
 import { GROUP_Q } from '../misc'
 import { P_LIE } from '../lies'
 import { TOPICS } from '../topics'
+import { WORLD } from '../world'
 import { fmtDayMonth } from '../../engine/time'
 
 type R = Rule<Game>
@@ -30,7 +31,7 @@ interface OfferSpec {
 
 const fromD = (game: Game, key: string, map: Record<string, string> = {}) =>
   game.playerLine(() => game.X.fill(game.draw(key, D[key]), map))
-const fromArr = (game: Game, key: string, arr: readonly string[]) => game.playerLine(() => game.draw(key, arr))
+const fromArr = (game: Game, key: string, arr: readonly Entry<string>[]) => game.playerLine(() => game.draw(key, arr))
 
 const yours = (n: string) => n.replace(/^(мой|моя|моё|мои)(?![а-яё])/i, (m) => ({ мой: 'ваш', моя: 'ваша', моё: 'ваше', мои: 'ваши' } as Record<string, string>)[m.toLowerCase()])
 
@@ -56,7 +57,10 @@ export const choiceRules: R[] = [
   // извиниться после грубости
   offer({ name: 'Sorry', when: [is('ctx.offended')], act: 'sorry', tone: 'polite', bonus: 5, text: (g) => fromD(g, 'P_SORRY') }),
   // лестница грубости: заблокирован — извиниться можно только через Бориса; ссора горячая — можно мычать
-  offer({ name: 'ViaBoris', when: [is('blocked')], act: 'viaBoris', tone: 'polite', bonus: 7, text: (g) => fromArr(g, 'P_VIA_BORIS', ['Борис, передай Алику: прости меня', 'Попросить Бориса передать извинения', 'Борис, скажи ему «бее» от меня. Мирное', 'Карине, передайте Алику: я извиняюсь']) }),
+  // посредник — лучший из тех, кто есть: Борис, Карине, мама Алика (один вариант на слот)
+  offer({ name: 'Via_boris', slot: 'via', when: [is('blocked'), WORLD.boris], act: 'via', arg: () => 'boris', tone: 'polite', bonus: 7, text: (g) => fromArr(g, 'P_VIA_BORIS', ['Борис, передай Алику: прости меня', 'Попросить Бориса передать извинения', 'Борис, скажи ему «бее» от меня. Мирное']) }),
+  offer({ name: 'Via_karine', slot: 'via', when: [is('blocked'), WORLD.karineHome], act: 'via', arg: () => 'karine', tone: 'polite', bonus: 6, text: (g) => fromArr(g, 'P_VIA_KARINE', ['Карине, передайте Алику: я извиняюсь', 'Попросить Карине передать извинения']) }),
+  offer({ name: 'Via_mama', slot: 'via', when: [is('blocked')], act: 'via', arg: () => 'mama', tone: 'polite', bonus: 6, text: (g) => fromArr(g, 'P_VIA_MAMA', ['Попросить маму Алика передать извинения']) }),
   offer({ name: 'Moo', when: [is('ctx.offended'), gte('rude.heat', 1)], odds: 0.5, act: 'moo', tone: 'neutral', bonus: 4, text: (g) => fromArr(g, 'P_MOO', ['Мууу.', 'Мууууу 🐄', 'Му. (Это значит «мир».)']) }),
 
   // ответ на то, ЧТО прислал Алик
@@ -140,10 +144,11 @@ export const choiceRules: R[] = [
       text: (g, f) => {
         const sub = kind === 'memory' ? '' : String(f['ctx.' + kind])
         const said = g.S.msgs.slice(-6).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : [])).join(' ')
-        const i = talkPairs(kind, sub).findIndex((p, j) => !g.lines.has(talkId(kind, sub, j)) && g.known(p[0]) && g.known(p[1]) && (p[2]?.(g.S, said) ?? true))
+        const facts = g.lineFacts()
+        const i = talkPairs(kind, sub).findIndex((e, j) => !g.lines.has(talkId(kind, sub, j)) && isOpen(e, facts) && (valueOf(e)[2]?.(g.S, said) ?? true))
         if (i < 0) return ''
         arg = `${kind}|${sub}|${i}`
-        return talkPairs(kind, sub)[i][0]
+        return valueOf(talkPairs(kind, sub)[i])[0]
       },
       arg: () => arg,
     })
@@ -160,7 +165,7 @@ export const choiceRules: R[] = [
           const t = TOPICS[String(f['ctx.topic'])]
           const fits = t.p.filter((_, i) => !t.need?.[i] || t.need[i].test(g.topicText))
           const q = g.freshPlayer('PT_' + f['ctx.topic'], fits)
-          arg = q ? `${f['ctx.topic']}:${t.p.indexOf(q)}` : ''
+          arg = q ? `${f['ctx.topic']}:${t.p.findIndex((e) => valueOf(e) === q)}` : ''
           return q ?? ''
         },
         arg: () => arg,

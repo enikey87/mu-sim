@@ -5,8 +5,12 @@ import { ARCS, ARC_DONE, CAST } from './arcs'
 import { ACH } from './achievements'
 import { FINALES, ENDINGS, DEFAULT_FINALE } from './finales'
 import type { Game } from '../engine/game'
+import { valueOf } from '../engine/rules'
+import type { Episode } from './arcs'
 
-const lines = (ep: { m: Array<string | { t: string }> }) => ep.m.map((m) => (typeof m === 'string' ? m : m.t))
+const lines = (ep: Pick<Episode, 'm'>) => ep.m.map(valueOf).map((m) => (typeof m === 'string' ? m : m.t))
+/** Реплики серии, уместные в этой партии. */
+const fitting = (g: Game, ep: Pick<Episode, 'm'>) => g.open(ep.m).map((m) => (typeof m === 'string' ? m : m.t))
 const toLast = (game: Game, id: string) => { game.S.arcs[id] = { i: ARCS[id].eps.length - 1, last: -99 } }
 const said = (game: Game, from: number) => game.S.msgs.slice(from).filter((m) => m.kind === 'text').map((m) => (m.kind === 'text' ? m.text : ''))
 
@@ -26,7 +30,7 @@ const SETUP: Record<string, (g: Game) => void> = {
   'alik_death.sulk': () => {},
   'garik.cutter': (g) => { g.S.ach.newjob = 190 },
   'tile.lost': (g) => { g.S.mem.court = 6 },
-  'grandpa.revoke': (g) => { g.S.ach.heir = 190 },
+  'grandpa.revoke': (g) => { g.S.ach.heir = 190; g.S.arcs.boris = { i: 1, last: 0 } }, // наследство — Борису: он уже есть
   'rubik.bribe': (g) => { g.S.ach.redo = 190 },
   'rubik.karine': (g) => { g.S.ach.wife = 190 },
   'razmik.union': (g) => { g.S.ach.customer = 190 },
@@ -45,7 +49,7 @@ describe('финалы сериалов: контент', () => {
         expect(ACH[f.fx?.ach ?? ''], `${arc}.${f.id} ach`).toBeDefined()
         expect(ACH[`fin_${arc}_${f.id}`]).toBeDefined()
         expect(SETUP[`${arc}.${f.id}`], `нет теста на ${arc}.${f.id}`).toBeDefined()
-        for (const m of f.m) if (typeof m !== 'string') expect(CAST[m.w], m.w).toBeDefined()
+        for (const m of f.m.map(valueOf)) if (typeof m !== 'string') expect(CAST[m.w], m.w).toBeDefined()
       }
     }
   })
@@ -67,7 +71,7 @@ describe('финалы сериалов: выбор', () => {
       toLast(game, id)
       const from = game.S.msgs.length
       await game.playArc(id)
-      expect(said(game, from), id).toEqual(expect.arrayContaining(lines(ARCS[id].eps.at(-1)!)))
+      expect(said(game, from), id).toEqual(expect.arrayContaining(fitting(game, ARCS[id].eps.at(-1)!)))
       expect(game.S.mem['finale.' + id]).toBe('default')
       expect(game.finaleTitle(id)).toBe(DEFAULT_FINALE[id])
       expect(game.arcDoneLines(id)).toBe(ARC_DONE[id])
@@ -84,7 +88,7 @@ describe('финалы сериалов: выбор', () => {
         const from = game.S.msgs.length
         await game.playArc(arc)
         expect(game.S.mem['finale.' + arc], `${arc}.${f.id}`).toBe(f.id)
-        expect(said(game, from)).toEqual(expect.arrayContaining(lines(f)))
+        expect(said(game, from)).toEqual(expect.arrayContaining(fitting(game, f)))
         expect(game.S.ach[`fin_${arc}_${f.id}`]).toBeDefined()
         expect(game.S.ach[f.fx!.ach!]).toBeDefined()
         expect(game.finaleTitle(arc)).toBe(f.title)

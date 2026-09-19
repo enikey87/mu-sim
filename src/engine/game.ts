@@ -11,7 +11,7 @@ import { FINALES, ENDINGS, DEFAULT_FINALE, type Finale } from '../content/finale
 import { ARCS, ARC_DONE, CAST, type Episode, GROUP, GROUP_OOPS, WRONG_TO, WRONG_WHAT, WRONG_OOPS } from '../content/arcs'
 import * as L from '../content/life'
 import { ACH } from '../content/achievements'
-import { INTRO, STATE_GATES } from '../content/world'
+import { WORLD, SPEAKS, meet } from '../content/world'
 import { FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_WANDER, OATH_FORMS } from '../content/misc'
 import { STARTS } from '../content/quests'
 import { allRules } from '../content/rules'
@@ -19,7 +19,10 @@ import { CLAIMS, claimByKey, conflicts, pairKey, CALLBACK_OPEN, type Claim } fro
 import { type Rng, mathRng, rndInt, shuffle, chance } from './rng'
 import { Decks } from './deck'
 import { Seen, type Keyed } from './uniq'
-import { RuleSet, makeHub, Lines, resolver, test, type Facts, type Rule, type Trace, type Query, type Priority, type Line as PoolLine, type LineOpts, type Picked } from './rules'
+import {
+  RuleSet, makeHub, Lines, resolver, test, isOpen, valueOf,
+  type Criterion, type Entry, type Facts, type Resolver, type Rule, type Trace, type Query, type Priority, type Line as PoolLine, type LineOpts, type Picked,
+} from './rules'
 import { MENTION_RE } from '../content/world'
 import { type Clock, realClock } from './clock'
 import { type Audio, silentAudio } from './audio'
@@ -118,7 +121,7 @@ export class Game {
     this.S = loadState(this.storage) ?? freshState()
     this.decks = new Decks(this.S.bags, this.rng)
     this.seen = new Seen(this.S.seen)
-    this.X = make((k, a, nr) => this.decks.draw(k, this.fitWorld(a), nr), () => this.S.tier, this.rng) // и генератор не говорит о том, чего в мире ещё нет
+    this.X = make(<T>(k: string, a: readonly Entry<T>[], nr?: boolean) => (nr ? this.decks.pick(k, a, this.lineFacts(), { noRepeat: true }) as T : this.draw(k, a)), () => this.S.tier, this.rng)
     this.scenes = makeScenes(this.X)
     this.S.rules.said ??= {} // старые сохранения
     this.lines = new Lines(this.S.rules.said, this.rng, () => ({ turn: this.S.stats.sent, day: this.S.day }))
@@ -172,7 +175,22 @@ export class Game {
   }
 
   // ---------- helpers ----------
-  draw = <T>(key: string, arr: readonly T[]): T => this.decks.draw(key, this.fitWorld(arr))
+  /** Следующий уместный сейчас элемент колоды (needs/gate). */
+  draw = <T>(key: string, arr: readonly Entry<T>[]): T => {
+    const x = this.decks.pick(key, arr, this.lineFacts())
+    if (x === null) throw new Error(`Колода ${key}: ни одного элемента, уместного сейчас`)
+    return x
+  }
+  lineFacts(): Resolver {
+    return resolver(this.rules.hub, { event: 'line' }, this.facts())
+  }
+  holds = (c: Criterion): boolean => test(c, this.lineFacts())
+  /** Уместные сейчас элементы списка, который звучит целиком. */
+  open<T>(arr: readonly Entry<T>[]): T[] {
+    const facts = this.lineFacts()
+    return arr.filter((e) => isOpen(e, facts)).map(valueOf)
+  }
+  canSpeak = (who: string): boolean => !SPEAKS[who] || this.holds(SPEAKS[who])
   /**
    * Реплика из пула по правилам Hades: подходящие условия, не сказанные, верхний приоритет.
    * Пул исчерпан — fallback (обычно генератор отмазок) или null.
@@ -184,35 +202,12 @@ export class Game {
   }
   /** То же, но с самой репликой (её поля: сумма в День выплаты, кто говорит). */
   linePicked(key: string, pool: readonly PoolLine[], o: LineOpts = {}): Picked | null {
-    const facts = resolver(this.rules.hub, { event: 'line' }, this.facts())
-    const p = this.lines.pick(key, pool, facts, { ...o, filter: (l) => this.known(l.t) && (o.filter?.(l) ?? true) })
+    const p = this.lines.pick(key, pool, this.lineFacts(), o)
     if (!p) return null
     this.lines.mark(p.id)
     this.seen.mark(p.text)
     if (p.spec.remember) this.rules.applyOps(p.spec.remember, {})
     return p
-  }
-  /** Текст не упоминает того, чего в мире ещё нет: Борис — с первой серии своего сериала, слова из INTRO — когда прозвучали в переписке. */
-  known(t: string): boolean {
-    if (!this.S.arcs.boris && /Борис/.test(t)) return false
-    if (STATE_GATES.some((s) => s.when(this.S) && s.re.test(t) && !s.unless.test(t))) return false
-    return INTRO.every(([k, re]) => this.S.mem['intro.' + k] || !re.test(t))
-  }
-  /** Персонаж уже в мире и может писать сам: Борис — с сериала, Арсен — когда прозвучал, Карине — пока не ушла к Рубику. */
-  canSpeak(who: string): boolean {
-    if (who === 'boris') return !!this.S.arcs.boris
-    if (who === 'arsen') return !!this.S.mem['intro.arsen']
-    if (who === 'karine') return this.S.mem['finale.rubik'] !== 'karine'
-    return true
-  }
-  /** Не упоминать то, чего в мире игры ещё нет: Борис — только с первой серией своего сериала, остальное (INTRO) — когда прозвучало. */
-  fitWorld<T>(arr: readonly T[]): readonly T[] {
-    const unknown = (x: unknown): boolean =>
-      typeof x === 'string' ? !this.known(x) || (x === 'boris' && !this.S.arcs.boris)
-      : x !== null && typeof x === 'object' ? Object.values(x).some(unknown) // пересланное { f, t }, пары, сроки { t, d }
-      : false
-    const ok = arr.filter((x) => !unknown(x))
-    return ok.length ? ok : arr
   }
   rnd = (n: number): number => rndInt(this.rng, n)
   chance = (p: number): boolean => chance(this.rng, p)
@@ -251,17 +246,16 @@ export class Game {
   /** Ход, в котором уже была серия (две серии разных сериалов подряд — каша). */
   private arcAt = -1
   /** Свежая реплика игрока из пула или null, если весь пул недавно показывали или отправляли. */
-  freshPlayer(key: string, arr: readonly string[]): string | null {
-    const ok = arr.filter((t) => !this.shown.has(t) && !this.seen.has(t))
-    if (!ok.length) return null
-    const t = this.draw(key, ok)
+  freshPlayer(key: string, arr: readonly Entry<string>[]): string | null {
+    const t = this.decks.pick(key, arr, this.lineFacts(), { eligible: (e) => !this.shown.has(valueOf(e)) && !this.seen.has(valueOf(e)) })
+    if (t === null) return null
     this.shown.add(t)
     if (this.shown.size > 60) this.shown.delete(this.shown.values().next().value!)
     return t
   }
-  pair = (ka: string, a: readonly string[], kb: string, b: readonly string[]): string =>
+  pair = (ka: string, a: readonly Entry<string>[], kb: string, b: readonly Entry<string>[]): string =>
     this.uniq(() => `${this.draw(ka, a)} ${this.draw(kb, b)}`)
-  addrLine = (key: string, arr: readonly string[]): string => this.uniq(() => `${this.X.g('ADDR')}, ${this.draw(key, arr)}`)
+  addrLine = (key: string, arr: readonly Entry<string>[]): string => this.uniq(() => `${this.X.g('ADDR')}, ${this.draw(key, arr)}`)
 
   get ctx(): Ctx | null { return this.S.ctx }
   setCtx(c: Ctx | null): void { this.S.ctx = c }
@@ -299,9 +293,6 @@ export class Game {
   push<M extends NewMsg>(m: M): Msg {
     const msg = { ...m, id: this.S.nextId++ } as Msg
     this.S.msgs.push(msg)
-    // прозвучало в переписке (не от игрока) — теперь об этом можно говорить: «кран», «Арсен», «калым»…
-    const said = msg.kind === 'sys' || (msg.kind === 'text' && msg.from !== 'me') ? msg.text : ''
-    for (const [k, re] of INTRO) if (!this.S.mem['intro.' + k] && re.test(said)) this.S.mem['intro.' + k] = true
     this.emit()
     return msg
   }
@@ -315,7 +306,7 @@ export class Game {
     if (msg.kind === 'text' || msg.kind === 'photo') this.noteClaims(msg.text)
     // хор: Алик кого-то упомянул — тот, может быть, вклинится после его ответа
     if (msg.kind === 'text' && !msg.who) {
-      for (const [who, re] of Object.entries(MENTION_RE)) if (re.test(msg.text) && (who !== 'boris' || this.S.arcs.boris)) this.pending.push({ event: 'Mentioned', target: who })
+      for (const [who, re] of Object.entries(MENTION_RE)) if (re.test(msg.text)) this.pending.push({ event: 'Mentioned', target: who })
     }
     this.audio.beep()
     this.audio.vibrate(40)
@@ -555,7 +546,7 @@ export class Game {
       if (m.from === 'me') return undefined
       if (m.who || m.deleted || !m.topical) continue
       // клятвы и сроки («Клянусь лавашом», «как бетон застынет») — не тема разговора
-      if ((D.OATH as string[]).some((o) => m.text.startsWith(o))) continue
+      if ((D.OATH as Entry<string>[]).some((o) => m.text.startsWith(valueOf(o)))) continue
       let text = m.text
       for (const p of this.S.promises) text = text.split(p.t).join('')
       const hit = Object.entries(TOPICS).find(([k, t]) => t.re.test(text) && !this.topicMuted(k))
@@ -614,7 +605,7 @@ export class Game {
       if (c) out.push(c)
     }
     const P2 = (a: string, b: string) => this.playerLine(() => `${this.draw(a, D[a])} ${this.draw(b, D[b])}`)
-    const one = (key: string, arr: readonly string[]) => this.playerLine(() => this.draw(key, arr))
+    const one = (key: string, arr: readonly Entry<string>[]) => this.playerLine(() => this.draw(key, arr))
     // общие реплики зависят от стадии: вежливый режим Алика, блок, поздние дни
     if (S.mem.polite && this.chance(0.6)) out.push({ text: one('P_POL_POLITE', P_POL_POLITE), tone: 'polite' })
     else out.push({ text: P2('P_POL_A', 'P_POL_B'), tone: 'polite' })
@@ -716,7 +707,8 @@ export class Game {
     }
     if (!S.ram && S.stats.sent >= 25) {
       S.ram = true
-      this.sys('Алик Воздухонесян сменил фото профиля')
+      this.rules.applyOps(meet('baran'), {})
+      this.sys('Алик Воздухонесян сменил фото профиля. На фото — баран')
       this.unlock('ram')
     }
     if (this.chance(0.12)) this.randomNotif()
@@ -971,9 +963,10 @@ export class Game {
   }
   async callback(): Promise<void> {
     const c = this.callbackCandidate()
-    if (!c) return this.excuseTurn()
+    // продолжение истории может опираться на то, чего ещё нет в мире (Борис) — тогда в другой раз
+    const upd = c && this.decks.pick('CB_' + c.key, c.updates!, this.lineFacts())
+    if (!c || !upd) return this.excuseTurn()
     this.S.mem['cb.' + c.key] = this.S.day
-    const upd = this.draw('CB_' + c.key, c.updates!)
     await this.say([this.uniq(() => `${this.X.g('ADDR')}, ${this.draw('CB_OPEN', CALLBACK_OPEN)} ${c.say}? ${upd}`)])
     this.unlock('memory')
     await this.promiseLine()
@@ -1002,11 +995,13 @@ export class Game {
     await this.playEpisode(ep, id)
   }
   async playEpisode(ep: Episode, arc?: string): Promise<void> {
+    if (ep.remember) this.rules.applyOps(ep.remember, {})
     if (ep.legend !== undefined) this.setLegend(ep.legend, arc)
     // серия без своей легенды возвращает легенду своего сериала: свадьба идёт — значит, деньги «после свадьбы»
     else if (arc && this.S.mem['legend.of.' + arc]) this.setLegend(String(this.S.mem['legend.of.' + arc]), arc)
-    for (const m of ep.m) this.seen.mark(typeof m === 'string' ? m : m.t)
-    this.markTopical(await this.say(ep.m))
+    const m = this.open(ep.m)
+    for (const x of m) this.seen.mark(typeof x === 'string' ? x : x.t)
+    this.markTopical(await this.say(m))
     if (typeof ep.legend === 'string' && this.S.ctx) this.S.ctx.legend = ep.legend // новая легенда — есть что переспросить
     if (ep.fx?.debt) this.S.debt += ep.fx.debt
     if (ep.fx?.pay) { this.S.debt -= ep.fx.pay; this.S.money += ep.fx.pay }
@@ -1056,7 +1051,7 @@ export class Game {
     return this.finaleOf(id)?.title ?? DEFAULT_FINALE[id]
   }
   /** Ответы на «Как там…?» после финала — свои у каждого финала. */
-  arcDoneLines(id: string): string[] {
+  arcDoneLines(id: string): readonly Entry<string>[] {
     return this.finaleOf(id)?.done ?? ARC_DONE[id]
   }
 
@@ -1065,8 +1060,8 @@ export class Game {
   async tribunal(): Promise<void> {
     await this.sleep(600)
     this.sys('Дядя Самвел добавил вас в группу «Стройка под ключ 🏗️ Семья». Тема: «Дело №1. Плиточник против уважения»')
-    for (const [w, t] of this.fitWorld(TRIBUNAL)) await this.say([{ w, t }]) // без Бориса, если его ещё нет
-    this.sys(`Голосование «Простить плиточника?» — Да: 1 (Гарик). Нет: ${5 + this.rnd(4)}.${this.S.arcs.boris ? ' Бее: 1.' : ''}`)
+    for (const [w, t] of this.open(TRIBUNAL)) await this.say([{ w, t }])
+    this.sys(`Голосование «Простить плиточника?» — Да: 1 (Гарик). Нет: ${5 + this.rnd(4)}.${this.holds(WORLD.boris) ? ' Бее: 1.' : ''}`)
     await this.enterNode('tribunal', 'verdict')
   }
 
@@ -1074,7 +1069,7 @@ export class Game {
   async reachEnding(id: string): Promise<void> {
     const e = ENDINGS.find((x) => x.id === id)!
     await this.sleep(800)
-    await this.say(e.m)
+    await this.say(this.open(e.m))
     this.S.endings[id] = this.S.day
     this.S.ending = id
     this.unlock('end_' + id)
@@ -1098,20 +1093,15 @@ export class Game {
     const sc = this.scenes[sid]
     // новая сцена — старый контекст («что вы удалили?», «при чём тут тётя?») больше не к месту
     if (!S.scene || S.scene.id !== sid) {
-      S.scene = { id: sid, node: nid, vars: sc.init ? sc.init(this.rng) : {} }
+      S.scene = { id: sid, node: nid, vars: sc.init ? sc.init(this.rng, (arr) => this.open(arr)) : {} }
       S.ctx = null
-      // бартер до сериала «Баран Борис»: у барана ещё нет имени (иначе сериал потом «знакомит» с Борисом второй раз)
-      const v = S.scene.vars
-      if (typeof v.n === 'string' && /Борис/.test(v.n) && !S.arcs.boris) { v.n = 'баран без имени'; v.p = 'Откликается на «эй». Имя придумаешь сам.' }
-      // и в акте взаимозачёта нет строки «корм для Бориса»
-      if (Array.isArray(v.rows) && !S.arcs.boris) { v.rows = (v.rows as Array<[string, number]>).filter(([t]) => this.known(t)); v.total = (v.rows as Array<[string, number]>).reduce((n, r) => n + r[1], 0) }
     }
     S.scene.node = nid
     const n = sc.nodes[nid]
     const v = S.scene.vars
     const res = (x: Line) => (typeof x === 'function' ? x(v) : x)
-    const gen = (key: string, arr: Line | Line[]) => () => res(Array.isArray(arr) ? this.draw(`${sid}.${nid}.${key}`, arr) : arr)
-    const variant = (key: string, arr: Line[]) => this.uniq(gen(key, arr))
+    const gen = (key: string, arr: Line | Entry<Line>[]) => () => res(Array.isArray(arr) ? this.draw(`${sid}.${nid}.${key}`, arr) : arr)
+    const variant = (key: string, arr: Entry<Line>[]) => this.uniq(gen(key, arr))
 
     const fx = n.fx ?? {}
     if (fx.days) this.nextDay(fx.days)

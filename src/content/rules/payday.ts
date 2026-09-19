@@ -104,7 +104,7 @@ const outcome = (id: string, when: R['when'], extra: Partial<R> = {}): R => ({
     await game.sleep(900)
     // «перевёл {sum}» — ровно то, что осталось «к выплате» после всех долей, а не 240 000 из воздуха
     if (o.sys) game.sys(o.sys.replace('{debt}', fmt(game.S.debt)).replace('{sum}', fmt(Number(game.S.mem['payday.sum'] ?? TARGET))))
-    for (const l of o.lines) await game.say([typeof l === 'string' ? l : { w: l[0], t: l[1] }])
+    for (const l of game.open(o.lines)) await game.say([typeof l === 'string' ? l : { w: l[0], t: l[1] }])
     if (id === 'real' || id === 'coins') { game.S.money += game.S.debt; game.S.debt = 0 }
     if (id === 'lavash') { game.S.debt = 0; game.S.items.push('Лаваш × 240 000') }
     if (id === 'niva') { game.S.debt = Math.max(0, game.S.debt - 5000); game.S.items.push('«Нива» (выплата)') }
@@ -129,7 +129,7 @@ export const paydayRules: R[] = [
   outcome('real', [is('ach.saint'), gte('caught', 3), is('ach.court'), gte('quests', 5)]),
   // поймал великую отмазку — заслуга игрока: важнее исходов «по стилю партии» (одинаковая специфичность решалась бы случайно)
   outcome('coins', [is('payday.caught')], { bonus: 1 }),
-  outcome('lavash', [is('payday.caught'), is('ach.q_crypto')], { bonus: 1 }),
+  outcome('lavash', [is('payday.caught'), is('crypto.hodl')], { bonus: 1 }),
   // исходы «по стилю партии» — одной специфичности: подходит несколько — выбор случайный, а не всегда один
   outcome('niva', [eq('finale.niva', 'chose')], { specificity: 1 }),
   outcome('strasbourg', [is('ach.strasbourg')], { specificity: 1 }),
@@ -137,6 +137,6 @@ export const paydayRules: R[] = [
   outcome('default', []),
   {
     name: 'Payday_Button', event: 'PaydayButton', when: [], priority: 'system',
-    respond: async ({ game, facts }) => { await game.say([OUTCOME[String(facts.outcome)]?.button ?? OUTCOME.default.button]) },
+    respond: async ({ game, facts }) => { await game.say([game.open((OUTCOME[String(facts.outcome)] ?? OUTCOME.default).button)[0]]) },
   },
 ]

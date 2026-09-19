@@ -5,6 +5,7 @@ import type { Game } from '../../engine/game'
 import type { Msg } from '../../engine/state'
 import * as T from '../rude'
 import { HEAT } from './rude'
+import { valueOf, spec, type Entry } from '../../engine/rules'
 
 const texts = (game: Game, from: number) => game.S.msgs.slice(from).map((m) => (m.kind === 'text' || m.kind === 'sys' ? m.text : m.kind === 'sticker' ? m.e : ''))
 const whos = (game: Game, from: number) => game.S.msgs.slice(from).filter((m): m is Extract<Msg, { kind: 'text' }> => m.kind === 'text').map((m) => m.who ?? 'alik')
@@ -13,7 +14,7 @@ const says = async (game: Game, intent: string) => { const n = game.S.msgs.lengt
 const heat = (game: Game, h: number) => { game.S.mem[HEAT] = h }
 const fresh = (game: Game) => { game.S.choices = null; return game.choices }
 const offered = (game: Game) => { for (let i = 0; i < 20; i++) if (fresh(game).some((c) => c.act === 'moo')) return true; return false }
-const all = (pool: readonly T.Said[]) => pool.map(([, t]) => t)
+const all = (pool: readonly Entry<T.Said>[]) => pool.map(valueOf).map(([, t]) => t)
 
 describe('лестница грубости: ступени', () => {
   it('S0 — обида: коротко пропадает; температура +1 и через 20 дней остывает', async () => {
@@ -54,7 +55,8 @@ describe('лестница грубости: ступени', () => {
       expect(r).toMatch(/^Rude_Family_/)
       const who = r!.replace('Rude_Family_', '')
       expect(whos(game, n)[0]).toBe(who)
-      expect(T.RUDE_FAMILY[who]).toContain(texts(game, n).find((t) => T.RUDE_FAMILY[who].includes(t)))
+      const pool = T.RUDE_FAMILY[who].map(valueOf)
+      expect(pool).toContain(texts(game, n).find((t) => pool.includes(t)))
       seen.add(who)
     }
     expect(seen.size).toBe(3) // все трое по очереди: каждый на перерыве 4 дня
@@ -88,24 +90,36 @@ describe('лестница грубости: ступени', () => {
     await game.afterTurn()
     expect(game.S.mem.blocked).toBeUndefined()
   })
-  it('в блоке извинение не доставлено — только «через Бориса»; Борис разблокирует', async () => {
+  it('в блоке извинение не доставлено — только через посредника; до Бориса это Карине, посредник разблокирует', async () => {
     const { game } = makeGame()
     heat(game, 3)
     await fire(game, 'rude')
-    expect(fresh(game).map((c) => c.act)).toContain('viaBoris')
+    const via = fresh(game).find((c) => c.act === 'via')!
+    expect(via.arg).toBe('karine')
     const s = await says(game, 'sorry')
-    expect(s.r).toBe('Says_sorry_blocked')
+    expect(s.r).toBe('Says_sorry_blocked_karine')
     expect(texts(game, s.n)[0]).toBe(T.NOT_DELIVERED)
-    const v = await says(game, 'viaBoris')
-    expect(v.r).toBe('Says_viaBoris')
+    const n = game.S.msgs.length
+    expect((await game.fire('PlayerSays', { intent: 'via', arg: via.arg }))?.name).toBe('Says_via_karine')
     expect(game.S.mem.blocked).toBe(false)
-    expect(texts(game, v.n)).toContain('Алик Воздухонесян разблокировал вас')
+    expect(texts(game, n)).toContain('Алик Воздухонесян разблокировал вас')
     expect(game.rules.match({ event: 'AlikTurn' }, game.facts())?.name).not.toBe('Turn_Blocked')
+  })
+  it('посредник — лучший из тех, кто есть: Борис, если он уже в истории; мама, если Карине ушла к Рубику', async () => {
+    const { game } = makeGame()
+    game.S.mem.blocked = true
+    game.S.arcs.boris = { i: 1, last: 0 }
+    expect(fresh(game).find((c) => c.act === 'via')?.arg).toBe('boris')
+    expect((await says(game, 'sorry')).r).toBe('Says_sorry_blocked_boris')
+    delete game.S.arcs.boris
+    game.S.mem['finale.rubik'] = 'karine'
+    expect(fresh(game).find((c) => c.act === 'via')?.arg).toBe('mama')
+    expect((await says(game, 'sorry')).r).toBe('Says_sorry_blocked')
   })
   it('S4 — семейный суд в группе (один раз): прелюдия, голосование, приговор — 10 дней вежливости', async () => {
     const { game } = makeGame()
     game.S.arcs.boris = { i: 1, last: 0 } // Борис уже в сюжете — он свидетель в суде
-    game.S.mem['intro.dekret'] = true // и Нуне уже в декрете
+    game.S.arcs.nune = { i: 1, last: 0 } // и Нуне уже в декрете
     heat(game, 4)
     const { r, n } = await fire(game, 'rude')
     expect(r).toBe('Rude_Tribunal')
@@ -223,9 +237,9 @@ describe('лестница грубости: ветки', () => {
       game.S.stats.sent += 3
       game.S.ctx = { offended: true } // пересланное / стикер между ними меняют контекст — игрок всё ещё молчит обиженно
       const n = game.S.msgs.length
-      if ((await game.fire('AlikIdle'))?.name === 'Idle_ColdWar') got.push(...texts(game, n).filter((t) => T.COLD_WAR.includes(t)))
+      if ((await game.fire('AlikIdle'))?.name === 'Idle_ColdWar') got.push(...texts(game, n).filter((t) => T.COLD_WAR.map(valueOf).includes(t)))
     }
-    expect(got).toEqual(T.COLD_WAR)
+    expect(got).toEqual(T.COLD_WAR.map(valueOf))
   })
   it('привыкание: кричал всю игру и вдруг вежлив — Алику не хватает крика', async () => {
     const { game } = makeGame()
@@ -240,7 +254,7 @@ describe('лестница грубости: ветки', () => {
       game.S.scene = null // ход Алика мог начать сцену — в сцене тон игрока не разбирается
       const { r, n } = await fire(game, 'polite')
       rs.push(String(r))
-      if (r === 'Tone_MissRude') { missed = true; expect(T.MISS_RUDE).toContain(texts(game, n)[0]) }
+      if (r === 'Tone_MissRude') { missed = true; expect(T.MISS_RUDE.map(spec).map((l) => l.t)).toContain(texts(game, n)[0]) }
     }
     expect(missed, rs.join(',')).toBe(true)
     expect(game.S.ach.habit).toBeDefined()

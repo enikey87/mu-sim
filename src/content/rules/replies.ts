@@ -1,7 +1,7 @@
 // Событие PlayerSays { intent, arg } — ответ Алика на контекстную реплику игрока.
 // Общее правило по intent + более специфичные для частных случаев (память, контекст).
 import type { Game } from '../../engine/game'
-import { type Rule, eq, ne, is, gte, add } from '../../engine/rules'
+import { type Rule, eq, ne, is, gte, add, valueOf } from '../../engine/rules'
 import { AlikOffline, ThickJournal } from './criteria'
 import { cooldown } from './rude'
 import { TOPICS, TOPIC_FALLBACK, TOPIC_NAME, TOPIC_OBSESSED } from '../topics'
@@ -64,7 +64,8 @@ export const replyRules: R[] = [
   says('talk', {
     respond: async ({ game, facts }) => {
       const [kind, sub, i] = String(facts.arg).split('|') as [TalkKind, string, string]
-      const pair = talkPairs(kind, sub)[Number(i)]
+      const e = talkPairs(kind, sub)[Number(i)]
+      const pair = e && valueOf(e)
       game.setCtx(null)
       if (!pair) return false
       game.lines.mark(talkId(kind, sub, Number(i)))

@@ -42,12 +42,13 @@ function pick(rng: Rng, style: Style, cs: Choice[]): number {
   return safe.length ? any(safe) : 0
 }
 
-/** Сыграть партию ботом (или повторить записанные действия replay). */
-export async function playtest(seed: number, turns: number, replay?: Act[]): Promise<Played> {
+/** Сыграть партию ботом (или повторить записанные действия replay); watch — посмотреть на игру до первого хода. */
+export async function playtest(seed: number, turns: number, replay?: Act[], watch?: (game: Game) => void): Promise<Played> {
   const style = STYLES[seed % STYLES.length]
   const hour = HOURS[seed % HOURS.length]
   const clock = manualClock(Date.parse('2026-09-14T12:00:00Z') + (seed % 7) * 864e5)
   const game = new Game({ storage: null, clock, rng: seededRng(seed), noTimers: true, hour })
+  watch?.(game)
   const bot = seededRng(seed * 7919 + 17)
   const acts: Act[] = []
   const asides: Aside[] = []

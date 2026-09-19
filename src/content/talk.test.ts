@@ -4,6 +4,7 @@ import { makeGame } from '../test/helpers'
 import { CHORUS_TALK, MEMORY_TALK } from './talk'
 import { LEGENDS } from './legends'
 import type { Game } from '../engine/game'
+import { valueOf } from '../engine/rules'
 
 const talkOpt = (g: Game) => g.buildChoices().find((c) => c.act === 'talk')
 async function ask(g: Game) {
@@ -16,7 +17,7 @@ describe('ответ на только что прозвучавшее', () => {
     const { game } = makeGame()
     game.S.ctx = { chorus: 'karine' }
     const c = (await ask(game))!
-    expect(CHORUS_TALK.karine.map((p) => p[0])).toContain(c.text)
+    expect(CHORUS_TALK.karine.map(valueOf).map((p) => p[0])).toContain(c.text)
     const from = game.S.msgs.length
     await game.send(c)
     const m = game.S.msgs.slice(from).find((x) => x.kind === 'text' && x.who === 'karine')
@@ -30,13 +31,13 @@ describe('ответ на только что прозвучавшее', () => {
     game.setLegend('safe_baby', 'nune')
     game.S.ctx = { legend: 'safe_baby' }
     const c = (await ask(game))!
-    expect(LEGENDS.safe_baby.talk!.map((p) => p[0])).toContain(c.text)
+    expect(LEGENDS.safe_baby.talk!.map(valueOf).map((p) => p[0])).toContain(c.text)
   })
   it('после воспоминания — ответ на воспоминание', async () => {
     const { game } = makeGame()
     game.S.ctx = { memory: true }
     const c = (await ask(game))!
-    expect(MEMORY_TALK.map((p) => p[0])).toContain(c.text)
+    expect(MEMORY_TALK.map(valueOf).map((p) => p[0])).toContain(c.text)
   })
   it('у каждой легенды и каждого персонажа хора есть что спросить', () => {
     for (const [id, l] of Object.entries(LEGENDS)) expect(l.talk?.length, id).toBeGreaterThanOrEqual(2)
