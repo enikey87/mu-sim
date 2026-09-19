@@ -6,7 +6,7 @@ import type { Game } from '../../engine/game'
 import type { Choice, Ctx } from '../../engine/state'
 import { D } from '../excuses'
 import { ARCS, ARC_DONE } from '../arcs'
-import { RUDE_AGAIN, SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER } from '../misc'
+import { RUDE_AGAIN, SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, SWING } from '../misc'
 
 const rel = { n: 'дядя Самвел', g: 'дяди Самвела' }
 const choicesFor = (game: Game, ctx: Ctx | null) => { game.S.ctx = ctx; return game.buildChoices() }
@@ -114,10 +114,18 @@ describe('ответы Алика (PlayerSays)', () => {
   })
   it('память: третье извинение подряд — Алик это замечает', async () => {
     const { game } = makeGame()
-    for (let i = 0; i < 2; i++) await reply(game, { text: 'Прости', tone: 'polite', act: 'sorry' })
+    for (let i = 0; i < 2; i++) { await reply(game, { text: 'Прости', tone: 'polite', act: 'sorry' }); game.S.stats.sent += 10 }
     const t = await reply(game, { text: 'Прости ещё раз', tone: 'polite', act: 'sorry' })
     expect(oneOf(SORRY_AGAIN.map((l) => frag(spec(l).t)), t.join(' '))).toBe(true)
     expect(game.S.ach.memory).toBeDefined()
+  })
+  it('качели: третий «мир» за 6 ходов — Алика укачало, ссора не остывает', async () => {
+    const { game } = makeGame()
+    for (let i = 0; i < 2; i++) await reply(game, { text: 'Прости', tone: 'polite', act: 'sorry' })
+    game.S.mem['rude.heat'] = 1 // на высокой температуре своё правило лестницы («только очно: хаш…»)
+    const t = await reply(game, { text: 'Прости ещё раз', tone: 'polite', act: 'sorry' })
+    expect(oneOf(SWING.map(frag), t.join(' ')), t.join(' | ')).toBe(true)
+    expect(game.S.mem['rude.heat']).toBe(1)
   })
   it('сериал закончился — финальный ответ этого сериала, а не «без новостей»', async () => {
     const { game } = makeGame()
@@ -132,9 +140,9 @@ describe('ответы Алика (PlayerSays)', () => {
     expect(t.join(' ')).toMatch(/Место отметили/)
     expect(game.S.arcs.beton.i).toBe(2)
   })
-  it('на вопрос после серии — следующая серия, второй вопрос подряд в тот же день — «пока без новостей»', async () => {
+  it('на вопрос назавтра после серии — следующая серия, второй вопрос в тот же день — «пока без новостей»', async () => {
     const { game } = makeGame()
-    game.S.arcs.beton = { i: 1, last: game.S.day + 5 }
+    game.S.arcs.beton = { i: 1, last: game.S.day - 1 }
     const ask = () => game.fire('PlayerSays', { intent: 'arc', arg: 'beton' })
     await ask()
     expect(game.S.arcs.beton.i).toBe(2)

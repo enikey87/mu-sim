@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest'
 import { lintRules, type Rule } from '../engine/rules'
 import { allRules } from '../content/rules'
 import { ruleCoverage, formatCoverage } from './coverage'
+import { RARE } from './rare'
 import { rudeRules, rudeSaysRules } from '../content/rules/rude'
 
 describe('линтер правил', () => {
@@ -22,21 +23,15 @@ describe('линтер правил', () => {
 })
 
 // Редкие правила: срабатывают только при особых сочетаниях, которые бот за разумное время не собирает
-const RARE = new Set(['Due_Cosmic', 'Tone_Cow', 'Says_catchLie_liekind_grandpa', 'Says_catchLie_caught3', 'Says_catchLie_caught2', 'Says_condole_ctxrevived', 'Says_catchLie_liekind_customer', 'Turn_BorisSick',
-  // «Мууу» в симуляции без таймеров не звучит; пропажа Алика теперь короткая — редко совпадает с тишиной игрока
-  'Opt_Cow', 'Idle_Offline', 'Says_catchLie_liekind_sent',
-  // первый сериал обычно запускает ход Алика раньше сюжетного хода; пропажа Алика короткая
-  'Beat_FirstArc', 'Says_WhileOffline',
-  // «толкни „Ниву“» — эпизод сериала «Нива», только пока она «не заводится»
-  'Quest_q_niva'])
+
 
 describe('покрытие правил', () => {
   it('за 10 партий (2 — с грубым игроком) срабатывают все правила, кроме заведомо редких', async () => {
     const r = await ruleCoverage([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 500, undefined, 2)
     if (process.env.RULES_REPORT) process.stdout.write('\n' + formatCoverage(r) + '\n')
     // финалы, концовки и лестница грубости зависят от стиля игры (одно извинение сбрасывает ссору) —
-    // их проверяют отдельные детерминированные тесты: finales.test.ts, rude.test.ts
+    // их проверяют отдельные детерминированные тесты: finales.test.ts, rude.test.ts; тишину «умер»/«в чёрном списке» — dialog.test.ts
     const ladder = new Set([...rudeRules, ...rudeSaysRules].map((x) => x.name).concat('Opt_ViaBoris', 'Opt_Moo'))
-    expect(r.never.filter((n) => !RARE.has(n) && !ladder.has(n) && !/^(Finale|Ending|Payday)_/.test(n))).toEqual([])
+    expect(r.never.filter((n) => !RARE.has(n) && !ladder.has(n) && !/^(Finale|Ending|Payday|Quiet)_/.test(n))).toEqual([])
   }, 300_000)
 })

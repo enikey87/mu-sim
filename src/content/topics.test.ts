@@ -112,8 +112,8 @@ describe('ответ по теме', () => {
   })
   it('Борис не упоминается до первой серии своего сериала', () => {
     const { game } = makeGame()
-    const pool = ['Передайте Борису привет.', 'Баран сыт.']
-    for (let i = 0; i < 10; i++) expect(game.draw('T_BORIS', pool)).toBe('Баран сыт.')
+    const pool = ['Передайте Борису привет.', 'Все сыты.']
+    for (let i = 0; i < 10; i++) expect(game.draw('T_BORIS', pool)).toBe('Все сыты.')
     game.S.arcs.boris = { i: 1, last: 0 }
     const seen = new Set<string>()
     for (let i = 0; i < 10; i++) seen.add(game.draw('T_BORIS', pool))
@@ -123,7 +123,7 @@ describe('ответ по теме', () => {
     const { game } = makeGame()
     game.alikMsg({ kind: 'text', from: 'alik', text: 'Борис заболел. Съел смету.', topical: true })
     game.S.ctx = { arc: 'boris' }
-    game.S.arcs.boris = { i: 2, last: game.S.day }
+    game.S.arcs.boris = { i: 2, last: game.S.day - 1 } // серия была вчера — сегодня по вопросу будет новая
     expect(offered(game, (c) => c.act === 'topic')).toBe(false)
     expect(offered(game, (c) => c.act === 'arc')).toBe(true)
   })

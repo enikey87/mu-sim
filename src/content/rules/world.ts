@@ -1,6 +1,6 @@
 // Правила новых возможностей: выбор сцен, наступившие обещания, хор персонажей, состояния мира.
 import type { Game } from '../../engine/game'
-import { type Rule, type Facts, eq, gte, lte, is, add, of } from '../../engine/rules'
+import { type Rule, type Facts, eq, ne, gte, lte, is, add, of, missing } from '../../engine/rules'
 import { CHORUS_LEGEND } from '../legends'
 import { PROMISE_DUE, PROMISE_DUE_COSMIC, PROMISE_DUE_KEPT, CHORUS, CHORUS_FED_UP, WEDDING_NOISE, BORIS_SICK, DEAD_KARINE, DEAD_ALIK } from '../world'
 
@@ -19,7 +19,7 @@ export const sceneRules: R[] = [
   scene('lend', [gte('mood', 4)]),
   scene('toast', [], eveningBoost), // застолье — чаще вечером и в пятницу
   scene('tax', [gte('count.threat', 1)], 2), // «если спросят — ты у меня не работал» — после угроз судом
-  { ...scene('wife', [gte('count.rude', 1)]), once: true }, // Карине знакомится один раз: «Вы кто такой?» дважды — нелепо
+  { ...scene('wife', [gte('count.rude', 1), missing('met.karine')]), once: true }, // Карине знакомится один раз: «Вы кто такой?» дважды — нелепо
   scene('invoice', [gte('day', 215)]),
   scene('loan', [gte('day', 230)]),
   scene('deathbed', [gte('day', 240), lte('mood', 6)], 2), // умирать Алик начинает, когда дела плохи
@@ -61,7 +61,13 @@ export const promiseRules: R[] = [
   {
     // в хорошем настроении Алик «держит слово» — 50 рублей ровно в срок
     name: 'Due_Kept', event: 'PromiseDue', when: [live, gte('mood', 8)], odds: 0.5, cooldown: { days: 10 }, priority: 'chatter',
-    respond: async ({ game }) => { await game.say([game.uniq(() => game.draw('DUE_KEPT', PROMISE_DUE_KEPT))]); await game.transfer() },
+    respond: async ({ game, facts }) => {
+      await game.say([game.uniq(() => game.draw('DUE_KEPT', PROMISE_DUE_KEPT))])
+      await game.transfer()
+      // сдержал (на 50 ₽) — в журнале больше не «просрочено», упрекать нечем
+      const p = game.S.promises[Number(facts.promise)]
+      if (p) p.asked = true
+    },
   },
 ]
 
@@ -71,9 +77,11 @@ const chorus = (who: string): R => ({
   remember: [add('interjections', 1, { scope: 'target' })],
   respond: async ({ game }) => {
     // сначала реплики в рамках легенды денег (Нуне не скажет «денег нет», пока деньги в сейфе)
+    if (!game.canSpeak(who)) return false // Карине ушла к Рубику — в чат Алика не пишет
     const t = game.line('CH_' + who, [...(CHORUS_LEGEND[who] ?? []), ...CHORUS[who]])
     if (!t) return false // новых реплик нет — молчит
     await game.say([{ w: who, t }])
+    game.S.ctx = { ...(game.S.ctx ?? {}), chorus: who } // можно ответить самому персонажу
   },
 })
 const fedUp = (who: string): R => ({
@@ -92,17 +100,23 @@ export const chorusRules: R[] = [...Object.keys(CHORUS).map(chorus), ...Object.k
 const noise = (key: string, arr: string[]) => async ({ game }: { game: Game }) => {
   await game.say([game.uniq(() => game.draw(key, arr))])
 }
+async function deadTurn(game: Game): Promise<void> {
+  game.setCtx(null)
+  if (game.chance(0.5)) await game.say([{ w: 'karine', t: game.uniq(() => game.draw('DEAD_K', DEAD_KARINE)) }])
+  else await game.say([game.uniq(() => game.draw('DEAD_A', DEAD_ALIK))])
+}
 export const stateRules: R[] = [
   { name: 'Turn_Wedding', event: 'AlikTurn', when: [is('wedding')], specificity: 0, weight: 12, cooldown: { turns: 3 }, respond: noise('WEDDING', WEDDING_NOISE) },
   { name: 'Turn_BorisSick', event: 'AlikTurn', when: [of('boris', is('sick'))], specificity: 0, weight: 10, cooldown: { turns: 3 }, respond: noise('BORIS_SICK', BORIS_SICK) },
-  {
-    // пока Алик «мёртв», это состояние перекрывает обычный ход целиком (специфичность выше весовых правил)
-    name: 'Turn_WhileDead', event: 'AlikTurn', when: [is('alik_dead')],
-    respond: async ({ game }) => {
-      if (game.chance(0.5)) await game.say([{ w: 'karine', t: game.uniq(() => game.draw('DEAD_K', DEAD_KARINE)) }])
-      else await game.say([game.uniq(() => game.draw('DEAD_A', DEAD_ALIK))])
-    },
-  },
+  // «умер» — значит, умер: ни болтовни простоя, ни сюжетных ходов, ни «доброе утро»; на слова игрока — Карине / «с того света»
+  // ход Алика по другим путям (после сцены, после пропажи) — тоже «умер»
+  { name: 'Turn_WhileDead', event: 'AlikTurn', when: [is('alik_dead')], respond: ({ game }) => deadTurn(game) },
+  // пока Алик «мёртв», это состояние перекрывает ответ на любое сообщение игрока (кроме вопроса о сериале — так идут похороны)
+  { name: 'Tone_WhileDead', event: 'PlayerMessage', when: [is('alik_dead')], bonus: 10, respond: ({ game }) => deadTurn(game) },
+  { name: 'Says_WhileDead', event: 'PlayerSays', when: [is('alik_dead'), ne('intent', 'arc')], bonus: 6, respond: ({ game }) => deadTurn(game) },
+  ...['AlikIdle', 'StoryBeat', 'PeriodLine', 'PromiseDue'].map((event): R => ({ name: 'Quiet_Dead_' + event, event, when: [is('alik_dead')], bonus: 10, respond: () => {} })),
+  // заблокировал — значит, не пишет: ни легенд, ни «обед — святое» (пишет разве что через «Ниву» — это ход блокировки)
+  ...['StoryBeat', 'PeriodLine', 'PromiseDue'].map((event): R => ({ name: 'Quiet_Blocked_' + event, event, when: [is('blocked')], bonus: 10, respond: () => {} })),
 ]
 
 export const worldRules: R[] = [...sceneRules, ...questRules, ...promiseRules, ...chorusRules, ...stateRules]

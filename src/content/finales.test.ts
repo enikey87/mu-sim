@@ -14,7 +14,7 @@ const said = (game: Game, from: number) => game.S.msgs.slice(from).filter((m) =>
 const SETUP: Record<string, (g: Game) => void> = {
   'boris.brigadir': (g) => { g.S.mem['asked.boris'] = 6 },
   'boris.toyou': (g) => { g.S.items.push('баран Борис') },
-  'beton.opened': (g) => { g.S.mem['count.rude'] = 2 },
+  'beton.opened': (g) => { g.S.mem['count.rude'] = 6; g.S.mem['rude.heat'] = 2 },
   'beton.corner': (g) => { g.S.ach.redo = 190 },
   'beton.ledger': (g) => { g.S.mem.caught = 2 },
   'samvel.tamada': (g) => { g.S.ach.toast = 190 },
@@ -25,12 +25,12 @@ const SETUP: Record<string, (g: Game) => void> = {
   'alik_death.will': (g) => { g.S.ach.forgive = 190; g.S.mem['asked.alik_death'] = 1 },
   'alik_death.sulk': () => {},
   'garik.cutter': (g) => { g.S.ach.newjob = 190 },
-  'tile.lost': (g) => { g.S.mem['count.threat'] = 1 },
+  'tile.lost': (g) => { g.S.mem.court = 6 },
   'grandpa.revoke': (g) => { g.S.ach.heir = 190 },
   'rubik.bribe': (g) => { g.S.ach.redo = 190 },
   'rubik.karine': (g) => { g.S.ach.wife = 190 },
   'razmik.union': (g) => { g.S.ach.customer = 190 },
-  'razmik.swap': (g) => { g.S.mem['count.rude'] = 3 },
+  'razmik.swap': (g) => { g.S.mem['count.rude'] = 10; g.S.mem['rude.heat'] = 3 },
   'razmik.shift': (g) => { g.S.ach.fence = 190 },
 }
 
@@ -194,9 +194,9 @@ describe('новые сериалы: фундамент, Рубик, Разми�
     await game.playArc('razmik')
     expect(game.S.mem.wedding).toBe(true)
   })
-  it('запасные условия: угроза судом вскрывает фундамент, новый объект сажает в кабину крана', async () => {
+  it('запасные условия: суд до Страсбурга вскрывает фундамент, новый объект сажает в кабину крана', async () => {
     const a = makeGame().game
-    a.S.mem['count.threat'] = 1
+    a.S.mem.court = 5
     toLast(a, 'beton')
     await a.playArc('beton')
     expect(a.S.mem['finale.beton']).toBe('opened')

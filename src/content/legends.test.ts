@@ -36,6 +36,7 @@ describe('легенда денег', () => {
     let got = false
     for (let i = 0; i < 60 && !got; i++) {
       game.S.stats.sent += 3
+      game.setLegend('safe_baby', 'nune') // серии других сериалов по дороге ставят свои легенды
       const n = game.S.msgs.length
       if ((await game.fire('AlikTurn'))?.name === 'Turn_Legend') got = texts(game, n).some((x) => LEGENDS.safe_baby.lines.map((l) => spec(l).t).includes(x))
       game.S.scene = null

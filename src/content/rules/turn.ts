@@ -25,9 +25,9 @@ export const storyRules: R[] = [
   // легенда денег продолжается и между «обычными» ходами
   {
     name: 'Beat_Legend', event: 'StoryBeat', when: [exists('legend')], specificity: 0, odds: 0.12, cooldown: { turns: 5 }, priority: 'chatter',
-    respond: async ({ game, facts }) => { const t = game.line('LEG_' + facts.legend, LEGENDS[String(facts.legend)].lines); if (!t) return false; game.markTopical(await game.say([t])) },
+    respond: async ({ game, facts }) => { const t = game.line('LEG_' + facts.legend, LEGENDS[String(facts.legend)].lines); if (!t) return false; game.markTopical(await game.say([t])); game.S.ctx = { ...(game.S.ctx ?? {}), legend: String(facts.legend) } },
   },
-  { name: 'Beat_Memory', event: 'StoryBeat', when: [gte('sent', 10)], specificity: 0, odds: 0.08, cooldown: { turns: 6 }, priority: 'chatter', respond: async ({ game }) => { const t = game.line('MEMORY', MEMORY); if (!t) return false; await game.say([t]); game.unlock('memory') } },
+  { name: 'Beat_Memory', event: 'StoryBeat', when: [gte('sent', 10)], specificity: 0, odds: 0.08, cooldown: { turns: 6 }, priority: 'chatter', respond: async ({ game }) => { const t = game.line('MEMORY', MEMORY); if (!t) return false; await game.say([t]); game.unlock('memory'); game.S.ctx = { ...(game.S.ctx ?? {}), memory: true } } },
   { name: 'Beat_Quest', event: 'StoryBeat', when: [gte('sent', 6)], specificity: 0, odds: 0.06, cooldown: { turns: 8 }, priority: 'chatter', respond: ({ game }) => game.fire('PickQuest').then((r) => !!r) },
 ]
 
@@ -63,6 +63,7 @@ export const turnRules: R[] = [
       const t = game.line('LEG_' + facts.legend, LEGENDS[String(facts.legend)].lines)
       if (!t) return game.excuseTurn()
       game.markTopical(await game.say([t]))
+      game.S.ctx = { ...(game.S.ctx ?? {}), legend: String(facts.legend) } // можно переспросить именно про это
       if (game.chance(0.6)) await game.promiseLine(undefined, true)
     },
   },

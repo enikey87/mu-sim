@@ -57,13 +57,13 @@ describe('обещания наступают', () => {
   it('в день срока Алик пишет сам — про это обещание', async () => {
     for (let seed = 1; seed <= 12; seed++) {
       const { game } = makeGame({ seed })
-      game.recordPromise({ text: 'в среду утром — всё отдам', d: 3 })
+      game.recordPromise({ text: 'через три дня — всё отдам', d: 3 })
       expect(game.S.rules.schedule.at(-1)).toMatchObject({ event: 'PromiseDue', at: game.S.day + 3 })
       game.S.day += 3
       const from = game.S.msgs.length
       await game.afterTurn()
       const t = texts(game.S.msgs.slice(from)).join(' ')
-      if (t) { expect(t).toContain('в среду утром — всё отдам'); return }
+      if (t) { expect(t).toContain('через три дня — всё отдам'); return }
     }
     throw new Error('ни в одной из 12 партий обещание не «наступило» (шанс 60%)')
   })
@@ -83,7 +83,7 @@ describe('обещания наступают', () => {
     for (let seed = 1; seed <= 30 && !kept; seed++) {
       const { game } = makeGame({ seed })
       game.S.mood = 9
-      game.recordPromise({ text: 'в пятницу — переведу', d: 2 })
+      game.recordPromise({ text: 'послезавтра — переведу', d: 2 })
       game.S.day += 2
       await game.afterTurn()
       kept = game.S.msgs.some((m) => m.kind === 'transfer')

@@ -11,7 +11,8 @@ import { FINALES, ENDINGS, DEFAULT_FINALE, type Finale } from '../content/finale
 import { ARCS, ARC_DONE, CAST, type Episode, GROUP, GROUP_OOPS, WRONG_TO, WRONG_WHAT, WRONG_OOPS } from '../content/arcs'
 import * as L from '../content/life'
 import { ACH } from '../content/achievements'
-import { FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_WANDER } from '../content/misc'
+import { INTRO, STATE_GATES } from '../content/world'
+import { FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_WANDER, OATH_FORMS } from '../content/misc'
 import { STARTS } from '../content/quests'
 import { allRules } from '../content/rules'
 import { CLAIMS, claimByKey, conflicts, pairKey, CALLBACK_OPEN, type Claim } from '../content/lies'
@@ -23,7 +24,7 @@ import { MENTION_RE } from '../content/world'
 import { type Clock, realClock } from './clock'
 import { type Audio, silentAudio } from './audio'
 import { typo } from './typo'
-import { dateOf, fmtDate, fmtTime, periodOf, tierOf, TIERS, type Period } from './time'
+import { calendarDays, dateOf, fmtDate, fmtTime, periodOf, tierOf, TIERS, type Period } from './time'
 import {
   type GameState, type Msg, type NewMsg, type Choice, type Ctx, type Tone, type Storage,
   freshState, loadState, saveState, SAVE_KEY, MAX_PATIENCE,
@@ -191,15 +192,26 @@ export class Game {
     if (p.spec.remember) this.rules.applyOps(p.spec.remember, {})
     return p
   }
-  /** Текст не упоминает того, чего в мире ещё нет (Борис — только с первой серии своего сериала). */
+  /** Текст не упоминает того, чего в мире ещё нет: Борис — с первой серии своего сериала, слова из INTRO — когда прозвучали в переписке. */
   known(t: string): boolean {
-    return !!this.S.arcs.boris || !/Борис/.test(t)
+    if (!this.S.arcs.boris && /Борис/.test(t)) return false
+    if (STATE_GATES.some((s) => s.when(this.S) && s.re.test(t) && !s.unless.test(t))) return false
+    return INTRO.every(([k, re]) => this.S.mem['intro.' + k] || !re.test(t))
   }
-  /** Не упоминать то, чего в мире игры ещё нет: Борис появляется только с первой серией своего сериала. */
+  /** Персонаж уже в мире и может писать сам: Борис — с сериала, Арсен — когда прозвучал, Карине — пока не ушла к Рубику. */
+  canSpeak(who: string): boolean {
+    if (who === 'boris') return !!this.S.arcs.boris
+    if (who === 'arsen') return !!this.S.mem['intro.arsen']
+    if (who === 'karine') return this.S.mem['finale.rubik'] !== 'karine'
+    return true
+  }
+  /** Не упоминать то, чего в мире игры ещё нет: Борис — только с первой серией своего сериала, остальное (INTRO) — когда прозвучало. */
   fitWorld<T>(arr: readonly T[]): readonly T[] {
-    if (this.S.arcs.boris) return arr
-    const boris = (x: unknown): boolean => (typeof x === 'string' ? /Борис/.test(x) || x === 'boris' : Array.isArray(x) && x.some(boris))
-    const ok = arr.filter((x) => !boris(x))
+    const unknown = (x: unknown): boolean =>
+      typeof x === 'string' ? !this.known(x) || (x === 'boris' && !this.S.arcs.boris)
+      : x !== null && typeof x === 'object' ? Object.values(x).some(unknown) // пересланное { f, t }, пары, сроки { t, d }
+      : false
+    const ok = arr.filter((x) => !unknown(x))
     return ok.length ? ok : arr
   }
   rnd = (n: number): number => rndInt(this.rng, n)
@@ -226,8 +238,11 @@ export class Game {
   /** Реплика игрока, которой ещё не было (помечается как виденная только при отправке). */
   /** Реплика игрока: не отправленная раньше и не мелькавшая среди вариантов последних ходов. */
   playerLine = (gen: () => string): string => {
+    // «Эм… <то, что игрок только что отправил>» — не перефразировка, а эхо: такие варианты не предлагаем
+    const recent = this.S.msgs.slice(-40).flatMap((m) => (m.kind === 'text' && m.from === 'me' ? [m.text] : []))
+    const echo = (t: string) => recent.some((r) => t !== r && (t.endsWith(r) || t.startsWith(r)))
     let t = ''
-    for (let i = 0; i < 8; i++) { t = this.seen.pickFresh(gen, this.playerDecor); if (!this.shown.has(t)) break }
+    for (let i = 0; i < 8; i++) { t = this.seen.pickFresh(gen, this.playerDecor); if (!this.shown.has(t) && !echo(t)) break }
     this.shown.add(t)
     if (this.shown.size > 60) this.shown.delete(this.shown.values().next().value!)
     return t
@@ -284,6 +299,9 @@ export class Game {
   push<M extends NewMsg>(m: M): Msg {
     const msg = { ...m, id: this.S.nextId++ } as Msg
     this.S.msgs.push(msg)
+    // прозвучало в переписке (не от игрока) — теперь об этом можно говорить: «кран», «Арсен», «калым»…
+    const said = msg.kind === 'sys' || (msg.kind === 'text' && msg.from !== 'me') ? msg.text : ''
+    for (const [k, re] of INTRO) if (!this.S.mem['intro.' + k] && re.test(said)) this.S.mem['intro.' + k] = true
     this.emit()
     return msg
   }
@@ -461,7 +479,7 @@ export class Game {
     })
   }
   unfinishedArc(): string | undefined {
-    return Object.keys(this.S.arcs).find((id) => this.arcCanAdvance(id))
+    return Object.keys(this.S.arcs).find((id) => this.arcCanAdvance(id, true))
   }
   /** Квест можно запустить из разговора: он ещё не проходил и его условия выполнены (как у слота квестов). */
   questAllowed(id: string): boolean {
@@ -472,9 +490,11 @@ export class Game {
     return true
   }
   /** Вопрос «Как там…?» к чему-то приведёт: сериал не закончен и сегодня по вопросу ещё не показывали серию. */
-  arcCanAdvance(id: string): boolean {
+  arcCanAdvance(id: string, asked = false): boolean {
     const st = this.S.arcs[id]
-    return !!st && st.i < ARCS[id].eps.length && !(st.byAsk && this.S.day === st.last)
+    // серия в тот же день, что предыдущая, — каша («Свадьба. Третий день» и тут же «Десятый день»):
+    // по вопросу игрока — назавтра, сама — через три дня
+    return !!st && st.i < ARCS[id].eps.length && this.S.day - st.last >= (asked ? 1 : 3)
   }
   lateCount(): number {
     return this.S.promises.filter((p) => p.due != null && p.due < this.S.day && !p.asked).length
@@ -496,6 +516,8 @@ export class Game {
       // «Мууу» прозвучало после последнего сообщения игрока — только тогда про корову и спрашивают
       mooFresh: S.mem.mooAt === S.stats.sent,
       sinceRude: S.stats.sent - Number(S.mem.rudeAt ?? -99),
+      // сколько раз игрок извинялся за последние 6 ходов («крик → мир → крик → мир»)
+      sorrySwing: String(S.mem.sorryAt ?? '').split(',').filter((n) => n && S.stats.sent - Number(n) <= 6).length,
       // температура ссоры не уходит ниже нуля (после примирения ещё тикают отложенные «остывания»)
       'rude.heat': Math.max(0, Number(S.mem['rude.heat'] ?? 0)),
       'has.boris': S.items.some((n) => /Борис/.test(n)),
@@ -503,7 +525,8 @@ export class Game {
       promiseLive: !!pr && pr.due != null,
       period: this.period(), night: this.isNight(), offline: S.offlineDays > 0, scene: S.scene?.id,
       lateCount: this.lateCount(),
-      arcAvailable: this.availableArcs().length > 0,
+      // сама — не больше одной серии в день: три легенды денег за день — уже не сюжет, а шум
+      arcAvailable: this.availableArcs().length > 0 && !Object.values(S.arcs).some((a) => a.last === S.day),
       arcsStarted: Object.keys(S.arcs).length,
       arcsDone: Object.entries(S.arcs).filter(([id, a]) => a.i >= ARCS[id].eps.length).length,
       quests: Object.keys(S.ach).filter((k) => k.startsWith('q_')).length,
@@ -513,8 +536,9 @@ export class Game {
       'ctx.when': c.when, 'ctx.whenNever': c.whenNever, 'ctx.rel': c.rel?.n, 'ctx.sad': c.sad, 'ctx.festive': c.festive, 'ctx.revived': c.revived,
       'ctx.constr': c.constr, 'ctx.legendary': c.legendary, 'ctx.arc': c.arc,
       // спросить про сериал есть смысл: будет новая серия, или сериал закончен и сегодня про финал ещё не спрашивали
-      'ctx.arcCanAdvance': c.arc ? this.arcCanAdvance(c.arc) || (S.arcs[c.arc]?.i >= ARCS[c.arc].eps.length && S.mem['doneAsked.' + c.arc] !== S.day) : false,
+      'ctx.arcCanAdvance': c.arc ? this.arcCanAdvance(c.arc, true) || (S.arcs[c.arc]?.i >= ARCS[c.arc].eps.length && S.mem['doneAsked.' + c.arc] !== S.day) : false,
       'arc.done': c.arc ? this.S.arcs[c.arc]?.i >= ARCS[c.arc].eps.length : false,
+      'ctx.legend': c.legend, 'ctx.chorus': c.chorus, 'ctx.memory': c.memory,
       'ctx.group': c.group, 'ctx.wrong': c.wrong, 'ctx.deleted': c.deleted, 'ctx.offended': c.offended,
       ...extra,
     }
@@ -605,7 +629,7 @@ export class Game {
     if (S.mem.blocked) out.push({ text: one('P_RUDE_BLOCKED', P_RUDE_BLOCKED), tone: 'rude' })
     else if (S.mem.polite) out.push({ text: one('P_RUDE_POLITE', P_RUDE_POLITE), tone: 'rude' })
     else {
-      const topic = facts['ctx.topic'] && this.chance(0.6) ? this.freshPlayer('PR_' + facts['ctx.topic'], TOPICS[String(facts['ctx.topic'])].r) : null
+      const topic = facts['ctx.topic'] && this.chance(0.6) ? this.freshPlayer('PR_' + facts['ctx.topic'], TOPICS[String(facts['ctx.topic'])].r.filter((_, i) => TOPICS[String(facts['ctx.topic'])].rneed?.[i]?.test(this.topicText) ?? true)) : null
       out.push({ text: topic ?? P2('P_RUDE_A', 'P_RUDE_B'), tone: 'rude' })
     }
     return out.slice(0, 4)
@@ -643,6 +667,7 @@ export class Game {
     if ((tone === 'rude' || tone === 'threat') && !o.scene) { this.unlock(tone); this.shakeId++; this.audio.vibrate([80, 40, 80]) }
     if (tone === 'cow') this.unlock('cow')
     if (o.act !== 'topic') S.mem.topicRun = 0 // серия вопросов по одной теме прервалась
+    if (o.act === 'sorry') S.mem.sorryAt = [...String(S.mem.sorryAt ?? '').split(',').filter(Boolean), S.stats.sent].slice(-4).join(',') // для «качелей»
     if (tone === 'rude') S.mem.rudeAt = S.stats.sent
     S.choices = null
     this.drain(1)
@@ -705,7 +730,8 @@ export class Game {
 
   recordPromise(p?: { text: string; d: number | null } | null): void {
     if (!p) return
-    const due = p.d == null ? null : this.S.day + p.d
+    // «в среду» — ближайшая среда, «до Нового года» — 1 января: срок по календарю, а не «через 3 дня»
+    const due = p.d == null ? null : this.S.day + calendarDays(p.text, this.S.day, p.d)
     this.S.promises.push({ t: p.text, made: this.S.day, due })
     if (due !== null && due > this.S.day) this.rules.schedule({ at: due, kind: 'event', event: 'PromiseDue', facts: { promise: this.S.promises.length - 1 } })
     if (this.S.promises.length >= 20) this.unlock('promises20')
@@ -721,7 +747,10 @@ export class Game {
     const p = this.uniq(() => {
       const q = this.X.promise()
       if (fromLegend) { q.text = q.text.replace(q.t, until!); q.t = until!; q.d = null } // срок-условие («как ключ выйдет»): дня у него нет, «просрочено» — нелепо
-      return { text: prefix ? `${prefix} ${low(q.text)}.` : `${this.X.g('OATH')}, ${q.text}.`, q }
+      if (prefix) return { text: `${prefix} ${low(q.text)}.`, q }
+      // форма клятвы — из пула (одна формула в каждом втором сообщении приедается)
+      const form = this.line('OATH_FORMS', OATH_FORMS) ?? '{o}, {p}.'
+      return { text: form.replace('{o}', this.X.g('OATH')).replace('{P}', cap(q.text)).replace('{p}', q.text), q }
     })
     this.recordPromise(p.q)
     await this.say([p.text])
@@ -870,7 +899,7 @@ export class Game {
   async groupChat(): Promise<void> {
     await this.sleep(600)
     this.sys('Алик добавил вас в группу «Стройка под ключ 🏗️ Семья»')
-    const members = shuffle(this.rng, Object.keys(GROUP).filter((w) => w !== 'boris' || this.S.arcs.boris)).slice(0, 4 + this.rnd(3))
+    const members = shuffle(this.rng, Object.keys(GROUP).filter((w) => this.canSpeak(w))).slice(0, 4 + this.rnd(3))
     for (const w of members) {
       const t = this.seen.pickFresh(() => this.draw('G_' + w, GROUP[w]), (x) => x)
       if (this.seen.has(t)) continue // у участника кончились новые фразы — в этот раз молчит
@@ -903,14 +932,16 @@ export class Game {
     const mem = this.S.mem
     const found = CLAIMS.filter((c) => c.re.test(text))
     for (const c of found) {
-      const old = CLAIMS.find((o) => mem['said.' + o.key] !== undefined && conflicts(o.key, c.key) && !mem['caught.' + pairKey(o.key, c.key)])
+      // где деньги — меняется по сюжету: противоречие ловится, только если старое место звучало недавно (не «Нива» полгода назад)
+      const fresh = (o: Claim) => o.group !== 'money' || this.S.day - Number(mem['saidLast.' + o.key] ?? mem['said.' + o.key]) <= 14
+      const old = CLAIMS.find((o) => mem['said.' + o.key] !== undefined && conflicts(o.key, c.key) && !mem['caught.' + pairKey(o.key, c.key)] && fresh(o))
       if (old) {
         mem['lie.old'] = old.key
         mem['lie.new'] = c.key
         mem['lie.kind'] = old.group === 'money' ? 'money' : ({ grandpa_dead: 'grandpa', grandpa_alive: 'grandpa', customer_owes: 'customer', customer_paid: 'customer', sent: 'sent', no_money: 'sent' } as Record<string, string>)[c.key] ?? 'other'
       }
     }
-    for (const c of found) if (mem['said.' + c.key] === undefined) mem['said.' + c.key] = this.S.day
+    for (const c of found) { if (mem['said.' + c.key] === undefined) mem['said.' + c.key] = this.S.day; mem['saidLast.' + c.key] = this.S.day }
   }
   lie(): { old: Claim; new: Claim } | null {
     const o = claimByKey(String(this.S.mem['lie.old'] ?? '')), n = claimByKey(String(this.S.mem['lie.new'] ?? ''))
@@ -976,6 +1007,7 @@ export class Game {
     else if (arc && this.S.mem['legend.of.' + arc]) this.setLegend(String(this.S.mem['legend.of.' + arc]), arc)
     for (const m of ep.m) this.seen.mark(typeof m === 'string' ? m : m.t)
     this.markTopical(await this.say(ep.m))
+    if (typeof ep.legend === 'string' && this.S.ctx) this.S.ctx.legend = ep.legend // новая легенда — есть что переспросить
     if (ep.fx?.debt) this.S.debt += ep.fx.debt
     if (ep.fx?.pay) { this.S.debt -= ep.fx.pay; this.S.money += ep.fx.pay }
     if (ep.item) this.S.items.push(ep.item)
@@ -988,6 +1020,8 @@ export class Game {
   /** Легенда денег — факт на доске мира: где деньги и что мешает. Живёт 30 дней или до следующей серии. */
   setLegend(id: string | null, arc?: string): void {
     const m = this.S.mem
+    // после Дня выплаты деньги «выплачены» — новые легенды о том, где они, спорили бы с утром выплаты
+    if (id !== null && m['payday.chain']) return
     if (id === null) {
       if (arc) delete m['legend.of.' + arc]
       if (!arc || m['legend.arc'] === arc) { delete m['legend.id']; delete m['legend.arc'] }
@@ -1032,7 +1066,7 @@ export class Game {
     await this.sleep(600)
     this.sys('Дядя Самвел добавил вас в группу «Стройка под ключ 🏗️ Семья». Тема: «Дело №1. Плиточник против уважения»')
     for (const [w, t] of this.fitWorld(TRIBUNAL)) await this.say([{ w, t }]) // без Бориса, если его ещё нет
-    this.sys(`Голосование «Простить плиточника?» — Да: 1 (Гарик). Нет: ${5 + this.rnd(4)}. Бее: 1.`)
+    this.sys(`Голосование «Простить плиточника?» — Да: 1 (Гарик). Нет: ${5 + this.rnd(4)}.${this.S.arcs.boris ? ' Бее: 1.' : ''}`)
     await this.enterNode('tribunal', 'verdict')
   }
 
@@ -1063,7 +1097,15 @@ export class Game {
     if (nid.includes(':')) [sid, nid] = nid.split(':')
     const sc = this.scenes[sid]
     // новая сцена — старый контекст («что вы удалили?», «при чём тут тётя?») больше не к месту
-    if (!S.scene || S.scene.id !== sid) { S.scene = { id: sid, node: nid, vars: sc.init ? sc.init(this.rng) : {} }; S.ctx = null }
+    if (!S.scene || S.scene.id !== sid) {
+      S.scene = { id: sid, node: nid, vars: sc.init ? sc.init(this.rng) : {} }
+      S.ctx = null
+      // бартер до сериала «Баран Борис»: у барана ещё нет имени (иначе сериал потом «знакомит» с Борисом второй раз)
+      const v = S.scene.vars
+      if (typeof v.n === 'string' && /Борис/.test(v.n) && !S.arcs.boris) { v.n = 'баран без имени'; v.p = 'Откликается на «эй». Имя придумаешь сам.' }
+      // и в акте взаимозачёта нет строки «корм для Бориса»
+      if (Array.isArray(v.rows) && !S.arcs.boris) { v.rows = (v.rows as Array<[string, number]>).filter(([t]) => this.known(t)); v.total = (v.rows as Array<[string, number]>).reduce((n, r) => n + r[1], 0) }
+    }
     S.scene.node = nid
     const n = sc.nodes[nid]
     const v = S.scene.vars

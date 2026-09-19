@@ -43,6 +43,10 @@ export interface Ctx {
   wrong?: boolean
   deleted?: boolean
   offended?: boolean
+  /** Реплика по легенде денег / вмешался персонаж / Алик вспомнил — игрок может ответить именно на это. */
+  legend?: string
+  chorus?: string
+  memory?: boolean
 }
 
 export interface Choice {
