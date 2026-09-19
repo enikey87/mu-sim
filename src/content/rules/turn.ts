@@ -1,6 +1,6 @@
 // Ход Алика в ответ на обычное сообщение игрока.
 import type { Game } from '../../engine/game'
-import { type Rule, eq, ne, gte, lte, is, exists, missing } from '../../engine/rules'
+import { type Rule, eq, ne, gte, lte, is, exists, missing, add } from '../../engine/rules'
 import { meet } from '../world'
 import { AlikOffline } from './criteria'
 import { IDLE } from '../life'
@@ -14,7 +14,7 @@ export const toneRules: R[] = [
   { name: 'Tone_Default', event: 'PlayerMessage', when: [], respond: ({ game }) => game.turnRoll() },
   // грубость — лестница эскалации в rude.ts
   // угрозы судом — линия суда (court.ts): каждая угроза двигает дело на ступень
-  { name: 'Tone_Cow', event: 'PlayerMessage', when: [eq('tone', 'cow')], respond: async ({ game }) => { await game.say([game.uniq(game.X.cow)]) } },
+  { name: 'Tone_Cow', event: 'PlayerMessage', when: [eq('tone', 'cow')], remember: [add('count.cow')], respond: async ({ game }) => { await game.say([game.uniq(game.X.cow)]) } },
 ]
 
 // Событие StoryBeat — после хода игрока, даже если он спорил, кричал или отвечал на контекст:

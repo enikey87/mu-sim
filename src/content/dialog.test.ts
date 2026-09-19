@@ -4,7 +4,7 @@ import { makeGame } from '../test/helpers'
 import { GROUP } from './arcs'
 import { CONDOLE_REVIVED, GREET_A } from './misc'
 import { WORLD, needs } from './world'
-import { valueOf } from '../engine/rules'
+import { valueOf, type Entry } from '../engine/rules'
 import type { Game } from '../engine/game'
 
 const texts = (g: Game, n = 0) => g.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' ? [m.text] : []))
@@ -186,9 +186,12 @@ describe('несостыковки из плейтеста ботами, рау�
     game.S.mem['rude.heat'] = 1
     for (let i = 0; i < 30; i++) expect((await game.fire('PlayerMessage', { tone: 'rude' }))?.name).not.toBe('Rude_Family_arsen')
   })
-  it('«при чём тут ваш шофёр Гриша?», а не «мой»', () => {
+  it('«при чём тут ваш шофёр Гриша?», а не «мой»: у родни, названной словами Алика, есть форма для игрока', async () => {
+    const { D } = await import('./excuses')
+    for (const r of (D.REL as Entry<string>[]).map(valueOf)) if (/(^|\s|\()(мой|моего|моей|я)(\s|$)/.test(r.split('|')[0])) expect(r.split('|')[2], r).toBeDefined()
     const { game } = makeGame()
-    game.S.ctx = { rel: { n: 'мой шофёр Гриша', g: 'моего шофёра Гриши' } as never }
+    const [n, g, you] = (D.REL as Entry<string>[]).map(valueOf).find((r) => r.startsWith('мой шофёр'))!.split('|')
+    game.S.ctx = { rel: { n, g, you } }
     for (let i = 0; i < 20; i++) expect(game.buildChoices().map((c) => c.text).join(' ')).not.toMatch(/мой шофёр/)
   })
   it('срок-условие в ответе на «это когда?» — без «Как только как…»', async () => {

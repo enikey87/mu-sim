@@ -27,7 +27,7 @@ import { MENTION_RE } from '../content/world'
 import { type Clock, realClock } from './clock'
 import { type Audio, silentAudio } from './audio'
 import { typo } from './typo'
-import { calendarDays, dateOf, fmtDate, fmtTime, periodOf, tierOf, TIERS, type Period } from './time'
+import { dueIn, dateOf, fmtDate, fmtTime, periodOf, tierOf, TIERS, type Due, type Period } from './time'
 import {
   type GameState, type Msg, type NewMsg, type Choice, type Ctx, type Tone, type Storage,
   freshState, loadState, saveState, SAVE_KEY, MAX_PATIENCE,
@@ -517,7 +517,8 @@ export class Game {
       'rude.heat': Math.max(0, Number(S.mem['rude.heat'] ?? 0)),
       'has.boris': S.items.some((n) => /Борис/.test(n)),
       'has.niva': S.items.some((n) => /Нива/.test(n)),
-      promiseLive: !!pr && pr.due != null,
+      // «сегодня тот самый день» — только в сам день срока (обещание могло наступить, пока Алик пропадал)
+      promiseLive: !!pr && pr.due === S.day,
       period: this.period(), night: this.isNight(), offline: S.offlineDays > 0, scene: S.scene?.id,
       lateCount: this.lateCount(),
       // сама — не больше одной серии в день: три легенды денег за день — уже не сюжет, а шум
@@ -528,7 +529,7 @@ export class Game {
       callbackReady: !!this.callbackCandidate(),
       arcUnfinished: this.unfinishedArc(),
       'ctx.type': c.type, 'ctx.s': c.s, 'ctx.shortTimey': c.s ? TIMEY.test(c.s) : false,
-      'ctx.when': c.when, 'ctx.whenNever': c.whenNever, 'ctx.rel': c.rel?.n, 'ctx.sad': c.sad, 'ctx.festive': c.festive, 'ctx.revived': c.revived,
+      'ctx.when': c.when, 'ctx.whenNever': c.whenNever, 'ctx.rel': c.rel?.n, 'ctx.relYou': c.rel?.you ?? c.rel?.n, 'ctx.sad': c.sad, 'ctx.festive': c.festive, 'ctx.revived': c.revived,
       'ctx.constr': c.constr, 'ctx.legendary': c.legendary, 'ctx.arc': c.arc,
       // спросить про сериал есть смысл: будет новая серия, или сериал закончен и сегодня про финал ещё не спрашивали
       'ctx.arcCanAdvance': c.arc ? this.arcCanAdvance(c.arc, true) || (S.arcs[c.arc]?.i >= ARCS[c.arc].eps.length && S.mem['doneAsked.' + c.arc] !== S.day) : false,
@@ -725,10 +726,9 @@ export class Game {
     this.armIdle()
   }
 
-  recordPromise(p?: { text: string; d: number | null } | null): void {
+  recordPromise(p?: { text: string; d: number | null; due?: Due } | null): void {
     if (!p) return
-    // «в среду» — ближайшая среда, «до Нового года» — 1 января: срок по календарю, а не «через 3 дня»
-    const due = p.d == null ? null : this.S.day + calendarDays(p.text, this.S.day, p.d)
+    const due = p.d == null ? null : this.S.day + (p.due ? dueIn(p.due, this.S.day) : p.d)
     this.S.promises.push({ t: p.text, made: this.S.day, due })
     if (due !== null && due > this.S.day) this.rules.schedule({ at: due, kind: 'event', event: 'PromiseDue', facts: { promise: this.S.promises.length - 1 } })
     if (this.S.promises.length >= 20) this.unlock('promises20')
@@ -1012,6 +1012,7 @@ export class Game {
     if (ep.fx?.pay) { this.S.debt -= ep.fx.pay; this.S.money += ep.fx.pay }
     if (ep.item) this.S.items.push(ep.item)
     if (ep.state) this.rules.applyOps([{ key: ep.state.key, op: '=', value: true, forDays: ep.state.days, scope: ep.state.actor ? 'target' : 'world' }], { target: ep.state.actor })
+    if (ep.fx?.days) this.nextDay(ep.fx.days)
     if (ep.sys) { await this.sleep(500); this.sys(ep.sys) }
     if (ep.fx?.ach) this.unlock(ep.fx.ach)
     if (ep.fx?.offline) this.goOffline(ep.fx.offline)

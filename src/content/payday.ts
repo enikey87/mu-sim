@@ -2,7 +2,7 @@
 // Анонс → утро (линии партии отдают деньги) → все в сборе → дележ (сумма тает) → великая отмазка из событий партии →
 // перевёртыш (деньги приходят в невозможной форме) → кнопка на следующий день.
 // Реплики — пулы с условиями и приоритетом (game.line): звучит то, что было в этой партии.
-import { type Line, type LineSpec, type Entry, is, eq, exists, gte, gate } from '../engine/rules'
+import { type Line, type LineSpec, type Entry, is, eq, exists, gte, gate, missing } from '../engine/rules'
 import type { Scene } from './scenes'
 import { needs } from './world'
 
@@ -54,7 +54,7 @@ export const ROLL: Entry<Call>[] = [
   { who: 'judge', t: 'Присутствую неофициально. С хашем.', when: [is('met.judge')], prio: 1 },
   needs('razmikUp')({ who: 'razmik', t: 'Я с крана вижу — всё честно. Пока.', when: [is('met.razmik')], prio: 1 }),
   needs('rubik')({ who: 'rubik', t: 'Проверяю подлинность купюр. Все — подозрительно ровные.', when: [is('met.rubik')], prio: 1 }),
-  gate(exists('arc.garik'))({ who: 'garik', t: 'Я только что из фундамента. Что пропустил?', when: [is('met.garik')], prio: 1 }),
+  gate(exists('arc.garik'), missing('garik.concrete'))({ who: 'garik', t: 'Я только что из фундамента. Что пропустил?', when: [is('met.garik')], prio: 1 }),
   { who: 'mama', t: 'Сынок, покушай сначала. Деньги не убегут. Хотя от Алика — убегут.', when: [is('met.mama')], prio: 1 },
   needs('arsen')({ who: 'arsen', t: 'Я как юрист фиксирую: выплата — прецедент. Внесу в диплом.', when: [is('met.arsen')], prio: 1 }),
   { who: 'samvel', t: 'Кто пригласил плиточника? А, это его выплата. Садись, дорогой, во главу стола.' },

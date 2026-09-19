@@ -10,7 +10,7 @@ import * as L from '../life'
 import { GROUP_Q } from '../misc'
 import { P_LIE } from '../lies'
 import { TOPICS } from '../topics'
-import { WORLD, SPEAKS } from '../world'
+import { WORLD, SPEAKS, needs } from '../world'
 import { fmtDayMonth } from '../../engine/time'
 
 type R = Rule<Game>
@@ -33,7 +33,6 @@ const fromD = (game: Game, key: string, map: Record<string, string> = {}) =>
   game.playerLine(() => game.X.fill(game.draw(key, D[key]), map))
 const fromArr = (game: Game, key: string, arr: readonly Entry<string>[]) => game.playerLine(() => game.draw(key, arr))
 
-const yours = (n: string) => n.replace(/^(мой|моя|моё|мои)(?![а-яё])/i, (m) => ({ мой: 'ваш', моя: 'ваша', моё: 'ваше', мои: 'ваши' } as Record<string, string>)[m.toLowerCase()])
 
 const offer = (o: OfferSpec): R => ({
   name: `Opt_${o.name}`,
@@ -57,10 +56,10 @@ export const choiceRules: R[] = [
   // извиниться после грубости
   offer({ name: 'Sorry', when: [is('ctx.offended')], act: 'sorry', tone: 'polite', bonus: 5, text: (g) => fromD(g, 'P_SORRY') }),
   // лестница грубости: заблокирован — извиниться можно только через Бориса; ссора горячая — можно мычать
-  // посредник — лучший из тех, кто есть: Борис, Карине, мама Алика (один вариант на слот)
-  offer({ name: 'Via_boris', slot: 'via', when: [is('blocked'), SPEAKS.boris], act: 'via', arg: () => 'boris', tone: 'polite', bonus: 7, text: (g) => fromArr(g, 'P_VIA_BORIS', ['Борис, передай Алику: прости меня', 'Попросить Бориса передать извинения', 'Борис, скажи ему «бее» от меня. Мирное']) }),
-  offer({ name: 'Via_karine', slot: 'via', when: [is('blocked'), WORLD.karineHome], act: 'via', arg: () => 'karine', tone: 'polite', bonus: 6, text: (g) => fromArr(g, 'P_VIA_KARINE', ['Карине, передайте Алику: я извиняюсь', 'Попросить Карине передать извинения']) }),
-  offer({ name: 'Via_mama', slot: 'via', when: [is('blocked')], act: 'via', arg: () => 'mama', tone: 'polite', bonus: 6, text: (g) => fromArr(g, 'P_VIA_MAMA', ['Попросить маму Алика передать извинения']) }),
+  // посредник — лучший из тех, кто есть: Борис, Карине, мама Алика (один вариант на слот); обращение к посреднику — без «Алик, …»
+  offer({ name: 'Via_boris', slot: 'via', when: [is('blocked'), SPEAKS.boris], act: 'via', arg: () => 'boris', tone: 'polite', bonus: 7, text: (g) => g.draw('P_VIA_BORIS', ['Борис, передай Алику: прости меня', 'Попросить Бориса передать извинения', 'Борис, скажи ему «бее» от меня. Мирное']) }),
+  offer({ name: 'Via_karine', slot: 'via', when: [is('blocked'), WORLD.karineHome], act: 'via', arg: () => 'karine', tone: 'polite', bonus: 6, text: (g) => g.draw('P_VIA_KARINE', ['Карине, передайте Алику: я извиняюсь', 'Попросить Карине передать извинения']) }),
+  offer({ name: 'Via_mama', slot: 'via', when: [is('blocked')], act: 'via', arg: () => 'mama', tone: 'polite', bonus: 6, text: (g) => g.draw('P_VIA_MAMA', ['Попросить маму Алика передать извинения']) }),
   offer({ name: 'Moo', when: [is('ctx.offended'), gte('rude.heat', 1)], odds: 0.5, act: 'moo', tone: 'neutral', bonus: 4, text: (g) => fromArr(g, 'P_MOO', ['Мууу.', 'Мууууу 🐄', 'Му. (Это значит «мир».)']) }),
 
   // ответ на то, ЧТО прислал Алик
@@ -94,8 +93,8 @@ export const choiceRules: R[] = [
   // родственник: спросить «при чём тут он» / поздравить / посочувствовать — одна кнопка на слот
   offer({
     name: 'WhyRel', slot: 'rel', specificity: 2, weight: 1, when: [exists('ctx.rel')], act: 'whyRel', tone: 'neutral',
-    // родственник назван словами Алика («мой шофёр Гриша») — игрок говорит «ваш»
-    text: (g, f) => fromD(g, 'P_WHY_REL', { n: yours(String(f['ctx.rel'])) }),
+    // родственник назван словами Алика («мой шофёр Гриша») — у игрока своя форма в словаре («ваш шофёр Гриша»)
+    text: (g, f) => fromD(g, 'P_WHY_REL', { n: String(f['ctx.relYou']) }),
   }),
   offer({ name: 'Congrats', slot: 'rel', specificity: 2, weight: 1, when: [exists('ctx.rel'), is('ctx.festive')], act: 'congrats', tone: 'polite', text: (g) => fromD(g, 'P_CONGRATS') }),
   offer({ name: 'Condole', slot: 'rel', specificity: 2, weight: 1, when: [exists('ctx.rel'), is('ctx.sad')], act: 'condole', tone: 'polite', text: (g) => fromD(g, 'P_CONDOLE') }),
@@ -133,7 +132,7 @@ export const choiceRules: R[] = [
   // дело в суде открыто — игрок может его продолжить (угроза двигает линию суда)
   offer({
     name: 'Court', when: [gte('court', 1), lte('court', 6)], odds: 0.35, tone: 'threat',
-    text: (g) => fromArr(g, 'P_COURT', ['Увидимся в суде, Алик.', 'Я подаю в суд. Серьёзно.', 'Мой адвокат с вами свяжется.', 'Жду повестку, Алик.', 'До встречи в зале суда.', 'Суд всё решит.', 'Передайте Арсену: я готов.', 'Я иду до конца. До самого Страсбурга.', 'Готовьте документы, Алик.', 'Суд — не свадьба, там не отмажешься.', 'Я нашёл юриста. Настоящего, с дипломом.', 'Иск готов. Осталось распечатать.']),
+    text: (g) => fromArr(g, 'P_COURT', ['Увидимся в суде, Алик.', 'Я подаю в суд. Серьёзно.', 'Мой адвокат с вами свяжется.', 'Жду повестку, Алик.', 'До встречи в зале суда.', 'Суд всё решит.', needs('arsen')('Передайте Арсену: я готов.'), 'Я иду до конца. До самого Страсбурга.', 'Готовьте документы, Алик.', 'Суд — не свадьба, там не отмажешься.', 'Я нашёл юриста. Настоящего, с дипломом.', 'Иск готов. Осталось распечатать.']),
   }),
   // «Это корова?» — только сразу после «Мууу», а не всю игру
   // ответить на то, что только что прозвучало: реплику легенды денег, вмешавшегося персонажа, воспоминание Алика

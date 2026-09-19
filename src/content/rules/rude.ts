@@ -49,8 +49,7 @@ const family = (who: string): R => ({
     const t = game.line('RF_' + who, T.RUDE_FAMILY[who])
     if (!t) { await game.say([game.uniq(game.X.offended)]); game.setCtx({ offended: true }); return }
     await game.say([{ w: who, t }])
-    // «я забрала у Алика телефон» — значит, сам Алик следом не пишет
-    if (!/забрала у Алика телефон/.test(t) && game.chance(0.6)) { await game.sleep(700); await game.say([freshOr(game, 'RF_ALIK', T.RUDE_FAMILY_ALIK, game.X.offended)]) }
+    if (!game.holds(is('phone.karine')) && game.chance(0.6)) { await game.sleep(700); await game.say([freshOr(game, 'RF_ALIK', T.RUDE_FAMILY_ALIK, game.X.offended)]) }
     game.setCtx({ offended: true })
   },
 })
@@ -142,6 +141,12 @@ export const rudeRules: R[] = [
     respond: async ({ game }) => { const t = game.line('MISS_RUDE', T.MISS_RUDE); if (!t) return game.turnRoll(); await game.say([t]); game.unlock('habit'); await game.turnRoll() },
   },
 
+  // телефон у Карине: Алик не пишет, отвечает она — и не на каждое слово
+  ...(['AlikTurn', 'PlayerMessage', 'PlayerSays'] as const).map((event): R => ({
+    name: 'Phone_Karine_' + event, event, when: [is('phone.karine')], bonus: 9,
+    respond: async ({ game }) => { const t = game.line('PHONE_KARINE', T.PHONE_KARINE); if (t) await game.say([{ w: 'karine', t }]) },
+  })),
+  ...['AlikIdle', 'StoryBeat', 'PeriodLine', 'PromiseDue'].map((event): R => ({ name: 'Quiet_PhoneKarine_' + event, event, when: [is('phone.karine')], bonus: 9, respond: () => {} })),
   // состояния: блок, вежливость, вендетта перекрывают обычный ход
   { name: 'Turn_Blocked', event: 'AlikTurn', when: [is('blocked')], respond: async ({ game }) => { if (!(await sayFresh(game, 'ALT', T.RUDE_ALT))) await game.excuseTurn() } },
   {

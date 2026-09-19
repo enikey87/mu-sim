@@ -68,7 +68,7 @@ const ANY_STATE = new Set<string>([
   'Проверили. Дёрнули. Не открыт. Или открыт, но упрямый. Гарик говорит, это одно и то же.',
   // про Гарика — не про то, где он сейчас
   'Гарика я уже отругал.', 'Гарик', 'не то что Гарик', 'Гарик, что ему соврать?', 'Гарик ← Самвел ← Неизвестно',
-  'Лучше, чем Гарик. Не пьёт, не опаздывает, бригада его боится. Прораб мечты.', 'Рубик теперь проверяет Гарика. Говорит, слишком честные глаза — подозрительно.',
+  'Рубик теперь проверяет Гарика. Говорит, слишком честные глаза — подозрительно.',
   'С кем? Таких, кто так долго ждёт, больше нет. Ты у меня один. Ну, ещё Гарик. Но Гарик — это другое.',
   'В этот банк не перевожу, там работает бывшая жена Гарика.',
   // «Нива» — где бы она ни была
@@ -160,9 +160,9 @@ function corpus(): Found[] {
       else if (['quests.COURT', 'quests.COURT_LAWYER_AGAIN', 'quests.COURT_SCENE', 'quests.COURT_AFTER'].includes(at)) strings(v, at, atoms([WORLD.arsen]), out)
       // исход Дня выплаты звучит по своему правилу — его условия известны
       else if (at === 'payday.OUTCOME') for (const [id, x] of Object.entries(v as object)) strings(x, `${at}.${id}`, expand(atoms(paydayRules.find((r) => r.name === 'Payday_' + id)?.when ?? [])), out)
-      // посредники разблокировки — по своим правилам: Борис, пока он есть; Карине, пока она жена Алика
+      // по своим правилам: посредники разблокировки, телефон у Карине (она забирает его, пока жена Алика)
       else if (at === 'rude.VIA_BORIS') strings(v, at, atoms([SPEAKS.boris]), out)
-      else if (at === 'rude.VIA_KARINE' || at === 'rude.KARINE_HINT') strings(v, at, atoms([WORLD.karineHome]), out)
+      else if (['rude.VIA_KARINE', 'rude.KARINE_HINT', 'rude.PHONE_KARINE'].includes(at)) strings(v, at, atoms([WORLD.karineHome]), out)
       else if (typeof v !== 'function') strings(v, at, [], out)
     }
   }
