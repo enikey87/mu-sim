@@ -246,7 +246,7 @@ describe('концовки игры', () => {
     expect(await check(game)).toBe('honest')
   })
   it('каждую концовку можно получить', async () => {
-    const setups: Record<string, (g: Game) => void> = {
+    const setups: Record<string, (g: Game) => void | Record<string, unknown>> = {
       family: (g) => { g.S.mem['finale.samvel'] = 'groom' },
       heir: (g) => { g.S.mem['finale.alik_death'] = 'will' },
       ram: (g) => { g.S.mem['finale.boris'] = 'toyou'; g.S.items.push('баран Борис', '½ фундамента') },
@@ -255,6 +255,8 @@ describe('концовки игры', () => {
       multiverse: (g) => { g.S.day = 800; g.S.stats.sent = 300 },
       vendetta: (g) => { g.S.mem.vendetta = true },
     }
+    // исходы Дня выплаты: концовка по факту payday = id
+    for (const e of ENDINGS) if (e.id.startsWith('payday_')) setups[e.id] = (g) => { g.S.mem.payday = e.id.slice(7) }
     expect(Object.keys(setups).sort()).toEqual(ENDINGS.map((e) => e.id).sort())
     for (const [id, setup] of Object.entries(setups)) {
       const { game } = late()

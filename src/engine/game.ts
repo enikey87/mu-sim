@@ -3,6 +3,7 @@
 import { make, D, low, cap, type ExcuseApi, type Promise3 } from '../content/excuses'
 import { makeScenes, type Scene, type Line } from '../content/scenes'
 import { TRIBUNAL } from '../content/rude'
+import { PAYDAY_HOOKS } from '../content/rules/payday'
 import { LEGENDS } from '../content/legends'
 import { TOPICS, P_NEU_B_LATE, P_RUDE_BLOCKED, P_RUDE_POLITE, P_POL_POLITE, P_NIGHT, P_FRIDAY } from '../content/topics'
 import { FINALES, ENDINGS, DEFAULT_FINALE, type Finale } from '../content/finales'
@@ -16,7 +17,7 @@ import { CLAIMS, claimByKey, conflicts, pairKey, CALLBACK_OPEN, type Claim } fro
 import { type Rng, mathRng, rndInt, shuffle, chance } from './rng'
 import { Decks } from './deck'
 import { Seen, type Keyed } from './uniq'
-import { RuleSet, makeHub, Lines, resolver, type Facts, type Rule, type Trace, type Query, type Priority, type Line as PoolLine, type LineOpts } from './rules'
+import { RuleSet, makeHub, Lines, resolver, type Facts, type Rule, type Trace, type Query, type Priority, type Line as PoolLine, type LineOpts, type Picked } from './rules'
 import { MENTION_RE } from '../content/world'
 import { type Clock, realClock } from './clock'
 import { type Audio, silentAudio } from './audio'
@@ -175,13 +176,19 @@ export class Game {
    * Пул исчерпан — fallback (обычно генератор отмазок) или null.
    */
   line(key: string, pool: readonly PoolLine[], o: LineOpts & { fallback?: () => string } = {}): string | null {
+    const p = this.linePicked(key, pool, o)
+    if (!p) return o.fallback ? this.uniq(o.fallback) : null
+    return p.text
+  }
+  /** То же, но с самой репликой (её поля: сумма в День выплаты, кто говорит). */
+  linePicked(key: string, pool: readonly PoolLine[], o: LineOpts = {}): Picked | null {
     const facts = resolver(this.rules.hub, { event: 'line' }, this.facts())
     const p = this.lines.pick(key, pool, facts, { ...o, filter: (l) => this.known(l.t) && (o.filter?.(l) ?? true) })
-    if (!p) return o.fallback ? this.uniq(o.fallback) : null
+    if (!p) return null
     this.lines.mark(p.id)
     this.seen.mark(p.text)
     if (p.spec.remember) this.rules.applyOps(p.spec.remember, {})
-    return p.text
+    return p
   }
   /** Текст не упоминает того, чего в мире ещё нет (Борис — только с первой серии своего сериала). */
   known(t: string): boolean {
@@ -282,6 +289,7 @@ export class Game {
   sys(text: string): Msg { return this.push({ kind: 'sys', text }) }
 
   alikMsg<M extends NewMsg>(m: M): Msg {
+    if (m.kind === 'text' && m.who) this.S.mem['met.' + m.who] = true // «кого игрок встречал» — для переклички в День выплаты
     this.tick(1 + this.rnd(3))
     const msg = this.push({ from: 'alik', time: fmtTime(this.S.clock), ...m } as NewMsg)
     if (msg.kind === 'text' && /брат джан/i.test(msg.text)) this.unlock('brat')
@@ -482,6 +490,8 @@ export class Game {
       lateCount: this.lateCount(),
       arcAvailable: this.availableArcs().length > 0,
       arcsStarted: Object.keys(S.arcs).length,
+      arcsDone: Object.entries(S.arcs).filter(([id, a]) => a.i >= ARCS[id].eps.length).length,
+      quests: Object.keys(S.ach).filter((k) => k.startsWith('q_')).length,
       callbackReady: !!this.callbackCandidate(),
       arcUnfinished: this.unfinishedArc(),
       'ctx.type': c.type, 'ctx.s': c.s, 'ctx.shortTimey': c.s ? TIMEY.test(c.s) : false,
@@ -1064,6 +1074,8 @@ export class Game {
     }
     if (n.a2) await this.say([n.who2 ? gen('a2', n.a2)() : variant('a2', n.a2)], false, n.who2)
     if (n.sys2) { await this.sleep(700); this.sys(gen('sys2', n.sys2)()) }
+    // шаг, собранный на лету (День выплаты); если шаг перевёл сцену в другой узел — дальше управляет он
+    if (n.hook) { await PAYDAY_HOOKS[n.hook]?.(this); if (S.scene?.id !== sid || S.scene?.node !== nid) return }
     if (n.then === 'moo') { await this.sleep(400); this.moo() }
     if (n.then === 'transfer') await this.transfer()
     if (n.then === 'promise') await this.promiseLine()

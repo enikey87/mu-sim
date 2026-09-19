@@ -28,6 +28,7 @@ export const CAST: Record<string, { name: string; color: string }> = {
   mama: { name: 'Мама Алика', color: '#c0567a' },
   intercom: { name: 'Домофон тёти Гоар', color: '#6b6b6b' },
   judge: { name: 'Судья Ашот', color: '#3f4a5a' },
+  goar: { name: 'Тётя Гоар', color: '#8a5a8c' },
   razmik: { name: 'Крановщик Размик 🏗️', color: '#c46a1d' },
   rubik: { name: 'Инспектор Рубик', color: '#4a5d7e' },
 };
