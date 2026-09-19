@@ -20,6 +20,21 @@ describe('несостыковки из партии пользователя', 
     expect(game.S.msgs.some((m) => m.kind === 'text' && m.who === 'boris')).toBe(false)
     expect(GROUP.boris.length).toBeGreaterThan(0)
   })
+  it('после семейного чата игрок цитирует только то, что в нём сказали', async () => {
+    const { game } = makeGame()
+    const quotes = new Set<string>()
+    for (let i = 0; i < 15; i++) {
+      const n = game.S.msgs.length
+      await game.groupChat()
+      const said = game.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' && m.who ? [m.text] : []))
+      for (let k = 0; k < 10; k++) {
+        const q = game.choices.find((c) => c.act === 'group' && c.text.startsWith('«'))
+        if (q) { quotes.add(q.text); expect(said.some((t) => t.startsWith(q.text.slice(1, -3))), q.text).toBe(true) }
+        game.S.choices = null
+      }
+    }
+    expect(quotes.size).toBeGreaterThan(2)
+  })
   it('бартер и акт до сериала «Баран Борис»: баран без имени, корма для Бориса нет', () => {
     const { game } = makeGame()
     game.S.mem['intro.baran'] = true

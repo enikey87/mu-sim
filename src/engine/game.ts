@@ -538,7 +538,7 @@ export class Game {
       arcUnfinished: this.unfinishedArc(),
       'ctx.type': c.type, 'ctx.s': c.s, 'ctx.shortTimey': c.s ? TIMEY.test(c.s) : false,
       'ctx.when': c.when, 'ctx.whenNever': c.whenNever, 'ctx.rel': c.rel?.n, 'ctx.relYou': c.rel?.you ?? c.rel?.n, 'ctx.sad': c.sad, 'ctx.festive': c.festive, 'ctx.revived': c.revived,
-      'ctx.constr': c.constr, 'ctx.legendary': c.legendary, 'ctx.arc': c.arc,
+      'ctx.constr': c.constr, 'ctx.legendary': c.legendary, 'ctx.arc': c.arc, 'ctx.quote': c.quote,
       // спросить про сериал есть смысл: будет новая серия, или сериал закончен и сегодня про финал ещё не спрашивали
       'ctx.arcCanAdvance': c.arc ? this.arcCanAdvance(c.arc, true) || (S.arcs[c.arc]?.i >= ARCS[c.arc].eps.length && S.mem['doneAsked.' + c.arc] !== S.day) : false,
       'arc.done': c.arc ? this.S.arcs[c.arc]?.i >= ARCS[c.arc].eps.length : false,
@@ -904,16 +904,19 @@ export class Game {
     await this.sleep(600)
     this.sys('Алик добавил вас в группу «Стройка под ключ 🏗️ Семья»')
     const members = shuffle(this.rng, Object.keys(GROUP).filter((w) => this.canSpeak(w))).slice(0, 4 + this.rnd(3))
+    const said: string[] = []
     for (const w of members) {
       const t = this.seen.pickFresh(() => this.draw('G_' + w, GROUP[w]), (x) => x)
       if (this.seen.has(t)) continue // у участника кончились новые фразы — в этот раз молчит
       this.seen.mark(t)
+      said.push(t)
       await this.say([{ w, t }])
     }
     await this.say([this.uniq(() => this.draw('GOOPS', GROUP_OOPS))])
     this.sys('Алик удалил вас из группы')
     this.unlock('group')
-    this.S.ctx = { group: true }
+    const short = said.filter((t) => t.length <= 60)
+    this.S.ctx = { group: true, quote: short.length ? short[this.rnd(short.length)].replace(/[.!?…]+$/, '') : undefined }
   }
 
   async wrongChat(): Promise<void> {
