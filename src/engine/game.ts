@@ -3,12 +3,13 @@
 import { make, D, low, cap, type ExcuseApi, type Promise3 } from '../content/excuses'
 import { makeScenes, type Scene, type Line } from '../content/scenes'
 import { TRIBUNAL } from '../content/rude'
-import { TOPICS, P_NEU_B_LATE, P_RUDE_BLOCKED, P_RUDE_POLITE, P_POL_POLITE } from '../content/topics'
+import { TOPICS, P_NEU_B_LATE, P_RUDE_BLOCKED, P_RUDE_POLITE, P_POL_POLITE, P_NIGHT, P_FRIDAY } from '../content/topics'
 import { FINALES, ENDINGS, DEFAULT_FINALE, type Finale } from '../content/finales'
 import { ARCS, ARC_DONE, CAST, type Episode, GROUP, GROUP_OOPS, WRONG_TO, WRONG_WHAT, WRONG_OOPS } from '../content/arcs'
 import * as L from '../content/life'
 import { ACH } from '../content/achievements'
-import { FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_WANDER, SEED_INTRO, SEED_REPLY } from '../content/misc'
+import { FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_WANDER } from '../content/misc'
+import { STARTS } from '../content/quests'
 import { allRules } from '../content/rules'
 import { CLAIMS, claimByKey, conflicts, pairKey, CALLBACK_OPEN, type Claim } from '../content/lies'
 import { type Rng, mathRng, rndInt, shuffle, chance } from './rng'
@@ -52,6 +53,8 @@ export const THREAT_RE = /суд|полиц|заявлен|прокур|юрис
 export const TIMEY = /^(Завтра|Скоро|Вечером|Щас|Минуту|Уже почти|Сейчас не могу|Перезвоню|Наберу)/
 export const SAD = /похорон|поминк|умер|реанимац|заболел|потоп|пожар|затопил|сломал|потерял|утонул|упало|сбежал|развод|похитил|застрял|сорвалась|отменили/
 export const REVIVED = /встал|встаёт|воскрес|вернулась/
+/** Повод поздравить (иначе «Поздравляю!» на «зуб мудрости растёт» звучит невпопад). */
+export const FESTIVE = /свадьб|крестин|юбилей|обручен|день рождения|отмечаем|обмываем|празд|родился|поступил|выпускн|сватовств|помолвк|открыва|открыли|приехал|вернулся|урожа|отелилась|правнук|первое слово|дочку выдают/
 
 export type SayItem = string | { w: string; t: string }
 
@@ -161,7 +164,14 @@ export class Game {
   }
 
   // ---------- helpers ----------
-  draw = <T>(key: string, arr: readonly T[]): T => this.decks.draw(key, arr)
+  draw = <T>(key: string, arr: readonly T[]): T => this.decks.draw(key, this.fitWorld(arr))
+  /** Не упоминать то, чего в мире игры ещё нет: Борис появляется только с первой серией своего сериала. */
+  fitWorld<T>(arr: readonly T[]): readonly T[] {
+    if (this.S.arcs.boris) return arr
+    const boris = (x: unknown): boolean => (typeof x === 'string' ? /Борис/.test(x) || x === 'boris' : Array.isArray(x) && x.some(boris))
+    const ok = arr.filter((x) => !boris(x))
+    return ok.length ? ok : arr
+  }
   rnd = (n: number): number => rndInt(this.rng, n)
   chance = (p: number): boolean => chance(this.rng, p)
   sleep = (ms: number): Promise<void> => this.clock.sleep(ms)
@@ -193,6 +203,8 @@ export class Game {
     return t
   }
   private shown = new Set<string>()
+  /** Ход, в котором уже была серия (две серии разных сериалов подряд — каша). */
+  private arcAt = -1
   /** Свежая реплика игрока из пула или null, если весь пул недавно показывали или отправляли. */
   freshPlayer(key: string, arr: readonly string[]): string | null {
     const ok = arr.filter((t) => !this.shown.has(t) && !this.seen.has(t))
@@ -413,7 +425,7 @@ export class Game {
   availableArcs(): string[] {
     return Object.keys(ARCS).filter((id) => {
       const st = this.S.arcs[id]
-      return st ? st.i < ARCS[id].eps.length && this.S.day - st.last >= 6 : this.S.day >= (ARCS[id].minDay ?? 0)
+      return st ? st.i < ARCS[id].eps.length && this.S.day - st.last >= 3 : this.S.day >= (ARCS[id].minDay ?? 0)
     })
   }
   unfinishedArc(): string | undefined {
@@ -437,6 +449,7 @@ export class Game {
       'ctx.topic': this.topicOfLast(),
       // «Мууу» прозвучало после последнего сообщения игрока — только тогда про корову и спрашивают
       mooFresh: S.mem.mooAt === S.stats.sent,
+      sinceRude: S.stats.sent - Number(S.mem.rudeAt ?? -99),
       // температура ссоры не уходит ниже нуля (после примирения ещё тикают отложенные «остывания»)
       'rude.heat': Math.max(0, Number(S.mem['rude.heat'] ?? 0)),
       'has.boris': S.items.some((n) => /Борис/.test(n)),
@@ -445,15 +458,20 @@ export class Game {
       period: this.period(), night: this.isNight(), offline: S.offlineDays > 0, scene: S.scene?.id,
       lateCount: this.lateCount(),
       arcAvailable: this.availableArcs().length > 0,
+      arcsStarted: Object.keys(S.arcs).length,
       callbackReady: !!this.callbackCandidate(),
       arcUnfinished: this.unfinishedArc(),
       'ctx.type': c.type, 'ctx.s': c.s, 'ctx.shortTimey': c.s ? TIMEY.test(c.s) : false,
-      'ctx.when': c.when, 'ctx.whenNever': c.whenNever, 'ctx.rel': c.rel?.n, 'ctx.sad': c.sad, 'ctx.revived': c.revived,
+      'ctx.when': c.when, 'ctx.whenNever': c.whenNever, 'ctx.rel': c.rel?.n, 'ctx.sad': c.sad, 'ctx.festive': c.festive, 'ctx.revived': c.revived,
       'ctx.constr': c.constr, 'ctx.legendary': c.legendary, 'ctx.arc': c.arc,
       'arc.done': c.arc ? this.S.arcs[c.arc]?.i >= ARCS[c.arc].eps.length : false,
       'ctx.group': c.group, 'ctx.wrong': c.wrong, 'ctx.deleted': c.deleted, 'ctx.offended': c.offended,
       ...extra,
     }
+  }
+  /** Реплики, за тему которых игрок может зацепиться (отмазка, серия, ответ по теме) — не реакции на крик и извинения. */
+  markTopical(msgs: Msg[]): void {
+    for (const m of msgs) if (m.kind === 'text') m.topical = true
   }
   /** Тема последней реплики самого Алика (после сообщения игрока): бетон, «Нива», свадьба… */
   topicOfLast(): string | undefined {
@@ -461,11 +479,22 @@ export class Game {
       const m = this.S.msgs[i]
       if (m.kind !== 'text') continue
       if (m.from === 'me') return undefined
-      if (m.who || m.deleted) continue
-      const hit = Object.entries(TOPICS).find(([, t]) => t.re.test(m.text))
-      if (hit) return hit[0]
+      if (m.who || m.deleted || !m.topical) continue
+      // клятвы и сроки («Клянусь лавашом», «как бетон застынет») — не тема разговора
+      if ((D.OATH as string[]).some((o) => m.text.startsWith(o))) continue
+      let text = m.text
+      for (const p of this.S.promises) text = text.split(p.t).join('')
+      const hit = Object.entries(TOPICS).find(([k, t]) => t.re.test(text) && !this.topicMuted(k))
+      if (hit) { this.topicText = text; return hit[0] }
     }
     return undefined
+  }
+  /** Текст, из которого взята тема: конкретный вопрос («Какой ещё ковчег?») — только если в нём есть ковчег. */
+  topicText = ''
+  /** Тема заглушена: Алик сказал «больше не скажу», или игрок уже дважды подряд спрашивал про это. */
+  topicMuted(k: string): boolean {
+    const m = this.S.mem
+    return this.S.day < Number(m['topicMute.' + k] ?? -1) || (m.topicLast === k && Number(m.topicRun ?? 0) >= 2)
   }
   saysFacts(o: Choice): Facts {
     const f: Facts = { intent: o.act, arg: o.arg }
@@ -516,8 +545,12 @@ export class Game {
     if (S.mem.polite && this.chance(0.6)) out.push({ text: one('P_POL_POLITE', P_POL_POLITE), tone: 'polite' })
     else out.push({ text: P2('P_POL_A', 'P_POL_B'), tone: 'polite' })
     if (out.length < 3) {
-      const late = S.day >= 300 && this.chance(0.4)
-      out.push({ text: late ? `${this.draw('P_NEU_A', D.P_NEU_A)} ${this.draw('P_NEU_B_LATE', P_NEU_B_LATE)}` : P2('P_NEU_A', 'P_NEU_B'), tone: 'neutral' })
+      // нейтральная реплика знает время: ночь, вечер пятницы, поздние дни ожидания
+      const period = this.period()
+      const tail = period === 'night' && this.chance(0.5) ? this.freshPlayer('P_NIGHT', P_NIGHT)
+        : period === 'friday' && this.chance(0.5) ? this.freshPlayer('P_FRIDAY', P_FRIDAY)
+        : S.day >= 300 && this.chance(0.4) ? this.freshPlayer('P_NEU_B_LATE', P_NEU_B_LATE) : null
+      out.push({ text: tail ? `${this.draw('P_NEU_A', D.P_NEU_A)} ${tail}` : P2('P_NEU_A', 'P_NEU_B'), tone: 'neutral' })
     }
     if (S.mem.blocked) out.push({ text: one('P_RUDE_BLOCKED', P_RUDE_BLOCKED), tone: 'rude' })
     else if (S.mem.polite) out.push({ text: one('P_RUDE_POLITE', P_RUDE_POLITE), tone: 'rude' })
@@ -559,6 +592,8 @@ export class Game {
     if (tone === 'polite') { if (++S.politeStreak >= 10) this.unlock('saint') } else S.politeStreak = 0
     if ((tone === 'rude' || tone === 'threat') && !o.scene) { this.unlock(tone); this.shakeId++; this.audio.vibrate([80, 40, 80]) }
     if (tone === 'cow') this.unlock('cow')
+    if (o.act !== 'topic') S.mem.topicRun = 0 // серия вопросов по одной теме прервалась
+    if (tone === 'rude') S.mem.rudeAt = S.stats.sent
     S.choices = null
     this.drain(1)
     this.save()
@@ -593,6 +628,8 @@ export class Game {
     }
 
     await this.afterTurn()
+    // сюжетный ход: только вне сцены, если Алик не «пропал» и в этом ходу ещё не было сцены или серии
+    if (!S.scene && !o.scene && !S.offlineDays && !this.dead && this.arcAt !== S.stats.sent) await this.fire('StoryBeat')
     await this.fire('CheckEnding')
 
     S.patience = Math.max(0, S.patience - 1)
@@ -679,9 +716,10 @@ export class Game {
     if (ex.legendary) this.unlock('legend')
     this.recordPromise(ex.p)
     const msgs = await this.say(ex.texts, ex.legendary)
+    this.markTopical(msgs)
     this.S.ctx = {
       ...this.ctxFromPromise(ex.p), rel: ex.r, constr: ex.constr, legendary: ex.legendary,
-      sad: SAD.test(ex.ev ?? ''), revived: REVIVED.test(ex.ev ?? ''),
+      sad: SAD.test(ex.ev ?? ''), revived: REVIVED.test(ex.ev ?? ''), festive: !SAD.test(ex.ev ?? '') && FESTIVE.test(ex.ev ?? ''),
     }
     if (this.chance(0.09)) await this.editLast(msgs[msgs.length - 1], ex.p)
   }
@@ -854,9 +892,13 @@ export class Game {
   }
 
   // ---------- сериалы ----------
+  /** Следующая серия: чаще продолжение начатого сериала, новый — когда начатых мало (не больше трёх сразу). */
   nextArc(): string | null {
     const ids = this.availableArcs()
-    return ids.length ? ids[this.rnd(ids.length)] : null
+    const going = ids.filter((id) => this.S.arcs[id])
+    const running = Object.keys(this.S.arcs).filter((id) => this.S.arcs[id].i < ARCS[id].eps.length).length
+    const pool = going.length && (running >= 3 || this.chance(0.75)) ? going : ids
+    return pool.length ? pool[this.rnd(pool.length)] : null
   }
   async playArc(id: string): Promise<void> {
     const st = (this.S.arcs[id] ??= { i: 0, last: -99 })
@@ -864,6 +906,8 @@ export class Game {
     const ep = ARCS[id].eps[st.i]
     st.i++
     st.last = this.S.day
+    st.byAsk = false
+    this.arcAt = this.S.stats.sent
     this.S.ctx = { arc: id }
     // последнюю серию выбирают правила ArcFinale: частный финал перекрывает обычный
     if (last && (await this.fire('ArcFinale', { arc: id }))) return
@@ -871,7 +915,7 @@ export class Game {
   }
   async playEpisode(ep: Episode): Promise<void> {
     for (const m of ep.m) this.seen.mark(typeof m === 'string' ? m : m.t)
-    await this.say(ep.m)
+    this.markTopical(await this.say(ep.m))
     if (ep.fx?.debt) this.S.debt += ep.fx.debt
     if (ep.fx?.pay) { this.S.debt -= ep.fx.pay; this.S.money += ep.fx.pay }
     if (ep.item) this.S.items.push(ep.item)
@@ -936,7 +980,8 @@ export class Game {
     if (nid === null) { S.scene = null; S.ctx = null; await this.say([this.uniq(this.X.short)]); return }
     if (nid.includes(':')) [sid, nid] = nid.split(':')
     const sc = this.scenes[sid]
-    if (!S.scene || S.scene.id !== sid) S.scene = { id: sid, node: nid, vars: sc.init ? sc.init(this.rng) : {} }
+    // новая сцена — старый контекст («что вы удалили?», «при чём тут тётя?») больше не к месту
+    if (!S.scene || S.scene.id !== sid) { S.scene = { id: sid, node: nid, vars: sc.init ? sc.init(this.rng) : {} }; S.ctx = null }
     S.scene.node = nid
     const n = sc.nodes[nid]
     const v = S.scene.vars
@@ -1097,12 +1142,15 @@ export class Game {
   }
 
   // ---------- начало ----------
+  /** Начало партии: одна из завязок (что Алик обещал в день сдачи и что было потом). */
   private seed(): void {
+    const st = STARTS[this.rnd(STARTS.length)]
     this.push({ kind: 'sep', text: fmtDate(0) })
-    this.push({ kind: 'text', from: 'alik', time: '18:02', text: SEED_INTRO })
-    this.push({ kind: 'text', from: 'me', time: '18:05', text: SEED_REPLY })
-    this.sys(`…прошло ${this.S.day} дня…`)
+    this.push({ kind: 'text', from: 'alik', time: '18:02', text: st.intro })
+    this.push({ kind: 'text', from: 'me', time: '18:05', text: st.reply })
+    this.sys(st.gap.replace('{d}', String(this.S.day)))
     this.push({ kind: 'sep', text: fmtDate(this.S.day) })
+    if (st.first) this.push({ kind: 'text', from: 'alik', time: '09:40', text: st.first })
   }
 
   // для отображения

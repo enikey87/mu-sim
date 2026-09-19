@@ -1,3 +1,4 @@
+import { STARTS } from '../content/quests'
 import { describe, it, expect } from 'vitest'
 import { makeGame, memStorage, alikTexts } from '../test/helpers'
 import { manualClock } from './clock'
@@ -7,13 +8,20 @@ import { SAVE_KEY } from './state'
 import { ARCS } from '../content/arcs'
 
 describe('Game: начало и ход', () => {
-  it('новая игра: вступление, 184-й день, 3–4 варианта реплик', () => {
+  it('новая игра: одна из завязок, 184-й день, 3–4 варианта реплик', () => {
     const { game } = makeGame()
-    expect(game.S.msgs.map((m) => m.kind)).toEqual(['sep', 'text', 'text', 'sys', 'sep'])
+    expect(game.S.msgs.map((m) => m.kind).slice(0, 5)).toEqual(['sep', 'text', 'text', 'sys', 'sep'])
+    const first = game.S.msgs[1]
+    expect(STARTS.some((s) => first.kind === 'text' && first.text === s.intro)).toBe(true)
     expect(game.S.day).toBe(184)
     expect(game.choices.length).toBeGreaterThanOrEqual(3)
     expect(game.choices.length).toBeLessThanOrEqual(4)
     expect(game.choices.some((c) => c.tone === 'rude')).toBe(true)
+  })
+  it('завязки разные: за десять новых игр — хотя бы четыре разных начала', () => {
+    const intros = new Set<string>()
+    for (let seed = 1; seed <= 10; seed++) { const m = makeGame({ seed }).game.S.msgs[1]; if (m.kind === 'text') intros.add(m.text) }
+    expect(intros.size).toBeGreaterThanOrEqual(4)
   })
   it('вежливая реплика: Алик отвечает, счётчики и сохранение обновляются', async () => {
     const { game, storage } = makeGame()

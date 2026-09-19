@@ -15,7 +15,7 @@ interface MsgBase { id: number; time?: string }
 export type Msg =
   | (MsgBase & { kind: 'sep'; text: string })
   | (MsgBase & { kind: 'sys'; text: string; unread?: boolean })
-  | (MsgBase & { kind: 'text'; from: 'me' | 'alik'; text: string; who?: string; legend?: boolean; deleted?: boolean; edited?: boolean; react?: string })
+  | (MsgBase & { kind: 'text'; from: 'me' | 'alik'; text: string; who?: string; legend?: boolean; deleted?: boolean; edited?: boolean; react?: string; topical?: boolean })
   | (MsgBase & { kind: 'transfer'; from: 'alik'; text: string })
   | (MsgBase & { kind: 'voice'; from: 'alik'; len: number; feast?: boolean })
   | (MsgBase & { kind: 'photo'; from: 'alik'; text: string })
@@ -34,6 +34,7 @@ export interface Ctx {
   whenNever?: boolean
   rel?: Rel
   sad?: boolean
+  festive?: boolean
   revived?: boolean
   constr?: boolean
   legendary?: boolean
@@ -76,7 +77,8 @@ export interface GameState {
   scene: { id: string; node: string; vars: Vars } | null
   ctx: Ctx | null
   choices: Choice[] | null
-  arcs: Record<string, { i: number; last: number }>
+  /** byAsk — последняя серия показана по вопросу игрока (второй вопрос подряд — «пока без новостей»). */
+  arcs: Record<string, { i: number; last: number; byAsk?: boolean }>
   tier: number
   battery: number
   money: number

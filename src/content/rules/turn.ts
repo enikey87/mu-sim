@@ -1,8 +1,7 @@
 // Ход Алика в ответ на обычное сообщение игрока.
 import type { Game } from '../../engine/game'
-import { type Rule, eq, ne, gte, is, add } from '../../engine/rules'
+import { type Rule, eq, ne, gte, lte, is } from '../../engine/rules'
 import { AlikOffline } from './criteria'
-import { THREAT_AGAIN } from '../misc'
 import { IDLE } from '../life'
 
 type R = Rule<Game>
@@ -11,19 +10,17 @@ type R = Rule<Game>
 export const toneRules: R[] = [
   { name: 'Tone_Default', event: 'PlayerMessage', when: [], respond: ({ game }) => game.turnRoll() },
   // грубость — лестница эскалации в rude.ts
-  {
-    name: 'Tone_Threat', event: 'PlayerMessage', when: [eq('tone', 'threat')], remember: [add('count.threat')],
-    respond: async ({ game }) => { game.mood(-1); await game.say([game.uniq(game.X.threat)]); game.goOffline(1 + game.rnd(3)) },
-  },
-  {
-    name: 'Tone_Threat_Again', event: 'PlayerMessage', when: [eq('tone', 'threat'), gte('count.threat', 2)], remember: [add('count.threat')],
-    respond: async ({ game }) => {
-      game.unlock('memory'); game.mood(-1)
-      await game.say([game.uniq(() => game.draw('THREAT_AGAIN', THREAT_AGAIN))])
-      game.goOffline(1 + game.rnd(3))
-    },
-  },
+  // угрозы судом — линия суда (court.ts): каждая угроза двигает дело на ступень
   { name: 'Tone_Cow', event: 'PlayerMessage', when: [eq('tone', 'cow')], respond: async ({ game }) => { await game.say([game.uniq(game.X.cow)]) } },
+]
+
+// Событие StoryBeat — после хода игрока, даже если он спорил, кричал или отвечал на контекст:
+// сюжет не ждёт «обычного» хода. Первый сериал — в первые ходы; изредка — мини-квест.
+export const storyRules: R[] = [
+  { name: 'Beat_FirstArc', event: 'StoryBeat', when: [gte('sent', 3), lte('arcsStarted', 0), is('arcAvailable')], odds: 0.5, priority: 'chatter', respond: async ({ game }) => { const id = game.nextArc(); if (id) await game.playArc(id) } },
+  // идущие сериалы продолжаются и между «обычными» ходами — не реже серии в ~8 ходов
+  { name: 'Beat_Arc', event: 'StoryBeat', when: [gte('arcsStarted', 1), is('arcAvailable')], specificity: 0, odds: 0.14, cooldown: { turns: 4 }, priority: 'chatter', respond: async ({ game }) => { const id = game.nextArc(); if (id) await game.playArc(id) } },
+  { name: 'Beat_Quest', event: 'StoryBeat', when: [gte('sent', 6)], specificity: 0, odds: 0.06, cooldown: { turns: 8 }, priority: 'chatter', respond: ({ game }) => game.fire('PickQuest').then((r) => !!r) },
 ]
 
 // Событие AlikIgnores — «прочитано в 3:14» и тишина (4%)
@@ -38,10 +35,15 @@ export const periodRules: R[] = [
 
 // Событие AlikTurn — взвешенный выбор, что Алик сделает. Специфичность у всех одна (0),
 // условия лишь отсекают недоступное; веса повторяют вероятности оригинала.
-const W: Record<string, number> = { scene: 13, arc: 15, group: 3, wrong: 3.5, sticker: 4, fwd: 4, job: 6, photo: 3, voice: 4, short: 6 }
+const W: Record<string, number> = { scene: 11, quest: 15, arc: 26, group: 3, wrong: 3.5, sticker: 4, fwd: 4, job: 6, photo: 3, voice: 4, short: 6 }
 const transferW = (f: Record<string, unknown>) => (2 + Number(f.mood ?? 5) * 0.6)
 export const turnRules: R[] = [
   { name: 'Turn_Scene', event: 'AlikTurn', when: [gte('sent', 3)], specificity: 0, weight: W.scene, respond: ({ game }) => game.startScene() },
+  // мини-квест — короткая глупая история; все на перерыве — обычная отмазка
+  { name: 'Turn_Quest', event: 'AlikTurn', when: [gte('sent', 3)], specificity: 0, weight: W.quest, respond: async ({ game }) => { if (!(await game.fire('PickQuest'))) await game.excuseTurn() } },
+  // первый сериал — в первые ходы, второй — к пятнадцатому: сюжет должен начаться сразу
+  { name: 'Turn_ArcFirst', event: 'AlikTurn', when: [gte('sent', 1), lte('arcsStarted', 0), is('arcAvailable')], odds: 0.75, respond: async ({ game }) => { const id = game.nextArc(); if (id) await game.playArc(id) } },
+  { name: 'Turn_ArcSecond', event: 'AlikTurn', when: [gte('sent', 6), lte('arcsStarted', 1), is('arcAvailable')], odds: 0.4, respond: async ({ game }) => { const id = game.nextArc(); if (id) await game.playArc(id) } },
   { name: 'Turn_Arc', event: 'AlikTurn', when: [gte('sent', 2), is('arcAvailable')], specificity: 0, weight: W.arc, respond: async ({ game }) => { const id = game.nextArc(); if (id) await game.playArc(id) } },
   { name: 'Turn_Group', event: 'AlikTurn', when: [gte('sent', 8)], specificity: 0, weight: W.group, respond: ({ game }) => game.groupChat() },
   { name: 'Turn_Wrong', event: 'AlikTurn', when: [gte('sent', 5)], specificity: 0, weight: W.wrong, respond: ({ game }) => game.wrongChat() },
@@ -59,7 +61,7 @@ export const turnRules: R[] = [
     name: 'Turn_Excuse', event: 'AlikTurn', when: [], specificity: 0,
     weight: (f) => {
       const sent = Number(f.sent ?? 0)
-      const active = (sent >= 3 ? W.scene : 0) + (sent >= 2 && f.arcAvailable ? W.arc : 0) + (sent >= 8 ? W.group : 0) + (sent >= 5 ? W.wrong : 0)
+      const active = (sent >= 3 ? W.scene + W.quest : 0) + (sent >= 2 && f.arcAvailable ? W.arc : 0) + (sent >= 8 ? W.group : 0) + (sent >= 5 ? W.wrong : 0)
         + W.sticker + W.fwd + W.job + W.photo + W.voice + W.short + transferW(f)
       return Math.max(20, 100 - active)
     },

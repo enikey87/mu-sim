@@ -5,7 +5,7 @@ import type { Game } from '../../engine/game'
 import type { Choice, Ctx } from '../../engine/state'
 import { D } from '../excuses'
 import { ARCS, ARC_DONE } from '../arcs'
-import { RUDE_AGAIN, THREAT_AGAIN, SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER } from '../misc'
+import { RUDE_AGAIN, SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER } from '../misc'
 
 const rel = { n: 'дядя Самвел', g: 'дяди Самвела' }
 const choicesFor = (game: Game, ctx: Ctx | null) => { game.S.ctx = ctx; return game.buildChoices() }
@@ -131,11 +131,14 @@ describe('ответы Алика (PlayerSays)', () => {
     expect(t.join(' ')).toMatch(/Кран извинился/)
     expect(game.S.arcs.beton.i).toBe(2)
   })
-  it('серия только что была — «пока без новостей», сериал не проглатывается подряд', async () => {
+  it('на вопрос после серии — следующая серия, второй вопрос подряд в тот же день — «пока без новостей»', async () => {
     const { game } = makeGame()
     game.S.arcs.beton = { i: 1, last: game.S.day + 5 }
-    await reply(game, { text: 'Как бетон?', tone: 'polite', act: 'arc', arg: 'beton' })
-    expect(game.S.arcs.beton.i).toBe(1)
+    const ask = () => game.fire('PlayerSays', { intent: 'arc', arg: 'beton' })
+    await ask()
+    expect(game.S.arcs.beton.i).toBe(2)
+    await ask()
+    expect(game.S.arcs.beton.i).toBe(2)
   })
   it('много просроченных обещаний — Алик предлагает «начать с чистого листа»', async () => {
     const { game } = makeGame()
@@ -174,16 +177,16 @@ describe('тон сообщения (PlayerMessage)', () => {
     const fourth = await reply(game, rude)
     expect(oneOf(RUDE_AGAIN.map(frag), fourth.join(' '))).toBe(true)
   })
-  it('угроза судом — отдельный ответ, повторная — «Алик помнит»', async () => {
+  it('угроза судом — насмешка, дальше линия суда: юрист, претензия', async () => {
     const { game } = makeGame()
     const t1 = await reply(game, { text: 'Я иду в суд!', tone: 'rude' })
     expect(oneOf(D.THREAT_A, t1.join(' '))).toBe(true)
     expect(game.S.ach.threat).toBeDefined()
     game.S.offlineDays = 0
-    await reply(game, { text: 'Пишу заявление!!', tone: 'rude' })
-    game.S.offlineDays = 0
-    const t3 = await reply(game, { text: 'Я в суд!!', tone: 'rude' })
-    expect(oneOf(THREAT_AGAIN.map(frag), t3.join(' '))).toBe(true)
+    const t2 = game.S.msgs.length
+    await game.send({ text: 'Пишу заявление!!', tone: 'rude' })
+    expect(game.S.msgs.slice(t2).some((m) => m.kind === 'text' && m.who === 'arsen')).toBe(true)
+    expect(game.S.mem.court).toBe(2)
   })
   it('вопрос про корову', async () => {
     const { game } = makeGame()
@@ -216,12 +219,13 @@ describe('Алик пишет сам (AlikIdle)', () => {
 describe('ход Алика (AlikTurn): веса как в оригинале', () => {
   it('частоты действий близки к заданным', () => {
     const { game } = makeGame({ seed: 5 })
-    const f = { ...game.facts(), sent: 20, arcAvailable: true, mood: 5 }
+    const f = { ...game.facts(), sent: 20, arcAvailable: true, arcsStarted: 3, mood: 5 } // сериалы уже идут — без «первого сериала»
     const n: Record<string, number> = {}
     const N = 6000
     for (let i = 0; i < N; i++) { const r = game.rules.match({ event: 'AlikTurn' }, f)!.name; n[r] = (n[r] ?? 0) + 1 }
     const p = (k: string) => (n[k] ?? 0) / N
-    expect(p('Turn_Excuse')).toBeGreaterThan(0.25)
+    expect(p('Turn_Excuse')).toBeGreaterThan(0.12)
+    expect(p('Turn_Quest')).toBeGreaterThan(0.08)
     expect(p('Turn_Excuse')).toBeLessThan(0.42)
     expect(p('Turn_Arc')).toBeGreaterThan(0.1)
     expect(p('Turn_Scene')).toBeGreaterThan(0.09)

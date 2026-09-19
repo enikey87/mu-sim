@@ -12,6 +12,7 @@ const fire = async (game: Game, tone: string) => { const n = game.S.msgs.length;
 const says = async (game: Game, intent: string) => { const n = game.S.msgs.length; const r = await game.fire('PlayerSays', { intent }); return { r: r?.name, n } }
 const heat = (game: Game, h: number) => { game.S.mem[HEAT] = h }
 const fresh = (game: Game) => { game.S.choices = null; return game.choices }
+const offered = (game: Game) => { for (let i = 0; i < 20; i++) if (fresh(game).some((c) => c.act === 'moo')) return true; return false }
 const all = (pool: readonly T.Said[]) => pool.map(([, t]) => t)
 
 describe('лестница грубости: ступени', () => {
@@ -139,8 +140,9 @@ describe('лестница грубости: ступени', () => {
     expect(texts(game, n)).toEqual(expect.arrayContaining(all(T.VENDETTA)))
     expect(game.S.mem.vendetta).toBe(true)
     expect(game.S.ach.vendetta).toBeDefined()
+    Object.assign(game.S.arcs, { beton: { i: 1, last: 0 }, niva: { i: 1, last: 0 } }) // сериалы уже идут — «первый/второй сериал» не перехватывают
     let colored = false
-    for (let i = 0; i < 40 && !colored; i++) { game.S.stats.sent += 5; colored = game.rules.match({ event: 'AlikTurn' }, game.facts())?.name === 'Turn_Vendetta' }
+    for (let i = 0; i < 200 && !colored; i++) { game.S.stats.sent += 5; colored = game.rules.match({ event: 'AlikTurn' }, game.facts())?.name === 'Turn_Vendetta' }
     expect(colored).toBe(true)
   })
   it('хоть раз извинился — вендетты не будет', async () => {
@@ -152,18 +154,20 @@ describe('лестница грубости: ступени', () => {
 })
 
 describe('лестница грубости: ветки', () => {
-  it('«Мууу», пока ссора горячая, — корова мирит: температура −2; вариант «Мууу» предлагается', async () => {
+  it('«Мууу» игрока, пока ссора горячая, — корова мирит: температура −2; без ссоры Алик не понимает', async () => {
     const { game } = makeGame()
     heat(game, 3)
     game.S.ctx = { offended: true } // «Мууу» — сразу после обиды, а не всю ссору
-    let offered = false
-    for (let i = 0; i < 20 && !offered; i++) { game.S.choices = null; offered = game.buildChoices().some((c) => c.tone === 'cow') }
-    expect(offered).toBe(true)
-    const { r, n } = await fire(game, 'cow')
-    expect(r).toBe('Tone_Cow_Peace')
+    expect(offered(game)).toBe(true)
+    const { r, n } = await says(game, 'moo')
+    expect(r).toBe('Says_moo_peace')
     expect(T.COW_PEACE).toContain(texts(game, n).at(-1))
     expect(game.facts()[HEAT]).toBe(1)
     expect(game.S.ach.cowpeace).toBeDefined()
+    heat(game, 0)
+    const odd = await says(game, 'moo')
+    expect(odd.r).toBe('Says_moo')
+    expect(T.MOO_ODD).toContain(texts(game, odd.n).at(-1))
   })
   it('угроза судом в разгар ссоры — встречный иск, суд всех мирит', async () => {
     const { game } = makeGame()
@@ -203,9 +207,16 @@ describe('лестница грубости: ветки', () => {
   })
   it('холодная война: игрок молчит после ссоры — Алик пишет первым, по порядку и без повторов', async () => {
     const { game } = makeGame()
+    game.S.arcs.boris = { i: 1, last: 0 } // Борис уже в сюжете — его реплика тоже в колоде
     heat(game, 1)
+    game.S.ctx = { offended: true }
+    const n0 = game.S.msgs.length
+    game.S.ctx = null // извинился — «Ну и молчи» уже невпопад
+    for (let i = 0; i < 20; i++) expect((await game.fire('AlikIdle'))?.name).not.toBe('Idle_ColdWar')
+    expect(game.S.msgs.length).toBeGreaterThanOrEqual(n0)
+    game.S.ctx = { offended: true }
     const got: string[] = []
-    for (let i = 0; i < 60 && got.length < T.COLD_WAR.length; i++) {
+    for (let i = 0; i < 200 && got.length < T.COLD_WAR.length; i++) {
       game.S.stats.sent += 3
       const n = game.S.msgs.length
       if ((await game.fire('AlikIdle'))?.name === 'Idle_ColdWar') got.push(...texts(game, n).filter((t) => T.COLD_WAR.includes(t)))

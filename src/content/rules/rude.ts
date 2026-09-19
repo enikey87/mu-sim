@@ -117,11 +117,6 @@ export const rudeRules: R[] = [
   // остывание ссоры: −1 через 20 дней после крика, не ниже нуля
   { name: 'Rude_Cool', event: 'RudeCool', when: [gte(HEAT, 1)], priority: 'system', respond: ({ game }) => cooldown(game, 1) },
 
-  // ветка: «Мууу», пока ссора горячая — корова миротворец
-  {
-    name: 'Tone_Cow_Peace', event: 'PlayerMessage', when: [eq('tone', 'cow'), gte(HEAT, 1)], bonus: 1,
-    respond: async ({ game }) => { cooldown(game, 2); game.mood(1); await game.say([freshOr(game, 'COW_PEACE', T.COW_PEACE, game.X.cow)]); game.unlock('cowpeace'); game.setCtx(null) },
-  },
   // ветка: угроза судом, пока ссора горячая — встречный иск, суд мирит
   {
     name: 'Tone_Threat_Hot', event: 'PlayerMessage', when: [eq('tone', 'threat'), gte(HEAT, 2)], bonus: 2, once: true,
@@ -136,7 +131,7 @@ export const rudeRules: R[] = [
   // ветка: кричал всю игру и вдруг вежлив — Алику не хватает крика
   {
     // ссора остыла (давно не кричал), но за игру накричал много
-    name: 'Tone_MissRude', event: 'PlayerMessage', when: [ne('tone', 'rude'), ne('tone', 'threat'), gte('count.rude', 15), lte(HEAT, 0)], odds: 0.35, cooldown: { turns: 8 },
+    name: 'Tone_MissRude', event: 'PlayerMessage', when: [ne('tone', 'rude'), ne('tone', 'threat'), gte('count.rude', 15), lte(HEAT, 0), gte('sinceRude', 8)], odds: 0.35, cooldown: { turns: 8 },
     respond: async ({ game }) => { const t = game.seen.pickFresh(() => game.draw('MISS_RUDE', T.MISS_RUDE), (x) => x); if (game.seen.has(t)) return game.turnRoll(); game.seen.mark(t); await game.say([t]); game.unlock('habit'); await game.turnRoll() },
   },
 
@@ -150,7 +145,8 @@ export const rudeRules: R[] = [
 
   // ветка: холодная война — игрок молчит после ссоры, Алик не выдерживает первым
   {
-    name: 'Idle_ColdWar', event: 'AlikIdle', when: [gte(HEAT, 1)], odds: 0.7, cooldown: { turns: 2 }, priority: 'chatter',
+    // Алик ещё обижен (после извинения «Ну и молчи» — невпопад)
+    name: 'Idle_ColdWar', event: 'AlikIdle', when: [gte(HEAT, 1), is('ctx.offended')], odds: 0.7, cooldown: { turns: 2 }, priority: 'chatter',
     respond: async ({ game }) => {
       const t = game.decks.next('COLD_WAR', T.COLD_WAR, { mode: 'sequential', noRepeat: true })
       if (!t) return false
@@ -161,6 +157,12 @@ export const rudeRules: R[] = [
 
 // извинения: во время блока не доставляются; после серии криков — только ритуал
 export const rudeSaysRules: R[] = [
+  // «Мууу» игрока: пока ссора горячая — корова мирит, иначе Алик не понимает
+  {
+    name: 'Says_moo_peace', event: 'PlayerSays', when: [eq('intent', 'moo'), gte(HEAT, 1)],
+    respond: async ({ game }) => { cooldown(game, 2); game.mood(1); await game.say([freshOr(game, 'COW_PEACE', T.COW_PEACE, game.X.cow)]); game.unlock('cowpeace'); game.setCtx(null) },
+  },
+  { name: 'Says_moo', event: 'PlayerSays', when: [eq('intent', 'moo')], respond: async ({ game }) => { await game.say([freshOr(game, 'MOO_ODD', T.MOO_ODD, game.X.cow)]); game.setCtx(null) } },
   {
     name: 'Says_sorry_blocked', event: 'PlayerSays', when: [eq('intent', 'sorry'), is('blocked')], bonus: 6,
     respond: async ({ game }) => { game.sys(T.NOT_DELIVERED); await game.sleep(700); await game.say([{ w: 'boris', t: 'Бее. (Борис намекает: попроси через него.)' }]) },

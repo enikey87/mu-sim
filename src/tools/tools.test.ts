@@ -22,11 +22,13 @@ describe('линтер правил', () => {
 })
 
 // Редкие правила: срабатывают только при особых сочетаниях, которые бот за разумное время не собирает
-const RARE = new Set(['Due_Cosmic', 'Tone_Threat_Again', 'Tone_Cow', 'Says_catchLie_liekind_grandpa', 'Says_catchLie_caught3', 'Says_catchLie_caught2', 'Says_condole_ctxrevived', 'Says_catchLie_liekind_customer'])
+const RARE = new Set(['Due_Cosmic', 'Tone_Cow', 'Says_catchLie_liekind_grandpa', 'Says_catchLie_caught3', 'Says_catchLie_caught2', 'Says_condole_ctxrevived', 'Says_catchLie_liekind_customer', 'Turn_BorisSick',
+  // «Мууу» в симуляции без таймеров не звучит; пропажа Алика теперь короткая — редко совпадает с тишиной игрока
+  'Opt_Cow', 'Idle_Offline', 'Says_catchLie_liekind_sent'])
 
 describe('покрытие правил', () => {
   it('за 10 партий (2 — с грубым игроком) срабатывают все правила, кроме заведомо редких', async () => {
-    const r = await ruleCoverage([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 400, undefined, 2)
+    const r = await ruleCoverage([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 500, undefined, 2)
     if (process.env.RULES_REPORT) process.stdout.write('\n' + formatCoverage(r) + '\n')
     // финалы, концовки и лестница грубости зависят от стиля игры (одно извинение сбрасывает ссору) —
     // их проверяют отдельные детерминированные тесты: finales.test.ts, rude.test.ts

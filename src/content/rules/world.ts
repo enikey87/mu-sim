@@ -25,6 +25,13 @@ export const sceneRules: R[] = [
   scene('heir', [gte('arc.grandpa', 4)], 3), // наследство — после того как дедушка переписал завещание
 ]
 
+// ---- мини-квесты (PickQuest): свой слот в ходе Алика, у каждого перерыв 25 дней ----
+const quest = (id: string, when: R['when'] = []): R => ({ ...scene(id, when), name: `Quest_${id}`, event: 'PickQuest' })
+export const questRules: R[] = [
+  quest('q_hash'), quest('q_niva'), quest('q_tamada'), quest('q_lottery'), quest('q_parking'),
+  quest('q_mama'), quest('q_crypto', [gte('day', 200)]), quest('q_photo'), quest('q_witness', [gte('day', 210)]), quest('q_goat'),
+]
+
 // ---- обещание наступило (PromiseDue — отложенное событие на день срока) ----
 const promiseText = (game: Game, f: Facts) => game.S.promises[Number(f.promise)]
 const dueLine = (game: Game, f: Facts, key: string, arr: string[]) => {
@@ -35,7 +42,8 @@ const dueLine = (game: Game, f: Facts, key: string, arr: string[]) => {
 const live = { key: 'promiseLive', op: '==' as const, value: true }
 export const promiseRules: R[] = [
   {
-    name: 'Due_Default', event: 'PromiseDue', when: [live], odds: 0.6, cooldown: { days: 3 }, priority: 'chatter',
+    // не через ход: наступивший срок — событие, а не фон
+    name: 'Due_Default', event: 'PromiseDue', when: [live], odds: 0.5, cooldown: { days: 6 }, priority: 'chatter',
     respond: async ({ game, facts }) => { await game.say([dueLine(game, facts, 'DUE', PROMISE_DUE)]) },
   },
   {
@@ -89,4 +97,4 @@ export const stateRules: R[] = [
   },
 ]
 
-export const worldRules: R[] = [...sceneRules, ...promiseRules, ...chorusRules, ...stateRules]
+export const worldRules: R[] = [...sceneRules, ...questRules, ...promiseRules, ...chorusRules, ...stateRules]
