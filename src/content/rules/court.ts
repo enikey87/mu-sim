@@ -32,11 +32,7 @@ export const courtRules: R[] = [
     // дело прошло все инстанции
     name: 'Court_After', event: 'PlayerMessage', when: [threat, gte('court', 7)], remember: [add('count.threat')],
     respond: async ({ game }) => {
-      const pool = [...COURT_AFTER, ...THREAT_AGAIN]
-      const t = game.seen.pickFresh(() => game.draw('COURT_AFTER', pool), (x) => x)
-      if (game.seen.has(t)) { await game.say([game.uniq(game.X.threat)]); return }
-      game.seen.mark(t)
-      await game.say([t])
+      await game.say([game.line('COURT_AFTER', [...COURT_AFTER, ...THREAT_AGAIN], { fallback: game.X.threat })!])
     },
   },
 ]

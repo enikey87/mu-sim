@@ -148,6 +148,8 @@ export interface RuleState {
   cooldown: Record<string, { turn: number; day: number }>
   schedule: Scheduled[]
   groups: Record<string, GroupState>
+  /** Реплики, которые уже прозвучали: id → когда (для «один раз» и перерывов). */
+  said: Record<string, { turn: number; day: number }>
 }
 
-export const freshRuleState = (): RuleState => ({ once: {}, cooldown: {}, schedule: [], groups: {} })
+export const freshRuleState = (): RuleState => ({ once: {}, cooldown: {}, schedule: [], groups: {}, said: {} })

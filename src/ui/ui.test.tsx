@@ -31,6 +31,27 @@ describe('App', () => {
     expect(document.querySelectorAll('.msg.alik').length + (game.S.ctx?.type === 'reactOnly' ? 1 : 0)).toBeGreaterThan(1)
   })
 
+  it('пока Алик отвечает — варианты скрыты дёргающимися «?», потом появляются', () => {
+    const { game } = makeGame({ seed: 2 })
+    renderApp(game)
+    const texts = game.choices.map((c) => c.text)
+    act(() => { game.busy = true; game.emit() })
+    const locked = document.querySelectorAll('.choices button')
+    expect(locked.length).toBe(texts.length)
+    expect(document.querySelector('#choices')).toHaveAttribute('aria-busy', 'true')
+    for (const b of locked) {
+      expect(b).toBeDisabled()
+      expect(b).toHaveClass('locked')
+      expect(b).not.toHaveClass('rude')
+      expect(b).toHaveAttribute('aria-label', 'Варианты скрыты, Алик отвечает')
+      expect(b.textContent).toMatch(/^\?{2,4}$/)
+    }
+    for (const t of texts) expect(screen.queryByText(t)).toBeNull()
+    act(() => { game.busy = false; game.emit() })
+    expect(document.querySelector('#choices')).toHaveAttribute('aria-busy', 'false')
+    for (const t of texts) expect(screen.getAllByText(t).some((el) => el.closest('.choices'))).toBe(true)
+  })
+
   it('поля ввода и индикаторов настроения/терпения нет', () => {
     const { game } = makeGame()
     renderApp(game)

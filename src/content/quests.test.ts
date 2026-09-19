@@ -42,6 +42,14 @@ describe('начало игры и сериалы', () => {
   it('у каждой завязки есть обещание, ответ и «сколько прошло»', () => {
     for (const s of STARTS) { expect(s.intro.length).toBeGreaterThan(20); expect(s.gap).toContain('{d}') }
   })
+  it('сюжетный ход запускает первый сериал, даже если игрок только спорит', async () => {
+    const { game } = makeGame()
+    game.S.stats.sent = 3
+    let r
+    for (let i = 0; i < 20 && r !== 'Beat_FirstArc'; i++) r = (await game.fire('StoryBeat'))?.name
+    expect(r).toBe('Beat_FirstArc')
+    expect(Object.keys(game.S.arcs)).toHaveLength(1)
+  })
   it('первый сериал начинается в первые ходы', async () => {
     let early = 0
     for (let seed = 1; seed <= 10; seed++) {
@@ -55,5 +63,15 @@ describe('начало игры и сериалы', () => {
       if (Object.keys(game.S.arcs).length) early++
     }
     expect(early).toBeGreaterThanOrEqual(7)
+  })
+})
+
+describe('сцены: реплики персонажей', () => {
+  it('реплика Бориса в сцене не получает обращение Алика, даже если уже звучала', async () => {
+    const { game } = makeGame()
+    game.seen.mark('Бее. (протокольно)')
+    await game.enterNode('court', 'moo')
+    const boris = game.S.msgs.flatMap((m) => (m.kind === 'text' && m.who === 'boris' ? [m.text] : []))
+    expect(boris.at(-1)).toBe('Бее. (протокольно)')
   })
 })
