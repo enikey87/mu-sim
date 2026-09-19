@@ -3,7 +3,10 @@
 export type ArcMsg = string | { w: string; t: string }
 export interface Episode {
   m: ArcMsg[]
-  fx?: { ach?: string; debt?: number }
+  /** pay — настоящие деньги игроку (долг уменьшается); offline — Алик пропадает на N дней. */
+  fx?: { ach?: string; debt?: number; pay?: number; offline?: number }
+  /** Трофей в досье. */
+  item?: string
   /** Состояние мира на N дней (свадьба идёт, Борис болеет…); actor — чья это доска, иначе общая. */
   state?: { key: string; days: number; actor?: string }
   sys?: string

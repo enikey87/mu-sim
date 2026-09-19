@@ -94,6 +94,27 @@ describe('App', () => {
     fireEvent.click(screen.getByLabelText('Закрыть'))
   })
 
+  it('концовка: экран с итогами, «играть дальше» и «заново»; в досье — финалы и концовки', async () => {
+    const { game } = makeGame()
+    game.S.arcs.samvel = { i: 8, last: 0 }
+    game.S.mem['finale.samvel'] = 'groom'
+    game.S.day = 320
+    await game.fire('CheckEnding')
+    const { onReset } = renderApp(game)
+    const end = screen.getByRole('dialog', { name: /Породнились/ })
+    expect(within(end).getByText(/Свадьба дяди Самвела: «Жених»/)).toBeInTheDocument()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    fireEvent.click(within(end).getByText('Начать заново'))
+    expect(onReset).toHaveBeenCalled()
+    act(() => fireEvent.click(within(end).getByText('Играть дальше')))
+    expect(screen.queryByRole('dialog', { name: /Породнились/ })).toBeNull()
+    fireEvent.click(screen.getByTitle('Обещания и ачивки'))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText(/финал «Жених»/)).toBeInTheDocument()
+    expect(within(dialog).getByText('Породнились')).toBeInTheDocument()
+    expect(within(dialog).getByText('1/6')).toBeInTheDocument()
+  })
+
   it('телефон сел → зарядка', async () => {
     const { game } = makeGame()
     renderApp(game)

@@ -215,6 +215,23 @@ body {
 .dead button {
   border: 0; border-radius: 12px; padding: 10px 16px; background: var(--accent); color: #fff; font: inherit; cursor: pointer;
 }
+.ending {
+  position: absolute; inset: 0; z-index: 45; background: color-mix(in srgb, var(--bg) 70%, transparent);
+  backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.ending-in {
+  background: var(--panel); border-radius: 18px; padding: 22px 20px; max-width: 340px; width: 100%;
+  display: flex; flex-direction: column; gap: 8px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,.25);
+  max-height: 100%; overflow-y: auto;
+}
+.ending-icon { font-size: 56px; line-height: 1; }
+.ending-in small { opacity: .6; text-transform: uppercase; letter-spacing: .06em; font-size: 11px; }
+.ending-in h2 { margin: 0; font-size: 22px; }
+.ending-in p { margin: 0; font-size: 14.5px; line-height: 1.45; }
+.ending-stats { list-style: none; margin: 4px 0; padding: 10px 0 0; border-top: 1px solid rgba(127,127,127,.25); font-size: 13px; opacity: .8; text-align: left; display: grid; gap: 3px; }
+.ending-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 6px; }
+.ending-btns button { border: 0; border-radius: 12px; padding: 10px 16px; background: var(--accent); color: #fff; font: inherit; cursor: pointer; }
+.ending-btns button.secondary { background: transparent; color: inherit; border: 1px solid rgba(127,127,127,.4); }
 .phone.shake { animation: shake .45s; }
 @keyframes shake {
   0%, 100% { transform: translateX(0); }

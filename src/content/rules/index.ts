@@ -5,5 +5,6 @@ import { toneRules, ignoreRules, periodRules, turnRules, idleRules } from './tur
 import { replyRules } from './replies'
 import { choiceRules } from './choices'
 import { worldRules } from './world'
+import { finaleRules, endingRules } from './finales'
 
-export const allRules: Rule<Game>[] = [...toneRules, ...ignoreRules, ...periodRules, ...turnRules, ...idleRules, ...replyRules, ...choiceRules, ...worldRules]
+export const allRules: Rule<Game>[] = [...toneRules, ...ignoreRules, ...periodRules, ...turnRules, ...idleRules, ...replyRules, ...choiceRules, ...worldRules, ...finaleRules, ...endingRules]

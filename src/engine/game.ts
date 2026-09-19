@@ -2,7 +2,8 @@
 // что сделать Алику — принимает система правил (engine/rules/, content/rules/*).
 import { make, D, low, cap, type ExcuseApi, type Promise3 } from '../content/excuses'
 import { makeScenes, type Scene, type Line } from '../content/scenes'
-import { ARCS, CAST, GROUP, GROUP_OOPS, WRONG_TO, WRONG_WHAT, WRONG_OOPS } from '../content/arcs'
+import { FINALES, ENDINGS, DEFAULT_FINALE, type Finale } from '../content/finales'
+import { ARCS, ARC_DONE, CAST, type Episode, GROUP, GROUP_OOPS, WRONG_TO, WRONG_WHAT, WRONG_OOPS } from '../content/arcs'
 import * as L from '../content/life'
 import { ACH } from '../content/achievements'
 import { FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_WANDER, SEED_INTRO, SEED_REPLY } from '../content/misc'
@@ -405,6 +406,11 @@ export class Game {
       day: S.day, tier: S.tier, mood: S.mood, sent: S.stats.sent, moo: S.stats.moo, patience: S.patience,
       // прогресс сериалов: arc.grandpa = номер серии
       ...Object.fromEntries(Object.entries(S.arcs).map(([id, st]) => ['arc.' + id, st.i])),
+      // ачивки и трофеи — условия для финалов сериалов и концовок
+      ...Object.fromEntries(Object.keys(S.ach).map((k) => ['ach.' + k, true])),
+      items: S.items.length,
+      'has.boris': S.items.some((n) => /Борис/.test(n)),
+      'has.niva': S.items.some((n) => /Нива/.test(n)),
       promiseLive: !!pr && pr.due != null,
       period: this.period(), night: this.isNight(), offline: S.offlineDays > 0, scene: S.scene?.id,
       lateCount: this.lateCount(),
@@ -534,6 +540,7 @@ export class Game {
     }
 
     await this.afterTurn()
+    await this.fire('CheckEnding')
 
     S.patience = Math.max(0, S.patience - 1)
     if (S.patience === 0) {
@@ -800,17 +807,60 @@ export class Game {
   }
   async playArc(id: string): Promise<void> {
     const st = (this.S.arcs[id] ??= { i: 0, last: -99 })
+    const last = st.i === ARCS[id].eps.length - 1
     const ep = ARCS[id].eps[st.i]
     st.i++
     st.last = this.S.day
     this.S.ctx = { arc: id }
+    // последнюю серию выбирают правила ArcFinale: частный финал перекрывает обычный
+    if (last && (await this.fire('ArcFinale', { arc: id }))) return
+    await this.playEpisode(ep)
+  }
+  async playEpisode(ep: Episode): Promise<void> {
     for (const m of ep.m) this.seen.mark(typeof m === 'string' ? m : m.t)
     await this.say(ep.m)
     if (ep.fx?.debt) this.S.debt += ep.fx.debt
+    if (ep.fx?.pay) { this.S.debt -= ep.fx.pay; this.S.money += ep.fx.pay }
+    if (ep.item) this.S.items.push(ep.item)
     if (ep.state) this.rules.applyOps([{ key: ep.state.key, op: '=', value: true, forDays: ep.state.days, scope: ep.state.actor ? 'target' : 'world' }], { target: ep.state.actor })
     if (ep.sys) { await this.sleep(500); this.sys(ep.sys) }
     if (ep.fx?.ach) this.unlock(ep.fx.ach)
+    if (ep.fx?.offline) this.goOffline(ep.fx.offline)
     if (ep.then === 'promise') await this.promiseLine()
+  }
+  /** Финал сериала: обычный (последний эпизод) или частный из FINALES. */
+  async playFinale(id: string, f: Finale | null): Promise<void> {
+    this.S.mem['finale.' + id] = f?.id ?? 'default'
+    await this.playEpisode(f ?? ARCS[id].eps.at(-1)!)
+    if (f) this.unlock(`fin_${id}_${f.id}`)
+  }
+  finaleOf(id: string): Finale | undefined {
+    const fid = this.S.mem['finale.' + id]
+    return FINALES[id]?.find((f) => f.id === fid)
+  }
+  finaleTitle(id: string): string | undefined {
+    if (!this.S.mem['finale.' + id]) return undefined
+    return this.finaleOf(id)?.title ?? DEFAULT_FINALE[id]
+  }
+  /** Ответы на «Как там…?» после финала — свои у каждого финала. */
+  arcDoneLines(id: string): string[] {
+    return this.finaleOf(id)?.done ?? ARC_DONE[id]
+  }
+
+  // ---------- концовки ----------
+  async reachEnding(id: string): Promise<void> {
+    const e = ENDINGS.find((x) => x.id === id)!
+    await this.sleep(800)
+    await this.say(e.m)
+    this.S.endings[id] = this.S.day
+    this.S.ending = id
+    this.unlock('end_' + id)
+    this.emit()
+  }
+  closeEnding(): void {
+    this.S.ending = null
+    this.save()
+    this.emit()
   }
 
   // ---------- сцены ----------

@@ -1,4 +1,7 @@
 import { useGame } from './useGame'
+import { ENDINGS } from '../content/finales'
+import { ARCS } from '../content/arcs'
+import { START_DAY } from '../engine/state'
 
 export function Toast() {
   const game = useGame()
@@ -42,6 +45,35 @@ export function DeadScreen() {
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+/** Экран концовки: итоги и выбор — играть дальше или заново. */
+export function EndingScreen({ onReset }: { onReset: () => void }) {
+  const game = useGame()
+  const S = game.S
+  const e = ENDINGS.find((x) => x.id === S.ending)
+  if (!e) return null
+  const finales = Object.keys(ARCS).filter((id) => game.finaleTitle(id))
+  return (
+    <div className="ending" id="endingScreen" role="dialog" aria-label={`Концовка: ${e.title}`}>
+      <div className="ending-in">
+        <div className="ending-icon">{e.icon}</div>
+        <small>Концовка {Object.keys(S.endings).length} из {ENDINGS.length}</small>
+        <h2>{e.title}</h2>
+        <p>{e.text}</p>
+        <ul className="ending-stats">
+          <li>День {S.day - START_DAY} после сдачи объекта</li>
+          <li>Долг Алика: {S.debt.toLocaleString('ru-RU')} ₽</li>
+          <li>Обещаний в журнале: {S.promises.length}</li>
+          {finales.map((id) => <li key={id}>{ARCS[id].title}: «{game.finaleTitle(id)}»</li>)}
+        </ul>
+        <div className="ending-btns">
+          <button id="endingContinue" onClick={() => game.closeEnding()}>Играть дальше</button>
+          <button className="secondary" id="endingReset" onClick={onReset}>Начать заново</button>
+        </div>
+      </div>
     </div>
   )
 }

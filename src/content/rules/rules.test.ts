@@ -126,10 +126,16 @@ describe('ответы Алика (PlayerSays)', () => {
   })
   it('сериал не закончился — следующая серия', async () => {
     const { game } = makeGame()
-    game.S.arcs.beton = { i: 1, last: game.S.day }
+    game.S.arcs.beton = { i: 1, last: game.S.day - 2 }
     const t = await reply(game, { text: 'Как бетон?', tone: 'polite', act: 'arc', arg: 'beton' })
     expect(t.join(' ')).toMatch(/Кран извинился/)
     expect(game.S.arcs.beton.i).toBe(2)
+  })
+  it('серия только что была — «пока без новостей», сериал не проглатывается подряд', async () => {
+    const { game } = makeGame()
+    game.S.arcs.beton = { i: 1, last: game.S.day + 5 }
+    await reply(game, { text: 'Как бетон?', tone: 'polite', act: 'arc', arg: 'beton' })
+    expect(game.S.arcs.beton.i).toBe(1)
   })
   it('много просроченных обещаний — Алик предлагает «начать с чистого листа»', async () => {
     const { game } = makeGame()
