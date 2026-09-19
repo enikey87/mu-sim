@@ -672,9 +672,7 @@ export class Game {
     if (o.act === 'sorry') S.mem.sorryAt = [...String(S.mem.sorryAt ?? '').split(',').filter(Boolean), S.stats.sent].slice(-4).join(',') // для «качелей»
     if (tone === 'rude') S.mem.rudeAt = S.stats.sent
     S.choices = null
-    this.drain(1)
     this.save()
-    if (this.dead) return
 
     await this.sleep((500 + this.rnd(700)) * (this.isNight() ? 2 : 1))
     this.setStatus('прочитано')
@@ -707,7 +705,7 @@ export class Game {
 
     await this.afterTurn()
     // сюжетный ход: только вне сцены, если Алик не «пропал» и в этом ходу ещё не было сцены или серии
-    if (!S.scene && !o.scene && !S.offlineDays && !this.dead && this.arcAt !== S.stats.sent) await this.fire('StoryBeat')
+    if (!S.scene && !o.scene && !S.offlineDays && this.arcAt !== S.stats.sent) await this.fire('StoryBeat')
     await this.fire('CheckEnding')
 
     S.patience = Math.max(0, S.patience - 1)
@@ -727,6 +725,7 @@ export class Game {
     this.restStatus()
     this.busy = false
     S.choices = this.buildChoices()
+    this.drain(1) // садится после ответа Алика: реплика игрока и выбор в сцене не повисают без ответа
     this.save()
     this.emit()
     this.armIdle()

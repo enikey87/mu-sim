@@ -102,12 +102,14 @@ describe('Game: допработа', () => {
 })
 
 describe('Game: батарея', () => {
-  it('разряд — «телефон сел», отправка блокируется; зарядка — пачка непрочитанных', async () => {
+  it('разряд — «телефон сел» после ответа Алика, отправка блокируется; зарядка — пачка непрочитанных', async () => {
     const { game } = makeGame()
     game.S.battery = 1
     game.S.stats.sent = 3
+    const n0 = game.S.msgs.length
     await game.send('Алик, привет')
     expect(game.dead).toBe(true)
+    expect(game.S.msgs.slice(n0 + 1).some((m) => m.kind === 'text' && m.from === 'alik')).toBe(true)
     expect(game.S.ach.dead).toBeDefined()
     await game.send('ещё')
     expect(game.S.stats.sent).toBe(4)
