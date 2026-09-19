@@ -4,5 +4,6 @@ import type { Rule } from '../../engine/rules'
 import { toneRules, ignoreRules, periodRules, turnRules, idleRules } from './turn'
 import { replyRules } from './replies'
 import { choiceRules } from './choices'
+import { worldRules } from './world'
 
-export const allRules: Rule<Game>[] = [...toneRules, ...ignoreRules, ...periodRules, ...turnRules, ...idleRules, ...replyRules, ...choiceRules]
+export const allRules: Rule<Game>[] = [...toneRules, ...ignoreRules, ...periodRules, ...turnRules, ...idleRules, ...replyRules, ...choiceRules, ...worldRules]

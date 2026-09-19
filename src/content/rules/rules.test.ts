@@ -211,7 +211,7 @@ describe('ход Алика (AlikTurn): веса как в оригинале', 
     const f = { ...game.facts(), sent: 20, arcAvailable: true, mood: 5 }
     const n: Record<string, number> = {}
     const N = 6000
-    for (let i = 0; i < N; i++) { const r = game.rules.match('AlikTurn', f)!.name; n[r] = (n[r] ?? 0) + 1 }
+    for (let i = 0; i < N; i++) { const r = game.rules.match({ event: 'AlikTurn' }, f)!.name; n[r] = (n[r] ?? 0) + 1 }
     const p = (k: string) => (n[k] ?? 0) / N
     expect(p('Turn_Excuse')).toBeGreaterThan(0.25)
     expect(p('Turn_Excuse')).toBeLessThan(0.42)
@@ -222,6 +222,6 @@ describe('ход Алика (AlikTurn): веса как в оригинале', 
   it('недоступное отсекается условиями', () => {
     const { game } = makeGame({ seed: 5 })
     const f = { ...game.facts(), sent: 0, arcAvailable: false }
-    for (let i = 0; i < 1000; i++) expect(['Turn_Scene', 'Turn_Arc', 'Turn_Group', 'Turn_Wrong']).not.toContain(game.rules.match('AlikTurn', f)!.name)
+    for (let i = 0; i < 1000; i++) expect(['Turn_Scene', 'Turn_Arc', 'Turn_Group', 'Turn_Wrong']).not.toContain(game.rules.match({ event: 'AlikTurn' }, f)!.name)
   })
 })

@@ -1,5 +1,5 @@
 // Игра: состояние, сообщения, ход Алика, «живость». Решения — что ответить, что предложить игроку,
-// что сделать Алику — принимает система правил (engine/rules.ts, content/rules/*).
+// что сделать Алику — принимает система правил (engine/rules/, content/rules/*).
 import { make, D, low, cap, type ExcuseApi, type Promise3 } from '../content/excuses'
 import { makeScenes, type Scene, type Line } from '../content/scenes'
 import { ARCS, CAST, GROUP, GROUP_OOPS, WRONG_TO, WRONG_WHAT, WRONG_OOPS } from '../content/arcs'
@@ -11,7 +11,8 @@ import { CLAIMS, claimByKey, conflicts, pairKey, CALLBACK_OPEN, type Claim } fro
 import { type Rng, mathRng, rndInt, shuffle, chance } from './rng'
 import { Decks } from './deck'
 import { Seen, type Keyed } from './uniq'
-import { RuleSet, type Facts, type Rule, type Trace } from './rules'
+import { RuleSet, makeHub, type Facts, type Rule, type Trace, type Query, type Priority } from './rules'
+import { MENTION_RE } from '../content/world'
 import { type Clock, realClock } from './clock'
 import { type Audio, silentAudio } from './audio'
 import { typo } from './typo'
@@ -103,7 +104,12 @@ export class Game {
     this.seen = new Seen(this.S.seen)
     this.X = make((k, a, nr) => this.decks.draw(k, a, nr), () => this.S.tier, this.rng)
     this.scenes = makeScenes(this.X)
-    this.rules = new RuleSet<Game>(this.rng, this.S.mem).add(...allRules)
+    this.rules = new RuleSet<Game>({
+      rng: this.rng,
+      hub: makeHub(this.S.mem, this.S.actors),
+      state: this.S.rules,
+      now: () => ({ turn: this.S.stats.sent, day: this.S.day }),
+    }).add(...allRules)
     if (opts.debug) {
       this.rules.tracer = (t) => {
         this.trace = [{ ...t, id: this.seq++, day: this.S.day }, ...this.trace].slice(0, 40)
@@ -222,6 +228,10 @@ export class Game {
     const msg = this.push({ from: 'alik', time: fmtTime(this.S.clock), ...m } as NewMsg)
     if (msg.kind === 'text' && /брат джан/i.test(msg.text)) this.unlock('brat')
     if (msg.kind === 'text' || msg.kind === 'photo') this.noteClaims(msg.text)
+    // хор: Алик кого-то упомянул — тот, может быть, вклинится после его ответа
+    if (msg.kind === 'text' && !msg.who) {
+      for (const [who, re] of Object.entries(MENTION_RE)) if (re.test(msg.text)) this.pending.push({ event: 'Mentioned', target: who })
+    }
     this.audio.beep()
     this.audio.vibrate(40)
     if (this.chance(this.mooChance())) this.clock.setTimeout(() => this.moo(), 300 + this.rnd(900))
@@ -390,11 +400,13 @@ export class Game {
   facts = (extra: Facts = {}): Facts => {
     const S = this.S
     const c = S.ctx ?? {}
+    const pr = extra.promise !== undefined ? S.promises[Number(extra.promise)] : undefined
     return {
-      ...S.mem,
       day: S.day, tier: S.tier, mood: S.mood, sent: S.stats.sent, moo: S.stats.moo, patience: S.patience,
+      // прогресс сериалов: arc.grandpa = номер серии
+      ...Object.fromEntries(Object.entries(S.arcs).map(([id, st]) => ['arc.' + id, st.i])),
+      promiseLive: !!pr && pr.due != null,
       period: this.period(), night: this.isNight(), offline: S.offlineDays > 0, scene: S.scene?.id,
-      sincePeriod: S.stats.sent - Number(S.mem.periodAt ?? -99),
       lateCount: this.lateCount(),
       arcAvailable: this.availableArcs().length > 0,
       callbackReady: !!this.callbackCandidate(),
@@ -412,8 +424,20 @@ export class Game {
     if (o.act === 'arc' && typeof o.arg === 'string' && ARCS[o.arg]) f.argArcDone = (this.S.arcs[o.arg]?.i ?? 0) >= ARCS[o.arg].eps.length
     return f
   }
-  fire(event: string, extra: Facts = {}): Promise<Rule<Game> | null> {
-    return this.rules.fire(event, this, this.facts, extra)
+  /** Порог приоритета речи: пока идёт сцена, фоновая болтовня Алика отклоняется. */
+  floor(): Priority {
+    return this.S.scene ? 'cinematic' : 'idle'
+  }
+  fire(event: string, extra: Facts = {}, q: Omit<Query, 'event' | 'facts'> = {}): Promise<Rule<Game> | null> {
+    return this.rules.fire(this, { event, facts: extra, ...q }, this.facts, { floor: this.floor() })
+  }
+  /** События, отложенные до «безопасной точки» (после ответа Алика): хор, наступившие обещания. */
+  private pending: Query[] = []
+  async afterTurn(): Promise<void> {
+    await this.rules.runDue(this, this.facts, { floor: this.floor() })
+    // из упоминаний — не больше одного вклинившегося персонажа за ход
+    const queue = this.pending.splice(0)
+    for (const q of queue) if (await this.rules.fire(this, q, this.facts, { floor: this.floor() })) break
   }
 
   // ---------- варианты игрока ----------
@@ -422,8 +446,8 @@ export class Game {
     if (S.scene) {
       const n = this.scenes[S.scene.id].nodes[S.scene.node]
       // поймать на лжи можно и посреди сцены — это её прерывает
-      const catchLie = this.rules.collect('BuildChoices', this.facts()).find((r) => r.name === 'Opt_CatchLie')
-      const lieOpt = catchLie ? [catchLie.offer!({ game: this, facts: this.facts(), rule: catchLie }) as Choice] : []
+      const catchLie = this.rules.collect({ event: 'BuildChoices' }, this.facts()).find((r) => r.name === 'Opt_CatchLie')
+      const lieOpt = catchLie ? [catchLie.offer!(this.rules.ctx(this, catchLie, { event: 'BuildChoices' }, this.facts())) as Choice] : []
       return [...lieOpt, ...(n.opts ?? []).map((o, i) => {
         const gen = (): string => (typeof o.t === 'function' ? o.t(S.scene!.vars) : Array.isArray(o.t) ? this.draw<string>(`${S.scene!.id}.${S.scene!.node}.o${i}`, o.t) : o.t)
         const t = gen().length > 8 ? this.playerLine(gen) : gen()
@@ -433,9 +457,9 @@ export class Game {
     // контекстные варианты — правила события BuildChoices (самые специфичные первыми)
     const facts = this.facts()
     const out: Choice[] = []
-    for (const r of this.rules.collect('BuildChoices', facts)) {
+    for (const r of this.rules.collect({ event: 'BuildChoices' }, facts)) {
       if (out.length >= 2) break
-      const c = r.offer?.({ game: this, facts, rule: r }) as Choice | null
+      const c = r.offer?.(this.rules.ctx(this, r, { event: 'BuildChoices' }, facts)) as Choice | null
       if (c) out.push(c)
     }
     const P2 = (a: string, b: string) => this.playerLine(() => `${this.draw(a, D[a])} ${this.draw(b, D[b])}`)
@@ -509,6 +533,8 @@ export class Game {
       await this.alikTurn(tone)
     }
 
+    await this.afterTurn()
+
     S.patience = Math.max(0, S.patience - 1)
     if (S.patience === 0) {
       await this.sleep(600)
@@ -532,7 +558,9 @@ export class Game {
 
   recordPromise(p?: { text: string; d: number | null } | null): void {
     if (!p) return
-    this.S.promises.push({ t: p.text, made: this.S.day, due: p.d == null ? null : this.S.day + p.d })
+    const due = p.d == null ? null : this.S.day + p.d
+    this.S.promises.push({ t: p.text, made: this.S.day, due })
+    if (due !== null && due > this.S.day) this.rules.schedule({ at: due, kind: 'event', event: 'PromiseDue', facts: { promise: this.S.promises.length - 1 } })
     if (this.S.promises.length >= 20) this.unlock('promises20')
   }
   /** «Клянусь мамой, завтра — всё отдам» + запись в журнал. */
@@ -710,7 +738,6 @@ export class Game {
 
   async periodLine(p: Period): Promise<void> {
     if (!L.PERIOD[p]) return
-    this.S.mem.periodAt = this.S.stats.sent
     await this.say([this.addrLine('PER_' + p, L.PERIOD[p])])
     if (p === 'friday' && this.chance(0.5)) this.audio.feast((a) => this.draw('FEAST', a))
   }
@@ -780,6 +807,7 @@ export class Game {
     for (const m of ep.m) this.seen.mark(typeof m === 'string' ? m : m.t)
     await this.say(ep.m)
     if (ep.fx?.debt) this.S.debt += ep.fx.debt
+    if (ep.state) this.rules.applyOps([{ key: ep.state.key, op: '=', value: true, forDays: ep.state.days, scope: ep.state.actor ? 'target' : 'world' }], { target: ep.state.actor })
     if (ep.sys) { await this.sleep(500); this.sys(ep.sys) }
     if (ep.fx?.ach) this.unlock(ep.fx.ach)
     if (ep.then === 'promise') await this.promiseLine()
@@ -787,8 +815,8 @@ export class Game {
 
   // ---------- сцены ----------
   async startScene(): Promise<void> {
-    const sid = this.draw('SCENES', Object.keys(this.scenes))
-    await this.enterNode(sid, this.scenes[sid].start)
+    // сцену выбирают правила PickScene (по сюжету и с перерывом); все на перерыве — обычная отмазка
+    if (!(await this.fire('PickScene'))) await this.excuseTurn()
   }
   async enterNode(sid: string, nid: string | null): Promise<void> {
     const S = this.S
@@ -871,6 +899,7 @@ export class Game {
     this.drain(1)
     if (!this.dead) {
       await this.fire('AlikIdle')
+      await this.afterTurn()
       this.S.choices = this.buildChoices()
       this.save()
     }
