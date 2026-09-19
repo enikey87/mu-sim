@@ -17,8 +17,9 @@ export type Act =
   | { kind: 'charge' }
   | { kind: 'idle' }
 
-/** moos — индексы сообщений, перед которыми на фоне прозвучало «Мууу» (в чате его нет, игрок его слышит и видит). */
-export interface Played { seed: number; style: Style; hour: number; acts: Act[]; moos: number[]; game: Game }
+/** Что игрок видит и слышит вне чата («Мууу» на фоне, уведомления телефона): at — индекс сообщения, перед которым. */
+export interface Aside { at: number; text: string }
+export interface Played { seed: number; style: Style; hour: number; acts: Act[]; asides: Aside[]; game: Game }
 
 /** Характер бота: доля контекстных вариантов, доля грубости, шанс промолчать (Алик пишет сам). */
 const PROFILE: Record<Style, { ctx: number; rude: number; idle: number; polite: number }> = {
@@ -49,7 +50,9 @@ export async function playtest(seed: number, turns: number, replay?: Act[]): Pro
   const game = new Game({ storage: null, clock, rng: seededRng(seed), noTimers: true, hour })
   const bot = seededRng(seed * 7919 + 17)
   const acts: Act[] = []
-  const moos: number[] = []
+  const asides: Aside[] = []
+  const notify = game.notify.bind(game)
+  game.notify = (icon, app, text) => { asides.push({ at: game.S.msgs.length, text: `(уведомление телефона: ${icon} ${app} — ${text})` }); notify(icon, app, text) }
   const next = (): Act => {
     if (game.dead) return { kind: 'charge' }
     const job = game.S.msgs.find((m) => m.kind === 'job' && !m.answered)
@@ -75,9 +78,9 @@ export async function playtest(seed: number, turns: number, replay?: Act[]): Pro
     }
     const moo = game.S.stats.moo
     clock.runTimers() // «Мууу» и прочее отложенное
-    if (game.S.stats.moo > moo) moos.push(game.S.msgs.length)
+    if (game.S.stats.moo > moo) asides.push({ at: game.S.msgs.length, text: '(на фоне кто-то протяжно: «Мууууу»)' })
   }
-  return { seed, style, hour, acts, moos, game }
+  return { seed, style, hour, acts, asides, game }
 }
 
 function line(m: Msg): string {
@@ -92,7 +95,7 @@ function line(m: Msg): string {
     }
     case 'transfer': return `${t}Алик: 💸 перевод 50 ₽ — «${m.text}»`
     case 'voice': return `${t}Алик: 🎤 голосовое 0:${String(m.len).padStart(2, '0')}${m.feast ? ' (шум застолья)' : ''}`
-    case 'photo': return `${t}Алик: 📷 фото «платёжки» — ${m.text}`
+    case 'photo': return `${t}Алик: 📷 фото «платёжки» (на снимке — баран на фоне Арарата), подпись: ${m.text}`
     case 'sticker': return `${t}Алик: [стикер ${m.e} ${m.c}]`
     case 'fwd': return `${t}Алик: ↪ переслано от «${m.f}»: ${m.text}`
     case 'doc': return `${t}Алик: 📄 ${m.title}: ${m.rows.map(([r, n]) => `${r} — ${n} ₽`).join('; ')}. Итого ${m.total} ₽`
@@ -105,13 +108,13 @@ export function transcript(p: Played): string {
   const offers = new Map<number, string>()
   for (const a of p.acts) if (a.kind === 'send') offers.set(a.at, a.offered.map((o, i) => `${i === a.i ? '▶' : ' '} ${o}`).join('\n    '))
   const out = [`Партия ${p.seed}: сообщений игрока — ${p.game.S.stats.sent}, в конце — ${p.game.S.day}-й день ожидания денег`]
-  const moo = new Set(p.moos)
+  const aside = (i: number) => { for (const a of p.asides) if (a.at === i) out.push(a.text) }
   p.game.S.msgs.forEach((m, i) => {
-    if (moo.has(i)) out.push('(на фоне кто-то протяжно: «Мууууу»)')
+    aside(i)
     const o = offers.get(i)
     if (o && m.kind === 'text' && m.from === 'me') out.push(`    варианты:\n    ${o}`)
     out.push(line(m))
   })
-  if (moo.has(p.game.S.msgs.length)) out.push('(на фоне кто-то протяжно: «Мууууу»)')
+  aside(p.game.S.msgs.length)
   return out.join('\n')
 }
