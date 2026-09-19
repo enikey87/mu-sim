@@ -3,6 +3,7 @@
 import { make, D, low, cap, type ExcuseApi, type Promise3 } from '../content/excuses'
 import { makeScenes, type Scene, type Line } from '../content/scenes'
 import { TRIBUNAL } from '../content/rude'
+import { TOPICS, P_NEU_B_LATE, P_RUDE_BLOCKED, P_RUDE_POLITE, P_POL_POLITE } from '../content/topics'
 import { FINALES, ENDINGS, DEFAULT_FINALE, type Finale } from '../content/finales'
 import { ARCS, ARC_DONE, CAST, type Episode, GROUP, GROUP_OOPS, WRONG_TO, WRONG_WHAT, WRONG_OOPS } from '../content/arcs'
 import * as L from '../content/life'
@@ -37,6 +38,8 @@ export interface GameOptions {
   noTimers?: boolean
   /** Записывать, какое правило выбрано и почему (?debug) */
   debug?: boolean
+  /** Опечатки Алика (в тестах выключены, чтобы проверять тексты дословно) */
+  typos?: boolean
 }
 
 export interface TraceEntry extends Trace { id: number; day: number }
@@ -92,6 +95,7 @@ export class Game {
   private seq = 1
   private resetting = false
   private noTimers: boolean
+  private typos: boolean
   private hiddenAt = 0
 
   constructor(opts: GameOptions = {}) {
@@ -101,6 +105,7 @@ export class Game {
     this.audio = opts.audio ?? silentAudio
     this.hour = opts.hour ?? null
     this.noTimers = !!opts.noTimers
+    this.typos = opts.typos ?? true
     this.S = loadState(this.storage) ?? freshState()
     this.decks = new Decks(this.S.bags, this.rng)
     this.seen = new Seen(this.S.seen)
@@ -179,7 +184,24 @@ export class Game {
     return t
   }
   /** Реплика игрока, которой ещё не было (помечается как виденная только при отправке). */
-  playerLine = (gen: () => string): string => this.seen.pickFresh(gen, this.playerDecor)
+  /** Реплика игрока: не отправленная раньше и не мелькавшая среди вариантов последних ходов. */
+  playerLine = (gen: () => string): string => {
+    let t = ''
+    for (let i = 0; i < 8; i++) { t = this.seen.pickFresh(gen, this.playerDecor); if (!this.shown.has(t)) break }
+    this.shown.add(t)
+    if (this.shown.size > 60) this.shown.delete(this.shown.values().next().value!)
+    return t
+  }
+  private shown = new Set<string>()
+  /** Свежая реплика игрока из пула или null, если весь пул недавно показывали или отправляли. */
+  freshPlayer(key: string, arr: readonly string[]): string | null {
+    const ok = arr.filter((t) => !this.shown.has(t) && !this.seen.has(t))
+    if (!ok.length) return null
+    const t = this.draw(key, ok)
+    this.shown.add(t)
+    if (this.shown.size > 60) this.shown.delete(this.shown.values().next().value!)
+    return t
+  }
   pair = (ka: string, a: readonly string[], kb: string, b: readonly string[]): string =>
     this.uniq(() => `${this.draw(ka, a)} ${this.draw(kb, b)}`)
   addrLine = (key: string, arr: readonly string[]): string => this.uniq(() => `${this.X.g('ADDR')}, ${this.draw(key, arr)}`)
@@ -259,7 +281,7 @@ export class Game {
       let text = typeof x === 'string' ? x : x.t
       const from = typeof x === 'string' ? who : x.w
       let fix: string | null = null
-      if (!from && this.chance(this.isNight() ? 0.2 : 0.06)) {
+      if (!from && this.typos && this.chance(this.isNight() ? 0.2 : 0.06)) {
         const t = typo(text, this.rng, this.decks)
         if (t) ({ text, fix } = t)
       }
@@ -303,6 +325,8 @@ export class Game {
   }
   moo(): void {
     this.S.stats.moo++
+    this.S.mem.mooAt = this.S.stats.sent
+    if (!this.busy && !this.S.scene) this.S.choices = null // появится «Это корова?»
     if (this.S.stats.moo >= 10) this.unlock('moo10')
     const m: Moo = { id: this.seq++, text: 'М' + 'у'.repeat(4 + this.rnd(8)), left: 5 + this.rnd(45), top: 15 + this.rnd(60) }
     this.moos.push(m)
@@ -410,6 +434,9 @@ export class Game {
       // ачивки и трофеи — условия для финалов сериалов и концовок
       ...Object.fromEntries(Object.keys(S.ach).map((k) => ['ach.' + k, true])),
       items: S.items.length,
+      'ctx.topic': this.topicOfLast(),
+      // «Мууу» прозвучало после последнего сообщения игрока — только тогда про корову и спрашивают
+      mooFresh: S.mem.mooAt === S.stats.sent,
       // температура ссоры не уходит ниже нуля (после примирения ещё тикают отложенные «остывания»)
       'rude.heat': Math.max(0, Number(S.mem['rude.heat'] ?? 0)),
       'has.boris': S.items.some((n) => /Борис/.test(n)),
@@ -427,6 +454,18 @@ export class Game {
       'ctx.group': c.group, 'ctx.wrong': c.wrong, 'ctx.deleted': c.deleted, 'ctx.offended': c.offended,
       ...extra,
     }
+  }
+  /** Тема последней реплики самого Алика (после сообщения игрока): бетон, «Нива», свадьба… */
+  topicOfLast(): string | undefined {
+    for (let i = this.S.msgs.length - 1; i >= 0; i--) {
+      const m = this.S.msgs[i]
+      if (m.kind !== 'text') continue
+      if (m.from === 'me') return undefined
+      if (m.who || m.deleted) continue
+      const hit = Object.entries(TOPICS).find(([, t]) => t.re.test(m.text))
+      if (hit) return hit[0]
+    }
+    return undefined
   }
   saysFacts(o: Choice): Facts {
     const f: Facts = { intent: o.act, arg: o.arg }
@@ -472,9 +511,20 @@ export class Game {
       if (c) out.push(c)
     }
     const P2 = (a: string, b: string) => this.playerLine(() => `${this.draw(a, D[a])} ${this.draw(b, D[b])}`)
-    out.push({ text: P2('P_POL_A', 'P_POL_B'), tone: 'polite' })
-    if (out.length < 3) out.push({ text: P2('P_NEU_A', 'P_NEU_B'), tone: 'neutral' })
-    out.push({ text: P2('P_RUDE_A', 'P_RUDE_B'), tone: 'rude' })
+    const one = (key: string, arr: readonly string[]) => this.playerLine(() => this.draw(key, arr))
+    // общие реплики зависят от стадии: вежливый режим Алика, блок, поздние дни
+    if (S.mem.polite && this.chance(0.6)) out.push({ text: one('P_POL_POLITE', P_POL_POLITE), tone: 'polite' })
+    else out.push({ text: P2('P_POL_A', 'P_POL_B'), tone: 'polite' })
+    if (out.length < 3) {
+      const late = S.day >= 300 && this.chance(0.4)
+      out.push({ text: late ? `${this.draw('P_NEU_A', D.P_NEU_A)} ${this.draw('P_NEU_B_LATE', P_NEU_B_LATE)}` : P2('P_NEU_A', 'P_NEU_B'), tone: 'neutral' })
+    }
+    if (S.mem.blocked) out.push({ text: one('P_RUDE_BLOCKED', P_RUDE_BLOCKED), tone: 'rude' })
+    else if (S.mem.polite) out.push({ text: one('P_RUDE_POLITE', P_RUDE_POLITE), tone: 'rude' })
+    else {
+      const topic = facts['ctx.topic'] && this.chance(0.6) ? this.freshPlayer('PR_' + facts['ctx.topic'], TOPICS[String(facts['ctx.topic'])].r) : null
+      out.push({ text: topic ?? P2('P_RUDE_A', 'P_RUDE_B'), tone: 'rude' })
+    }
     return out.slice(0, 4)
   }
   get choices(): Choice[] {
@@ -953,8 +1003,9 @@ export class Game {
   // ---------- Алик живёт сам ----------
   armIdle(): void {
     this.clock.clearTimeout(this.idleT)
-    if (this.noTimers || this.dead || this.idleCount >= 3) return
-    this.idleT = this.clock.setTimeout(() => void this.onIdle(), (20000 + this.rnd(40000)) * (this.idleCount + 1))
+    // Алик пишет сам редко: не в начале игры, не раньше чем через 1,5–3 минуты тишины, не больше двух раз подряд
+    if (this.noTimers || this.dead || this.idleCount >= 2 || this.S.stats.sent < 5) return
+    this.idleT = this.clock.setTimeout(() => void this.onIdle(), (90000 + this.rnd(90000)) * (this.idleCount + 1) * 1.5 ** this.idleCount)
   }
   sheetOpen = false
   async onIdle(): Promise<void> {

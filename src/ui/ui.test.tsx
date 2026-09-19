@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, act, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { App } from './App'
 import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
@@ -31,14 +30,11 @@ describe('App', () => {
     expect(document.querySelectorAll('.msg.alik').length + (game.S.ctx?.type === 'reactOnly' ? 1 : 0)).toBeGreaterThan(1)
   })
 
-  it('свой текст через поле ввода', async () => {
+  it('поля ввода и индикаторов настроения/терпения нет', () => {
     const { game } = makeGame()
     renderApp(game)
-    const user = userEvent.setup()
-    await user.type(screen.getByLabelText('Сообщение'), 'Алик, привет')
-    await act(async () => { await user.click(screen.getByLabelText('Отправить')) })
-    expect(game.S.stats.sent).toBe(1)
-    expect((screen.getByLabelText('Сообщение') as HTMLInputElement).value).toBe('')
+    expect(screen.queryByLabelText('Сообщение')).toBeNull()
+    expect(document.querySelector('#mood, #patience')).toBeNull()
   })
 
   it('рисует все виды сообщений', () => {

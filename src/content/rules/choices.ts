@@ -2,12 +2,13 @@
 // Берутся два самых приоритетных (специфичность + bonus); из одного слота — только одна.
 import type { Game } from '../../engine/game'
 import type { Choice, Tone } from '../../engine/state'
-import { type Rule, type Facts, type Criterion, eq, is, exists, gt, gte } from '../../engine/rules'
+import { type Rule, type Facts, type Criterion, eq, is, exists, missing, gt, gte } from '../../engine/rules'
 import { D, cap } from '../excuses'
 import { ARCS, WRONG_Q } from '../arcs'
 import * as L from '../life'
 import { GROUP_Q } from '../misc'
 import { P_LIE } from '../lies'
+import { TOPICS } from '../topics'
 import { fmtDayMonth } from '../../engine/time'
 
 type R = Rule<Game>
@@ -39,7 +40,8 @@ const offer = (o: OfferSpec): R => ({
   slot: o.slot ?? o.name,
   weight: o.weight,
   odds: o.odds,
-  offer: ({ game, facts }): Choice => ({ text: o.text(game, facts), tone: o.tone, act: o.act, arg: o.arg?.(game, facts) }),
+  // пустой текст — нечего предложить (весь пул недавно показывали)
+  offer: ({ game, facts }): Choice | null => { const text = o.text(game, facts); return text ? { text, tone: o.tone, act: o.act, arg: o.arg?.(game, facts) } : null },
 })
 
 export const choiceRules: R[] = [
@@ -52,7 +54,7 @@ export const choiceRules: R[] = [
   offer({ name: 'Sorry', when: [is('ctx.offended')], act: 'sorry', tone: 'polite', bonus: 5, text: (g) => fromD(g, 'P_SORRY') }),
   // лестница грубости: заблокирован — извиниться можно только через Бориса; ссора горячая — можно мычать
   offer({ name: 'ViaBoris', when: [is('blocked')], act: 'viaBoris', tone: 'polite', bonus: 7, text: (g) => fromArr(g, 'P_VIA_BORIS', ['Борис, передай Алику: прости меня', 'Попросить Бориса передать извинения', 'Борис, скажи ему «бее» от меня. Мирное']) }),
-  offer({ name: 'Moo', when: [gte('rude.heat', 1)], odds: 0.5, tone: 'cow', bonus: 4, text: (g) => fromArr(g, 'P_MOO', ['Мууу.', 'Мууууу 🐄', 'Му. (Это значит «мир».)']) }),
+  offer({ name: 'Moo', when: [is('ctx.offended'), gte('rude.heat', 1)], odds: 0.5, tone: 'cow', bonus: 4, text: (g) => fromArr(g, 'P_MOO', ['Мууу.', 'Мууууу 🐄', 'Му. (Это значит «мир».)']) }),
 
   // ответ на то, ЧТО прислал Алик
   offer({ name: 'Photo', when: [eq('ctx.type', 'photo')], act: 'photo', tone: 'neutral', bonus: 3, text: (g) => fromD(g, 'P_PHOTO') }),
@@ -118,5 +120,11 @@ export const choiceRules: R[] = [
     text: (g, f) => fromArr(g, 'F_' + f.arcUnfinished, ARCS[String(f.arcUnfinished)].follow), arg: (_g, f) => String(f.arcUnfinished),
   }),
 
-  offer({ name: 'Cow', when: [gt('moo', 0)], odds: 0.2, tone: 'cow', text: (g) => fromD(g, 'P_COW') }),
+  // «Это корова?» — только сразу после «Мууу», а не всю игру
+  offer({ name: 'Cow', when: [is('mooFresh')], odds: 0.8, bonus: 2, tone: 'cow', text: (g) => fromD(g, 'P_COW') }),
+  // ответ по теме: игрок цепляется за то, что Алик только что сказал (после серии сериала — вопрос про сериал важнее)
+  offer({
+    name: 'Topic', when: [exists('ctx.topic'), missing('ctx.arc')], act: 'topic', tone: 'neutral', odds: 0.85,
+    text: (g, f) => g.freshPlayer('PT_' + f['ctx.topic'], TOPICS[String(f['ctx.topic'])].p) ?? '', arg: (_g, f) => String(f['ctx.topic']),
+  }),
 ]

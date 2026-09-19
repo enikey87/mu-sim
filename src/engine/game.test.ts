@@ -150,19 +150,28 @@ describe('Game: возвращение после паузы', () => {
 })
 
 describe('Game: Алик пишет сам (таймеры)', () => {
-  it('молчание игрока → Алик пишет первым, не больше трёх раз подряд', async () => {
+  it('молчание игрока → Алик пишет первым: не в начале игры, не раньше 1,5 минут, не больше двух раз подряд', async () => {
     const clock = manualClock()
+    const delays: number[] = []
+    const set = clock.setTimeout.bind(clock)
+    clock.setTimeout = (fn, ms) => { delays.push(ms); return set(fn, ms) }
     const game = new Game({ storage: memStorage(), clock, rng: seededRng(4), hour: 14 })
-    let before = game.S.msgs.length
+    const idle = () => delays.filter((d) => d >= 90000)
+    game.armIdle()
+    expect(idle()).toEqual([]) // первые 5 сообщений игрока — Алик сам не пишет
+    game.S.stats.sent = 5
     let acted = 0
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 4; i++) {
+      const before = game.S.msgs.length
       clock.runTimers()
       await new Promise((r) => setTimeout(r, 0))
       await new Promise((r) => setTimeout(r, 0))
       if (game.S.msgs.length > before || game.notif) acted++
-      before = game.S.msgs.length
+      if (i === 0) game.armIdle()
     }
     expect(acted).toBeGreaterThan(0)
+    expect(idle().length).toBe(2) // две попытки, потом ждёт игрока
+    expect(Math.min(...idle())).toBeGreaterThanOrEqual(90000)
     game.dispose()
   })
   it('status «печатает…» и прочие статусы меняются сами', () => {

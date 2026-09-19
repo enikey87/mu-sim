@@ -1,7 +1,4 @@
 import { useGame } from './useGame'
-import { MAX_PATIENCE } from '../engine/state'
-
-const MOODS = ['😡', '😠', '😒', '😐', '😐', '🙂', '🙂', '😊', '😄', '🥰', '🥰']
 
 export function StatusBar() {
   const game = useGame()
@@ -37,8 +34,6 @@ export function StatsBar() {
     <div className="stats">
       <span>Долг: <b id="debt">{S.debt.toLocaleString('ru-RU')} ₽</b></span>
       <span>Дней после сдачи: <b id="days">{S.day}</b></span>
-      <span title="Настроение Алика" id="mood">{MOODS[S.mood]}</span>
-      <span title="Терпение" id="patience">{'❤️'.repeat(S.patience) + '🖤'.repeat(MAX_PATIENCE - S.patience)}</span>
     </div>
   )
 }

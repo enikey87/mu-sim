@@ -155,6 +155,7 @@ describe('лестница грубости: ветки', () => {
   it('«Мууу», пока ссора горячая, — корова мирит: температура −2; вариант «Мууу» предлагается', async () => {
     const { game } = makeGame()
     heat(game, 3)
+    game.S.ctx = { offended: true } // «Мууу» — сразу после обиды, а не всю ссору
     let offered = false
     for (let i = 0; i < 20 && !offered; i++) { game.S.choices = null; offered = game.buildChoices().some((c) => c.tone === 'cow') }
     expect(offered).toBe(true)

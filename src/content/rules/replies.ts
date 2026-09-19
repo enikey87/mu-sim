@@ -4,6 +4,7 @@ import type { Game } from '../../engine/game'
 import { type Rule, eq, ne, is, gte, add } from '../../engine/rules'
 import { AlikOffline, ThickJournal } from './criteria'
 import { cooldown } from './rude'
+import { TOPICS, TOPIC_FALLBACK } from '../topics'
 import { D, low, cap } from '../excuses'
 import { ARCS, NO_NEWS_A, NO_NEWS_B, GROUP_SEEN_A, GROUP_SEEN_B, WRONG_A, WRONG_B } from '../arcs'
 import * as L from '../life'
@@ -126,6 +127,16 @@ export const replyRules: R[] = [
     },
   }, [is('argArcDone')]),
 
+  // ответ по теме (бетон, «Нива», свадьба…): свой пул у каждой темы, исчерпан — общий
+  says('topic', {
+    respond: async ({ game, facts }) => {
+      const t = TOPICS[String(facts.arg ?? '')]
+      const line = t ? game.seen.pickFresh(() => game.draw('TA_' + facts.arg, t.a), (x) => x) : ''
+      if (t && !game.seen.has(line)) { game.seen.mark(line); await game.say([line]) } else await game.say([game.uniq(() => game.draw('TOPIC_FB', TOPIC_FALLBACK))])
+      game.setCtx(null)
+      if (game.chance(0.35)) await game.promiseLine()
+    },
+  }),
   says('group', { respond: async ({ game }) => { game.mood(-1); await game.say([game.pair('GS_A', GROUP_SEEN_A, 'GS_B', GROUP_SEEN_B)]); game.setCtx(null) } }),
   simple('wrong', (g) => g.pair('WA', WRONG_A, 'WB', WRONG_B)),
   says('idleReply', { respond: async ({ game }) => { game.setCtx(null); await game.say([game.uniq(() => game.draw('IDLE_A', L.IDLE_A))]); await game.promiseLine() } }),

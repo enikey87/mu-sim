@@ -22,7 +22,7 @@ describe('линтер правил', () => {
 })
 
 // Редкие правила: срабатывают только при особых сочетаниях, которые бот за разумное время не собирает
-const RARE = new Set(['Due_Cosmic', 'Tone_Threat_Again', 'Tone_Cow', 'Says_catchLie_liekind_grandpa', 'Says_catchLie_caught3', 'Says_catchLie_caught2', 'Says_condole_ctxrevived'])
+const RARE = new Set(['Due_Cosmic', 'Tone_Threat_Again', 'Tone_Cow', 'Says_catchLie_liekind_grandpa', 'Says_catchLie_caught3', 'Says_catchLie_caught2', 'Says_condole_ctxrevived', 'Says_catchLie_liekind_customer'])
 
 describe('покрытие правил', () => {
   it('за 10 партий (2 — с грубым игроком) срабатывают все правила, кроме заведомо редких', async () => {
