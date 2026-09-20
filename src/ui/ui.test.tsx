@@ -245,6 +245,15 @@ describe('App', () => {
     fireEvent.click(screen.getByLabelText('Закрыть'))
   })
 
+  it('Esc закрывает досье', () => {
+    const { game } = makeGame()
+    renderApp(game)
+    fireEvent.click(screen.getByTitle('Обещания и ачивки'))
+    expect(screen.getByRole('dialog', { name: 'Досье на Алика' })).toBeInTheDocument()
+    act(() => { fireEvent.keyDown(document, { key: 'Escape' }) })
+    expect(screen.queryByRole('dialog', { name: 'Досье на Алика' })).toBeNull()
+  })
+
   it('концовка: экран с итогами, «играть дальше» и «заново»; в досье — финалы и концовки', async () => {
     const { game } = makeGame()
     game.S.arcs.samvel = { i: 8, last: 0 }
@@ -281,6 +290,11 @@ describe('App', () => {
     const end = screen.getByRole('dialog', { name: /День выплаты/ })
     expect(within(end).getByText(/лежали в сейфе/)).toBeInTheDocument()
     expect(within(end).getByText('Скопировать великую отмазку')).toBeInTheDocument()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    await act(async () => { fireEvent.click(within(end).getByText('Скопировать великую отмазку')) })
+    expect(writeText).toHaveBeenCalled()
+    expect(screen.getByRole('status')).toHaveTextContent('Скопировано')
   })
 
   it('телефон сел → зарядка', async () => {

@@ -373,13 +373,17 @@ export class Game {
     else this.setStatus(this.chance(0.5) ? 'был недавно' : 'в сети', 'online')
   }
 
+  /** Короткий тост поверх чата (ачивка, «Скопировано»…). */
+  flash(text: string, ms = 2600): void {
+    this.toast = text
+    this.clock.clearTimeout(this.toastT)
+    this.toastT = this.clock.setTimeout(() => { this.toast = null; this.emit() }, ms)
+    this.emit()
+  }
   unlock(key: string): void {
     if (!ACH[key] || this.S.ach[key]) return
     this.S.ach[key] = this.S.day
-    this.toast = `🏆 ${ACH[key][0]}`
-    this.clock.clearTimeout(this.toastT)
-    this.toastT = this.clock.setTimeout(() => { this.toast = null; this.emit() }, 2600)
-    this.emit()
+    this.flash(`🏆 ${ACH[key][0]}`)
   }
   mood(d: number): void {
     this.S.mood = Math.max(0, Math.min(10, this.S.mood + d))

@@ -53,6 +53,14 @@ function Phone({ onReset }: { onReset: () => void }) {
   }, [game.feelId, game.feel])
 
   const setSheetOpen = (v: boolean) => { game.sheetOpen = v; setSheet(v) }
+
+  // Esc закрывает досье
+  useEffect(() => {
+    if (!sheet) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSheetOpen(false) }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [sheet])
   const reset = () => {
     if (!confirm('Стереть всё и начать заново?')) return
     game.reset()
