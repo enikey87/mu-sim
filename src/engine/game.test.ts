@@ -348,6 +348,20 @@ describe('Game: сериалы', () => {
 })
 
 describe('Game: мелочи', () => {
+  it('касание разблокирует звук, не запуская таймер фоновых шумов', () => {
+    const clock = manualClock()
+    let unlocks = 0
+    const audio = { ...silentAudio, unlock: () => { unlocks++ } }
+    const game = new Game({ storage: memStorage(), clock, rng: seededRng(1), audio })
+    const pending = clock.pending()
+
+    game.gesture()
+    game.gesture()
+
+    expect(unlocks).toBe(2)
+    expect(clock.pending()).toBe(pending)
+    game.dispose()
+  })
   it('эскалация отмазок объявляется в чате', () => {
     const { game } = makeGame()
     game.nextDay(70)
