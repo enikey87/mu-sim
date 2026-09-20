@@ -65,9 +65,11 @@ function Phone({ onReset }: { onReset: () => void }) {
     onReset()
   }
 
+  const blocked = sheet || game.dead || !!game.S.ending
+
   return (
     <div className="phone" ref={phone}>
-      <div className="phone-surface" inert={sheet || undefined}>
+      <div className="phone-surface" inert={blocked || undefined}>
         <div className="phone-main">
           <StatusBar />
           <ChatHeader onInfo={() => setSheetOpen(true)} />
@@ -78,9 +80,9 @@ function Phone({ onReset }: { onReset: () => void }) {
         </div>
         <Toast />
         <Notification />
-        <DeadScreen />
-        <EndingScreen onReset={reset} />
       </div>
+      <DeadScreen />
+      <EndingScreen onReset={reset} />
       {sheet && <Sheet onClose={() => setSheetOpen(false)} onReset={reset} />}
     </div>
   )

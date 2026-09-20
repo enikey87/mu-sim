@@ -332,17 +332,37 @@ describe('App', () => {
     await game.fire('CheckEnding')
     const { onReset } = renderApp(game)
     const end = screen.getByRole('dialog', { name: /Породнились/ })
+    expect(end).toHaveAttribute('aria-modal', 'true')
+    expect(document.querySelector('.phone-surface')).toHaveAttribute('inert')
     expect(within(end).getByText(/Свадьба дяди Самвела: «Жених»/)).toBeInTheDocument()
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     fireEvent.click(within(end).getByText('Начать заново'))
     expect(onReset).toHaveBeenCalled()
     act(() => fireEvent.click(within(end).getByText('Играть дальше')))
     expect(screen.queryByRole('dialog', { name: /Породнились/ })).toBeNull()
+    expect(document.querySelector('.phone-surface')).not.toHaveAttribute('inert')
     fireEvent.click(screen.getByTitle('Обещания и ачивки'))
-    const dialog = screen.getByRole('dialog')
+    const dialog = screen.getByRole('dialog', { name: 'Досье на Алика' })
     expect(within(dialog).getByText(/финал «Жених»/)).toBeInTheDocument()
     expect(within(dialog).getByText('Породнились')).toBeInTheDocument()
     expect(within(dialog).getByText('1/14')).toBeInTheDocument()
+  })
+
+  it('концовка: Esc и aria — фон inert, фокус не в чате', async () => {
+    const { game } = makeGame()
+    game.S.arcs.samvel = { i: 8, last: 0 }
+    game.S.mem['finale.samvel'] = 'groom'
+    game.S.day = 320
+    await game.fire('CheckEnding')
+    renderApp(game)
+    const end = screen.getByRole('dialog', { name: /Породнились/ })
+    expect(end).toHaveAttribute('aria-modal', 'true')
+    expect(document.querySelector('.phone-surface')).toHaveAttribute('inert')
+    expect(end.contains(document.activeElement)).toBe(true)
+    act(() => { fireEvent.keyDown(document, { key: 'Escape' }) })
+    expect(screen.queryByRole('dialog', { name: /Породнились/ })).toBeNull()
+    expect(game.S.ending).toBeNull()
+    expect(document.querySelector('.phone-surface')).not.toHaveAttribute('inert')
   })
 
   it('День выплаты: счётчик «к выплате» в шапке; на экране итогов — великая отмазка и «Скопировать»', async () => {
@@ -367,13 +387,35 @@ describe('App', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Скопировано')
   })
 
+  it('копирование отмазки: отказ clipboard → тост об ошибке', async () => {
+    const { game } = makeGame()
+    game.S.day = 340
+    Object.assign(game.S.mem, { payday: 'coins', 'payday.chain': 'отмазка' })
+    await game.fire('CheckEnding')
+    renderApp(game)
+    const end = screen.getByRole('dialog', { name: /День выплаты/ })
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn().mockRejectedValue(new Error('denied')) },
+    })
+    const execBackup = document.execCommand
+    document.execCommand = () => false
+    await act(async () => { fireEvent.click(within(end).getByText('Скопировать великую отмазку')) })
+    expect(screen.getByRole('status')).toHaveTextContent('Не удалось скопировать')
+    document.execCommand = execBackup
+  })
+
   it('телефон сел → зарядка', async () => {
     const { game } = makeGame()
     renderApp(game)
     act(() => { game.S.battery = 1; game.drain(1) })
-    expect(screen.getByText('Телефон сел')).toBeInTheDocument()
+    const dead = screen.getByRole('dialog', { name: 'Телефон сел' })
+    expect(dead).toHaveAttribute('aria-modal', 'true')
+    expect(document.querySelector('.phone-surface')).toHaveAttribute('inert')
+    expect(dead.contains(document.activeElement)).toBe(true)
     await act(async () => { fireEvent.click(screen.getByText('Поставить на зарядку')) })
     expect(document.querySelector('#deadScreen')).toHaveClass('hidden')
+    expect(document.querySelector('.phone-surface')).not.toHaveAttribute('inert')
   })
 
   it('уведомление телефона и тост ачивки', () => {
