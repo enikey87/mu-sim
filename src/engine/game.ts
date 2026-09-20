@@ -28,8 +28,11 @@ import { classifyUserInput, type ClassifiedInput } from './input'
 import { calendarDays, dateOf, fmtDate, fmtTime, periodOf, tierOf, TIERS, type Period } from './time'
 import {
   type GameState, type Msg, type NewMsg, type Choice, type Ctx, type Tone, type Storage,
-  freshState, loadState, saveState, SAVE_KEY, MAX_PATIENCE,
+  type InputCategory, freshState, loadState, saveState, SAVE_KEY, MAX_PATIENCE,
 } from './state'
+
+/** Отклик на отправку: смысл понят, категория на экране не показывается. */
+export type SendFeel = 'shake' | 'intimidate' | 'sorry' | 'moo'
 
 export interface GameOptions {
   storage?: Storage | null
@@ -86,7 +89,8 @@ export class Game {
   dead = false
   charging: number | null = null
   unread = 0
-  shakeId = 0
+  feel: SendFeel | null = null
+  feelId = 0
   title = 'Алик, где деньги?'
   /** Последние выборы правил — для отладочной панели (?debug). */
   trace: TraceEntry[] = []
@@ -642,6 +646,26 @@ export class Game {
   /** Совместимый шорткат для тестов и отладки из консоли. */
   classify(text: string): Tone { return this.classifyInput(text).tone }
 
+  /** Какой отклик дать на это сообщение (категорию игроку не показываем). */
+  feelFor(o: Choice): SendFeel | null {
+    const cat: InputCategory = o.category ?? this.classifyInput(o.text).category
+    if (o.act === 'moo' || cat === 'cow') return 'moo'
+    if (o.act === 'sorry' || cat === 'apology') return 'sorry'
+    if (cat === 'intimidation' || cat === 'violent-threat') return 'intimidate'
+    if (o.tone === 'rude' || o.tone === 'threat' || cat === 'rude') return 'shake'
+    return null
+  }
+
+  private triggerFeel(o: Choice): void {
+    const feel = this.feelFor(o)
+    if (!feel) return
+    this.feel = feel
+    this.feelId++
+    if (feel === 'shake') this.audio.vibrate([80, 40, 80])
+    else if (feel === 'intimidate') this.audio.vibrate([120, 50, 120, 50, 200])
+    this.emit()
+  }
+
   // ---------- ход игрока ----------
   async send(opt: Choice | string): Promise<void> {
     const parsed = typeof opt === 'string' ? this.classifyInput(opt) : null
@@ -665,8 +689,9 @@ export class Game {
     this.unlock('first')
     if (this.isNight()) this.unlock('nightowl')
     if (tone === 'polite') { if (++S.politeStreak >= 10) this.unlock('saint') } else S.politeStreak = 0
-    if ((tone === 'rude' || tone === 'threat') && !o.scene) { this.unlock(tone); this.shakeId++; this.audio.vibrate([80, 40, 80]) }
+    if ((tone === 'rude' || tone === 'threat') && !o.scene) this.unlock(tone)
     if (tone === 'cow') this.unlock('cow')
+    if (!o.scene) this.triggerFeel(o)
     if (o.act !== 'topic') S.mem.topicRun = 0 // серия вопросов по одной теме прервалась
     if (o.act === 'sorry') S.mem.sorryAt = [...String(S.mem.sorryAt ?? '').split(',').filter(Boolean), S.stats.sent].slice(-4).join(',') // для «качелей»
     if (tone === 'rude') S.mem.rudeAt = S.stats.sent

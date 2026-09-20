@@ -42,14 +42,15 @@ function Phone({ onReset }: { onReset: () => void }) {
   // заголовок вкладки: «(3) Алик, где деньги?»
   useEffect(() => { document.title = game.title }, [game.title])
 
-  // тряска телефона на «АЛИК!!!»
+  // отклик на смысл ввода (без подписи категории)
   useEffect(() => {
     const p = phone.current
-    if (!p || !game.shakeId) return
-    p.classList.remove('shake')
+    if (!p || !game.feelId || !game.feel) return
+    const cls = `feel-${game.feel}`
+    p.classList.remove('feel-shake', 'feel-intimidate', 'feel-sorry', 'feel-moo')
     void p.offsetWidth
-    p.classList.add('shake')
-  }, [game.shakeId])
+    p.classList.add(cls)
+  }, [game.feelId, game.feel])
 
   const setSheetOpen = (v: boolean) => { game.sheetOpen = v; setSheet(v) }
   const reset = () => {
