@@ -34,6 +34,12 @@ import {
 /** Отклик на отправку: смысл понят, категория на экране не показывается. */
 export type SendFeel = 'shake' | 'intimidate' | 'sorry' | 'moo'
 
+/** Отмена async после dispose — ловится на entry points, игроку не показывается. */
+export class GameDisposed extends Error {
+  override name = 'GameDisposed'
+  constructor() { super('Game disposed') }
+}
+
 export interface GameOptions {
   storage?: Storage | null
   rng?: Rng
@@ -111,7 +117,7 @@ export class Game {
   private resetting = false
   private disposed = false
   private timerIds = new Set<number>()
-  private sleepResolvers = new Set<() => void>()
+  private sleepWaiters = new Set<(err?: GameDisposed) => void>()
   private noTimers: boolean
   private typos: boolean
   private hiddenAt = 0
@@ -167,7 +173,7 @@ export class Game {
 
   /** Активные таймеры этого экземпляра (для тестов). */
   pendingTimers(): number {
-    return this.timerIds.size
+    return this.timerIds.size + this.sleepWaiters.size
   }
 
   private schedule(fn: () => void, ms: number): number {
@@ -184,15 +190,21 @@ export class Game {
     this.timerIds.delete(id)
   }
 
+  private swallowDisposed(e: unknown): void {
+    if (!(e instanceof GameDisposed)) throw e
+  }
+
   dispose(): void {
     if (this.disposed) return
     this.disposed = true
     for (const id of [...this.timerIds]) this.clock.clearTimeout(id)
     this.timerIds.clear()
     this.idleT = this.statusT = this.toastT = this.notifT = 0
-    for (const resolve of this.sleepResolvers) resolve()
-    this.sleepResolvers.clear()
+    const err = new GameDisposed()
+    for (const finish of this.sleepWaiters) finish(err)
+    this.sleepWaiters.clear()
     this.listeners.clear()
+    this.rawAudio.dispose()
   }
 
   save(): void {
@@ -252,17 +264,18 @@ export class Game {
   rnd = (n: number): number => rndInt(this.rng, n)
   chance = (p: number): boolean => chance(this.rng, p)
   sleep = (ms: number): Promise<void> => {
-    if (this.disposed) return Promise.resolve()
-    return new Promise((resolve) => {
+    if (this.disposed) return Promise.reject(new GameDisposed())
+    return new Promise((resolve, reject) => {
       let settled = false
-      const finish = () => {
+      const finish = (err?: GameDisposed) => {
         if (settled) return
         settled = true
-        this.sleepResolvers.delete(finish)
-        resolve()
+        this.sleepWaiters.delete(finish)
+        if (err) reject(err)
+        else resolve()
       }
-      this.sleepResolvers.add(finish)
-      void this.clock.sleep(ms).then(finish)
+      this.sleepWaiters.add(finish)
+      void this.clock.sleep(ms).then(() => finish(this.disposed ? new GameDisposed() : undefined))
     })
   }
 
@@ -345,6 +358,7 @@ export class Game {
 
   // ---------- сообщения ----------
   push<M extends NewMsg>(m: M): Msg {
+    if (this.disposed) throw new GameDisposed()
     const msg = { ...m, id: this.S.nextId++ } as Msg
     this.S.msgs.push(msg)
     // прозвучало в переписке (не от игрока) — теперь об этом можно говорить: «кран», «Арсен», «калым»…
@@ -385,6 +399,7 @@ export class Game {
 
   /** Реплики Алика (или участника { w, t }). Иногда с опечаткой и исправлением. */
   async say(items: SayItem[], legend = false, who?: string): Promise<Msg[]> {
+    if (this.disposed) throw new GameDisposed()
     if (this.S.ctx?.type === 'reactOnly') this.S.ctx = null // Алик ответил словами — «а ответить словами?» уже не к месту
     const out: Msg[] = []
     for (const x of items) {
@@ -396,9 +411,11 @@ export class Game {
         if (t) ({ text, fix } = t)
       }
       await this.typingFor(600 + text.length * 22)
+      if (this.disposed) throw new GameDisposed()
       out.push(this.alikMsg({ kind: 'text', from: 'alik', text, legend, who: from }))
       if (fix) {
         await this.typingFor(500)
+        if (this.disposed) throw new GameDisposed()
         this.alikMsg({ kind: 'text', from: 'alik', text: fix })
         this.unlock('typo')
       }
@@ -506,19 +523,21 @@ export class Game {
   }
   async charge(): Promise<void> {
     if (!this.dead || this.charging !== null || this.disposed) return
-    for (let p = 1; p <= 100; p += 9) {
+    try {
+      for (let p = 1; p <= 100; p += 9) {
+        if (this.disposed) return
+        this.charging = p; this.emit(); await this.sleep(120)
+      }
       if (this.disposed) return
-      this.charging = p; this.emit(); await this.sleep(120)
-    }
-    if (this.disposed) return
-    this.charging = null
-    this.S.battery = 100
-    this.dead = false
-    this.busy = false
-    this.emit()
-    this.awayBurst(2 + this.rnd(3), 1 + this.rnd(2), 'Пока телефон заряжался')
-    this.armIdle()
-    this.armStatus()
+      this.charging = null
+      this.S.battery = 100
+      this.dead = false
+      this.busy = false
+      this.emit()
+      this.awayBurst(2 + this.rnd(3), 1 + this.rnd(2), 'Пока телефон заряжался')
+      this.armIdle()
+      this.armStatus()
+    } catch (e) { this.swallowDisposed(e) }
   }
 
   // ---------- факты для правил ----------
@@ -631,14 +650,17 @@ export class Game {
   }
   fire(event: string, extra: Facts = {}, q: Omit<Query, 'event' | 'facts'> = {}): Promise<Rule<Game> | null> {
     return this.rules.fire(this, { event, facts: extra, ...q }, this.facts, { floor: this.floor() })
+      .catch((e) => { this.swallowDisposed(e); return null })
   }
   /** События, отложенные до «безопасной точки» (после ответа Алика): хор, наступившие обещания. */
   private pending: Query[] = []
   async afterTurn(): Promise<void> {
-    await this.rules.runDue(this, this.facts, { floor: this.floor() })
-    // из упоминаний — не больше одного вклинившегося персонажа за ход
-    const queue = this.pending.splice(0)
-    for (const q of queue) if (await this.rules.fire(this, q, this.facts, { floor: this.floor() })) break
+    try {
+      await this.rules.runDue(this, this.facts, { floor: this.floor() })
+      // из упоминаний — не больше одного вклинившегося персонажа за ход
+      const queue = this.pending.splice(0)
+      for (const q of queue) if (await this.rules.fire(this, q, this.facts, { floor: this.floor() })) break
+    } catch (e) { this.swallowDisposed(e) }
   }
 
   // ---------- варианты игрока ----------
@@ -714,11 +736,17 @@ export class Game {
 
   // ---------- ход игрока ----------
   async send(opt: Choice | string): Promise<void> {
+    try {
+      await this.sendTurn(opt)
+    } catch (e) { this.swallowDisposed(e) }
+  }
+
+  private async sendTurn(opt: Choice | string): Promise<void> {
     const parsed = typeof opt === 'string' ? this.classifyInput(opt) : null
     const o: Choice = parsed
       ? { text: opt as string, tone: parsed.tone, category: parsed.category, act: parsed.intent }
       : opt as Choice
-    if (this.busy || this.dead || !o.text.trim()) return
+    if (this.busy || this.dead || this.disposed || !o.text.trim()) return
     const S = this.S
     this.busy = true
     this.clearSchedule(this.idleT)
@@ -1222,32 +1250,34 @@ export class Game {
 
   // ---------- допработа ----------
   async answerJob(id: number, yes: boolean): Promise<void> {
-    const m = this.S.msgs.find((x) => x.id === id)
-    if (!m || m.kind !== 'job' || m.answered || this.busy || this.dead) return
-    m.answered = true
-    this.busy = true
-    this.clearSchedule(this.idleT)
-    const reply = this.playerLine(() => (yes ? this.draw('JY', JOB_YES_P) : this.draw('JN', JOB_NO_P)))
-    this.seen.mark(reply)
-    this.push({ kind: 'text', from: 'me', text: reply, time: fmtTime(this.S.clock) })
-    if (yes) {
-      const add = 5000 + this.rnd(16) * 1000
-      this.nextDay(2 + this.rnd(3))
-      this.sys(`Вы сделали работу. Долг Алика вырос на ${add.toLocaleString('ru-RU')} ₽`)
-      this.S.debt += add
-      this.mood(2)
-      this.unlock('fence')
-      await this.say([this.uniq(this.X.jobYes)])
-    } else {
-      this.mood(-1)
-      await this.say([this.uniq(this.X.jobNo)])
-    }
-    this.S.ctx = null
-    this.busy = false
-    this.S.choices = this.buildChoices()
-    this.save()
-    this.emit()
-    this.armIdle()
+    try {
+      const m = this.S.msgs.find((x) => x.id === id)
+      if (!m || m.kind !== 'job' || m.answered || this.busy || this.dead || this.disposed) return
+      m.answered = true
+      this.busy = true
+      this.clearSchedule(this.idleT)
+      const reply = this.playerLine(() => (yes ? this.draw('JY', JOB_YES_P) : this.draw('JN', JOB_NO_P)))
+      this.seen.mark(reply)
+      this.push({ kind: 'text', from: 'me', text: reply, time: fmtTime(this.S.clock) })
+      if (yes) {
+        const add = 5000 + this.rnd(16) * 1000
+        this.nextDay(2 + this.rnd(3))
+        this.sys(`Вы сделали работу. Долг Алика вырос на ${add.toLocaleString('ru-RU')} ₽`)
+        this.S.debt += add
+        this.mood(2)
+        this.unlock('fence')
+        await this.say([this.uniq(this.X.jobYes)])
+      } else {
+        this.mood(-1)
+        await this.say([this.uniq(this.X.jobNo)])
+      }
+      this.S.ctx = null
+      this.busy = false
+      this.S.choices = this.buildChoices()
+      this.save()
+      this.emit()
+      this.armIdle()
+    } catch (e) { this.swallowDisposed(e) }
   }
 
   // ---------- Алик живёт сам ----------
@@ -1259,39 +1289,43 @@ export class Game {
   }
   sheetOpen = false
   async onIdle(): Promise<void> {
-    if (this.disposed || this.busy || this.dead || this.sheetOpen || (typeof document !== 'undefined' && document.hidden)) return this.armIdle()
-    this.idleCount++
-    this.busy = true
-    this.drain(1)
-    if (!this.dead) {
-      await this.fire('AlikIdle')
-      if (this.disposed) { this.busy = false; return }
-      await this.afterTurn()
-      this.S.choices = this.buildChoices()
-      this.save()
-    }
-    this.busy = false
-    this.emit()
-    if (!this.dead && !this.disposed) { this.restStatus(); this.armIdle() }
+    try {
+      if (this.disposed || this.busy || this.dead || this.sheetOpen || (typeof document !== 'undefined' && document.hidden)) return this.armIdle()
+      this.idleCount++
+      this.busy = true
+      this.drain(1)
+      if (!this.dead) {
+        await this.fire('AlikIdle')
+        if (this.disposed) { this.busy = false; return }
+        await this.afterTurn()
+        this.S.choices = this.buildChoices()
+        this.save()
+      }
+      this.busy = false
+      this.emit()
+      if (!this.dead && !this.disposed) { this.restStatus(); this.armIdle() }
+    } catch (e) { this.swallowDisposed(e) }
   }
   armStatus(): void {
     this.clearSchedule(this.statusT)
     if (this.disposed || this.noTimers || this.dead) return
     this.statusT = this.schedule(async () => {
-      if (this.disposed) return
-      if (!this.busy && !this.dead && this.S.offlineDays === 0) {
-        if (this.chance(0.2)) {
-          // «печатает…» — и ничего не приходит
-          this.typing = 'печатает…'
-          this.setStatus('печатает…', 'typing')
-          await this.sleep(1500 + this.rnd(2500))
-          if (this.disposed) return
-          this.typing = null
-          if (!this.busy) this.setStatus('в сети', 'online')
-        } else if (this.isNight()) this.setStatus(`был(а) в ${this.realHHMM()}`)
-        else this.setStatus(this.draw('WANDER', STATUS_WANDER), 'online')
-      }
-      this.armStatus()
+      try {
+        if (this.disposed) return
+        if (!this.busy && !this.dead && this.S.offlineDays === 0) {
+          if (this.chance(0.2)) {
+            // «печатает…» — и ничего не приходит
+            this.typing = 'печатает…'
+            this.setStatus('печатает…', 'typing')
+            await this.sleep(1500 + this.rnd(2500))
+            if (this.disposed) return
+            this.typing = null
+            if (!this.busy) this.setStatus('в сети', 'online')
+          } else if (this.isNight()) this.setStatus(`был(а) в ${this.realHHMM()}`)
+          else this.setStatus(this.draw('WANDER', STATUS_WANDER), 'online')
+        }
+        this.armStatus()
+      } catch (e) { this.swallowDisposed(e) }
     }, 7000 + this.rnd(9000))
   }
 

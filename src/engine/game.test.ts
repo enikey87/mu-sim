@@ -1,5 +1,5 @@
 import { STARTS } from '../content/quests'
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { makeGame, memStorage, alikTexts } from '../test/helpers'
 import { silentAudio } from './audio'
 import { manualClock } from './clock'
@@ -511,5 +511,46 @@ describe('Game: dispose отменяет async', () => {
     await next.send('Алик, верните деньги')
     expect(next.S.stats.sent).toBe(1)
     expect(next.S.msgs.some((m) => m.kind === 'text' && m.from === 'me')).toBe(true)
+  })
+
+  it('dispose внутри say/typingFor не добавляет поздних сообщений', async () => {
+    const clock = manualClock()
+    let gate: (() => void) | null = null
+    clock.sleep = () => new Promise((r) => { gate = r })
+    const game = new Game({ storage: memStorage(), clock, rng: seededRng(1), noTimers: true, hour: 14 })
+    const before = game.S.msgs.length
+    const pending = game.say(['Позднее сообщение'])
+    expect(gate).toBeTruthy()
+    expect(game.pendingTimers()).toBeGreaterThan(0)
+    game.dispose()
+    expect(game.pendingTimers()).toBe(0)
+    gate!()
+    await expect(pending).rejects.toMatchObject({ name: 'GameDisposed' })
+    expect(game.S.msgs.length).toBe(before)
+  })
+
+  it('audio.dispose отменяет отложенный callback после playVoice', async () => {
+    vi.useFakeTimers()
+    let moos = 0
+    const pending = new Set<ReturnType<typeof setTimeout>>()
+    const audio = {
+      ...silentAudio,
+      dispose() {
+        for (const id of pending) clearTimeout(id)
+        pending.clear()
+      },
+      moo: () => { moos++ },
+      alikVoice(_pick?: (a: readonly string[]) => string) {
+        const id = setTimeout(() => { pending.delete(id); audio.moo() }, 2500)
+        pending.add(id)
+      },
+    }
+    const game = new Game({ storage: memStorage(), clock: manualClock(), rng: seededRng(1), noTimers: true, hour: 14, audio })
+    audio.alikVoice()
+    game.dispose()
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(moos).toBe(0)
+    expect(pending.size).toBe(0)
+    vi.useRealTimers()
   })
 })

@@ -11,23 +11,34 @@ export interface Audio {
   feast(pick: (arr: readonly string[]) => string): void
   alikVoice(pick: (arr: readonly string[]) => string): void
   vibrate(pattern: number | number[]): void
+  /** Остановить речь и отложенные колбэки (после dispose игры). */
+  dispose(): void
 }
 
 export const silentAudio: Audio = {
-  unlock() {}, setMuted() {}, beep() {}, moo() {}, speak() {}, feast() {}, alikVoice() {}, vibrate() {},
+  unlock() {}, setMuted() {}, beep() {}, moo() {}, speak() {}, feast() {}, alikVoice() {}, vibrate() {}, dispose() {},
 }
 
 export function browserAudio(): Audio {
   let ac: AudioContext | null = null
   let gestured = false
   let muted = false
+  let disposed = false
+  const pending = new Set<number>()
   const ctx = (): AudioContext => {
     if (!gestured) throw new Error('no gesture')
     return (ac ??= new AudioContext())
   }
   const safe = (fn: () => void) => {
-    if (muted) return
+    if (muted || disposed) return
     try { fn() } catch { /* до первого касания или без Web Audio */ }
+  }
+  const trackTimeout = (fn: () => void, ms: number): void => {
+    const id = window.setTimeout(() => {
+      pending.delete(id)
+      if (!disposed) fn()
+    }, ms)
+    pending.add(id)
   }
 
   function tone(freq: number, dur: number, vol: number, type: OscillatorType = 'sine', at = 0) {
@@ -62,7 +73,7 @@ export function browserAudio(): Audio {
   }
   const api: Audio = {
     unlock() {
-      if (gestured) return
+      if (disposed || gestured) return
       gestured = true
       try { ctx().resume() } catch { /* ignore */ }
     },
@@ -70,13 +81,20 @@ export function browserAudio(): Audio {
       muted = m
       if (m) try { speechSynthesis.cancel() } catch { /* ignore */ }
     },
+    dispose() {
+      disposed = true
+      muted = true
+      for (const id of pending) window.clearTimeout(id)
+      pending.clear()
+      try { speechSynthesis.cancel() } catch { /* ignore */ }
+    },
     beep: () => safe(() => { tone(1320, 0.1, 0.15); tone(1320, 0.1, 0.15, 'sine', 0.12) }),
     moo() {
       safe(() => cow(0.25))
       api.speak('М' + 'у'.repeat(5 + Math.floor(Math.random() * 6)), { pitch: 0.1, rate: 0.55, volume: 0.35 })
     },
     speak(text, { pitch = 1, rate = 1, volume = 0.5 } = {}) {
-      if (muted || !gestured) return
+      if (muted || disposed || !gestured) return
       try {
         const u = new SpeechSynthesisUtterance(text)
         u.lang = 'ru-RU'; u.pitch = pitch; u.rate = rate; u.volume = volume
@@ -85,11 +103,12 @@ export function browserAudio(): Audio {
     },
     feast: (pick) => api.speak(pick(FEAST), { rate: 1.2 }),
     alikVoice(pick) {
+      if (disposed) return
       api.speak(pick(VOICE), { pitch: 0.55, rate: 0.8, volume: 0.6 })
-      if (Math.random() < 0.3) setTimeout(() => api.moo(), 2500)
+      if (Math.random() < 0.3) trackTimeout(() => api.moo(), 2500)
     },
     vibrate(p) {
-      if (muted || !gestured) return
+      if (muted || disposed || !gestured) return
       try { navigator.vibrate?.(p) } catch { /* ignore */ }
     },
   }
