@@ -50,3 +50,20 @@ test('досье открывается и закрывается клавише
 
   await expect(page.getByRole('dialog', { name: 'Досье на Алика' })).toBeHidden()
 })
+
+test('сброс во время ответа Алика: старая партия не вмешивается', async ({ page }) => {
+  page.once('dialog', (d) => d.accept())
+  await page.locator('#choices button:not([disabled])').first().click()
+  await expect(page.locator('#composer')).toHaveAttribute('aria-busy', 'true')
+
+  await page.getByTitle('Обещания и ачивки').click()
+  await page.getByRole('button', { name: 'Начать заново' }).click()
+
+  await expect(page.locator('.chat-head .name')).toHaveText('Алик Воздухонесян')
+  await expect(page.locator('#composer')).toHaveAttribute('aria-busy', 'false')
+  const introCount = await page.locator('.msg').count()
+
+  await page.waitForTimeout(800)
+  await expect(page.locator('.msg')).toHaveCount(introCount)
+  await expect(page.locator('#debt')).toHaveText(/240\s000 ₽/)
+})

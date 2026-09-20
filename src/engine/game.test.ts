@@ -403,3 +403,113 @@ describe('Game: мелочи', () => {
     expect(n).toBe(1)
   })
 })
+
+describe('Game: dispose отменяет async', () => {
+  it('dispose в покое идемпотентен и обнуляет таймеры', () => {
+    const clock = manualClock()
+    const game = new Game({ storage: memStorage(), clock, rng: seededRng(1), hour: 14 })
+    game.S.stats.sent = 5
+    game.armIdle()
+    expect(game.pendingTimers()).toBeGreaterThan(0)
+    game.dispose()
+    expect(game.pendingTimers()).toBe(0)
+    expect(clock.pending()).toBe(0)
+    game.dispose()
+    expect(game.pendingTimers()).toBe(0)
+  })
+
+  it('dispose во время send: нет emit/save/audio после отмены', async () => {
+    const clock = manualClock()
+    let sleepGate: (() => void) | null = null
+    clock.sleep = () => new Promise((r) => { sleepGate = r })
+    let saves = 0
+    const storage = memStorage()
+    const setItem = storage.setItem.bind(storage)
+    storage.setItem = (k, v) => { saves++; setItem(k, v) }
+    let beeps = 0
+    const audio = { ...silentAudio, beep: () => { beeps++ }, vibrate: () => { beeps++ }, moo: () => { beeps++ } }
+    const game = new Game({ storage, clock, rng: seededRng(1), noTimers: true, hour: 14, audio })
+    saves = 0
+    beeps = 0
+    let emits = 0
+    game.subscribe(() => emits++)
+
+    const turn = game.send('Алик, верни деньги')
+    expect(sleepGate).toBeTruthy()
+    const msgsAtDispose = game.S.msgs.length
+    const emitsBefore = emits
+    const savesBefore = saves
+    game.dispose()
+    sleepGate!()
+    await turn
+    await Promise.resolve()
+    clock.runTimers()
+
+    expect(game.pendingTimers()).toBe(0)
+    expect(emits).toBe(emitsBefore)
+    expect(saves).toBe(savesBefore)
+    expect(beeps).toBe(0)
+    expect(game.S.msgs.length).toBe(msgsAtDispose)
+  })
+
+  it('отложенное Мууу не срабатывает после dispose', () => {
+    const clock = manualClock()
+    let moos = 0
+    const audio = { ...silentAudio, moo: () => { moos++ } }
+    const game = new Game({ storage: memStorage(), clock, rng: seededRng(1), noTimers: true, hour: 14, audio })
+    game.moo()
+    expect(game.moos).toHaveLength(1)
+    expect(moos).toBe(1)
+    game.dispose()
+    clock.runTimers()
+    expect(game.moos).toHaveLength(1)
+    expect(moos).toBe(1)
+    expect(game.pendingTimers()).toBe(0)
+  })
+
+  it('dispose во время зарядки останавливает последовательность', async () => {
+    const clock = manualClock()
+    let sleepGate: (() => void) | null = null
+    clock.sleep = () => new Promise((r) => { sleepGate = r })
+    const game = new Game({ storage: memStorage(), clock, rng: seededRng(1), noTimers: true, hour: 14 })
+    game.die()
+    const charge = game.charge()
+    expect(game.charging).toBe(1)
+    expect(sleepGate).toBeTruthy()
+    game.dispose()
+    sleepGate!()
+    await charge
+    expect(game.charging).toBe(1)
+    expect(game.dead).toBe(true)
+    expect(game.pendingTimers()).toBe(0)
+  })
+
+  it('гонка: callback начался → dispose → следующий await без эффектов', async () => {
+    const clock = manualClock()
+    const sleeps: Array<() => void> = []
+    clock.sleep = () => new Promise((r) => { sleeps.push(r) })
+    let emits = 0
+    const game = new Game({ storage: memStorage(), clock, rng: seededRng(1), noTimers: true, hour: 14 })
+    game.subscribe(() => emits++)
+    const turn = game.send('Алик, привет')
+    expect(sleeps.length).toBe(1)
+    sleeps[0]!()
+    await Promise.resolve()
+    const emitsAfterFirst = emits
+    game.dispose()
+    while (sleeps.length) sleeps.shift()!()
+    await turn
+    expect(emits).toBe(emitsAfterFirst)
+    expect(game.pendingTimers()).toBe(0)
+  })
+
+  it('новая игра после dispose работает независимо', async () => {
+    const storage = memStorage()
+    const old = new Game({ storage, clock: manualClock(), rng: seededRng(1), noTimers: true, hour: 14 })
+    old.dispose()
+    const next = new Game({ storage, clock: manualClock(), rng: seededRng(2), noTimers: true, hour: 14 })
+    await next.send('Алик, верните деньги')
+    expect(next.S.stats.sent).toBe(1)
+    expect(next.S.msgs.some((m) => m.kind === 'text' && m.from === 'me')).toBe(true)
+  })
+})
