@@ -10,6 +10,24 @@ function renderApp(game: Game, onReset = vi.fn()) {
   return { ...utils, onReset }
 }
 
+function mockScrollBox(el: HTMLElement, initial = { height: 800, client: 300, top: 500 }) {
+  let height = initial.height
+  let client = initial.client
+  let top = initial.top
+  const setTop = (value: number) => { top = Math.max(0, Math.min(value, height - client)) }
+  Object.defineProperties(el, {
+    scrollHeight: { configurable: true, get: () => height },
+    clientHeight: { configurable: true, get: () => client },
+    scrollTop: { configurable: true, get: () => top, set: setTop },
+  })
+  return {
+    top: () => top,
+    bottom: () => height - client,
+    setTop,
+    setClient: (value: number) => { client = value },
+  }
+}
+
 describe('App', () => {
   it('показывает шапку, статистику и варианты реплик', () => {
     const { game } = makeGame()
@@ -51,6 +69,65 @@ describe('App', () => {
     act(() => { game.busy = false; game.emit() })
     expect(document.querySelector('#choices')).toHaveAttribute('aria-busy', 'false')
     for (const t of texts) expect(screen.getAllByText(t).some((el) => el.closest('.choices'))).toBe(true)
+  })
+
+  it('после раскрытия высоких вариантов удерживает текущий диалог у нижнего края', () => {
+    const { game } = makeGame()
+    renderApp(game)
+    const chat = document.querySelector('#chat') as HTMLElement
+    const box = mockScrollBox(chat)
+
+    act(() => { game.busy = true; game.emit() })
+    expect(box.top()).toBe(box.bottom())
+    box.setClient(220) // настоящие многострочные варианты отняли ещё 80 px у чата
+    act(() => { game.busy = false; game.emit() })
+    expect(box.top()).toBe(580)
+    expect(box.top()).toBe(box.bottom())
+  })
+
+  it('при чтении истории сохраняет позицию, считает новые сообщения и возвращает вниз по кнопке', () => {
+    const { game } = makeGame()
+    renderApp(game)
+    const chat = document.querySelector('#chat') as HTMLElement
+    const box = mockScrollBox(chat)
+    act(() => game.emit())
+
+    box.setTop(120)
+    fireEvent.scroll(chat)
+    act(() => { game.push({ kind: 'text', from: 'alik', text: 'Первое новое сообщение' }) })
+    expect(box.top()).toBe(120)
+    expect(screen.getByRole('button', { name: '↓ Новое сообщение' })).toBeInTheDocument()
+
+    act(() => {
+      game.push({ kind: 'sep', text: 'Новый день' }) // разделитель не считается сообщением
+      game.push({ kind: 'sys', text: 'Алик снова в сети' })
+    })
+    expect(box.top()).toBe(120)
+    fireEvent.click(screen.getByRole('button', { name: '↓ 2 новых сообщения' }))
+    expect(box.top()).toBe(box.bottom())
+    expect(screen.queryByText(/новых? сообщения/)).not.toBeInTheDocument()
+  })
+
+  it('нижний порог не открепляет чат, а собственная реплика возвращает из истории', () => {
+    const { game } = makeGame()
+    renderApp(game)
+    const chat = document.querySelector('#chat') as HTMLElement
+    const box = mockScrollBox(chat)
+    act(() => game.emit())
+
+    box.setTop(box.bottom() - 24)
+    fireEvent.scroll(chat)
+    act(() => { game.push({ kind: 'text', from: 'alik', text: 'В пределах нижнего порога' }) })
+    expect(box.top()).toBe(box.bottom())
+    expect(screen.queryByRole('button', { name: /Новое сообщение/ })).not.toBeInTheDocument()
+
+    box.setTop(box.bottom() - 25)
+    fireEvent.scroll(chat)
+    act(() => { game.push({ kind: 'text', from: 'alik', text: 'Уже в истории' }) })
+    expect(screen.getByRole('button', { name: '↓ Новое сообщение' })).toBeInTheDocument()
+    act(() => { game.push({ kind: 'text', from: 'me', text: 'Вернуться в разговор' }) })
+    expect(box.top()).toBe(box.bottom())
+    expect(screen.queryByRole('button', { name: /Новое сообщение/ })).not.toBeInTheDocument()
   })
 
   it('свой текст отправляется, обрезается по краям, а поле очищается', async () => {
