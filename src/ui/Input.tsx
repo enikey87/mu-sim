@@ -52,6 +52,7 @@ export function Composer() {
         maxLength={300}
         value={text}
         disabled={locked}
+        enterKeyHint="send"
         onChange={(e) => setText(e.target.value)}
         placeholder={game.S.scene ? 'Выберите ответ выше или напишите свой…' : 'Сообщение…'}
         aria-label="Сообщение"

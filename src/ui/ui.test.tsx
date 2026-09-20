@@ -135,6 +135,7 @@ describe('App', () => {
     renderApp(game)
     const user = userEvent.setup()
     const input = screen.getByLabelText('Сообщение') as HTMLInputElement
+    expect(input).toHaveAttribute('enterKeyHint', 'send')
     expect(screen.getByLabelText('Отправить')).toBeDisabled()
     await user.type(input, '  Алик, когда оплата?  ')
     await act(async () => { await user.click(screen.getByLabelText('Отправить')) })
