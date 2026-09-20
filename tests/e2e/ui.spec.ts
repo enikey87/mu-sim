@@ -93,14 +93,50 @@ test('landscape: нет горизонтального overflow при нену�
     content: `:root { --safe-top: 0px; --safe-right: 44px; --safe-bottom: 21px; --safe-left: 44px; }`,
   })
 
-  const metrics = await page.evaluate(() => ({
-    scrollWidth: document.documentElement.scrollWidth,
-    clientWidth: document.documentElement.clientWidth,
-    paddingLeft: getComputedStyle(document.querySelector('.phone')!).paddingLeft,
-    paddingRight: getComputedStyle(document.querySelector('.phone')!).paddingRight,
-  }))
+  const metrics = await page.evaluate(() => {
+    const phone = document.querySelector('.phone') as HTMLElement
+    const box = phone.getBoundingClientRect()
+    const cs = getComputedStyle(phone)
+    return {
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+      phoneWidth: box.width,
+      paddingLeft: cs.paddingLeft,
+      paddingRight: cs.paddingRight,
+      borderWidth: cs.borderLeftWidth,
+      fullscreen: matchMedia('(max-width: 500px), (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse)').matches,
+    }
+  })
 
+  expect(metrics.fullscreen).toBe(true)
+  expect(metrics.borderWidth).toBe('0px')
   expect(metrics.paddingLeft).toBe('44px')
   expect(metrics.paddingRight).toBe('44px')
   expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1)
+})
+
+test('landscape desktop: короткая высота не снимает рамку телефона', async ({ page }, testInfo) => {
+  test.skip(!testInfo.project.name.includes('desktop'), 'только desktop project')
+
+  await page.setViewportSize({ width: 844, height: 390 })
+  await page.addStyleTag({
+    content: `:root { --safe-top: 0px; --safe-right: 44px; --safe-bottom: 21px; --safe-left: 44px; }`,
+  })
+
+  const metrics = await page.evaluate(() => {
+    const phone = document.querySelector('.phone') as HTMLElement
+    const box = phone.getBoundingClientRect()
+    const cs = getComputedStyle(phone)
+    return {
+      phoneWidth: Math.round(box.width),
+      paddingLeft: cs.paddingLeft,
+      paddingRight: cs.paddingRight,
+      borderWidth: cs.borderLeftWidth,
+    }
+  })
+
+  expect(metrics.phoneWidth).toBe(400)
+  expect(metrics.borderWidth).not.toBe('0px')
+  expect(metrics.paddingLeft).toBe('0px')
+  expect(metrics.paddingRight).toBe('0px')
 })

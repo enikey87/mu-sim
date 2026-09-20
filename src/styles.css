@@ -44,7 +44,7 @@ body {
   display: flex; flex-direction: column; overflow: hidden;
   box-shadow: 0 20px 60px rgba(0, 0, 0, .35);
 }
-@media (max-width: 500px), (orientation: landscape) and (max-height: 500px) {
+@media (max-width: 500px), (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
   .phone {
     width: 100%; height: 100dvh; border: 0; border-radius: 0;
     padding-top: var(--safe-top);
@@ -178,7 +178,7 @@ body {
   flex: 1; min-width: 0; border: 0; border-radius: 18px; padding: 9px 14px; font: inherit;
   background: rgba(127, 127, 127, .14); color: var(--text); outline: none;
 }
-@media (max-width: 500px), (orientation: landscape) and (max-height: 500px) {
+@media (max-width: 500px), (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
   .composer input { font-size: 16px; }
 }
 .composer input:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
@@ -270,7 +270,7 @@ body {
 .ending-btns button { border: 0; border-radius: 12px; padding: 10px 16px; background: var(--accent); color: #fff; font: inherit; cursor: pointer; }
 .ending-btns button.secondary { background: transparent; color: inherit; border: 1px solid rgba(127,127,127,.4); }
 /* abspos не видит padding .phone — inset один раз через те же --safe-* */
-@media (max-width: 500px), (orientation: landscape) and (max-height: 500px) {
+@media (max-width: 500px), (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
   .sheet, .dead, .ending {
     top: var(--safe-top);
     right: var(--safe-right);
