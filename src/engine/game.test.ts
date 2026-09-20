@@ -161,7 +161,7 @@ describe('Game: допработа', () => {
     const debt = game.S.debt
     await game.answerJob(job.id, true)
     expect(game.S.debt).toBeGreaterThan(debt)
-    expect(job.kind === 'job' && job.answered).toBe(true)
+    expect(game.S.msgs.find((m) => m.id === job.id)).toMatchObject({ kind: 'job', answered: true })
     await game.answerJob(job.id, true) // повторно — ничего
     expect(game.S.ach.fence).toBeDefined()
     await game.job()
@@ -373,8 +373,9 @@ describe('Game: мелочи', () => {
     const m = game.push({ kind: 'text', from: 'alik', text: 'В среду утром — всё отдам.' })
     game.recordPromise({ text: 'в среду утром — всё отдам', d: 3 })
     await game.editLast(m, { text: 'в среду утром — всё отдам', t: 'в среду утром', d: 3 })
-    expect(m.kind === 'text' && m.edited).toBe(true)
-    expect(m.kind === 'text' && m.text).not.toMatch(/среду утром/)
+    const edited = game.S.msgs.find((x) => x.id === m.id)
+    expect(edited?.kind === 'text' && edited.edited).toBe(true)
+    expect(edited?.kind === 'text' && edited.text).not.toMatch(/среду утром/)
     expect(game.S.promises.at(-1)!.due).toBeNull()
   })
   it('«Мууу» появляется и исчезает, звук отключается', () => {

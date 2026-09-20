@@ -50,3 +50,43 @@ test('досье открывается и закрывается клавише
 
   await expect(page.getByRole('dialog', { name: 'Досье на Алика' })).toBeHidden()
 })
+
+test('длинная история: прокрутка, непрочитанные, своя реплика возвращает вниз', async ({ page }) => {
+  await page.evaluate(() => {
+    const g = (window as unknown as { __alik: { S: { msgs: unknown[]; nextId: number }; emit: () => void } }).__alik
+    for (let i = 0; i < 200; i++) {
+      g.S.msgs.push({
+        id: g.S.nextId++,
+        kind: 'text',
+        from: i % 2 ? 'me' : 'alik',
+        text: `длинное-сообщение-${i}`,
+        time: '12:00',
+      })
+    }
+    g.emit()
+  })
+
+  const chat = page.locator('#chat')
+  await expect(page.getByText('длинное-сообщение-199')).toBeVisible()
+  await chat.evaluate((el) => {
+    el.scrollTop = 0
+    el.dispatchEvent(new Event('scroll'))
+  })
+  await expect(page.getByText('длинное-сообщение-0')).toBeVisible()
+
+  await page.evaluate(() => {
+    const g = (window as unknown as { __alik: { push: (m: object) => void } }).__alik
+    g.push({ kind: 'text', from: 'alik', text: 'входящее-пока-читаешь', time: '12:05' })
+  })
+  await expect(page.getByRole('button', { name: /новое сообщение|новых сообщени/i })).toBeVisible()
+  await page.getByRole('button', { name: /новое сообщение|новых сообщени/i }).click()
+  await expect(page.getByText('входящее-пока-читаешь')).toBeVisible()
+
+  const input = page.getByLabel('Сообщение')
+  await input.fill('моя реплика после длинной истории')
+  await page.getByLabel('Отправить').click()
+  await expect(page.locator('.msg.me').filter({ hasText: 'моя реплика после длинной истории' })).toBeVisible()
+  await expect(page.locator('#composer')).toHaveAttribute('aria-busy', 'false')
+  const atBottom = await chat.evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop <= 30)
+  expect(atBottom).toBe(true)
+})

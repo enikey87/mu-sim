@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, act, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { App } from './App'
+import { messageRenderStats } from './Message'
 import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
 
@@ -332,5 +333,56 @@ describe('App', () => {
     expect(within(panel).getAllByText('PlayerMessage').length + within(panel).getAllByText('BuildChoices').length).toBeGreaterThan(0)
     fireEvent.click(within(panel).getAllByText('BuildChoices')[0])
     expect(within(panel).getAllByText('выбрано').length).toBeGreaterThan(0)
+  })
+
+  it('длинная лента: несвязанный emit не рендерит старые Message', () => {
+    const { game } = makeGame()
+    for (let i = 0; i < 500; i++) {
+      game.S.msgs.push({
+        id: game.S.nextId++,
+        kind: 'text',
+        from: i % 2 ? 'me' : 'alik',
+        text: `msg-${i}`,
+        time: '12:00',
+      })
+    }
+    renderApp(game)
+    messageRenderStats.count = 0
+    const t0 = performance.now()
+    act(() => { game.setStatus('в сети', 'online') })
+    const statusMs = performance.now() - t0
+    expect(messageRenderStats.count).toBe(0)
+
+    messageRenderStats.count = 0
+    const t1 = performance.now()
+    act(() => { game.push({ kind: 'text', from: 'alik', text: 'новое', time: '12:01' }) })
+    const pushMs = performance.now() - t1
+    expect(messageRenderStats.count).toBe(1)
+
+    // нефлейковый порог: обновление статуса быстрее добавления и далеко от O(n) на 500 пузырях
+    expect(statusMs).toBeLessThan(80)
+    expect(pushMs).toBeLessThan(120)
+    // eslint-disable-next-line no-console
+    console.log(`[chat-render] status=${statusMs.toFixed(1)}ms push=${pushMs.toFixed(1)}ms msgs=500`)
+  })
+
+  it('динамические поля сообщения обновляют UI после replace', async () => {
+    const { game } = makeGame()
+    const mine = game.push({ kind: 'text', from: 'me', text: 'Жду оплату', time: '10:00' })
+    const alik = game.push({ kind: 'text', from: 'alik', text: 'Завтра утром — всё отдам.', time: '10:01' })
+    renderApp(game)
+
+    act(() => {
+      const i = game.S.msgs.findIndex((x) => x.id === mine.id)
+      game.S.msgs[i] = { ...mine, kind: 'text', from: 'me', text: 'Жду оплату', time: '10:00', react: '🔥' }
+      game.emit()
+    })
+    expect(screen.getByText('🔥')).toBeInTheDocument()
+
+    await act(async () => { await game.editLast(alik) })
+    expect(screen.getByText(/^изменено/)).toBeInTheDocument()
+
+    await act(async () => { await game.deletedMsg() })
+    expect(screen.getByText('🚫 Сообщение удалено')).toBeInTheDocument()
   })
 })
