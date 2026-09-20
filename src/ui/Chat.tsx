@@ -85,10 +85,6 @@ const MessageList = memo(function MessageList() {
   if (applied.current !== epoch) {
     const dirtyAbs = game.getMsgsDirtyFrom()
     const dirtyRel = windowStart > 0 ? Math.max(0, dirtyAbs - windowStart) : dirtyAbs
-    if (import.meta.env.MODE === 'test') {
-      // eslint-disable-next-line no-console
-      console.log('[MessageList sync] ' + JSON.stringify({ epoch, applied: applied.current, dirtyAbs, dirtyRel, vis: visible.length, cacheLen: cache.current.len, msgs: all.length }))
-    }
     cache.current = syncMessageNodes(cache.current, visible, dirtyRel, windowStart)
     applied.current = epoch
   }
