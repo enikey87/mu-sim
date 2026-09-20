@@ -53,7 +53,7 @@ test('досье открывается и закрывается клавише
 
 test('длинная история: прокрутка, непрочитанные, своя реплика возвращает вниз', async ({ page }) => {
   await page.evaluate(() => {
-    const g = (window as unknown as { __alik: { S: { msgs: unknown[]; nextId: number }; emit: () => void } }).__alik
+    const g = (window as unknown as { __alik: { S: { msgs: unknown[]; nextId: number }; notifyMsgs: () => void } }).__alik
     for (let i = 0; i < 200; i++) {
       g.S.msgs.push({
         id: g.S.nextId++,
@@ -63,7 +63,7 @@ test('длинная история: прокрутка, непрочитанн�
         time: '12:00',
       })
     }
-    g.emit()
+    g.notifyMsgs()
   })
 
   const chat = page.locator('#chat')

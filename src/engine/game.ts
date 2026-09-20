@@ -153,9 +153,20 @@ export class Game {
     return () => this.listeners.delete(fn)
   }
   getVersion = (): number => this.version
+  /** Эпоха ленты: растёт только при push/замене сообщения — для изолированного списка в UI. */
+  getMsgsEpoch = (): number => this.msgsEpoch
   emit(): void {
     this.version++
     for (const fn of this.listeners) fn()
+  }
+
+  private msgsEpoch = 0
+  private touchMsgs(): void { this.msgsEpoch++ }
+
+  /** Лента изменена снаружи (тесты): перерисовать MessageList. */
+  notifyMsgs(): void {
+    this.touchMsgs()
+    this.emit()
   }
 
   dispose(): void {
@@ -305,6 +316,7 @@ export class Game {
     // прозвучало в переписке (не от игрока) — теперь об этом можно говорить: «кран», «Арсен», «калым»…
     const said = msg.kind === 'sys' || (msg.kind === 'text' && msg.from !== 'me') ? msg.text : ''
     for (const [k, re] of INTRO) if (!this.S.mem['intro.' + k] && re.test(said)) this.S.mem['intro.' + k] = true
+    this.touchMsgs()
     this.emit()
     return msg
   }
@@ -313,6 +325,7 @@ export class Game {
     const next = { ...m, ...patch } as T
     const i = this.S.msgs.findIndex((x) => x.id === m.id)
     if (i >= 0) this.S.msgs[i] = next
+    this.touchMsgs()
     return next
   }
   sys(text: string): Msg { return this.push({ kind: 'sys', text }) }

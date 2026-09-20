@@ -1,5 +1,5 @@
-import { useLayoutEffect, useRef, useState } from 'react'
-import { useGame } from './useGame'
+import { useLayoutEffect, useRef, useState, useSyncExternalStore, memo } from 'react'
+import { useGame, useGameApi } from './useGame'
 import { Message } from './Message'
 import type { Msg } from '../engine/state'
 
@@ -13,6 +13,17 @@ const unreadLabel = (n: number): string => {
   const last = n % 10
   return `↓ ${n} ${lastTwo >= 11 && lastTwo <= 14 ? 'новых сообщений' : last >= 2 && last <= 4 ? 'новых сообщения' : 'новых сообщений'}`
 }
+
+/** Счётчик пересборок списка — только в test. */
+export const messageListRenderStats = { count: 0 }
+
+/** Список пузырей: подписан только на эпоху сообщений, не на status/typing. */
+const MessageList = memo(function MessageList() {
+  const game = useGameApi()
+  useSyncExternalStore(game.subscribe, game.getMsgsEpoch)
+  if (import.meta.env.MODE === 'test') messageListRenderStats.count++
+  return game.S.msgs.map((m) => <Message key={m.id} m={m} />)
+})
 
 /** Лента сообщений + «печатает…» + всплывающие «Мууу». */
 export function Chat() {
@@ -70,7 +81,7 @@ export function Chat() {
             <div key={m.id} className="moo" style={{ left: `${m.left}%`, top: `${m.top}%` }}>{m.text}</div>
           ))}
         </div>
-        {game.S.msgs.map((m) => <Message key={m.id} m={m} />)}
+        <MessageList />
         {game.typing && (
           <div className="typing-bubble" aria-label={game.typing}><span /><span /><span /></div>
         )}
