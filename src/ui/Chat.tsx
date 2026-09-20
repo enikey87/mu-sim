@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, useSyncExternalStore, memo } from 'react'
+import { useLayoutEffect, useRef, useState, useSyncExternalStore, memo, type ReactElement } from 'react'
 import { useGame, useGameApi } from './useGame'
 import { Message } from './Message'
 import type { Msg } from '../engine/state'
@@ -16,13 +16,42 @@ const unreadLabel = (n: number): string => {
 
 /** Счётчик пересборок списка — только в test. */
 export const messageListRenderStats = { count: 0 }
+/** Сколько Message-элементов создано при последней синхронизации — только в test. */
+export const messageListBuildStats = { created: 0 }
+
+type NodeCache = { msgs: Msg[]; nodes: ReactElement[] }
+
+/** Инкрементально: append/patch без полного map по N. */
+function syncMessageNodes(cache: NodeCache, next: Msg[]): NodeCache {
+  const { msgs: prev, nodes: oldNodes } = cache
+  if (next.length < prev.length) {
+    if (import.meta.env.MODE === 'test') messageListBuildStats.created = next.length
+    return { msgs: next.slice(), nodes: next.map((m) => <Message key={m.id} m={m} />) }
+  }
+  const nodes = oldNodes.slice()
+  let created = 0
+  for (let i = 0; i < prev.length; i++) {
+    if (next[i] !== prev[i]) {
+      nodes[i] = <Message key={next[i].id} m={next[i]} />
+      created++
+    }
+  }
+  for (let i = prev.length; i < next.length; i++) {
+    nodes.push(<Message key={next[i].id} m={next[i]} />)
+    created++
+  }
+  if (import.meta.env.MODE === 'test') messageListBuildStats.created = created
+  return { msgs: next.slice(), nodes }
+}
 
 /** Список пузырей: подписан только на эпоху сообщений, не на status/typing. */
 const MessageList = memo(function MessageList() {
   const game = useGameApi()
   useSyncExternalStore(game.subscribe, game.getMsgsEpoch)
   if (import.meta.env.MODE === 'test') messageListRenderStats.count++
-  return game.S.msgs.map((m) => <Message key={m.id} m={m} />)
+  const cache = useRef<NodeCache>({ msgs: [], nodes: [] })
+  cache.current = syncMessageNodes(cache.current, game.S.msgs)
+  return cache.current.nodes
 })
 
 /** Лента сообщений + «печатает…» + всплывающие «Мууу». */

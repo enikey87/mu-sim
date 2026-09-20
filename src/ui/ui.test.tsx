@@ -3,7 +3,7 @@ import { render, screen, fireEvent, act, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { App } from './App'
 import { messageRenderStats } from './Message'
-import { messageListRenderStats } from './Chat'
+import { messageListRenderStats, messageListBuildStats } from './Chat'
 import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
 
@@ -420,24 +420,44 @@ describe('App', () => {
     renderApp(game)
     messageRenderStats.count = 0
     messageListRenderStats.count = 0
+    messageListBuildStats.created = 0
     const t0 = performance.now()
     act(() => { game.setStatus('в сети', 'online') })
     const statusMs = performance.now() - t0
     expect(messageListRenderStats.count).toBe(0)
     expect(messageRenderStats.count).toBe(0)
+    expect(messageListBuildStats.created).toBe(0)
 
     messageRenderStats.count = 0
     messageListRenderStats.count = 0
+    messageListBuildStats.created = 0
     const t1 = performance.now()
     act(() => { game.push({ kind: 'text', from: 'alik', text: 'новое', time: '12:01' }) })
     const pushMs = performance.now() - t1
     expect(messageListRenderStats.count).toBe(1)
     expect(messageRenderStats.count).toBe(1)
+    expect(messageListBuildStats.created).toBe(1)
 
+    messageListBuildStats.created = 0
+    const t2 = performance.now()
+    act(() => {
+      const last = game.S.msgs[game.S.msgs.length - 1]!
+      game.S.msgs[game.S.msgs.length - 1] = { ...last, kind: 'text', from: 'alik', text: 'новое', time: '12:01', react: '👍' }
+      game.notifyMsgs()
+    })
+    const patchMs = performance.now() - t2
+    expect(messageListBuildStats.created).toBe(1)
+    expect(screen.getByText('👍')).toBeInTheDocument()
+
+    // baseline до оптимизации (полный map N): status ~500 Message renders; push создавал N elements
     expect(statusMs).toBeLessThan(80)
-    expect(pushMs).toBeLessThan(200)
+    expect(pushMs).toBeLessThan(120)
+    expect(patchMs).toBeLessThan(80)
     // eslint-disable-next-line no-console
-    console.log(`[chat-render] n=1000 status=${statusMs.toFixed(1)}ms list=0; push=${pushMs.toFixed(1)}ms list=1 msg=1`)
+    console.log(
+      `[chat-render] n=1000 before≈status:500msgs/push:N-map; after status=${statusMs.toFixed(1)}ms build=0; ` +
+        `push=${pushMs.toFixed(1)}ms build=1 msg=1; patch=${patchMs.toFixed(1)}ms build=1`,
+    )
   })
 
   it('динамические поля сообщения обновляют UI после replace', async () => {

@@ -157,7 +157,7 @@ test('landscape desktop: короткая высота не снимает ра�
 test('длинная история: прокрутка, непрочитанные, своя реплика возвращает вниз', async ({ page }) => {
   await page.evaluate(() => {
     const g = (window as unknown as { __alik: { S: { msgs: unknown[]; nextId: number }; notifyMsgs: () => void } }).__alik
-    for (let i = 0; i < 200; i++) {
+    for (let i = 0; i < 1000; i++) {
       g.S.msgs.push({
         id: g.S.nextId++,
         kind: 'text',
@@ -170,7 +170,7 @@ test('длинная история: прокрутка, непрочитанн�
   })
 
   const chat = page.locator('#chat')
-  await expect(page.getByText('длинное-сообщение-199')).toBeVisible()
+  await expect(page.getByText('длинное-сообщение-999')).toBeVisible()
   await chat.evaluate((el) => {
     el.scrollTop = 0
     el.dispatchEvent(new Event('scroll'))
