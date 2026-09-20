@@ -155,17 +155,30 @@ export class Game {
   getVersion = (): number => this.version
   /** Эпоха ленты: растёт только при push/замене сообщения — для изолированного списка в UI. */
   getMsgsEpoch = (): number => this.msgsEpoch
+  /** Индекс, с которого UI должен пересобрать узлы (накопленный min с прошлого ack). */
+  getMsgsDirtyFrom = (): number => this.msgsDirtyFrom
+  /** UI: dirty-диапазон применён. */
+  ackMsgsDirty = (): void => {
+    this.msgsDirtyOpen = false
+    this.msgsDirtyFrom = this.S.msgs.length
+  }
   emit(): void {
     this.version++
     for (const fn of this.listeners) fn()
   }
 
   private msgsEpoch = 0
-  private touchMsgs(): void { this.msgsEpoch++ }
+  private msgsDirtyFrom = 0
+  private msgsDirtyOpen = false
+  private touchMsgs(from = 0): void {
+    this.msgsDirtyFrom = this.msgsDirtyOpen ? Math.min(this.msgsDirtyFrom, from) : from
+    this.msgsDirtyOpen = true
+    this.msgsEpoch++
+  }
 
   /** Лента изменена снаружи (тесты): перерисовать MessageList. */
   notifyMsgs(): void {
-    this.touchMsgs()
+    this.touchMsgs(0)
     this.emit()
   }
 
@@ -316,7 +329,7 @@ export class Game {
     // прозвучало в переписке (не от игрока) — теперь об этом можно говорить: «кран», «Арсен», «калым»…
     const said = msg.kind === 'sys' || (msg.kind === 'text' && msg.from !== 'me') ? msg.text : ''
     for (const [k, re] of INTRO) if (!this.S.mem['intro.' + k] && re.test(said)) this.S.mem['intro.' + k] = true
-    this.touchMsgs()
+    this.touchMsgs(this.S.msgs.length - 1)
     this.emit()
     return msg
   }
@@ -325,7 +338,7 @@ export class Game {
     const next = { ...m, ...patch } as T
     const i = this.S.msgs.findIndex((x) => x.id === m.id)
     if (i >= 0) this.S.msgs[i] = next
-    this.touchMsgs()
+    this.touchMsgs(i >= 0 ? i : 0)
     return next
   }
   sys(text: string): Msg { return this.push({ kind: 'sys', text }) }

@@ -16,41 +16,55 @@ const unreadLabel = (n: number): string => {
 
 /** Счётчик пересборок списка — только в test. */
 export const messageListRenderStats = { count: 0 }
-/** Сколько Message-элементов создано при последней синхронизации — только в test. */
-export const messageListBuildStats = { created: 0 }
+/** Создание узлов и сколько индексов затронул sync — только в test. */
+export const messageListBuildStats = { created: 0, touched: 0 }
 
-type NodeCache = { msgs: Msg[]; nodes: ReactElement[] }
+type NodeCache = { len: number; nodes: ReactElement[] }
 
-/** Инкрементально: append/patch без полного map по N. */
-function syncMessageNodes(cache: NodeCache, next: Msg[]): NodeCache {
-  const { msgs: prev, nodes: oldNodes } = cache
-  if (next.length < prev.length) {
-    if (import.meta.env.MODE === 'test') messageListBuildStats.created = next.length
-    return { msgs: next.slice(), nodes: next.map((m) => <Message key={m.id} m={m} />) }
+/** С dirtyFrom: только хвост с изменённого индекса, без scan/copy префикса. */
+function syncMessageNodes(cache: NodeCache, next: Msg[], dirtyFrom: number): NodeCache {
+  if (cache.len === 0 || next.length < cache.len) {
+    const nodes = next.map((m) => <Message key={m.id} m={m} />)
+    if (import.meta.env.MODE === 'test') {
+      messageListBuildStats.created = nodes.length
+      messageListBuildStats.touched = nodes.length
+    }
+    return { len: next.length, nodes }
   }
-  const nodes = oldNodes.slice()
+  const from = Math.min(Math.max(0, dirtyFrom), cache.len)
+  const nodes = cache.nodes
   let created = 0
-  for (let i = 0; i < prev.length; i++) {
-    if (next[i] !== prev[i]) {
+  if (next.length === cache.len) {
+    for (let i = from; i < next.length; i++) {
       nodes[i] = <Message key={next[i].id} m={next[i]} />
       created++
     }
+  } else {
+    nodes.length = from
+    for (let i = from; i < next.length; i++) {
+      nodes.push(<Message key={next[i].id} m={next[i]} />)
+      created++
+    }
   }
-  for (let i = prev.length; i < next.length; i++) {
-    nodes.push(<Message key={next[i].id} m={next[i]} />)
-    created++
+  if (import.meta.env.MODE === 'test') {
+    messageListBuildStats.created = created
+    messageListBuildStats.touched = next.length - from
   }
-  if (import.meta.env.MODE === 'test') messageListBuildStats.created = created
-  return { msgs: next.slice(), nodes }
+  return { len: next.length, nodes }
 }
 
 /** Список пузырей: подписан только на эпоху сообщений, не на status/typing. */
 const MessageList = memo(function MessageList() {
   const game = useGameApi()
-  useSyncExternalStore(game.subscribe, game.getMsgsEpoch)
+  const epoch = useSyncExternalStore(game.subscribe, game.getMsgsEpoch)
   if (import.meta.env.MODE === 'test') messageListRenderStats.count++
-  const cache = useRef<NodeCache>({ msgs: [], nodes: [] })
-  cache.current = syncMessageNodes(cache.current, game.S.msgs)
+  const cache = useRef<NodeCache>({ len: 0, nodes: [] })
+  const applied = useRef(-1)
+  if (applied.current !== epoch) {
+    cache.current = syncMessageNodes(cache.current, game.S.msgs, game.getMsgsDirtyFrom())
+    applied.current = epoch
+  }
+  useLayoutEffect(() => { game.ackMsgsDirty() }, [epoch, game])
   return cache.current.nodes
 })
 

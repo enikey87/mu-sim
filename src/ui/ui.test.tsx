@@ -404,7 +404,7 @@ describe('App', () => {
     expect(within(panel).getAllByText('выбрано').length).toBeGreaterThan(0)
   })
 
-  it('длинная лента: несвязанный emit не пересобирает список', () => {
+  it('длинная лента: несвязанный emit не пересобирает список', async () => {
     const { game } = makeGame()
     for (let i = 0; i < 1000; i++) {
       game.S.msgs.push({
@@ -421,42 +421,46 @@ describe('App', () => {
     messageRenderStats.count = 0
     messageListRenderStats.count = 0
     messageListBuildStats.created = 0
+    messageListBuildStats.touched = 0
     const t0 = performance.now()
     act(() => { game.setStatus('в сети', 'online') })
     const statusMs = performance.now() - t0
     expect(messageListRenderStats.count).toBe(0)
     expect(messageRenderStats.count).toBe(0)
     expect(messageListBuildStats.created).toBe(0)
+    expect(messageListBuildStats.touched).toBe(0)
 
     messageRenderStats.count = 0
     messageListRenderStats.count = 0
     messageListBuildStats.created = 0
+    messageListBuildStats.touched = 0
     const t1 = performance.now()
-    act(() => { game.push({ kind: 'text', from: 'alik', text: 'новое', time: '12:01' }) })
+    let last!: ReturnType<typeof game.push>
+    act(() => { last = game.push({ kind: 'text', from: 'alik', text: 'новое', time: '12:01' }) })
     const pushMs = performance.now() - t1
     expect(messageListRenderStats.count).toBe(1)
     expect(messageRenderStats.count).toBe(1)
     expect(messageListBuildStats.created).toBe(1)
+    expect(messageListBuildStats.touched).toBe(1)
 
+    messageRenderStats.count = 0
     messageListBuildStats.created = 0
+    messageListBuildStats.touched = 0
     const t2 = performance.now()
-    act(() => {
-      const last = game.S.msgs[game.S.msgs.length - 1]!
-      game.S.msgs[game.S.msgs.length - 1] = { ...last, kind: 'text', from: 'alik', text: 'новое', time: '12:01', react: '👍' }
-      game.notifyMsgs()
-    })
+    await act(async () => { await game.editLast(last) })
     const patchMs = performance.now() - t2
     expect(messageListBuildStats.created).toBe(1)
-    expect(screen.getByText('👍')).toBeInTheDocument()
+    expect(messageListBuildStats.touched).toBe(1)
+    expect(messageRenderStats.count).toBe(1)
+    expect(screen.getByText(/^изменено/)).toBeInTheDocument()
 
-    // baseline до оптимизации (полный map N): status ~500 Message renders; push создавал N elements
     expect(statusMs).toBeLessThan(80)
     expect(pushMs).toBeLessThan(120)
     expect(patchMs).toBeLessThan(80)
     // eslint-disable-next-line no-console
     console.log(
-      `[chat-render] n=1000 before≈status:500msgs/push:N-map; after status=${statusMs.toFixed(1)}ms build=0; ` +
-        `push=${pushMs.toFixed(1)}ms build=1 msg=1; patch=${patchMs.toFixed(1)}ms build=1`,
+      `[chat-render] n=1000 before≈status:N-scan/push:N-map; after status=${statusMs.toFixed(1)}ms touched=0; ` +
+        `push=${pushMs.toFixed(1)}ms created=1 touched=1; editLast=${patchMs.toFixed(1)}ms created=1 touched=1`,
     )
   })
 
