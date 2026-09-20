@@ -348,6 +348,19 @@ describe('App', () => {
     expect(within(dialog).getByText('1/14')).toBeInTheDocument()
   })
 
+  it('концовка закрывает открытое досье', async () => {
+    const { game } = makeGame()
+    game.S.arcs.samvel = { i: 8, last: 0 }
+    game.S.mem['finale.samvel'] = 'groom'
+    game.S.day = 320
+    renderApp(game)
+    fireEvent.click(screen.getByTitle('Обещания и ачивки'))
+    expect(screen.getByRole('dialog', { name: 'Досье на Алика' })).toBeInTheDocument()
+    await act(async () => { await game.fire('CheckEnding') })
+    expect(screen.queryByRole('dialog', { name: 'Досье на Алика' })).toBeNull()
+    expect(screen.getByRole('dialog', { name: /Породнились/ })).toBeInTheDocument()
+  })
+
   it('концовка: Esc и aria — фон inert, фокус не в чате', async () => {
     const { game } = makeGame()
     game.S.arcs.samvel = { i: 8, last: 0 }
@@ -401,8 +414,51 @@ describe('App', () => {
     const execBackup = document.execCommand
     document.execCommand = () => false
     await act(async () => { fireEvent.click(within(end).getByText('Скопировать великую отмазку')) })
-    expect(screen.getByRole('status')).toHaveTextContent('Не удалось скопировать')
+    const toast = screen.getByRole('status')
+    expect(toast).toHaveTextContent('Не удалось скопировать')
+    expect(toast.closest('[inert]')).toBeNull()
     document.execCommand = execBackup
+  })
+
+  it('тост на концовке вне inert', async () => {
+    const { game } = makeGame()
+    game.S.arcs.samvel = { i: 8, last: 0 }
+    game.S.mem['finale.samvel'] = 'groom'
+    game.S.day = 320
+    await game.fire('CheckEnding')
+    renderApp(game)
+    expect(document.querySelector('.phone-surface')).toHaveAttribute('inert')
+    act(() => { game.flash('Скопировано') })
+    const toast = screen.getByRole('status')
+    expect(toast).toHaveTextContent('Скопировано')
+    expect(toast.closest('.phone-surface')).toBeNull()
+    expect(toast.closest('[inert]')).toBeNull()
+  })
+
+  it('голосовое доступно с клавиатуры', () => {
+    const { game } = makeGame()
+    const play = vi.spyOn(game, 'playVoice')
+    game.push({ kind: 'voice', from: 'alik', len: 12 })
+    renderApp(game)
+    const voice = screen.getByLabelText('Голосовое сообщение')
+    expect(voice).toHaveAttribute('tabindex', '0')
+    voice.focus()
+    expect(voice).toHaveFocus()
+    fireEvent.keyDown(voice, { key: 'Enter' })
+    expect(play).toHaveBeenCalled()
+    play.mockClear()
+    fireEvent.keyDown(voice, { key: ' ' })
+    expect(play).toHaveBeenCalled()
+  })
+
+  it('feel-класс снимается на animationend', async () => {
+    const { game } = makeGame()
+    renderApp(game)
+    const phone = document.querySelector('.phone')!
+    await act(async () => { await game.send('АЛИК!!!') })
+    expect(phone).toHaveClass('feel-shake')
+    act(() => { fireEvent.animationEnd(phone) })
+    expect(phone).not.toHaveClass('feel-shake')
   })
 
   it('телефон сел → зарядка', async () => {
@@ -431,9 +487,13 @@ describe('App', () => {
   it('звук переключается', () => {
     const { game } = makeGame()
     renderApp(game)
-    fireEvent.click(screen.getByTitle('Звук'))
+    const mute = screen.getByRole('button', { name: 'Звук включён' })
+    expect(mute).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(mute)
     expect(game.S.muted).toBe(true)
-    expect(screen.getByTitle('Звук')).toHaveTextContent('🔇')
+    const muted = screen.getByRole('button', { name: 'Звук выключен' })
+    expect(muted).toHaveTextContent('🔇')
+    expect(muted).toHaveAttribute('aria-pressed', 'false')
   })
 
   it('отладочная панель показывает выборы правил и память', async () => {

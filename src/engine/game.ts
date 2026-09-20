@@ -110,8 +110,9 @@ export class Game {
   private version = 0
   private idleT = 0
   private statusT = 0
-  private toastT = 0
-  private notifT = 0
+  /** UI-таймеры вне game-clock — иначе ?fast гасит тост за десятки мс. */
+  private toastWall = 0
+  private notifWall = 0
   private idleCount = 0
   private seq = 1
   private resetting = false
@@ -223,7 +224,9 @@ export class Game {
     this.disposed = true
     for (const id of [...this.timerIds]) this.clock.clearTimeout(id)
     this.timerIds.clear()
-    this.idleT = this.statusT = this.toastT = this.notifT = 0
+    this.idleT = this.statusT = 0
+    if (this.toastWall) { clearTimeout(this.toastWall); this.toastWall = 0 }
+    if (this.notifWall) { clearTimeout(this.notifWall); this.notifWall = 0 }
     const err = new GameDisposed()
     for (const finish of this.sleepWaiters) finish(err)
     this.sleepWaiters.clear()
@@ -474,11 +477,15 @@ export class Game {
     else this.setStatus(this.chance(0.5) ? 'был недавно' : 'в сети', 'online')
   }
 
-  /** Короткий тост поверх чата (ачивка, «Скопировано»…). */
+  /** Короткий тост поверх чата (ачивка, «Скопировано»…). Длительность — wall clock. */
   flash(text: string, ms = 2600): void {
     this.toast = text
-    this.clearSchedule(this.toastT)
-    this.toastT = this.schedule(() => { this.toast = null; this.emit() }, ms)
+    if (this.toastWall) clearTimeout(this.toastWall)
+    this.toastWall = window.setTimeout(() => {
+      this.toastWall = 0
+      this.toast = null
+      this.emit()
+    }, ms)
     this.emit()
   }
   unlock(key: string): void {
@@ -526,12 +533,17 @@ export class Game {
   // ---------- уведомления, батарея ----------
   notify(icon: string, app: string, text: string): void {
     this.notif = { id: this.seq++, icon, app, text }
-    this.clearSchedule(this.notifT)
-    this.notifT = this.schedule(() => { this.notif = null; this.emit() }, 4200)
+    if (this.notifWall) clearTimeout(this.notifWall)
+    this.notifWall = window.setTimeout(() => {
+      this.notifWall = 0
+      this.notif = null
+      this.emit()
+    }, 4200)
     this.audio.vibrate(30)
     this.emit()
   }
   dismissNotif(): void {
+    if (this.notifWall) { clearTimeout(this.notifWall); this.notifWall = 0 }
     this.notif = null
     this.emit()
   }

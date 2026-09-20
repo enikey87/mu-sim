@@ -49,7 +49,19 @@ function body(m: Msg, game: ReturnType<typeof useGameApi>) {
       return (<><div>💸 Вам перевод</div><div className="sum">50 ₽</div><div>«{m.text}»</div></>)
     case 'voice':
       return (
-        <div className="voice" role="button" aria-label="Голосовое сообщение" onClick={() => game.playVoice(m)}>
+        <div
+          className="voice"
+          role="button"
+          tabIndex={0}
+          aria-label="Голосовое сообщение"
+          onClick={() => game.playVoice(m)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              game.playVoice(m)
+            }
+          }}
+        >
           <div className="play">▶</div><div className="wave">▂▃▅▂▇▃▂▅▆▃▂▅▃▇▂</div><div>0:{m.len}</div>
         </div>
       )
