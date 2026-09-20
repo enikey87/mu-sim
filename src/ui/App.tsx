@@ -54,13 +54,11 @@ function Phone({ onReset }: { onReset: () => void }) {
 
   const setSheetOpen = (v: boolean) => { game.sheetOpen = v; setSheet(v) }
 
-  // Esc закрывает досье
   useEffect(() => {
     if (!sheet) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSheetOpen(false) }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [sheet])
+    return () => { game.sheetOpen = false }
+  }, [sheet, game])
+
   const reset = () => {
     if (!confirm('Стереть всё и начать заново?')) return
     game.reset()
@@ -69,12 +67,14 @@ function Phone({ onReset }: { onReset: () => void }) {
 
   return (
     <div className="phone" ref={phone}>
-      <StatusBar />
-      <ChatHeader onInfo={() => setSheetOpen(true)} />
-      <StatsBar />
-      <Chat />
-      <Choices />
-      <Composer />
+      <div className="phone-main" inert={sheet || undefined}>
+        <StatusBar />
+        <ChatHeader onInfo={() => setSheetOpen(true)} />
+        <StatsBar />
+        <Chat />
+        <Choices />
+        <Composer />
+      </div>
       {sheet && <Sheet onClose={() => setSheetOpen(false)} onReset={reset} />}
       <Toast />
       <Notification />
