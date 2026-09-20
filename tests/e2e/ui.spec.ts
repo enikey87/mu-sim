@@ -42,13 +42,26 @@ test('ручной ответ отправляется, очищает поле 
   await expect(page.locator('.msg.me').filter({ hasText: text })).toBeVisible()
 })
 
-test('досье открывается и закрывается клавишей Escape', async ({ page }) => {
-  await page.getByTitle('Обещания и ачивки').click()
-  await expect(page.getByRole('dialog', { name: 'Досье на Алика' })).toBeVisible()
+test('досье: модальность с клавиатуры, фон недоступен', async ({ page }) => {
+  await page.getByTitle('Обещания и ачивки').focus()
+  await page.keyboard.press('Enter')
+  const dialog = page.getByRole('dialog', { name: 'Досье на Алика' })
+  await expect(dialog).toBeVisible()
+  await expect(dialog).toHaveAttribute('aria-modal', 'true')
+  await expect(page.locator('.phone-surface')).toHaveAttribute('inert')
+  await expect(page.getByLabel('Закрыть')).toBeFocused()
+
+  await page.keyboard.press('Tab')
+  const inDialog = await page.evaluate(() => {
+    const d = document.querySelector('.sheet-inner')
+    return !!d && d.contains(document.activeElement)
+  })
+  expect(inDialog).toBe(true)
 
   await page.keyboard.press('Escape')
-
-  await expect(page.getByRole('dialog', { name: 'Досье на Алика' })).toBeHidden()
+  await expect(dialog).toBeHidden()
+  await expect(page.getByTitle('Обещания и ачивки')).toBeFocused()
+  await expect(page.locator('.phone-surface')).not.toHaveAttribute('inert')
 })
 
 test('поле сообщения имеет enterKeyHint=send', async ({ page }) => {

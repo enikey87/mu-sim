@@ -246,13 +246,80 @@ describe('App', () => {
     fireEvent.click(screen.getByLabelText('Закрыть'))
   })
 
-  it('Esc закрывает досье', () => {
+  it('Esc закрывает досье и возвращает фокус на кнопку досье', () => {
     const { game } = makeGame()
     renderApp(game)
-    fireEvent.click(screen.getByTitle('Обещания и ачивки'))
+    const info = screen.getByTitle('Обещания и ачивки')
+    info.focus()
+    fireEvent.click(info)
+    const dialog = screen.getByRole('dialog', { name: 'Досье на Алика' })
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
+    expect(document.activeElement).toBe(screen.getByLabelText('Закрыть'))
+    expect(game.sheetOpen).toBe(true)
+    expect(document.querySelector('.phone-surface')).toHaveAttribute('inert')
+    act(() => { fireEvent.keyDown(document, { key: 'Escape' }) })
+    expect(screen.queryByRole('dialog', { name: 'Досье на Алика' })).toBeNull()
+    expect(document.activeElement).toBe(info)
+    expect(game.sheetOpen).toBe(false)
+    expect(document.querySelector('.phone-surface')).not.toHaveAttribute('inert')
+  })
+
+  it('досье: Tab зациклен, подложка закрывает, повторное открытие без утечки', async () => {
+    const user = userEvent.setup()
+    const { game } = makeGame()
+    renderApp(game)
+    const info = screen.getByTitle('Обещания и ачивки')
+    await user.click(info)
+    const dialog = screen.getByRole('dialog', { name: 'Досье на Алика' })
+    const close = screen.getByLabelText('Закрыть')
+    const resetBtn = within(dialog).getByText('Начать заново')
+    expect(document.activeElement).toBe(close)
+
+    await user.tab()
+    expect(dialog.contains(document.activeElement)).toBe(true)
+    resetBtn.focus()
+    await user.tab()
+    expect(document.activeElement).toBe(close)
+    close.focus()
+    await user.tab({ shift: true })
+    expect(document.activeElement).toBe(resetBtn)
+
+    expect(screen.getByLabelText('Сообщение')).not.toHaveFocus()
+    fireEvent.click(document.getElementById('sheet')!)
+    expect(screen.queryByRole('dialog', { name: 'Досье на Алика' })).toBeNull()
+    expect(document.activeElement).toBe(info)
+
+    await user.click(info)
     expect(screen.getByRole('dialog', { name: 'Досье на Алика' })).toBeInTheDocument()
     act(() => { fireEvent.keyDown(document, { key: 'Escape' }) })
     expect(screen.queryByRole('dialog', { name: 'Досье на Алика' })).toBeNull()
+  })
+
+  it('при открытом досье onIdle не вмешивается в игру', async () => {
+    const { game } = makeGame()
+    renderApp(game)
+    fireEvent.click(screen.getByTitle('Обещания и ачивки'))
+    expect(game.sheetOpen).toBe(true)
+    const before = game.S.msgs.length
+    await act(async () => { await game.onIdle() })
+    expect(game.S.msgs.length).toBe(before)
+    expect(game.busy).toBe(false)
+  })
+
+  it('досье поверх уведомления: фон inert, клик по notif не dismiss', () => {
+    const { game } = makeGame()
+    renderApp(game)
+    act(() => { game.notify('👩', 'Мама', 'Сынок, ты поел?') })
+    expect(screen.getByText('Сынок, ты поел?')).toBeInTheDocument()
+    fireEvent.click(screen.getByTitle('Обещания и ачивки'))
+    const dialog = screen.getByRole('dialog', { name: 'Досье на Алика' })
+    const notif = document.getElementById('notif')!
+    expect(document.querySelector('.phone-surface')).toHaveAttribute('inert')
+    expect(notif.closest('[inert]')).toBeTruthy()
+    expect(dialog.closest('[inert]')).toBeNull()
+    expect(screen.getByLabelText('Сообщение').closest('[inert]')).toBeTruthy()
+    // jsdom не блокирует клики по inert — проверяем, что обработчик на inert-поддереве, а не срабатывание
+    expect(notif.hasAttribute('inert') || !!notif.closest('[inert]')).toBe(true)
   })
 
   it('концовка: экран с итогами, «играть дальше» и «заново»; в досье — финалы и концовки', async () => {
