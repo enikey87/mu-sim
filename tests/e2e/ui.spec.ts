@@ -63,3 +63,93 @@ test('досье: модальность с клавиатуры, фон нед�
   await expect(page.getByTitle('Обещания и ачивки')).toBeFocused()
   await expect(page.locator('.phone-surface')).not.toHaveAttribute('inert')
 })
+
+test('поле сообщения имеет enterKeyHint=send', async ({ page }) => {
+  await expect(page.getByLabel('Сообщение')).toHaveAttribute('enterkeyhint', 'send')
+})
+
+test('мобильный layout: композер в viewport, без горизонтального overflow', async ({ page }, testInfo) => {
+  test.skip(!testInfo.project.name.includes('mobile'), 'только mobile project')
+
+  await page.addStyleTag({
+    content: `:root { --safe-top: 47px; --safe-right: 0px; --safe-bottom: 34px; --safe-left: 0px; }`,
+  })
+
+  const metrics = await page.evaluate(() => {
+    const phone = document.querySelector('.phone') as HTMLElement
+    const send = document.getElementById('sendBtn') as HTMLElement
+    const phoneBox = phone.getBoundingClientRect()
+    const sendBox = send.getBoundingClientRect()
+    const cs = getComputedStyle(phone)
+    return {
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+      paddingTop: cs.paddingTop,
+      paddingBottom: cs.paddingBottom,
+      sendBottom: sendBox.bottom,
+      phoneBottom: phoneBox.bottom,
+      sendVisible: sendBox.bottom <= phoneBox.bottom + 1 && sendBox.top >= phoneBox.top - 1,
+    }
+  })
+
+  expect(metrics.paddingTop).toBe('47px')
+  expect(metrics.paddingBottom).toBe('34px')
+  expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1)
+  expect(metrics.sendVisible).toBe(true)
+})
+
+test('landscape: нет горизонтального overflow при ненулевых боковых inset', async ({ page }, testInfo) => {
+  test.skip(!testInfo.project.name.includes('mobile'), 'только mobile project')
+
+  await page.setViewportSize({ width: 844, height: 390 })
+  await page.addStyleTag({
+    content: `:root { --safe-top: 0px; --safe-right: 44px; --safe-bottom: 21px; --safe-left: 44px; }`,
+  })
+
+  const metrics = await page.evaluate(() => {
+    const phone = document.querySelector('.phone') as HTMLElement
+    const box = phone.getBoundingClientRect()
+    const cs = getComputedStyle(phone)
+    return {
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+      phoneWidth: box.width,
+      paddingLeft: cs.paddingLeft,
+      paddingRight: cs.paddingRight,
+      borderWidth: cs.borderLeftWidth,
+      fullscreen: matchMedia('(max-width: 500px), (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse)').matches,
+    }
+  })
+
+  expect(metrics.fullscreen).toBe(true)
+  expect(metrics.borderWidth).toBe('0px')
+  expect(metrics.paddingLeft).toBe('44px')
+  expect(metrics.paddingRight).toBe('44px')
+  expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1)
+})
+
+test('landscape desktop: короткая высота не снимает рамку телефона', async ({ page }, testInfo) => {
+  test.skip(!testInfo.project.name.includes('desktop'), 'только desktop project')
+
+  await page.setViewportSize({ width: 844, height: 390 })
+  await page.addStyleTag({
+    content: `:root { --safe-top: 0px; --safe-right: 44px; --safe-bottom: 21px; --safe-left: 44px; }`,
+  })
+
+  const metrics = await page.evaluate(() => {
+    const phone = document.querySelector('.phone') as HTMLElement
+    const box = phone.getBoundingClientRect()
+    const cs = getComputedStyle(phone)
+    return {
+      phoneWidth: Math.round(box.width),
+      paddingLeft: cs.paddingLeft,
+      paddingRight: cs.paddingRight,
+      borderWidth: cs.borderLeftWidth,
+    }
+  })
+
+  expect(metrics.phoneWidth).toBe(400)
+  expect(metrics.borderWidth).not.toBe('0px')
+  expect(metrics.paddingLeft).toBe('0px')
+  expect(metrics.paddingRight).toBe('0px')
+})
