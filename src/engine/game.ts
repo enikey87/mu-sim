@@ -101,7 +101,6 @@ export class Game {
   private version = 0
   private idleT = 0
   private statusT = 0
-  private ambientT = 0
   private toastT = 0
   private notifT = 0
   private idleCount = 0
@@ -160,7 +159,7 @@ export class Game {
   }
 
   dispose(): void {
-    for (const t of [this.idleT, this.statusT, this.ambientT, this.toastT, this.notifT]) this.clock.clearTimeout(t)
+    for (const t of [this.idleT, this.statusT, this.toastT, this.notifT]) this.clock.clearTimeout(t)
     this.listeners.clear()
   }
 
@@ -413,15 +412,9 @@ export class Game {
     this.save()
     this.emit()
   }
-  /** Первое касание: разрешить звук и запустить фон. */
+  /** Касание разрешает браузеру воспроизводить звуки игры. */
   gesture(): void {
     this.audio.unlock()
-    if (this.ambientT || this.noTimers) return
-    const loop = () => {
-      if (!this.S.muted && !this.dead) this.audio.ambient(this.period())
-      this.ambientT = this.clock.setTimeout(loop, 6000)
-    }
-    this.ambientT = this.clock.setTimeout(loop, 6000)
   }
 
   // ---------- уведомления, батарея ----------
