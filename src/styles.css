@@ -9,6 +9,11 @@
   --accent: #2f9e5c;
   --sys: rgba(0, 0, 0, .28);
   --danger: #d9443c;
+  /* переопределяются в тестах; на устройстве = системные inset */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -39,8 +44,23 @@ body {
   display: flex; flex-direction: column; overflow: hidden;
   box-shadow: 0 20px 60px rgba(0, 0, 0, .35);
 }
-@media (max-width: 500px) {
-  .phone { width: 100%; height: 100dvh; border: 0; border-radius: 0; }
+.phone-main {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
+}
+.phone-surface {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
+  position: relative;
+}
+@media (max-width: 500px), (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
+  .phone {
+    width: 100%; height: 100dvh; border: 0; border-radius: 0;
+    padding-top: var(--safe-top);
+    padding-right: var(--safe-right);
+    padding-bottom: var(--safe-bottom);
+    padding-left: var(--safe-left);
+  }
 }
 .statusbar {
   display: flex; justify-content: space-between;
@@ -167,6 +187,9 @@ body {
   flex: 1; min-width: 0; border: 0; border-radius: 18px; padding: 9px 14px; font: inherit;
   background: rgba(127, 127, 127, .14); color: var(--text); outline: none;
 }
+@media (max-width: 500px), (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
+  .composer input { font-size: 16px; }
+}
 .composer input:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
 .composer button {
   width: 40px; flex: 0 0 40px; border: 0; border-radius: 50%; background: var(--accent); color: #fff;
@@ -175,13 +198,15 @@ body {
 .composer input:disabled, .composer button:disabled { opacity: .45; cursor: default; }
 
 .sheet {
-  position: absolute; inset: 0; background: rgba(0, 0, 0, .4); z-index: 10;
+  position: absolute; inset: 0; background: rgba(0, 0, 0, .4); z-index: 50;
   display: flex; align-items: flex-end;
 }
 .sheet-inner {
   background: var(--panel); width: 100%; max-height: 80%; overflow-y: auto;
   border-radius: 18px 18px 0 0; padding: 14px 16px 20px;
 }
+.sheet-inner:focus { outline: none; }
+.sheet-inner:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .sheet-head { display: flex; justify-content: space-between; align-items: center; }
 .sheet h3 { font-size: 14px; margin: 14px 0 6px; color: var(--muted); }
 .list { list-style: none; margin: 0; padding: 0; font-size: 13px; }
@@ -255,6 +280,15 @@ body {
 .ending-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 6px; }
 .ending-btns button { border: 0; border-radius: 12px; padding: 10px 16px; background: var(--accent); color: #fff; font: inherit; cursor: pointer; }
 .ending-btns button.secondary { background: transparent; color: inherit; border: 1px solid rgba(127,127,127,.4); }
+/* abspos не видит padding .phone — inset один раз через те же --safe-* */
+@media (max-width: 500px), (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
+  .sheet, .dead, .ending {
+    top: var(--safe-top);
+    right: var(--safe-right);
+    bottom: var(--safe-bottom);
+    left: var(--safe-left);
+  }
+}
 /* отклик на тип ввода (категория на экране не показывается) */
 .phone.feel-shake { animation: feel-shake .45s; }
 @keyframes feel-shake {
