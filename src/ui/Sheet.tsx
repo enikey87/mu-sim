@@ -1,17 +1,34 @@
+import { useRef } from 'react'
 import { useGame } from './useGame'
 import { ACH } from '../content/achievements'
 import { ARCS } from '../content/arcs'
 import { ENDINGS } from '../content/finales'
 import { fmtDate } from '../engine/time'
+import { useModal } from './useModal'
 
 /** Досье на Алика: обещания, сериалы, трофеи, ачивки, сброс. */
 export function Sheet({ onClose, onReset }: { onClose: () => void; onReset: () => void }) {
   const game = useGame()
   const S = game.S
   const got = Object.keys(S.ach).length
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useModal({
+    active: true,
+    dialogRef,
+    onEscape: onClose,
+    returnFocus: () => document.getElementById('infoBtn'),
+  })
+
   return (
     <div className="sheet" id="sheet" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="sheet-inner" role="dialog" aria-label="Досье на Алика">
+      <div
+        className="sheet-inner"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Досье на Алика"
+        tabIndex={-1}
+      >
         <div className="sheet-head"><b>Досье на Алика</b><button className="icon-btn" id="closeSheet" onClick={onClose} aria-label="Закрыть">✕</button></div>
 
         <h3>Журнал обещаний</h3>
