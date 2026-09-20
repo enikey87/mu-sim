@@ -184,7 +184,9 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .choices button.locked .q,
   .moo,
+  .msg,
   .msg .react,
+  .new-messages,
   .typing-bubble span,
   .phone.feel-shake,
   .phone.feel-sorry,
@@ -235,7 +237,7 @@ body {
 .toast {
   position: absolute; top: 90px; left: 50%; transform: translateX(-50%);
   background: #222; color: #fff; padding: 8px 14px; border-radius: 12px;
-  font-size: 13px; z-index: 20; box-shadow: 0 6px 20px rgba(0, 0, 0, .3);
+  font-size: 13px; z-index: 60; box-shadow: 0 6px 20px rgba(0, 0, 0, .3);
   transition: opacity .3s; white-space: nowrap;
 }
 .hidden { display: none !important; }
