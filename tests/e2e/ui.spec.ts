@@ -48,7 +48,7 @@ test('досье: модальность с клавиатуры, фон нед�
   const dialog = page.getByRole('dialog', { name: 'Досье на Алика' })
   await expect(dialog).toBeVisible()
   await expect(dialog).toHaveAttribute('aria-modal', 'true')
-  await expect(page.locator('.phone-main')).toHaveAttribute('inert')
+  await expect(page.locator('.phone-surface')).toHaveAttribute('inert')
   await expect(page.getByLabel('Закрыть')).toBeFocused()
 
   await page.keyboard.press('Tab')
@@ -61,5 +61,5 @@ test('досье: модальность с клавиатуры, фон нед�
   await page.keyboard.press('Escape')
   await expect(dialog).toBeHidden()
   await expect(page.getByTitle('Обещания и ачивки')).toBeFocused()
-  await expect(page.locator('.phone-main')).not.toHaveAttribute('inert')
+  await expect(page.locator('.phone-surface')).not.toHaveAttribute('inert')
 })

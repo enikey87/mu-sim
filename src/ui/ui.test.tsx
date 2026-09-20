@@ -255,12 +255,12 @@ describe('App', () => {
     expect(dialog).toHaveAttribute('aria-modal', 'true')
     expect(document.activeElement).toBe(screen.getByLabelText('Закрыть'))
     expect(game.sheetOpen).toBe(true)
-    expect(document.querySelector('.phone-main')).toHaveAttribute('inert')
+    expect(document.querySelector('.phone-surface')).toHaveAttribute('inert')
     act(() => { fireEvent.keyDown(document, { key: 'Escape' }) })
     expect(screen.queryByRole('dialog', { name: 'Досье на Алика' })).toBeNull()
     expect(document.activeElement).toBe(info)
     expect(game.sheetOpen).toBe(false)
-    expect(document.querySelector('.phone-main')).not.toHaveAttribute('inert')
+    expect(document.querySelector('.phone-surface')).not.toHaveAttribute('inert')
   })
 
   it('досье: Tab зациклен, подложка закрывает, повторное открытие без утечки', async () => {
@@ -303,6 +303,23 @@ describe('App', () => {
     await act(async () => { await game.onIdle() })
     expect(game.S.msgs.length).toBe(before)
     expect(game.busy).toBe(false)
+  })
+
+  it('досье поверх уведомления: фон inert, клик по notif не dismiss', () => {
+    const { game } = makeGame()
+    renderApp(game)
+    act(() => { game.notify('👩', 'Мама', 'Сынок, ты поел?') })
+    expect(screen.getByText('Сынок, ты поел?')).toBeInTheDocument()
+    fireEvent.click(screen.getByTitle('Обещания и ачивки'))
+    const dialog = screen.getByRole('dialog', { name: 'Досье на Алика' })
+    const notif = document.getElementById('notif')!
+    expect(document.querySelector('.phone-surface')).toHaveAttribute('inert')
+    expect(notif.closest('[inert]')).toBeTruthy()
+    expect(dialog.closest('[inert]')).toBeNull()
+    fireEvent.click(screen.getByText('Сынок, ты поел?'))
+    expect(screen.getByText('Сынок, ты поел?')).toBeInTheDocument()
+    expect(dialog).toBeInTheDocument()
+    expect(screen.getByLabelText('Сообщение').closest('[inert]')).toBeTruthy()
   })
 
   it('концовка: экран с итогами, «играть дальше» и «заново»; в досье — финалы и концовки', async () => {

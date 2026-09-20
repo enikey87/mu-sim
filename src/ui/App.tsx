@@ -67,19 +67,21 @@ function Phone({ onReset }: { onReset: () => void }) {
 
   return (
     <div className="phone" ref={phone}>
-      <div className="phone-main" inert={sheet || undefined}>
-        <StatusBar />
-        <ChatHeader onInfo={() => setSheetOpen(true)} />
-        <StatsBar />
-        <Chat />
-        <Choices />
-        <Composer />
+      <div className="phone-surface" inert={sheet || undefined}>
+        <div className="phone-main">
+          <StatusBar />
+          <ChatHeader onInfo={() => setSheetOpen(true)} />
+          <StatsBar />
+          <Chat />
+          <Choices />
+          <Composer />
+        </div>
+        <Toast />
+        <Notification />
+        <DeadScreen />
+        <EndingScreen onReset={reset} />
       </div>
       {sheet && <Sheet onClose={() => setSheetOpen(false)} onReset={reset} />}
-      <Toast />
-      <Notification />
-      <DeadScreen />
-      <EndingScreen onReset={reset} />
     </div>
   )
 }

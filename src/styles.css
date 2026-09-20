@@ -43,6 +43,11 @@ body {
   flex: 1; min-height: 0;
   display: flex; flex-direction: column;
 }
+.phone-surface {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
+  position: relative;
+}
 @media (max-width: 500px) {
   .phone { width: 100%; height: 100dvh; border: 0; border-radius: 0; }
 }
@@ -179,7 +184,7 @@ body {
 .composer input:disabled, .composer button:disabled { opacity: .45; cursor: default; }
 
 .sheet {
-  position: absolute; inset: 0; background: rgba(0, 0, 0, .4); z-index: 10;
+  position: absolute; inset: 0; background: rgba(0, 0, 0, .4); z-index: 50;
   display: flex; align-items: flex-end;
 }
 .sheet-inner {
