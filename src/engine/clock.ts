@@ -46,3 +46,5 @@ export function manualClock(start = Date.parse('2026-09-18T12:00:00Z')): ManualC
     },
   }
 }
+
+export const isManualClock = (c: Clock): c is ManualClock => 'runTimers' in c
