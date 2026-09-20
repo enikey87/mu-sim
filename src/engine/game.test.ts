@@ -1,8 +1,8 @@
 import { STARTS } from '../content/quests'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { makeGame, memStorage, alikTexts } from '../test/helpers'
 import { silentAudio } from './audio'
-import { manualClock } from './clock'
+import { manualClock, realClock } from './clock'
 import { Game } from './game'
 import { seededRng } from './rng'
 import { SAVE_KEY } from './state'
@@ -405,6 +405,10 @@ describe('Game: мелочи', () => {
 })
 
 describe('Game: dispose отменяет async', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('dispose в покое идемпотентен и обнуляет таймеры', () => {
     const clock = manualClock()
     const game = new Game({ storage: memStorage(), clock, rng: seededRng(1), hour: 14 })
@@ -419,33 +423,30 @@ describe('Game: dispose отменяет async', () => {
   })
 
   it('dispose во время send: нет emit/save/audio после отмены', async () => {
-    const clock = manualClock()
-    let sleepGate: (() => void) | null = null
-    clock.sleep = () => new Promise((r) => { sleepGate = r })
+    vi.useFakeTimers()
     let saves = 0
     const storage = memStorage()
     const setItem = storage.setItem.bind(storage)
     storage.setItem = (k, v) => { saves++; setItem(k, v) }
     let beeps = 0
     const audio = { ...silentAudio, beep: () => { beeps++ }, vibrate: () => { beeps++ }, moo: () => { beeps++ } }
-    const game = new Game({ storage, clock, rng: seededRng(1), noTimers: true, hour: 14, audio })
+    const game = new Game({ storage, clock: realClock(), rng: seededRng(1), noTimers: true, hour: 14, audio })
     saves = 0
     beeps = 0
     let emits = 0
     game.subscribe(() => emits++)
 
     const turn = game.send('Алик, верни деньги')
-    expect(sleepGate).toBeTruthy()
+    expect(vi.getTimerCount()).toBeGreaterThan(0)
     const msgsAtDispose = game.S.msgs.length
     const emitsBefore = emits
     const savesBefore = saves
     game.dispose()
-    sleepGate!()
-    await turn
-    await Promise.resolve()
-    clock.runTimers()
-
     expect(game.pendingTimers()).toBe(0)
+    expect(vi.getTimerCount()).toBe(0)
+    await turn
+    await vi.runAllTimersAsync()
+
     expect(emits).toBe(emitsBefore)
     expect(saves).toBe(savesBefore)
     expect(beeps).toBe(0)
@@ -468,36 +469,32 @@ describe('Game: dispose отменяет async', () => {
   })
 
   it('dispose во время зарядки останавливает последовательность', async () => {
-    const clock = manualClock()
-    let sleepGate: (() => void) | null = null
-    clock.sleep = () => new Promise((r) => { sleepGate = r })
-    const game = new Game({ storage: memStorage(), clock, rng: seededRng(1), noTimers: true, hour: 14 })
+    vi.useFakeTimers()
+    const game = new Game({ storage: memStorage(), clock: realClock(), rng: seededRng(1), noTimers: true, hour: 14 })
     game.die()
     const charge = game.charge()
     expect(game.charging).toBe(1)
-    expect(sleepGate).toBeTruthy()
+    expect(vi.getTimerCount()).toBeGreaterThan(0)
     game.dispose()
-    sleepGate!()
+    expect(game.pendingTimers()).toBe(0)
+    expect(vi.getTimerCount()).toBe(0)
     await charge
     expect(game.charging).toBe(1)
     expect(game.dead).toBe(true)
-    expect(game.pendingTimers()).toBe(0)
   })
 
   it('гонка: callback начался → dispose → следующий await без эффектов', async () => {
-    const clock = manualClock()
-    const sleeps: Array<() => void> = []
-    clock.sleep = () => new Promise((r) => { sleeps.push(r) })
+    vi.useFakeTimers()
     let emits = 0
-    const game = new Game({ storage: memStorage(), clock, rng: seededRng(1), noTimers: true, hour: 14 })
+    const game = new Game({ storage: memStorage(), clock: realClock(), rng: seededRng(1), noTimers: true, hour: 14 })
     game.subscribe(() => emits++)
     const turn = game.send('Алик, привет')
-    expect(sleeps.length).toBe(1)
-    sleeps[0]!()
-    await Promise.resolve()
+    expect(vi.getTimerCount()).toBeGreaterThan(0)
+    // один шаг typingFor — затем dispose до следующей паузы
+    await vi.advanceTimersToNextTimerAsync()
     const emitsAfterFirst = emits
     game.dispose()
-    while (sleeps.length) sleeps.shift()!()
+    expect(vi.getTimerCount()).toBe(0)
     await turn
     expect(emits).toBe(emitsAfterFirst)
     expect(game.pendingTimers()).toBe(0)
@@ -513,18 +510,15 @@ describe('Game: dispose отменяет async', () => {
     expect(next.S.msgs.some((m) => m.kind === 'text' && m.from === 'me')).toBe(true)
   })
 
-  it('dispose внутри say/typingFor не добавляет поздних сообщений', async () => {
-    const clock = manualClock()
-    let gate: (() => void) | null = null
-    clock.sleep = () => new Promise((r) => { gate = r })
-    const game = new Game({ storage: memStorage(), clock, rng: seededRng(1), noTimers: true, hour: 14 })
+  it('dispose внутри say/typingFor отменяет физический sleep-таймер', async () => {
+    vi.useFakeTimers()
+    const game = new Game({ storage: memStorage(), clock: realClock(), rng: seededRng(1), noTimers: true, hour: 14 })
     const before = game.S.msgs.length
     const pending = game.say(['Позднее сообщение'])
-    expect(gate).toBeTruthy()
-    expect(game.pendingTimers()).toBeGreaterThan(0)
+    expect(vi.getTimerCount()).toBe(1)
     game.dispose()
     expect(game.pendingTimers()).toBe(0)
-    gate!()
+    expect(vi.getTimerCount()).toBe(0)
     await expect(pending).rejects.toMatchObject({ name: 'GameDisposed' })
     expect(game.S.msgs.length).toBe(before)
   })
@@ -551,6 +545,5 @@ describe('Game: dispose отменяет async', () => {
     await vi.advanceTimersByTimeAsync(3000)
     expect(moos).toBe(0)
     expect(pending.size).toBe(0)
-    vi.useRealTimers()
   })
 })

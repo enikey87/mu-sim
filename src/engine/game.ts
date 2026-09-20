@@ -21,7 +21,7 @@ import { Decks } from './deck'
 import { Seen, type Keyed } from './uniq'
 import { RuleSet, makeHub, Lines, resolver, test, type Facts, type Rule, type Trace, type Query, type Priority, type Line as PoolLine, type LineOpts, type Picked } from './rules'
 import { MENTION_RE } from '../content/world'
-import { type Clock, realClock } from './clock'
+import { type Clock, realClock, isManualClock } from './clock'
 import { type Audio, silentAudio } from './audio'
 import { typo } from './typo'
 import { classifyUserInput, type ClassifiedInput } from './input'
@@ -173,7 +173,7 @@ export class Game {
 
   /** Активные таймеры этого экземпляра (для тестов). */
   pendingTimers(): number {
-    return this.timerIds.size + this.sleepWaiters.size
+    return this.timerIds.size
   }
 
   private schedule(fn: () => void, ms: number): number {
@@ -267,15 +267,22 @@ export class Game {
     if (this.disposed) return Promise.reject(new GameDisposed())
     return new Promise((resolve, reject) => {
       let settled = false
+      let id = 0
       const finish = (err?: GameDisposed) => {
         if (settled) return
         settled = true
         this.sleepWaiters.delete(finish)
+        this.clearSchedule(id)
         if (err) reject(err)
         else resolve()
       }
       this.sleepWaiters.add(finish)
-      void this.clock.sleep(ms).then(() => finish(this.disposed ? new GameDisposed() : undefined))
+      id = this.schedule(() => finish(), ms)
+      // manualClock: синхронные тесты — не ждём runTimers для каждой паузы
+      if (isManualClock(this.clock)) {
+        this.clearSchedule(id)
+        queueMicrotask(() => finish(this.disposed ? new GameDisposed() : undefined))
+      }
     })
   }
 
