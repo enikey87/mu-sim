@@ -66,6 +66,22 @@ describe('App', () => {
     expect(game.S.stats.sent).toBe(1)
   })
 
+  it('отклик на ввод вешает класс на телефон, без подписи категории', async () => {
+    const { game } = makeGame()
+    renderApp(game)
+    const phone = document.querySelector('.phone')!
+    expect(phone.className).not.toMatch(/feel-/)
+    await act(async () => { await game.send('АЛИК!!!') })
+    expect(phone).toHaveClass('feel-shake')
+    expect(screen.queryByText(/intimidation|apology|violent|request/i)).toBeNull()
+    await act(async () => { game.S.offlineDays = 0; await game.send('Извини') })
+    expect(phone).toHaveClass('feel-sorry')
+    await act(async () => { game.S.offlineDays = 0; await game.send('Мууу') })
+    expect(phone).toHaveClass('feel-moo')
+    await act(async () => { game.S.offlineDays = 0; await game.send('Знаю, где ты живёшь') })
+    expect(phone).toHaveClass('feel-intimidate')
+  })
+
   it('пустой ввод не отправляется; во время ответа поле блокируется и сохраняет черновик', async () => {
     const { game } = makeGame()
     renderApp(game)

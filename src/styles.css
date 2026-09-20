@@ -244,13 +244,42 @@ body {
 .ending-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 6px; }
 .ending-btns button { border: 0; border-radius: 12px; padding: 10px 16px; background: var(--accent); color: #fff; font: inherit; cursor: pointer; }
 .ending-btns button.secondary { background: transparent; color: inherit; border: 1px solid rgba(127,127,127,.4); }
-.phone.shake { animation: shake .45s; }
-@keyframes shake {
+/* отклик на тип ввода (категория на экране не показывается) */
+.phone.feel-shake { animation: feel-shake .45s; }
+@keyframes feel-shake {
   0%, 100% { transform: translateX(0); }
   20% { transform: translateX(-8px) rotate(-1deg); }
   40% { transform: translateX(8px) rotate(1deg); }
   60% { transform: translateX(-6px); }
   80% { transform: translateX(5px); }
+}
+.phone.feel-intimidate::after {
+  content: '';
+  position: absolute; inset: 0; z-index: 40;
+  background: rgba(0, 0, 0, .42);
+  pointer-events: none;
+  animation: feel-dim .55s ease-out forwards;
+}
+@keyframes feel-dim {
+  0% { opacity: 0; }
+  25% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.phone.feel-sorry { animation: feel-sorry .65s ease-out; }
+@keyframes feel-sorry {
+  0%, 100% { box-shadow: 0 20px 60px rgba(0, 0, 0, .35); }
+  40% { box-shadow: 0 0 0 3px rgba(47, 158, 92, .55), 0 0 28px rgba(47, 158, 92, .4), 0 20px 60px rgba(0, 0, 0, .35); }
+}
+.phone.feel-moo::before {
+  content: '🐄';
+  position: absolute; left: 50%; top: 40%; z-index: 40;
+  font-size: 40px; pointer-events: none;
+  animation: feel-cow .85s ease-out forwards;
+}
+@keyframes feel-cow {
+  0% { opacity: 0; transform: translate(-50%, -30%) scale(.35); }
+  35% { opacity: 1; transform: translate(-50%, -55%) scale(1.12); }
+  100% { opacity: 0; transform: translate(-50%, -90%) scale(.85); }
 }
 
 .msg.doc { background: #fffdf3 !important; color: #222; font-family: "Courier New", monospace; font-size: 12px; min-width: 250px; }

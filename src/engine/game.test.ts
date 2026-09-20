@@ -1,6 +1,7 @@
 import { STARTS } from '../content/quests'
 import { describe, it, expect } from 'vitest'
 import { makeGame, memStorage, alikTexts } from '../test/helpers'
+import { silentAudio } from './audio'
 import { manualClock } from './clock'
 import { Game } from './game'
 import { seededRng } from './rng'
@@ -77,6 +78,34 @@ describe('Game: начало и ход', () => {
     expect(intimidation.S.mem['count.intimidation']).toBe(1)
     expect(intimidation.S.mem['rude.heat']).toBe(1)
     expect(intimidation.S.mem.court).toBeUndefined()
+  })
+  it('отклик на отправку различает смысл, не показывая категорию', async () => {
+    const vibes: Array<number | number[]> = []
+    const audio = { ...silentAudio, vibrate: (p: number | number[]) => { vibes.push(p) } }
+    const request = makeGame({ audio }).game
+    await request.send('Алик, пожалуйста, переведите деньги')
+    expect(request.feel).toBeNull()
+    expect(request.feelId).toBe(0)
+
+    const shout = makeGame({ audio }).game
+    await shout.send('АЛИК!!!')
+    expect(shout.feel).toBe('shake')
+    expect(shout.feelId).toBe(1)
+    expect(vibes).toContainEqual([80, 40, 80])
+
+    const scare = makeGame({ audio }).game
+    await scare.send('Знаю, где ты живёшь')
+    expect(scare.feel).toBe('intimidate')
+    expect(vibes).toContainEqual([120, 50, 120, 50, 200])
+
+    const sorry = makeGame({ audio }).game
+    await sorry.send('Извини, я погорячился')
+    expect(sorry.feel).toBe('sorry')
+
+    const moo = makeGame({ audio }).game
+    await moo.send('Мууу')
+    expect(moo.feel).toBe('moo')
+    expect(moo.feelFor({ text: 'Мууууу 🐄', tone: 'neutral', act: 'moo' })).toBe('moo')
   })
   it('свой текст посреди сцены прерывает её и продолжает обычный цикл', async () => {
     const { game } = makeGame({ debug: true })
