@@ -19,17 +19,36 @@ export const messageListRenderStats = { count: 0 }
 /** Создание узлов и сколько индексов затронул sync — только в test. */
 export const messageListBuildStats = { created: 0, touched: 0 }
 
-type NodeCache = { len: number; nodes: ReactElement[] }
+/** Сколько последних сообщений держим в DOM (S.msgs не режем). */
+export const LIVE_RENDER_CAP = 1000
+
+type NodeCache = { len: number; nodes: ReactElement[]; windowStart: number }
 
 /** С dirtyFrom: только хвост с изменённого индекса, без scan/copy префикса. */
-function syncMessageNodes(cache: NodeCache, next: Msg[], dirtyFrom: number): NodeCache {
-  if (cache.len === 0 || next.length < cache.len) {
+function syncMessageNodes(cache: NodeCache, next: Msg[], dirtyFrom: number, windowStart: number): NodeCache {
+  // окно сдвинулось на 1 при полной длине CAP — снять голову, дописать хвост
+  if (
+    cache.len > 0 &&
+    next.length === cache.len &&
+    windowStart === cache.windowStart + 1
+  ) {
+    const nodes = cache.nodes
+    nodes.shift()
+    const last = next[next.length - 1]!
+    nodes.push(<Message key={last.id} m={last} />)
+    if (import.meta.env.MODE === 'test') {
+      messageListBuildStats.created = 1
+      messageListBuildStats.touched = 1
+    }
+    return { len: next.length, nodes, windowStart }
+  }
+  if (cache.windowStart !== windowStart || cache.len === 0 || next.length < cache.len) {
     const nodes = next.map((m) => <Message key={m.id} m={m} />)
     if (import.meta.env.MODE === 'test') {
       messageListBuildStats.created = nodes.length
       messageListBuildStats.touched = nodes.length
     }
-    return { len: next.length, nodes }
+    return { len: next.length, nodes, windowStart }
   }
   const from = Math.min(Math.max(0, dirtyFrom), cache.len)
   const nodes = cache.nodes
@@ -50,7 +69,7 @@ function syncMessageNodes(cache: NodeCache, next: Msg[], dirtyFrom: number): Nod
     messageListBuildStats.created = created
     messageListBuildStats.touched = next.length - from
   }
-  return { len: next.length, nodes }
+  return { len: next.length, nodes, windowStart }
 }
 
 /** Список пузырей: подписан только на эпоху сообщений, не на status/typing. */
@@ -58,14 +77,27 @@ const MessageList = memo(function MessageList() {
   const game = useGameApi()
   const epoch = useSyncExternalStore(game.subscribe, game.getMsgsEpoch)
   if (import.meta.env.MODE === 'test') messageListRenderStats.count++
-  const cache = useRef<NodeCache>({ len: 0, nodes: [] })
+  const cache = useRef<NodeCache>({ len: 0, nodes: [], windowStart: 0 })
   const applied = useRef(-1)
+  const all = game.S.msgs
+  const windowStart = Math.max(0, all.length - LIVE_RENDER_CAP)
+  const visible = windowStart > 0 ? all.slice(windowStart) : all
   if (applied.current !== epoch) {
-    cache.current = syncMessageNodes(cache.current, game.S.msgs, game.getMsgsDirtyFrom())
+    const dirtyAbs = game.getMsgsDirtyFrom()
+    const dirtyRel = windowStart > 0 ? Math.max(0, dirtyAbs - windowStart) : dirtyAbs
+    if (import.meta.env.MODE === 'test') {
+      // eslint-disable-next-line no-console
+      console.log('[MessageList sync] ' + JSON.stringify({ epoch, applied: applied.current, dirtyAbs, dirtyRel, vis: visible.length, cacheLen: cache.current.len, msgs: all.length }))
+    }
+    cache.current = syncMessageNodes(cache.current, visible, dirtyRel, windowStart)
     applied.current = epoch
   }
   useLayoutEffect(() => { game.ackMsgsDirty() }, [epoch, game])
-  return cache.current.nodes
+  // новый массив — иначе React может не увидеть in-place push в кэш
+  if (windowStart > 0) {
+    return [<div key="__cap" className="sep" aria-hidden="true">···</div>, ...cache.current.nodes]
+  }
+  return cache.current.nodes.slice()
 })
 
 /** Лента сообщений + «печатает…» + всплывающие «Мууу». */
