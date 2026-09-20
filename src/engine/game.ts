@@ -165,10 +165,34 @@ export class Game {
     return () => this.listeners.delete(fn)
   }
   getVersion = (): number => this.version
+  /** Эпоха ленты: растёт только при push/замене сообщения — для изолированного списка в UI. */
+  getMsgsEpoch = (): number => this.msgsEpoch
+  /** Индекс, с которого UI должен пересобрать узлы (накопленный min с прошлого ack). */
+  getMsgsDirtyFrom = (): number => this.msgsDirtyFrom
+  /** UI: dirty-диапазон применён. */
+  ackMsgsDirty = (): void => {
+    this.msgsDirtyOpen = false
+    this.msgsDirtyFrom = this.S.msgs.length
+  }
   emit(): void {
     if (this.disposed) return
     this.version++
     for (const fn of this.listeners) fn()
+  }
+
+  private msgsEpoch = 0
+  private msgsDirtyFrom = 0
+  private msgsDirtyOpen = false
+  private touchMsgs(from = 0): void {
+    this.msgsDirtyFrom = this.msgsDirtyOpen ? Math.min(this.msgsDirtyFrom, from) : from
+    this.msgsDirtyOpen = true
+    this.msgsEpoch++
+  }
+
+  /** Лента изменена снаружи (тесты): перерисовать MessageList. */
+  notifyMsgs(): void {
+    this.touchMsgs(0)
+    this.emit()
   }
 
   /** Активные таймеры этого экземпляра (для тестов). */
@@ -371,8 +395,17 @@ export class Game {
     // прозвучало в переписке (не от игрока) — теперь об этом можно говорить: «кран», «Арсен», «калым»…
     const said = msg.kind === 'sys' || (msg.kind === 'text' && msg.from !== 'me') ? msg.text : ''
     for (const [k, re] of INTRO) if (!this.S.mem['intro.' + k] && re.test(said)) this.S.mem['intro.' + k] = true
+    this.touchMsgs(this.S.msgs.length - 1)
     this.emit()
     return msg
+  }
+  /** Замена сообщения в ленте новым объектом — чтобы memo в UI увидел изменение. */
+  private replaceMsg<T extends Msg>(m: T, patch: Partial<T>): T {
+    const next = { ...m, ...patch } as T
+    const i = this.S.msgs.findIndex((x) => x.id === m.id)
+    if (i >= 0) this.S.msgs[i] = next
+    this.touchMsgs(i >= 0 ? i : 0)
+    return next
   }
   sys(text: string): Msg { return this.push({ kind: 'sys', text }) }
 
@@ -790,7 +823,7 @@ export class Game {
     if (!o.scene && this.chance(0.18) && mine.kind === 'text') {
       await this.sleep(600)
       if (this.disposed) return
-      mine.react = this.draw('R_' + tone, L.REACT[tone] ?? L.REACT.neutral)
+      this.replaceMsg(mine, { react: this.draw('R_' + tone, L.REACT[tone] ?? L.REACT.neutral) })
       this.audio.vibrate(20)
       this.emit()
       reactOnly = !o.act && tone !== 'rude' && tone !== 'threat' && !S.scene && this.chance(0.3)
@@ -981,7 +1014,7 @@ export class Game {
     this.seen.mark(text)
     const m = this.alikMsg({ kind: 'text', from: 'alik', text })
     await this.sleep(1300)
-    if (m.kind === 'text') m.deleted = true
+    if (m.kind === 'text') this.replaceMsg(m, { deleted: true })
     this.unlock('deleted')
     this.S.ctx = { ...(this.S.ctx ?? {}), deleted: true }
     this.emit()
@@ -994,17 +1027,18 @@ export class Game {
     const w = this.draw('EDIT_WHEN', L.EDIT_WHEN)
     // срок может стоять в начале фразы с заглавной — ищем без учёта регистра, регистр сохраняем
     const at = p ? m.text.toLowerCase().indexOf(p.t.toLowerCase()) : -1
+    let text = m.text
     if (p && at >= 0) {
       const orig = m.text.slice(at, at + p.t.length)
       const repl = orig[0] !== orig[0].toLowerCase() ? cap(w) : w
-      m.text = m.text.slice(0, at) + repl + m.text.slice(at + p.t.length)
+      text = m.text.slice(0, at) + repl + m.text.slice(at + p.t.length)
       const rec = this.S.promises[this.S.promises.length - 1]
       if (rec && rec.t.includes(p.t)) { rec.t = rec.t.replace(p.t, w); rec.due = null }
       this.S.ctx = { ...this.S.ctx, when: w, whenNever: true }
     } else {
-      m.text = m.text.replace(/[.!]?$/, this.draw('EDIT_SUFFIX', L.EDIT_SUFFIX) + '.')
+      text = m.text.replace(/[.!]?$/, this.draw('EDIT_SUFFIX', L.EDIT_SUFFIX) + '.')
     }
-    m.edited = true
+    this.replaceMsg(m, { text, edited: true })
     this.unlock('edited')
     this.emit()
   }
@@ -1260,7 +1294,7 @@ export class Game {
     try {
       const m = this.S.msgs.find((x) => x.id === id)
       if (!m || m.kind !== 'job' || m.answered || this.busy || this.dead || this.disposed) return
-      m.answered = true
+      this.replaceMsg(m, { answered: true })
       this.busy = true
       this.clearSchedule(this.idleT)
       const reply = this.playerLine(() => (yes ? this.draw('JY', JOB_YES_P) : this.draw('JN', JOB_NO_P)))

@@ -1,10 +1,15 @@
+import { memo } from 'react'
 import type { Msg } from '../engine/state'
-import { useGame } from './useGame'
+import { useGame, useGameApi } from './useGame'
 import { PhotoSvg } from './PhotoSvg'
 
+/** Счётчик рендеров Message — только в test. */
+export const messageRenderStats = { count: 0 }
+
 /** Одно сообщение чата: разделитель даты, системное или пузырь (текст, перевод, голосовое, стикер…). */
-export function Message({ m }: { m: Msg }) {
-  const game = useGame()
+export const Message = memo(function Message({ m }: { m: Msg }) {
+  if (import.meta.env.MODE === 'test') messageRenderStats.count++
+  const game = useGameApi()
   if (m.kind === 'sep') return <div className="sep">{m.text}</div>
   if (m.kind === 'sys') return <div className={'sys' + (m.unread ? ' unread' : '')}>{m.text}</div>
 
@@ -24,9 +29,19 @@ export function Message({ m }: { m: Msg }) {
       {m.kind === 'text' && m.react && <div className="react">{m.react}</div>}
     </div>
   )
+})
+
+function JobButtons({ id }: { id: number }) {
+  const game = useGame()
+  return (
+    <div className="job-btns">
+      <button disabled={game.busy || game.dead} onClick={() => void game.answerJob(id, true)}>Ладно, сделаю</button>
+      <button disabled={game.busy || game.dead} onClick={() => void game.answerJob(id, false)}>Нет, сначала деньги</button>
+    </div>
+  )
 }
 
-function body(m: Msg, game: ReturnType<typeof useGame>) {
+function body(m: Msg, game: ReturnType<typeof useGameApi>) {
   switch (m.kind) {
     case 'text':
       return m.deleted ? '🚫 Сообщение удалено' : m.text
@@ -59,12 +74,7 @@ function body(m: Msg, game: ReturnType<typeof useGame>) {
       return (
         <>
           {m.text}
-          {!m.answered && (
-            <div className="job-btns">
-              <button disabled={game.busy} onClick={() => void game.answerJob(m.id, true)}>Ладно, сделаю</button>
-              <button disabled={game.busy} onClick={() => void game.answerJob(m.id, false)}>Нет, сначала деньги</button>
-            </div>
-          )}
+          {!m.answered && <JobButtons id={m.id} />}
         </>
       )
   }

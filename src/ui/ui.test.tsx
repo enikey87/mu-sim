@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, act, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { App } from './App'
+import { messageRenderStats } from './Message'
+import { messageListRenderStats, messageListBuildStats } from './Chat'
 import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
 
@@ -400,5 +402,85 @@ describe('App', () => {
     expect(within(panel).getAllByText('PlayerMessage').length + within(panel).getAllByText('BuildChoices').length).toBeGreaterThan(0)
     fireEvent.click(within(panel).getAllByText('BuildChoices')[0])
     expect(within(panel).getAllByText('выбрано').length).toBeGreaterThan(0)
+  })
+
+  it('длинная лента: несвязанный emit не пересобирает список', async () => {
+    const { game } = makeGame()
+    for (let i = 0; i < 1000; i++) {
+      game.S.msgs.push({
+        id: game.S.nextId++,
+        kind: 'text',
+        from: i % 2 ? 'me' : 'alik',
+        text: `msg-${i}`,
+        time: '12:00',
+      })
+    }
+    // начальная эпоха должна видеть уже заполненную ленту
+    game.notifyMsgs()
+    renderApp(game)
+    messageRenderStats.count = 0
+    messageListRenderStats.count = 0
+    messageListBuildStats.created = 0
+    messageListBuildStats.touched = 0
+    const t0 = performance.now()
+    act(() => { game.setStatus('в сети', 'online') })
+    const statusMs = performance.now() - t0
+    expect(messageListRenderStats.count).toBe(0)
+    expect(messageRenderStats.count).toBe(0)
+    expect(messageListBuildStats.created).toBe(0)
+    expect(messageListBuildStats.touched).toBe(0)
+
+    messageRenderStats.count = 0
+    messageListRenderStats.count = 0
+    messageListBuildStats.created = 0
+    messageListBuildStats.touched = 0
+    const t1 = performance.now()
+    let last!: ReturnType<typeof game.push>
+    act(() => { last = game.push({ kind: 'text', from: 'alik', text: 'новое', time: '12:01' }) })
+    const pushMs = performance.now() - t1
+    expect(messageListRenderStats.count).toBe(1)
+    expect(messageRenderStats.count).toBe(1)
+    expect(messageListBuildStats.created).toBe(1)
+    expect(messageListBuildStats.touched).toBe(1)
+
+    messageRenderStats.count = 0
+    messageListBuildStats.created = 0
+    messageListBuildStats.touched = 0
+    const t2 = performance.now()
+    await act(async () => { await game.editLast(last) })
+    const patchMs = performance.now() - t2
+    expect(messageListBuildStats.created).toBe(1)
+    expect(messageListBuildStats.touched).toBe(1)
+    expect(messageRenderStats.count).toBe(1)
+    expect(screen.getByText(/^изменено/)).toBeInTheDocument()
+
+    expect(statusMs).toBeLessThan(80)
+    expect(pushMs).toBeLessThan(120)
+    expect(patchMs).toBeLessThan(80)
+    // eslint-disable-next-line no-console
+    console.log(
+      `[chat-render] n=1000 before≈status:N-scan/push:N-map; after status=${statusMs.toFixed(1)}ms touched=0; ` +
+        `push=${pushMs.toFixed(1)}ms created=1 touched=1; editLast=${patchMs.toFixed(1)}ms created=1 touched=1`,
+    )
+  })
+
+  it('динамические поля сообщения обновляют UI после replace', async () => {
+    const { game } = makeGame()
+    const mine = game.push({ kind: 'text', from: 'me', text: 'Жду оплату', time: '10:00' })
+    const alik = game.push({ kind: 'text', from: 'alik', text: 'Завтра утром — всё отдам.', time: '10:01' })
+    renderApp(game)
+
+    act(() => {
+      const i = game.S.msgs.findIndex((x) => x.id === mine.id)
+      game.S.msgs[i] = { ...mine, kind: 'text', from: 'me', text: 'Жду оплату', time: '10:00', react: '🔥' }
+      game.notifyMsgs()
+    })
+    expect(screen.getByText('🔥')).toBeInTheDocument()
+
+    await act(async () => { await game.editLast(alik) })
+    expect(screen.getByText(/^изменено/)).toBeInTheDocument()
+
+    await act(async () => { await game.deletedMsg() })
+    expect(screen.getByText('🚫 Сообщение удалено')).toBeInTheDocument()
   })
 })

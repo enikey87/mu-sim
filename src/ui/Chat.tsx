@@ -1,5 +1,5 @@
-import { useLayoutEffect, useRef, useState } from 'react'
-import { useGame } from './useGame'
+import { useLayoutEffect, useRef, useState, useSyncExternalStore, memo, type ReactElement } from 'react'
+import { useGame, useGameApi } from './useGame'
 import { Message } from './Message'
 import type { Msg } from '../engine/state'
 
@@ -13,6 +13,60 @@ const unreadLabel = (n: number): string => {
   const last = n % 10
   return `↓ ${n} ${lastTwo >= 11 && lastTwo <= 14 ? 'новых сообщений' : last >= 2 && last <= 4 ? 'новых сообщения' : 'новых сообщений'}`
 }
+
+/** Счётчик пересборок списка — только в test. */
+export const messageListRenderStats = { count: 0 }
+/** Создание узлов и сколько индексов затронул sync — только в test. */
+export const messageListBuildStats = { created: 0, touched: 0 }
+
+type NodeCache = { len: number; nodes: ReactElement[] }
+
+/** С dirtyFrom: только хвост с изменённого индекса, без scan/copy префикса. */
+function syncMessageNodes(cache: NodeCache, next: Msg[], dirtyFrom: number): NodeCache {
+  if (cache.len === 0 || next.length < cache.len) {
+    const nodes = next.map((m) => <Message key={m.id} m={m} />)
+    if (import.meta.env.MODE === 'test') {
+      messageListBuildStats.created = nodes.length
+      messageListBuildStats.touched = nodes.length
+    }
+    return { len: next.length, nodes }
+  }
+  const from = Math.min(Math.max(0, dirtyFrom), cache.len)
+  const nodes = cache.nodes
+  let created = 0
+  if (next.length === cache.len) {
+    for (let i = from; i < next.length; i++) {
+      nodes[i] = <Message key={next[i].id} m={next[i]} />
+      created++
+    }
+  } else {
+    nodes.length = from
+    for (let i = from; i < next.length; i++) {
+      nodes.push(<Message key={next[i].id} m={next[i]} />)
+      created++
+    }
+  }
+  if (import.meta.env.MODE === 'test') {
+    messageListBuildStats.created = created
+    messageListBuildStats.touched = next.length - from
+  }
+  return { len: next.length, nodes }
+}
+
+/** Список пузырей: подписан только на эпоху сообщений, не на status/typing. */
+const MessageList = memo(function MessageList() {
+  const game = useGameApi()
+  const epoch = useSyncExternalStore(game.subscribe, game.getMsgsEpoch)
+  if (import.meta.env.MODE === 'test') messageListRenderStats.count++
+  const cache = useRef<NodeCache>({ len: 0, nodes: [] })
+  const applied = useRef(-1)
+  if (applied.current !== epoch) {
+    cache.current = syncMessageNodes(cache.current, game.S.msgs, game.getMsgsDirtyFrom())
+    applied.current = epoch
+  }
+  useLayoutEffect(() => { game.ackMsgsDirty() }, [epoch, game])
+  return cache.current.nodes
+})
 
 /** Лента сообщений + «печатает…» + всплывающие «Мууу». */
 export function Chat() {
@@ -70,7 +124,7 @@ export function Chat() {
             <div key={m.id} className="moo" style={{ left: `${m.left}%`, top: `${m.top}%` }}>{m.text}</div>
           ))}
         </div>
-        {game.S.msgs.map((m) => <Message key={m.id} m={m} />)}
+        <MessageList />
         {game.typing && (
           <div className="typing-bubble" aria-label={game.typing}><span /><span /><span /></div>
         )}
