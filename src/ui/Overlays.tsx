@@ -65,7 +65,16 @@ export function EndingScreen({ onReset }: { onReset: () => void }) {
         {e.id.startsWith('payday_') && typeof S.mem['payday.chain'] === 'string' && (
           <>
             <blockquote className="grand" id="grandExcuse">«{S.mem['payday.chain']}»</blockquote>
-            <button className="secondary" id="copyExcuse" onClick={() => void navigator.clipboard?.writeText(`Алик, где деньги? — великая отмазка Дня выплаты:\n«${S.mem['payday.chain']}»`)}>Скопировать великую отмазку</button>
+            <button
+              className="secondary"
+              id="copyExcuse"
+              onClick={() => {
+                const text = `Алик, где деньги? — великая отмазка Дня выплаты:\n«${S.mem['payday.chain']}»`
+                void navigator.clipboard?.writeText(text).then(() => game.flash('Скопировано'))
+              }}
+            >
+              Скопировать великую отмазку
+            </button>
           </>
         )}
         <ul className="ending-stats">
