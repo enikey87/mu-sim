@@ -28,6 +28,16 @@ describe('несостыковки из партии пользователя', 
     expect(spends).not.toContain('Квартплата')
     expect(new Set(spends).size).toBeGreaterThan(3)
   })
+  it('Алик вспоминает подаренное словами, а не ярлыком из досье', async () => {
+    const { game } = makeGame()
+    game.S.items.push('Место на кране (40 м)')
+    game.S.stats.sent = 20
+    const n = game.S.msgs.length
+    for (let i = 0; i < 12 && !texts(game, n).some((t) => /отдал тебе/.test(t)); i++) { game.S.rules.cooldown = {}; await game.fire('AlikTurn') }
+    const line = texts(game, n).find((t) => /отдал тебе/.test(t))!
+    expect(line).toContain('«Место на кране»')
+    expect(line).not.toContain('(40 м)')
+  })
   it('«Кто это? А, …» — только если Алик не писал со вчера', () => {
     const { game } = makeGame()
     const excuses = () => Array.from({ length: 200 }, () => game.X.excuse().texts.join(' ')).join('\n')
