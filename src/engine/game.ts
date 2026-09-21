@@ -125,6 +125,9 @@ export class Game {
   private noTimers: boolean
   private typos: boolean
   private hiddenAt = 0
+  /** Ход игрока: nextDay уже был (offline / fx.days) — обычный +1…3 в конце не дублируем. */
+  private inPlayerTurn = false
+  private dayMovedInTurn = false
 
   constructor(opts: GameOptions = {}) {
     this.storage = opts.storage === undefined ? (typeof localStorage !== 'undefined' ? localStorage : null) : opts.storage
@@ -380,6 +383,7 @@ export class Game {
     this.S.day += n
     this.S.clock = this.realMinutes()
     this.push({ kind: 'sep', text: fmtDate(this.S.day) })
+    if (this.inPlayerTurn) this.dayMovedInTurn = true
     const t = tierOf(this.S.day)
     if (t > this.S.tier) {
       this.S.tier = t
@@ -387,6 +391,12 @@ export class Game {
       this.unlock('tier' + t)
     }
     if (this.S.day >= 365) this.unlock('year')
+  }
+
+  /** После ответа Алика и хора: всегда +1…3, если день ещё не сдвинули и нет сцены/пропажи. */
+  private advanceTurnDay(): void {
+    if (this.dayMovedInTurn || this.S.offlineDays > 0 || this.S.scene) return
+    this.nextDay(1 + this.rnd(3))
   }
 
   // ---------- сообщения ----------
@@ -708,12 +718,15 @@ export class Game {
   }
   /** События, отложенные до «безопасной точки» (после ответа Алика): хор, наступившие обещания. */
   private pending: Query[] = []
+  /** Хор из упоминаний — не больше одного персонажа; тот же игровой день, что ответ Алика. */
+  private async flushChorus(): Promise<void> {
+    const queue = this.pending.splice(0)
+    for (const q of queue) if (await this.rules.fire(this, q, this.facts, { floor: this.floor() })) break
+  }
   async afterTurn(): Promise<void> {
     try {
       await this.rules.runDue(this, this.facts, { floor: this.floor() })
-      // из упоминаний — не больше одного вклинившегося персонажа за ход
-      const queue = this.pending.splice(0)
-      for (const q of queue) if (await this.rules.fire(this, q, this.facts, { floor: this.floor() })) break
+      await this.flushChorus()
     } catch (e) { this.swallowDisposed(e) }
   }
 
@@ -803,6 +816,8 @@ export class Game {
     if (this.busy || this.dead || this.disposed || !o.text.trim()) return
     const S = this.S
     this.busy = true
+    this.inPlayerTurn = true
+    this.dayMovedInTurn = false
     this.clearSchedule(this.idleT)
     this.idleCount = 0
     this.clearUnread()
@@ -826,68 +841,76 @@ export class Game {
     S.choices = null
     this.drain(1)
     this.save()
-    if (this.dead || this.disposed) return
+    if (this.dead || this.disposed) { this.inPlayerTurn = false; return }
 
-    await this.sleep((500 + this.rnd(700)) * (this.isNight() ? 2 : 1))
-    if (this.disposed) return
-    this.setStatus('прочитано')
-
-    // реакция на сообщение игрока; иногда — вместо ответа
-    let reactOnly = false
-    // заблокировал — значит, не видит: реакции на недоставленное не бывает
-    if (!o.scene && !S.mem.blocked && this.chance(0.18) && mine.kind === 'text') {
-      await this.sleep(600)
+    try {
+      await this.sleep((500 + this.rnd(700)) * (this.isNight() ? 2 : 1))
       if (this.disposed) return
-      this.replaceMsg(mine, { react: this.draw('R_' + tone, L.REACT[tone] ?? L.REACT.neutral) })
-      this.audio.vibrate(20)
+      this.setStatus('прочитано')
+
+      // реакция на сообщение игрока; иногда — вместо ответа
+      let reactOnly = false
+      // заблокировал — значит, не видит: реакции на недоставленное не бывает
+      if (!o.scene && !S.mem.blocked && this.chance(0.18) && mine.kind === 'text') {
+        await this.sleep(600)
+        if (this.disposed) return
+        this.replaceMsg(mine, { react: this.draw('R_' + tone, L.REACT[tone] ?? L.REACT.neutral) })
+        this.audio.vibrate(20)
+        this.emit()
+        reactOnly = !o.act && tone !== 'rude' && tone !== 'threat' && !S.scene && this.chance(0.3)
+      }
+
+      if (reactOnly) {
+        this.unlock('react')
+        S.ctx = { type: 'reactOnly' }
+      } else if (o.scene) {
+        await this.enterNode(o.scene, o.go ?? null)
+      } else if (o.act) {
+        S.scene = null // контекстная реплика посреди сцены (например, «Поймать на лжи») прерывает её
+        await this.fire('PlayerSays', this.saysFacts(o))
+      } else if (S.scene) {
+        S.scene = null // свой текст посреди сцены — сцена прерывается
+        await this.alikTurn(tone, o.category)
+      } else {
+        await this.alikTurn(tone, o.category)
+      }
+      if (this.disposed) return
+
+      // хор ещё в том же дне → смена даты → утром наступившие обещания и сюжет
+      await this.flushChorus()
+      if (this.disposed) return
+      this.advanceTurnDay()
+      await this.rules.runDue(this, this.facts, { floor: this.floor() })
+      if (this.disposed) return
+      // сюжетный ход: только вне сцены, если Алик не «пропал» и в этом ходу ещё не было сцены или серии
+      if (!S.scene && !o.scene && !S.offlineDays && !this.dead && this.arcAt !== S.stats.sent) await this.fire('StoryBeat')
+      await this.fire('CheckEnding')
+      if (this.disposed) return
+
+      S.patience = Math.max(0, S.patience - 1)
+      if (S.patience === 0) {
+        await this.sleep(600)
+        if (this.disposed) return
+        this.sys(this.draw('FLOOR', FLOOR))
+        S.patience = MAX_PATIENCE
+        this.unlock('floor')
+      }
+      if (!S.ram && S.stats.sent >= 25) {
+        S.ram = true
+        this.rules.applyOps(meet('baran'), {})
+        this.sys('Алик Воздухонесян сменил фото профиля. На фото — баран')
+        this.unlock('ram')
+      }
+      if (this.chance(0.12)) this.randomNotif()
+      this.restStatus()
+      this.busy = false
+      S.choices = this.buildChoices()
+      this.save()
       this.emit()
-      reactOnly = !o.act && tone !== 'rude' && tone !== 'threat' && !S.scene && this.chance(0.3)
+      this.armIdle()
+    } finally {
+      this.inPlayerTurn = false
     }
-
-    if (reactOnly) {
-      this.unlock('react')
-      S.ctx = { type: 'reactOnly' }
-    } else if (o.scene) {
-      await this.enterNode(o.scene, o.go ?? null)
-    } else if (o.act) {
-      S.scene = null // контекстная реплика посреди сцены (например, «Поймать на лжи») прерывает её
-      await this.fire('PlayerSays', this.saysFacts(o))
-    } else if (S.scene) {
-      S.scene = null // свой текст посреди сцены — сцена прерывается
-      await this.alikTurn(tone, o.category)
-    } else {
-      await this.alikTurn(tone, o.category)
-    }
-    if (this.disposed) return
-
-    await this.afterTurn()
-    if (this.disposed) return
-    // сюжетный ход: только вне сцены, если Алик не «пропал» и в этом ходу ещё не было сцены или серии
-    if (!S.scene && !o.scene && !S.offlineDays && !this.dead && this.arcAt !== S.stats.sent) await this.fire('StoryBeat')
-    await this.fire('CheckEnding')
-    if (this.disposed) return
-
-    S.patience = Math.max(0, S.patience - 1)
-    if (S.patience === 0) {
-      await this.sleep(600)
-      if (this.disposed) return
-      this.sys(this.draw('FLOOR', FLOOR))
-      S.patience = MAX_PATIENCE
-      this.unlock('floor')
-    }
-    if (!S.ram && S.stats.sent >= 25) {
-      S.ram = true
-      this.rules.applyOps(meet('baran'), {})
-      this.sys('Алик Воздухонесян сменил фото профиля. На фото — баран')
-      this.unlock('ram')
-    }
-    if (this.chance(0.12)) this.randomNotif()
-    this.restStatus()
-    this.busy = false
-    S.choices = this.buildChoices()
-    this.save()
-    this.emit()
-    this.armIdle()
   }
 
   recordPromise(p?: { text: string; d: number | null; due?: Due } | null): void {
@@ -925,14 +948,13 @@ export class Game {
   async alikTurn(tone: Tone, category?: Choice['category']): Promise<void> {
     const S = this.S
     S.ctx = null
+    // обычный +1…3 — в конце хода (после хора); здесь только возврат из пропажи
     if (S.offlineDays > 0) {
       this.setStatus('был давно')
       await this.sleep(1500)
       this.nextDay(S.offlineDays)
       S.offlineDays = 0
       await this.say([this.uniq(this.X.back)])
-    } else if (this.chance(0.65)) {
-      this.nextDay(1 + this.rnd(3))
     }
     await this.fire('PlayerMessage', { tone, category })
   }
