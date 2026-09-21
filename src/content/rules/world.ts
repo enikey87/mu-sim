@@ -15,7 +15,8 @@ const scene = (id: string, when: R['when'] = [], weight: R['weight'] = 1): R => 
 })
 const eveningBoost = (f: Facts) => (f.period === 'evening' || f.period === 'friday' ? 3 : 1)
 export const sceneRules: R[] = [
-  scene('meet'), scene('card'), scene('barter'), scene('redo'), scene('choice'),
+  scene('meet'), scene('card'), scene('barter'), scene('choice'),
+  { ...scene('redo'), once: true }, // «заказчик жалуется на плитку» — один раз: игрок уже съездил и проверил
   // истории, которые случаются один раз: «новый объект», «займи 5000», «если спросят — ты не работал», кредит
   { ...scene('newjob'), once: true },
   // «это Арсен, племянник» — знакомство: если Арсен уже в истории (суд, фундамент), второй раз не представляется

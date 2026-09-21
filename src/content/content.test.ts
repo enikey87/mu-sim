@@ -38,7 +38,7 @@ describe('scenes', () => {
     const base = { v: 1, n: 'баран', p: 'x', rows: [['a', 1]], total: 1, r: ['a', 'b', 'c'] }
     const all = <T,>(arr: readonly Entry<T>[]) => arr.map(valueOf)
     for (const [sid, sc] of Object.entries(scenes)) {
-      const vars = { ...base, ...sc.init?.(seededRng(1), all) }
+      const vars = { ...base, ...sc.init?.(seededRng(1), all, 200) }
       const txt = (l: Line) => (typeof l === 'function' ? l(vars) : l)
       for (const [nid, n] of Object.entries(sc.nodes)) {
         const has = n.a || n.a2 || n.sys || n.sys2 || n.opts || n.then || n.doc || n.hook
@@ -52,10 +52,10 @@ describe('scenes', () => {
   it('scene init functions produce the vars their lines use', () => {
     const rng = seededRng(1)
     const all = <T,>(arr: readonly Entry<T>[]) => arr.map(valueOf)
-    expect(scenes.barter.init!(rng, all)).toMatchObject({ n: expect.any(String), v: expect.any(Number) })
-    const inv = scenes.invoice.init!(rng, all)
+    expect(scenes.barter.init!(rng, all, 200)).toMatchObject({ n: expect.any(String), v: expect.any(Number) })
+    const inv = scenes.invoice.init!(rng, all, 200)
     expect(inv.total).toBe(inv.rows.reduce((n: number, r: [string, number]) => n + r[1], 0))
-    expect(scenes.choice.init!(rng, all).r).toHaveLength(3)
+    expect(scenes.choice.init!(rng, all, 200).r).toHaveLength(3)
   })
 })
 

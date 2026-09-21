@@ -28,7 +28,7 @@ export interface SceneNode {
   opts?: SceneOpt[]
 }
 /** init: open(список) — элементы, уместные сейчас (needs). */
-export interface Scene { start: string; init?: (rng: Rng, open: <T>(arr: readonly Entry<T>[]) => T[]) => Vars; nodes: Record<string, SceneNode> }
+export interface Scene { start: string; init?: (rng: Rng, open: <T>(arr: readonly Entry<T>[]) => T[], day: number) => Vars; nodes: Record<string, SceneNode> }
 // до сериала «Баран Борис» баран ещё без имени: иначе сериал потом «знакомит» с Борисом второй раз
 const REDO = [
   {
@@ -513,9 +513,9 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
 
     invoice: {
       start: 'ask',
-      init: (rng, open) => {
+      init: (rng, open, day) => {
         const rows = open<[string, number]>([
-          ['Хранение твоих денег (6 мес.)', 7200], ['Моральный ущерб Алику от твоих сообщений', 15000], ['Амортизация терпения', 3000],
+          [`Хранение твоих денег (${Math.max(1, Math.round(day / 30))} мес.)`, 7200], ['Моральный ущерб Алику от твоих сообщений', 15000], ['Амортизация терпения', 3000],
           ['Бензин до банка (не доехал)', 2400], ['Консультации по отмазкам', 5000], ['Аренда воздуха на объекте', 1800],
           ['Хаш, съеденный за твоё здоровье', 900], ['Налог на ожидание', 4500], needs('tamada')(['Тосты за тебя (услуги тамады)', 3000]),
           needs('boris')(['Корм для Бориса (он тебя любит)', 1200]), ['Стикеры авторские', 700], needs('nivaHome')(['Амортизация «Нивы» (ехала к тебе, не доехала)', 3300]),

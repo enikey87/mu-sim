@@ -1399,7 +1399,7 @@ export class Game {
     const sc = this.scenes[sid]
     // новая сцена — старый контекст («что вы удалили?», «при чём тут тётя?») больше не к месту
     if (!S.scene || S.scene.id !== sid) {
-      S.scene = { id: sid, node: nid, vars: sc.init ? sc.init(this.rng, (arr) => this.open(arr)) : {} }
+      S.scene = { id: sid, node: nid, vars: sc.init ? sc.init(this.rng, (arr) => this.open(arr), S.day) : {} }
       S.ctx = null
     }
     S.scene.node = nid

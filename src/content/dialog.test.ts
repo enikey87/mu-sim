@@ -71,8 +71,8 @@ describe('несостыковки из партии пользователя', 
     const { game } = makeGame()
     game.S.mem['intro.baran'] = true
     const open = <T,>(a: readonly Parameters<typeof game.open<T>>[0][number][]) => game.open<T>(a)
-    const barter = () => Array.from({ length: 80 }, () => String(game.scenes.barter.init!(game.rng, open).n))
-    const rows = () => Array.from({ length: 40 }, () => (game.scenes.invoice.init!(game.rng, open).rows as Array<[string, number]>).map(([t]) => t)).flat()
+    const barter = () => Array.from({ length: 80 }, () => String(game.scenes.barter.init!(game.rng, open, game.S.day).n))
+    const rows = () => Array.from({ length: 40 }, () => (game.scenes.invoice.init!(game.rng, open, game.S.day).rows as Array<[string, number]>).map(([t]) => t)).flat()
     expect(barter()).toContain('баран без имени')
     expect(barter().join(' ')).not.toMatch(/Борис/)
     expect(rows().join(' ')).not.toMatch(/Борис/)
