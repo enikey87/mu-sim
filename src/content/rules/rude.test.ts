@@ -130,6 +130,14 @@ describe('лестница грубости: ступени', () => {
     expect(texts(game, n)).toContain('Алик Воздухонесян разблокировал вас')
     expect(game.rules.match({ event: 'AlikTurn' }, game.facts())?.name).not.toBe('Turn_Blocked')
   })
+  it('в блоке Карине подсказывает посредника один раз: второе извинение просто не доставлено', async () => {
+    const { game } = makeGame()
+    game.S.mem.blocked = true
+    expect((await says(game, 'sorry')).r).toBe('Says_sorry_blocked_karine')
+    const again = await says(game, 'sorry')
+    expect(again.r).toBe('Says_sorry_blocked_hinted')
+    expect(texts(game, again.n)).not.toContain(T.KARINE_HINT)
+  })
   it('посредник — лучший из тех, кто есть: Борис, если он уже в истории; мама, если Карине ушла к Рубику', async () => {
     const { game } = makeGame()
     game.S.mem.blocked = true

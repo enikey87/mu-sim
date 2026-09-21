@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import { makeGame } from '../test/helpers'
 import { GROUP } from './arcs'
-import { CONDOLE_REVIVED, GREET_A } from './misc'
+import { CONDOLE_REVIVED, GREET_A, FLOOR } from './misc'
 import { WORLD, needs } from './world'
 import { valueOf, type Entry } from '../engine/rules'
 import type { Game } from '../engine/game'
@@ -19,6 +19,22 @@ describe('несостыковки из партии пользователя', 
     for (let i = 0; i < 20; i++) await game.afterTurn()
     expect(game.S.msgs.some((m) => m.kind === 'text' && m.who === 'boris')).toBe(false)
     expect(GROUP.boris.length).toBeGreaterThan(0)
+  })
+  it('«терпение восстановлено»: событие вроде «продали микроволновку» — один раз, занятия — повторяются', () => {
+    const { game } = makeGame()
+    const floor = () => { game.S.patience = 0; game.S.stats.sent += 20; return game.line('FLOOR', FLOOR) }
+    const got = Array.from({ length: 40 }, floor)
+    expect(got.every(Boolean)).toBe(true)
+    expect(got.filter((t) => /микроволновку/.test(t!))).toHaveLength(1)
+  })
+  it('займ 5000: деньги уходят с карты; нет 5000 на карте — Алик не просит', async () => {
+    const { game } = makeGame()
+    game.S.money = 3000
+    game.S.mood = 8
+    for (let i = 0; i < 30; i++) expect((await game.fire('PickScene'))?.name).not.toBe('Scene_lend')
+    game.S.money = 9000
+    await game.enterNode('lend', 'yes')
+    expect(game.S.money).toBe(4000)
   })
   it('после семейного чата игрок цитирует только то, что в нём сказали', async () => {
     const { game } = makeGame()

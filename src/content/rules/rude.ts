@@ -3,7 +3,7 @@
 // S0 обида → S1 семья пишет в личку → S2 звонки мамы → S3 блок и чужие номера → S4 семейный суд → S5 вежливость-убийца;
 // сбоку — «Мууу»-дипломатия, встречный иск, ритуал примирения, холодная война, привыкание; финал — вендетта.
 import type { Game } from '../../engine/game'
-import { type Rule, type Line, type Entry, eq, ne, gte, lte, is, add, set, mapEntry, valueOf } from '../../engine/rules'
+import { type Rule, type Line, type Entry, eq, ne, gte, lte, is, add, set, missing, mapEntry, valueOf } from '../../engine/rules'
 import { WORLD, SPEAKS } from '../world'
 import * as T from '../rude'
 import { RUDE_AGAIN } from '../misc'
@@ -78,7 +78,7 @@ export const rudeRules: R[] = [
   // S3 — блок на 4 дня; Алик всё равно отвечает — с телефона Бориса, «Нивы», домофона
   {
     name: 'Rude_Block', event: 'PlayerMessage', when: [rude, gte(HEAT, 3)], bonus: 3, cooldown: { days: 10 },
-    remember: [...cools, { key: 'blocked', op: '=', value: true, forDays: 4 }], trigger: cool,
+    remember: [...cools, { key: 'blocked', op: '=', value: true, forDays: 4 }, set('blocked.hint', false)], trigger: cool,
     respond: async ({ game }) => {
       game.mood(-2)
       game.sys(game.draw('RB_SYS', T.RUDE_BLOCK_SYS))
@@ -175,18 +175,22 @@ export const rudeSaysRules: R[] = [
     respond: async ({ game }) => { cooldown(game, 2); game.mood(1); await game.say([freshOr(game, 'COW_PEACE', T.COW_PEACE, game.X.cow)]); game.unlock('cowpeace'); game.setCtx(null) },
   },
   { name: 'Says_moo', event: 'PlayerSays', when: [eq('intent', 'moo')], respond: async ({ game }) => { await game.say([freshOr(game, 'MOO_ODD', T.MOO_ODD, game.X.cow)]); game.setCtx(null) } },
-  // заблокирован — извинение не доходит; подсказывает посредник: Борис, Карине, иначе мама
+  // заблокирован — извинение не доходит; подсказывает посредник: Борис, Карине, иначе мама (Карине и мама — раз за блок)
   {
-    name: 'Says_sorry_blocked_boris', event: 'PlayerSays', when: [eq('intent', 'sorry'), is('blocked'), SPEAKS.boris], bonus: 6,
+    name: 'Says_sorry_blocked_boris', event: 'PlayerSays', when: [eq('intent', 'sorry'), is('blocked'), SPEAKS.boris], bonus: 7,
     respond: async ({ game }) => { game.sys(T.NOT_DELIVERED); await game.sleep(700); await game.say([{ w: 'boris', t: game.line('BORIS_HINT', T.BORIS_HINT, { repeat: true, cooldown: { turns: 5 }, fallback: () => 'Бее.' })! }]) },
   },
   {
-    name: 'Says_sorry_blocked_karine', event: 'PlayerSays', when: [eq('intent', 'sorry'), is('blocked'), WORLD.karineHome], bonus: 5,
+    name: 'Says_sorry_blocked_karine', event: 'PlayerSays', when: [eq('intent', 'sorry'), is('blocked'), WORLD.karineHome, missing('blocked.hint')], bonus: 5, remember: [set('blocked.hint', true)],
     respond: async ({ game }) => { game.sys(T.NOT_DELIVERED); await game.sleep(700); await game.say([{ w: 'karine', t: T.KARINE_HINT }]) },
   },
   {
-    name: 'Says_sorry_blocked', event: 'PlayerSays', when: [eq('intent', 'sorry'), is('blocked')], bonus: 5,
+    name: 'Says_sorry_blocked', event: 'PlayerSays', when: [eq('intent', 'sorry'), is('blocked'), missing('blocked.hint')], bonus: 5, remember: [set('blocked.hint', true)],
     respond: async ({ game }) => { game.sys(T.NOT_DELIVERED); await game.sleep(700); await game.say([{ w: 'mama', t: T.MAMA_HINT }]) },
+  },
+  {
+    name: 'Says_sorry_blocked_hinted', event: 'PlayerSays', when: [eq('intent', 'sorry'), is('blocked'), is('blocked.hint')], bonus: 5,
+    respond: async ({ game }) => { game.sys(T.NOT_DELIVERED); await game.sleep(900); await sayFresh(game, 'ALT', T.RUDE_ALT) },
   },
   // извинение через посредника, которого игрок выбрал (arg)
   ...([['boris', T.VIA_BORIS], ['karine', T.VIA_KARINE], ['mama', T.VIA_MAMA]] as const).map(([who, lines]): R => ({

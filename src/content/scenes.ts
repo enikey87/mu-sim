@@ -14,7 +14,7 @@ export type Vars = Record<string, any>
 export type Line = string | ((v: Vars) => string)
 export interface SceneOpt { t: Line | string[]; go: string | null; tone?: 'polite' | 'neutral' | 'rude' }
 export interface SceneFx {
-  days?: number; debt?: number; mood?: number; ach?: string; barter?: boolean; invoice?: boolean
+  days?: number; debt?: number; money?: number; mood?: number; ach?: string; barter?: boolean; invoice?: boolean
   /** Записать факты в память мира; during — факт = true на N дней. */
   set?: Record<string, number | boolean>; during?: { key: string; days: number }
 }
@@ -302,7 +302,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
           ],
         },
         yes: {
-          fx: { debt: 5000, ach: 'lend' },
+          fx: { debt: 5000, money: -5000, ach: 'lend' },
           sys: 'Вы перевели Алику 5 000 ₽. Долг Алика вырос.',
           a: ['Брат! Ты святой человек! Всем расскажу! В пятницу — всё.', 'Вот это брат! Я знал! Пятница — наша.'],
         },

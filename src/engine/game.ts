@@ -506,7 +506,7 @@ export class Game {
     const c = S.ctx ?? {}
     const pr = extra.promise !== undefined ? S.promises[Number(extra.promise)] : undefined
     return {
-      day: S.day, tier: S.tier, mood: S.mood, sent: S.stats.sent, moo: S.stats.moo, patience: S.patience,
+      day: S.day, tier: S.tier, mood: S.mood, sent: S.stats.sent, moo: S.stats.moo, patience: S.patience, money: S.money,
       dow: dateOf(S.day).getDay(), month: dateOf(S.day).getMonth() + 1,
       // прогресс сериалов: arc.grandpa = номер серии
       ...Object.fromEntries(Object.entries(S.arcs).map(([id, st]) => ['arc.' + id, st.i])),
@@ -713,7 +713,7 @@ export class Game {
     S.patience = Math.max(0, S.patience - 1)
     if (S.patience === 0) {
       await this.sleep(600)
-      this.sys(this.draw('FLOOR', FLOOR))
+      this.sys(this.line('FLOOR', FLOOR, { fallback: () => 'Вы полежали на полу. Терпение восстановлено.' })!)
       S.patience = MAX_PATIENCE
       this.unlock('floor')
     }
@@ -1123,6 +1123,7 @@ export class Game {
     const fx = n.fx ?? {}
     if (fx.days) this.nextDay(fx.days)
     if (fx.debt) S.debt += fx.debt
+    if (fx.money) S.money += fx.money
     if (fx.mood) this.mood(fx.mood)
     if (fx.barter) { S.debt -= v.v; S.items.push(v.n) }
     if (fx.invoice) S.debt -= v.total

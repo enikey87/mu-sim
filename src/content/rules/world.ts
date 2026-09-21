@@ -20,15 +20,15 @@ export const sceneRules: R[] = [
   { ...scene('newjob'), once: true },
   // «это Арсен, племянник» — знакомство: если Арсен уже в истории (суд, фундамент), второй раз не представляется
   scene('nephew', [missing('intro.arsen')]),
-  scene('customer', [gte('day', 200)]),
-  { ...scene('lend', [gte('mood', 4)]), once: true },
+  { ...scene('customer', [gte('day', 200)]), once: true }, // «позвони заказчику сам» — один раз
+  { ...scene('lend', [gte('mood', 4), gte('money', 5000)]), once: true }, // «займи 5000» — если на карте есть 5000
   scene('toast', [], eveningBoost), // застолье — чаще вечером и в пятницу
   { ...scene('tax', [gte('count.threat', 1)], 2), once: true }, // «если спросят — ты у меня не работал» — после угроз судом
   { ...scene('wife', [gte('count.rude', 1), missing('met.karine'), WORLD.karineHome]), once: true }, // Карине знакомится один раз: «Вы кто такой?» дважды — нелепо
   scene('invoice', [gte('day', 215)]),
   { ...scene('loan', [gte('day', 230)]), once: true }, // кредит «на твоё имя» — один раз
   scene('deathbed', [gte('day', 240), lte('mood', 6)], 2), // умирать Алик начинает, когда дела плохи
-  { ...scene('heir', [gte('arc.grandpa', 4), gte('arc.boris', 4)], 3), once: true }, // «долг перешёл Борису» — когда Борис уже есть // наследство — один раз, после того как дедушка переписал завещание
+  { ...scene('heir', [gte('arc.grandpa', 4), gte('arc.boris', 4)], 3), once: true }, // наследство: после того как дедушка переписал завещание и когда Борис уже есть
 ]
 
 // ---- мини-квесты (PickQuest): свой слот в ходе Алика, каждый — один раз за игру ----
