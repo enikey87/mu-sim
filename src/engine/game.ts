@@ -16,6 +16,10 @@ import { FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUF
 import { STARTS } from '../content/quests'
 import { allRules } from '../content/rules'
 import { CLAIMS, claimByKey, conflicts, pairKey, CALLBACK_OPEN, type Claim } from '../content/lies'
+import {
+  ENDGAME_CHOICES, ENDGAME_FALLBACK, ENDGAME_FORMALITIES, ENDGAME_GROUP, ENDGAME_INTRO, ENDGAME_JUBILEES,
+  ENDGAME_LEAVE, ENDGAME_MONEY, ENDGAME_MUTE, ENDGAME_OPEN, ENDGAME_RENAMES, ENDGAME_RETURNERS, ENDGAME_VENDETTA,
+} from '../content/endgame'
 import { type Rng, mathRng, rndInt, shuffle, chance } from './rng'
 import { Decks } from './deck'
 import { Seen, type Keyed } from './uniq'
@@ -733,6 +737,7 @@ export class Game {
   // ---------- варианты игрока ----------
   buildChoices(): Choice[] {
     const S = this.S
+    if (S.mem['endgame.active']) return ENDGAME_CHOICES.map((c) => ({ ...c }))
     if (S.scene) {
       const n = this.scenes[S.scene.id].nodes[S.scene.node]
       // поймать на лжи можно и посреди сцены — это её прерывает
@@ -1269,9 +1274,69 @@ export class Game {
     this.emit()
   }
   closeEnding(): void {
+    const id = this.S.ending
     this.S.ending = null
+    if (id?.startsWith('payday_') && !this.S.mem['endgame.active']) this.startEndgame(id.slice(7))
     this.save()
     this.emit()
+  }
+
+  private startEndgame(outcome: string): void {
+    const S = this.S
+    S.mem['endgame.active'] = true
+    S.mem['endgame.started'] = S.day
+    S.mem['endgame.forms'] = 0
+    S.mem['endgame.exits'] = 0
+    S.mem['endgame.mutes'] = 0
+    S.mem['endgame.renames'] = 0
+    S.scene = null
+    S.ctx = null
+    S.offlineDays = 0
+    S.rules.schedule = S.rules.schedule.filter((item) => item.kind !== 'event')
+    this.sys(`Алик создал группу «${ENDGAME_GROUP}»`)
+    this.sys('Алик добавил вас')
+    for (const text of ENDGAME_OPEN) this.alikMsg({ kind: 'text', from: 'alik', text })
+    const intro = S.endings.vendetta ? ENDGAME_VENDETTA : ENDGAME_INTRO[outcome] ?? ENDGAME_FALLBACK
+    this.alikMsg({ kind: 'text', from: 'alik', text: intro })
+    S.choices = ENDGAME_CHOICES.map((c) => ({ ...c }))
+  }
+
+  async endgameAction(action: 'money' | 'mute' | 'leave'): Promise<void> {
+    const S = this.S
+    S.ctx = null
+    if (action === 'money') {
+      await this.say([this.draw('ENDGAME_MONEY', ENDGAME_MONEY)])
+      return
+    }
+    if (action === 'mute') {
+      S.mem['endgame.mutes'] = Number(S.mem['endgame.mutes'] ?? 0) + 1
+      this.sys('Вы отключили уведомления')
+      await this.say([this.draw('ENDGAME_MUTE', ENDGAME_MUTE)])
+      const name = this.draw('ENDGAME_RENAMES', ENDGAME_RENAMES)
+      S.mem['endgame.renames'] = Number(S.mem['endgame.renames'] ?? 0) + 1
+      this.sys(`Алик изменил название группы на «${name}»`)
+      return
+    }
+
+    S.mem['endgame.exits'] = Number(S.mem['endgame.exits'] ?? 0) + 1
+    this.sys('Вы покинули группу')
+    const back = this.decks.pick('ENDGAME_RETURNERS', ENDGAME_RETURNERS, this.lineFacts())
+    if (back) {
+      this.sys(`${back.name} добавил вас обратно`)
+      await this.say([{ w: back.who, t: back.t }])
+    } else {
+      this.sys('Алик добавил вас обратно')
+    }
+    await this.say([this.draw('ENDGAME_LEAVE', ENDGAME_LEAVE)])
+  }
+
+  async endgameFormality(): Promise<void> {
+    const n = Number(this.S.mem['endgame.forms'] ?? 0) + 1
+    this.S.mem['endgame.forms'] = n
+    await this.say([this.draw('ENDGAME_FORMALITIES', ENDGAME_FORMALITIES)])
+    const jubilee = ENDGAME_JUBILEES[n]
+    if (jubilee) await this.say([jubilee])
+    this.S.ctx = null
   }
 
   // ---------- сцены ----------
