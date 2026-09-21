@@ -151,7 +151,7 @@ describe('App', () => {
     renderApp(game)
     const phone = document.querySelector('.phone')!
     expect(phone.className).not.toMatch(/feel-/)
-    await act(async () => { await game.send('АЛИК!!!') })
+    await act(async () => { await game.send('СКОЛЬКО МОЖНО ЖДАТЬ!!!') })
     expect(phone).toHaveClass('feel-shake')
     expect(screen.queryByText(/intimidation|apology|violent|request/i)).toBeNull()
     await act(async () => { game.S.offlineDays = 0; await game.send('Извини') })
@@ -455,7 +455,7 @@ describe('App', () => {
     const { game } = makeGame()
     renderApp(game)
     const phone = document.querySelector('.phone')!
-    await act(async () => { await game.send('АЛИК!!!') })
+    await act(async () => { await game.send('СКОЛЬКО МОЖНО ЖДАТЬ!!!') })
     expect(phone).toHaveClass('feel-shake')
     act(() => { fireEvent.animationEnd(phone) })
     expect(phone).not.toHaveClass('feel-shake')

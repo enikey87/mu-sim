@@ -43,11 +43,14 @@ describe('classifyUserInput', () => {
 
   it.each([
     'Ты мошенник и лжец',
-    'Разводила, верни деньги',
     'Ты меня кинул',
     'Опять врёшь',
     'Жулик',
   ])('отделяет обвинение «%s» от оскорбления', (text) => expectClass(text, 'accusation', 'rude'))
+
+  it('обвинение с просьбой сохраняет intent request', () => {
+    expectClass('Разводила, верни деньги', 'accusation', 'rude', 'request')
+  })
 
   it.each([
     'Ты меня бесишь',
@@ -81,7 +84,7 @@ describe('classifyUserInput', () => {
   })
 
   it('отделяет смысл просьбы от грубого оформления', () => {
-    expectClass('ВЕРНИ ДЕНЬГИ!!!', 'request', 'rude')
+    expectClass('ВЕРНИ ДЕНЬГИ!!!', 'request', 'rude', 'request')
     expectClass('ПОЖАЛУЙСТА, верни деньги!!!', 'request', 'polite', 'request')
   })
 
@@ -99,5 +102,73 @@ describe('classifyUserInput', () => {
 
   it('в составной реплике распознаёт содержательную просьбу', () => {
     expectClass('Привет, спасибо за ответ. Когда деньги?', 'request', 'polite', 'request')
+  })
+
+  it.each([
+    'Алик ты совсем охуел',
+    'пошёл нахуй',
+    'лох',
+    'ты крыса',
+    'ты конченый',
+    'х*й',
+    'п_и_д_о_р',
+    'с.у.к.а',
+    'идiот',
+  ])('распознаёт расширенный мат и обход «%s»', (text) => {
+    const r = classifyUserInput(text)
+    expect(r.tone).toBe('rude')
+    expect(['insult', 'anger']).toContain(r.category)
+  })
+
+  it.each([
+    ['Я тебя уничтожу', 'violent-threat'],
+    ['Я тебя в больницу уложу', 'violent-threat'],
+    ['Тебя найдут', 'intimidation'],
+    ['Я знаю где ты', 'intimidation'],
+    ['Сейчас приеду и разберусь', 'intimidation'],
+    ['Будешь дёргаться — хуже будет', 'intimidation'],
+    ['Напишу ментам', 'threat'],
+    ['Вызову ментов', 'threat'],
+    ['Участковый уже в курсе', 'threat'],
+    ['Через приставов заберу', 'threat'],
+  ] as const)('закрывает дыру угроз «%s»', (text, category) => {
+    expectClass(text, category, category === 'threat' ? 'threat' : 'rude')
+  })
+
+  it.each([
+    ['Кинь на карту', 'request', 'neutral', 'request'],
+    ['Скинь бабки', 'request', 'neutral', 'request'],
+    ['Аванс когда?', 'request', 'neutral', 'request'],
+    ['Я жду перевод', 'request', 'neutral', 'request'],
+    ['Переведи плиз', 'request', 'polite', 'request'],
+  ] as const)('распознаёт разговорную просьбу «%s»', (text, category, tone, intent) => {
+    expectClass(text, category, tone, intent)
+  })
+
+  it.each(['Муууу', 'Mooo', 'мооо'])('принимает мычание «%s»', (text) => {
+    expectClass(text, 'cow', 'cow', 'moo')
+  })
+
+  it.each(['АЛИК!!!', 'ДА!!!', 'НЕТ'])('не считает короткий окрик грубостью «%s»', (text) => {
+    expect(classifyUserInput(text)).toMatchObject({ category: 'neutral', tone: 'neutral' })
+  })
+
+  it('крик с просьбой о деньгах остаётся грубым', () => {
+    expectClass('ВЕРНИ ДЕНЬГИ!!!', 'request', 'rude', 'request')
+  })
+
+  it('грубая просьба с оскорблением сохраняет intent request', () => {
+    expectClass('верни уже бабки урод', 'insult', 'rude', 'request')
+  })
+
+  it.each([
+    'мне нужно время на иске',
+    'На иске написано мелко',
+  ])('не считает голое «иск» угрозой «%s»', (text) => {
+    expect(classifyUserInput(text)).toMatchObject({ category: 'neutral', tone: 'neutral' })
+  })
+
+  it.each(['Подам иск', 'Направлю иск в суд'])('считает иск с глаголом угрозой «%s»', (text) => {
+    expectClass(text, 'threat', 'threat')
   })
 })

@@ -39,7 +39,8 @@ describe('Game: начало и ход', () => {
   })
   it('свой текст классифицируется по тону', () => {
     const { game } = makeGame()
-    expect(game.classify('АЛИК!!!')).toBe('rude')
+    expect(game.classify('СКОЛЬКО МОЖНО ЖДАТЬ!!!')).toBe('rude')
+    expect(game.classify('АЛИК!!!')).toBe('neutral')
     expect(game.classify('Я иду в СУД!!!')).toBe('threat')
     expect(game.classify('Это корова мычит?')).toBe('cow')
     expect(game.classify('Здравствуйте, извините')).toBe('polite')
@@ -57,7 +58,7 @@ describe('Game: начало и ход', () => {
     expect(game.S.mem['count.sorry']).toBe(1)
   })
   it('угроза и грубая просьба из поля ввода двигают разные ветки', async () => {
-    const { game } = makeGame()
+    const { game } = makeGame({ debug: true })
     await game.send('Если не заплатишь, подам в суд')
     expect(game.S.mem.court).toBe(1)
     expect(game.S.mem['count.threat']).toBe(1)
@@ -65,6 +66,7 @@ describe('Game: начало и ход', () => {
     await game.send('ВЕРНИ ДЕНЬГИ!!!')
     expect(game.S.mem['count.rude']).toBe(1)
     expect(game.S.mem['rude.heat']).toBe(1)
+    expect(game.trace.some((entry) => entry.event === 'PlayerSays' && entry.chosen.some((n) => n.startsWith('Says_request')))).toBe(true)
   })
   it('насилие и запугивание из поля ввода не попадают в судебную ветку', async () => {
     const violence = makeGame().game
@@ -88,10 +90,14 @@ describe('Game: начало и ход', () => {
     expect(request.feelId).toBe(0)
 
     const shout = makeGame({ audio }).game
-    await shout.send('АЛИК!!!')
+    await shout.send('СКОЛЬКО МОЖНО ЖДАТЬ!!!')
     expect(shout.feel).toBe('shake')
     expect(shout.feelId).toBe(1)
     expect(vibes).toContainEqual([80, 40, 80])
+
+    const benign = makeGame({ audio }).game
+    await benign.send('АЛИК!!!')
+    expect(benign.feel).toBeNull()
 
     const scare = makeGame({ audio }).game
     await scare.send('Знаю, где ты живёшь')

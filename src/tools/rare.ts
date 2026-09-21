@@ -6,7 +6,7 @@ export const RARE = new Set(['Due_Cosmic', 'Tone_Cow', 'Says_catchLie_liekind_gr
   // первый сериал обычно запускает ход Алика раньше сюжетного хода; пропажа Алика короткая
   'Beat_FirstArc', 'Says_WhileOffline',
   // ручного ввода нет в симуляции бота
-  'Says_request', 'Tone_ViolentThreat', 'Tone_Intimidation',
+  'Says_request', 'Says_request_tone_rude', 'Tone_ViolentThreat', 'Tone_Intimidation',
   // «толкни „Ниву“» — эпизод сериала «Нива», только пока она «не заводится»
   'Quest_q_niva',
   // сцен много, каждая с перерывом 25 дней: «займи 5000» (хорошее настроение) и «налоговая» (после угроз) могут не выпасть
