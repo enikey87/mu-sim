@@ -1,3 +1,4 @@
+import { useState, type FormEvent } from 'react'
 import { useGame } from './useGame'
 
 /** Сколько «?» на скрытой кнопке: 2–4, стабильно по индексу. */
@@ -27,5 +28,36 @@ export function Choices() {
         ),
       )}
     </div>
+  )
+}
+
+/** Свободный ответ: движок сам определит смысл и тон текста. */
+export function Composer() {
+  const game = useGame()
+  const [text, setText] = useState('')
+  const locked = game.busy || game.dead
+  const submit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const value = text.trim()
+    if (!value || locked) return
+    setText('')
+    void game.send(value)
+  }
+
+  return (
+    <form className="composer" id="composer" onSubmit={submit} aria-busy={locked}>
+      <input
+        id="input"
+        autoComplete="off"
+        maxLength={300}
+        value={text}
+        disabled={locked}
+        enterKeyHint="send"
+        onChange={(e) => setText(e.target.value)}
+        placeholder={game.S.scene ? 'Выберите ответ выше или напишите свой…' : 'Сообщение…'}
+        aria-label="Сообщение"
+      />
+      <button type="submit" id="sendBtn" disabled={locked || !text.trim()} aria-label="Отправить">➤</button>
+    </form>
   )
 }

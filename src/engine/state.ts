@@ -10,6 +10,10 @@ export const MAX_PATIENCE = 5
 export const START_DAY = 184
 
 export type Tone = 'polite' | 'neutral' | 'rude' | 'threat' | 'cow'
+export type InputCategory =
+  | 'threat' | 'violent-threat' | 'intimidation'
+  | 'insult' | 'accusation' | 'anger' | 'rude'
+  | 'request' | 'apology' | 'gratitude' | 'greeting' | 'cow' | 'neutral'
 
 interface MsgBase { id: number; time?: string }
 export type Msg =
@@ -52,6 +56,8 @@ export interface Ctx {
 export interface Choice {
   text: string
   tone: Tone
+  /** Только у свободно введённого текста; варианты уже несут точный act/arg. */
+  category?: InputCategory
   act?: string
   arg?: string | number
   scene?: string

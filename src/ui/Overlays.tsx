@@ -1,6 +1,8 @@
+import { useRef } from 'react'
 import { useGame } from './useGame'
 import { ENDINGS } from '../content/finales'
 import { ARCS } from '../content/arcs'
+import { useModal } from './useModal'
 
 export function Toast() {
   const game = useGame()
@@ -26,13 +28,47 @@ export function Notification() {
   )
 }
 
+async function copyText(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+  } catch { /* fallback ниже */ }
+  try {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.setAttribute('readonly', '')
+    ta.style.position = 'fixed'
+    ta.style.left = '-9999px'
+    document.body.appendChild(ta)
+    ta.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(ta)
+    return ok
+  } catch {
+    return false
+  }
+}
+
 /** «Телефон сел» и зарядка. */
 export function DeadScreen() {
   const game = useGame()
+  const active = game.dead
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useModal({ active, dialogRef })
+
   return (
-    <div className={'dead' + (game.dead ? '' : ' hidden')} id="deadScreen">
-      {game.dead && (
-        <div className="dead-in">
+    <div className={'dead' + (active ? '' : ' hidden')} id="deadScreen">
+      {active && (
+        <div
+          className="dead-in"
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Телефон сел"
+          tabIndex={-1}
+        >
           {game.charging === null ? (
             <>
               <div className="dead-icon">🔌</div>
@@ -53,11 +89,29 @@ export function EndingScreen({ onReset }: { onReset: () => void }) {
   const game = useGame()
   const S = game.S
   const e = ENDINGS.find((x) => x.id === S.ending)
+  const active = !!e
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useModal({
+    active,
+    dialogRef,
+    onEscape: () => game.closeEnding(),
+  })
   if (!e) return null
   const finales = Object.keys(ARCS).filter((id) => game.finaleTitle(id))
   return (
-    <div className="ending" id="endingScreen" role="dialog" aria-label={`Концовка: ${e.title}`}>
-      <div className="ending-in">
+    <div
+      className="ending"
+      id="endingScreen"
+      onClick={(ev) => { if (ev.target === ev.currentTarget) game.closeEnding() }}
+    >
+      <div
+        className="ending-in"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Концовка: ${e.title}`}
+        tabIndex={-1}
+      >
         <div className="ending-icon">{e.icon}</div>
         <small>Концовка {Object.keys(S.endings).length} из {ENDINGS.length}</small>
         <h2>{e.title}</h2>
@@ -65,7 +119,16 @@ export function EndingScreen({ onReset }: { onReset: () => void }) {
         {e.id.startsWith('payday_') && typeof S.mem['payday.chain'] === 'string' && (
           <>
             <blockquote className="grand" id="grandExcuse">«{S.mem['payday.chain']}»</blockquote>
-            <button className="secondary" id="copyExcuse" onClick={() => void navigator.clipboard?.writeText(`Алик, где деньги? — великая отмазка Дня выплаты:\n«${S.mem['payday.chain']}»`)}>Скопировать великую отмазку</button>
+            <button
+              className="secondary"
+              id="copyExcuse"
+              onClick={() => {
+                const text = `Алик, где деньги? — великая отмазка Дня выплаты:\n«${S.mem['payday.chain']}»`
+                void copyText(text).then((ok) => game.flash(ok ? 'Скопировано' : 'Не удалось скопировать'))
+              }}
+            >
+              Скопировать великую отмазку
+            </button>
           </>
         )}
         <ul className="ending-stats">

@@ -3,7 +3,7 @@ import type { Game } from '../engine/game'
 import { GameContext, useGame } from './useGame'
 import { StatusBar, ChatHeader, StatsBar } from './Header'
 import { Chat } from './Chat'
-import { Choices } from './Input'
+import { Choices, Composer } from './Input'
 import { Sheet } from './Sheet'
 import { Toast, Notification, DeadScreen, EndingScreen } from './Overlays'
 import { DebugPanel } from './DebugPanel'
@@ -42,34 +42,58 @@ function Phone({ onReset }: { onReset: () => void }) {
   // заголовок вкладки: «(3) Алик, где деньги?»
   useEffect(() => { document.title = game.title }, [game.title])
 
-  // тряска телефона на «АЛИК!!!»
+  // отклик на смысл ввода (без подписи категории); снимаем класс на animationend
   useEffect(() => {
     const p = phone.current
-    if (!p || !game.shakeId) return
-    p.classList.remove('shake')
+    if (!p || !game.feelId || !game.feel) return
+    const cls = `feel-${game.feel}`
+    p.classList.remove('feel-shake', 'feel-intimidate', 'feel-sorry', 'feel-moo')
     void p.offsetWidth
-    p.classList.add('shake')
-  }, [game.shakeId])
+    p.classList.add(cls)
+    const clear = (e: AnimationEvent) => {
+      if (e.target !== p) return
+      p.classList.remove(cls)
+    }
+    p.addEventListener('animationend', clear)
+    return () => p.removeEventListener('animationend', clear)
+  }, [game.feelId, game.feel])
 
   const setSheetOpen = (v: boolean) => { game.sheetOpen = v; setSheet(v) }
+
+  useEffect(() => {
+    if (!sheet) return
+    return () => { game.sheetOpen = false }
+  }, [sheet, game])
+
+  useEffect(() => {
+    if (game.S.ending || game.dead) setSheetOpen(false)
+  }, [game.S.ending, game.dead])
+
   const reset = () => {
     if (!confirm('Стереть всё и начать заново?')) return
     game.reset()
     onReset()
   }
 
+  const blocked = sheet || game.dead || !!game.S.ending
+
   return (
     <div className="phone" ref={phone}>
-      <StatusBar />
-      <ChatHeader onInfo={() => setSheetOpen(true)} />
-      <StatsBar />
-      <Chat />
-      <Choices />
-      {sheet && <Sheet onClose={() => setSheetOpen(false)} onReset={reset} />}
+      <div className="phone-surface" inert={blocked || undefined}>
+        <div className="phone-main">
+          <StatusBar />
+          <ChatHeader onInfo={() => setSheetOpen(true)} />
+          <StatsBar />
+          <Chat />
+          <Choices />
+          <Composer />
+        </div>
+        <Notification />
+      </div>
       <Toast />
-      <Notification />
       <DeadScreen />
       <EndingScreen onReset={reset} />
+      {sheet && <Sheet onClose={() => setSheetOpen(false)} onReset={reset} />}
     </div>
   )
 }

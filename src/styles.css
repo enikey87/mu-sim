@@ -9,6 +9,11 @@
   --accent: #2f9e5c;
   --sys: rgba(0, 0, 0, .28);
   --danger: #d9443c;
+  /* переопределяются в тестах; на устройстве = системные inset */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -39,8 +44,23 @@ body {
   display: flex; flex-direction: column; overflow: hidden;
   box-shadow: 0 20px 60px rgba(0, 0, 0, .35);
 }
-@media (max-width: 500px) {
-  .phone { width: 100%; height: 100dvh; border: 0; border-radius: 0; }
+.phone-main {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
+}
+.phone-surface {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
+  position: relative;
+}
+@media (max-width: 500px), (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
+  .phone {
+    width: 100%; height: 100dvh; border: 0; border-radius: 0;
+    padding-top: var(--safe-top);
+    padding-right: var(--safe-right);
+    padding-bottom: var(--safe-bottom);
+    padding-left: var(--safe-left);
+  }
 }
 .statusbar {
   display: flex; justify-content: space-between;
@@ -74,10 +94,21 @@ body {
 }
 .stats b { color: var(--text); }
 
+.chat-shell { position: relative; flex: 1; min-height: 0; }
 .chat {
-  position: relative; flex: 1; overflow-y: auto;
+  position: relative; height: 100%; overflow-y: auto;
   padding: 10px 10px 6px; display: flex; flex-direction: column; gap: 4px;
 }
+.new-messages-slot {
+  position: absolute; left: 0; right: 0; bottom: 8px; z-index: 4;
+  display: flex; justify-content: center; pointer-events: none;
+}
+.new-messages {
+  pointer-events: auto; border: 0; border-radius: 16px; padding: 7px 12px;
+  background: var(--accent); color: #fff; box-shadow: 0 3px 12px rgba(0, 0, 0, .25);
+  font: inherit; font-size: 12px; font-weight: 600; line-height: 1.2; cursor: pointer;
+}
+.new-messages:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 .moo-layer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .moo {
   position: absolute; font-size: 38px; font-weight: 900; opacity: 0;
@@ -135,7 +166,7 @@ body {
 
 .choices {
   display: flex; flex-direction: column; gap: 5px;
-  padding: 6px 8px 12px; background: var(--panel);
+  padding: 6px 8px 0; background: var(--panel);
 }
 .choices button { font-size: 13px; }
 .choices button.ctx { background: rgba(47, 158, 92, .16); }
@@ -150,16 +181,49 @@ body {
   60% { transform: translate(0, -1px) rotate(4deg); }
   80% { transform: translate(1px, 1px) rotate(-8deg); }
 }
-@media (prefers-reduced-motion: reduce) { .choices button.locked .q { animation: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .choices button.locked .q,
+  .moo,
+  .msg,
+  .msg .react,
+  .new-messages,
+  .typing-bubble span,
+  .phone.feel-shake,
+  .phone.feel-sorry,
+  .phone.feel-intimidate::after,
+  .phone.feel-moo::before {
+    animation: none !important;
+  }
+  .notif,
+  .toast {
+    transition: none !important;
+  }
+}
+.composer { display: flex; gap: 6px; padding: 6px 8px 10px; background: var(--panel); }
+.composer input {
+  flex: 1; min-width: 0; border: 0; border-radius: 18px; padding: 9px 14px; font: inherit;
+  background: rgba(127, 127, 127, .14); color: var(--text); outline: none;
+}
+@media (max-width: 500px), (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
+  .composer input { font-size: 16px; }
+}
+.composer input:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
+.composer button {
+  width: 40px; flex: 0 0 40px; border: 0; border-radius: 50%; background: var(--accent); color: #fff;
+  font-size: 17px; cursor: pointer;
+}
+.composer input:disabled, .composer button:disabled { opacity: .45; cursor: default; }
 
 .sheet {
-  position: absolute; inset: 0; background: rgba(0, 0, 0, .4); z-index: 10;
+  position: absolute; inset: 0; background: rgba(0, 0, 0, .4); z-index: 50;
   display: flex; align-items: flex-end;
 }
 .sheet-inner {
   background: var(--panel); width: 100%; max-height: 80%; overflow-y: auto;
   border-radius: 18px 18px 0 0; padding: 14px 16px 20px;
 }
+.sheet-inner:focus { outline: none; }
+.sheet-inner:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .sheet-head { display: flex; justify-content: space-between; align-items: center; }
 .sheet h3 { font-size: 14px; margin: 14px 0 6px; color: var(--muted); }
 .list { list-style: none; margin: 0; padding: 0; font-size: 13px; }
@@ -173,7 +237,7 @@ body {
 .toast {
   position: absolute; top: 90px; left: 50%; transform: translateX(-50%);
   background: #222; color: #fff; padding: 8px 14px; border-radius: 12px;
-  font-size: 13px; z-index: 20; box-shadow: 0 6px 20px rgba(0, 0, 0, .3);
+  font-size: 13px; z-index: 60; box-shadow: 0 6px 20px rgba(0, 0, 0, .3);
   transition: opacity .3s; white-space: nowrap;
 }
 .hidden { display: none !important; }
@@ -212,6 +276,8 @@ body {
   display: flex; align-items: center; justify-content: center; text-align: center;
 }
 .dead-in { display: flex; flex-direction: column; gap: 14px; align-items: center; font-size: 16px; }
+.dead-in:focus { outline: none; }
+.dead-in:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 .dead-icon { font-size: 56px; }
 .dead button {
   border: 0; border-radius: 12px; padding: 10px 16px; background: var(--accent); color: #fff; font: inherit; cursor: pointer;
@@ -225,6 +291,8 @@ body {
   display: flex; flex-direction: column; gap: 8px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,.25);
   max-height: 100%; overflow-y: auto;
 }
+.ending-in:focus { outline: none; }
+.ending-in:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .ending-icon { font-size: 56px; line-height: 1; }
 .ending-in small { opacity: .6; text-transform: uppercase; letter-spacing: .06em; font-size: 11px; }
 .ending-in h2 { margin: 0; font-size: 22px; }
@@ -233,13 +301,51 @@ body {
 .ending-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 6px; }
 .ending-btns button { border: 0; border-radius: 12px; padding: 10px 16px; background: var(--accent); color: #fff; font: inherit; cursor: pointer; }
 .ending-btns button.secondary { background: transparent; color: inherit; border: 1px solid rgba(127,127,127,.4); }
-.phone.shake { animation: shake .45s; }
-@keyframes shake {
+/* abspos не видит padding .phone — inset один раз через те же --safe-* */
+@media (max-width: 500px), (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
+  .sheet, .dead, .ending {
+    top: var(--safe-top);
+    right: var(--safe-right);
+    bottom: var(--safe-bottom);
+    left: var(--safe-left);
+  }
+}
+/* отклик на тип ввода (категория на экране не показывается) */
+.phone.feel-shake { animation: feel-shake .45s; }
+@keyframes feel-shake {
   0%, 100% { transform: translateX(0); }
   20% { transform: translateX(-8px) rotate(-1deg); }
   40% { transform: translateX(8px) rotate(1deg); }
   60% { transform: translateX(-6px); }
   80% { transform: translateX(5px); }
+}
+.phone.feel-intimidate::after {
+  content: '';
+  position: absolute; inset: 0; z-index: 40;
+  background: rgba(0, 0, 0, .42);
+  pointer-events: none;
+  animation: feel-dim .55s ease-out forwards;
+}
+@keyframes feel-dim {
+  0% { opacity: 0; }
+  25% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.phone.feel-sorry { animation: feel-sorry .65s ease-out; }
+@keyframes feel-sorry {
+  0%, 100% { box-shadow: 0 20px 60px rgba(0, 0, 0, .35); }
+  40% { box-shadow: 0 0 0 3px rgba(47, 158, 92, .55), 0 0 28px rgba(47, 158, 92, .4), 0 20px 60px rgba(0, 0, 0, .35); }
+}
+.phone.feel-moo::before {
+  content: '🐄';
+  position: absolute; left: 50%; top: 40%; z-index: 40;
+  font-size: 40px; pointer-events: none;
+  animation: feel-cow .85s ease-out forwards;
+}
+@keyframes feel-cow {
+  0% { opacity: 0; transform: translate(-50%, -30%) scale(.35); }
+  35% { opacity: 1; transform: translate(-50%, -55%) scale(1.12); }
+  100% { opacity: 0; transform: translate(-50%, -90%) scale(.85); }
 }
 
 .msg.doc { background: #fffdf3 !important; color: #222; font-family: "Courier New", monospace; font-size: 12px; min-width: 250px; }

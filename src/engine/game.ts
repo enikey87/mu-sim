@@ -24,14 +24,24 @@ import {
   type Criterion, type Entry, type Facts, type Resolver, type Rule, type Trace, type Query, type Priority, type Line as PoolLine, type LineOpts, type Picked,
 } from './rules'
 import { MENTION_RE } from '../content/world'
-import { type Clock, realClock } from './clock'
+import { type Clock, realClock, isManualClock } from './clock'
 import { type Audio, silentAudio } from './audio'
 import { typo } from './typo'
+import { classifyUserInput, type ClassifiedInput } from './input'
 import { dueIn, dateOf, fmtDate, fmtTime, periodOf, tierOf, TIERS, type Due, type Period } from './time'
 import {
   type GameState, type Msg, type NewMsg, type Choice, type Ctx, type Tone, type Storage,
-  freshState, loadState, saveState, SAVE_KEY, MAX_PATIENCE,
+  type InputCategory, freshState, loadState, saveState, SAVE_KEY, MAX_PATIENCE,
 } from './state'
+
+/** Отклик на отправку: смысл понят, категория на экране не показывается. */
+export type SendFeel = 'shake' | 'intimidate' | 'sorry' | 'moo'
+
+/** Отмена async после dispose — ловится на entry points, игроку не показывается. */
+export class GameDisposed extends Error {
+  override name = 'GameDisposed'
+  constructor() { super('Game disposed') }
+}
 
 export interface GameOptions {
   storage?: Storage | null
@@ -55,8 +65,7 @@ export interface TraceEntry extends Trace { id: number; day: number }
 export interface Notif { id: number; icon: string; app: string; text: string }
 export interface Moo { id: number; text: string; left: number; top: number }
 
-// Регулярки классификации текста игрока и событий
-export const THREAT_RE = /суд|полиц|заявлен|прокур|юрист|адвокат|коллектор/i
+// Регулярки событий в тексте Алика; ввод игрока классифицирует engine/input.ts.
 export const TIMEY = /^(Завтра|Скоро|Вечером|Щас|Минуту|Уже почти|Сейчас не могу|Перезвоню|Наберу)/
 export const SAD = /похорон|поминк|умер|реанимац|заболел|потоп|пожар|затопил|сломал|потерял|утонул|упало|сбежал|развод|похитил|застрял|сорвалась|отменили/
 export const REVIVED = /встал|встаёт|воскрес|вернулась/
@@ -69,7 +78,10 @@ export class Game {
   S: GameState
   readonly rng: Rng
   readonly clock: Clock
-  readonly audio: Audio
+  private readonly rawAudio: Audio
+  get audio(): Audio {
+    return this.disposed ? silentAudio : this.rawAudio
+  }
   readonly decks: Decks
   readonly seen: Seen
   readonly X: ExcuseApi
@@ -89,7 +101,8 @@ export class Game {
   dead = false
   charging: number | null = null
   unread = 0
-  shakeId = 0
+  feel: SendFeel | null = null
+  feelId = 0
   title = 'Алик, где деньги?'
   /** Последние выборы правил — для отладочной панели (?debug). */
   trace: TraceEntry[] = []
@@ -100,12 +113,15 @@ export class Game {
   private version = 0
   private idleT = 0
   private statusT = 0
-  private ambientT = 0
-  private toastT = 0
-  private notifT = 0
+  /** UI-таймеры вне game-clock — иначе ?fast гасит тост за десятки мс. */
+  private toastWall = 0
+  private notifWall = 0
   private idleCount = 0
   private seq = 1
   private resetting = false
+  private disposed = false
+  private timerIds = new Set<number>()
+  private sleepWaiters = new Set<(err?: GameDisposed) => void>()
   private noTimers: boolean
   private typos: boolean
   private hiddenAt = 0
@@ -114,7 +130,7 @@ export class Game {
     this.storage = opts.storage === undefined ? (typeof localStorage !== 'undefined' ? localStorage : null) : opts.storage
     this.rng = opts.rng ?? mathRng
     this.clock = opts.clock ?? realClock()
-    this.audio = opts.audio ?? silentAudio
+    this.rawAudio = opts.audio ?? silentAudio
     this.hour = opts.hour ?? null
     this.noTimers = !!opts.noTimers
     this.typos = opts.typos ?? true
@@ -136,7 +152,7 @@ export class Game {
         this.trace = [{ ...t, id: this.seq++, day: this.S.day }, ...this.trace].slice(0, 40)
       }
     }
-    this.audio.setMuted(this.S.muted)
+    this.rawAudio.setMuted(this.S.muted)
 
     if (!this.S.msgs.length) this.seed()
     this.checkAway(opts.away ?? null)
@@ -153,18 +169,76 @@ export class Game {
     return () => this.listeners.delete(fn)
   }
   getVersion = (): number => this.version
+  /** Эпоха ленты: растёт только при push/замене сообщения — для изолированного списка в UI. */
+  getMsgsEpoch = (): number => this.msgsEpoch
+  /** Индекс, с которого UI должен пересобрать узлы (накопленный min с прошлого ack). */
+  getMsgsDirtyFrom = (): number => this.msgsDirtyFrom
+  /** UI: dirty-диапазон применён. */
+  ackMsgsDirty = (): void => {
+    this.msgsDirtyOpen = false
+    this.msgsDirtyFrom = this.S.msgs.length
+  }
   emit(): void {
+    if (this.disposed) return
     this.version++
     for (const fn of this.listeners) fn()
   }
 
+  private msgsEpoch = 0
+  private msgsDirtyFrom = 0
+  private msgsDirtyOpen = false
+  private touchMsgs(from = 0): void {
+    this.msgsDirtyFrom = this.msgsDirtyOpen ? Math.min(this.msgsDirtyFrom, from) : from
+    this.msgsDirtyOpen = true
+    this.msgsEpoch++
+  }
+
+  /** Лента изменена снаружи (тесты): перерисовать MessageList. */
+  notifyMsgs(): void {
+    this.touchMsgs(0)
+    this.emit()
+  }
+
+  /** Активные таймеры этого экземпляра (для тестов). */
+  pendingTimers(): number {
+    return this.timerIds.size
+  }
+
+  private schedule(fn: () => void, ms: number): number {
+    const id = this.clock.setTimeout(() => {
+      this.timerIds.delete(id)
+      if (!this.disposed) fn()
+    }, ms)
+    this.timerIds.add(id)
+    return id
+  }
+
+  private clearSchedule(id: number): void {
+    this.clock.clearTimeout(id)
+    this.timerIds.delete(id)
+  }
+
+  private swallowDisposed(e: unknown): void {
+    if (!(e instanceof GameDisposed)) throw e
+  }
+
   dispose(): void {
-    for (const t of [this.idleT, this.statusT, this.ambientT, this.toastT, this.notifT]) this.clock.clearTimeout(t)
+    if (this.disposed) return
+    this.disposed = true
+    for (const id of [...this.timerIds]) this.clock.clearTimeout(id)
+    this.timerIds.clear()
+    this.idleT = this.statusT = 0
+    if (this.toastWall) { clearTimeout(this.toastWall); this.toastWall = 0 }
+    if (this.notifWall) { clearTimeout(this.notifWall); this.notifWall = 0 }
+    const err = new GameDisposed()
+    for (const finish of this.sleepWaiters) finish(err)
+    this.sleepWaiters.clear()
     this.listeners.clear()
+    this.rawAudio.dispose()
   }
 
   save(): void {
-    if (this.resetting) return
+    if (this.disposed || this.resetting) return
     this.S.lastSeen = this.clock.now()
     saveState(this.storage, this.S)
   }
@@ -211,7 +285,28 @@ export class Game {
   }
   rnd = (n: number): number => rndInt(this.rng, n)
   chance = (p: number): boolean => chance(this.rng, p)
-  sleep = (ms: number): Promise<void> => this.clock.sleep(ms)
+  sleep = (ms: number): Promise<void> => {
+    if (this.disposed) return Promise.reject(new GameDisposed())
+    return new Promise((resolve, reject) => {
+      let settled = false
+      let id = 0
+      const finish = (err?: GameDisposed) => {
+        if (settled) return
+        settled = true
+        this.sleepWaiters.delete(finish)
+        this.clearSchedule(id)
+        if (err) reject(err)
+        else resolve()
+      }
+      this.sleepWaiters.add(finish)
+      id = this.schedule(() => finish(), ms)
+      // manualClock: синхронные тесты — не ждём runTimers для каждой паузы
+      if (isManualClock(this.clock)) {
+        this.clearSchedule(id)
+        queueMicrotask(() => finish(this.disposed ? new GameDisposed() : undefined))
+      }
+    })
+  }
 
   alikDecor = <T extends Keyed>(t: T): T => {
     const f = (s: string) => `${this.X.g('ADDR')}, ${low(s)}`
@@ -296,10 +391,20 @@ export class Game {
 
   // ---------- сообщения ----------
   push<M extends NewMsg>(m: M): Msg {
+    if (this.disposed) throw new GameDisposed()
     const msg = { ...m, id: this.S.nextId++ } as Msg
     this.S.msgs.push(msg)
+    this.touchMsgs(this.S.msgs.length - 1)
     this.emit()
     return msg
+  }
+  /** Замена сообщения в ленте новым объектом — чтобы memo в UI увидел изменение. */
+  private replaceMsg<T extends Msg>(m: T, patch: Partial<T>): T {
+    const next = { ...m, ...patch } as T
+    const i = this.S.msgs.findIndex((x) => x.id === m.id)
+    if (i >= 0) this.S.msgs[i] = next
+    this.touchMsgs(i >= 0 ? i : 0)
+    return next
   }
   sys(text: string): Msg { return this.push({ kind: 'sys', text }) }
 
@@ -315,7 +420,7 @@ export class Game {
     }
     this.audio.beep()
     this.audio.vibrate(40)
-    if (this.chance(this.mooChance())) this.clock.setTimeout(() => this.moo(), 300 + this.rnd(900))
+    if (this.chance(this.mooChance())) this.schedule(() => this.moo(), 300 + this.rnd(900))
     return msg
   }
 
@@ -333,6 +438,7 @@ export class Game {
 
   /** Реплики Алика (или участника { w, t }). Иногда с опечаткой и исправлением. */
   async say(items: SayItem[], legend = false, who?: string): Promise<Msg[]> {
+    if (this.disposed) throw new GameDisposed()
     if (this.S.ctx?.type === 'reactOnly') this.S.ctx = null // Алик ответил словами — «а ответить словами?» уже не к месту
     // ответить можно на последнее сказанное: воспоминание, реплика легенды или персонажа ставятся после своей реплики
     if (this.S.ctx) { delete this.S.ctx.memory; delete this.S.ctx.legend; delete this.S.ctx.chorus }
@@ -346,9 +452,11 @@ export class Game {
         if (t) ({ text, fix } = t)
       }
       await this.typingFor(600 + text.length * 22)
+      if (this.disposed) throw new GameDisposed()
       out.push(this.alikMsg({ kind: 'text', from: 'alik', text, legend, who: from }))
       if (fix) {
         await this.typingFor(500)
+        if (this.disposed) throw new GameDisposed()
         this.alikMsg({ kind: 'text', from: 'alik', text: fix })
         this.unlock('typo')
       }
@@ -367,13 +475,21 @@ export class Game {
     else this.setStatus(this.chance(0.5) ? 'был недавно' : 'в сети', 'online')
   }
 
+  /** Короткий тост поверх чата (ачивка, «Скопировано»…). Длительность — wall clock. */
+  flash(text: string, ms = 2600): void {
+    this.toast = text
+    if (this.toastWall) clearTimeout(this.toastWall)
+    this.toastWall = window.setTimeout(() => {
+      this.toastWall = 0
+      this.toast = null
+      this.emit()
+    }, ms)
+    this.emit()
+  }
   unlock(key: string): void {
     if (!ACH[key] || this.S.ach[key]) return
     this.S.ach[key] = this.S.day
-    this.toast = `🏆 ${ACH[key][0]}`
-    this.clock.clearTimeout(this.toastT)
-    this.toastT = this.clock.setTimeout(() => { this.toast = null; this.emit() }, 2600)
-    this.emit()
+    this.flash(`🏆 ${ACH[key][0]}`)
   }
   mood(d: number): void {
     this.S.mood = Math.max(0, Math.min(10, this.S.mood + d))
@@ -390,7 +506,7 @@ export class Game {
     if (this.S.stats.moo >= 10) this.unlock('moo10')
     const m: Moo = { id: this.seq++, text: 'М' + 'у'.repeat(4 + this.rnd(8)), left: 5 + this.rnd(45), top: 15 + this.rnd(60) }
     this.moos.push(m)
-    this.clock.setTimeout(() => { this.moos = this.moos.filter((x) => x !== m); this.emit() }, 3100)
+    this.schedule(() => { this.moos = this.moos.filter((x) => x !== m); this.emit() }, 3100)
     this.audio.moo()
     this.emit()
   }
@@ -407,26 +523,25 @@ export class Game {
     this.save()
     this.emit()
   }
-  /** Первое касание: разрешить звук и запустить фон. */
+  /** Касание разрешает браузеру воспроизводить звуки игры. */
   gesture(): void {
     this.audio.unlock()
-    if (this.ambientT || this.noTimers) return
-    const loop = () => {
-      if (!this.S.muted && !this.dead) this.audio.ambient(this.period())
-      this.ambientT = this.clock.setTimeout(loop, 6000)
-    }
-    this.ambientT = this.clock.setTimeout(loop, 6000)
   }
 
   // ---------- уведомления, батарея ----------
   notify(icon: string, app: string, text: string): void {
     this.notif = { id: this.seq++, icon, app, text }
-    this.clock.clearTimeout(this.notifT)
-    this.notifT = this.clock.setTimeout(() => { this.notif = null; this.emit() }, 4200)
+    if (this.notifWall) clearTimeout(this.notifWall)
+    this.notifWall = window.setTimeout(() => {
+      this.notifWall = 0
+      this.notif = null
+      this.emit()
+    }, 4200)
     this.audio.vibrate(30)
     this.emit()
   }
   dismissNotif(): void {
+    if (this.notifWall) { clearTimeout(this.notifWall); this.notifWall = 0 }
     this.notif = null
     this.emit()
   }
@@ -452,23 +567,29 @@ export class Game {
   }
   die(): void {
     this.dead = true
-    this.clock.clearTimeout(this.idleT)
-    this.clock.clearTimeout(this.statusT)
+    this.clearSchedule(this.idleT)
+    this.clearSchedule(this.statusT)
     this.unlock('dead')
     this.save()
     this.emit()
   }
   async charge(): Promise<void> {
-    if (!this.dead || this.charging !== null) return
-    for (let p = 1; p <= 100; p += 9) { this.charging = p; this.emit(); await this.sleep(120) }
-    this.charging = null
-    this.S.battery = 100
-    this.dead = false
-    this.busy = false
-    this.emit()
-    this.awayBurst(2 + this.rnd(3), 1 + this.rnd(2), 'Пока телефон заряжался')
-    this.armIdle()
-    this.armStatus()
+    if (!this.dead || this.charging !== null || this.disposed) return
+    try {
+      for (let p = 1; p <= 100; p += 9) {
+        if (this.disposed) return
+        this.charging = p; this.emit(); await this.sleep(120)
+      }
+      if (this.disposed) return
+      this.charging = null
+      this.S.battery = 100
+      this.dead = false
+      this.busy = false
+      this.emit()
+      this.awayBurst(2 + this.rnd(3), 1 + this.rnd(2), 'Пока телефон заряжался')
+      this.armIdle()
+      this.armStatus()
+    } catch (e) { this.swallowDisposed(e) }
   }
 
   // ---------- факты для правил ----------
@@ -573,7 +694,7 @@ export class Game {
     return this.S.day < Number(m['topicMute.' + k] ?? -1) || (m.topicLast === k && Number(m.topicRun ?? 0) >= 2)
   }
   saysFacts(o: Choice): Facts {
-    const f: Facts = { intent: o.act, arg: o.arg, greet: !!o.text && !o.text.includes('?') }
+    const f: Facts = { intent: o.act, arg: o.arg, category: o.category, tone: o.tone, greet: !!o.text && !o.text.includes('?') }
     if (o.act === 'arc' && typeof o.arg === 'string' && ARCS[o.arg]) f.argArcDone = (this.S.arcs[o.arg]?.i ?? 0) >= ARCS[o.arg].eps.length
     return f
   }
@@ -583,14 +704,17 @@ export class Game {
   }
   fire(event: string, extra: Facts = {}, q: Omit<Query, 'event' | 'facts'> = {}): Promise<Rule<Game> | null> {
     return this.rules.fire(this, { event, facts: extra, ...q }, this.facts, { floor: this.floor() })
+      .catch((e) => { this.swallowDisposed(e); return null })
   }
   /** События, отложенные до «безопасной точки» (после ответа Алика): хор, наступившие обещания. */
   private pending: Query[] = []
   async afterTurn(): Promise<void> {
-    await this.rules.runDue(this, this.facts, { floor: this.floor() })
-    // из упоминаний — не больше одного вклинившегося персонажа за ход
-    const queue = this.pending.splice(0)
-    for (const q of queue) if (await this.rules.fire(this, q, this.facts, { floor: this.floor() })) break
+    try {
+      await this.rules.runDue(this, this.facts, { floor: this.floor() })
+      // из упоминаний — не больше одного вклинившегося персонажа за ход
+      const queue = this.pending.splice(0)
+      for (const q of queue) if (await this.rules.fire(this, q, this.facts, { floor: this.floor() })) break
+    } catch (e) { this.swallowDisposed(e) }
   }
 
   // ---------- варианты игрока ----------
@@ -640,25 +764,52 @@ export class Game {
     return (this.S.choices ??= this.buildChoices())
   }
 
-  classify(text: string): Tone {
-    if (/коров|му{2,}|мыч/i.test(text)) return 'cow'
-    if (/[А-ЯЁA-Z]{4,}/.test(text) || /!!|верни|обман|врать|врёшь|суд|полиц|заявлен|приеду/i.test(text)) return THREAT_RE.test(text) ? 'threat' : 'rude'
-    if (/пожалуйста|извин|прост|добр|здравств|спасибо|🙏/i.test(text)) return 'polite'
-    return 'neutral'
+  classifyInput(text: string): ClassifiedInput { return classifyUserInput(text) }
+  /** Совместимый шорткат для тестов и отладки из консоли. */
+  classify(text: string): Tone { return this.classifyInput(text).tone }
+
+  /** Какой отклик дать на это сообщение (категорию игроку не показываем). */
+  feelFor(o: Choice): SendFeel | null {
+    const cat: InputCategory = o.category ?? this.classifyInput(o.text).category
+    if (o.act === 'moo' || cat === 'cow') return 'moo'
+    if (o.act === 'sorry' || cat === 'apology') return 'sorry'
+    if (cat === 'intimidation' || cat === 'violent-threat') return 'intimidate'
+    if (o.tone === 'rude' || o.tone === 'threat' || cat === 'rude') return 'shake'
+    return null
+  }
+
+  private triggerFeel(o: Choice): void {
+    const feel = this.feelFor(o)
+    if (!feel) return
+    this.feel = feel
+    this.feelId++
+    if (feel === 'shake') this.audio.vibrate([80, 40, 80])
+    else if (feel === 'intimidate') this.audio.vibrate([120, 50, 120, 50, 200])
+    this.emit()
   }
 
   // ---------- ход игрока ----------
   async send(opt: Choice | string): Promise<void> {
-    const o: Choice = typeof opt === 'string' ? { text: opt, tone: this.classify(opt) } : opt
-    if (this.busy || this.dead || !o.text.trim()) return
+    try {
+      await this.sendTurn(opt)
+    } catch (e) { this.swallowDisposed(e) }
+  }
+
+  private async sendTurn(opt: Choice | string): Promise<void> {
+    const parsed = typeof opt === 'string' ? this.classifyInput(opt) : null
+    const o: Choice = parsed
+      ? { text: opt as string, tone: parsed.tone, category: parsed.category, act: parsed.intent }
+      : opt as Choice
+    if (this.busy || this.dead || this.disposed || !o.text.trim()) return
     const S = this.S
     this.busy = true
-    this.clock.clearTimeout(this.idleT)
+    this.clearSchedule(this.idleT)
     this.idleCount = 0
     this.clearUnread()
     if (o.act !== 'catchLie') this.forgetLie() // не поймал сразу — момент упущен
     let tone = o.tone
-    if (tone === 'rude' && !o.scene && THREAT_RE.test(o.text)) tone = 'threat'
+    // Готовая кнопка может быть помечена как rude, но текст с судом всё равно двигает ветку угроз.
+    if (tone === 'rude' && !o.scene && this.classifyInput(o.text).category === 'threat') tone = 'threat'
     this.tick(1 + this.rnd(5))
     const mine = this.push({ kind: 'text', from: 'me', text: o.text, time: fmtTime(S.clock) })
     this.seen.mark(o.text)
@@ -666,17 +817,19 @@ export class Game {
     this.unlock('first')
     if (this.isNight()) this.unlock('nightowl')
     if (tone === 'polite') { if (++S.politeStreak >= 10) this.unlock('saint') } else S.politeStreak = 0
-    if ((tone === 'rude' || tone === 'threat') && !o.scene) { this.unlock(tone); this.shakeId++; this.audio.vibrate([80, 40, 80]) }
+    if ((tone === 'rude' || tone === 'threat') && !o.scene) this.unlock(tone)
     if (tone === 'cow') this.unlock('cow')
+    if (!o.scene) this.triggerFeel(o)
     if (o.act !== 'topic') S.mem.topicRun = 0 // серия вопросов по одной теме прервалась
     if (o.act === 'sorry') S.mem.sorryAt = [...String(S.mem.sorryAt ?? '').split(',').filter(Boolean), S.stats.sent].slice(-4).join(',') // для «качелей»
     if (tone === 'rude') S.mem.rudeAt = S.stats.sent
     S.choices = null
     this.drain(1)
     this.save()
-    if (this.dead) return
+    if (this.dead || this.disposed) return
 
     await this.sleep((500 + this.rnd(700)) * (this.isNight() ? 2 : 1))
+    if (this.disposed) return
     this.setStatus('прочитано')
 
     // реакция на сообщение игрока; иногда — вместо ответа
@@ -684,7 +837,8 @@ export class Game {
     // заблокировал — значит, не видит: реакции на недоставленное не бывает
     if (!o.scene && !S.mem.blocked && this.chance(0.18) && mine.kind === 'text') {
       await this.sleep(600)
-      mine.react = this.draw('R_' + tone, L.REACT[tone] ?? L.REACT.neutral)
+      if (this.disposed) return
+      this.replaceMsg(mine, { react: this.draw('R_' + tone, L.REACT[tone] ?? L.REACT.neutral) })
       this.audio.vibrate(20)
       this.emit()
       reactOnly = !o.act && tone !== 'rude' && tone !== 'threat' && !S.scene && this.chance(0.3)
@@ -700,19 +854,23 @@ export class Game {
       await this.fire('PlayerSays', this.saysFacts(o))
     } else if (S.scene) {
       S.scene = null // свой текст посреди сцены — сцена прерывается
-      await this.alikTurn(tone)
+      await this.alikTurn(tone, o.category)
     } else {
-      await this.alikTurn(tone)
+      await this.alikTurn(tone, o.category)
     }
+    if (this.disposed) return
 
     await this.afterTurn()
+    if (this.disposed) return
     // сюжетный ход: только вне сцены, если Алик не «пропал» и в этом ходу ещё не было сцены или серии
     if (!S.scene && !o.scene && !S.offlineDays && !this.dead && this.arcAt !== S.stats.sent) await this.fire('StoryBeat')
     await this.fire('CheckEnding')
+    if (this.disposed) return
 
     S.patience = Math.max(0, S.patience - 1)
     if (S.patience === 0) {
       await this.sleep(600)
+      if (this.disposed) return
       this.sys(this.draw('FLOOR', FLOOR))
       S.patience = MAX_PATIENCE
       this.unlock('floor')
@@ -764,7 +922,7 @@ export class Game {
   }
 
   // ---------- ход Алика ----------
-  async alikTurn(tone: Tone): Promise<void> {
+  async alikTurn(tone: Tone, category?: Choice['category']): Promise<void> {
     const S = this.S
     S.ctx = null
     if (S.offlineDays > 0) {
@@ -776,7 +934,7 @@ export class Game {
     } else if (this.chance(0.65)) {
       this.nextDay(1 + this.rnd(3))
     }
-    await this.fire('PlayerMessage', { tone })
+    await this.fire('PlayerMessage', { tone, category })
   }
 
   /** Обычный ход: иногда «прочитано и молчит», иногда реплика по времени суток, потом взвешенный выбор. */
@@ -871,7 +1029,7 @@ export class Game {
     this.seen.mark(text)
     const m = this.alikMsg({ kind: 'text', from: 'alik', text })
     await this.sleep(1300)
-    if (m.kind === 'text') m.deleted = true
+    if (m.kind === 'text') this.replaceMsg(m, { deleted: true })
     this.unlock('deleted')
     this.S.ctx = { ...(this.S.ctx ?? {}), deleted: true }
     this.emit()
@@ -884,17 +1042,18 @@ export class Game {
     const w = this.draw('EDIT_WHEN', L.EDIT_WHEN)
     // срок может стоять в начале фразы с заглавной — ищем без учёта регистра, регистр сохраняем
     const at = p ? m.text.toLowerCase().indexOf(p.t.toLowerCase()) : -1
+    let text = m.text
     if (p && at >= 0) {
       const orig = m.text.slice(at, at + p.t.length)
       const repl = orig[0] !== orig[0].toLowerCase() ? cap(w) : w
-      m.text = m.text.slice(0, at) + repl + m.text.slice(at + p.t.length)
+      text = m.text.slice(0, at) + repl + m.text.slice(at + p.t.length)
       const rec = this.S.promises[this.S.promises.length - 1]
       if (rec && rec.t.includes(p.t)) { rec.t = rec.t.replace(p.t, w); rec.due = null }
       this.S.ctx = { ...this.S.ctx, when: w, whenNever: true }
     } else {
-      m.text = m.text.replace(/[.!]?$/, this.draw('EDIT_SUFFIX', L.EDIT_SUFFIX) + '.')
+      text = m.text.replace(/[.!]?$/, this.draw('EDIT_SUFFIX', L.EDIT_SUFFIX) + '.')
     }
-    m.edited = true
+    this.replaceMsg(m, { text, edited: true })
     this.unlock('edited')
     this.emit()
   }
@@ -1146,73 +1305,82 @@ export class Game {
 
   // ---------- допработа ----------
   async answerJob(id: number, yes: boolean): Promise<void> {
-    const m = this.S.msgs.find((x) => x.id === id)
-    if (!m || m.kind !== 'job' || m.answered || this.busy || this.dead) return
-    m.answered = true
-    this.busy = true
-    this.clock.clearTimeout(this.idleT)
-    const reply = this.playerLine(() => (yes ? this.draw('JY', JOB_YES_P) : this.draw('JN', JOB_NO_P)))
-    this.seen.mark(reply)
-    this.push({ kind: 'text', from: 'me', text: reply, time: fmtTime(this.S.clock) })
-    if (yes) {
-      const add = 5000 + this.rnd(16) * 1000
-      this.nextDay(2 + this.rnd(3))
-      this.sys(`Вы сделали работу. Долг Алика вырос на ${add.toLocaleString('ru-RU')} ₽`)
-      this.S.debt += add
-      this.mood(2)
-      this.unlock('fence')
-      await this.say([this.uniq(this.X.jobYes)])
-    } else {
-      this.mood(-1)
-      await this.say([this.uniq(this.X.jobNo)])
-    }
-    this.S.ctx = null
-    this.busy = false
-    this.S.choices = this.buildChoices()
-    this.save()
-    this.emit()
-    this.armIdle()
+    try {
+      const m = this.S.msgs.find((x) => x.id === id)
+      if (!m || m.kind !== 'job' || m.answered || this.busy || this.dead || this.disposed) return
+      this.replaceMsg(m, { answered: true })
+      this.busy = true
+      this.clearSchedule(this.idleT)
+      const reply = this.playerLine(() => (yes ? this.draw('JY', JOB_YES_P) : this.draw('JN', JOB_NO_P)))
+      this.seen.mark(reply)
+      this.push({ kind: 'text', from: 'me', text: reply, time: fmtTime(this.S.clock) })
+      if (yes) {
+        const add = 5000 + this.rnd(16) * 1000
+        this.nextDay(2 + this.rnd(3))
+        this.sys(`Вы сделали работу. Долг Алика вырос на ${add.toLocaleString('ru-RU')} ₽`)
+        this.S.debt += add
+        this.mood(2)
+        this.unlock('fence')
+        await this.say([this.uniq(this.X.jobYes)])
+      } else {
+        this.mood(-1)
+        await this.say([this.uniq(this.X.jobNo)])
+      }
+      this.S.ctx = null
+      this.busy = false
+      this.S.choices = this.buildChoices()
+      this.save()
+      this.emit()
+      this.armIdle()
+    } catch (e) { this.swallowDisposed(e) }
   }
 
   // ---------- Алик живёт сам ----------
   armIdle(): void {
-    this.clock.clearTimeout(this.idleT)
+    this.clearSchedule(this.idleT)
     // Алик пишет сам редко: не в начале игры, не раньше чем через 1,5–3 минуты тишины, не больше двух раз подряд
-    if (this.noTimers || this.dead || this.idleCount >= 2 || this.S.stats.sent < 5) return
-    this.idleT = this.clock.setTimeout(() => void this.onIdle(), (90000 + this.rnd(90000)) * (this.idleCount + 1) * 1.5 ** this.idleCount)
+    if (this.disposed || this.noTimers || this.dead || this.idleCount >= 2 || this.S.stats.sent < 5) return
+    this.idleT = this.schedule(() => void this.onIdle(), (90000 + this.rnd(90000)) * (this.idleCount + 1) * 1.5 ** this.idleCount)
   }
   sheetOpen = false
   async onIdle(): Promise<void> {
-    if (this.busy || this.dead || this.sheetOpen || (typeof document !== 'undefined' && document.hidden)) return this.armIdle()
-    this.idleCount++
-    this.busy = true
-    this.drain(1)
-    if (!this.dead) {
-      await this.fire('AlikIdle')
-      await this.afterTurn()
-      this.S.choices = this.buildChoices()
-      this.save()
-    }
-    this.busy = false
-    this.emit()
-    if (!this.dead) { this.restStatus(); this.armIdle() }
+    try {
+      if (this.disposed || this.busy || this.dead || this.sheetOpen || (typeof document !== 'undefined' && document.hidden)) return this.armIdle()
+      this.idleCount++
+      this.busy = true
+      this.drain(1)
+      if (!this.dead) {
+        await this.fire('AlikIdle')
+        if (this.disposed) { this.busy = false; return }
+        await this.afterTurn()
+        this.S.choices = this.buildChoices()
+        this.save()
+      }
+      this.busy = false
+      this.emit()
+      if (!this.dead && !this.disposed) { this.restStatus(); this.armIdle() }
+    } catch (e) { this.swallowDisposed(e) }
   }
   armStatus(): void {
-    this.clock.clearTimeout(this.statusT)
-    if (this.noTimers || this.dead) return
-    this.statusT = this.clock.setTimeout(async () => {
-      if (!this.busy && !this.dead && this.S.offlineDays === 0) {
-        if (this.chance(0.2)) {
-          // «печатает…» — и ничего не приходит
-          this.typing = 'печатает…'
-          this.setStatus('печатает…', 'typing')
-          await this.sleep(1500 + this.rnd(2500))
-          this.typing = null
-          if (!this.busy) this.setStatus('в сети', 'online')
-        } else if (this.isNight()) this.setStatus(`был(а) в ${this.realHHMM()}`)
-        else this.setStatus(this.draw('WANDER', STATUS_WANDER), 'online')
-      }
-      this.armStatus()
+    this.clearSchedule(this.statusT)
+    if (this.disposed || this.noTimers || this.dead) return
+    this.statusT = this.schedule(async () => {
+      try {
+        if (this.disposed) return
+        if (!this.busy && !this.dead && this.S.offlineDays === 0) {
+          if (this.chance(0.2)) {
+            // «печатает…» — и ничего не приходит
+            this.typing = 'печатает…'
+            this.setStatus('печатает…', 'typing')
+            await this.sleep(1500 + this.rnd(2500))
+            if (this.disposed) return
+            this.typing = null
+            if (!this.busy) this.setStatus('в сети', 'online')
+          } else if (this.isNight()) this.setStatus(`был(а) в ${this.realHHMM()}`)
+          else this.setStatus(this.draw('WANDER', STATUS_WANDER), 'online')
+        }
+        this.armStatus()
+      } catch (e) { this.swallowDisposed(e) }
     }, 7000 + this.rnd(9000))
   }
 

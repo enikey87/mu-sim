@@ -55,6 +55,18 @@ const family = (who: string): R => ({
 })
 
 export const rudeRules: R[] = [
+  // Реальные угрозы не превращаем в судебную шутку: они ускоряют ссору и получают отдельный ответ.
+  {
+    name: 'Tone_ViolentThreat', event: 'PlayerMessage', when: [eq('category', 'violent-threat')], bonus: 6,
+    remember: [add('count.rude'), add('count.violence'), add(HEAT, 2)],
+    trigger: [{ event: 'RudeCool', delay: 20 }, { event: 'RudeCool', delay: 40 }],
+    respond: ({ game }) => offended(game, game.uniq(() => game.draw('VIOLENT_THREAT', T.VIOLENT_THREAT)), false),
+  },
+  {
+    name: 'Tone_Intimidation', event: 'PlayerMessage', when: [eq('category', 'intimidation')], bonus: 6,
+    remember: [add('count.rude'), add('count.intimidation'), add(HEAT)], trigger: cool,
+    respond: ({ game }) => offended(game, game.uniq(() => game.draw('INTIMIDATION', T.INTIMIDATION)), false),
+  },
   // S0 — обида (как раньше, но коротко); второй крик за игру Алик помнит
   { name: 'Tone_Rude', event: 'PlayerMessage', when: [rude], remember: cools, trigger: cool, respond: ({ game }) => offended(game) },
   {
