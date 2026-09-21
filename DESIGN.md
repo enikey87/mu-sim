@@ -181,7 +181,7 @@
 
 ## Тех
 - Vite + React + TypeScript, без бэкенда. Прогресс в localStorage (последние 150 сообщений).
-- **Система правил** (`src/engine/rules.ts`, по мотивам доклада Valve про Left 4 Dead и gorecode/kawaii-doom): событие + факты → побеждает самое специфичное правило; веса, шанс, «один раз», память (`remember`), цепочки событий (`trigger`). События: `PlayerSays`, `PlayerMessage`, `BuildChoices`, `AlikTurn`, `AlikIdle`, `PeriodLine`, `AlikIgnores`.
+- **Система правил** (`src/engine/rules/`, по мотивам доклада Valve про Left 4 Dead и gorecode/kawaii-doom): событие + факты → побеждает самое специфичное правило; веса, шанс, «один раз», память (`remember`), цепочки событий (`trigger`). События: `PlayerSays`, `PlayerMessage`, `BuildChoices`, `AlikTurn`, `AlikIdle`, `PeriodLine`, `AlikIgnores`.
 - **Память Алика**: счётчики грубостей, угроз, извинений; отдельные ответы для повторов, законченных сериалов, «когда-нибудь», толстого журнала обещаний.
 - Web Audio + Speech Synthesis, вибрация — после первого касания.
 - Тесты: Vitest (движок, контент, сценарии правил, симуляция 3×300 ходов, интерфейс).

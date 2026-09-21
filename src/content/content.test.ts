@@ -125,7 +125,7 @@ describe('excuse generator', () => {
         const e = X.excuse({ preferLong: i % 2 === 0 })
         expect(e.texts.length).toBeGreaterThan(0)
         for (const t of e.texts) {
-          expect(t, t).not.toMatch(/undefined|null|NaN|\[object|\s,|\s\.\s|  /)
+          expect(t, t).not.toMatch(/undefined|null|NaN|\[object|\s,|\s\.\s| {2}/)
           expect(t.length).toBeGreaterThan(2)
         }
         if (e.p) expect(e.texts.join(' ').toLowerCase()).toContain(e.p.t.toLowerCase())

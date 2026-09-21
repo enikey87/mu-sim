@@ -13,7 +13,7 @@ function renderApp(game: Game, onReset = vi.fn()) {
 }
 
 function mockScrollBox(el: HTMLElement, initial = { height: 800, client: 300, top: 500 }) {
-  let height = initial.height
+  const height = initial.height
   let client = initial.client
   let top = initial.top
   const setTop = (value: number) => { top = Math.max(0, Math.min(value, height - client)) }
@@ -559,7 +559,6 @@ describe('App', () => {
     expect(statusMs).toBeLessThan(80)
     expect(pushMs).toBeLessThan(120)
     expect(patchMs).toBeLessThan(80)
-    // eslint-disable-next-line no-console
     console.log(
       `[chat-render] n=1000 before≈status:N-scan/push:N-map; after status=${statusMs.toFixed(1)}ms touched=0; ` +
         `push=${pushMs.toFixed(1)}ms created=1 touched=1; editLast=${patchMs.toFixed(1)}ms created=1 touched=1`,
