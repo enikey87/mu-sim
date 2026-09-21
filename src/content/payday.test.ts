@@ -59,12 +59,11 @@ describe('День выплаты', () => {
     await choose(game, 'refuse')
     expect(game.S.mem['payday.refused']).toBe(true)
     const debt = game.S.debt
+    const n = game.S.msgs.length
     await choose(game, 'accept')
     expect(game.S.mem.payday).toBe('default')
     expect(game.S.debt).toBe(debt - 50)
-    const n = game.S.msgs.length
-    game.nextDay(1)
-    await game.afterTurn()
+    // исход ставит кнопку на «завтра»; ход заканчивается +1…3 — кнопка в том же send
     expect(texts(game, n).join(' ')).toMatch(/через год/)
   })
   it('бедная партия: общие источники и добор до 240 000, общие звенья отмазки', async () => {
