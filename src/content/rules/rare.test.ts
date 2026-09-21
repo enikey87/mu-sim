@@ -26,6 +26,7 @@ const CASES: Record<string, Case> = {
   Tone_ViolentThreat: { event: 'PlayerMessage', facts: { tone: 'rude', category: 'violent-threat' } },
   Tone_Intimidation: { event: 'PlayerMessage', facts: { tone: 'rude', category: 'intimidation' } },
   Turn_WhileDead: { event: 'AlikTurn', setup: (g) => { g.S.mem.alik_dead = true } },
+  Says_OtherArcWhileDead: { event: 'PlayerSays', facts: { intent: 'arc', arg: 'boris' }, setup: (g) => { g.S.mem.alik_dead = true } },
   Scene_wife: { event: 'PickScene', setup: (g) => { g.S.mem['count.rude'] = 1 } },
   Scene_tax: { event: 'PickScene', setup: (g) => { g.S.mem['count.threat'] = 1 } },
   Scene_lend: { event: 'PickScene', setup: (g) => { g.S.mood = 8 } },

@@ -38,6 +38,24 @@ describe('Game: начало и ход', () => {
     expect(game.busy).toBe(false)
     expect(JSON.parse(storage.data[SAVE_KEY]).stats.sent).toBe(1)
   })
+  it('ход игрока всегда двигает календарь на 1–3 дня (после ответа и хора)', async () => {
+    for (let seed = 1; seed <= 12; seed++) {
+      const { game } = makeGame({ seed })
+      game.S.offlineDays = 0
+      const day = game.S.day
+      await game.send(game.choices.find((c) => c.tone === 'polite') ?? game.choices[0])
+      expect(game.S.day - day, `seed ${seed}`).toBeGreaterThanOrEqual(1)
+      expect(game.S.day - day, `seed ${seed}`).toBeLessThanOrEqual(3)
+    }
+  })
+  it('возврат из пропажи: прыжок на offlineDays, без доп. +1…3', async () => {
+    const { game } = makeGame({ seed: 2 })
+    game.S.offlineDays = 4
+    const day = game.S.day
+    await game.send({ text: 'Где вы?', tone: 'neutral' })
+    expect(game.S.offlineDays).toBe(0)
+    expect(game.S.day).toBe(day + 4)
+  })
   it('свой текст классифицируется по тону', () => {
     const { game } = makeGame()
     expect(game.classify('СКОЛЬКО МОЖНО ЖДАТЬ!!!')).toBe('rude')
@@ -145,6 +163,20 @@ describe('Game: начало и ход', () => {
     }
     expect(new Set(mine).size).toBe(mine.length)
   })
+  it('исчерпанный пул вопросов к сериалу не повторяет уже показанный вариант', () => {
+    const { game } = makeGame()
+    game.S.arcs.tile = { i: 2, last: 0 }
+    game.S.ctx = { arc: 'tile' }
+    const offered = new Set<string>()
+    for (let i = 0; i < 6; i++) {
+      const choice = game.buildChoices().find((item) => item.act === 'arc' && item.arg === 'tile')
+      if (choice) {
+        expect(offered.has(choice.text)).toBe(false)
+        offered.add(choice.text)
+      }
+    }
+    expect(offered.size).toBe(4)
+  })
   it('терпение кончается — «полежал на полу»', async () => {
     const { game } = makeGame()
     game.S.patience = 1
@@ -180,15 +212,14 @@ describe('Game: допработа', () => {
 })
 
 describe('Game: батарея', () => {
-  it('разряд — «телефон сел» после ответа Алика, отправка блокируется; зарядка — пачка непрочитанных', async () => {
+  it('разряд — «телефон сел», отправка блокируется; зарядка — пачка непрочитанных', async () => {
     const { game } = makeGame()
     game.S.battery = 1
     game.S.stats.sent = 3
-    const n0 = game.S.msgs.length
     await game.send('Алик, привет')
     expect(game.dead).toBe(true)
-    expect(game.S.msgs.slice(n0 + 1).some((m) => m.kind === 'text' && m.from === 'alik')).toBe(true)
     expect(game.S.ach.dead).toBeDefined()
+    expect(game.S.msgs.at(-1)).toMatchObject({ kind: 'sys', text: 'Не доставлено: телефон Алика выключен.' })
     await game.send('ещё')
     expect(game.S.stats.sent).toBe(4)
     const n = game.S.msgs.length

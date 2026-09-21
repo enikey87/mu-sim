@@ -1,6 +1,6 @@
 // Игра: состояние, сообщения, ход Алика, «живость». Решения — что ответить, что предложить игроку,
 // что сделать Алику — принимает система правил (engine/rules/, content/rules/*).
-import { make, D, low, cap, type ExcuseApi, type Promise3 } from '../content/excuses'
+import { make, D, low, cap, type ExcuseApi, type Promise3, type PromiseCondition } from '../content/excuses'
 import { makeScenes, type Scene, type Line } from '../content/scenes'
 import { TRIBUNAL } from '../content/rude'
 import { PAYDAY_HOOKS } from '../content/rules/payday'
@@ -16,6 +16,10 @@ import { FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUF
 import { STARTS } from '../content/quests'
 import { allRules } from '../content/rules'
 import { CLAIMS, claimByKey, conflicts, pairKey, CALLBACK_OPEN, type Claim } from '../content/lies'
+import {
+  ENDGAME_CHOICES, ENDGAME_FALLBACK, ENDGAME_FORMALITIES, ENDGAME_GROUP, ENDGAME_INTRO, ENDGAME_JUBILEES,
+  ENDGAME_LEAVE, ENDGAME_MONEY, ENDGAME_MUTE, ENDGAME_OPEN, ENDGAME_RENAMES, ENDGAME_RETURNERS, ENDGAME_VENDETTA,
+} from '../content/endgame'
 import { type Rng, mathRng, rndInt, shuffle, chance } from './rng'
 import { Decks } from './deck'
 import { Seen, type Keyed } from './uniq'
@@ -125,6 +129,9 @@ export class Game {
   private noTimers: boolean
   private typos: boolean
   private hiddenAt = 0
+  /** Ход игрока: nextDay уже был (offline / fx.days) — обычный +1…3 в конце не дублируем. */
+  private inPlayerTurn = false
+  private dayMovedInTurn = false
 
   constructor(opts: GameOptions = {}) {
     this.storage = opts.storage === undefined ? (typeof localStorage !== 'undefined' ? localStorage : null) : opts.storage
@@ -381,6 +388,7 @@ export class Game {
     this.rules.settle()
     this.S.clock = this.realMinutes()
     this.push({ kind: 'sep', text: fmtDate(this.S.day) })
+    if (this.inPlayerTurn) this.dayMovedInTurn = true
     const t = tierOf(this.S.day)
     if (t > this.S.tier) {
       this.S.tier = t
@@ -388,6 +396,12 @@ export class Game {
       this.unlock('tier' + t)
     }
     if (this.S.day >= 365) this.unlock('year')
+  }
+
+  /** После ответа Алика и хора: всегда +1…3, если день ещё не сдвинули и нет сцены/пропажи. */
+  private advanceTurnDay(): void {
+    if (this.dayMovedInTurn || this.S.offlineDays > 0 || this.S.scene) return
+    this.nextDay(1 + this.rnd(3))
   }
 
   // ---------- сообщения ----------
@@ -636,6 +650,7 @@ export class Game {
       ...Object.fromEntries(Object.keys(S.ach).map((k) => ['ach.' + k, true])),
       ...Object.fromEntries(Object.entries(S.ach).map(([k, day]) => ['since.' + k, S.day - day])),
       items: S.items.length,
+      latestItem: S.items.at(-1),
       legend: this.legend(),
       'ctx.topic': this.topicOfLast(),
       // «Мууу» прозвучало после последнего сообщения игрока — только тогда про корову и спрашивают
@@ -647,8 +662,8 @@ export class Game {
       'rude.heat': Math.max(0, Number(S.mem['rude.heat'] ?? 0)),
       'has.boris': S.items.some((n) => /Борис/.test(n)),
       'has.niva': S.items.some((n) => /Нива/.test(n)),
-      // «сегодня тот самый день» — только в сам день срока (обещание могло наступить, пока Алик пропадал)
-      promiseLive: !!pr && pr.due === S.day,
+      // Календарное обещание живо в день срока; событийное — в ход, когда его факт стал истиной.
+      promiseLive: !!pr && (pr.condition ? pr.met === S.day : pr.due === S.day),
       period: this.period(), night: this.isNight(), offline: S.offlineDays > 0, scene: S.scene?.id,
       sinceAlik: S.day - Number(S.mem['alik.day'] ?? S.day),
       lateCount: this.lateCount(),
@@ -659,7 +674,8 @@ export class Game {
       quests: Object.keys(S.ach).filter((k) => k.startsWith('q_')).length,
       callbackReady: !!this.callbackCandidate(),
       arcUnfinished: this.unfinishedArc(),
-      'ctx.type': c.type, 'ctx.s': c.s, 'ctx.shortTimey': c.s ? TIMEY.test(c.s) : false,
+      deathCanAdvance: !!S.mem.alik_dead && this.arcCanAdvance('alik_death', true),
+      'ctx.type': c.type, 'ctx.amount': c.amount, 'ctx.s': c.s, 'ctx.shortTimey': c.s ? TIMEY.test(c.s) : false,
       'ctx.when': c.when, 'ctx.whenNever': c.whenNever, 'ctx.rel': c.rel?.n, 'ctx.relYou': c.rel?.you ?? c.rel?.n, 'ctx.sad': c.sad, 'ctx.festive': c.festive, 'ctx.revived': c.revived,
       'ctx.constr': c.constr, 'ctx.legendary': c.legendary, 'ctx.arc': c.arc, 'ctx.quote': c.quote,
       // спросить про сериал есть смысл: будет новая серия, или сериал закончен и сегодня про финал ещё не спрашивали
@@ -712,18 +728,39 @@ export class Game {
   }
   /** События, отложенные до «безопасной точки» (после ответа Алика): хор, наступившие обещания. */
   private pending: Query[] = []
+  /** Хор из упоминаний — не больше одного персонажа; тот же игровой день, что ответ Алика. */
+  private async flushChorus(): Promise<void> {
+    const queue = this.pending.splice(0)
+    for (const q of queue) if (await this.rules.fire(this, q, this.facts, { floor: this.floor() })) break
+  }
+  private async fulfillConditionalPromise(): Promise<void> {
+    const promise = !this.S.mem.alik_dead && !this.S.mem.blocked
+      ? this.S.promises.findIndex((p) => p.condition && p.met === undefined && this.S.mem[p.condition] === true)
+      : -1
+    if (promise < 0) return
+    const record = this.S.promises[promise]
+    for (const candidate of this.S.promises) {
+      if (candidate.condition === record.condition && candidate.met === undefined) candidate.met = this.S.day
+    }
+    const legend = this.legend()
+    if (legend && LEGENDS[legend]?.condition === record.condition) {
+      const arc = this.S.mem['legend.arc']
+      this.setLegend(null, typeof arc === 'string' ? arc : undefined)
+    }
+    await this.fire('PromiseConditionMet', { promise })
+  }
   async afterTurn(): Promise<void> {
     try {
       await this.rules.runDue(this, this.facts, { floor: this.floor() })
-      // из упоминаний — не больше одного вклинившегося персонажа за ход
-      const queue = this.pending.splice(0)
-      for (const q of queue) if (await this.rules.fire(this, q, this.facts, { floor: this.floor() })) break
+      await this.fulfillConditionalPromise()
+      await this.flushChorus()
     } catch (e) { this.swallowDisposed(e) }
   }
 
   // ---------- варианты игрока ----------
   buildChoices(): Choice[] {
     const S = this.S
+    if (S.mem['endgame.active']) return ENDGAME_CHOICES.map((c) => ({ ...c }))
     if (S.scene) {
       const n = this.scenes[S.scene.id].nodes[S.scene.node]
       // поймать на лжи можно и посреди сцены — это её прерывает
@@ -807,6 +844,8 @@ export class Game {
     if (this.busy || this.dead || this.disposed || !o.text.trim()) return
     const S = this.S
     this.busy = true
+    this.inPlayerTurn = true
+    this.dayMovedInTurn = false
     this.clearSchedule(this.idleT)
     this.idleCount = 0
     this.clearUnread()
@@ -828,90 +867,116 @@ export class Game {
     if (o.act === 'sorry') S.mem.sorryAt = [...String(S.mem.sorryAt ?? '').split(',').filter(Boolean), S.stats.sent].slice(-4).join(',') // для «качелей»
     if (tone === 'rude') S.mem.rudeAt = S.stats.sent
     S.choices = null
+    this.drain(1)
     this.save()
-    if (this.disposed) return
+    if (this.disposed) { this.inPlayerTurn = false; return }
+    if (this.dead) {
+      this.sys('Не доставлено: телефон Алика выключен.')
+      S.ctx = null
+      this.save()
+      this.inPlayerTurn = false
+      return
+    }
 
-    await this.sleep((500 + this.rnd(700)) * (this.isNight() ? 2 : 1))
-    if (this.disposed) return
-    this.setStatus('прочитано')
-
-    // реакция на сообщение игрока; иногда — вместо ответа
-    let reactOnly = false
-    // реакция — Алика: не бывает, когда он не видит (заблокирован) или телефон у Карине
-    if (!o.scene && !S.mem.blocked && !S.mem['phone.karine'] && this.chance(0.18) && mine.kind === 'text') {
-      await this.sleep(600)
+    try {
+      await this.sleep((500 + this.rnd(700)) * (this.isNight() ? 2 : 1))
       if (this.disposed) return
-      this.replaceMsg(mine, { react: this.draw('R_' + tone, L.REACT[tone] ?? L.REACT.neutral) })
-      this.audio.vibrate(20)
+      this.setStatus('прочитано')
+
+      // реакция на сообщение игрока; иногда — вместо ответа
+      let reactOnly = false
+      // реакция — Алика: не бывает, когда он не видит (заблокирован) или телефон у Карине
+      if (!o.scene && !S.mem.blocked && !S.mem['phone.karine'] && this.chance(0.18) && mine.kind === 'text') {
+        await this.sleep(600)
+        if (this.disposed) return
+        this.replaceMsg(mine, { react: this.draw('R_' + tone, L.REACT[tone] ?? L.REACT.neutral) })
+        this.audio.vibrate(20)
+        this.emit()
+        reactOnly = !o.act && tone !== 'rude' && tone !== 'threat' && !S.scene && this.chance(0.3)
+      }
+
+      if (reactOnly) {
+        this.unlock('react')
+        S.ctx = { type: 'reactOnly' }
+      } else if (o.scene) {
+        await this.enterNode(o.scene, o.go ?? null)
+      } else if (o.act) {
+        S.scene = null // контекстная реплика посреди сцены (например, «Поймать на лжи») прерывает её
+        await this.fire('PlayerSays', this.saysFacts(o))
+      } else if (S.scene) {
+        S.scene = null // свой текст посреди сцены — сцена прерывается
+        await this.alikTurn(tone, o.category)
+      } else {
+        await this.alikTurn(tone, o.category)
+      }
+      if (this.disposed) return
+
+      await this.fulfillConditionalPromise()
+      // хор ещё в том же дне → смена даты → утром наступившие обещания и сюжет
+      await this.flushChorus()
+      if (this.disposed) return
+      this.advanceTurnDay()
+      await this.rules.runDue(this, this.facts, { floor: this.floor() })
+      if (this.disposed) return
+      // сюжетный ход: только вне сцены, если Алик не «пропал» и в этом ходу ещё не было сцены или серии
+      if (!S.scene && !o.scene && !S.offlineDays && !this.dead && this.arcAt !== S.stats.sent) await this.fire('StoryBeat')
+      await this.fire('CheckEnding')
+      if (this.disposed) return
+
+      S.patience = Math.max(0, S.patience - 1)
+      if (S.patience === 0) {
+        await this.sleep(600)
+        if (this.disposed) return
+        this.sys(this.line('FLOOR', FLOOR, { fallback: () => 'Вы полежали на полу. Терпение восстановлено.' })!)
+        S.patience = MAX_PATIENCE
+        this.unlock('floor')
+      }
+      if (!S.ram && S.stats.sent >= 25) {
+        S.ram = true
+        this.rules.applyOps(meet('baran'), {})
+        this.sys('Алик Воздухонесян сменил фото профиля. На фото — баран')
+        this.unlock('ram')
+      }
+      if (this.chance(0.12)) this.randomNotif()
+      this.restStatus()
+      this.busy = false
+      S.choices = this.buildChoices()
+      this.save()
       this.emit()
-      reactOnly = !o.act && tone !== 'rude' && tone !== 'threat' && !S.scene && this.chance(0.3)
+      this.armIdle()
+    } finally {
+      this.inPlayerTurn = false
     }
-
-    if (reactOnly) {
-      this.unlock('react')
-      S.ctx = { type: 'reactOnly' }
-    } else if (o.scene) {
-      await this.enterNode(o.scene, o.go ?? null)
-    } else if (o.act) {
-      S.scene = null // контекстная реплика посреди сцены (например, «Поймать на лжи») прерывает её
-      await this.fire('PlayerSays', this.saysFacts(o))
-    } else if (S.scene) {
-      S.scene = null // свой текст посреди сцены — сцена прерывается
-      await this.alikTurn(tone, o.category)
-    } else {
-      await this.alikTurn(tone, o.category)
-    }
-    if (this.disposed) return
-
-    await this.afterTurn()
-    if (this.disposed) return
-    // сюжетный ход: только вне сцены, если Алик не «пропал» и в этом ходу ещё не было сцены или серии
-    if (!S.scene && !o.scene && !S.offlineDays && this.arcAt !== S.stats.sent) await this.fire('StoryBeat')
-    await this.fire('CheckEnding')
-    if (this.disposed) return
-
-    S.patience = Math.max(0, S.patience - 1)
-    if (S.patience === 0) {
-      await this.sleep(600)
-      if (this.disposed) return
-      this.sys(this.line('FLOOR', FLOOR, { fallback: () => 'Вы полежали на полу. Терпение восстановлено.' })!)
-      S.patience = MAX_PATIENCE
-      this.unlock('floor')
-    }
-    if (!S.ram && S.stats.sent >= 25) {
-      S.ram = true
-      this.rules.applyOps(meet('baran'), {})
-      this.sys('Алик Воздухонесян сменил фото профиля. На фото — баран')
-      this.unlock('ram')
-    }
-    if (this.chance(0.12)) this.randomNotif()
-    this.restStatus()
-    this.busy = false
-    S.choices = this.buildChoices()
-    this.drain(1) // садится после ответа Алика: реплика игрока и выбор в сцене не повисают без ответа
-    this.save()
-    this.emit()
-    this.armIdle()
   }
 
-  recordPromise(p?: { text: string; d: number | null; due?: Due } | null): void {
+  recordPromise(p?: { text: string; d: number | null; due?: Due; condition?: PromiseCondition } | null): void {
     if (!p) return
+    if (p.condition && this.S.mem[p.condition] === true) return
     const due = p.d == null ? null : this.S.day + (p.due ? dueIn(p.due, this.S.day) : p.d)
-    this.S.promises.push({ t: p.text, made: this.S.day, due })
+    this.S.promises.push({ t: p.text, made: this.S.day, due, condition: p.condition })
     if (due !== null && due > this.S.day) this.rules.schedule({ at: due, kind: 'event', event: 'PromiseDue', facts: { promise: this.S.promises.length - 1 } })
     if (this.S.promises.length >= 20) this.unlock('promises20')
+  }
+  private alignPromise(p: Promise3, until: string, condition?: PromiseCondition): Promise3 {
+    p.text = p.text.replace(p.t, until)
+    p.t = until
+    p.d = null
+    p.due = undefined
+    p.condition = condition
+    return p
   }
   /** «Клянусь мамой, завтра — всё отдам» + запись в журнал. */
   /** Обещание. Пока жива легенда денег — срок чаще вытекает из неё («как ключ выйдет»); legend = true — всегда из неё. */
   async promiseLine(prefix?: string, legend?: boolean): Promise<void> {
-    const until = this.legend() ? LEGENDS[this.legend()!]?.until : undefined
+    const legendSpec = this.legend() ? LEGENDS[this.legend()!] : undefined
+    const until = legendSpec?.until
     // срок из легенды — после серии обязательно, дальше изредка: одна и та же клятва «как „Нива“ заведётся» приедается
     const recent = this.S.stats.sent - Number(this.S.mem.legendPromiseAt ?? -99) < 4
     const fromLegend = !!until && (legend || (!recent && this.chance(0.4)))
     if (fromLegend) this.S.mem.legendPromiseAt = this.S.stats.sent
     const p = this.uniq(() => {
       const q = this.X.promise()
-      if (fromLegend) { q.text = q.text.replace(q.t, until!); q.t = until!; q.d = null } // срок-условие («как ключ выйдет»): дня у него нет, «просрочено» — нелепо
+      if (fromLegend) this.alignPromise(q, until!, legendSpec?.condition)
       if (prefix) return { text: `${prefix} ${low(q.text)}.`, q }
       // форма клятвы — из пула (одна формула в каждом втором сообщении приедается)
       const form = this.line('OATH_FORMS', OATH_FORMS) ?? '{o}, {p}.'
@@ -929,14 +994,13 @@ export class Game {
   async alikTurn(tone: Tone, category?: Choice['category']): Promise<void> {
     const S = this.S
     S.ctx = null
+    // обычный +1…3 — в конце хода (после хора); здесь только возврат из пропажи
     if (S.offlineDays > 0) {
       this.setStatus('был давно')
       await this.sleep(1500)
       this.nextDay(S.offlineDays)
       S.offlineDays = 0
       await this.say([this.uniq(this.X.back)])
-    } else if (this.chance(0.65)) {
-      this.nextDay(1 + this.rnd(3))
     }
     await this.fire('PlayerMessage', { tone, category })
   }
@@ -963,6 +1027,7 @@ export class Game {
   }
 
   async excuseTurn(): Promise<void> {
+    if (this.legend()) return this.promiseLine(undefined, true)
     const ex = this.uniq(() => this.X.excuse({ preferLong: this.S.politeStreak >= 3 }))
     if (ex.legendary) this.unlock('legend')
     this.recordPromise(ex.p)
@@ -1002,11 +1067,13 @@ export class Game {
 
   async transfer(): Promise<void> {
     await this.typingFor(1200)
-    this.S.debt -= 50
-    this.S.money += 50
+    const amount = Number(this.S.mem.nextTransfer ?? 50)
+    delete this.S.mem.nextTransfer
+    this.S.debt -= amount
+    this.S.money += amount
     if (++this.S.stats.fifty >= 5) this.unlock('fifty5')
-    this.alikMsg({ kind: 'transfer', from: 'alik', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE) })
-    this.S.ctx = { type: 'transfer' }
+    this.alikMsg({ kind: 'transfer', from: 'alik', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE), amount })
+    this.S.ctx = { type: 'transfer', amount }
   }
 
   async sticker(fixed?: { e: string; c: string }): Promise<void> {
@@ -1255,9 +1322,69 @@ export class Game {
     this.emit()
   }
   closeEnding(): void {
+    const id = this.S.ending
     this.S.ending = null
+    if (id?.startsWith('payday_') && !this.S.mem['endgame.active']) this.startEndgame(id.slice(7))
     this.save()
     this.emit()
+  }
+
+  private startEndgame(outcome: string): void {
+    const S = this.S
+    S.mem['endgame.active'] = true
+    S.mem['endgame.started'] = S.day
+    S.mem['endgame.forms'] = 0
+    S.mem['endgame.exits'] = 0
+    S.mem['endgame.mutes'] = 0
+    S.mem['endgame.renames'] = 0
+    S.scene = null
+    S.ctx = null
+    S.offlineDays = 0
+    S.rules.schedule = S.rules.schedule.filter((item) => item.kind !== 'event')
+    this.sys(`Алик создал группу «${ENDGAME_GROUP}»`)
+    this.sys('Алик добавил вас')
+    for (const text of ENDGAME_OPEN) this.alikMsg({ kind: 'text', from: 'alik', text })
+    const intro = S.endings.vendetta ? ENDGAME_VENDETTA : ENDGAME_INTRO[outcome] ?? ENDGAME_FALLBACK
+    this.alikMsg({ kind: 'text', from: 'alik', text: intro })
+    S.choices = ENDGAME_CHOICES.map((c) => ({ ...c }))
+  }
+
+  async endgameAction(action: 'money' | 'mute' | 'leave'): Promise<void> {
+    const S = this.S
+    S.ctx = null
+    if (action === 'money') {
+      await this.say([this.draw('ENDGAME_MONEY', ENDGAME_MONEY)])
+      return
+    }
+    if (action === 'mute') {
+      S.mem['endgame.mutes'] = Number(S.mem['endgame.mutes'] ?? 0) + 1
+      this.sys('Вы отключили уведомления')
+      await this.say([this.draw('ENDGAME_MUTE', ENDGAME_MUTE)])
+      const name = this.draw('ENDGAME_RENAMES', ENDGAME_RENAMES)
+      S.mem['endgame.renames'] = Number(S.mem['endgame.renames'] ?? 0) + 1
+      this.sys(`Алик изменил название группы на «${name}»`)
+      return
+    }
+
+    S.mem['endgame.exits'] = Number(S.mem['endgame.exits'] ?? 0) + 1
+    this.sys('Вы покинули группу')
+    const back = this.decks.pick('ENDGAME_RETURNERS', ENDGAME_RETURNERS, this.lineFacts())
+    if (back) {
+      this.sys(`${back.name} добавил вас обратно`)
+      await this.say([{ w: back.who, t: back.t }])
+    } else {
+      this.sys('Алик добавил вас обратно')
+    }
+    await this.say([this.draw('ENDGAME_LEAVE', ENDGAME_LEAVE)])
+  }
+
+  async endgameFormality(): Promise<void> {
+    const n = Number(this.S.mem['endgame.forms'] ?? 0) + 1
+    this.S.mem['endgame.forms'] = n
+    await this.say([this.draw('ENDGAME_FORMALITIES', ENDGAME_FORMALITIES)])
+    const jubilee = ENDGAME_JUBILEES[n]
+    if (jubilee) await this.say([jubilee])
+    this.S.ctx = null
   }
 
   // ---------- сцены ----------
@@ -1290,6 +1417,7 @@ export class Game {
     if (fx.barter) { S.debt -= v.v; S.items.push(v.n) }
     if (fx.invoice) S.debt -= v.total
     if (fx.ach) this.unlock(fx.ach)
+    if (fx.legend !== undefined) this.setLegend(fx.legend)
     if (fx.set) this.rules.applyOps(Object.entries(fx.set).map(([key, value]) => ({ key, op: '=' as const, value })), {})
     if (fx.during) this.rules.applyOps([{ key: fx.during.key, op: '=', value: true, forDays: fx.during.days }], {})
     if (n.sys) { await this.sleep(700); this.sys(gen('sys', n.sys)()) }
@@ -1413,7 +1541,15 @@ export class Game {
     if (r < 0.85) { this.push({ ...base, kind: 'voice', len: 10 + this.rnd(50) }); return }
     if (r < 0.92) {
       this.S.debt -= 50; this.S.money += 50; this.S.stats.fifty++
-      this.push({ ...base, kind: 'transfer', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE) })
+      this.push({ ...base, kind: 'transfer', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE), amount: 50 })
+      return
+    }
+    const legend = this.legend()
+    if (legend) {
+      const spec = LEGENDS[legend]
+      const promise = this.alignPromise(this.X.promise(), spec.until, spec.condition)
+      this.recordPromise(promise)
+      this.push({ ...base, kind: 'text', text: promise.text })
       return
     }
     const ex = this.uniq(() => this.X.excuse())

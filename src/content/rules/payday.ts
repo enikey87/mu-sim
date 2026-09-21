@@ -1,6 +1,6 @@
 // День выплаты: шаги сцены (hook) собираются из событий партии; исход выбирают правила PaydayOutcome.
 import type { Game } from '../../engine/game'
-import { type Rule, eq, gte, is, exists } from '../../engine/rules'
+import { type Rule, eq, gte, is, exists, missing } from '../../engine/rules'
 import { SOURCES, SOURCES_TOPUP, ROLL, CLAIMS, GRAND, GRAND_FALLBACK, SLOTS, CONTRADICTIONS, MORNING_CONTRA, OUTCOME, type Source, type Call, type Claim } from '../payday'
 
 type R = Rule<Game>
@@ -119,7 +119,7 @@ const outcome = (id: string, when: R['when'], extra: Partial<R> = {}): R => ({
 export const paydayRules: R[] = [
   // запуск: третий акт — когда сошлись линии (3+ законченных сериала после 330-го дня) или просто поздно
   {
-    name: 'Beat_Payday', event: 'StoryBeat', when: [gte('day', 330), gte('arcsDone', 3)], bonus: 10, once: true, priority: 'cinematic',
+    name: 'Beat_Payday', event: 'StoryBeat', when: [gte('day', 330), gte('arcsDone', 3), missing('payday'), missing('payday.at')], bonus: 10, once: true, priority: 'cinematic',
     respond: ({ game }) => game.enterNode('payday', 'announce'),
   },
   {
