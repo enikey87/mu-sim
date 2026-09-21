@@ -21,8 +21,15 @@ export function ChatHeader({ onInfo }: { onInfo: () => void }) {
         <div className="name">Алик Воздухонесян</div>
         <div className={'status ' + game.status.cls} id="status">{game.status.text}</div>
       </div>
-      <button className="icon-btn" id="muteBtn" title="Звук" onClick={() => game.toggleMute()}>{game.S.muted ? '🔇' : '🔊'}</button>
-      <button className="icon-btn" id="infoBtn" title="Обещания и ачивки" onClick={onInfo}>📋</button>
+      <button
+        className="icon-btn"
+        id="muteBtn"
+        title="Звук"
+        aria-label={game.S.muted ? 'Звук выключен' : 'Звук включён'}
+        aria-pressed={!game.S.muted}
+        onClick={() => game.toggleMute()}
+      >{game.S.muted ? '🔇' : '🔊'}</button>
+      <button className="icon-btn" id="infoBtn" title="Обещания и ачивки" aria-label="Обещания и ачивки" onClick={onInfo}>📋</button>
     </header>
   )
 }

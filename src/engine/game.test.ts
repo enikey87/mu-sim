@@ -1,7 +1,8 @@
 import { STARTS } from '../content/quests'
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { makeGame, memStorage, alikTexts } from '../test/helpers'
-import { manualClock } from './clock'
+import { silentAudio } from './audio'
+import { manualClock, realClock } from './clock'
 import { Game } from './game'
 import { seededRng } from './rng'
 import { SAVE_KEY } from './state'
@@ -39,11 +40,88 @@ describe('Game: начало и ход', () => {
   })
   it('свой текст классифицируется по тону', () => {
     const { game } = makeGame()
-    expect(game.classify('АЛИК!!!')).toBe('rude')
+    expect(game.classify('СКОЛЬКО МОЖНО ЖДАТЬ!!!')).toBe('rude')
+    expect(game.classify('АЛИК!!!')).toBe('neutral')
     expect(game.classify('Я иду в СУД!!!')).toBe('threat')
     expect(game.classify('Это корова мычит?')).toBe('cow')
     expect(game.classify('Здравствуйте, извините')).toBe('polite')
     expect(game.classify('ну что там')).toBe('neutral')
+  })
+  it('ввод встраивается в правила: просьба — отмазка, извинение — примирение', async () => {
+    const { game } = makeGame({ debug: true })
+    await game.send('Алик, пожалуйста, переведите деньги')
+    expect(game.trace.some((entry) => entry.event === 'PlayerSays' && entry.chosen.includes('Says_request'))).toBe(true)
+    expect(game.S.ctx).toMatchObject({ when: expect.any(String) })
+
+    game.S.mem['rude.heat'] = 2
+    await game.send('Извини, я погорячился')
+    expect(game.S.mem['rude.heat']).toBe(1)
+    expect(game.S.mem['count.sorry']).toBe(1)
+  })
+  it('угроза и грубая просьба из поля ввода двигают разные ветки', async () => {
+    const { game } = makeGame({ debug: true })
+    await game.send('Если не заплатишь, подам в суд')
+    expect(game.S.mem.court).toBe(1)
+    expect(game.S.mem['count.threat']).toBe(1)
+    game.S.offlineDays = 0
+    await game.send('ВЕРНИ ДЕНЬГИ!!!')
+    expect(game.S.mem['count.rude']).toBe(1)
+    expect(game.S.mem['rude.heat']).toBe(1)
+    expect(game.trace.some((entry) => entry.event === 'PlayerSays' && entry.chosen.some((n) => n.startsWith('Says_request')))).toBe(true)
+  })
+  it('насилие и запугивание из поля ввода не попадают в судебную ветку', async () => {
+    const violence = makeGame().game
+    await violence.send('Я тебя убью')
+    expect(violence.S.mem['count.violence']).toBe(1)
+    expect(violence.S.mem['rude.heat']).toBe(2)
+    expect(violence.S.mem.court).toBeUndefined()
+
+    const intimidation = makeGame().game
+    await intimidation.send('Знаю, где ты живёшь')
+    expect(intimidation.S.mem['count.intimidation']).toBe(1)
+    expect(intimidation.S.mem['rude.heat']).toBe(1)
+    expect(intimidation.S.mem.court).toBeUndefined()
+  })
+  it('отклик на отправку различает смысл, не показывая категорию', async () => {
+    const vibes: Array<number | number[]> = []
+    const audio = { ...silentAudio, vibrate: (p: number | number[]) => { vibes.push(p) } }
+    const request = makeGame({ audio }).game
+    await request.send('Алик, пожалуйста, переведите деньги')
+    expect(request.feel).toBeNull()
+    expect(request.feelId).toBe(0)
+
+    const shout = makeGame({ audio }).game
+    await shout.send('СКОЛЬКО МОЖНО ЖДАТЬ!!!')
+    expect(shout.feel).toBe('shake')
+    expect(shout.feelId).toBe(1)
+    expect(vibes).toContainEqual([80, 40, 80])
+
+    const benign = makeGame({ audio }).game
+    await benign.send('АЛИК!!!')
+    expect(benign.feel).toBeNull()
+
+    const scare = makeGame({ audio }).game
+    await scare.send('Знаю, где ты живёшь')
+    expect(scare.feel).toBe('intimidate')
+    expect(vibes).toContainEqual([120, 50, 120, 50, 200])
+
+    const sorry = makeGame({ audio }).game
+    await sorry.send('Извини, я погорячился')
+    expect(sorry.feel).toBe('sorry')
+
+    const moo = makeGame({ audio }).game
+    await moo.send('Мууу')
+    expect(moo.feel).toBe('moo')
+    expect(moo.feelFor({ text: 'Мууууу 🐄', tone: 'neutral', act: 'moo' })).toBe('moo')
+  })
+  it('свой текст посреди сцены прерывает её и продолжает обычный цикл', async () => {
+    const { game } = makeGame({ debug: true })
+    await game.enterNode('toast', 'ask')
+    expect(game.S.scene).not.toBeNull()
+    await game.send('Когда вы оплатите долг?')
+    expect(game.S.scene).toBeNull()
+    expect(game.trace.some((entry) => entry.chosen.includes('Says_request'))).toBe(true)
+    expect(game.busy).toBe(false)
   })
   it('пустое сообщение и повторная отправка во время ответа игнорируются', async () => {
     const { game } = makeGame()
@@ -90,7 +168,7 @@ describe('Game: допработа', () => {
     const debt = game.S.debt
     await game.answerJob(job.id, true)
     expect(game.S.debt).toBeGreaterThan(debt)
-    expect(job.kind === 'job' && job.answered).toBe(true)
+    expect(game.S.msgs.find((m) => m.id === job.id)).toMatchObject({ kind: 'job', answered: true })
     await game.answerJob(job.id, true) // повторно — ничего
     expect(game.S.ach.fence).toBeDefined()
     await game.job()
@@ -289,6 +367,20 @@ describe('Game: сериалы', () => {
 })
 
 describe('Game: мелочи', () => {
+  it('касание разблокирует звук, не запуская таймер фоновых шумов', () => {
+    const clock = manualClock()
+    let unlocks = 0
+    const audio = { ...silentAudio, unlock: () => { unlocks++ } }
+    const game = new Game({ storage: memStorage(), clock, rng: seededRng(1), audio })
+    const pending = clock.pending()
+
+    game.gesture()
+    game.gesture()
+
+    expect(unlocks).toBe(2)
+    expect(clock.pending()).toBe(pending)
+    game.dispose()
+  })
   it('эскалация отмазок объявляется в чате', () => {
     const { game } = makeGame()
     game.nextDay(70)
@@ -300,8 +392,9 @@ describe('Game: мелочи', () => {
     const m = game.push({ kind: 'text', from: 'alik', text: 'В среду утром — всё отдам.' })
     game.recordPromise({ text: 'в среду утром — всё отдам', d: 3 })
     await game.editLast(m, { text: 'в среду утром — всё отдам', t: 'в среду утром', d: 3 })
-    expect(m.kind === 'text' && m.edited).toBe(true)
-    expect(m.kind === 'text' && m.text).not.toMatch(/среду утром/)
+    const edited = game.S.msgs.find((x) => x.id === m.id)
+    expect(edited?.kind === 'text' && edited.edited).toBe(true)
+    expect(edited?.kind === 'text' && edited.text).not.toMatch(/среду утром/)
     expect(game.S.promises.at(-1)!.due).toBeNull()
   })
   it('«Мууу» появляется и исчезает, звук отключается', () => {
@@ -328,5 +421,149 @@ describe('Game: мелочи', () => {
     off()
     game.sys('y')
     expect(n).toBe(1)
+  })
+})
+
+describe('Game: dispose отменяет async', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('dispose в покое идемпотентен и обнуляет таймеры', () => {
+    const clock = manualClock()
+    const game = new Game({ storage: memStorage(), clock, rng: seededRng(1), hour: 14 })
+    game.S.stats.sent = 5
+    game.armIdle()
+    expect(game.pendingTimers()).toBeGreaterThan(0)
+    game.dispose()
+    expect(game.pendingTimers()).toBe(0)
+    expect(clock.pending()).toBe(0)
+    game.dispose()
+    expect(game.pendingTimers()).toBe(0)
+  })
+
+  it('dispose во время send: нет emit/save/audio после отмены', async () => {
+    vi.useFakeTimers()
+    let saves = 0
+    const storage = memStorage()
+    const setItem = storage.setItem.bind(storage)
+    storage.setItem = (k, v) => { saves++; setItem(k, v) }
+    let beeps = 0
+    const audio = { ...silentAudio, beep: () => { beeps++ }, vibrate: () => { beeps++ }, moo: () => { beeps++ } }
+    const game = new Game({ storage, clock: realClock(), rng: seededRng(1), noTimers: true, hour: 14, audio })
+    saves = 0
+    beeps = 0
+    let emits = 0
+    game.subscribe(() => emits++)
+
+    const turn = game.send('Алик, верни деньги')
+    expect(vi.getTimerCount()).toBeGreaterThan(0)
+    const msgsAtDispose = game.S.msgs.length
+    const emitsBefore = emits
+    const savesBefore = saves
+    game.dispose()
+    expect(game.pendingTimers()).toBe(0)
+    expect(vi.getTimerCount()).toBe(0)
+    await turn
+    await vi.runAllTimersAsync()
+
+    expect(emits).toBe(emitsBefore)
+    expect(saves).toBe(savesBefore)
+    expect(beeps).toBe(0)
+    expect(game.S.msgs.length).toBe(msgsAtDispose)
+  })
+
+  it('отложенное Мууу не срабатывает после dispose', () => {
+    const clock = manualClock()
+    let moos = 0
+    const audio = { ...silentAudio, moo: () => { moos++ } }
+    const game = new Game({ storage: memStorage(), clock, rng: seededRng(1), noTimers: true, hour: 14, audio })
+    game.moo()
+    expect(game.moos).toHaveLength(1)
+    expect(moos).toBe(1)
+    game.dispose()
+    clock.runTimers()
+    expect(game.moos).toHaveLength(1)
+    expect(moos).toBe(1)
+    expect(game.pendingTimers()).toBe(0)
+  })
+
+  it('dispose во время зарядки останавливает последовательность', async () => {
+    vi.useFakeTimers()
+    const game = new Game({ storage: memStorage(), clock: realClock(), rng: seededRng(1), noTimers: true, hour: 14 })
+    game.die()
+    const charge = game.charge()
+    expect(game.charging).toBe(1)
+    expect(vi.getTimerCount()).toBeGreaterThan(0)
+    game.dispose()
+    expect(game.pendingTimers()).toBe(0)
+    expect(vi.getTimerCount()).toBe(0)
+    await charge
+    expect(game.charging).toBe(1)
+    expect(game.dead).toBe(true)
+  })
+
+  it('гонка: callback начался → dispose → следующий await без эффектов', async () => {
+    vi.useFakeTimers()
+    let emits = 0
+    const game = new Game({ storage: memStorage(), clock: realClock(), rng: seededRng(1), noTimers: true, hour: 14 })
+    game.subscribe(() => emits++)
+    const turn = game.send('Алик, привет')
+    expect(vi.getTimerCount()).toBeGreaterThan(0)
+    // один шаг typingFor — затем dispose до следующей паузы
+    await vi.advanceTimersToNextTimerAsync()
+    const emitsAfterFirst = emits
+    game.dispose()
+    expect(vi.getTimerCount()).toBe(0)
+    await turn
+    expect(emits).toBe(emitsAfterFirst)
+    expect(game.pendingTimers()).toBe(0)
+  })
+
+  it('новая игра после dispose работает независимо', async () => {
+    const storage = memStorage()
+    const old = new Game({ storage, clock: manualClock(), rng: seededRng(1), noTimers: true, hour: 14 })
+    old.dispose()
+    const next = new Game({ storage, clock: manualClock(), rng: seededRng(2), noTimers: true, hour: 14 })
+    await next.send('Алик, верните деньги')
+    expect(next.S.stats.sent).toBe(1)
+    expect(next.S.msgs.some((m) => m.kind === 'text' && m.from === 'me')).toBe(true)
+  })
+
+  it('dispose внутри say/typingFor отменяет физический sleep-таймер', async () => {
+    vi.useFakeTimers()
+    const game = new Game({ storage: memStorage(), clock: realClock(), rng: seededRng(1), noTimers: true, hour: 14 })
+    const before = game.S.msgs.length
+    const pending = game.say(['Позднее сообщение'])
+    expect(vi.getTimerCount()).toBe(1)
+    game.dispose()
+    expect(game.pendingTimers()).toBe(0)
+    expect(vi.getTimerCount()).toBe(0)
+    await expect(pending).rejects.toMatchObject({ name: 'GameDisposed' })
+    expect(game.S.msgs.length).toBe(before)
+  })
+
+  it('audio.dispose отменяет отложенный callback после playVoice', async () => {
+    vi.useFakeTimers()
+    let moos = 0
+    const pending = new Set<ReturnType<typeof setTimeout>>()
+    const audio = {
+      ...silentAudio,
+      dispose() {
+        for (const id of pending) clearTimeout(id)
+        pending.clear()
+      },
+      moo: () => { moos++ },
+      alikVoice(_pick?: (a: readonly string[]) => string) {
+        const id = setTimeout(() => { pending.delete(id); audio.moo() }, 2500)
+        pending.add(id)
+      },
+    }
+    const game = new Game({ storage: memStorage(), clock: manualClock(), rng: seededRng(1), noTimers: true, hour: 14, audio })
+    audio.alikVoice()
+    game.dispose()
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(moos).toBe(0)
+    expect(pending.size).toBe(0)
   })
 })

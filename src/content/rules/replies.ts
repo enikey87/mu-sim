@@ -40,6 +40,16 @@ export const replyRules: R[] = [
   // Алик «пропал» после грубости — на любой вопрос, кроме извинения, отвечает, когда вернётся
   { name: 'Says_WhileOffline', event: 'PlayerSays', when: [AlikOffline, ne('intent', 'sorry'), ne('intent', 'moo')], bonus: 5, respond: ({ game }) => game.alikTurn('neutral') },
 
+  // Свободно введённая просьба о деньгах всегда получает отмазку, а не случайный стикер или сцену.
+  // Грубая просьба: отмазка + нагрев ссоры (без отдельной обиженной реплики Tone_Rude).
+  says('request', {
+    bonus: 1,
+    remember: [add('count.rude'), add('rude.heat')],
+    trigger: [{ event: 'RudeCool', delay: 20 }],
+    respond: ({ game }) => game.excuseTurn(),
+  }, [eq('tone', 'rude')]),
+  says('request', { respond: ({ game }) => game.excuseTurn() }),
+
   says('sorry', { remember: [add('count.sorry')], respond: ({ game }) => sorry(game, game.uniq(game.X.sorry)) }),
   says('sorry', {
     remember: [add('count.sorry')],
