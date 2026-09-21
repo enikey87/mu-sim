@@ -14,6 +14,7 @@ export type Line = string | ((v: Vars) => string)
 export interface SceneOpt { t: Line | string[]; go: string | null; tone?: 'polite' | 'neutral' | 'rude' }
 export interface SceneFx {
   days?: number; debt?: number; mood?: number; ach?: string; barter?: boolean; invoice?: boolean
+  legend?: string | null
   /** Записать факты в память мира; during — факт = true на N дней. */
   set?: Record<string, number | boolean>; during?: { key: string; days: number }
 }

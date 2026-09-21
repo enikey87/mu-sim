@@ -94,7 +94,7 @@ function line(m: Msg): string {
       const marks = [m.deleted && 'удалено', m.edited && 'изменено', m.react && `реакция Алика ${m.react}`].filter(Boolean)
       return `${t}${who}: ${m.text}${marks.length ? `  (${marks.join(', ')})` : ''}`
     }
-    case 'transfer': return `${t}Алик: 💸 перевод 50 ₽ — «${m.text}»`
+    case 'transfer': return `${t}Алик: 💸 перевод ${m.amount ?? 50} ₽ — «${m.text}»`
     case 'voice': return `${t}Алик: 🎤 голосовое 0:${String(m.len).padStart(2, '0')}${m.feast ? ' (шум застолья)' : ''}`
     case 'photo': return `${t}Алик: 📷 фото «платёжки» (на снимке — баран на фоне Арарата), подпись: ${m.text}`
     case 'sticker': return `${t}Алик: [стикер ${m.e} ${m.c}]`

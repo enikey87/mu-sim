@@ -3,7 +3,7 @@ import type { Game } from '../../engine/game'
 import { type Rule, type Facts, type Entry, eq, ne, gte, lte, is, add, of, missing } from '../../engine/rules'
 import { WORLD, SPEAKS } from '../world'
 import { CHORUS_LEGEND } from '../legends'
-import { PROMISE_DUE, PROMISE_DUE_COSMIC, PROMISE_DUE_KEPT, CHORUS, CHORUS_FED_UP, WEDDING_NOISE, BORIS_SICK, DEAD_KARINE, DEAD_ALIK } from '../world'
+import { PROMISE_DUE, PROMISE_DUE_COSMIC, PROMISE_DUE_KEPT, PROMISE_MET, CHORUS, CHORUS_FED_UP, WEDDING_NOISE, BORIS_SICK, DEAD_KARINE, DEAD_ALIK } from '../world'
 
 type R = Rule<Game>
 
@@ -37,7 +37,7 @@ const quest = (id: string, when: R['when'] = []): R => ({ ...scene(id, when), na
 /** Условия квестов — общие для слота квестов и для запуска из разговора. */
 export const QUEST_WHEN: Record<string, R['when']> = {
   q_niva: [eq('legend', 'niva_stuck')], // «толкни „Ниву“» — эпизод сериала «Нива», а не его повторная завязка
-  q_crypto: [gte('day', 200)],
+  q_crypto: [gte('day', 200), missing('legend')],
   q_witness: [gte('day', 210)],
 }
 export const questRules: R[] = [
@@ -73,6 +73,10 @@ export const promiseRules: R[] = [
       const p = game.S.promises[Number(facts.promise)]
       if (p) p.asked = true
     },
+  },
+  {
+    name: 'Condition_Met', event: 'PromiseConditionMet', when: [live], priority: 'chatter',
+    respond: async ({ game, facts }) => { await game.say([dueLine(game, facts, 'MET', PROMISE_MET)]) },
   },
 ]
 
@@ -120,9 +124,10 @@ export const stateRules: R[] = [
   // пока Алик «мёртв», это состояние перекрывает ответ на любое сообщение игрока (кроме вопроса о сериале — так идут похороны)
   { name: 'Tone_WhileDead', event: 'PlayerMessage', when: [is('alik_dead')], bonus: 10, respond: ({ game }) => deadTurn(game) },
   { name: 'Says_WhileDead', event: 'PlayerSays', when: [is('alik_dead'), ne('intent', 'arc')], bonus: 6, respond: ({ game }) => deadTurn(game) },
-  ...['AlikIdle', 'StoryBeat', 'PeriodLine', 'PromiseDue'].map((event): R => ({ name: 'Quiet_Dead_' + event, event, when: [is('alik_dead')], bonus: 10, respond: () => {} })),
+  { name: 'Says_OtherArcWhileDead', event: 'PlayerSays', when: [is('alik_dead'), eq('intent', 'arc'), ne('arg', 'alik_death')], bonus: 6, respond: ({ game }) => deadTurn(game) },
+  ...['AlikIdle', 'StoryBeat', 'PeriodLine', 'PromiseDue', 'PromiseConditionMet'].map((event): R => ({ name: 'Quiet_Dead_' + event, event, when: [is('alik_dead')], bonus: 10, respond: () => {} })),
   // заблокировал — значит, не пишет: ни легенд, ни «обед — святое» (пишет разве что через «Ниву» — это ход блокировки)
-  ...['StoryBeat', 'PeriodLine', 'PromiseDue'].map((event): R => ({ name: 'Quiet_Blocked_' + event, event, when: [is('blocked')], bonus: 10, respond: () => {} })),
+  ...['StoryBeat', 'PeriodLine', 'PromiseDue', 'PromiseConditionMet'].map((event): R => ({ name: 'Quiet_Blocked_' + event, event, when: [is('blocked')], bonus: 10, respond: () => {} })),
 ]
 
 export const worldRules: R[] = [...sceneRules, ...questRules, ...promiseRules, ...chorusRules, ...stateRules]

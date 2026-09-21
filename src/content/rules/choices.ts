@@ -32,6 +32,7 @@ interface OfferSpec {
 const fromD = (game: Game, key: string, map: Record<string, string> = {}) =>
   game.playerLine(() => game.X.fill(game.draw(key, D[key]), map))
 const fromArr = (game: Game, key: string, arr: readonly Entry<string>[]) => game.playerLine(() => game.draw(key, arr))
+const freshFromArr = (game: Game, key: string, arr: readonly Entry<string>[]) => game.freshPlayer(key, arr) ?? ''
 
 
 const offer = (o: OfferSpec): R => ({
@@ -66,7 +67,7 @@ export const choiceRules: R[] = [
   offer({ name: 'Photo', when: [eq('ctx.type', 'photo')], act: 'photo', tone: 'neutral', bonus: 3, text: (g) => fromD(g, 'P_PHOTO') }),
   offer({ name: 'VoiceCow', slot: 'voice', weight: 0.4, when: [eq('ctx.type', 'voice')], act: 'voice', tone: 'neutral', bonus: 3, text: (g) => fromD(g, 'P_VOICE') }),
   offer({ name: 'VoiceText', slot: 'voice', weight: 0.6, when: [eq('ctx.type', 'voice')], act: 'voiceText', tone: 'neutral', bonus: 3, text: (g) => fromD(g, 'P_VOICE2') }),
-  offer({ name: 'Transfer', when: [eq('ctx.type', 'transfer')], act: 'transferQ', tone: 'neutral', bonus: 3, text: (g) => fromD(g, 'P_TRANSFER') }),
+  offer({ name: 'Transfer', when: [eq('ctx.type', 'transfer')], act: 'transferQ', tone: 'neutral', bonus: 3, text: (g, f) => fromD(g, 'P_TRANSFER', { amount: String(f['ctx.amount'] ?? 50) }) }),
   offer({ name: 'Ping', when: [eq('ctx.type', 'readonly')], act: 'ping', tone: 'neutral', bonus: 3, text: (g) => fromD(g, 'P_PING') }),
   // «Завтра» → «это когда?», а «Брат, в пути» → «А подробнее?»
   offer({
@@ -124,13 +125,17 @@ export const choiceRules: R[] = [
 
   // сериалы: про текущий — всегда, про любой незаконченный — иногда
   offer({
-    // вопрос про сериал — только если он к чему-то приведёт (иначе «Как Нуне?» трижды подряд → «пока без новостей»)
-    name: 'Arc', slot: 'arc', when: [exists('ctx.arc'), is('ctx.arcCanAdvance')], act: 'arc', tone: 'polite', bonus: 1,
-    text: (g, f) => fromArr(g, 'F_' + f['ctx.arc'], ARCS[String(f['ctx.arc'])].follow), arg: (_g, f) => String(f['ctx.arc']),
+    name: 'ArcDeath', slot: 'arc', when: [is('alik_dead'), is('deathCanAdvance')], act: 'arc', tone: 'polite', bonus: 2,
+    text: (g) => freshFromArr(g, 'F_alik_death', ARCS.alik_death.follow), arg: () => 'alik_death',
   }),
   offer({
-    name: 'ArcAny', slot: 'arc', when: [exists('arcUnfinished')], odds: 0.2, act: 'arc', tone: 'polite',
-    text: (g, f) => fromArr(g, 'F_' + f.arcUnfinished, ARCS[String(f.arcUnfinished)].follow), arg: (_g, f) => String(f.arcUnfinished),
+    // вопрос про сериал — только если он к чему-то приведёт (иначе «Как Нуне?» трижды подряд → «пока без новостей»)
+    name: 'Arc', slot: 'arc', when: [missing('alik_dead'), exists('ctx.arc'), is('ctx.arcCanAdvance')], act: 'arc', tone: 'polite', bonus: 1,
+    text: (g, f) => freshFromArr(g, 'F_' + f['ctx.arc'], ARCS[String(f['ctx.arc'])].follow), arg: (_g, f) => String(f['ctx.arc']),
+  }),
+  offer({
+    name: 'ArcAny', slot: 'arc', when: [missing('alik_dead'), exists('arcUnfinished')], odds: 0.2, act: 'arc', tone: 'polite',
+    text: (g, f) => freshFromArr(g, 'F_' + f.arcUnfinished, ARCS[String(f.arcUnfinished)].follow), arg: (_g, f) => String(f.arcUnfinished),
   }),
 
   // дело в суде открыто — игрок может его продолжить (угроза двигает линию суда)

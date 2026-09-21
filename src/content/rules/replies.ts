@@ -7,7 +7,7 @@ import { cooldown } from './rude'
 import { TOPICS, TOPIC_FALLBACK, TOPIC_NAME, TOPIC_OBSESSED } from '../topics'
 import { D, low, cap } from '../excuses'
 import { GREET_A, WHEN_COND, SWING } from '../misc'
-import { type TalkKind, talkPairs, talkId } from '../talk'
+import { type TalkKind, talkPairs, talkId, TALK_REMEMBER } from '../talk'
 import { ARCS, NO_NEWS_A, NO_NEWS_B, GROUP_SEEN_A, GROUP_SEEN_B, WRONG_A, WRONG_B } from '../arcs'
 import * as L from '../life'
 import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER } from '../misc'
@@ -78,7 +78,9 @@ export const replyRules: R[] = [
       const pair = e && valueOf(e)
       game.setCtx(null)
       if (!pair) return false
-      game.lines.mark(talkId(kind, sub, Number(i)))
+      const id = talkId(kind, sub, Number(i))
+      game.lines.mark(id)
+      game.rules.applyOps(TALK_REMEMBER[id] ?? [], {})
       await game.say([kind === 'chorus' ? { w: sub, t: pair[1] } : pair[1]])
     },
   }),
@@ -86,7 +88,14 @@ export const replyRules: R[] = [
   simple('photo', (g) => g.uniq(g.X.photo)),
   simple('voice', (g) => g.uniq(g.X.cow)),
   simple('voiceText', (g) => g.pair('VOICE_A', D.VOICE_A, 'VOICE_B', D.VOICE_B)),
-  simple('transferQ', (g) => g.uniq(g.X.transferQ)),
+  says('transferQ', {
+    respond: async ({ game }) => {
+      const reply = game.uniq(game.X.transferQ)
+      if (reply.nextTransfer) game.S.mem.nextTransfer = reply.nextTransfer
+      await game.say([reply.text])
+      game.setCtx(null)
+    },
+  }),
   says('legendQ', { respond: async ({ game }) => { game.mood(1); await game.say([game.uniq(game.X.legendQ)]); game.setCtx(null) } }),
   says('shortQ', { respond: async ({ game, facts }) => { await game.say([game.uniq(() => game.X.shortQ(String(facts.arg ?? '')))]); game.setCtx(null) } }),
   simple('short2', (g) => g.pair('SHORT2_A', D.SHORT2_A, 'SHORT2_B', D.SHORT2_B)),

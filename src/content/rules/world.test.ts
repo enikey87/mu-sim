@@ -3,6 +3,9 @@ import { describe, it, expect } from 'vitest'
 import { makeGame, alikTexts } from '../../test/helpers'
 import { ARCS } from '../arcs'
 import { CHORUS, CHORUS_FED_UP, WEDDING_NOISE, BORIS_SICK, DEAD_KARINE, DEAD_ALIK, PROMISE_DUE } from '../world'
+import { PROMISE_CONDITIONS } from '../excuses'
+import { LEGENDS } from '../legends'
+import { TALK_REMEMBER } from '../talk'
 import type { Game } from '../../engine/game'
 import type { Msg } from '../../engine/state'
 import { valueOf, type Entry } from '../../engine/rules'
@@ -93,6 +96,39 @@ describe('обещания наступают', () => {
   })
   it('у реплик — свой текст обещания', () => {
     expect(PROMISE_DUE.map(valueOf).every((t) => t.includes('{t}') || t.includes('тот самый'))).toBe(true)
+  })
+  it('событийное условие исполняет обещание ровно один раз', async () => {
+    const { game } = makeGame()
+    game.setLegend('grant', 'grant')
+    game.recordPromise({ text: 'как Грант заплатит — отдам', d: null, condition: 'grant.paid' })
+    game.recordPromise({ text: 'как Грант заплатит — точно отдам', d: null, condition: 'grant.paid' })
+    const before = game.S.msgs.length
+    await game.afterTurn()
+    expect(game.S.msgs).toHaveLength(before)
+
+    game.S.mem['grant.paid'] = true
+    await game.afterTurn()
+    expect(game.S.promises[0].met).toBe(game.S.day)
+    expect(game.S.promises[1].met).toBe(game.S.day)
+    expect(game.legend()).toBeUndefined()
+    expect(texts(game.S.msgs.slice(before)).join(' ')).toContain('как Грант заплатит — отдам')
+
+    const after = game.S.msgs.length
+    await game.afterTurn()
+    expect(game.S.msgs).toHaveLength(after)
+    game.recordPromise({ text: 'как Грант заплатит — снова отдам', d: null, condition: 'grant.paid' })
+    expect(game.S.promises).toHaveLength(2)
+  })
+  it('каждое событийное условие имеет декларативный producer', () => {
+    const fromArcs = Object.values(ARCS).flatMap((arc) => arc.eps.flatMap((ep) => ep.remember ?? []))
+    const fromLegends = Object.values(LEGENDS).flatMap((legend) => legend.lines.flatMap((line) => {
+      const spec = valueOf(line)
+      return typeof spec === 'string' ? [] : spec.remember ?? []
+    }))
+    const producers = new Set([...fromArcs, ...fromLegends, ...Object.values(TALK_REMEMBER).flat()].filter((op) => op.op === '=' && op.value === true).map((op) => op.key))
+    const missing = (conditions: readonly string[]) => conditions.filter((condition) => !producers.has(condition))
+    expect(missing(PROMISE_CONDITIONS)).toEqual([])
+    expect(missing([...PROMISE_CONDITIONS, 'without.producer'])).toEqual(['without.producer'])
   })
 })
 
@@ -188,6 +224,21 @@ describe('состояния мира со сроком', () => {
     game.S.day += 6
     await game.afterTurn()
     expect(game.S.mem.alik_dead).toBeUndefined()
+  })
+  it('во время смерти продвигаются только похороны, а возвращение сразу снимает состояние', async () => {
+    const { game } = makeGame()
+    game.S.day = 250
+    game.S.arcs.boris = { i: 2, last: 0 }
+    await game.playArc('alik_death')
+    const rule = game.rules.match({ event: 'PlayerSays', facts: { intent: 'arc', arg: 'boris' } }, game.facts({ intent: 'arc', arg: 'boris' }))
+    expect(rule?.name).toBe('Says_OtherArcWhileDead')
+    expect(game.buildChoices().filter((choice) => choice.act === 'arc').every((choice) => choice.arg === 'alik_death')).toBe(true)
+
+    for (let i = 0; i < 3; i++) {
+      game.S.day++
+      await game.playArc('alik_death')
+    }
+    expect(game.S.mem.alik_dead).toBe(false)
   })
   it('состояния в сериалах ссылаются на реальные эпизоды', () => {
     const states = Object.values(ARCS).flatMap((a) => a.eps.filter((e) => e.state).map((e) => e.state!.key))

@@ -1,6 +1,6 @@
 // Игра: состояние, сообщения, ход Алика, «живость». Решения — что ответить, что предложить игроку,
 // что сделать Алику — принимает система правил (engine/rules/, content/rules/*).
-import { make, D, low, cap, type ExcuseApi, type Promise3 } from '../content/excuses'
+import { make, D, low, cap, type ExcuseApi, type Promise3, type PromiseCondition } from '../content/excuses'
 import { makeScenes, type Scene, type Line } from '../content/scenes'
 import { TRIBUNAL } from '../content/rude'
 import { PAYDAY_HOOKS } from '../content/rules/payday'
@@ -647,6 +647,7 @@ export class Game {
       // ачивки и трофеи — условия для финалов сериалов и концовок
       ...Object.fromEntries(Object.keys(S.ach).map((k) => ['ach.' + k, true])),
       items: S.items.length,
+      latestItem: S.items.at(-1),
       legend: this.legend(),
       'ctx.topic': this.topicOfLast(),
       // «Мууу» прозвучало после последнего сообщения игрока — только тогда про корову и спрашивают
@@ -658,8 +659,8 @@ export class Game {
       'rude.heat': Math.max(0, Number(S.mem['rude.heat'] ?? 0)),
       'has.boris': S.items.some((n) => /Борис/.test(n)),
       'has.niva': S.items.some((n) => /Нива/.test(n)),
-      // «сегодня тот самый день» — только в сам день срока (обещание могло наступить, пока Алик пропадал)
-      promiseLive: !!pr && pr.due === S.day,
+      // Календарное обещание живо в день срока; событийное — в ход, когда его факт стал истиной.
+      promiseLive: !!pr && (pr.condition ? pr.met === S.day : pr.due === S.day),
       period: this.period(), night: this.isNight(), offline: S.offlineDays > 0, scene: S.scene?.id,
       lateCount: this.lateCount(),
       // сама — не больше одной серии в день: три легенды денег за день — уже не сюжет, а шум
@@ -669,7 +670,8 @@ export class Game {
       quests: Object.keys(S.ach).filter((k) => k.startsWith('q_')).length,
       callbackReady: !!this.callbackCandidate(),
       arcUnfinished: this.unfinishedArc(),
-      'ctx.type': c.type, 'ctx.s': c.s, 'ctx.shortTimey': c.s ? TIMEY.test(c.s) : false,
+      deathCanAdvance: !!S.mem.alik_dead && this.arcCanAdvance('alik_death', true),
+      'ctx.type': c.type, 'ctx.amount': c.amount, 'ctx.s': c.s, 'ctx.shortTimey': c.s ? TIMEY.test(c.s) : false,
       'ctx.when': c.when, 'ctx.whenNever': c.whenNever, 'ctx.rel': c.rel?.n, 'ctx.relYou': c.rel?.you ?? c.rel?.n, 'ctx.sad': c.sad, 'ctx.festive': c.festive, 'ctx.revived': c.revived,
       'ctx.constr': c.constr, 'ctx.legendary': c.legendary, 'ctx.arc': c.arc,
       // спросить про сериал есть смысл: будет новая серия, или сериал закончен и сегодня про финал ещё не спрашивали
@@ -727,9 +729,26 @@ export class Game {
     const queue = this.pending.splice(0)
     for (const q of queue) if (await this.rules.fire(this, q, this.facts, { floor: this.floor() })) break
   }
+  private async fulfillConditionalPromise(): Promise<void> {
+    const promise = !this.S.mem.alik_dead && !this.S.mem.blocked
+      ? this.S.promises.findIndex((p) => p.condition && p.met === undefined && this.S.mem[p.condition] === true)
+      : -1
+    if (promise < 0) return
+    const record = this.S.promises[promise]
+    for (const candidate of this.S.promises) {
+      if (candidate.condition === record.condition && candidate.met === undefined) candidate.met = this.S.day
+    }
+    const legend = this.legend()
+    if (legend && LEGENDS[legend]?.condition === record.condition) {
+      const arc = this.S.mem['legend.arc']
+      this.setLegend(null, typeof arc === 'string' ? arc : undefined)
+    }
+    await this.fire('PromiseConditionMet', { promise })
+  }
   async afterTurn(): Promise<void> {
     try {
       await this.rules.runDue(this, this.facts, { floor: this.floor() })
+      await this.fulfillConditionalPromise()
       await this.flushChorus()
     } catch (e) { this.swallowDisposed(e) }
   }
@@ -846,7 +865,14 @@ export class Game {
     S.choices = null
     this.drain(1)
     this.save()
-    if (this.dead || this.disposed) { this.inPlayerTurn = false; return }
+    if (this.disposed) { this.inPlayerTurn = false; return }
+    if (this.dead) {
+      this.sys('Не доставлено: телефон Алика выключен.')
+      S.ctx = null
+      this.save()
+      this.inPlayerTurn = false
+      return
+    }
 
     try {
       await this.sleep((500 + this.rnd(700)) * (this.isNight() ? 2 : 1))
@@ -881,6 +907,7 @@ export class Game {
       }
       if (this.disposed) return
 
+      await this.fulfillConditionalPromise()
       // хор ещё в том же дне → смена даты → утром наступившие обещания и сюжет
       await this.flushChorus()
       if (this.disposed) return
@@ -918,24 +945,34 @@ export class Game {
     }
   }
 
-  recordPromise(p?: { text: string; d: number | null; due?: Due } | null): void {
+  recordPromise(p?: { text: string; d: number | null; due?: Due; condition?: PromiseCondition } | null): void {
     if (!p) return
+    if (p.condition && this.S.mem[p.condition] === true) return
     const due = p.d == null ? null : this.S.day + (p.due ? dueIn(p.due, this.S.day) : p.d)
-    this.S.promises.push({ t: p.text, made: this.S.day, due })
+    this.S.promises.push({ t: p.text, made: this.S.day, due, condition: p.condition })
     if (due !== null && due > this.S.day) this.rules.schedule({ at: due, kind: 'event', event: 'PromiseDue', facts: { promise: this.S.promises.length - 1 } })
     if (this.S.promises.length >= 20) this.unlock('promises20')
+  }
+  private alignPromise(p: Promise3, until: string, condition?: PromiseCondition): Promise3 {
+    p.text = p.text.replace(p.t, until)
+    p.t = until
+    p.d = null
+    p.due = undefined
+    p.condition = condition
+    return p
   }
   /** «Клянусь мамой, завтра — всё отдам» + запись в журнал. */
   /** Обещание. Пока жива легенда денег — срок чаще вытекает из неё («как ключ выйдет»); legend = true — всегда из неё. */
   async promiseLine(prefix?: string, legend?: boolean): Promise<void> {
-    const until = this.legend() ? LEGENDS[this.legend()!]?.until : undefined
+    const legendSpec = this.legend() ? LEGENDS[this.legend()!] : undefined
+    const until = legendSpec?.until
     // срок из легенды — после серии обязательно, дальше изредка: одна и та же клятва «как „Нива“ заведётся» приедается
     const recent = this.S.stats.sent - Number(this.S.mem.legendPromiseAt ?? -99) < 4
     const fromLegend = !!until && (legend || (!recent && this.chance(0.4)))
     if (fromLegend) this.S.mem.legendPromiseAt = this.S.stats.sent
     const p = this.uniq(() => {
       const q = this.X.promise()
-      if (fromLegend) { q.text = q.text.replace(q.t, until!); q.t = until!; q.d = null } // срок-условие («как ключ выйдет»): дня у него нет, «просрочено» — нелепо
+      if (fromLegend) this.alignPromise(q, until!, legendSpec?.condition)
       if (prefix) return { text: `${prefix} ${low(q.text)}.`, q }
       // форма клятвы — из пула (одна формула в каждом втором сообщении приедается)
       const form = this.line('OATH_FORMS', OATH_FORMS) ?? '{o}, {p}.'
@@ -986,6 +1023,7 @@ export class Game {
   }
 
   async excuseTurn(): Promise<void> {
+    if (this.legend()) return this.promiseLine(undefined, true)
     const ex = this.uniq(() => this.X.excuse({ preferLong: this.S.politeStreak >= 3 }))
     if (ex.legendary) this.unlock('legend')
     this.recordPromise(ex.p)
@@ -1025,11 +1063,13 @@ export class Game {
 
   async transfer(): Promise<void> {
     await this.typingFor(1200)
-    this.S.debt -= 50
-    this.S.money += 50
+    const amount = Number(this.S.mem.nextTransfer ?? 50)
+    delete this.S.mem.nextTransfer
+    this.S.debt -= amount
+    this.S.money += amount
     if (++this.S.stats.fifty >= 5) this.unlock('fifty5')
-    this.alikMsg({ kind: 'transfer', from: 'alik', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE) })
-    this.S.ctx = { type: 'transfer' }
+    this.alikMsg({ kind: 'transfer', from: 'alik', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE), amount })
+    this.S.ctx = { type: 'transfer', amount }
   }
 
   async sticker(fixed?: { e: string; c: string }): Promise<void> {
@@ -1368,6 +1408,7 @@ export class Game {
     if (fx.barter) { S.debt -= v.v; S.items.push(v.n) }
     if (fx.invoice) S.debt -= v.total
     if (fx.ach) this.unlock(fx.ach)
+    if (fx.legend !== undefined) this.setLegend(fx.legend)
     if (fx.set) this.rules.applyOps(Object.entries(fx.set).map(([key, value]) => ({ key, op: '=' as const, value })), {})
     if (fx.during) this.rules.applyOps([{ key: fx.during.key, op: '=', value: true, forDays: fx.during.days }], {})
     if (n.sys) { await this.sleep(700); this.sys(gen('sys', n.sys)()) }
@@ -1492,7 +1533,15 @@ export class Game {
     if (r < 0.85) { this.push({ ...base, kind: 'voice', len: 10 + this.rnd(50) }); return }
     if (r < 0.92) {
       this.S.debt -= 50; this.S.money += 50; this.S.stats.fifty++
-      this.push({ ...base, kind: 'transfer', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE) })
+      this.push({ ...base, kind: 'transfer', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE), amount: 50 })
+      return
+    }
+    const legend = this.legend()
+    if (legend) {
+      const spec = LEGENDS[legend]
+      const promise = this.alignPromise(this.X.promise(), spec.until, spec.condition)
+      this.recordPromise(promise)
+      this.push({ ...base, kind: 'text', text: promise.text })
       return
     }
     const ex = this.uniq(() => this.X.excuse())

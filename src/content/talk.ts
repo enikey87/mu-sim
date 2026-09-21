@@ -3,7 +3,7 @@
 import { LEGENDS } from './legends'
 import { ARCS } from './arcs'
 import type { GameState } from '../engine/state'
-import type { Entry } from '../engine/rules'
+import { type Entry, type FactOp, set } from '../engine/rules'
 import { needs } from './world'
 
 /** Вопрос, ответ и (необязательно) когда вопрос уместен: по состоянию и по тому, что Алик только что сказал. */
@@ -36,7 +36,7 @@ export const CHORUS_TALK: Record<string, Entry<TalkPair>[]> = {
     needs('dekret')(['Нуне, выйдете из декрета — позвоните мне', 'Первым делом. После Алика. После мамы Алика. После педиатра. Вы четвёртый.']),
   ],
   grant: [
-    ['Грант, вы правда ему всё заплатили?', 'Всё. Наличными. В пакете из-под хаша. Он пересчитал и сказал «аванс».'],
+    ['Грант, вы правда ему всё заплатили?', 'По нашему договору — всё. Наличными, в пакете из-под хаша. Ваш долг Алик в этот расчёт не включал.'],
     ['Грант, дайте мне чек', 'Чек у Алика. Алик его «сохранил». Я теперь тоже в очереди — за чеком.'],
   ],
   razmik: [
@@ -64,3 +64,6 @@ export type TalkKind = 'legend' | 'chorus' | 'memory'
 export const talkPairs = (kind: TalkKind, sub: string): readonly Entry<TalkPair>[] =>
   (kind === 'legend' ? LEGENDS[sub]?.talk : kind === 'chorus' ? CHORUS_TALK[sub] : MEMORY_TALK) ?? []
 export const talkId = (kind: TalkKind, sub: string, i: number) => `TALK:${kind}:${sub}:${i}`
+export const TALK_REMEMBER: Record<string, FactOp[]> = {
+  [talkId('chorus', 'grant', 0)]: [set('grant.paid', true)],
+}
