@@ -9,13 +9,15 @@ import * as L from './life'
 import { allRules } from './rules'
 import { Decks } from '../engine/deck'
 import { seededRng } from '../engine/rng'
+import { valueOf, type Entry } from '../engine/rules'
 
 const sources = import.meta.glob(['../**/*.ts', '../**/*.tsx', '!../**/*.test.*'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>
 const allSource = Object.values(sources).join('\n')
 
 const api = (seed = 1, tier = 0) => {
   const decks = new Decks({}, seededRng(seed))
-  return make((k, a, nr) => decks.draw(k, a, nr), () => tier, seededRng(seed + 1))
+  // весь словарь, без требований мира: проверяется сам текст
+  return make(<T>(k: string, a: readonly Entry<T>[], nr?: boolean) => decks.draw(k, a.map(valueOf), nr), () => tier, seededRng(seed + 1))
 }
 
 describe('scenes', () => {
@@ -39,7 +41,7 @@ describe('scenes', () => {
       for (const [nid, n] of Object.entries(sc.nodes)) {
         const has = n.a || n.a2 || n.sys || n.sys2 || n.opts || n.then || n.doc || n.hook
         expect(has, `${sid}.${nid}`).toBeTruthy()
-        for (const l of [...(n.a ?? []), ...(n.a2 ?? [])]) expect(txt(l).length, `${sid}.${nid}`).toBeGreaterThan(1)
+        for (const l of [...(n.a ?? []), ...(n.a2 ?? [])]) expect(txt(valueOf(l)).length, `${sid}.${nid}`).toBeGreaterThan(1)
         if (n.fx?.ach) expect(ACH[n.fx.ach], `${sid}.${nid} ach`).toBeDefined()
         if (n.who) expect(CAST[n.who]).toBeDefined()
       }
@@ -47,10 +49,11 @@ describe('scenes', () => {
   })
   it('scene init functions produce the vars their lines use', () => {
     const rng = seededRng(1)
-    expect(scenes.barter.init!(rng)).toMatchObject({ n: expect.any(String), v: expect.any(Number) })
-    const inv = scenes.invoice.init!(rng)
+    const all = <T,>(arr: readonly Entry<T>[]) => arr.map(valueOf)
+    expect(scenes.barter.init!(rng, all)).toMatchObject({ n: expect.any(String), v: expect.any(Number) })
+    const inv = scenes.invoice.init!(rng, all)
     expect(inv.total).toBe(inv.rows.reduce((n: number, r: [string, number]) => n + r[1], 0))
-    expect(scenes.choice.init!(rng).r).toHaveLength(3)
+    expect(scenes.choice.init!(rng, all).r).toHaveLength(3)
   })
 })
 
@@ -61,12 +64,12 @@ describe('arcs and cast', () => {
       expect(a.follow.length, id).toBeGreaterThanOrEqual(2)
       expect(ACH[a.eps[a.eps.length - 1].fx?.ach ?? ''], `${id} final ach`).toBeDefined()
       expect(ARC_DONE[id]?.length, `${id} ARC_DONE`).toBeGreaterThan(0)
-      for (const ep of a.eps) for (const m of ep.m) if (typeof m !== 'string') expect(CAST[m.w], `${id} who ${m.w}`).toBeDefined()
+      for (const ep of a.eps) for (const m of ep.m.map(valueOf)) if (typeof m !== 'string') expect(CAST[m.w], `${id} who ${m.w}`).toBeDefined()
     }
     for (const w of Object.keys(GROUP)) expect(CAST[w], `group ${w}`).toBeDefined()
     // реплики семейного чата не совпадают с репликами сериалов (иначе — повтор в переписке)
-    const arcLines = new Set(Object.values(ARCS).flatMap((a) => a.eps.flatMap((e) => e.m.map((m) => (typeof m === 'string' ? m : m.t)))))
-    for (const t of Object.values(GROUP).flat()) expect(arcLines.has(t), t).toBe(false)
+    const arcLines = new Set(Object.values(ARCS).flatMap((a) => a.eps.flatMap((e) => e.m.map(valueOf).map((m) => (typeof m === 'string' ? m : m.t)))))
+    for (const t of Object.values(GROUP).flat().map(valueOf)) expect(arcLines.has(t), t).toBe(false)
   })
 })
 
@@ -100,15 +103,15 @@ describe('dictionaries', () => {
     for (const k of ['IDLE', 'STICKERS', 'FWD', 'DELETED', 'EDIT_WHEN', 'IDLE_Q', 'IDLE_A', 'VOICE', 'NOTIF', 'SPEND'] as const) {
       expect((L[k] as unknown[]).length, k).toBeGreaterThan(0)
     }
-    for (const [icon, app, t] of L.NOTIF) {
-      expect(icon && app).toBeTruthy()
-      const text = typeof t === 'function' ? t({ spend: 100, what: 'Гречка', money: 500 }) : t
-      expect(text).not.toMatch(/undefined|NaN/)
+    for (const n of L.NOTIF) {
+      expect(n.icon && n.app, n.t).toBeTruthy()
+      // подстановки — только у трат с карты
+      expect(/\{\w+\}/.test(n.t), n.t).toBe(!!n.spend)
     }
   })
   it('player templates only use known placeholders', () => {
     for (const k of Object.keys(D).filter((k) => k.startsWith('P_'))) {
-      for (const s of D[k] as string[]) for (const m of s.matchAll(/\{(\w+)\}/g)) expect(['t', 'T', 'n', 's', 'date'], `${k}: ${s}`).toContain(m[1])
+      for (const s of (D[k] as Entry<string>[]).map(valueOf)) for (const m of s.matchAll(/\{(\w+)\}/g)) expect(['t', 'T', 'n', 's', 'date'], `${k}: ${s}`).toContain(m[1])
     }
   })
 })
@@ -133,7 +136,7 @@ describe('excuse generator', () => {
   })
   it('higher tiers use escalated excuses', () => {
     const X = api(5, 3)
-    const esc = [...D.ESC1, ...D.ESC2, ...D.ESC3] as string[]
+    const esc = ([...D.ESC1, ...D.ESC2, ...D.ESC3] as Entry<string>[]).map(valueOf)
     let hits = 0
     for (let i = 0; i < 500; i++) if (esc.some((e) => X.excuse().texts.join(' ').includes(e))) hits++
     expect(hits).toBeGreaterThan(50)

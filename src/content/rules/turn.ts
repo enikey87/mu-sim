@@ -1,6 +1,7 @@
 // Ход Алика в ответ на обычное сообщение игрока.
 import type { Game } from '../../engine/game'
-import { type Rule, eq, ne, gte, lte, is, exists } from '../../engine/rules'
+import { type Rule, eq, ne, gte, lte, is, exists, missing, add } from '../../engine/rules'
+import { meet } from '../world'
 import { AlikOffline } from './criteria'
 import { IDLE } from '../life'
 import { MEMORY } from '../memory'
@@ -13,7 +14,7 @@ export const toneRules: R[] = [
   { name: 'Tone_Default', event: 'PlayerMessage', when: [], respond: ({ game }) => game.turnRoll() },
   // грубость — лестница эскалации в rude.ts
   // угрозы судом — линия суда (court.ts): каждая угроза двигает дело на ступень
-  { name: 'Tone_Cow', event: 'PlayerMessage', when: [eq('tone', 'cow')], respond: async ({ game }) => { await game.say([game.uniq(game.X.cow)]) } },
+  { name: 'Tone_Cow', event: 'PlayerMessage', when: [eq('tone', 'cow')], remember: [add('count.cow')], respond: async ({ game }) => { await game.say([game.uniq(game.X.cow)]) } },
 ]
 
 // Событие StoryBeat — после хода игрока, даже если он спорил, кричал или отвечал на контекст:
@@ -69,12 +70,14 @@ export const turnRules: R[] = [
   },
   // память: Алик вспоминает, что было в этой партии (реплики с условиями, каждая один раз)
   { name: 'Turn_Memory', event: 'AlikTurn', when: [gte('sent', 8)], specificity: 0, weight: 7, cooldown: { turns: 4 }, respond: async ({ game }) => { const t = game.line('MEMORY', MEMORY); if (t) { await game.say([t]); game.unlock('memory') } else await game.excuseTurn() } },
-  { name: 'Turn_Callback', event: 'AlikTurn', when: [is('callbackReady')], specificity: 0, weight: 6, cooldown: { days: 5 }, respond: ({ game }) => game.callback() },
+  // «помнишь, деньги в сейфе?» — после Дня выплаты деньги «отданы», старые версии уже не продолжаются
+  { name: 'Turn_Callback', event: 'AlikTurn', when: [is('callbackReady'), missing('payday.chain')], specificity: 0, weight: 6, cooldown: { days: 5 }, respond: ({ game }) => game.callback() },
   { name: 'Turn_Sticker', event: 'AlikTurn', when: [], specificity: 0, weight: W.sticker, respond: ({ game }) => game.sticker() },
   { name: 'Turn_Forward', event: 'AlikTurn', when: [], specificity: 0, weight: W.fwd, respond: ({ game }) => game.forward() },
   { name: 'Turn_Transfer', event: 'AlikTurn', when: [], specificity: 0, weight: transferW, respond: ({ game }) => game.transfer() },
   { name: 'Turn_Job', event: 'AlikTurn', when: [], specificity: 0, weight: W.job, respond: ({ game }) => game.job() },
-  { name: 'Turn_Photo', event: 'AlikTurn', when: [], specificity: 0, weight: W.photo, respond: ({ game }) => game.photo() },
+  // на «фото платёжки» — баран на фоне Арарата: с этого момента бараны — знакомая тема
+  { name: 'Turn_Photo', event: 'AlikTurn', when: [], specificity: 0, weight: W.photo, remember: meet('baran'), respond: ({ game }) => game.photo() },
   { name: 'Turn_Voice', event: 'AlikTurn', when: [], specificity: 0, weight: W.voice, respond: ({ game }) => game.voice() },
   { name: 'Turn_Short', event: 'AlikTurn', when: [], specificity: 0, weight: W.short, respond: ({ game }) => game.shortReply() },
   {

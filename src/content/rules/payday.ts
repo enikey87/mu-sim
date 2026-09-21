@@ -4,7 +4,6 @@ import { type Rule, eq, gte, is, exists } from '../../engine/rules'
 import { SOURCES, SOURCES_TOPUP, ROLL, CLAIMS, GRAND, GRAND_FALLBACK, SLOTS, CONTRADICTIONS, MORNING_CONTRA, OUTCOME, type Source, type Call, type Claim } from '../payday'
 
 type R = Rule<Game>
-const TARGET = 240000
 const NAMES = ['Гарик', 'Борис', 'Гоар', 'мама', 'Рубик', 'Размик', 'Нуне', 'Карине', 'Страсбург', 'малыш', '«Нив', 'Грант']
 const fmt = (n: number) => n.toLocaleString('ru-RU')
 
@@ -21,24 +20,25 @@ export const PAYDAY_HOOKS: Record<string, (game: Game) => Promise<void>> = {
     game.S.mem['payday.at'] = game.S.day + 1
     game.unlock('payday')
   },
-  // утро: каждая линия партии отдаёт деньги, счётчик растёт до 240 000
+  // утро: линии партии отдают деньги, счётчик растёт до долга (с допработами), а не до 240 000 из договора
   morning: async (game) => {
     await game.sleep(700)
     game.nextDay(1)
     game.sys('— День выплаты —')
+    const owed = game.S.debt
     let sum = 0
-    for (let i = 0; i < 4 && sum < TARGET; i++) {
+    for (let i = 0; i < 4 && sum < owed; i++) {
       const p = game.linePicked('PD_SRC', SOURCES)
       if (!p) break
       await game.say([p.text])
       game.S.mem['payday.morning'] = `${game.S.mem['payday.morning'] ?? ''}\n${p.text}`
-      const over = sum + (p.spec as Source).amount - TARGET
-      sum = Math.min(TARGET, sum + (p.spec as Source).amount)
+      const over = sum + (p.spec as Source).amount - owed
+      sum = Math.min(owed, sum + (p.spec as Source).amount)
       await money(game, sum)
       // сверх суммы по договору — не пропадает молча: 190 000 + 90 000 ≠ 240 000
-      if (over > 0) await game.say([`Лишние ${fmt(over)} — это сдача. Сдачу оставляю себе, так принято. По договору — ${fmt(TARGET)}, ни рублём больше.`])
+      if (over > 0) await game.say([`Лишние ${fmt(over)} — это сдача. Сдачу оставляю себе, так принято. Я должен ${fmt(owed)}, ни рублём больше.`])
     }
-    if (sum < TARGET) { await game.say([SOURCES_TOPUP]); sum = TARGET; await money(game, sum) }
+    if (sum < owed) { await game.say([game.X.fill(SOURCES_TOPUP, { sum: fmt(owed) })]); sum = owed; await money(game, sum) }
     game.sys('Алик добавил вас в группу «ДЕНЬ ВЫПЛАТЫ 💰 (не выходить)»')
     const came = new Set<string>()
     for (let i = 0; i < 4; i++) {
@@ -51,7 +51,7 @@ export const PAYDAY_HOOKS: Record<string, (game: Game) => Promise<void>> = {
   },
   // дележ: каждый требует долю, счётчик тает до 50 ₽
   claims: async (game) => {
-    let sum = Number(game.S.mem['payday.sum'] ?? TARGET)
+    let sum = Number(game.S.mem['payday.sum'] ?? game.S.debt)
     const took = new Set<string>()
     for (let i = 0; i < 5 && sum > 50; i++) {
       const p = game.linePicked('PD_CLAIM', CLAIMS, { filter: (l) => !took.has((l as Claim).who) })
@@ -103,8 +103,8 @@ const outcome = (id: string, when: R['when'], extra: Partial<R> = {}): R => ({
     const o = OUTCOME[id]
     await game.sleep(900)
     // «перевёл {sum}» — ровно то, что осталось «к выплате» после всех долей, а не 240 000 из воздуха
-    if (o.sys) game.sys(o.sys.replace('{debt}', fmt(game.S.debt)).replace('{sum}', fmt(Number(game.S.mem['payday.sum'] ?? TARGET))))
-    for (const l of o.lines) await game.say([typeof l === 'string' ? l : { w: l[0], t: l[1] }])
+    if (o.sys) game.sys(o.sys.replace('{debt}', fmt(game.S.debt)).replace('{sum}', fmt(Number(game.S.mem['payday.sum'] ?? game.S.debt))))
+    for (const l of game.open(o.lines)) await game.say([typeof l === 'string' ? l : { w: l[0], t: l[1] }])
     if (id === 'real' || id === 'coins') { game.S.money += game.S.debt; game.S.debt = 0 }
     if (id === 'lavash') { game.S.debt = 0; game.S.items.push('Лаваш × 240 000') }
     if (id === 'niva') { game.S.debt = Math.max(0, game.S.debt - 5000); game.S.items.push('«Нива» (выплата)') }
@@ -129,7 +129,7 @@ export const paydayRules: R[] = [
   outcome('real', [is('ach.saint'), gte('caught', 3), is('ach.court'), gte('quests', 5)]),
   // поймал великую отмазку — заслуга игрока: важнее исходов «по стилю партии» (одинаковая специфичность решалась бы случайно)
   outcome('coins', [is('payday.caught')], { bonus: 1 }),
-  outcome('lavash', [is('payday.caught'), is('ach.q_crypto')], { bonus: 1 }),
+  outcome('lavash', [is('payday.caught'), is('crypto.hodl')], { bonus: 1 }),
   // исходы «по стилю партии» — одной специфичности: подходит несколько — выбор случайный, а не всегда один
   outcome('niva', [eq('finale.niva', 'chose')], { specificity: 1 }),
   outcome('strasbourg', [is('ach.strasbourg')], { specificity: 1 }),
@@ -137,6 +137,6 @@ export const paydayRules: R[] = [
   outcome('default', []),
   {
     name: 'Payday_Button', event: 'PaydayButton', when: [], priority: 'system',
-    respond: async ({ game, facts }) => { await game.say([OUTCOME[String(facts.outcome)]?.button ?? OUTCOME.default.button]) },
+    respond: async ({ game, facts }) => { await game.say([game.open((OUTCOME[String(facts.outcome)] ?? OUTCOME.default).button)[0]]) },
   },
 ]

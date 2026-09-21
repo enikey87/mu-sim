@@ -176,16 +176,23 @@ describe('typo', () => {
 })
 
 describe('срок по календарю', () => {
-  it('«в среду» — до ближайшей среды, «до Нового года» — до 1 января, иначе — как в колоде', async () => {
-    const { calendarDays, dateOf } = await import('./time')
+  it('день недели, «край — в понедельник», конец месяца, Новый год, квартал, неделя — последний день срока', async () => {
+    const { dueIn, dateOf } = await import('./time')
     const day = 200
-    const dow = dateOf(day).getDay()
-    const wed = calendarDays('в среду утром — закину', day, 3)
-    expect(dateOf(day + wed).getDay()).toBe(3)
+    const at = (n: number) => dateOf(day + n)
+    const wed = dueIn({ weekday: 3 }, day)
+    expect(at(wed).getDay()).toBe(3)
     expect(wed).toBeGreaterThanOrEqual(1)
     expect(wed).toBeLessThanOrEqual(7)
-    expect(dateOf(day + calendarDays('до Нового года — всё', day, 90)).getMonth()).toBe(0)
-    expect(calendarDays('завтра — отдам', day, 1)).toBe(1)
-    expect(dow).toBeGreaterThanOrEqual(0)
+    expect(dueIn({ weekday: 3, next: true }, day)).toBe(wed + 7)
+    const fri = dueIn({ weekday: 5 }, day)
+    expect(at(dueIn({ weekday: 5, plus: 3 }, day)).getDay()).toBe(1) // пятница + 3 = понедельник после неё
+    expect(dueIn({ weekday: 5, plus: 3 }, day)).toBe(fri + 3)
+    const month = at(dueIn({ monthEnd: 1 }, day))
+    expect(month.getMonth()).toBe((dateOf(day).getMonth() + 1) % 12)
+    expect(at(dueIn({ monthEnd: 1 }, day) + 1).getDate()).toBe(1) // последний день следующего месяца
+    expect(at(dueIn({ newYear: true }, day)).getMonth()).toBe(0)
+    expect([2, 5, 8, 11]).toContain(at(dueIn({ quarter: true }, day)).getMonth())
+    expect(at(dueIn({ week: true }, day)).getDay()).toBe(0)
   })
 })

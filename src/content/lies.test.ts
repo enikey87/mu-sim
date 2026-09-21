@@ -5,6 +5,7 @@ import { makeGame, alikTexts } from '../test/helpers'
 import type { Game } from '../engine/game'
 import { D } from './excuses'
 import { ARCS } from './arcs'
+import { valueOf } from '../engine/rules'
 
 const frag = (s: string) => s.replace(/[.!?…]+$/, '').slice(5, 25)
 const oneOf = (arr: readonly string[], text: string) => arr.some((a) => text.includes(frag(a)))
@@ -90,8 +91,8 @@ describe('поймать на лжи', () => {
       replies.push(await catchLie(game))
     }
     // начало фразы: дальше может быть опечатка Алика («борат»)
-    expect(oneOf(LIE_THIRD.map((x) => x.slice(0, 12)), replies[2]), replies[2]).toBe(true)
-    expect(oneOf(LIE_NOCRED.map((x) => x.slice(0, 12)), replies[3]), replies[3]).toBe(true)
+    expect(oneOf(LIE_THIRD.map(valueOf).map((x) => x.slice(0, 12)), replies[2]), replies[2]).toBe(true)
+    expect(oneOf(LIE_NOCRED.map(valueOf).map((x) => x.slice(0, 12)), replies[3]), replies[3]).toBe(true)
     expect(game.S.ach.liar3).toBeDefined()
   })
   it('противоречие от другого персонажа: Грант «всё заплатил»', () => {

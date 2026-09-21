@@ -1,7 +1,7 @@
 // Сценарии правил: именно те места, где в оригинале были нелогичные ответы.
 import { describe, it, expect } from 'vitest'
 import { makeGame, alikTexts } from '../../test/helpers'
-import { spec } from '../../engine/rules'
+import { spec, valueOf } from '../../engine/rules'
 import type { Game } from '../../engine/game'
 import type { Choice, Ctx } from '../../engine/state'
 import { D } from '../excuses'
@@ -124,7 +124,7 @@ describe('ответы Алика (PlayerSays)', () => {
     for (let i = 0; i < 2; i++) await reply(game, { text: 'Прости', tone: 'polite', act: 'sorry' })
     game.S.mem['rude.heat'] = 1 // на высокой температуре своё правило лестницы («только очно: хаш…»)
     const t = await reply(game, { text: 'Прости ещё раз', tone: 'polite', act: 'sorry' })
-    expect(oneOf(SWING.map(frag), t.join(' ')), t.join(' | ')).toBe(true)
+    expect(oneOf(SWING.map(valueOf).map(frag), t.join(' ')), t.join(' | ')).toBe(true)
     expect(game.S.mem['rude.heat']).toBe(1)
   })
   it('сериал закончился — финальный ответ этого сериала, а не «без новостей»', async () => {
@@ -160,13 +160,23 @@ describe('ответы Алика (PlayerSays)', () => {
     const { game } = makeGame()
     game.S.ctx = { when: 'когда Арарат вернут', whenNever: true }
     const t = await reply(game, { text: 'Точно?', tone: 'neutral', act: 'promiseCheck', arg: 'когда Арарат вернут' })
-    expect(oneOf(PROMISE_NEVER.map(frag), t.join(' '))).toBe(true)
+    expect(oneOf(PROMISE_NEVER.map(valueOf).map(frag), t.join(' '))).toBe(true)
   })
   it('переспросить обычный срок — клятва и тот же срок', async () => {
     const { game } = makeGame()
     game.S.ctx = { when: 'в среду утром' }
     const t = await reply(game, { text: 'Точно?', tone: 'neutral', act: 'promiseCheck', arg: 'в среду утром' })
     expect(t.join(' ').toLowerCase()).toContain('в среду утром')
+  })
+  it('на срок — либо вопрос, либо согласие; на согласие Алик не клянётся заново, а подтверждает', async () => {
+    const { game } = makeGame()
+    const acts = new Set<string>()
+    for (let i = 0; i < 40; i++) { game.S.ctx = { when: 'в среду утром' }; game.S.choices = null; for (const c of game.choices) if (c.act) acts.add(c.act) }
+    expect(acts).toContain('promiseCheck')
+    expect(acts).toContain('promiseOk')
+    game.S.ctx = { when: 'в среду утром' }
+    const t = await reply(game, { text: 'Запомнил: в среду утром. Не подведите.', tone: 'polite', act: 'promiseOk' })
+    expect((D.PROMISE_OK as string[]).some((p) => t.join(' ').includes(p))).toBe(true)
   })
 })
 

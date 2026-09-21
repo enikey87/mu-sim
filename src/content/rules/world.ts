@@ -1,6 +1,7 @@
 // Правила новых возможностей: выбор сцен, наступившие обещания, хор персонажей, состояния мира.
 import type { Game } from '../../engine/game'
-import { type Rule, type Facts, eq, ne, gte, lte, is, add, of, missing } from '../../engine/rules'
+import { type Rule, type Facts, type Entry, eq, ne, gte, lte, is, add, of, missing } from '../../engine/rules'
+import { WORLD, SPEAKS } from '../world'
 import { CHORUS_LEGEND } from '../legends'
 import { PROMISE_DUE, PROMISE_DUE_COSMIC, PROMISE_DUE_KEPT, CHORUS, CHORUS_FED_UP, WEDDING_NOISE, BORIS_SICK, DEAD_KARINE, DEAD_ALIK } from '../world'
 
@@ -14,16 +15,20 @@ const scene = (id: string, when: R['when'] = [], weight: R['weight'] = 1): R => 
 })
 const eveningBoost = (f: Facts) => (f.period === 'evening' || f.period === 'friday' ? 3 : 1)
 export const sceneRules: R[] = [
-  scene('meet'), scene('card'), scene('barter'), scene('nephew'), scene('redo'), scene('newjob'), scene('choice'),
+  scene('meet'), scene('card'), scene('barter'), scene('redo'), scene('choice'),
+  // истории, которые случаются один раз: «новый объект», «займи 5000», «если спросят — ты не работал», кредит
+  { ...scene('newjob'), once: true },
+  // «это Арсен, племянник» — знакомство: если Арсен уже в истории (суд, фундамент), второй раз не представляется
+  scene('nephew', [missing('intro.arsen')]),
   scene('customer', [gte('day', 200)]),
-  scene('lend', [gte('mood', 4)]),
+  { ...scene('lend', [gte('mood', 4)]), once: true },
   scene('toast', [], eveningBoost), // застолье — чаще вечером и в пятницу
-  scene('tax', [gte('count.threat', 1)], 2), // «если спросят — ты у меня не работал» — после угроз судом
-  { ...scene('wife', [gte('count.rude', 1), missing('met.karine')]), once: true }, // Карине знакомится один раз: «Вы кто такой?» дважды — нелепо
+  { ...scene('tax', [gte('count.threat', 1)], 2), once: true }, // «если спросят — ты у меня не работал» — после угроз судом
+  { ...scene('wife', [gte('count.rude', 1), missing('met.karine'), WORLD.karineHome]), once: true }, // Карине знакомится один раз: «Вы кто такой?» дважды — нелепо
   scene('invoice', [gte('day', 215)]),
-  scene('loan', [gte('day', 230)]),
+  { ...scene('loan', [gte('day', 230)]), once: true }, // кредит «на твоё имя» — один раз
   scene('deathbed', [gte('day', 240), lte('mood', 6)], 2), // умирать Алик начинает, когда дела плохи
-  { ...scene('heir', [gte('arc.grandpa', 4), gte('arc.boris', 1)], 3), once: true }, // «долг перешёл Борису» — когда Борис уже есть // наследство — один раз, после того как дедушка переписал завещание
+  { ...scene('heir', [gte('arc.grandpa', 4), gte('arc.boris', 4)], 3), once: true }, // «долг перешёл Борису» — когда Борис уже есть // наследство — один раз, после того как дедушка переписал завещание
 ]
 
 // ---- мини-квесты (PickQuest): свой слот в ходе Алика, каждый — один раз за игру ----
@@ -42,7 +47,7 @@ export const questRules: R[] = [
 
 // ---- обещание наступило (PromiseDue — отложенное событие на день срока) ----
 const promiseText = (game: Game, f: Facts) => game.S.promises[Number(f.promise)]
-const dueLine = (game: Game, f: Facts, key: string, arr: string[]) => {
+const dueLine = (game: Game, f: Facts, key: string, arr: readonly Entry<string>[]) => {
   const p = promiseText(game, f)!
   return game.uniq(() => `${game.X.g('ADDR')}, ${game.X.fill(game.draw(key, arr), { t: p.t })}`)
 }
@@ -72,12 +77,12 @@ export const promiseRules: R[] = [
 ]
 
 // ---- хор (Mentioned, target — упомянутый персонаж) ----
+const speaks = (who: string) => (SPEAKS[who] ? [SPEAKS[who]] : [])
 const chorus = (who: string): R => ({
-  name: `Chorus_${who}`, event: 'Mentioned', target: who, when: [], odds: 0.3, cooldown: { turns: 12 }, priority: 'chatter',
+  name: `Chorus_${who}`, event: 'Mentioned', target: who, when: speaks(who), odds: 0.3, cooldown: { turns: 12 }, priority: 'chatter',
   remember: [add('interjections', 1, { scope: 'target' })],
   respond: async ({ game }) => {
     // сначала реплики в рамках легенды денег (Нуне не скажет «денег нет», пока деньги в сейфе)
-    if (!game.canSpeak(who)) return false // Карине ушла к Рубику — в чат Алика не пишет
     const t = game.line('CH_' + who, [...(CHORUS_LEGEND[who] ?? []), ...CHORUS[who]])
     if (!t) return false // новых реплик нет — молчит
     await game.say([{ w: who, t }])
@@ -85,7 +90,7 @@ const chorus = (who: string): R => ({
   },
 })
 const fedUp = (who: string): R => ({
-  name: `Chorus_${who}_FedUp`, event: 'Mentioned', target: who, when: [gte('interjections', 3, 'target')], odds: 0.5, cooldown: { turns: 12 }, priority: 'chatter',
+  name: `Chorus_${who}_FedUp`, event: 'Mentioned', target: who, when: [gte('interjections', 3, 'target'), ...speaks(who)], odds: 0.5, cooldown: { turns: 12 }, priority: 'chatter',
   remember: [add('interjections', 1, { scope: 'target' })],
   // по порядку и один раз: нарастание, а не случайная реплика
   respond: async ({ game }) => {
@@ -97,12 +102,13 @@ const fedUp = (who: string): R => ({
 export const chorusRules: R[] = [...Object.keys(CHORUS).map(chorus), ...Object.keys(CHORUS_FED_UP).map(fedUp)]
 
 // ---- состояния мира со сроком: окрашивают обычный ход ----
-const noise = (key: string, arr: string[]) => async ({ game }: { game: Game }) => {
+const noise = (key: string, arr: readonly Entry<string>[]) => async ({ game }: { game: Game }) => {
   await game.say([game.uniq(() => game.draw(key, arr))])
 }
 async function deadTurn(game: Game): Promise<void> {
   game.setCtx(null)
-  if (game.chance(0.5)) await game.say([{ w: 'karine', t: game.uniq(() => game.draw('DEAD_K', DEAD_KARINE)) }])
+  // Карине ушла к Рубику — о смерти сообщает мама Алика
+  if (game.chance(0.5)) await game.say([{ w: game.canSpeak('karine') ? 'karine' : 'mama', t: game.uniq(() => game.draw('DEAD_K', DEAD_KARINE)) }])
   else await game.say([game.uniq(() => game.draw('DEAD_A', DEAD_ALIK))])
 }
 export const stateRules: R[] = [

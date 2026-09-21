@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { Lines, lineId, lintLines, spec, type Line, type SaidState } from './lines'
 import { gte, is } from './criteria'
+import { gate } from './gated'
 import { seededRng } from '../rng'
 
 const mk = (said: SaidState = {}) => {
@@ -74,5 +75,17 @@ describe('линтер пулов', () => {
     expect(lintLines('P', ['а', 'б'])).toEqual([])
     const issues = lintLines('P', ['а', ' ', 'а', { t: 'в', id: 'X' }, { t: 'г', id: 'X' }])
     expect(issues).toHaveLength(3)
+  })
+})
+
+describe('реплика с требованиями через gate', () => {
+  it('требования gate складываются с when самой реплики; id — от текста', () => {
+    const { lines } = mk()
+    const pool: Line[] = [gate(is('crane'))('кран'), gate(is('crane'))({ t: 'кран в суде', when: [gte('court', 4)] }), 'обычная']
+    expect(spec(pool[0])).toEqual({ t: 'кран', when: [is('crane')] })
+    expect(spec(pool[1]).when).toEqual([is('crane'), gte('court', 4)])
+    expect(lines.eligible('P', pool, { crane: true, court: 1 }).map((p) => p.text)).toEqual(['кран', 'обычная'])
+    expect(lines.eligible('P', pool, { crane: true, court: 5 }).map((p) => p.id)).toContain(lineId('P', 'кран в суде'))
+    expect(lines.pick('P', pool, {})!.text).toBe('обычная')
   })
 })

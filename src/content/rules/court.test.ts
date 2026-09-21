@@ -1,7 +1,8 @@
 // Линия суда: каждая угроза — следующая ступень, заседание — сцена с выбором, потом апелляция и Страсбург.
 import { describe, it, expect } from 'vitest'
 import { makeGame } from '../../test/helpers'
-import { COURT, COURT_AFTER } from '../quests'
+import { COURT, COURT_AFTER, COURT_LAWYER_AGAIN } from '../quests'
+import { valueOf } from '../../engine/rules'
 import { THREAT_AGAIN } from '../misc'
 import type { Game } from '../../engine/game'
 
@@ -12,11 +13,12 @@ describe('линия суда', () => {
     const { game } = makeGame()
     expect((await threat(game)).r).toBe('Court_Start')
     expect(game.S.mem.court).toBe(1)
-    for (const stage of [1, 2]) {
+    for (const [stage, rule] of [[1, 'Court_Lawyer'], [2, 'Court_Step']] as const) {
       const { r, t } = await threat(game)
-      expect(r).toBe('Court_Step')
+      expect(r).toBe(rule)
       for (const [, line] of COURT[stage]) expect(t).toContain(line)
     }
+    expect(game.S.mem['intro.arsen']).toBe(true) // юрист Арсен вошёл в историю на ступени 1
     const hearing = await threat(game)
     expect(game.S.scene?.id).toBe('court')
     expect(hearing.t.some((x) => /повестка/.test(x))).toBe(true)
@@ -32,8 +34,18 @@ describe('линия суда', () => {
     expect(game.S.ach.strasbourg).toBeDefined()
     const after = await threat(game)
     expect(after.r).toBe('Court_After')
-    expect([...COURT_AFTER, ...THREAT_AGAIN]).toContain(after.t.at(-1))
+    expect([...COURT_AFTER, ...THREAT_AGAIN.map(valueOf)]).toContain(after.t.at(-1))
     expect(game.S.mem['count.threat']).toBe(8)
+  })
+  it('Арсен уже писал (племянник) — на ступени 1 не представляется второй раз', async () => {
+    const { game } = makeGame()
+    await game.enterNode('nephew', 'start')
+    game.S.scene = null
+    game.S.mem.court = 1
+    const { r, t } = await threat(game)
+    expect(r).toBe('Court_Lawyer_Again')
+    for (const [, line] of COURT_LAWYER_AGAIN) expect(t).toContain(line)
+    expect(t.join(' ')).not.toMatch(/Здравствуйте, это Арсен/)
   })
   it('в разгар ссоры угроза — встречный иск (один раз), линия суда не сбивается', async () => {
     const { game } = makeGame()

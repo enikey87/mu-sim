@@ -8,7 +8,7 @@ import { RARE } from '../../tools/rare'
 
 type Case = { event: string; facts?: Facts; setup?: (g: Game) => void }
 const CASES: Record<string, Case> = {
-  Due_Cosmic: { event: 'PromiseDue', facts: { promise: 0 }, setup: (g) => { g.S.tier = 3; g.recordPromise({ text: 'в пятницу — закину', d: 5 }) } },
+  Due_Cosmic: { event: 'PromiseDue', facts: { promise: 0 }, setup: (g) => { g.S.tier = 3; g.recordPromise({ text: 'в пятницу — закину', d: 5 }); g.S.day += 5 } },
   Tone_Cow: { event: 'PlayerMessage', facts: { tone: 'cow' } },
   Says_catchLie_liekind_grandpa: { event: 'PlayerSays', facts: { intent: 'catchLie' }, setup: (g) => { g.S.mem['lie.kind'] = 'grandpa' } },
   Says_catchLie_liekind_customer: { event: 'PlayerSays', facts: { intent: 'catchLie' }, setup: (g) => { g.S.mem['lie.kind'] = 'customer' } },
@@ -30,6 +30,8 @@ const CASES: Record<string, Case> = {
   Scene_tax: { event: 'PickScene', setup: (g) => { g.S.mem['count.threat'] = 1 } },
   Scene_lend: { event: 'PickScene', setup: (g) => { g.S.mood = 8 } },
   Quest_q_niva: { event: 'PickQuest', setup: (g) => { g.setLegend('niva_stuck', 'niva') } },
+  Court_Lawyer: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem.court = 1 } },
+  Says_sorry_sorrySwing3: { event: 'PlayerSays', facts: { intent: 'sorry' }, setup: (g) => { g.S.stats.sent = 10; g.S.mem.sorryAt = '8,9,10' } },
 }
 
 /** Срабатывает ли правило (у многих есть шанс — пробуем на разных сидах). */

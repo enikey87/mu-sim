@@ -1,6 +1,8 @@
 // Ответы по теме, «Это корова?» только сразу после «Мууу», реплики по стадии игры.
 import { describe, it, expect } from 'vitest'
 import { makeGame } from '../test/helpers'
+import { valueOf } from '../engine/rules'
+import { needs } from './world'
 import { TOPICS, P_RUDE_BLOCKED, P_RUDE_POLITE, TOPIC_OBSESSED, P_NIGHT } from './topics'
 import { D } from './excuses'
 import type { Game } from '../engine/game'
@@ -41,7 +43,7 @@ describe('ответ по теме', () => {
     let c
     for (let i = 0; i < 30 && !c; i++) c = fresh(game).find((x) => x.act === 'topic')
     expect(String(c!.arg)).toMatch(/^beton:\d$/)
-    expect(TOPICS.beton.p.some((p) => c!.text.includes(p.slice(0, 15)))).toBe(true)
+    expect(TOPICS.beton.p.map(valueOf).some((p) => c!.text.includes(p.slice(0, 15)))).toBe(true)
     const from = game.S.msgs.length
     await game.send(c!)
     const said = game.S.msgs.slice(from).filter((m) => m.kind === 'text' && m.from === 'alik').map((m) => (m.kind === 'text' ? m.text : ''))
@@ -61,7 +63,7 @@ describe('ответ по теме', () => {
     expect(game.topicOfLast()).toBeUndefined() // «больше не скажу» — и игроку не предлагается
     game.S.day += 20
     expect(game.topicOfLast()).toBe('beton')
-    expect(TOPIC_OBSESSED.some((t) => game.S.msgs.some((m) => m.kind === 'text' && m.text.includes(t.split('{n}')[1].slice(0, 12))))).toBe(true)
+    expect(TOPIC_OBSESSED.map(valueOf).some((t) => game.S.msgs.some((m) => m.kind === 'text' && m.text.includes(t.split('{n}')[1].slice(0, 12))))).toBe(true)
   })
   it('тема — только из отмазок, серий и ответов по теме, не из реакций на крик и извинения', () => {
     const { game } = makeGame()
@@ -110,9 +112,9 @@ describe('ответ по теме', () => {
     game.S.ctx = { rel: { n: 'тёща' } as never, festive: true }
     expect(offered(game, (c) => c.act === 'congrats')).toBe(true)
   })
-  it('Борис не упоминается до первой серии своего сериала', () => {
+  it('реплика с требованием «Борис есть» не звучит до первой серии его сериала', () => {
     const { game } = makeGame()
-    const pool = ['Передайте Борису привет.', 'Все сыты.']
+    const pool = [needs('boris')('Передайте Борису привет.'), 'Все сыты.']
     for (let i = 0; i < 10; i++) expect(game.draw('T_BORIS', pool)).toBe('Все сыты.')
     game.S.arcs.boris = { i: 1, last: 0 }
     const seen = new Set<string>()

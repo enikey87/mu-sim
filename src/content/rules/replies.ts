@@ -1,7 +1,7 @@
 // Событие PlayerSays { intent, arg } — ответ Алика на контекстную реплику игрока.
 // Общее правило по intent + более специфичные для частных случаев (память, контекст).
 import type { Game } from '../../engine/game'
-import { type Rule, eq, ne, is, gte, add } from '../../engine/rules'
+import { type Rule, eq, ne, is, gte, add, valueOf } from '../../engine/rules'
 import { AlikOffline, ThickJournal } from './criteria'
 import { cooldown } from './rude'
 import { TOPICS, TOPIC_FALLBACK, TOPIC_NAME, TOPIC_OBSESSED } from '../topics'
@@ -74,7 +74,8 @@ export const replyRules: R[] = [
   says('talk', {
     respond: async ({ game, facts }) => {
       const [kind, sub, i] = String(facts.arg).split('|') as [TalkKind, string, string]
-      const pair = talkPairs(kind, sub)[Number(i)]
+      const e = talkPairs(kind, sub)[Number(i)]
+      const pair = e && valueOf(e)
       game.setCtx(null)
       if (!pair) return false
       game.lines.mark(talkId(kind, sub, Number(i)))
@@ -91,6 +92,7 @@ export const replyRules: R[] = [
   simple('short2', (g) => g.pair('SHORT2_A', D.SHORT2_A, 'SHORT2_B', D.SHORT2_B)),
 
   says('promiseCheck', { respond: async ({ game, facts }) => { await game.say([game.uniq(() => game.X.promiseCheck(String(facts.arg ?? '')))]); game.setCtx(null) } }),
+  says('promiseOk', { respond: async ({ game }) => { await game.say([game.uniq(() => game.draw('PROMISE_OK', D.PROMISE_OK))]); game.setCtx(null) } }),
   // срок «когда-нибудь» — переспрашивать бессмысленно, и Алик это честно признаёт
   says('promiseCheck', {
     respond: async ({ game, facts }) => {

@@ -3,6 +3,8 @@ import { describe, it, expect } from 'vitest'
 import { makeGame } from '../test/helpers'
 import { GROUP } from './arcs'
 import { CONDOLE_REVIVED, GREET_A } from './misc'
+import { WORLD, needs } from './world'
+import { valueOf, type Entry } from '../engine/rules'
 import type { Game } from '../engine/game'
 
 const texts = (g: Game, n = 0) => g.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' ? [m.text] : []))
@@ -18,15 +20,19 @@ describe('несостыковки из партии пользователя', 
     expect(game.S.msgs.some((m) => m.kind === 'text' && m.who === 'boris')).toBe(false)
     expect(GROUP.boris.length).toBeGreaterThan(0)
   })
-  it('бартер и акт до сериала «Баран Борис»: баран без имени, корма для Бориса нет', async () => {
+  it('бартер и акт до сериала «Баран Борис»: баран без имени, корма для Бориса нет', () => {
     const { game } = makeGame()
-    game.scenes.barter.init = () => ({ n: 'баран Борис', v: 3000, p: 'Породистый!' })
-    await game.enterNode('barter', 'ask')
-    expect(texts(game).join(' ')).not.toMatch(/Борис/)
-    expect(game.S.scene?.vars.n).toBe('баран без имени')
-    game.scenes.invoice.init = () => ({ rows: [['Корм для Бориса (он тебя любит)', 1200], ['Ремонт нервов', 8000]], total: 9200 })
-    await game.enterNode('invoice', 'ask')
-    expect(game.S.scene?.vars.total).toBe(8000)
+    game.S.mem['intro.baran'] = true
+    const open = <T,>(a: readonly Parameters<typeof game.open<T>>[0][number][]) => game.open<T>(a)
+    const barter = () => Array.from({ length: 80 }, () => String(game.scenes.barter.init!(game.rng, open).n))
+    const rows = () => Array.from({ length: 40 }, () => (game.scenes.invoice.init!(game.rng, open).rows as Array<[string, number]>).map(([t]) => t)).flat()
+    expect(barter()).toContain('баран без имени')
+    expect(barter().join(' ')).not.toMatch(/Борис/)
+    expect(rows().join(' ')).not.toMatch(/Борис/)
+    game.S.arcs.boris = { i: 1, last: 0 }
+    expect(barter()).toContain('баран Борис')
+    expect(barter()).not.toContain('баран без имени')
+    expect(rows().join(' ')).toMatch(/Корм для Бориса/)
   })
   it('срок из легенды — условие: он не «наступает сегодня» и не бывает «просрочен»', async () => {
     const { game } = makeGame()
@@ -92,13 +98,19 @@ describe('несостыковки из партии пользователя', 
 
 // Несостыковки из плейтеста ботами (PR #11): 4 партии по 320 ходов, разбор — docs/PLAYTEST_ISSUES.md
 describe('несостыковки из плейтеста ботами', () => {
-  it('кран, Арсен, калым, близнец — не звучат, пока не появились в переписке', () => {
+  it('кран, Арсен, близнец — в мире с серии или ступени суда, а не со слова в переписке', async () => {
     const { game } = makeGame()
-    for (const t of ['Всё будет, когда кран вернётся.', 'Мой юрист — Арсен.', 'Калым платим.', 'Грант — близнец.']) expect(game.known(t), t).toBe(false)
-    expect(game.known('Смотрю в экран, брат.')).toBe(true)
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Здравствуйте, это Арсен, юрист Алика.' })
-    expect(game.known('Мой юрист — Арсен.')).toBe(true)
-    expect(game.draw('T_FWD', [{ f: 'Самвел', t: 'Кто взял мой кран?' }, { f: 'Мама', t: 'Сынок, поешь.' }]).f).toBe('Мама')
+    for (const k of ['crane', 'arsen', 'twin'] as const) expect(game.holds(WORLD[k]), k).toBe(false)
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Здравствуйте, это Арсен, юрист Алика. Кран уехал. Грант — близнец.' })
+    for (const k of ['crane', 'arsen', 'twin'] as const) expect(game.holds(WORLD[k]), k).toBe(false)
+    const fwd = [needs('crane')({ f: 'Самвел', t: 'Кто взял мой кран?' }), { f: 'Мама', t: 'Сынок, поешь.' }]
+    for (let i = 0; i < 10; i++) expect(game.draw('T_FWD', fwd).f).toBe('Мама')
+    await game.playArc('razmik')
+    expect(game.holds(WORLD.crane)).toBe(true)
+    expect(Array.from({ length: 10 }, () => game.draw('T_FWD', fwd).f)).toContain('Самвел')
+    game.S.mem.court = 1
+    await game.fire('PlayerMessage', { tone: 'threat' })
+    expect(game.holds(WORLD.arsen)).toBe(true)
   })
   it('вариант — не эхо только что отправленного («Эм… <то же самое>»)', async () => {
     const { game } = makeGame()
@@ -153,15 +165,16 @@ describe('несостыковки из плейтеста ботами', () => 
 })
 
 describe('несостыковки из плейтеста ботами, раунд 2', () => {
-  it('пока Гарик в фундаменте — не «в шашлычной у Гарика»; пока «Нива» в бегах — не «пишу с „Нивы“»', () => {
+  it('пока Гарик в фундаменте — не «в шашлычной у Гарика»; пока «Нива» в бегах — не «пишу с „Нивы“»', async () => {
     const { game } = makeGame()
-    expect(game.known('Я в шашлычной у Гарика.')).toBe(true)
-    game.S.arcs.garik = { i: 2, last: 0 }
-    expect(game.known('Я в шашлычной у Гарика.')).toBe(false)
-    expect(game.known('Гарик передаёт привет из фундамента.')).toBe(true)
-    game.S.arcs.niva = { i: 3, last: 0 }
-    expect(game.known('Пишу с «Нивы», у неё своя симка.')).toBe(false)
-    expect(game.known('«Нива» в Тбилиси.')).toBe(true)
+    const lines = [needs('garikFree')('Я в шашлычной у Гарика.'), needs('nivaHome')('Пишу с «Нивы», у неё своя симка.'), 'Гарик передаёт привет из фундамента.']
+    expect(game.open(lines)).toHaveLength(3)
+    await game.playArc('garik') // «застыл в фундаменте»
+    await game.playArc('niva')
+    await game.playArc('niva') // «завелась и уехала»
+    expect(game.open(lines)).toEqual(['Гарик передаёт привет из фундамента.'])
+    for (let i = 0; i < 5; i++) { game.S.day += 5; await game.playArc('garik') } // до «Гарика достали!»
+    expect(game.open(lines)).toContain('Я в шашлычной у Гарика.')
   })
   it('«Алик умер» — и на крик отвечает не Алик', async () => {
     const { game } = makeGame()
@@ -173,14 +186,17 @@ describe('несостыковки из плейтеста ботами, рау�
     game.S.mem['rude.heat'] = 1
     for (let i = 0; i < 30; i++) expect((await game.fire('PlayerMessage', { tone: 'rude' }))?.name).not.toBe('Rude_Family_arsen')
   })
-  it('«при чём тут ваш шофёр Гриша?», а не «мой»', () => {
+  it('«при чём тут ваш шофёр Гриша?», а не «мой»: у родни, названной словами Алика, есть форма для игрока', async () => {
+    const { D } = await import('./excuses')
+    for (const r of (D.REL as Entry<string>[]).map(valueOf)) if (/(^|\s|\()(мой|моего|моей|я)(\s|$)/.test(r.split('|')[0])) expect(r.split('|')[2], r).toBeDefined()
     const { game } = makeGame()
-    game.S.ctx = { rel: { n: 'мой шофёр Гриша', g: 'моего шофёра Гриши' } as never }
+    const [n, g, you] = (D.REL as Entry<string>[]).map(valueOf).find((r) => r.startsWith('мой шофёр'))!.split('|')
+    game.S.ctx = { rel: { n, g, you } }
     for (let i = 0; i < 20; i++) expect(game.buildChoices().map((c) => c.text).join(' ')).not.toMatch(/мой шофёр/)
   })
   it('срок-условие в ответе на «это когда?» — без «Как только как…»', async () => {
     const { WHEN_COND } = await import('./misc')
-    for (const w of WHEN_COND) expect(w).not.toMatch(/^(Как только|Когда) \{t\}/)
+    for (const w of WHEN_COND.map(valueOf)) expect(w).not.toMatch(/^(Как только|Когда) \{t\}/)
   })
 })
 
@@ -203,14 +219,15 @@ describe('несостыковки из плейтеста ботами, рау�
     game.alikMsg({ kind: 'text', from: 'alik', text: 'Приехал инспектор Рубик.' })
     game.S.mem['finale.rubik'] = 'karine'
     expect(game.canSpeak('karine')).toBe(false)
-    expect(game.known('Карине свидетель: отдам.')).toBe(false)
-    expect(game.known('Карине ушла к Рубику.')).toBe(true)
+    expect(game.open([needs('karineHome')('Карине свидетель: отдам.'), 'Карине ушла к Рубику.'])).toEqual(['Карине ушла к Рубику.'])
   })
-  it('декрет Нуне — только с её сериала', () => {
+  it('декрет Нуне — только с её сериала', async () => {
     const { game } = makeGame()
-    expect(game.known('Как Нуне из декрета выйдет — отдам.')).toBe(false)
+    expect(game.holds(WORLD.dekret)).toBe(false)
     game.alikMsg({ kind: 'text', from: 'alik', text: 'Бухгалтер Нуне ушла в декрет.' })
-    expect(game.known('Как Нуне из декрета выйдет — отдам.')).toBe(true)
+    expect(game.holds(WORLD.dekret)).toBe(false)
+    await game.playArc('nune')
+    expect(game.holds(WORLD.dekret)).toBe(true)
   })
 })
 
@@ -220,14 +237,17 @@ describe('несостыковки из плейтеста ботами, рау�
     game.S.mem['payday.chain'] = 'x'
     game.setLegend('niva_stuck', 'niva')
     expect(game.legend()).toBeFalsy()
-    expect(game.known('«Лаваш-коин» вырос! Держим дальше.')).toBe(false)
+    game.S.mem['crypto.hodl'] = true
+    expect(game.holds(WORLD.lavashHeld)).toBe(false)
+    delete game.S.mem['payday.chain']
+    expect(game.holds(WORLD.lavashHeld)).toBe(true)
   })
-  it('Размик слез — «с крана» про него больше не звучит', () => {
+  it('Размик слез — «с крана» про него больше не звучит', async () => {
     const { game } = makeGame()
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Крановщик Размик залез на кран.' })
+    await game.playArc('razmik')
+    expect(game.holds(WORLD.razmikUp)).toBe(true)
     game.S.mem['finale.razmik'] = 'default'
-    expect(game.known('Размик передаёт привет с крана.')).toBe(false)
-    expect(game.known('Размик слез и уволился.')).toBe(true)
+    expect(game.open([needs('razmikUp')('Размик передаёт привет с крана.'), 'Размик слез и уволился.'])).toEqual(['Размик слез и уволился.'])
   })
   it('Карине уже писала — «Вы кто такой?» не бывает', async () => {
     const { game } = makeGame()
