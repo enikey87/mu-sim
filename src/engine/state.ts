@@ -1,7 +1,7 @@
 // Состояние игры (сохраняется целиком) и сообщения чата.
 import type { Bags } from './deck'
 import { type Facts, type RuleState, freshRuleState } from './rules'
-import type { Rel } from '../content/excuses'
+import type { PromiseCondition, Rel } from '../content/excuses'
 import type { Vars } from '../content/scenes'
 
 export const SAVE_KEY = 'alik-save-v4'
@@ -64,7 +64,14 @@ export interface Choice {
   go?: string | null
 }
 
-export interface PromiseRec { t: string; made: number; due: number | null; asked?: boolean }
+export interface PromiseRec {
+  t: string
+  made: number
+  due: number | null
+  condition?: PromiseCondition
+  met?: number
+  asked?: boolean
+}
 
 export interface GameState {
   day: number

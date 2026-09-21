@@ -144,6 +144,20 @@ describe('Game: начало и ход', () => {
     }
     expect(new Set(mine).size).toBe(mine.length)
   })
+  it('исчерпанный пул вопросов к сериалу не повторяет уже показанный вариант', () => {
+    const { game } = makeGame()
+    game.S.arcs.tile = { i: 2, last: 0 }
+    game.S.ctx = { arc: 'tile' }
+    const offered = new Set<string>()
+    for (let i = 0; i < 6; i++) {
+      const choice = game.buildChoices().find((item) => item.act === 'arc' && item.arg === 'tile')
+      if (choice) {
+        expect(offered.has(choice.text)).toBe(false)
+        offered.add(choice.text)
+      }
+    }
+    expect(offered.size).toBe(4)
+  })
   it('терпение кончается — «полежал на полу»', async () => {
     const { game } = makeGame()
     game.S.patience = 1
@@ -186,6 +200,7 @@ describe('Game: батарея', () => {
     await game.send('Алик, привет')
     expect(game.dead).toBe(true)
     expect(game.S.ach.dead).toBeDefined()
+    expect(game.S.msgs.at(-1)).toMatchObject({ kind: 'sys', text: 'Не доставлено: телефон Алика выключен.' })
     await game.send('ещё')
     expect(game.S.stats.sent).toBe(4)
     const n = game.S.msgs.length

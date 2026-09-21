@@ -1,7 +1,7 @@
 // Словари и генератор отмазок Алика Воздухонесяна.
 import { type Rng, mathRng } from '../engine/rng'
 import type { Due } from '../engine/time'
-import { type Entry, gate, eq, gte, lt, lte, matches, missing, is, of } from '../engine/rules'
+import { type Entry, gate, eq, gte, lt, lte, matches, missing, exists, is, of } from '../engine/rules'
 import { needs, WORLD } from './world'
 
 // draw(key, arr) выдаёт уместный сейчас элемент «из колоды» (без повторов до конца колоды); noRefill — после исчерпания null
@@ -9,9 +9,11 @@ import { needs, WORLD } from './world'
 export type DrawFn = <T = any>(key: string, arr: readonly Entry<T>[], noRefill?: boolean) => T
 /** n — кто, g — кого; you — как его назовёт игрок, если Алик сказал «мой»/«я». */
 export interface Rel { n: string; g: string; you?: string }
-/** Срок: t — фраза; d — через сколько дней (null — никогда не наступает); due — по календарю, тогда d не нужен. */
-export interface When { t: string; d: number | null; due?: Due }
-export interface Promise3 { text: string; t: string; d: number | null; due?: Due }
+export const PROMISE_CONDITIONS = ['beton.set', 'boris.smetaReady', 'grant.paid', 'nune.dekretOver'] as const
+export type PromiseCondition = typeof PROMISE_CONDITIONS[number]
+/** Срок: календарный (`d`/`due`), событийный (`condition`) или неопределённый (`d: null`). */
+export interface When { t: string; d: number | null; due?: Due; condition?: PromiseCondition }
+export interface Promise3 extends When { text: string }
 export interface ExcuseParts { texts: string[]; p?: Promise3; r?: Rel; constr?: boolean }
 export interface Excuse extends ExcuseParts { ev?: string | null; legendary: boolean }
 export const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
@@ -261,7 +263,8 @@ D.VERB = [
 // срок: t — фраза, d — через сколько игровых дней, null — когда-нибудь
 D.WHEN = [
   { t: 'завтра', d: 1 }, { t: 'в пятницу, край — в понедельник', d: 4, due: { weekday: 5, plus: 3 } }, { t: 'после Навасарда', d: null },
-  { t: 'в понедельник, какой — не скажу', d: 7, due: { weekday: 1 } }, { t: 'как заказчик заплатит', d: null },
+  { t: 'в понедельник, какой — не скажу', d: 7, due: { weekday: 1 } },
+  gate(exists('arc.grant'), missing('grant.paid'))({ t: 'как заказчик заплатит', d: null, condition: 'grant.paid' }),
   { t: 'до конца недели', d: 5, due: { week: true } }, { t: 'через час, максимум два', d: 0 }, { t: 'после праздника', d: 10 },
   { t: 'когда брат вернётся из Гюмри', d: null }, { t: 'в среду утром', d: 3, due: { weekday: 3 } },
   { t: 'завтра с утра, если дождя не будет', d: 1 }, gate(WORLD.baran, of('boris', is('sick')))({ t: 'как баран поправится', d: null }),
@@ -270,8 +273,10 @@ D.WHEN = [
   { t: 'как только абрикосы созреют', d: null }, { t: 'после полнолуния', d: 15 },
   { t: 'в четверг после обеда, но до ужина', d: 3, due: { weekday: 4 } }, { t: 'через пять минут', d: 0 },
   { t: 'когда Арарат вернут', d: null }, { t: 'сегодня вечером', d: 0 },
-  { t: 'на следующей неделе, в начале или в конце', d: 7 }, needs('dekret')({ t: 'как Нуне из декрета выйдет', d: null }),
-  { t: 'как бетон застынет', d: 28 }, { t: 'после приёмки второго этажа', d: null }, { t: 'как акт подпишут', d: null },
+  { t: 'на следующей неделе, в начале или в конце', d: 7 },
+  gate(exists('arc.nune'), missing('nune.dekretOver'))({ t: 'как Нуне из декрета выйдет', d: null, condition: 'nune.dekretOver' }),
+  gate(exists('arc.beton'), missing('beton.set'))({ t: 'как бетон застынет', d: null, condition: 'beton.set' }),
+  { t: 'после приёмки второго этажа', d: null }, { t: 'как акт подпишут', d: null },
   needs('crane')({ t: 'когда кран вернётся', d: null }), { t: 'после Вардавара', d: null }, { t: 'как отопление дадут', d: null },
   gate(gte('month', 3), lte('month', 10))({ t: 'к зиме', d: null }), { t: 'к Пасхе', d: null }, { t: 'как объект в Абовяне сдадим', d: null },
   { t: 'когда налоговая уйдёт', d: null }, needs('nivaHome')({ t: 'после техосмотра «Нивы»', d: null }), { t: 'в конце квартала', d: 45, due: { quarter: true } },
@@ -630,7 +635,7 @@ export function make(draw: DrawFn, getTier: () => number = () => 0, rng: Rng = m
   const promise = (): Promise3 => {
     const w = when(), v: string = g('VERB');
     const text = draw('PFORM', [0, 1]) ? `${w.t} — ${v}` : `${v}, ${w.t}`;
-    return { text, t: w.t, d: w.d, due: w.due };
+    return { text, t: w.t, d: w.d, due: w.due, condition: w.condition };
   };
   const constr = (): string => { const t = escTier(); return t ? g('ESC' + t) : g('CONSTR'); };
   const absurd = (): string => { const t = escTier(); return t ? g('ESC' + t) : g('ABSURD'); };
