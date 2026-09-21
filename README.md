@@ -27,6 +27,8 @@ npm test           # Vitest: движок, контент, сценарии пр
 npx playwright install chromium  # один раз: браузер для UI-тестов
 npm run test:e2e   # Playwright: основные пользовательские сценарии в desktop и mobile Chromium
 npm run typecheck
+npm run lint       # ESLint (в CI)
+npm run format     # Prettier --write (опционально; стиль плотный, массовый прогон отдельно)
 npm run build      # сборка в dist/
 npm run rules:report  # покрытие правил: что срабатывает, что никогда, где побеждает общий ответ
 npm run test:rules    # движок правил с покрытием (порог 100%)
@@ -34,6 +36,8 @@ PLAYTEST_OUT=pt PLAYTEST_SEEDS=1-8 npm run playtest  # партии ботом: 
 ```
 
 Параметры адреса для проверки: `?fast` — паузы в ~30 раз короче, `?hour=3` — подменить реальный час, `?away=90` — «игрока не было 90 минут», `?debug` — панель «какое правило выбрано и почему» и память Алика.
+
+`typescript` в deps — API 6.x для ESLint (`typescript-eslint` пока не умеет TS 7); компиляция — `typescript-7` (`npm run typecheck`).
 
 Досье (📋): Esc закрывает. Концовка Дня выплаты: «Скопировать» → тост «Скопировано».
 

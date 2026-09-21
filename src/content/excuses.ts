@@ -5,7 +5,6 @@ import { type Entry, gate, eq, gte, lt, lte, matches, missing, exists, is, of } 
 import { needs, WORLD } from './world'
 
 // draw(key, arr) выдаёт уместный сейчас элемент «из колоды» (без повторов до конца колоды); noRefill — после исчерпания null
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type DrawFn = <T = any>(key: string, arr: readonly Entry<T>[], noRefill?: boolean) => T
 /** n — кто, g — кого; you — как его назовёт игрок, если Алик сказал «мой»/«я». */
 export interface Rel { n: string; g: string; you?: string }
@@ -22,7 +21,6 @@ export const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1)
 const NAME_RE = /^(Алик|Гарик|Борис|Нуне|Карине|Грант|Размик|Рубик|Самвел|Арсен|Гоар|Ашот|Мкртич|Грачик|Ованес|Вачик|Вартан|Гриша|Лусине|Ереван|Армени|Грузи|Тбилиси|Гюмри|Батуми|Арарат|Страсбург|Лос-Андж|Навасард|Вардавар|Пасх)/;
 export const low = (s: string): string => (NAME_RE.test(s) ? s : s.charAt(0).toLowerCase() + s.slice(1));
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const D: Record<string, any> = {};
 
 D.ADDR = [
