@@ -692,7 +692,7 @@ export class Game {
     return this.S.day < Number(m['topicMute.' + k] ?? -1) || (m.topicLast === k && Number(m.topicRun ?? 0) >= 2)
   }
   saysFacts(o: Choice): Facts {
-    const f: Facts = { intent: o.act, arg: o.arg, category: o.category, greet: !!o.text && !o.text.includes('?') }
+    const f: Facts = { intent: o.act, arg: o.arg, category: o.category, tone: o.tone, greet: !!o.text && !o.text.includes('?') }
     if (o.act === 'arc' && typeof o.arg === 'string' && ARCS[o.arg]) f.argArcDone = (this.S.arcs[o.arg]?.i ?? 0) >= ARCS[o.arg].eps.length
     return f
   }
