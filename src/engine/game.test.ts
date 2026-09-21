@@ -37,6 +37,24 @@ describe('Game: начало и ход', () => {
     expect(game.busy).toBe(false)
     expect(JSON.parse(storage.data[SAVE_KEY]).stats.sent).toBe(1)
   })
+  it('ход игрока всегда двигает календарь на 1–3 дня (после ответа и хора)', async () => {
+    for (let seed = 1; seed <= 12; seed++) {
+      const { game } = makeGame({ seed })
+      game.S.offlineDays = 0
+      const day = game.S.day
+      await game.send(game.choices.find((c) => c.tone === 'polite') ?? game.choices[0])
+      expect(game.S.day - day, `seed ${seed}`).toBeGreaterThanOrEqual(1)
+      expect(game.S.day - day, `seed ${seed}`).toBeLessThanOrEqual(3)
+    }
+  })
+  it('возврат из пропажи: прыжок на offlineDays, без доп. +1…3', async () => {
+    const { game } = makeGame({ seed: 2 })
+    game.S.offlineDays = 4
+    const day = game.S.day
+    await game.send({ text: 'Где вы?', tone: 'neutral' })
+    expect(game.S.offlineDays).toBe(0)
+    expect(game.S.day).toBe(day + 4)
+  })
   it('свой текст классифицируется по тону', () => {
     const { game } = makeGame()
     expect(game.classify('СКОЛЬКО МОЖНО ЖДАТЬ!!!')).toBe('rude')

@@ -109,11 +109,14 @@ describe('регрессии первоначального аудита', () =>
   })
 
   it('текстовая выгрузка сохраняет каждое голосовое сообщение', async () => {
-    const played = await playtest(4, 100)
-    const voices = played.game.S.msgs.filter((message) => message.kind === 'voice').length
-    const rendered = transcript(played).split('🎤 голосовое 0:').length - 1
+    let voices = 0
+    for (let seed = 1; seed <= 20 && voices === 0; seed++) {
+      const played = await playtest(seed, 100)
+      voices = played.game.S.msgs.filter((message) => message.kind === 'voice').length
+      const rendered = transcript(played).split('🎤 голосовое 0:').length - 1
+      expect(rendered).toBe(voices)
+    }
     expect(voices).toBeGreaterThan(0)
-    expect(rendered).toBe(voices)
   })
 
   it('формулировки фиксируют границы долга и обследования фундамента', () => {
