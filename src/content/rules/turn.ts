@@ -69,7 +69,15 @@ export const turnRules: R[] = [
     },
   },
   // память: Алик вспоминает, что было в этой партии (реплики с условиями, каждая один раз)
-  { name: 'Turn_Memory', event: 'AlikTurn', when: [gte('sent', 8)], specificity: 0, weight: 7, cooldown: { turns: 4 }, respond: async ({ game }) => { const t = game.line('MEMORY', MEMORY); if (t) { await game.say([t]); game.unlock('memory') } else await game.excuseTurn() } },
+  {
+    name: 'Turn_Memory', event: 'AlikTurn', when: [gte('sent', 8)], specificity: 0, weight: 7, cooldown: { turns: 4 },
+    respond: async ({ game, facts }) => {
+      const item = facts.latestItem && String(facts.latestItem)
+      const pool = item ? [{ id: 'MEMORY_ITEM_' + item, t: `Помнишь, я отдал тебе: ${item}? Всё ещё у тебя?`, prio: 2 }, ...MEMORY] : MEMORY
+      const t = game.line('MEMORY', pool)
+      if (t) { await game.say([t]); game.unlock('memory') } else await game.excuseTurn()
+    },
+  },
   // «помнишь, деньги в сейфе?» — после Дня выплаты деньги «отданы», старые версии уже не продолжаются
   { name: 'Turn_Callback', event: 'AlikTurn', when: [is('callbackReady'), missing('payday.chain')], specificity: 0, weight: 6, cooldown: { days: 5 }, respond: ({ game }) => game.callback() },
   { name: 'Turn_Sticker', event: 'AlikTurn', when: [], specificity: 0, weight: W.sticker, respond: ({ game }) => game.sticker() },

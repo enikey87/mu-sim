@@ -20,7 +20,7 @@ export type Msg =
   | (MsgBase & { kind: 'sep'; text: string })
   | (MsgBase & { kind: 'sys'; text: string; unread?: boolean })
   | (MsgBase & { kind: 'text'; from: 'me' | 'alik'; text: string; who?: string; legend?: boolean; deleted?: boolean; edited?: boolean; react?: string; topical?: boolean })
-  | (MsgBase & { kind: 'transfer'; from: 'alik'; text: string })
+  | (MsgBase & { kind: 'transfer'; from: 'alik'; text: string; amount?: number })
   | (MsgBase & { kind: 'voice'; from: 'alik'; len: number; feast?: boolean })
   | (MsgBase & { kind: 'photo'; from: 'alik'; text: string })
   | (MsgBase & { kind: 'sticker'; from: 'alik'; e: string; c: string })
@@ -33,6 +33,7 @@ export type NewMsg = Msg extends infer M ? (M extends Msg ? Omit<M, 'id'> : neve
 /** Контекст последней реплики Алика — на него опираются варианты ответа игрока. */
 export interface Ctx {
   type?: 'photo' | 'voice' | 'transfer' | 'readonly' | 'short' | 'idle' | 'sticker' | 'fwd' | 'reactOnly'
+  amount?: number
   s?: string
   when?: string
   whenNever?: boolean

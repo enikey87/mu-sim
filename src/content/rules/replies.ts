@@ -88,7 +88,14 @@ export const replyRules: R[] = [
   simple('photo', (g) => g.uniq(g.X.photo)),
   simple('voice', (g) => g.uniq(g.X.cow)),
   simple('voiceText', (g) => g.pair('VOICE_A', D.VOICE_A, 'VOICE_B', D.VOICE_B)),
-  simple('transferQ', (g) => g.uniq(g.X.transferQ)),
+  says('transferQ', {
+    respond: async ({ game }) => {
+      const reply = game.uniq(game.X.transferQ)
+      if (reply.nextTransfer) game.S.mem.nextTransfer = reply.nextTransfer
+      await game.say([reply.text])
+      game.setCtx(null)
+    },
+  }),
   says('legendQ', { respond: async ({ game }) => { game.mood(1); await game.say([game.uniq(game.X.legendQ)]); game.setCtx(null) } }),
   says('shortQ', { respond: async ({ game, facts }) => { await game.say([game.uniq(() => game.X.shortQ(String(facts.arg ?? '')))]); game.setCtx(null) } }),
   simple('short2', (g) => g.pair('SHORT2_A', D.SHORT2_A, 'SHORT2_B', D.SHORT2_B)),

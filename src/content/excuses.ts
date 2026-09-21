@@ -9,11 +9,12 @@ import { needs, WORLD } from './world'
 export type DrawFn = <T = any>(key: string, arr: readonly Entry<T>[], noRefill?: boolean) => T
 /** n — кто, g — кого; you — как его назовёт игрок, если Алик сказал «мой»/«я». */
 export interface Rel { n: string; g: string; you?: string }
-export const PROMISE_CONDITIONS = ['beton.set', 'boris.smetaReady', 'grant.paid', 'nune.dekretOver'] as const
+export const PROMISE_CONDITIONS = ['beton.set', 'boris.smetaReady', 'grant.paid', 'nune.dekretOver', 'nune.keyPassed'] as const
 export type PromiseCondition = typeof PROMISE_CONDITIONS[number]
 /** Срок: календарный (`d`/`due`), событийный (`condition`) или неопределённый (`d: null`). */
 export interface When { t: string; d: number | null; due?: Due; condition?: PromiseCondition }
 export interface Promise3 extends When { text: string }
+export interface TransferReply { text: string; nextTransfer?: number }
 export interface ExcuseParts { texts: string[]; p?: Promise3; r?: Rel; constr?: boolean }
 export interface Excuse extends ExcuseParts { ev?: string | null; legendary: boolean }
 export const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
@@ -266,7 +267,7 @@ D.WHEN = [
   { t: 'в понедельник, какой — не скажу', d: 7, due: { weekday: 1 } },
   gate(exists('arc.grant'), missing('grant.paid'))({ t: 'как заказчик заплатит', d: null, condition: 'grant.paid' }),
   { t: 'до конца недели', d: 5, due: { week: true } }, { t: 'через час, максимум два', d: 0 }, { t: 'после праздника', d: 10 },
-  { t: 'когда брат вернётся из Гюмри', d: null }, { t: 'в среду утром', d: 3, due: { weekday: 3 } },
+  { t: 'когда брат вернётся из Гюмри', d: null }, { t: 'в среду утром', d: 0, due: { weekday: 3 } },
   { t: 'завтра с утра, если дождя не будет', d: 1 }, gate(WORLD.baran, of('boris', is('sick')))({ t: 'как баран поправится', d: null }),
   { t: 'сразу после свадьбы', d: 7 }, { t: 'в следующем месяце', d: 30, due: { monthEnd: 1 } }, { t: 'на днях', d: 2 },
   { t: 'до Нового года', d: 90, due: { newYear: true } }, { t: 'послезавтра, край — послепослезавтра', d: 3 },
@@ -472,7 +473,7 @@ D.JOBS = [
 
 D.TRANSFER_NOTE = [
   'аванс на терпение', 'на бензин, брат', 'остальное завтра', 'часть первая из тысячи', 'чтоб ты не грустил',
-  'от души', 'на хлеб, лаваш сам купишь', 'пока так', 'проверка связи', 'за плитку в углу',
+  'от души', 'на хлеб, лаваш сам купишь', 'пока так', 'проверка связи', gate(is('tile.cornerRemoved'))('за плитку в углу'),
   'чтоб банк не забыл твой номер', 'на валерьянку', 'первый транш', 'на проезд до меня',
   'на свечку за мой успех', 'остаток — моральный',
 ];
@@ -531,7 +532,7 @@ D.PHOTO_B = [
 D.TRQ_A = ['Остальные тоже будут, брат.', 'Это же только начало!', 'Не всё сразу, джан.', 'Ты что, недоволен?', 'Пятьдесят — это уважение.'];
 D.TRQ_B = [
   'По пятьдесят — и через тринадцать лет всё закроем.', 'Представь, что это первый кирпич.', 'Я от сердца оторвал.',
-  'Мог и сорок, но я щедрый.', 'Следующий будет пятьдесят один.', 'Копи, брат, копи.',
+  'Мог и сорок, но я щедрый.', { t: 'Следующий будет пятьдесят один.', nextTransfer: 51 }, 'Копи, брат, копи.',
 ];
 D.LEG_A = ['Спасибо, брат!', 'Ара, я не придумываю, это жизнь!', 'Это не отмазка, это правда.', 'Я в молодости стихи писал.', 'Джан, у нас в роду все рассказчики.'];
 D.LEG_B = ['Но деньги всё равно потом.', 'За такое можно и подождать, да?', 'Хочешь, ещё расскажу?', 'Запиши, внукам передашь.', 'Так что — пятница.'];
@@ -616,7 +617,7 @@ D.P_VOICE = ['Я ничего не разобрал, кроме «Мууу».', 
 D.P_VOICE2 = ['Алик, можно текстом?', 'Что вы сказали? Там шумно.', 'Алик, я в метро, не могу слушать.', 'Голосовые не слушаю. Текстом, пожалуйста.'];
 D.VOICE_A = ['Текстом долго, брат. Там было главное: деньги будут.', 'Там всё сказано. Послушай ещё раз, внимательно.', 'Я сказал «завтра». Три раза. С любовью.', 'Голосом честнее, текст можно подделать.', 'Текстом не могу — руки в цементе.'];
 D.VOICE_B = ['Потом перескажу.', 'Остальное — при встрече.', 'Главное ты понял.', 'Не переживай.'];
-D.P_TRANSFER = ['Спасибо за 50 ₽… А остальные?', 'Алик, это шутка?', '50 рублей?!', 'Спасибо. Осталось ещё немножко.'];
+D.P_TRANSFER = ['Спасибо за {amount} ₽… А остальные?', 'Алик, это шутка?', '{amount} рублей?!', 'Спасибо. Осталось ещё немножко.'];
 D.P_LEGEND = ['Алик, это лучшая отмазка, что я слышал.', 'Вы это сами придумали?', 'Алик, запишите это в книгу.', 'Я даже не злюсь. Это прекрасно.'];
 D.P_SHORT = ['«{s}» — это когда?', '«{s}» — это во сколько?', '«{s}» — это сколько по времени?'];
 D.P_SHORT2 = ['А подробнее?', 'Алик, это всё?', 'И всё?', 'Алик, а по деньгам что?', 'Это ответ?'];
@@ -693,7 +694,11 @@ export function make(draw: DrawFn, getTier: () => number = () => 0, rng: Rng = m
     congrats: (r: Rel) => `Спасибо, ${low(g('ADDR'))}! ${cap(r.n)} тебя тоже помнит, говорит: ${g('COMPLIMENT')}.`,
     defend: () => { const o = g('DEFEND'), c = constr(), p = promise(); return { text: `${g('ADDR')}, ${o} ${o.endsWith(':') ? low(c) : c}. ${cap(p.text)}.`, p }; },
     photo: () => `${g('PHOTO_A')} ${g('PHOTO_B')}`,
-    transferQ: () => `${g('TRQ_A')} ${g('TRQ_B')}`,
+    transferQ: (): TransferReply => {
+      const opening = g('TRQ_A')
+      const tail = g<string | { t: string; nextTransfer: number }>('TRQ_B')
+      return typeof tail === 'string' ? { text: `${opening} ${tail}` } : { text: `${opening} ${tail.t}`, nextTransfer: tail.nextTransfer }
+    },
     legendQ: () => `${g('LEG_A')} ${g('LEG_B')}`,
     shortQ: (s: string) => `«${s.replace(/[.!…,].*$/, '')}» — ${g('SHORTQ')}`,
     sorry: () => `${g('SORRY_A')} ${g('SORRY_B')}`,

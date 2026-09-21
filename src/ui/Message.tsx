@@ -46,7 +46,7 @@ function body(m: Msg, game: ReturnType<typeof useGameApi>) {
     case 'text':
       return m.deleted ? '🚫 Сообщение удалено' : m.text
     case 'transfer':
-      return (<><div>💸 Вам перевод</div><div className="sum">50 ₽</div><div>«{m.text}»</div></>)
+      return (<><div>💸 Вам перевод</div><div className="sum">{m.amount ?? 50} ₽</div><div>«{m.text}»</div></>)
     case 'voice':
       return (
         <div

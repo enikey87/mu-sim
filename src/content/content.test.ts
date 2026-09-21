@@ -111,7 +111,7 @@ describe('dictionaries', () => {
   })
   it('player templates only use known placeholders', () => {
     for (const k of Object.keys(D).filter((k) => k.startsWith('P_'))) {
-      for (const s of (D[k] as Entry<string>[]).map(valueOf)) for (const m of s.matchAll(/\{(\w+)\}/g)) expect(['t', 'T', 'n', 's', 'date'], `${k}: ${s}`).toContain(m[1])
+      for (const s of (D[k] as Entry<string>[]).map(valueOf)) for (const m of s.matchAll(/\{(\w+)\}/g)) expect(['t', 'T', 'n', 's', 'date', 'amount'], `${k}: ${s}`).toContain(m[1])
     }
   })
 })
@@ -152,9 +152,10 @@ describe('excuse generator', () => {
   })
   it('helper generators produce text', () => {
     const X = api(3)
-    for (const f of [X.short, X.offended, X.threat, X.cow, X.back, X.jobYes, X.jobNo, X.photo, X.transferQ, X.legendQ, X.sorry]) {
+    for (const f of [X.short, X.offended, X.threat, X.cow, X.back, X.jobYes, X.jobNo, X.photo, X.legendQ, X.sorry]) {
       expect(f()).toMatch(/\S/)
     }
+    expect(X.transferQ().text).not.toBe('')
     expect(X.shortQ('Завтра.')).toMatch(/^«Завтра»/)
     expect(X.whyRel({ n: 'дядя Самвел', g: 'дяди Самвела' }).text).toMatch(/Дядя Самвел/)
     expect(X.fill('{t}-{x}', { t: 'a' })).toBe('a-')

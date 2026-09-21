@@ -633,6 +633,7 @@ export class Game {
       // ачивки и трофеи — условия для финалов сериалов и концовок
       ...Object.fromEntries(Object.keys(S.ach).map((k) => ['ach.' + k, true])),
       items: S.items.length,
+      latestItem: S.items.at(-1),
       legend: this.legend(),
       'ctx.topic': this.topicOfLast(),
       // «Мууу» прозвучало после последнего сообщения игрока — только тогда про корову и спрашивают
@@ -656,7 +657,7 @@ export class Game {
       callbackReady: !!this.callbackCandidate(),
       arcUnfinished: this.unfinishedArc(),
       deathCanAdvance: !!S.mem.alik_dead && this.arcCanAdvance('alik_death', true),
-      'ctx.type': c.type, 'ctx.s': c.s, 'ctx.shortTimey': c.s ? TIMEY.test(c.s) : false,
+      'ctx.type': c.type, 'ctx.amount': c.amount, 'ctx.s': c.s, 'ctx.shortTimey': c.s ? TIMEY.test(c.s) : false,
       'ctx.when': c.when, 'ctx.whenNever': c.whenNever, 'ctx.rel': c.rel?.n, 'ctx.relYou': c.rel?.you ?? c.rel?.n, 'ctx.sad': c.sad, 'ctx.festive': c.festive, 'ctx.revived': c.revived,
       'ctx.constr': c.constr, 'ctx.legendary': c.legendary, 'ctx.arc': c.arc,
       // спросить про сериал есть смысл: будет новая серия, или сериал закончен и сегодня про финал ещё не спрашивали
@@ -920,6 +921,14 @@ export class Game {
     if (due !== null && due > this.S.day) this.rules.schedule({ at: due, kind: 'event', event: 'PromiseDue', facts: { promise: this.S.promises.length - 1 } })
     if (this.S.promises.length >= 20) this.unlock('promises20')
   }
+  private alignPromise(p: Promise3, until: string, condition?: PromiseCondition): Promise3 {
+    p.text = p.text.replace(p.t, until)
+    p.t = until
+    p.d = null
+    p.due = undefined
+    p.condition = condition
+    return p
+  }
   /** «Клянусь мамой, завтра — всё отдам» + запись в журнал. */
   /** Обещание. Пока жива легенда денег — срок чаще вытекает из неё («как ключ выйдет»); legend = true — всегда из неё. */
   async promiseLine(prefix?: string, legend?: boolean): Promise<void> {
@@ -931,13 +940,7 @@ export class Game {
     if (fromLegend) this.S.mem.legendPromiseAt = this.S.stats.sent
     const p = this.uniq(() => {
       const q = this.X.promise()
-      if (fromLegend) {
-        q.text = q.text.replace(q.t, until!)
-        q.t = until!
-        q.d = null
-        q.due = undefined
-        q.condition = legendSpec?.condition
-      }
+      if (fromLegend) this.alignPromise(q, until!, legendSpec?.condition)
       if (prefix) return { text: `${prefix} ${low(q.text)}.`, q }
       // форма клятвы — из пула (одна формула в каждом втором сообщении приедается)
       const form = this.line('OATH_FORMS', OATH_FORMS) ?? '{o}, {p}.'
@@ -989,6 +992,7 @@ export class Game {
   }
 
   async excuseTurn(): Promise<void> {
+    if (this.legend()) return this.promiseLine(undefined, true)
     const ex = this.uniq(() => this.X.excuse({ preferLong: this.S.politeStreak >= 3 }))
     if (ex.legendary) this.unlock('legend')
     this.recordPromise(ex.p)
@@ -1028,11 +1032,13 @@ export class Game {
 
   async transfer(): Promise<void> {
     await this.typingFor(1200)
-    this.S.debt -= 50
-    this.S.money += 50
+    const amount = Number(this.S.mem.nextTransfer ?? 50)
+    delete this.S.mem.nextTransfer
+    this.S.debt -= amount
+    this.S.money += amount
     if (++this.S.stats.fifty >= 5) this.unlock('fifty5')
-    this.alikMsg({ kind: 'transfer', from: 'alik', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE) })
-    this.S.ctx = { type: 'transfer' }
+    this.alikMsg({ kind: 'transfer', from: 'alik', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE), amount })
+    this.S.ctx = { type: 'transfer', amount }
   }
 
   async sticker(fixed?: { e: string; c: string }): Promise<void> {
@@ -1436,7 +1442,15 @@ export class Game {
     if (r < 0.85) { this.push({ ...base, kind: 'voice', len: 10 + this.rnd(50) }); return }
     if (r < 0.92) {
       this.S.debt -= 50; this.S.money += 50; this.S.stats.fifty++
-      this.push({ ...base, kind: 'transfer', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE) })
+      this.push({ ...base, kind: 'transfer', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE), amount: 50 })
+      return
+    }
+    const legend = this.legend()
+    if (legend) {
+      const spec = LEGENDS[legend]
+      const promise = this.alignPromise(this.X.promise(), spec.until, spec.condition)
+      this.recordPromise(promise)
+      this.push({ ...base, kind: 'text', text: promise.text })
       return
     }
     const ex = this.uniq(() => this.X.excuse())
