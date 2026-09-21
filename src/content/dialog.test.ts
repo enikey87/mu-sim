@@ -38,10 +38,12 @@ describe('несостыковки из партии пользователя', 
   })
   it('«терпение восстановлено»: событие вроде «продали микроволновку» — один раз, занятия — повторяются', () => {
     const { game } = makeGame()
-    const floor = () => { game.S.patience = 0; game.S.stats.sent += 20; return game.line('FLOOR', FLOOR) }
-    const got = Array.from({ length: 40 }, floor)
-    expect(got.every(Boolean)).toBe(true)
-    expect(got.filter((t) => /микроволновку/.test(t!))).toHaveLength(1)
+    const floor = (turns: number) => { game.S.stats.sent += turns; return game.line('FLOOR', FLOOR) ?? 'Вы полежали на полу. Терпение восстановлено.' }
+    const got = Array.from({ length: 40 }, () => floor(20))
+    expect(got.filter((t) => /микроволновку/.test(t))).toHaveLength(1)
+    // пул исчерпан (перерыв не прошёл) — системное сообщение всё равно от лица игры, без обращений Алика
+    const dry = Array.from({ length: 30 }, () => floor(0))
+    expect(dry.every((t) => t.startsWith('Вы '))).toBe(true)
   })
   it('займ 5000: деньги уходят с карты; нет 5000 на карте — Алик не просит', async () => {
     const { game } = makeGame()

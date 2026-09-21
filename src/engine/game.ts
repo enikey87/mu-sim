@@ -927,7 +927,8 @@ export class Game {
       if (S.patience === 0) {
         await this.sleep(600)
         if (this.disposed) return
-        this.sys(this.line('FLOOR', FLOOR, { fallback: () => 'Вы полежали на полу. Терпение восстановлено.' })!)
+        // без fallback: он проходит через украшение реплик Алика и получает обращение («Сынок, слушай, вы полежали…»)
+        this.sys(this.line('FLOOR', FLOOR) ?? 'Вы полежали на полу. Терпение восстановлено.')
         S.patience = MAX_PATIENCE
         this.unlock('floor')
       }
