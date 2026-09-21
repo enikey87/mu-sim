@@ -639,14 +639,15 @@ export function make(draw: DrawFn, getTier: () => number = () => 0, rng: Rng = m
   // каждый шаблон: () => { texts, promise, rel, constr }
   let lastEv: string | null = null;
   const ev = (): string => { const e = g('EVENT'); lastEv = e; return e; };
-  const T: Array<() => ExcuseParts> = [
+  const T: Array<Entry<() => ExcuseParts>> = [
     () => { const r = rel(), p = promise(), c = reason(); return { texts: [`${g('ADDR')}, у ${r.g} ${ev()}. ${c}. ${g('OATH')}, ${p.text}.`], p, r }; },
     () => { const p = promise(), c = constr(); return { texts: [`${g('ADDR')}! ${c}. ${cap(p.text)}.`], p, constr: true }; },
     () => ({ texts: [`${reason()}. ${g('OATH')}.`] }),
     () => { const r = rel(), p = promise(); return { texts: [`${g('ADDR')}, ты же знаешь, я тебя как сына люблю. Но у ${r.g} ${ev()}. ${cap(p.text)}.`], p, r }; },
     () => { const r = rel(), p = promise(); return { texts: [`${g('ADDR')}, ${g('INTRO')}`, `У ${r.g} ${ev()}.`, `${constr()}.`, `${g('OATH')}. ${cap(p.text)}.`], p, r, constr: true }; },
     () => { const p = promise(); return { texts: [`${g('ADDR')}, я за рулём, коротко: ${low(reason())}. ${cap(p.text)}.`], p }; },
-    () => { const r = rel(), p = promise(); return { texts: [`Кто это? А, ${low(g('ADDR'))}! У ${r.g} ${ev()}. ${cap(p.text)}.`], p, r }; },
+    // «Кто это?» — только если Алик не писал со вчера: после своих же сообщений это нелепо
+    gate(gte('sinceAlik', 1))(() => { const r = rel(), p = promise(); return { texts: [`Кто это? А, ${low(g('ADDR'))}! У ${r.g} ${ev()}. ${cap(p.text)}.`], p, r }; }),
     () => { const r = rel(), p = promise(); return { texts: [`${g('ADDR')}, не пиши сейчас, у ${r.g} ${ev()}. ${g('OATH')}, ${p.text}.`], p, r }; },
     () => { const r = rel(), p = promise(); return { texts: [`${g('ADDR')}, деньги — это пыль. А у ${r.g} ${ev()} — вот это жизнь.`, `${cap(p.text)}.`], p, r }; },
     () => { const r = rel(), p = promise(); return { texts: [`${g('ADDR')}, ${low(constr())}.`, `${g('WOW')} А ещё у ${r.g} ${ev()}.`, `${g('OATH')}, ${p.text}.`], p, r, constr: true }; },
@@ -667,9 +668,9 @@ export function make(draw: DrawFn, getTier: () => number = () => 0, rng: Rng = m
       const l = draw('LEGENDARY', D.LEGENDARY, true);
       if (l) return { texts: [l], legendary: true };
     }
-    const i = preferLong && draw('LONGROLL', [0, 1]) ? draw('LONGT', [4, 8, 9, 12, 14, 16, 17, 18]) : draw('TPL', T.map((_, k) => k));
+    const tpl = preferLong && draw('LONGROLL', [0, 1]) ? draw('LONGT', [4, 8, 9, 12, 14, 16, 17, 18].map((k) => T[k])) : draw('TPL', T);
     lastEv = null;
-    return { ...T[i](), ev: lastEv, legendary: false };
+    return { ...tpl(), ev: lastEv, legendary: false };
   }
 
   const fill = (s: string, map: Record<string, string>): string => s.replace(/\{(\w+)\}/g, (_, k: string) => map[k] ?? '');

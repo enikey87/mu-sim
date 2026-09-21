@@ -306,6 +306,7 @@ export class Game {
 
   alikMsg<M extends NewMsg>(m: M): Msg {
     if (m.kind === 'text' && m.who) this.S.mem['met.' + m.who] = true // «кого игрок встречал» — для переклички в День выплаты
+    this.S.mem['alik.day'] = this.S.day
     this.tick(1 + this.rnd(3))
     const msg = this.push({ from: 'alik', time: fmtTime(this.S.clock), ...m } as NewMsg)
     if (msg.kind === 'text' && /брат джан/i.test(msg.text)) this.unlock('brat')
@@ -528,6 +529,7 @@ export class Game {
       // «сегодня тот самый день» — только в сам день срока (обещание могло наступить, пока Алик пропадал)
       promiseLive: !!pr && pr.due === S.day,
       period: this.period(), night: this.isNight(), offline: S.offlineDays > 0, scene: S.scene?.id,
+      sinceAlik: S.day - Number(S.mem['alik.day'] ?? S.day),
       lateCount: this.lateCount(),
       // сама — не больше одной серии в день: три легенды денег за день — уже не сюжет, а шум
       arcAvailable: this.availableArcs().length > 0 && !Object.values(S.arcs).some((a) => a.last === S.day),

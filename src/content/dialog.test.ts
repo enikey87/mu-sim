@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest'
 import { makeGame } from '../test/helpers'
 import { GROUP } from './arcs'
 import { CONDOLE_REVIVED, GREET_A, FLOOR } from './misc'
+import { SPEND } from './life'
 import { WORLD, needs } from './world'
 import { valueOf, type Entry } from '../engine/rules'
 import type { Game } from '../engine/game'
@@ -19,6 +20,21 @@ describe('несостыковки из партии пользователя', 
     for (let i = 0; i < 20; i++) await game.afterTurn()
     expect(game.S.msgs.some((m) => m.kind === 'text' && m.who === 'boris')).toBe(false)
     expect(GROUP.boris.length).toBeGreaterThan(0)
+  })
+  it('после выселения квартплата с карты не списывается', () => {
+    const { game } = makeGame()
+    game.S.mem.evicted = true
+    const spends = Array.from({ length: 200 }, () => game.draw('SPEND', SPEND))
+    expect(spends).not.toContain('Квартплата')
+    expect(new Set(spends).size).toBeGreaterThan(3)
+  })
+  it('«Кто это? А, …» — только если Алик не писал со вчера', () => {
+    const { game } = makeGame()
+    const excuses = () => Array.from({ length: 200 }, () => game.X.excuse().texts.join(' ')).join('\n')
+    game.S.mem['alik.day'] = game.S.day
+    expect(excuses()).not.toMatch(/Кто это\?/)
+    game.S.mem['alik.day'] = game.S.day - 1
+    expect(excuses()).toMatch(/Кто это\?/)
   })
   it('«терпение восстановлено»: событие вроде «продали микроволновку» — один раз, занятия — повторяются', () => {
     const { game } = makeGame()
