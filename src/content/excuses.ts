@@ -650,7 +650,7 @@ export function make(draw: DrawFn, getTier: () => number = () => 0, rng: Rng = m
     () => { const r = rel(), p = promise(); return { texts: [`${g('ADDR')}, ты же знаешь, я тебя как сына люблю. Но у ${r.g} ${ev()}. ${cap(p.text)}.`], p, r }; },
     () => { const r = rel(), p = promise(); return { texts: [`${g('ADDR')}, ${g('INTRO')}`, `У ${r.g} ${ev()}.`, `${constr()}.`, `${g('OATH')}. ${cap(p.text)}.`], p, r, constr: true }; },
     () => { const p = promise(); return { texts: [`${g('ADDR')}, я за рулём, коротко: ${low(reason())}. ${cap(p.text)}.`], p }; },
-    // «Кто это?» — только если Алик не писал со вчера: после своих же сообщений это нелепо
+    // после своих же сообщений «Кто это?» нелепо
     gate(gte('sinceAlik', 1))(() => { const r = rel(), p = promise(); return { texts: [`Кто это? А, ${low(g('ADDR'))}! У ${r.g} ${ev()}. ${cap(p.text)}.`], p, r }; }),
     () => { const r = rel(), p = promise(); return { texts: [`${g('ADDR')}, не пиши сейчас, у ${r.g} ${ev()}. ${g('OATH')}, ${p.text}.`], p, r }; },
     () => { const r = rel(), p = promise(); return { texts: [`${g('ADDR')}, деньги — это пыль. А у ${r.g} ${ev()} — вот это жизнь.`, `${cap(p.text)}.`], p, r }; },
