@@ -28,13 +28,14 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: npm audit --audit-level=high
       - run: npx playwright install --with-deps chromium
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
       - run: npm run test:rules   # движок правил — покрытие 100%
-      - run: npm run test:e2e
       - run: npm run build
+      - run: npm run test:e2e
       - if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
         with:

@@ -5,6 +5,13 @@ test.beforeEach(async ({ page }) => {
   await expect(page.locator('.chat-head .name')).toHaveText('Алик Воздухонесян')
 })
 
+test('под тестом прод-сборка, а не dev-сервер', async ({ page }) => {
+  // сборка отдаёт ./assets/index-<хеш>.js, dev-сервер — /src/main.tsx
+  const srcs = await page.evaluate(() => [...document.scripts].map((s) => s.getAttribute('src') ?? ''))
+  expect(srcs.some((s) => /assets\//.test(s))).toBe(true)
+  expect(srcs.some((s) => /\/src\//.test(s))).toBe(false)
+})
+
 test('новая игра показывает чат, долг и варианты ответа', async ({ page }) => {
   await expect(page).toHaveTitle('Алик, где деньги?')
   await expect(page.locator('#debt')).toHaveText(/240\s000 ₽/)
