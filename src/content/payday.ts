@@ -70,7 +70,7 @@ export const CLAIMS: Entry<Claim>[] = [
   { who: 'goar', t: 'А сервиз? Сорок один тост — и нет сервиза. Я считала.', when: [is('ach.q_tamada')], prio: 2, cut: 45000 },
   { who: 'grant', t: 'Моральный ущерб. Меня назвали близнецом. При свидетелях.', when: [exists('finale.grant')], prio: 1, cut: 40000 },
   { who: 'razmik', t: 'Я выше в очереди. Буквально. Сорок метров.', when: [exists('finale.razmik')], prio: 1, cut: 50000 },
-  { who: 'rubik', t: 'Штраф за взятку. Та самая ровная плитка. Я не забыл.', when: [exists('finale.rubik')], prio: 1, cut: 30000 },
+  { who: 'rubik', t: 'Штраф за взятку. Та самая ровная плитка. Я не забыл.', when: [exists('finale.rubik'), missing('rubik.fined')], prio: 1, cut: 30000 },
   { who: 'judge', t: 'Судебные издержки. Хаш, коньяк, мантия в химчистку.', when: [is('ach.court')], prio: 1, cut: 25000 },
   needs('dekret')({ who: 'nune', t: 'Налог с выплаты. Я из декрета, но налог — это святое.', cut: 30000 }),
   gate(gte('arc.boris', 8))({ who: 'boris', t: 'Бее. (Борис требует сено. За весь срок службы прорабом.)', when: [is('met.boris')], prio: 1, cut: 20000 }),

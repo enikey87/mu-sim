@@ -4,7 +4,7 @@
 // go: 'node' | 'scene:node' | null (конец). Нет opts — сцена закончилась.
 import type { ExcuseApi } from './excuses'
 import type { Rng } from '../engine/rng'
-import { type Entry, gate, missing, gte, lte } from '../engine/rules'
+import { type Entry, gate, missing, gte, lte, valueOf } from '../engine/rules'
 import { needs, WORLD } from './world'
 import { QUESTS, COURT_SCENE } from './quests'
 import { PAYDAY_SCENE } from './payday'
@@ -27,6 +27,12 @@ export interface SceneNode {
   hook?: string
   opts?: SceneOpt[]
 }
+/** Ключ строки акта без пояснения в скобках: одну и ту же позицию не вычитают дважды. */
+export const invKey = (t: string): string => 'inv.' + t.replace(/\s*\([^)]*\)\s*$/, '')
+/** Позиции акта, которые ещё не вычитали. */
+const invoiceRows = (rows: Entry<[string, number]>[]): Entry<[string, number]>[] =>
+  rows.map((r) => gate(missing(invKey(valueOf(r)[0])))(r))
+
 /** init: open(список) — элементы, уместные сейчас (needs). */
 export interface Scene { start: string; init?: (rng: Rng, open: <T>(arr: readonly Entry<T>[]) => T[], day: number) => Vars; nodes: Record<string, SceneNode> }
 // до сериала «Баран Борис» баран ещё без имени: иначе сериал потом «знакомит» с Борисом второй раз
@@ -515,13 +521,13 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
     invoice: {
       start: 'ask',
       init: (rng, open, day) => {
-        const rows = open<[string, number]>([
+        const rows = open<[string, number]>(invoiceRows([
           [`Хранение твоих денег (${Math.max(1, Math.round(day / 30))} мес.)`, 7200], ['Моральный ущерб Алику от твоих сообщений', 15000], ['Амортизация терпения', 3000],
           ['Бензин до банка (не доехал)', 2400], ['Консультации по отмазкам', 5000], ['Аренда воздуха на объекте', 1800],
           ['Хаш, съеденный за твоё здоровье', 900], ['Налог на ожидание', 4500], needs('tamada')(['Тосты за тебя (услуги тамады)', 3000]),
           needs('boris')(['Корм для Бориса (он тебя любит)', 1200]), ['Стикеры авторские', 700], needs('nivaHome')(['Амортизация «Нивы» (ехала к тебе, не доехала)', 3300]),
           ['Валерьянка Алику', 650], ['Ремонт нервов', 8000],
-        ]);
+        ]));
         for (let i = rows.length - 1; i > 0; i--) { const j = Math.floor(rng.random() * (i + 1)); [rows[i], rows[j]] = [rows[j], rows[i]]; }
         const pick = rows.slice(0, 4 + Math.floor(rng.random() * 3));
         return { rows: pick, total: pick.reduce((n, r) => n + r[1], 0) };

@@ -1,7 +1,7 @@
 // Игра: состояние, сообщения, ход Алика, «живость». Решения — что ответить, что предложить игроку,
 // что сделать Алику — принимает система правил (engine/rules/, content/rules/*).
 import { make, D, low, cap, type ExcuseApi, type Promise3, type PromiseCondition, type Rel } from '../content/excuses'
-import { makeScenes, type Scene, type Line } from '../content/scenes'
+import { makeScenes, invKey, type Scene, type Line } from '../content/scenes'
 import { TRIBUNAL } from '../content/rude'
 import { PAYDAY_HOOKS } from '../content/rules/payday'
 import { QUEST_WHEN } from '../content/rules/world'
@@ -24,7 +24,7 @@ import { type Rng, mathRng, rndInt, shuffle, chance } from './rng'
 import { Decks } from './deck'
 import { Seen, type Keyed } from './uniq'
 import {
-  RuleSet, makeHub, Lines, resolver, test, isOpen, valueOf,
+  RuleSet, makeHub, Lines, resolver, test, isOpen, valueOf, set,
   type Criterion, type Entry, type Facts, type Resolver, type Rule, type Trace, type Query, type Priority, type Line as PoolLine, type LineOpts, type Picked,
 } from './rules'
 import { MENTION_RE } from '../content/world'
@@ -358,6 +358,9 @@ export class Game {
   pair = (ka: string, a: readonly Entry<string>[], kb: string, b: readonly Entry<string>[]): string =>
     this.uniq(() => `${this.draw(ka, a)} ${this.draw(kb, b)}`)
   addrLine = (key: string, arr: readonly Entry<string>[]): string => this.uniq(() => `${this.X.g('ADDR')}, ${this.draw(key, arr)}`)
+
+  /** Текущие деньги в тексте: {debt} — долг Алика, {money} — на карте игрока. */
+  fillMoney = (t: string): string => t.replace('{debt}', this.S.debt.toLocaleString('ru-RU')).replace('{money}', this.S.money.toLocaleString('ru-RU'))
 
   get ctx(): Ctx | null { return this.S.ctx }
   setCtx(c: Ctx | null): void { this.S.ctx = c }
@@ -768,7 +771,7 @@ export class Game {
       const catchLie = this.rules.collect({ event: 'BuildChoices' }, this.facts()).find((r) => r.name === 'Opt_CatchLie')
       const lieOpt = catchLie ? [catchLie.offer!(this.rules.ctx(this, catchLie, { event: 'BuildChoices' }, this.facts())) as Choice] : []
       return [...lieOpt, ...(n.opts ?? []).map((o, i) => {
-        const gen = (): string => (typeof o.t === 'function' ? o.t(S.scene!.vars) : Array.isArray(o.t) ? this.draw<string>(`${S.scene!.id}.${S.scene!.node}.o${i}`, o.t) : o.t)
+        const gen = (): string => this.fillMoney(typeof o.t === 'function' ? o.t(S.scene!.vars) : Array.isArray(o.t) ? this.draw<string>(`${S.scene!.id}.${S.scene!.node}.o${i}`, o.t) : o.t)
         const t = gen().length > 8 ? this.playerLine(gen) : gen()
         return { text: t, tone: o.tone ?? 'polite', scene: S.scene!.id, go: o.go } as Choice
       })]
@@ -1414,7 +1417,7 @@ export class Game {
     S.scene.node = nid
     const n = sc.nodes[nid]
     const v = S.scene.vars
-    const res = (x: Line) => (typeof x === 'function' ? x(v) : x)
+    const res = (x: Line) => this.fillMoney(typeof x === 'function' ? x(v) : x)
     const gen = (key: string, arr: Line | Entry<Line>[]) => () => res(Array.isArray(arr) ? this.draw(`${sid}.${nid}.${key}`, arr) : arr)
     const variant = (key: string, arr: Entry<Line>[]) => this.uniq(gen(key, arr))
 
@@ -1435,6 +1438,8 @@ export class Game {
     if (n.doc) {
       await this.typingFor(2000, 'отправляет документ…')
       this.alikMsg({ kind: 'doc', from: 'alik', title: `АКТ ВЗАИМОЗАЧЁТА № ${100 + this.rnd(900)}`, rows: v.rows, total: v.total })
+      // позиция вычтена — во втором акте её уже не будет
+      this.rules.applyOps((v.rows as Array<[string, number]>).map(([t]) => set(invKey(t), true)), {})
       await this.sleep(600)
       this.sys(`Алик вычел из долга ${v.total.toLocaleString('ru-RU')} ₽ по акту.`)
     }

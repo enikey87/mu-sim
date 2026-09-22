@@ -38,6 +38,18 @@ describe('несостыковки из партии пользователя', 
     expect(line).toContain('«Место на кране»')
     expect(line).not.toContain('(40 м)')
   })
+  it('акт взаимозачёта не вычитает одну позицию дважды', async () => {
+    const { game } = makeGame()
+    const seen: string[] = []
+    for (let i = 0; i < 4; i++) {
+      game.S.scene = null
+      await game.enterNode('invoice', 'ask')
+      const doc = game.S.msgs.findLast((m) => m.kind === 'doc')
+      if (doc?.kind === 'doc') seen.push(...doc.rows.map(([t]) => t.replace(/\s*\([^)]*\)\s*$/, '')))
+    }
+    expect(seen.length).toBeGreaterThan(8)
+    expect(new Set(seen).size).toBe(seen.length)
+  })
   it('срок-условие не выдаётся после того, как событие уже случилось', async () => {
     const { game } = makeGame()
     game.setLegend('boris_wedding', 'boris')
