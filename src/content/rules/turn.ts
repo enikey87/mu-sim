@@ -7,6 +7,7 @@ import { AlikOffline } from './criteria'
 import { IDLE } from '../life'
 import { MEMORY } from '../memory'
 import { LEGENDS } from '../legends'
+import { count, payday } from '../memkeys'
 
 type R = Rule<Game, GameEvent>
 
@@ -15,7 +16,7 @@ export const toneRules: R[] = [
   { name: 'Tone_Default', event: 'PlayerMessage', when: [], respond: ({ game }) => game.turnRoll() },
   // грубость — лестница эскалации в rude.ts
   // угрозы судом — линия суда (court.ts): каждая угроза двигает дело на ступень
-  { name: 'Tone_Cow', event: 'PlayerMessage', when: [eq('tone', 'cow')], remember: [add('count.cow')], respond: async ({ game }) => { await game.say([game.uniq(game.X.cow)]) } },
+  { name: 'Tone_Cow', event: 'PlayerMessage', when: [eq('tone', 'cow')], remember: [add(count.cow)], respond: async ({ game }) => { await game.say([game.uniq(game.X.cow)]) } },
 ]
 
 // Событие StoryBeat — после хода игрока, даже если он спорил, кричал или отвечал на контекст:
@@ -83,7 +84,7 @@ export const turnRules: R[] = [
     },
   },
   // «помнишь, деньги в сейфе?» — после Дня выплаты деньги «отданы», старые версии уже не продолжаются
-  { name: 'Turn_Callback', event: 'AlikTurn', when: [is('callbackReady'), missing('payday.chain')], specificity: 0, weight: 6, cooldown: { days: 5 }, respond: ({ game }) => game.callback() },
+  { name: 'Turn_Callback', event: 'AlikTurn', when: [is('callbackReady'), missing(payday.chain)], specificity: 0, weight: 6, cooldown: { days: 5 }, respond: ({ game }) => game.callback() },
   { name: 'Turn_Sticker', event: 'AlikTurn', when: [], specificity: 0, weight: W.sticker, respond: ({ game }) => game.sticker() },
   { name: 'Turn_Forward', event: 'AlikTurn', when: [], specificity: 0, weight: W.fwd, respond: ({ game }) => game.forward() },
   { name: 'Turn_Transfer', event: 'AlikTurn', when: [], specificity: 0, weight: transferW, respond: ({ game }) => game.transfer() },

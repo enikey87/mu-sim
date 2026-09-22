@@ -1,7 +1,9 @@
 // Реестр ключей памяти мира (S.mem) и досок персонажей (S.actors). Каждый строковый ключ
 // проходит через этот модуль: опечатка в ключе — молча мёртвое условие правила. Линтер правил
 // (tools.test.ts, keyCheck: isMemKey) и memkeys.test.ts не пускают неизвестные ключи.
-import { pairKey } from './lies'
+
+/** Ключ пары утверждений «пойманы на противоречии»; канонический формат — здесь, lies.ts реэкспортирует. */
+export const pairKey = (a: string, b: string): string => [a, b].sort().join('|')
 
 export const HEAT = 'rude.heat'
 export const blocked = 'blocked'
@@ -27,6 +29,9 @@ export const rudeAt = 'rudeAt'
 export const topicRun = 'topicRun'
 export const topicLast = 'topicLast'
 export const legendPromiseAt = 'legendPromiseAt'
+export const legendId = 'legend.id'
+export const legendDay = 'legend.day'
+export const legendArc = 'legend.arc'
 export const nextTransfer = 'nextTransfer'
 export const tileCornerRemoved = 'tile.cornerRemoved'
 export const nivaAway = 'niva.away'
@@ -75,9 +80,14 @@ export const topicMute = (k: string): string => `topicMute.${k}`
 export const finaleOf = (arc: string): string => `finale.${arc}`
 export const legendOf = (arc: string): string => `legend.of.${arc}`
 export const caughtPair = (a: string, b: string): string => `caught.${pairKey(a, b)}`
+export const wedding = (who: string): string => `wedding.${who}`
+/** Активная сцена Дня выплаты (id узла) — факт на доске мира. */
+export const paydayScene = 'payday'
 
 /** Ключи досок персонажей (S.actors), не мира. */
-export const ACTOR_KEYS: ReadonlySet<string> = new Set(['sick', 'interjections'])
+export const sick = 'sick'
+export const interjections = 'interjections'
+export const ACTOR_KEYS: ReadonlySet<string> = new Set([sick, interjections])
 
 /** Параметризованные namespace'ы mem-ключей. */
 export const MEM_PREFIXES: readonly string[] = [
@@ -91,16 +101,16 @@ export const EVENT_KEYS: ReadonlySet<string> = new Set([
   'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sorrySwing', 'promiseLive',
   'period', 'night', 'offline', 'scene', 'sinceAlik', 'lateCount', 'arcAvailable',
   'arcsStarted', 'arcsDone', 'quests', 'callbackReady', 'arcUnfinished', 'deathCanAdvance',
-  'intent', 'tone', 'arg', 'category', 'arc', 'payday', 'argArcDone',
+  'intent', 'tone', 'arg', 'category', 'arc', 'argArcDone',
 ])
 export const EVENT_PREFIXES: readonly string[] = ['arc.', 'ach.', 'since.', 'ctx.', 'has.']
 
 export const MEM_KEYS: ReadonlySet<string> = new Set([
   HEAT, blocked, blockedHint, polite, alikDead, mourning, evicted, vendetta, court, courtVerdict,
   ritualCount, ritualCut, caughtCount, cryptoHodl, bathAsked, mamaCalls, phoneKarine, alikDay, mooAt, sorryAt,
-  rudeAt, topicRun, topicLast, legendPromiseAt, nextTransfer, tileCornerRemoved, nivaAway,
+  rudeAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway,
   garikConcrete, garikCut, houseOnGarik, borisMarried, borisSmetaReady, taxFrozen, taxThawed,
-  actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet,
+  actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, paydayScene,
   ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lie),
 ])
 

@@ -8,11 +8,11 @@ import type { GameEvent } from './events'
 import { WORLD, SPEAKS } from '../world'
 import * as T from '../rude'
 import { RUDE_AGAIN } from '../misc'
+import { HEAT, blocked, blockedHint, count, mamaCalls, phoneKarine, polite, ritualCount, vendetta } from '../memkeys'
 
 type R = Rule<Game, GameEvent>
-export const HEAT = 'rude.heat'
 const rude = eq('tone', 'rude')
-const cools = [add('count.rude'), add(HEAT)]
+const cools = [add(count.rude), add(HEAT)]
 // остывание — отложенное событие, а не отложенное «−1»: после примирения (температура = 0) старые остывания не уводят её в минус
 const cool: R['trigger'] = [{ event: 'RudeCool', delay: 20 }]
 
@@ -50,7 +50,7 @@ const family = (who: string): R => ({
     const t = game.line('RF_' + who, T.RUDE_FAMILY[who])
     if (!t) { await game.say([game.uniq(game.X.offended)]); game.setCtx({ offended: true }); return }
     await game.say([{ w: who, t }])
-    if (!game.holds(is('phone.karine')) && game.chance(0.6)) { await game.sleep(700); await game.say([freshOr(game, 'RF_ALIK', T.RUDE_FAMILY_ALIK, game.X.offended)]) }
+    if (!game.holds(is(phoneKarine)) && game.chance(0.6)) { await game.sleep(700); await game.say([freshOr(game, 'RF_ALIK', T.RUDE_FAMILY_ALIK, game.X.offended)]) }
     game.setCtx({ offended: true })
   },
 })
@@ -59,19 +59,19 @@ export const rudeRules: R[] = [
   // Реальные угрозы не превращаем в судебную шутку: они ускоряют ссору и получают отдельный ответ.
   {
     name: 'Tone_ViolentThreat', event: 'PlayerMessage', when: [eq('category', 'violent-threat')], bonus: 6,
-    remember: [add('count.rude'), add('count.violence'), add(HEAT, 2)],
+    remember: [add(count.rude), add(count.violence), add(HEAT, 2)],
     trigger: [{ event: 'RudeCool', delay: 20 }, { event: 'RudeCool', delay: 40 }],
     respond: ({ game }) => offended(game, game.uniq(() => game.draw('VIOLENT_THREAT', T.VIOLENT_THREAT)), false),
   },
   {
     name: 'Tone_Intimidation', event: 'PlayerMessage', when: [eq('category', 'intimidation')], bonus: 6,
-    remember: [add('count.rude'), add('count.intimidation'), add(HEAT)], trigger: cool,
+    remember: [add(count.rude), add(count.intimidation), add(HEAT)], trigger: cool,
     respond: ({ game }) => offended(game, game.uniq(() => game.draw('INTIMIDATION', T.INTIMIDATION)), false),
   },
   // S0 — обида (как раньше, но коротко); второй крик за игру Алик помнит
   { name: 'Tone_Rude', event: 'PlayerMessage', when: [rude], remember: cools, trigger: cool, respond: ({ game }) => offended(game) },
   {
-    name: 'Tone_Rude_Again', event: 'PlayerMessage', when: [rude, gte('count.rude', 2)], remember: cools, trigger: cool,
+    name: 'Tone_Rude_Again', event: 'PlayerMessage', when: [rude, gte(count.rude, 2)], remember: cools, trigger: cool,
     respond: async ({ game }) => { game.unlock('memory'); await offended(game, freshOr(game, 'RUDE_AGAIN', RUDE_AGAIN, game.X.offended), false) },
   },
   // S1 — вместо Алика пишет родня (одна из трёх, у каждой свой перерыв)
@@ -82,8 +82,8 @@ export const rudeRules: R[] = [
     respond: async ({ game }) => {
       game.mood(-1)
       // счётчик пропущенных только растёт: он копится за партию, а не выдумывается каждый раз
-      const calls = Number(game.S.mem['mama.calls'] ?? 6) + 1 + game.rnd(4)
-      game.rules.applyOps([set('mama.calls', calls)], {})
+      const calls = Number(game.S.mem[mamaCalls] ?? 6) + 1 + game.rnd(4)
+      game.rules.applyOps([set(mamaCalls, calls)], {})
       game.sys(game.draw('RC_SYS', T.RUDE_CALLS_SYS).replace('{n}', String(calls)))
       await game.sleep(600)
       await sayFresh(game, 'RC_VOICE', T.RUDE_CALLS_VOICE)
@@ -94,7 +94,7 @@ export const rudeRules: R[] = [
   // S3 — блок на 4 дня; Алик всё равно отвечает — с телефона Бориса, «Нивы», домофона
   {
     name: 'Rude_Block', event: 'PlayerMessage', when: [rude, gte(HEAT, 3)], bonus: 3, cooldown: { days: 10 },
-    remember: [...cools, { key: 'blocked', op: '=', value: true, forDays: 4 }, set('blocked.hint', false)], trigger: cool,
+    remember: [...cools, set(blocked, true, { forDays: 4 }), set(blockedHint, false)], trigger: cool,
     respond: async ({ game }) => {
       game.mood(-2)
       game.sys(game.draw('RB_SYS', T.RUDE_BLOCK_SYS))
@@ -106,29 +106,29 @@ export const rudeRules: R[] = [
   },
   {
     // блок важнее суда: суд — когда разблокирует
-    name: 'Rude_WhileBlocked', event: 'PlayerMessage', when: [rude, is('blocked')], bonus: 7, remember: cools, trigger: cool,
+    name: 'Rude_WhileBlocked', event: 'PlayerMessage', when: [rude, is(blocked)], bonus: 7, remember: cools, trigger: cool,
     respond: async ({ game }) => { game.sys(T.NOT_DELIVERED); await game.sleep(900); await sayFresh(game, 'ALT', T.RUDE_ALT); game.setCtx({ offended: true }) },
   },
   // в чёрном списке не доходит ничего: ни вежливое, ни «Мууу», ни вопрос — Алик пишет с чужих номеров, не отвечая на сказанное
   {
-    name: 'Tone_WhileBlocked', event: 'PlayerMessage', when: [is('blocked')], bonus: 6,
+    name: 'Tone_WhileBlocked', event: 'PlayerMessage', when: [is(blocked)], bonus: 6,
     respond: async ({ game }) => { game.sys(T.NOT_DELIVERED); await game.sleep(900); await sayFresh(game, 'ALT', T.RUDE_ALT) },
   },
   {
-    name: 'Says_WhileBlocked', event: 'PlayerSays', when: [is('blocked'), ne('intent', 'via'), ne('intent', 'sorry')], bonus: 6,
+    name: 'Says_WhileBlocked', event: 'PlayerSays', when: [is(blocked), ne('intent', 'via'), ne('intent', 'sorry')], bonus: 6,
     respond: async ({ game }) => { game.sys(T.NOT_DELIVERED); await game.sleep(900); await sayFresh(game, 'ALT', T.RUDE_ALT) },
   },
   // S4 — семейный суд в групповом чате, один раз за игру
   { name: 'Rude_Tribunal', event: 'PlayerMessage', when: [rude, gte(HEAT, 4)], bonus: 6, once: true, priority: 'cinematic', remember: cools, trigger: cool, respond: ({ game }) => game.tribunal() },
   // S5 — после суда 10 дней вежливости: на крик — ответ «в рамках регламента»
   {
-    name: 'Rude_Polite', event: 'PlayerMessage', when: [rude, is('polite')], bonus: 8, remember: [add('count.rude')],
+    name: 'Rude_Polite', event: 'PlayerMessage', when: [rude, is(polite)], bonus: 8, remember: [add(count.rude)],
     respond: async ({ game }) => { await game.say([line(game, 'POLITE_RUDE', T.POLITE_RUDE)]) },
   },
   // финал — вендетта: серия криков, 25+ за игру и ни одного извинения
   {
-    name: 'Rude_Vendetta', event: 'PlayerMessage', when: [rude, gte(HEAT, 5), gte('count.rude', 25), lte('count.sorry', 0)], bonus: 8, once: true, priority: 'cinematic',
-    remember: [add('count.rude'), set('vendetta', true)],
+    name: 'Rude_Vendetta', event: 'PlayerMessage', when: [rude, gte(HEAT, 5), gte(count.rude, 25), lte(count.sorry, 0)], bonus: 8, once: true, priority: 'cinematic',
+    remember: [add(count.rude), set(vendetta, true)],
     respond: async ({ game }) => {
       await game.sticker({ e: '🗡️', c: 'Вендетта' })
       for (const [w, t] of T.VENDETTA) await game.say([w === 'alik' ? t : { w, t }])
@@ -142,34 +142,34 @@ export const rudeRules: R[] = [
   // ветка: угроза судом, пока ссора горячая — встречный иск, суд мирит
   {
     name: 'Tone_Threat_Hot', event: 'PlayerMessage', when: [eq('tone', 'threat'), gte(HEAT, 2)], bonus: 2, once: true,
-    remember: [add('count.threat'), set(HEAT, 0)],
+    remember: [add(count.threat), set(HEAT, 0)],
     respond: async ({ game }) => { for (const [w, t] of T.COUNTERSUIT) await game.say([w === 'alik' ? t : { w, t }]); game.unlock('countersuit') },
   },
   {
     // встречный иск уже был — теперь апелляции; суд немного остужает
-    name: 'Tone_Threat_Hot_Again', event: 'PlayerMessage', when: [eq('tone', 'threat'), gte(HEAT, 2)], bonus: 1, remember: [add('count.threat')],
+    name: 'Tone_Threat_Hot_Again', event: 'PlayerMessage', when: [eq('tone', 'threat'), gte(HEAT, 2)], bonus: 1, remember: [add(count.threat)],
     respond: async ({ game }) => { cooldown(game, 1); await game.say([freshOr(game, 'APPEAL', T.APPEAL, game.X.threat)]) },
   },
   // ветка: кричал всю игру и вдруг вежлив — Алику не хватает крика
   {
     // ссора остыла (давно не кричал), но за игру накричал много
-    name: 'Tone_MissRude', event: 'PlayerMessage', when: [ne('tone', 'rude'), ne('tone', 'threat'), gte('count.rude', 15), lte(HEAT, 0), gte('sinceRude', 8)], odds: 0.35, cooldown: { turns: 8 },
+    name: 'Tone_MissRude', event: 'PlayerMessage', when: [ne('tone', 'rude'), ne('tone', 'threat'), gte(count.rude, 15), lte(HEAT, 0), gte('sinceRude', 8)], odds: 0.35, cooldown: { turns: 8 },
     respond: async ({ game }) => { const t = game.line('MISS_RUDE', T.MISS_RUDE); if (!t) return game.turnRoll(); await game.say([t]); game.unlock('habit'); await game.turnRoll() },
   },
 
   // телефон у Карине: Алик не пишет, отвечает она — и не на каждое слово
   ...(['AlikTurn', 'PlayerMessage', 'PlayerSays'] as const).map((event): R => ({
-    name: 'Phone_Karine_' + event, event, when: [is('phone.karine')], bonus: 9,
+    name: 'Phone_Karine_' + event, event, when: [is(phoneKarine)], bonus: 9,
     respond: async ({ game }) => { const t = game.line('PHONE_KARINE', T.PHONE_KARINE); if (t) await game.say([{ w: 'karine', t }]) },
   })),
-  ...(['AlikIdle', 'StoryBeat', 'PeriodLine', 'PromiseDue'] as GameEvent[]).map((event): R => ({ name: 'Quiet_PhoneKarine_' + event, event, when: [is('phone.karine')], bonus: 9, respond: () => {} })),
+  ...(['AlikIdle', 'StoryBeat', 'PeriodLine', 'PromiseDue'] as GameEvent[]).map((event): R => ({ name: 'Quiet_PhoneKarine_' + event, event, when: [is(phoneKarine)], bonus: 9, respond: () => {} })),
   // состояния: блок, вежливость, вендетта перекрывают обычный ход
-  { name: 'Turn_Blocked', event: 'AlikTurn', when: [is('blocked')], respond: async ({ game }) => { if (!(await sayFresh(game, 'ALT', T.RUDE_ALT))) await game.excuseTurn() } },
+  { name: 'Turn_Blocked', event: 'AlikTurn', when: [is(blocked)], respond: async ({ game }) => { if (!(await sayFresh(game, 'ALT', T.RUDE_ALT))) await game.excuseTurn() } },
   {
-    name: 'Turn_Polite', event: 'AlikTurn', when: [is('polite')],
+    name: 'Turn_Polite', event: 'AlikTurn', when: [is(polite)],
     respond: async ({ game }) => { await game.say([line(game, 'POLITE', T.POLITE_TURN)]); if (game.chance(0.2)) await game.transfer() },
   },
-  { name: 'Turn_Vendetta', event: 'AlikTurn', when: [is('vendetta')], specificity: 0, weight: 8, cooldown: { turns: 4 }, respond: async ({ game }) => { await game.say([line(game, 'VENDETTA', T.VENDETTA_TURN)]) } },
+  { name: 'Turn_Vendetta', event: 'AlikTurn', when: [is(vendetta)], specificity: 0, weight: 8, cooldown: { turns: 4 }, respond: async ({ game }) => { await game.say([line(game, 'VENDETTA', T.VENDETTA_TURN)]) } },
 
   // ветка: холодная война — игрок молчит после ссоры, Алик не выдерживает первым
   {
@@ -193,28 +193,28 @@ export const rudeSaysRules: R[] = [
   { name: 'Says_moo', event: 'PlayerSays', when: [eq('intent', 'moo')], respond: async ({ game }) => { await game.say([freshOr(game, 'MOO_ODD', T.MOO_ODD, game.X.cow)]); game.setCtx(null) } },
   // заблокирован — извинение не доходит; подсказывает посредник: Борис, Карине, иначе мама (Карине и мама — раз за блок)
   {
-    name: 'Says_sorry_blocked_boris', event: 'PlayerSays', when: [eq('intent', 'sorry'), is('blocked'), SPEAKS.boris], bonus: 7,
+    name: 'Says_sorry_blocked_boris', event: 'PlayerSays', when: [eq('intent', 'sorry'), is(blocked), SPEAKS.boris], bonus: 7,
     respond: async ({ game }) => { game.sys(T.NOT_DELIVERED); await game.sleep(700); await game.say([{ w: 'boris', t: game.line('BORIS_HINT', T.BORIS_HINT, { repeat: true, cooldown: { turns: 5 }, fallback: () => 'Бее.' })! }]) },
   },
   {
-    name: 'Says_sorry_blocked_karine', event: 'PlayerSays', when: [eq('intent', 'sorry'), is('blocked'), WORLD.karineHome, missing('blocked.hint')], bonus: 5, remember: [set('blocked.hint', true)],
+    name: 'Says_sorry_blocked_karine', event: 'PlayerSays', when: [eq('intent', 'sorry'), is(blocked), WORLD.karineHome, missing(blockedHint)], bonus: 5, remember: [set(blockedHint, true)],
     respond: async ({ game }) => { game.sys(T.NOT_DELIVERED); await game.sleep(700); await game.say([{ w: 'karine', t: T.KARINE_HINT }]) },
   },
   {
-    name: 'Says_sorry_blocked', event: 'PlayerSays', when: [eq('intent', 'sorry'), is('blocked'), missing('blocked.hint')], bonus: 5, remember: [set('blocked.hint', true)],
+    name: 'Says_sorry_blocked', event: 'PlayerSays', when: [eq('intent', 'sorry'), is(blocked), missing(blockedHint)], bonus: 5, remember: [set(blockedHint, true)],
     respond: async ({ game }) => { game.sys(T.NOT_DELIVERED); await game.sleep(700); await game.say([{ w: 'mama', t: T.MAMA_HINT }]) },
   },
   {
-    name: 'Says_sorry_blocked_hinted', event: 'PlayerSays', when: [eq('intent', 'sorry'), is('blocked'), is('blocked.hint')], bonus: 5,
+    name: 'Says_sorry_blocked_hinted', event: 'PlayerSays', when: [eq('intent', 'sorry'), is(blocked), is(blockedHint)], bonus: 5,
     respond: async ({ game }) => { game.sys(T.NOT_DELIVERED); await game.sleep(900); await sayFresh(game, 'ALT', T.RUDE_ALT) },
   },
   // извинение через посредника, которого игрок выбрал (arg)
   ...([['boris', T.VIA_BORIS], ['karine', T.VIA_KARINE], ['mama', T.VIA_MAMA]] as const).map(([who, lines]): R => ({
-    name: 'Says_via_' + who, event: 'PlayerSays', when: [eq('intent', 'via'), eq('arg', who)], remember: [set('blocked', false), add('count.sorry')],
+    name: 'Says_via_' + who, event: 'PlayerSays', when: [eq('intent', 'via'), eq('arg', who)], remember: [set(blocked, false), add(count.sorry)],
     respond: async ({ game }) => { cooldown(game, 1); for (const [w, t] of lines) await game.say([w === 'alik' ? t : { w, t }]); game.sys('Алик Воздухонесян разблокировал вас'); game.setCtx(null) },
   })),
   {
-    name: 'Says_sorry_ritual', event: 'PlayerSays', when: [eq('intent', 'sorry'), gte(HEAT, 3)], bonus: 3, remember: [add('count.sorry'), add('ritual.count')],
+    name: 'Says_sorry_ritual', event: 'PlayerSays', when: [eq('intent', 'sorry'), gte(HEAT, 3)], bonus: 3, remember: [add(count.sorry), add(ritualCount)],
     respond: ({ game }) => game.enterNode('ritual', 'ask'),
   },
 ]

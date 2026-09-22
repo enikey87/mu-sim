@@ -5,6 +5,7 @@ import { type Line, type Entry, eq, exists, gate, is, missing, set } from '../en
 import type { TalkPair } from './talk'
 import type { PromiseCondition } from './excuses'
 import { needs, WORLD } from './world'
+import { actSigned, borisMarried, borisSmetaReady, grantPaid, nuneDekretOver, nuneKeyPassed, taxFrozen, taxThawed } from './memkeys'
 
 export interface Legend {
   /** Срок, который из неё следует: «как ключ выйдет». */
@@ -20,7 +21,7 @@ export const LEGENDS: Record<string, Legend> = {
   // --- бухгалтер Нуне
   safe_nune: {
     until: 'как Нуне из декрета выйдет',
-    condition: 'nune.dekretOver',
+    condition: nuneDekretOver,
     lines: [
       'Сейф закрыт, ключ у Нуне в сумочке, сумочка в роддоме. Цепочка, брат. Не я её придумал.',
       'Звонил Нуне. Говорит, ключ на месте. Сейф на месте. Деньги на месте. Только всё это в разных местах.',
@@ -35,7 +36,7 @@ export const LEGENDS: Record<string, Legend> = {
   },
   safe_baby: {
     until: 'как ключ выйдет',
-    condition: 'nune.keyPassed',
+    condition: nuneKeyPassed,
     lines: [
       'Ключ ещё не вышел. Врач говорит: терпение. Как у тебя. Вы с малышом похожи.',
       'Даём малышу чернослив. Всей семьёй. Он смеётся. Мы нет. Деньги — там же, в сейфе.',
@@ -116,11 +117,11 @@ export const LEGENDS: Record<string, Legend> = {
   // --- баран Борис
   boris_smeta: {
     until: 'как новую смету составим',
-    condition: 'boris.smetaReady',
+    condition: borisSmetaReady,
     lines: [
-      { t: 'Без сметы не могу платить — бухгалтерия не пропустит. А смету Борис съел. Жду, пока бухгалтер новую нарисует.', when: [missing('boris.smetaReady'), missing('arc.nune')] },
-      needs('nune')({ t: 'Без сметы не могу платить — бухгалтерия не пропустит. А смету Борис съел. Жду, пока Нуне новую нарисует.', when: [missing('boris.smetaReady'), exists('arc.nune')] }),
-      { t: 'Новую смету составили — Борис посмотрел на неё с интересом. Спрятали в сейф. На всякий случай.', when: [missing('boris.smetaReady')], remember: [set('boris.smetaReady', true)] },
+      { t: 'Без сметы не могу платить — бухгалтерия не пропустит. А смету Борис съел. Жду, пока бухгалтер новую нарисует.', when: [missing(borisSmetaReady), missing('arc.nune')] },
+      needs('nune')({ t: 'Без сметы не могу платить — бухгалтерия не пропустит. А смету Борис съел. Жду, пока Нуне новую нарисует.', when: [missing(borisSmetaReady), exists('arc.nune')] }),
+      { t: 'Новую смету составили — Борис посмотрел на неё с интересом. Спрятали в сейф. На всякий случай.', when: [missing(borisSmetaReady)], remember: [set(borisSmetaReady, true)] },
     ],
     talk: [
       gate(missing('arc.nune'))(['Алик, может, смету в электронном виде?', 'Борис ест планшеты тоже. У бухгалтера так пропал ноутбук. И квартальный отчёт. Не знаю, что вкуснее.']),
@@ -143,7 +144,7 @@ export const LEGENDS: Record<string, Legend> = {
   },
   boris_wedding: {
     until: 'сразу после свадьбы Бориса',
-    condition: 'boris.married',
+    condition: borisMarried,
     lines: [
       'Все деньги ушли на свадьбу Бориса. Коза из хорошей семьи, приданое требуют. Твои тоже там, брат, в приданом.',
       'Семья козы хочет калым. Три барана и один плиточник. Я сказал, ты занят. Цени.',
@@ -179,12 +180,12 @@ export const LEGENDS: Record<string, Legend> = {
   },
   frozen: {
     until: 'как счета разморозят',
-    condition: 'tax.thawed',
+    condition: taxThawed,
     lines: [
       needs('boris')('Счета заморожены. Из-за Бориса. Он всё рассказал налоговой. Даже то, чего не было.'),
       needs('boris')('Звонил в налоговую: сказали, разморозят, как только Борис даст показания ещё раз. Он отказывается. Принципиальный.'),
       'Сижу на замороженных счетах, как на льду. Скользко, холодно, денег не видно.',
-      { t: 'Счета разморозили! Деньги оттаяли и сразу ушли на пени за просрочку. Осталось немного. На лаваш.', when: [is('tax.frozen')], remember: [set('tax.thawed', true), set('tax.frozen', false)] },
+      { t: 'Счета разморозили! Деньги оттаяли и сразу ушли на пени за просрочку. Осталось немного. На лаваш.', when: [is(taxFrozen)], remember: [set(taxThawed, true), set(taxFrozen, false)] },
     ],
     talk: [
       needs('boris', 'niva')(['Что именно Борис рассказал налоговой?', ('Всё. Про сейф, про «Ниву», про тебя. Они даже тебя проверить хотели. Я сказал: этот честный, он ждёт.')]),
@@ -236,9 +237,9 @@ export const LEGENDS: Record<string, Legend> = {
   // --- инспектор Рубик
   inspect: {
     until: 'как Рубик акт подпишет',
-    condition: 'act.signed',
+    condition: actSigned,
     lines: [
-      gate(WORLD.grant, missing('act.signed'))('Без акта Грант не платит, без Гранта — я. А акт у Рубика. А Рубик у меня в ванной.'),
+      gate(WORLD.grant, missing(actSigned))('Без акта Грант не платит, без Гранта — я. А акт у Рубика. А Рубик у меня в ванной.'),
       needs('garik')('Рубик теперь проверяет Гарика. Говорит, слишком честные глаза — подозрительно.'),
       'Предложил Рубику взятку, чтобы подписал. Он обрадовался: «Вот! Я же говорил, без взятки у вас никак». Теперь из принципа не подписывает.',
     ],
@@ -305,7 +306,7 @@ export const LEGENDS: Record<string, Legend> = {
   // --- заказчик Грант
   grant: {
     until: 'как Грант заплатит',
-    condition: 'grant.paid',
+    condition: grantPaid,
     lines: [
       'Я бы отдал, но Грант не платит мне. Я не могу платить тебе из денег, которых нет. Это же логика, брат.',
       'Звонил Гранту. Он говорит, плитка слишком ровная — не верит, что это ручная работа. Хочет экспертизу.',
@@ -444,8 +445,8 @@ export const CHORUS_LEGEND: Record<string, Line[]> = {
   grant: [
     { t: 'Молодой человек, ваш конверт стал частью моего дома. С Аликом по его работе я рассчитался отдельно.', when: [eq('legend', 'beton_law')], prio: 1 },
     { t: 'Молодой человек, плитку в углу не трогать. Там экскурсия в двенадцать.', when: [eq('legend', 'beton_goar')], prio: 1 },
-    { t: 'Молодой человек, я не плачу, пока в моей ванной живёт государство.', when: [eq('legend', 'inspect'), missing('grant.paid')], prio: 1 },
-    { t: 'Молодой человек, я в Лос-Анджелесе, но Алику по договору всё заплатил ещё в марте.', when: [eq('legend', 'grant_la')], remember: [set('grant.paid', true)], prio: 1 },
+    { t: 'Молодой человек, я не плачу, пока в моей ванной живёт государство.', when: [eq('legend', 'inspect'), missing(grantPaid)], prio: 1 },
+    { t: 'Молодой человек, я в Лос-Анджелесе, но Алику по договору всё заплатил ещё в марте.', when: [eq('legend', 'grant_la')], remember: [set(grantPaid, true)], prio: 1 },
   ],
   razmik: [
     { t: '(с крана) Очередь по высоте — это Алик придумал. Я просто залез первым. Лезь, пока место есть.', when: [eq('legend', 'crane_queue')], prio: 1 },

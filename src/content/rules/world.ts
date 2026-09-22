@@ -5,6 +5,7 @@ import type { GameEvent } from './events'
 import { WORLD, SPEAKS } from '../world'
 import { CHORUS_LEGEND } from '../legends'
 import { PROMISE_DUE, PROMISE_DUE_COSMIC, PROMISE_DUE_KEPT, PROMISE_MET, CHORUS, CHORUS_FED_UP, WEDDING_NOISE, BORIS_SICK, DEAD_KARINE, DEAD_ALIK } from '../world'
+import { alikDead, blocked, count, interjections, intro, met, mourning, sick } from '../memkeys'
 
 type R = Rule<Game, GameEvent>
 
@@ -21,16 +22,16 @@ export const sceneRules: R[] = [
   // истории, которые случаются один раз: «новый объект», «займи 5000», «если спросят — ты не работал», кредит
   { ...scene('newjob'), once: true },
   // «это Арсен, племянник» — знакомство: если Арсен уже в истории (суд, фундамент), второй раз не представляется
-  scene('nephew', [missing('intro.arsen')]),
+  scene('nephew', [missing(intro('arsen'))]),
   { ...scene('customer', [gte('day', 200)]), once: true }, // «позвони заказчику сам» — один раз
   { ...scene('lend', [gte('mood', 4), gte('money', 5000)]), once: true }, // «займи 5000» — если на карте есть 5000
-  scene('toast', [missing('mourning')], eveningBoost), // застолье — чаще вечером и в пятницу, и не когда в семье прощаются
-  { ...scene('tax', [gte('count.threat', 1)], 2), once: true }, // «если спросят — ты у меня не работал» — после угроз судом
-  { ...scene('wife', [gte('count.rude', 1), missing('met.karine'), WORLD.karineHome]), once: true }, // Карине знакомится один раз: «Вы кто такой?» дважды — нелепо
+  scene('toast', [missing(mourning)], eveningBoost), // застолье — чаще вечером и в пятницу, и не когда в семье прощаются
+  { ...scene('tax', [gte(count.threat, 1)], 2), once: true }, // «если спросят — ты у меня не работал» — после угроз судом
+  { ...scene('wife', [gte(count.rude, 1), missing(met('karine')), WORLD.karineHome]), once: true }, // Карине знакомится один раз: «Вы кто такой?» дважды — нелепо
   scene('invoice', [gte('day', 215)]),
   { ...scene('loan', [gte('day', 230)]), once: true }, // кредит «на твоё имя» — один раз
   // умирать Алик начинает, когда дела плохи, и только один раз: после похорон и воскрешения смертный одр уже был
-  { ...scene('deathbed', [gte('day', 240), lte('mood', 6), missing('mourning')], 2), once: true },
+  { ...scene('deathbed', [gte('day', 240), lte('mood', 6), missing(mourning)], 2), once: true },
   { ...scene('heir', [gte('arc.grandpa', 4), gte('arc.boris', 4)], 3), once: true }, // наследство: после того как дедушка переписал завещание и когда Борис уже есть
 ]
 
@@ -42,7 +43,7 @@ export const QUEST_WHEN: Record<string, R['when']> = {
   q_niva: [eq('legend', 'niva_stuck')], // «толкни „Ниву“» — эпизод сериала «Нива», а не его повторная завязка
   q_crypto: [gte('day', 200), missing('legend')],
   q_witness: [gte('day', 210)],
-  q_tamada: [missing('mourning')], // вести застолье, пока в семье прощаются, — нельзя
+  q_tamada: [missing(mourning)], // вести застолье, пока в семье прощаются, — нельзя
 }
 export const questRules: R[] = [
   quest('q_hash'), quest('q_niva', QUEST_WHEN.q_niva), quest('q_tamada', QUEST_WHEN.q_tamada), quest('q_lottery'), quest('q_parking'),
@@ -88,7 +89,7 @@ export const promiseRules: R[] = [
 const speaks = (who: string) => (SPEAKS[who] ? [SPEAKS[who]] : [])
 const chorus = (who: string): R => ({
   name: `Chorus_${who}`, event: 'Mentioned', target: who, when: speaks(who), odds: 0.3, cooldown: { turns: 12 }, priority: 'chatter',
-  remember: [add('interjections', 1, { scope: 'target' })],
+  remember: [add(interjections, 1, { scope: 'target' })],
   respond: async ({ game }) => {
     // сначала реплики в рамках легенды денег (Нуне не скажет «денег нет», пока деньги в сейфе)
     const t = game.line('CH_' + who, [...(CHORUS_LEGEND[who] ?? []), ...CHORUS[who]])
@@ -98,8 +99,8 @@ const chorus = (who: string): R => ({
   },
 })
 const fedUp = (who: string): R => ({
-  name: `Chorus_${who}_FedUp`, event: 'Mentioned', target: who, when: [gte('interjections', 3, 'target'), ...speaks(who)], odds: 0.5, cooldown: { turns: 12 }, priority: 'chatter',
-  remember: [add('interjections', 1, { scope: 'target' })],
+  name: `Chorus_${who}_FedUp`, event: 'Mentioned', target: who, when: [gte(interjections, 3, 'target'), ...speaks(who)], odds: 0.5, cooldown: { turns: 12 }, priority: 'chatter',
+  remember: [add(interjections, 1, { scope: 'target' })],
   // по порядку и один раз: нарастание, а не случайная реплика
   respond: async ({ game }) => {
     const t = game.decks.next('FED_' + who, CHORUS_FED_UP[who], { mode: 'sequential', noRepeat: true })
@@ -126,17 +127,17 @@ async function deadTurn(game: Game): Promise<void> {
 }
 export const stateRules: R[] = [
   weddingNoise('boris'), weddingNoise('samvel'), weddingNoise('razmik'),
-  { name: 'Turn_BorisSick', event: 'AlikTurn', when: [of('boris', is('sick'))], specificity: 0, weight: 10, cooldown: { turns: 3 }, respond: noise('BORIS_SICK', BORIS_SICK) },
+  { name: 'Turn_BorisSick', event: 'AlikTurn', when: [of('boris', is(sick))], specificity: 0, weight: 10, cooldown: { turns: 3 }, respond: noise('BORIS_SICK', BORIS_SICK) },
   // «умер» — значит, умер: ни болтовни простоя, ни сюжетных ходов, ни «доброе утро»; на слова игрока — Карине / «с того света»
   // ход Алика по другим путям (после сцены, после пропажи) — тоже «умер»
-  { name: 'Turn_WhileDead', event: 'AlikTurn', when: [is('alik_dead')], respond: ({ game }) => deadTurn(game) },
+  { name: 'Turn_WhileDead', event: 'AlikTurn', when: [is(alikDead)], respond: ({ game }) => deadTurn(game) },
   // пока Алик «мёртв», это состояние перекрывает ответ на любое сообщение игрока (кроме вопроса о сериале — так идут похороны)
-  { name: 'Tone_WhileDead', event: 'PlayerMessage', when: [is('alik_dead')], bonus: 10, respond: ({ game }) => deadTurn(game) },
-  { name: 'Says_WhileDead', event: 'PlayerSays', when: [is('alik_dead'), ne('intent', 'arc')], bonus: 6, respond: ({ game }) => deadTurn(game) },
-  { name: 'Says_OtherArcWhileDead', event: 'PlayerSays', when: [is('alik_dead'), eq('intent', 'arc'), ne('arg', 'alik_death')], bonus: 6, respond: ({ game }) => deadTurn(game) },
-  ...(['AlikIdle', 'StoryBeat', 'PeriodLine', 'PromiseDue', 'PromiseConditionMet'] as GameEvent[]).map((event): R => ({ name: 'Quiet_Dead_' + event, event, when: [is('alik_dead')], bonus: 10, respond: () => {} })),
+  { name: 'Tone_WhileDead', event: 'PlayerMessage', when: [is(alikDead)], bonus: 10, respond: ({ game }) => deadTurn(game) },
+  { name: 'Says_WhileDead', event: 'PlayerSays', when: [is(alikDead), ne('intent', 'arc')], bonus: 6, respond: ({ game }) => deadTurn(game) },
+  { name: 'Says_OtherArcWhileDead', event: 'PlayerSays', when: [is(alikDead), eq('intent', 'arc'), ne('arg', 'alik_death')], bonus: 6, respond: ({ game }) => deadTurn(game) },
+  ...(['AlikIdle', 'StoryBeat', 'PeriodLine', 'PromiseDue', 'PromiseConditionMet'] as GameEvent[]).map((event): R => ({ name: 'Quiet_Dead_' + event, event, when: [is(alikDead)], bonus: 10, respond: () => {} })),
   // заблокировал — значит, не пишет: ни легенд, ни «обед — святое» (пишет разве что через «Ниву» — это ход блокировки)
-  ...(['StoryBeat', 'PeriodLine', 'PromiseDue', 'PromiseConditionMet'] as GameEvent[]).map((event): R => ({ name: 'Quiet_Blocked_' + event, event, when: [is('blocked')], bonus: 10, respond: () => {} })),
+  ...(['StoryBeat', 'PeriodLine', 'PromiseDue', 'PromiseConditionMet'] as GameEvent[]).map((event): R => ({ name: 'Quiet_Blocked_' + event, event, when: [is(blocked)], bonus: 10, respond: () => {} })),
 ]
 
 export const worldRules: R[] = [...sceneRules, ...questRules, ...promiseRules, ...chorusRules, ...stateRules]

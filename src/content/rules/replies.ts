@@ -13,6 +13,7 @@ import { ARCS, NO_NEWS_A, NO_NEWS_B, GROUP_SEEN_A, GROUP_SEEN_B, WRONG_A, WRONG_
 import * as L from '../life'
 import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER } from '../misc'
 import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_SENT, LIE_THIRD, LIE_NOCRED } from '../lies'
+import { HEAT, asked, caughtCount, count, doneAsked, finaleOf, lie, nextTransfer, topic, topicMute } from '../memkeys'
 
 type R = Rule<Game, GameEvent>
 const says = (intent: string, rest: Partial<R> & Pick<R, 'respond'>, extra: R['when'] = []): R => ({
@@ -45,24 +46,24 @@ export const replyRules: R[] = [
   // Грубая просьба: отмазка + нагрев ссоры (без отдельной обиженной реплики Tone_Rude).
   says('request', {
     bonus: 1,
-    remember: [add('count.rude'), add('rude.heat')],
+    remember: [add(count.rude), add(HEAT)],
     trigger: [{ event: 'RudeCool', delay: 20 }],
     respond: ({ game }) => game.excuseTurn(),
   }, [eq('tone', 'rude')]),
   says('request', { respond: ({ game }) => game.excuseTurn() }),
 
-  says('sorry', { remember: [add('count.sorry')], respond: ({ game }) => sorry(game, game.uniq(game.X.sorry)) }),
+  says('sorry', { remember: [add(count.sorry)], respond: ({ game }) => sorry(game, game.uniq(game.X.sorry)) }),
   says('sorry', {
-    remember: [add('count.sorry')],
+    remember: [add(count.sorry)],
     respond: ({ game }) => {
       game.unlock('memory')
       // свежая фраза «опять мир?», а кончились — обычное прощение из генератора
       return sorry(game, game.line('SORRY_AGAIN', SORRY_AGAIN, { fallback: game.X.sorry })!)
     },
-  }, [gte('count.sorry', 2)]),
+  }, [gte(count.sorry, 2)]),
   // третий «мир» за 6 ходов — «качели»: Алик замечает, и ссору это уже не остужает
   says('sorry', {
-    remember: [add('count.sorry')], bonus: 3,
+    remember: [add(count.sorry)], bonus: 3,
     respond: async ({ game }) => {
       game.unlock('memory')
       game.mood(1) // мир всё-таки, хоть и качели
@@ -92,7 +93,7 @@ export const replyRules: R[] = [
   says('transferQ', {
     respond: async ({ game }) => {
       const reply = game.uniq(game.X.transferQ)
-      if (reply.nextTransfer) game.S.mem.nextTransfer = reply.nextTransfer
+      if (reply.nextTransfer) game.S.mem[nextTransfer] = reply.nextTransfer
       await game.say([reply.text])
       game.setCtx(null)
     },
@@ -167,7 +168,7 @@ export const replyRules: R[] = [
   says('arc', {
     respond: async ({ game, facts }) => {
       const id = String(facts.arg ?? '')
-      game.S.mem['asked.' + id] = Number(game.S.mem['asked.' + id] ?? 0) + 1 // для финалов: «спрашивал про Бориса 3+ раз»
+      game.S.mem[asked(id)] = Number(game.S.mem[asked(id)] ?? 0) + 1 // для финалов: «спрашивал про Бориса 3+ раз»
       const st = game.S.arcs[id]
       // на вопрос — следующая серия; второй вопрос подряд в тот же день — «пока без новостей» (не проглатывать сериал)
       if (st && ARCS[id] && game.arcCanAdvance(id, true)) { await game.playArc(id); game.S.arcs[id].byAsk = true; return }
@@ -180,9 +181,9 @@ export const replyRules: R[] = [
   says('arc', {
     respond: async ({ game, facts }) => {
       const id = String(facts.arg ?? '')
-      game.S.mem['doneAsked.' + id] = game.S.day
+      game.S.mem[doneAsked(id)] = game.S.day
       const lines = game.arcDoneLines(id) ?? NO_NEWS_A
-      await game.say([game.uniq(() => game.draw(`DONE_${id}_${game.S.mem['finale.' + id] ?? ''}`, lines))])
+      await game.say([game.uniq(() => game.draw(`DONE_${id}_${game.S.mem[finaleOf(id)] ?? ''}`, lines))])
       game.setCtx(null)
     },
   }, [is('argArcDone')]),
@@ -193,7 +194,7 @@ export const replyRules: R[] = [
     respond: async ({ game, facts }) => {
       const [k, i] = String(facts.arg ?? '').split(':')
       const mem = game.S.mem
-      const n = (mem['topic.' + k] = Number(mem['topic.' + k] ?? 0) + 1)
+      const n = (mem[topic(k)] = Number(mem[topic(k)] ?? 0) + 1)
       mem.topicRun = mem.topicLast === k ? Number(mem.topicRun ?? 0) + 1 : 1
       mem.topicLast = k
       // некоторые вопросы сразу превращаются в мини-квест («Приеду поесть» → хаш в 7 утра)
@@ -208,8 +209,8 @@ export const replyRules: R[] = [
         await game.sleep(600)
         await game.say([game.uniq(() => game.draw('TOPIC_OBS', TOPIC_OBSESSED).replace('{n}', TOPIC_NAME[k]))])
         game.unlock('memory')
-        mem['topic.' + k] = 0
-        mem['topicMute.' + k] = game.S.day + 20
+        mem[topic(k)] = 0
+        mem[topicMute(k)] = game.S.day + 20
       }
       game.setCtx(null)
       if (game.chance(0.35)) await game.promiseLine()
@@ -225,17 +226,17 @@ export const replyRules: R[] = [
 
   // --- пойман на лжи: общий ответ, частные по теме и по тому, сколько раз уже ловили
   says('catchLie', {
-    remember: [add('caught')],
+    remember: [add(caughtCount)],
     respond: ({ game }) => {
       const l = game.lie()
       const map = l ? { old: l.old.say, new: l.new.say, Old: cap(l.old.say), New: cap(l.new.say) } : { old: 'одно', new: 'другое', Old: 'Одно', New: 'Другое' }
       return game.caught(game.uniq(() => `${game.draw('LIE_OPEN', LIE_OPEN)} ${game.X.fill(game.draw('LIE_EXPLAIN', LIE_EXPLAIN), map)}`))
     },
   }),
-  says('catchLie', { remember: [add('caught')], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_GRANDPA', LIE_GRANDPA))) }, [eq('lie.kind', 'grandpa')]),
-  says('catchLie', { remember: [add('caught')], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_CUSTOMER', LIE_CUSTOMER))) }, [eq('lie.kind', 'customer')]),
-  says('catchLie', { remember: [add('caught')], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_SENT', LIE_SENT))) }, [eq('lie.kind', 'sent')]),
+  says('catchLie', { remember: [add(caughtCount)], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_GRANDPA', LIE_GRANDPA))) }, [eq(lie.kind, 'grandpa')]),
+  says('catchLie', { remember: [add(caughtCount)], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_CUSTOMER', LIE_CUSTOMER))) }, [eq(lie.kind, 'customer')]),
+  says('catchLie', { remember: [add(caughtCount)], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_SENT', LIE_SENT))) }, [eq(lie.kind, 'sent')]),
   // третий раз пойман — признаётся (по-своему); дальше — Алику уже никто не верит
-  { ...says('catchLie', { remember: [add('caught')], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_THIRD', LIE_THIRD))) }, [gte('caught', 2)]), bonus: 1 },
-  { ...says('catchLie', { remember: [add('caught')], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_NOCRED', LIE_NOCRED))) }, [gte('caught', 3)]), bonus: 2 },
+  { ...says('catchLie', { remember: [add(caughtCount)], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_THIRD', LIE_THIRD))) }, [gte(caughtCount, 2)]), bonus: 1 },
+  { ...says('catchLie', { remember: [add(caughtCount)], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_NOCRED', LIE_NOCRED))) }, [gte(caughtCount, 3)]), bonus: 2 },
 ]
