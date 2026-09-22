@@ -38,6 +38,17 @@ describe('несостыковки из партии пользователя', 
     expect(line).toContain('«Место на кране»')
     expect(line).not.toContain('(40 м)')
   })
+  it('срок-условие не выдаётся после того, как событие уже случилось', async () => {
+    const { game } = makeGame()
+    game.setLegend('boris_wedding', 'boris')
+    const n0 = game.S.msgs.length
+    await game.promiseLine(undefined, true)
+    expect(texts(game, n0).join(' ')).toMatch(/свадьбы Бориса/)
+    game.S.mem['boris.married'] = true // свадьба сыграна
+    const n1 = game.S.msgs.length
+    for (let i = 0; i < 10; i++) await game.promiseLine(undefined, true)
+    expect(texts(game, n1).join(' ')).not.toMatch(/свадьбы Бориса/)
+  })
   it('«Кто это? А, …» — только если Алик не писал со вчера', () => {
     const { game } = makeGame()
     const excuses = () => Array.from({ length: 200 }, () => game.X.excuse().texts.join(' ')).join('\n')

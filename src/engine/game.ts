@@ -975,7 +975,9 @@ export class Game {
   /** Обещание. Пока жива легенда денег — срок чаще вытекает из неё («как ключ выйдет»); legend = true — всегда из неё. */
   async promiseLine(prefix?: string, legend?: boolean): Promise<void> {
     const legendSpec = this.legend() ? LEGENDS[this.legend()!] : undefined
-    const until = legendSpec?.until
+    // событие легенды уже случилось («свадьба Бориса прошла») — обещать «сразу после него» поздно
+    const done = legendSpec?.condition ? this.S.mem[legendSpec.condition] === true : false
+    const until = done ? undefined : legendSpec?.until
     // срок из легенды — после серии обязательно, дальше изредка: одна и та же клятва «как „Нива“ заведётся» приедается
     const recent = this.S.stats.sent - Number(this.S.mem.legendPromiseAt ?? -99) < 4
     const fromLegend = !!until && (legend || (!recent && this.chance(0.4)))
