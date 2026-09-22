@@ -114,7 +114,7 @@ const outcome = (id: string, when: R['when'], extra: Partial<R> = {}): R => ({
     game.S.mem.payday = id
     game.S.mem['payday.sum'] = undefined
     game.setLegend(null) // деньги «отданы» — легенда денег кончилась
-    game.rules.schedule({ at: game.S.day + 1, kind: 'event', event: 'PaydayButton', facts: { outcome: id } })
+    game.scheduleEvent(game.S.day + 1, 'PaydayButton', { outcome: id })
   },
 })
 export const paydayRules: R[] = [

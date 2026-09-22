@@ -238,11 +238,18 @@ export class Game {
     console.error('[alik] ход прерван ошибкой', e)
     try {
       this.restStatus()
-      this.S.choices = this.buildChoices()
+      this.S.choices = this.choicesAfterCrash()
       this.save()
       this.emit()
       this.armIdle()
     } catch (inner) { console.error('[alik] восстановление после ошибки не удалось', inner) }
+  }
+
+  /** Кнопки после падения: сломанная сцена собирается снова при каждой отрисовке, а пустой список — всё ещё игра, свой текст пишется. */
+  private choicesAfterCrash(): Choice[] {
+    try { return this.buildChoices() } catch (e) { console.error('[alik] сцена не собирается — выходим из неё', e) }
+    this.S.scene = null
+    try { return this.buildChoices() } catch (e) { console.error('[alik] кнопки не собираются', e); return [] }
   }
 
   dispose(): void {
@@ -753,12 +760,16 @@ export class Game {
   floor(): Priority {
     return this.S.scene ? 'cinematic' : 'idle'
   }
+  /** Событие на будущий день: имя — из того же union, иначе опечатка молчит — событие просто не наступит. */
+  scheduleEvent(at: number, event: GameEvent, facts?: Facts): void {
+    this.rules.schedule({ at, kind: 'event', event, facts })
+  }
   fire(event: GameEvent, extra: Facts = {}, q: Omit<Query, 'event' | 'facts'> = {}): Promise<Rule<Game> | null> {
     return this.rules.fire(this, { event, facts: extra, ...q }, this.facts, { floor: this.floor() })
       .catch((e) => { this.swallowDisposed(e); return null })
   }
   /** События, отложенные до «безопасной точки» (после ответа Алика): хор, наступившие обещания. */
-  private pending: Query[] = []
+  private pending: (Query & { event: GameEvent })[] = []
   /** Хор из упоминаний — не больше одного персонажа; тот же игровой день, что ответ Алика. */
   private async flushChorus(): Promise<void> {
     const queue = this.pending.splice(0)
@@ -992,7 +1003,7 @@ export class Game {
     if (p.tomorrow) this.rules.applyOps([set('said.tomorrow', true)], {})
     const due = p.d == null ? null : this.S.day + (p.due ? dueIn(p.due, this.S.day) : p.d)
     this.S.promises.push({ t: p.text, made: this.S.day, due, condition: p.condition })
-    if (due !== null && due > this.S.day) this.rules.schedule({ at: due, kind: 'event', event: 'PromiseDue', facts: { promise: this.S.promises.length - 1 } })
+    if (due !== null && due > this.S.day) this.scheduleEvent(due, 'PromiseDue', { promise: this.S.promises.length - 1 })
     if (this.S.promises.length >= 20) this.unlock('promises20')
   }
   private alignPromise(p: Promise3, until: string, condition?: PromiseCondition): Promise3 {

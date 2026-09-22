@@ -155,7 +155,7 @@ export function Chat() {
         <MessageList />
         {game.typing && (
           // внутри живой ленты «печатает…» дублировало бы каждое входящее — читалке достаточно самого сообщения
-          <div className="typing-bubble" aria-hidden="true" aria-label={game.typing}><span /><span /><span /></div>
+          <div className="typing-bubble" aria-hidden="true"><span /><span /><span /></div>
         )}
       </main>
       <div className="new-messages-slot" aria-live="polite">
