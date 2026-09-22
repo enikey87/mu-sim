@@ -25,7 +25,8 @@ npm install
 npm run dev        # http://localhost:5173
 npm test           # Vitest: движок, контент, сценарии правил, симуляция, интерфейс
 npx playwright install chromium  # один раз: браузер для UI-тестов
-npm run test:e2e   # Playwright: основные пользовательские сценарии в desktop и mobile Chromium
+npm run test:e2e   # Playwright: сценарии в desktop и mobile Chromium против прод-сборки
+                   # (собирает dist и подаёт его через `vite preview` на :4173; dev — на :5173)
 npm run typecheck
 npm run lint       # ESLint (в CI)
 npm run format     # Prettier --write (опционально; стиль плотный, массовый прогон отдельно)

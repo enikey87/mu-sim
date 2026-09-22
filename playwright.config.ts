@@ -17,8 +17,12 @@ export default defineConfig({
     { name: 'mobile-chromium', use: { ...devices['Pixel 7'] } },
   ],
   webServer: {
-    command: 'npm run dev -- --host 127.0.0.1 --port 4173',
+    // сборка в команде: dist/ в дереве стареет, а `vite preview` один молча отдаст его
+    command: 'npm run build && npm run preview -- --host 127.0.0.1 --port 4173 --strictPort',
     url: 'http://127.0.0.1:4173',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false, // чужой сервер на порту должен падать, а не подменять артефакт
+    timeout: 120_000,
+    stdout: 'pipe', // иначе падение сборки видно как «Exit code: 1» без текста
+    name: 'vite preview',
   },
 })
