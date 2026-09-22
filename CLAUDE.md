@@ -1,6 +1,14 @@
-# Repository instructions
+# CLAUDE.md
 
-- This repository does not use Builderr.
-- Do not invoke or assume project-specific CLIs, services, automation, or scripts that are not included or documented in this repository.
-- Use the checked-in package scripts, dependencies, and configuration for development and verification.
-- CI runs through the GitHub Actions workflows stored in this repository; inspect it through GitHub.
+Пет-проект. Правила корпоративной разработки (songsterr) сюда **не распространяются**:
+
+- нет builderr — ветки могут называться как угодно, префикс `feature/` не обязателен;
+- нет `ship-branch-preflight` и прочих корпоративных гардов — не искать и не требовать их;
+- PR создаётся обычным `gh pr create`, без скиллов `/pull-request` и `/ship`; draft по умолчанию не нужен;
+- нет review-ботов и обязательных ревью-лупов;
+- мерж — когда зелёный CI, без дополнительных согласований;
+- если в ветке не менялся код (только docs/, *.md, конфиги агентов) — за CI после пуша или PR следить **не нужно**: он уже доказан зелёным для этого кода, перепроверка бессмысленна.
+
+Остальное — обычная гигиена: не пушить в `main` напрямую, не коммитить секреты, перед коммитом смотреть `git status`/`git diff --cached`.
+
+О проекте — `README.md`, дизайн — `DESIGN.md`, журналы огрехов — `docs/`.
