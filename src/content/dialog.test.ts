@@ -1,5 +1,6 @@
 // Несостыковки из партии пользователя (docs/PLAYTEST_ISSUES.md): каждая — тестом, чтобы не вернулась.
 import { describe, it, expect } from 'vitest'
+import type { GameEvent } from './rules/events'
 import { makeGame } from '../test/helpers'
 import { ARCS, GROUP } from './arcs'
 import { D } from './excuses'
@@ -216,13 +217,13 @@ describe('несостыковки из плейтеста ботами', () => 
   it('«Алик умер»: ни простоя, ни сюжетных ходов, на слова — Карине или «с того света»', async () => {
     const { game } = makeGame()
     game.S.mem.alik_dead = true
-    for (const ev of ['AlikIdle', 'StoryBeat', 'PeriodLine', 'PromiseDue']) expect((await game.fire(ev))?.name).toBe('Quiet_Dead_' + ev)
+    for (const ev of ['AlikIdle', 'StoryBeat', 'PeriodLine', 'PromiseDue'] as GameEvent[]) expect((await game.fire(ev))?.name).toBe('Quiet_Dead_' + ev)
     expect((await game.fire('PlayerSays', { intent: 'photo' }))?.name).toBe('Says_WhileDead')
   })
   it('в чёрном списке — легенды и «обед — святое» не приходят', async () => {
     const { game } = makeGame()
     game.S.mem.blocked = true
-    for (const ev of ['StoryBeat', 'PeriodLine', 'PromiseDue']) expect((await game.fire(ev))?.name).toBe('Quiet_Blocked_' + ev)
+    for (const ev of ['StoryBeat', 'PeriodLine', 'PromiseDue'] as GameEvent[]) expect((await game.fire(ev))?.name).toBe('Quiet_Blocked_' + ev)
   })
   it('где деньги — меняется по сюжету: «Нива» полгода назад не ловится как ложь', () => {
     const { game } = makeGame()

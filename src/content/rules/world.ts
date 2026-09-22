@@ -1,11 +1,12 @@
 // Правила новых возможностей: выбор сцен, наступившие обещания, хор персонажей, состояния мира.
 import type { Game } from '../../engine/game'
 import { type Rule, type Facts, type Entry, eq, ne, gte, lte, is, add, of, missing } from '../../engine/rules'
+import type { GameEvent } from './events'
 import { WORLD, SPEAKS } from '../world'
 import { CHORUS_LEGEND } from '../legends'
 import { PROMISE_DUE, PROMISE_DUE_COSMIC, PROMISE_DUE_KEPT, PROMISE_MET, CHORUS, CHORUS_FED_UP, WEDDING_NOISE, BORIS_SICK, DEAD_KARINE, DEAD_ALIK } from '../world'
 
-type R = Rule<Game>
+type R = Rule<Game, GameEvent>
 
 // ---- выбор сцены (PickScene): раньше — случайно из колоды, теперь — по сюжету ----
 // Специфичность у всех 0 (выбор по весам), условия — ворота; после показа — перерыв 25 дней.
@@ -112,6 +113,11 @@ export const chorusRules: R[] = [...Object.keys(CHORUS).map(chorus), ...Object.k
 const noise = (key: string, arr: readonly Entry<string>[]) => async ({ game }: { game: Game }) => {
   await game.say([game.uniq(() => game.draw(key, arr))])
 }
+/** Факт у каждой свадьбы свой: два срока на одном ключе откатывали бы друг друга. */
+const weddingNoise = (who: string): R => ({
+  name: `Turn_Wedding_${who.charAt(0).toUpperCase()}${who.slice(1)}`, event: 'AlikTurn', when: [is(`wedding.${who}`)],
+  specificity: 0, weight: 12, cooldown: { turns: 3 }, respond: noise('WEDDING', WEDDING_NOISE),
+})
 async function deadTurn(game: Game): Promise<void> {
   game.setCtx(null)
   // Карине ушла к Рубику — о смерти сообщает мама Алика
@@ -119,7 +125,7 @@ async function deadTurn(game: Game): Promise<void> {
   else await game.say([game.uniq(() => game.draw('DEAD_A', DEAD_ALIK))])
 }
 export const stateRules: R[] = [
-  { name: 'Turn_Wedding', event: 'AlikTurn', when: [is('wedding')], specificity: 0, weight: 12, cooldown: { turns: 3 }, respond: noise('WEDDING', WEDDING_NOISE) },
+  weddingNoise('boris'), weddingNoise('samvel'), weddingNoise('razmik'),
   { name: 'Turn_BorisSick', event: 'AlikTurn', when: [of('boris', is('sick'))], specificity: 0, weight: 10, cooldown: { turns: 3 }, respond: noise('BORIS_SICK', BORIS_SICK) },
   // «умер» — значит, умер: ни болтовни простоя, ни сюжетных ходов, ни «доброе утро»; на слова игрока — Карине / «с того света»
   // ход Алика по другим путям (после сцены, после пропажи) — тоже «умер»
@@ -128,9 +134,9 @@ export const stateRules: R[] = [
   { name: 'Tone_WhileDead', event: 'PlayerMessage', when: [is('alik_dead')], bonus: 10, respond: ({ game }) => deadTurn(game) },
   { name: 'Says_WhileDead', event: 'PlayerSays', when: [is('alik_dead'), ne('intent', 'arc')], bonus: 6, respond: ({ game }) => deadTurn(game) },
   { name: 'Says_OtherArcWhileDead', event: 'PlayerSays', when: [is('alik_dead'), eq('intent', 'arc'), ne('arg', 'alik_death')], bonus: 6, respond: ({ game }) => deadTurn(game) },
-  ...['AlikIdle', 'StoryBeat', 'PeriodLine', 'PromiseDue', 'PromiseConditionMet'].map((event): R => ({ name: 'Quiet_Dead_' + event, event, when: [is('alik_dead')], bonus: 10, respond: () => {} })),
+  ...(['AlikIdle', 'StoryBeat', 'PeriodLine', 'PromiseDue', 'PromiseConditionMet'] as GameEvent[]).map((event): R => ({ name: 'Quiet_Dead_' + event, event, when: [is('alik_dead')], bonus: 10, respond: () => {} })),
   // заблокировал — значит, не пишет: ни легенд, ни «обед — святое» (пишет разве что через «Ниву» — это ход блокировки)
-  ...['StoryBeat', 'PeriodLine', 'PromiseDue', 'PromiseConditionMet'].map((event): R => ({ name: 'Quiet_Blocked_' + event, event, when: [is('blocked')], bonus: 10, respond: () => {} })),
+  ...(['StoryBeat', 'PeriodLine', 'PromiseDue', 'PromiseConditionMet'] as GameEvent[]).map((event): R => ({ name: 'Quiet_Blocked_' + event, event, when: [is('blocked')], bonus: 10, respond: () => {} })),
 ]
 
 export const worldRules: R[] = [...sceneRules, ...questRules, ...promiseRules, ...chorusRules, ...stateRules]

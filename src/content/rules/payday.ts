@@ -1,9 +1,10 @@
 // День выплаты: шаги сцены (hook) собираются из событий партии; исход выбирают правила PaydayOutcome.
 import type { Game } from '../../engine/game'
 import { type Rule, eq, gte, is, exists, missing } from '../../engine/rules'
+import type { GameEvent } from './events'
 import { SOURCES, SOURCES_TOPUP, ROLL, CLAIMS, GRAND, GRAND_FALLBACK, SLOTS, CONTRADICTIONS, MORNING_CONTRA, OUTCOME, type Source, type Call, type Claim } from '../payday'
 
-type R = Rule<Game>
+type R = Rule<Game, GameEvent>
 const NAMES = ['Гарик', 'Борис', 'Гоар', 'мама', 'Рубик', 'Размик', 'Нуне', 'Карине', 'Страсбург', 'малыш', '«Нив', 'Грант']
 const fmt = (n: number) => n.toLocaleString('ru-RU')
 

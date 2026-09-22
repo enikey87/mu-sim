@@ -18,4 +18,6 @@ export const RARE = new Set(['Due_Cosmic', 'Tone_Cow', 'Says_catchLie_liekind_gr
   // юрист Арсен представляется на суде, только если не встречался раньше — обычно уже был «племянник»
   'Court_Lawyer',
   // третье извинение за 6 ходов: бот извиняется редко
-  'Says_sorry_sorrySwing3'])
+  'Says_sorry_sorrySwing3',
+  // в симуляции бот доходит до свадьбы Бориса; свадьбы Самвела и Размика окрашивают ходы в его партиях редко
+  'Turn_Wedding_Samvel', 'Turn_Wedding_Razmik'])

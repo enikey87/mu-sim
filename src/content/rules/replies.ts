@@ -2,6 +2,7 @@
 // Общее правило по intent + более специфичные для частных случаев (память, контекст).
 import type { Game } from '../../engine/game'
 import { type Rule, eq, ne, is, gte, add, valueOf } from '../../engine/rules'
+import type { GameEvent } from './events'
 import { AlikOffline, ThickJournal } from './criteria'
 import { cooldown } from './rude'
 import { TOPICS, TOPIC_FALLBACK, TOPIC_NAME, TOPIC_OBSESSED } from '../topics'
@@ -13,7 +14,7 @@ import * as L from '../life'
 import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER } from '../misc'
 import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_SENT, LIE_THIRD, LIE_NOCRED } from '../lies'
 
-type R = Rule<Game>
+type R = Rule<Game, GameEvent>
 const says = (intent: string, rest: Partial<R> & Pick<R, 'respond'>, extra: R['when'] = []): R => ({
   name: `Says_${intent}${extra.length ? '_' + extra.map((c) => (c.key + (typeof c.value === 'string' ? '_' + c.value : c.value === true || c.value === undefined ? '' : c.value)).replace(/[^\wа-я]/gi, '')).join('_') : ''}`,
   event: 'PlayerSays',

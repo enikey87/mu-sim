@@ -150,6 +150,30 @@ describe('Game: начало и ход', () => {
     await p
     expect(game.S.stats.sent).toBe(1)
   })
+  it('ход, упавший на правиле, отпускает busy: следующий ход принимается, кнопки возвращаются', async () => {
+    const { game } = makeGame()
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    game.rules.add({ name: 'Test_Boom', event: 'PlayerMessage', when: [], specificity: 99, respond: () => { throw new Error('boom') } })
+    await game.send('Ну как там?')
+    expect(errors).toHaveBeenCalledWith('[alik] ход прерван ошибкой', expect.anything())
+    expect(game.busy).toBe(false)
+    expect(game.choices.length).toBeGreaterThan(0)
+    const sent = game.S.stats.sent
+    await game.send('Алло')
+    expect(game.S.stats.sent).toBe(sent + 1)
+    errors.mockRestore()
+  })
+  it('падение в «Алик пишет сам» тоже отпускает busy', async () => {
+    const { game } = makeGame()
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    game.S.stats.sent = 6
+    game.rules.add({ name: 'Test_IdleBoom', event: 'AlikIdle', when: [], specificity: 99, respond: () => { throw new Error('boom') } })
+    await game.onIdle()
+    expect(errors).toHaveBeenCalledWith('[alik] ход прерван ошибкой', expect.anything())
+    expect(game.busy).toBe(false)
+    expect(game.choices.length).toBeGreaterThan(0)
+    errors.mockRestore()
+  })
   it('реплики игрока не повторяются', async () => {
     const { game } = makeGame({ seed: 3 })
     const mine: string[] = []

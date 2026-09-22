@@ -395,3 +395,13 @@ body {
 .payday-sum b { color: var(--danger); }
 .ending-in blockquote.grand { margin: 4px 0; padding: 8px 10px; border-left: 3px solid var(--accent); font-size: 13.5px; text-align: left; font-style: italic; opacity: .9; }
 .ending-in button.secondary { border: 1px solid rgba(127,127,127,.4); background: transparent; color: inherit; border-radius: 12px; padding: 8px 12px; font: inherit; cursor: pointer; }
+
+/* Экран падения: ошибка отрисовки вместо белого экрана */
+.crash {
+  margin: auto; max-width: 320px; padding: 24px 18px; text-align: center;
+  display: flex; flex-direction: column; gap: 14px; align-items: center;
+}
+.crash button {
+  border: 1px solid rgba(127,127,127,.4); background: transparent; color: inherit;
+  border-radius: 12px; padding: 10px 14px; font: inherit; cursor: pointer;
+}

@@ -15,6 +15,7 @@ import { SPEAKS, meet } from '../content/world'
 import { FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_WANDER, OATH_FORMS } from '../content/misc'
 import { STARTS } from '../content/quests'
 import { allRules } from '../content/rules'
+import type { GameEvent } from '../content/rules/events'
 import { CLAIMS, claimByKey, conflicts, pairKey, CALLBACK_OPEN, type Claim } from '../content/lies'
 import {
   ENDGAME_CHOICES, ENDGAME_FALLBACK, ENDGAME_FORMALITIES, ENDGAME_GROUP, ENDGAME_INTRO, ENDGAME_JUBILEES,
@@ -227,6 +228,21 @@ export class Game {
 
   private swallowDisposed(e: unknown): void {
     if (!(e instanceof GameDisposed)) throw e
+  }
+
+  /** Ошибка в середине хода: партия не должна умереть вместе с ним. */
+  private recoverTurn(e: unknown): void {
+    this.busy = false
+    this.inPlayerTurn = false
+    if (e instanceof GameDisposed) return
+    console.error('[alik] ход прерван ошибкой', e)
+    try {
+      this.restStatus()
+      this.S.choices = this.buildChoices()
+      this.save()
+      this.emit()
+      this.armIdle()
+    } catch (inner) { console.error('[alik] восстановление после ошибки не удалось', inner) }
   }
 
   dispose(): void {
@@ -728,7 +744,7 @@ export class Game {
   floor(): Priority {
     return this.S.scene ? 'cinematic' : 'idle'
   }
-  fire(event: string, extra: Facts = {}, q: Omit<Query, 'event' | 'facts'> = {}): Promise<Rule<Game> | null> {
+  fire(event: GameEvent, extra: Facts = {}, q: Omit<Query, 'event' | 'facts'> = {}): Promise<Rule<Game> | null> {
     return this.rules.fire(this, { event, facts: extra, ...q }, this.facts, { floor: this.floor() })
       .catch((e) => { this.swallowDisposed(e); return null })
   }
@@ -839,7 +855,7 @@ export class Game {
   async send(opt: Choice | string): Promise<void> {
     try {
       await this.sendTurn(opt)
-    } catch (e) { this.swallowDisposed(e) }
+    } catch (e) { this.recoverTurn(e) }
   }
 
   private async sendTurn(opt: Choice | string): Promise<void> {
@@ -953,6 +969,7 @@ export class Game {
       this.armIdle()
     } finally {
       this.inPlayerTurn = false
+      this.busy = false // страховка: иначе падение в середине хода запирает игру до перезагрузки
     }
   }
 
@@ -1493,7 +1510,7 @@ export class Game {
       this.save()
       this.emit()
       this.armIdle()
-    } catch (e) { this.swallowDisposed(e) }
+    } catch (e) { this.recoverTurn(e) }
   }
 
   // ---------- Алик живёт сам ----------
@@ -1520,7 +1537,7 @@ export class Game {
       this.busy = false
       this.emit()
       if (!this.dead && !this.disposed) { this.restStatus(); this.armIdle() }
-    } catch (e) { this.swallowDisposed(e) }
+    } catch (e) { this.recoverTurn(e) }
   }
   armStatus(): void {
     this.clearSchedule(this.statusT)

@@ -1,7 +1,8 @@
 import type { Game } from '../../engine/game'
 import { type Rule, eq, is } from '../../engine/rules'
+import type { GameEvent } from './events'
 
-type R = Rule<Game>
+type R = Rule<Game, GameEvent>
 
 const active = is('endgame.active')
 

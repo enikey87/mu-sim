@@ -1,13 +1,14 @@
 // Ход Алика в ответ на обычное сообщение игрока.
 import type { Game } from '../../engine/game'
 import { type Rule, eq, ne, gte, lte, is, exists, missing, add } from '../../engine/rules'
+import type { GameEvent } from './events'
 import { meet } from '../world'
 import { AlikOffline } from './criteria'
 import { IDLE } from '../life'
 import { MEMORY } from '../memory'
 import { LEGENDS } from '../legends'
 
-type R = Rule<Game>
+type R = Rule<Game, GameEvent>
 
 // Событие PlayerMessage { tone } — как Алик реагирует на тон
 export const toneRules: R[] = [
