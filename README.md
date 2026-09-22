@@ -32,6 +32,7 @@ npm run lint       # ESLint (в CI)
 npm run format     # Prettier --write (опционально; стиль плотный, массовый прогон отдельно)
 npm run build      # сборка в dist/
 npm run rules:report  # покрытие правил: что срабатывает, что никогда, где побеждает общий ответ
+npm run rules:stable  # список редких правил не протух: покрытая всеми выборками запись больше не редкая
 npm run test:rules    # движок правил с покрытием (порог 100%)
 PLAYTEST_OUT=pt PLAYTEST_SEEDS=1-8 npm run playtest  # партии ботом: переписка с вариантами и запись действий (seed воспроизводит партию)
 ```
