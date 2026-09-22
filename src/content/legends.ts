@@ -444,7 +444,7 @@ export const CHORUS_LEGEND: Record<string, Line[]> = {
   grant: [
     { t: 'Молодой человек, ваш конверт стал частью моего дома. С Аликом по его работе я рассчитался отдельно.', when: [eq('legend', 'beton_law')], prio: 1 },
     { t: 'Молодой человек, плитку в углу не трогать. Там экскурсия в двенадцать.', when: [eq('legend', 'beton_goar')], prio: 1 },
-    { t: 'Молодой человек, я не плачу, пока в моей ванной живёт государство.', when: [eq('legend', 'inspect')], prio: 1 },
+    { t: 'Молодой человек, я не плачу, пока в моей ванной живёт государство.', when: [eq('legend', 'inspect'), missing('grant.paid')], prio: 1 },
     { t: 'Молодой человек, я в Лос-Анджелесе, но Алику по договору всё заплатил ещё в марте.', when: [eq('legend', 'grant_la')], remember: [set('grant.paid', true)], prio: 1 },
   ],
   razmik: [
