@@ -27,7 +27,7 @@ import {
   RuleSet, makeHub, Lines, resolver, test, isOpen, valueOf, set,
   type Criterion, type Entry, type Facts, type Resolver, type Rule, type Trace, type Query, type Priority, type Line as PoolLine, type LineOpts, type Picked,
 } from './rules'
-import { MENTION_RE } from '../content/world'
+import { MENTION_RE, WORLD } from '../content/world'
 import { type Clock, realClock, isManualClock } from './clock'
 import { type Audio, silentAudio } from './audio'
 import { typo } from './typo'
@@ -1319,7 +1319,8 @@ export class Game {
     await this.sleep(600)
     this.sys('Дядя Самвел добавил вас в группу «Стройка под ключ 🏗️ Семья». Тема: «Дело №1. Плиточник против уважения»')
     for (const [w, t] of this.open(TRIBUNAL)) await this.say([{ w, t }])
-    this.sys(`Голосование «Простить плиточника?» — Да: 1 (Гарик). Нет: ${5 + this.rnd(4)}.${this.canSpeak('boris') ? ' Бее: 1.' : ''}`)
+    const yes = this.holds(WORLD.garik) ? '1 (Гарик)' : '1 (кто-то из родни)'
+    this.sys(`Голосование «Простить плиточника?» — Да: ${yes}. Нет: ${5 + this.rnd(4)}.${this.canSpeak('boris') ? ' Бее: 1.' : ''}`)
     await this.enterNode('tribunal', 'verdict')
   }
 

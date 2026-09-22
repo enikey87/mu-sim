@@ -71,6 +71,7 @@ describe('несостыковки из партии пользователя', 
   })
   it('«терпение восстановлено»: событие вроде «продали микроволновку» — один раз, занятия — повторяются', () => {
     const { game } = makeGame()
+    game.S.money = 1000 // нищета: только тогда в пуле есть «продали микроволновку»
     const floor = (turns: number) => { game.S.stats.sent += turns; return game.line('FLOOR', FLOOR) ?? 'Вы полежали на полу. Терпение восстановлено.' }
     const got = Array.from({ length: 40 }, () => floor(20))
     expect(got.filter((t) => /микроволновку/.test(t))).toHaveLength(1)
