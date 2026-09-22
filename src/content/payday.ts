@@ -17,8 +17,8 @@ export interface Source extends LineSpec { amount: number }
 export const SOURCES: Source[] = [
   // сериалы
   { t: 'Сейф открыли! Малыш Алик наконец отдал ключ. Внутри 120 000 и соска.', when: [exists('finale.nune')], prio: 2, amount: 120000 },
-  { t: '«Нива» же у тебя! Загляни в бардачок: там 80 000 и грузинский сыр. Я говорил — деньги в «Ниве». Ты просто не искал. Сыр верни.', when: [eq('finale.niva', 'chose')], prio: 2, amount: 80000 },
-  { t: '«Нива» прислала из Батуми перевод. 60 000. Подпись: «Не ищи. Но деньги — вот».', when: [eq('finale.niva', 'default')], prio: 2, amount: 60000 },
+  { t: '«Нива» же у тебя! Загляни в бардачок: там 80 000 и грузинский сыр. Я говорил — деньги в «Ниве». Ты просто не искал. Сыр верни.', when: [WORLD.niva, eq('finale.niva', 'chose')], prio: 2, amount: 80000 },
+  { t: '«Нива» прислала из Батуми перевод. 60 000. Подпись: «Не ищи. Но деньги — вот».', when: [WORLD.niva, eq('finale.niva', 'default')], prio: 2, amount: 60000 },
   { t: 'Борис-прораб выписал премию. Всей бригаде. И тебе. Премия — 50 000. И клок шерсти.', when: [eq('finale.boris', 'brigadir')], prio: 2, amount: 50000 },
   { t: 'Налоговая разморозила счета! Сказали: Борис дал такие показания, что им стыдно. 90 000.', when: [eq('finale.boris', 'default')], prio: 2, amount: 90000 },
   { t: 'Помнишь конверт из фундамента? У него было двойное дно. 40 000 — чьи, не знаю, теперь наши.', when: [exists('finale.beton')], prio: 2, amount: 40000 },
@@ -84,7 +84,7 @@ export const GRAND: Record<Slot, Line[]> = {
   place: [
     { t: 'Эти пятьдесят рублей лежали в сейфе,', when: [exists('finale.nune')], prio: 2 },
     { t: 'Эти пятьдесят рублей лежали в фундаменте, рядом с конвертом,', when: [exists('finale.beton')], prio: 2 },
-    { t: 'Эти пятьдесят рублей были в бардачке «Нивы»,', when: [exists('finale.niva')], prio: 2 },
+    needs('niva')({ t: 'Эти пятьдесят рублей были в бардачке «Нивы»,', when: [exists('finale.niva')], prio: 2 }),
     { t: 'Эти пятьдесят рублей были в банке с огурцами,', when: [exists('said.money_jar')], prio: 2 },
     { t: 'Эти пятьдесят рублей лежали в кассе шаурмичной дедушки,', when: [exists('finale.grandpa')], prio: 2 },
     { t: 'Эти пятьдесят рублей были в кабине крана, на сорока метрах,', when: [exists('finale.razmik')], prio: 2 },
@@ -102,9 +102,9 @@ export const GRAND: Record<Slot, Line[]> = {
     needs('goar')({ t: 'но тётя Гоар забрала их за сервиз,', when: [is('ach.q_tamada')], prio: 2 }),
   ],
   route: [
-    needs('samvel')({ t: 'их погрузили в «Ниву», а «Нива» поехала на свадьбу Самвела,', when: [exists('finale.niva'), exists('finale.samvel')], prio: 2 }),
+    needs('samvel')(needs('niva')({ t: 'их погрузили в «Ниву», а «Нива» поехала на свадьбу Самвела,', when: [exists('finale.niva'), exists('finale.samvel')], prio: 2 })),
     needs('grant')({ t: 'их повезли в Лос-Анджелес к Гранту — или к его близнецу, мы так и не поняли,', when: [exists('finale.grant')], prio: 2 }),
-    { t: 'их отправили в Грузию, «Нива» знала дорогу,', when: [exists('finale.niva')], prio: 2 },
+    needs('niva')({ t: 'их отправили в Грузию, «Нива» знала дорогу,', when: [exists('finale.niva')], prio: 2 }),
     needs('samvel')({ t: 'их отнесли на свадьбу — дядя Самвел как раз опять женился,', when: [exists('finale.samvel')], prio: 2 }),
     { t: 'их повезли на хаш — ты же знаешь, где у нас хаш в семь утра,', when: [is('ach.q_hash')], prio: 2 },
     needs('goar')({ t: 'их подняли на крышу к козе тёти Гоар — там надёжнее,', when: [is('ach.q_goat')], prio: 2 }),
@@ -170,8 +170,8 @@ export const OUTCOME: Record<string, { lines: Array<Entry<string | [string, stri
   },
   niva: {
     sys: 'К вашему подъезду подъехала «Нива». На капоте маркером: «ПЛИТОЧНИКУ».',
-    lines: [needs('goar')('Выплата — «Нивой». Она сама выбрала тебя. Документы у козы тёти Гоар, забери, когда она будет в настроении.')],
-    button: ['Брат, «Нива» у тебя? Передай ей: если заскучает — пусть приезжает. Бензин за твой счёт.'],
+    lines: [needs('goar')(needs('niva')('Выплата — «Нивой». Она сама выбрала тебя. Документы у козы тёти Гоар, забери, когда она будет в настроении.'))],
+    button: [needs('niva')('Брат, «Нива» у тебя? Передай ей: если заскучает — пусть приезжает. Бензин за твой счёт.')],
   },
   strasbourg: {
     sys: 'Вам пришло письмо из Страсбурга. На французском.',

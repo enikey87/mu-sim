@@ -31,6 +31,10 @@ export const WORLD = {
   karine: named('karine', is('intro.karine')),
   /** Заказчик Грант вошёл в историю. */
   grant: named('grant', is('intro.grant')),
+  /** «Нива» вошла в историю (сериал, бартер, её собственное «би-бип»). */
+  niva: named('niva', is('intro.niva')),
+  /** Гагик из Абовяна — из отмазок Алика. */
+  gagik: named('gagik', is('intro.gagik')),
   /** Алик — тамада (свадьба Самвела). */
   tamada: named('tamada', is('intro.tamada')),
   /** История с декретом Нуне началась (о нём можно говорить). */

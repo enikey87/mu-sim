@@ -36,6 +36,8 @@ export const MENTION: Array<[WorldKey, RegExp]> = [
   ['nune', /Нуне/],
   ['karine', /Карине/],
   ['grant', /Грант/],
+  ['niva', /Нив[аеуыо]/],
+  ['gagik', /Гагик/],
   ['dekret', /декрет/i],
   ['nuneBaby', /ребёнок спит|с ребёнком на руках/i],
   // «тамада» — роль, а не персонаж: у любого застолья свой тамада; «Алик — тамада» размечено needs('tamada') вручную
@@ -74,6 +76,8 @@ function implied(c: Criterion, known: Criterion[]): boolean {
       k.key === 'finale.' + arc && (k.op === 'exist' || k.op === '==')
       || k.key === c.key && k.op === '>=' && num(k) >= (c.op === 'exist' ? 1 : num(c))))
     || (k.key.startsWith('arc.') && k.op === '>=' && setBy(k.key.slice(4), num(k)).some((f) => describeCriterion(f) === describeCriterion(c)))
+    // финал сериала идёт после всех его серий — значит, всё, что они записали, уже в мире
+    || (k.key.startsWith('finale.') && (k.op === 'exist' || k.op === '==') && setBy(k.key.slice(7), ARCS[k.key.slice(7)]?.eps.length ?? 0).some((f) => describeCriterion(f) === describeCriterion(c)))
     || (c.op === '!=' && k.key === c.key && (k.op === '!exist' || (k.op === '==' && k.value !== c.value))))
 }
 const holds = (key: WorldKey, known: Criterion[]) => atoms([WORLD[key]]).filter((a) => a.op !== 'all').every((a) => implied(a, known))

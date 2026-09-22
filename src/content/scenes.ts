@@ -117,7 +117,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
             { t: 'Я уже заплатил за ваш столик…', go: 'cafe3' },
           ],
         },
-        cafe2: { a: [needs('nivaHome')('Серьёзно, брат. Я как раз ехал, но «Нива» не хотела.'), 'Серьёзнее не бывает. Там был хаш.'], then: 'promise' },
+        cafe2: { a: [needs('nivaHome')(needs('niva')('Серьёзно, брат. Я как раз ехал, но «Нива» не хотела.')), 'Серьёзнее не бывает. Там был хаш.'], then: 'promise' },
         cafe3: {
           fx: { debt: 1800 },
           sys: 'Долг Алика вырос на 1 800 ₽ (его кофе и хачапури).',
