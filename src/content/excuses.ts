@@ -5,7 +5,7 @@ import { type Entry, gate, eq, gte, lt, lte, matches, missing, exists, is, of } 
 import { needs, WORLD } from './world'
 
 // draw(key, arr) выдаёт уместный сейчас элемент «из колоды» (без повторов до конца колоды); noRefill — после исчерпания null
-export type DrawFn = <T = any>(key: string, arr: readonly Entry<T>[], noRefill?: boolean) => T
+export type DrawFn = <T = unknown>(key: string, arr: readonly Entry<T>[], noRefill?: boolean) => T
 /** n — кто, g — кого; you — как его назовёт игрок, если Алик сказал «мой»/«я». */
 /** id — кто это из CAST, если отмазка называет его роль: такая реплика знакомит с персонажем. */
 export interface Rel { n: string; g: string; you?: string; id?: string }
@@ -25,6 +25,7 @@ export const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1)
 const NAME_RE = /^(Алик|Гарик|Борис|Нуне|Карине|Грант|Размик|Рубик|Самвел|Арсен|Гоар|Ашот|Мкртич|Грачик|Ованес|Вачик|Вартан|Гриша|Лусине|Ереван|Армени|Грузи|Тбилиси|Гюмри|Батуми|Арарат|Страсбург|Лос-Андж|Навасард|Вардавар|Пасх)/;
 export const low = (s: string): string => (NAME_RE.test(s) ? s : s.charAt(0).toLowerCase() + s.slice(1));
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- форма записи своя у каждой: строки, пары, объекты
 export const D: Record<string, any> = {};
 
 D.ADDR = [
@@ -686,7 +687,7 @@ export function make(draw: DrawFn, getTier: () => number = () => 0, rng: Rng = m
 
   function excuse({ preferLong = false }: { preferLong?: boolean } = {}): Excuse {
     if (draw('LEGROLL', Array.from({ length: 40 }, (_, i) => i)) === 0) {
-      const l = draw('LEGENDARY', D.LEGENDARY, true);
+      const l = draw<string>('LEGENDARY', D.LEGENDARY, true);
       if (l) return { texts: [l], legendary: true };
     }
     const tpl = preferLong && draw('LONGROLL', [0, 1]) ? draw('LONGT', [4, 8, 9, 12, 14, 16, 17, 18].map((k) => T[k])) : draw('TPL', T);
