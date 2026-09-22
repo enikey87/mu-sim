@@ -49,10 +49,12 @@ function fires(name: string, c: Case): boolean {
 }
 
 describe('редкие правила — детерминированно', () => {
-  it('у каждого правила из RARE есть случай, и оно срабатывает', () => {
-    for (const name of RARE) {
-      expect(CASES[name], `нет случая для ${name}`).toBeDefined()
-      expect(fires(name, CASES[name]), name).toBe(true)
-    }
+  it('каждый случай срабатывает', () => {
+    for (const [name, c] of Object.entries(CASES)) expect(fires(name, c), name).toBe(true)
+  })
+  // Кейсы и список редких не связаны: правило, которое симуляция уверенно покрывает,
+  // уходит из RARE, но прямой случай остаётся страховкой, пока его кто-то не удалит осознанно.
+  it('у каждой записи RARE есть случай', () => {
+    expect([...RARE].filter((name) => !CASES[name])).toEqual([])
   })
 })
