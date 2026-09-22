@@ -16,7 +16,7 @@ export const WORLD = {
   rubik: named('rubik', exists('arc.rubik')),
   twin: named('twin', gte('arc.grant', 5)),
   arsen: named('arsen', is('intro.arsen')),
-  grachik: named('grachik', exists('arc.grandpa')),
+  grachik: named('grachik', is('intro.grachik')),
   /** Прораб Мкртич вошёл в историю (сам написал или его представили). */
   mkrtich: named('mkrtich', is('intro.mkrtich')),
   /** Тётя Гоар вошла в историю (домофон, отмазка с её ролью, сцена). */
@@ -48,6 +48,9 @@ export const WORLD = {
   garikFree: named('garikFree', missing('garik.concrete')),
   /** Гарик на связи: не сидит в фундаменте без интернета. */
   garikOnline: named('garikOnline', missing('garik.cut')),
+  /** В семье прощаются: дедушка умирает или хоронят Алика. */
+  mourning: named('mourning', is('mourning')),
+  grandpaDying: named('grandpaDying', is('grandpa.dying')),
   karineHome: named('karineHome', ne('finale.rubik', 'karine')),
   karineGone: named('karineGone', eq('finale.rubik', 'karine')),
   /** Игрок знает Карине: она уже писала сама. */

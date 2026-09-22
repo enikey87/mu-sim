@@ -17,6 +17,9 @@ export interface Promise3 extends When { text: string }
 export interface TransferReply { text: string; nextTransfer?: number }
 export interface ExcuseParts { texts: string[]; p?: Promise3; r?: Rel; constr?: boolean }
 export interface Excuse extends ExcuseParts { ev?: string | null; legendary: boolean }
+/** События, которые персонажу с собственной линией устраивает его сериал, а не генератор. */
+const OWN_STORY = /похорон|поминк|умер|свадьб|женил|крестин|юбилей|обручен|родила|роды/i
+
 export const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 // имена с большой буквы и после приставки: «Алик-джан, Гарика достали?», а не «гарика»
 const NAME_RE = /^(Алик|Гарик|Борис|Нуне|Карине|Грант|Размик|Рубик|Самвел|Арсен|Гоар|Ашот|Мкртич|Грачик|Ованес|Вачик|Вартан|Гриша|Лусине|Ереван|Армени|Грузи|Тбилиси|Гюмри|Батуми|Арарат|Страсбург|Лос-Андж|Навасард|Вардавар|Пасх)/;
@@ -39,7 +42,7 @@ D.REL = [
   'крёстный моего кума|крёстного моего кума|крёстный вашего кума', 'сосед дяди Тиграна|соседа дяди Тиграна', 'бабушка Асмик|бабушки Асмик',
   needs('arsen')('племянник Арсен|племянника Арсена'), 'зять Рубен|зятя Рубена', 'сват из Гюмри|свата из Гюмри',
   'кум Вазген|кума Вазгена', 'тёща|тёщи', 'Гагик из Абовяна|Гагика из Абовяна||gagik', 'шурин Мамикон|шурина Мамикона',
-  needs('grachik')('дедушка Грачик|дедушки Грачика'), 'сестра жены|сестры жены', 'тётя Гоар|тёти Гоар||goar',
+  needs('grachik')('дедушка Грачик|дедушки Грачика||grachik'), 'сестра жены|сестры жены', 'тётя Гоар|тёти Гоар||goar',
   'друг детства Левон|друга детства Левона', 'брат жены Сурен|брата жены Сурена', 'дядя Гурген|дяди Гургена',
   'старший сын|старшего сына', 'Жора с рынка|Жоры с рынка', 'Вачик-сварщик|Вачика-сварщика',
   'бабушка Шушаник|бабушки Шушаник', 'крёстная|крёстной', 'дядя Ваго|дяди Ваго', 'тётя Анаит|тёти Анаит',
@@ -644,20 +647,25 @@ export function make(draw: DrawFn, getTier: () => number = () => 0, rng: Rng = m
   // каждый шаблон: () => { texts, promise, rel, constr }
   let lastEv: string | null = null;
   const ev = (): string => { const e = g('EVENT'); lastEv = e; return e; };
+  const evFor = (r: Rel): string => {
+    let e = ev();
+    for (let i = 0; i < 8 && r.id && OWN_STORY.test(e); i++) e = ev();
+    return e;
+  };
   const T: Array<Entry<() => ExcuseParts>> = [
-    () => { const r = rel(), p = promise(), c = reason(); return { texts: [`${g('ADDR')}, у ${r.g} ${ev()}. ${c}. ${g('OATH')}, ${p.text}.`], p, r }; },
+    () => { const r = rel(), p = promise(), c = reason(); return { texts: [`${g('ADDR')}, у ${r.g} ${evFor(r)}. ${c}. ${g('OATH')}, ${p.text}.`], p, r }; },
     () => { const p = promise(), c = constr(); return { texts: [`${g('ADDR')}! ${c}. ${cap(p.text)}.`], p, constr: true }; },
     () => ({ texts: [`${reason()}. ${g('OATH')}.`] }),
-    () => { const r = rel(), p = promise(); return { texts: [`${g('ADDR')}, ты же знаешь, я тебя как сына люблю. Но у ${r.g} ${ev()}. ${cap(p.text)}.`], p, r }; },
-    () => { const r = rel(), p = promise(); return { texts: [`${g('ADDR')}, ${g('INTRO')}`, `У ${r.g} ${ev()}.`, `${constr()}.`, `${g('OATH')}. ${cap(p.text)}.`], p, r, constr: true }; },
+    () => { const r = rel(), p = promise(); return { texts: [`${g('ADDR')}, ты же знаешь, я тебя как сына люблю. Но у ${r.g} ${evFor(r)}. ${cap(p.text)}.`], p, r }; },
+    () => { const r = rel(), p = promise(); return { texts: [`${g('ADDR')}, ${g('INTRO')}`, `У ${r.g} ${evFor(r)}.`, `${constr()}.`, `${g('OATH')}. ${cap(p.text)}.`], p, r, constr: true }; },
     () => { const p = promise(); return { texts: [`${g('ADDR')}, я за рулём, коротко: ${low(reason())}. ${cap(p.text)}.`], p }; },
     // после своих же сообщений «Кто это?» нелепо
-    gate(gte('sinceAlik', 1))(() => { const r = rel(), p = promise(); return { texts: [`Кто это? А, ${low(g('ADDR'))}! У ${r.g} ${ev()}. ${cap(p.text)}.`], p, r }; }),
-    () => { const r = rel(), p = promise(); return { texts: [`${g('ADDR')}, не пиши сейчас, у ${r.g} ${ev()}. ${g('OATH')}, ${p.text}.`], p, r }; },
-    () => { const r = rel(), p = promise(); return { texts: [`${g('ADDR')}, деньги — это пыль. А у ${r.g} ${ev()} — вот это жизнь.`, `${cap(p.text)}.`], p, r }; },
-    () => { const r = rel(), p = promise(); return { texts: [`${g('ADDR')}, ${low(constr())}.`, `${g('WOW')} А ещё у ${r.g} ${ev()}.`, `${g('OATH')}, ${p.text}.`], p, r, constr: true }; },
+    gate(gte('sinceAlik', 1))(() => { const r = rel(), p = promise(); return { texts: [`Кто это? А, ${low(g('ADDR'))}! У ${r.g} ${evFor(r)}. ${cap(p.text)}.`], p, r }; }),
+    () => { const r = rel(), p = promise(); return { texts: [`${g('ADDR')}, не пиши сейчас, у ${r.g} ${evFor(r)}. ${g('OATH')}, ${p.text}.`], p, r }; },
+    () => { const r = rel(), p = promise(); return { texts: [`${g('ADDR')}, деньги — это пыль. А у ${r.g} ${evFor(r)} — вот это жизнь.`, `${cap(p.text)}.`], p, r }; },
+    () => { const r = rel(), p = promise(); return { texts: [`${g('ADDR')}, ${low(constr())}.`, `${g('WOW')} А ещё у ${r.g} ${evFor(r)}.`, `${g('OATH')}, ${p.text}.`], p, r, constr: true }; },
     () => { const p = promise(); return { texts: [`${g('ADDR')}, я уже в банке стою. ${absurd()}. ${cap(p.text)}.`], p }; },
-    () => { const r = rel(), p = promise(); return { texts: [`Ара, как раз хотел тебе писать! ${reason()}. Плюс у ${r.g} ${ev()}. ${g('OATH')}, ${p.text}.`], p, r }; },
+    () => { const r = rel(), p = promise(); return { texts: [`Ара, как раз хотел тебе писать! ${reason()}. Плюс у ${r.g} ${evFor(r)}. ${g('OATH')}, ${p.text}.`], p, r }; },
     () => { const p = promise(); return { texts: [`${g('ADDR')}, я на объекте. ${constr()}. ${constr()}. Вот так живём.`, `${cap(p.text)}.`], p, constr: true }; },
     gate(missing('act.signed'))(() => { const p = promise(); return { texts: [`${g('ADDR')}, прораб звонил: ${low(constr())}. Без акта денег нет. ${cap(p.text)}.`], p, constr: true }; }),
     () => { const p = promise(); return { texts: [`Сначала хорошая новость: ${low(constr())}. Плохая: ${low(absurd())}.`, `${g('OATH')}, ${p.text}.`], p, constr: true }; },

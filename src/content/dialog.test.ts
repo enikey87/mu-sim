@@ -1,7 +1,7 @@
 // Несостыковки из партии пользователя (docs/PLAYTEST_ISSUES.md): каждая — тестом, чтобы не вернулась.
 import { describe, it, expect } from 'vitest'
 import { makeGame } from '../test/helpers'
-import { GROUP } from './arcs'
+import { ARCS, GROUP } from './arcs'
 import { CONDOLE_REVIVED, GREET_A, FLOOR } from './misc'
 import { SPEND } from './life'
 import { WORLD, needs } from './world'
@@ -337,6 +337,46 @@ describe('несостыковки из плейтеста ботами, рау�
     game.S.mem['count.rude'] = 1
     game.S.mem['met.karine'] = true
     for (let i = 0; i < 30; i++) expect((await game.rules.match({ event: 'PickScene', facts: {} }, game.facts()))?.name).not.toBe('Scene_wife')
+  })
+  it('свадьбу и похороны своим героям устраивает их сериал, а не генератор отмазок', async () => {
+    const { game } = makeGame()
+    await game.playArc('grandpa')
+    for (const id of ['goar', 'mkrtich', 'gagik', 'samvel', 'garik']) game.S.mem['intro.' + id] = true
+    const own = /(Самвела(?!-)|Гарика|Гоар|Мкртича|Гагика|Грачика)[^.!?]*?(похорон|поминк|умер|свадьб|женил|крестин|юбилей|обручен|родила|роды)/i
+    const said: string[] = []
+    for (let i = 0; i < 600; i++) said.push(game.X.excuse({}).texts.join(' '))
+    expect(said.filter((t) => own.test(t))).toEqual([])
+    expect(said.some((t) => /Самвела|Гарика|Гоар|Мкртича|Гагика|Грачика/.test(t))).toBe(true)
+  })
+  it('пока в семье прощаются, застолья и смертного одра не бывает', async () => {
+    const { game } = makeGame()
+    game.S.day = 250
+    game.S.mood = 5
+    await game.playArc('grandpa') // «дедушка умирает»
+    expect(game.holds(WORLD.mourning)).toBe(true)
+    const offered = async () => {
+      const names = new Set<string>()
+      for (let i = 0; i < 60; i++) {
+        names.add((await game.rules.match({ event: 'PickScene', facts: {} }, game.facts()))?.name ?? '')
+        names.add((await game.rules.match({ event: 'PickQuest', facts: {} }, game.facts()))?.name ?? '')
+      }
+      return names
+    }
+    const mourned = await offered()
+    expect([...mourned].filter((n) => /toast|deathbed|tamada/.test(n))).toEqual([])
+    await game.playArc('grandpa') // «дедушка опять не умер» — траур снят
+    expect(game.holds(WORLD.mourning)).toBe(false)
+    const after = await offered()
+    expect([...after].some((n) => /toast|deathbed|tamada/.test(n))).toBe(true)
+  })
+  it('«дедушка ещё умирает?» спрашивают, только пока он умирает', async () => {
+    const { game } = makeGame()
+    const dying = () => game.open(ARCS.grandpa.follow).includes('Алик, дедушка ещё умирает?')
+    expect(dying()).toBe(false)
+    await game.playArc('grandpa')
+    expect(dying()).toBe(true)
+    await game.playArc('grandpa')
+    expect(dying()).toBe(false)
   })
   it('имя после приставки — с большой буквы', async () => {
     const { low } = await import('./excuses')
