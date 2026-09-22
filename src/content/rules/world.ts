@@ -28,7 +28,8 @@ export const sceneRules: R[] = [
   { ...scene('wife', [gte('count.rude', 1), missing('met.karine'), WORLD.karineHome]), once: true }, // Карине знакомится один раз: «Вы кто такой?» дважды — нелепо
   scene('invoice', [gte('day', 215)]),
   { ...scene('loan', [gte('day', 230)]), once: true }, // кредит «на твоё имя» — один раз
-  scene('deathbed', [gte('day', 240), lte('mood', 6)], 2), // умирать Алик начинает, когда дела плохи
+  // умирать Алик начинает, когда дела плохи, и только один раз: после похорон и воскрешения смертный одр уже был
+  { ...scene('deathbed', [gte('day', 240), lte('mood', 6)], 2), once: true },
   { ...scene('heir', [gte('arc.grandpa', 4), gte('arc.boris', 4)], 3), once: true }, // наследство: после того как дедушка переписал завещание и когда Борис уже есть
 ]
 

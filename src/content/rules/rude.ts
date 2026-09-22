@@ -80,7 +80,10 @@ export const rudeRules: R[] = [
     name: 'Rude_Calls', event: 'PlayerMessage', when: [rude, gte(HEAT, 2)], bonus: 2, cooldown: { days: 5 }, remember: cools, trigger: cool,
     respond: async ({ game }) => {
       game.mood(-1)
-      game.sys(game.draw('RC_SYS', T.RUDE_CALLS_SYS).replace('{n}', String(7 + game.rnd(20))))
+      // счётчик пропущенных только растёт: он копится за партию, а не выдумывается каждый раз
+      const calls = Number(game.S.mem['mama.calls'] ?? 6) + 1 + game.rnd(4)
+      game.rules.applyOps([set('mama.calls', calls)], {})
+      game.sys(game.draw('RC_SYS', T.RUDE_CALLS_SYS).replace('{n}', String(calls)))
       await game.sleep(600)
       await sayFresh(game, 'RC_VOICE', T.RUDE_CALLS_VOICE)
       await game.say([freshOr(game, 'RC_ALIK', T.RUDE_CALLS_ALIK, game.X.offended)])

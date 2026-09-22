@@ -52,6 +52,7 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
   watch?.(game)
   const bot = seededRng(seed * 7919 + 17)
   const acts: Act[] = []
+  let ending: string | null = null
   const asides: Aside[] = []
   const notify = game.notify.bind(game)
   game.notify = (icon, app, text) => { asides.push({ at: game.S.msgs.length, text: `(уведомление телефона: ${icon} ${app} — ${text})` }); notify(icon, app, text) }
@@ -77,6 +78,12 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
       await game.send(game.choices[a.i])
       // перед репликой игрока может встать разделитель дня — варианты привязываем к самой реплике
       if (!replay) a.at = game.S.msgs.findIndex((m, i) => i >= a.at && m.kind === 'text' && m.from === 'me')
+    }
+    // концовка — экран с итогами: дальше игрок играет уже «после финала», и это видно в расшифровке
+    if (game.S.ending && game.S.ending !== ending) {
+      ending = game.S.ending
+      const e = ENDINGS.find((x) => x.id === ending)
+      asides.push({ at: game.S.msgs.length, text: `(экран концовки: «${e?.title ?? ending}». Игрок выбрал «играть дальше»)` })
     }
     const moo = game.S.stats.moo
     clock.runTimers() // «Мууу» и прочее отложенное
