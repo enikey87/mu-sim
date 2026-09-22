@@ -1,6 +1,6 @@
 # Бесконечный endgame: группа, из которой нельзя выйти
 
-> **Статус: концепт, draft. Не реализовано.**
+> **Статус: реализовано (MVP) в PR #34: `src/content/endgame.ts`, `src/content/rules/endgame.ts`.**
 
 ## Идея
 
