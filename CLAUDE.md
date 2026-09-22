@@ -1,20 +1,28 @@
-# Repository instructions
+# CLAUDE.md
 
-- This repository does not use Builderr.
-- Do not invoke or assume project-specific CLIs, services, automation, or scripts that are not included or documented in this repository.
-- Use the checked-in package scripts, dependencies, and configuration for development and verification.
-- CI runs through the GitHub Actions workflows stored in this repository; inspect it through GitHub.
+Пет-проект. Правила корпоративной разработки (songsterr) сюда **не распространяются**:
 
-## Content changes: facts, not text
+- нет builderr — ветки могут называться как угодно, префикс `feature/` не обязателен;
+- нет `ship-branch-preflight` и прочих корпоративных гардов — не искать и не требовать их;
+- PR создаётся обычным `gh pr create`, без скиллов `/pull-request` и `/ship`; draft по умолчанию не нужен;
+- нет review-ботов и обязательных ревью-лупов;
+- мерж — когда зелёный CI, без дополнительных согласований;
+- если в ветке не менялся код (только docs/, *.md, конфиги агентов) — за CI после пуша или PR следить **не нужно**: он уже доказан зелёным для этого кода, перепроверка бессмысленна.
 
-The world model lives on the rule engine's blackboard, not in the words of a rendered message (see «Мир как факты» in DESIGN.md).
+Остальное — обычная гигиена: не пушить в `main` напрямую, не коммитить секреты, перед коммитом смотреть `git status`/`git diff --cached`.
 
-- A line states its own requirements: `needs('boris')('…')`, `gate(...)(…)`, `when: [...]`. Never decide what may be said by matching words of the rendered text at runtime.
-- A message that changes the world writes a fact where it happens: `remember` on an episode, rule or line, `fx.set` on a scene node. Introducing a character without writing the fact leaves every later line guessing.
-- Presence and position are separate facts: `WORLD.razmik` (the crane story exists) vs `WORLD.razmikUp` (he is still up there). A line declares the one it relies on.
-- Condition on facts, not on episode numbers: `gte('arc.x', n)` only when the order of episodes is the point, otherwise on the fact that episode set — episodes get reordered and finales replace the last one.
-- News happens once: `once` on a rule or scene, a line without `repeat` in a pool; a recurring activity is `repeat` with a cooldown.
-- Time comes from time facts: `Due` for deadlines, `since.<event>` for «тогда». Never hardcode months, dates or durations into text.
-- System lines are the game's voice: `sys()` text does not go through Alik's line decoration, or it picks up his forms of address.
-- A new output path joins the lint: `mentions.test.ts` checks pools, not output, so content reached through a new route is unchecked until it is in its corpus.
-- Every new gate gets a negative control: break it, watch the test go red, restore it.
+О проекте — `README.md`, дизайн — `DESIGN.md`, журналы огрехов — `docs/`.
+
+## Правки контента: факты, а не текст
+
+Модель мира живёт фактами на доске системы правил, а не словами готового сообщения (см. «Мир как факты» в `DESIGN.md`).
+
+- Реплика сама объявляет свои требования: `needs('boris')('…')`, `gate(...)(…)`, `when: [...]`. Не решать по словам готового текста, что можно говорить.
+- Сообщение, которое меняет мир, пишет факт там же, где это происходит: `remember` у серии, правила или строки, `fx.set` у узла сцены. Ввод персонажа без записи факта оставляет все следующие реплики гадать.
+- Присутствие и положение — разные факты: `WORLD.razmik` (линия с краном началась) против `WORLD.razmikUp` (он всё ещё наверху). Реплика объявляет то, на что опирается.
+- Условие — по факту, а не по номеру серии: `gte('arc.x', n)` только там, где важен порядок серий; иначе — по факту, который серия поставила (серии переставляют, финал заменяет последнюю).
+- Новость звучит один раз: `once` у правила или сцены, строка без `repeat` в пуле; повторяемое занятие — `repeat` с перерывом.
+- Время — из фактов времени: `Due` для сроков, `since.<событие>` для «тогда». Не зашивать в текст месяцы, даты и длительности.
+- Системные сообщения — голос игры: текст `sys()` не проходит через украшение реплик Алика, иначе получает его обращения.
+- Новый путь вывода — в линтер: `mentions.test.ts` проверяет пулы, а не выдачу, поэтому контент, доходящий новым путём, не проверен, пока не попал в его корпус.
+- У каждого нового условия — негативный контроль: сломать, увидеть красный тест, вернуть.
