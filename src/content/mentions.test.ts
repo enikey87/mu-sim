@@ -32,6 +32,10 @@ export const MENTION: Array<[WorldKey, RegExp]> = [
   ['mkrtich', /Мкртич/],
   ['goar', /Гоар/],
   ['judge', /Ашот/],
+  ['samvel', /Самвел/],
+  ['nune', /Нуне/],
+  ['karine', /Карине/],
+  ['grant', /Грант/],
   ['dekret', /декрет/i],
   ['nuneBaby', /ребёнок спит|с ребёнком на руках/i],
   // «тамада» — роль, а не персонаж: у любого застолья свой тамада; «Алик — тамада» размечено needs('tamada') вручную
@@ -48,6 +52,9 @@ export const STATE: Array<[string, RegExp, string[]]> = [
 const atoms = (cs: readonly Criterion[]): Criterion[] => cs.flatMap((c) => (c.op === 'all' ? [c, ...atoms(c.all ?? [])] : [c]))
 const num = (c: Criterion) => (typeof c.value === 'number' ? c.value : NaN)
 /** Что серии arc до n-й оставили в памяти (remember, последняя запись побеждает): true — факт есть, false — снят. */
+/** Персонаж пишет сам — этим он и входит в историю (движок пишет intro.<кто> на его сообщении). */
+const selfIntro = (who: string): Criterion[] => [{ key: 'intro.' + who, op: '==', value: true }]
+
 /** Факты, которые сцена ставит сама (fx.set): знакомство происходит в ней же. */
 const ownSets = (sc: unknown): Criterion[] =>
   Object.values((sc as { nodes?: Record<string, { fx?: { set?: Record<string, unknown> } }> })?.nodes ?? {})
@@ -101,7 +108,7 @@ interface Found { path: string; text: string; known: Criterion[]; who?: string; 
 function strings(v: unknown, path: string, known: Criterion[], out: Found[]): Found[] {
   if (typeof v === 'string') out.push({ path, text: v, known })
   else if (v instanceof Gated) strings(v.v, path, [...known, ...expand(atoms(v.when))], out)
-  else if (Array.isArray(v) && v.length === 2 && typeof v[0] === 'string' && v[0] in CAST && typeof v[1] === 'string') out.push({ path, text: v[1], known, who: v[0] })
+  else if (Array.isArray(v) && v.length === 2 && typeof v[0] === 'string' && v[0] in CAST && typeof v[1] === 'string') out.push({ path, text: v[1], known: [...known, ...selfIntro(v[0])], who: v[0] })
   else if (Array.isArray(v)) v.forEach((x, i) => strings(x, `${path}[${i}]`, known, out))
   else if (v && typeof v === 'object' && !(v instanceof RegExp)) {
     const o = v as Record<string, unknown>
@@ -109,7 +116,7 @@ function strings(v: unknown, path: string, known: Criterion[], out: Found[]): Fo
     const sets = Array.isArray(o.remember) ? (o.remember as FactOp[]).filter((f) => f.op === '=' && f.value === true).map((f): Criterion => ({ key: f.key, op: '==', value: true })) : []
     const own = Array.isArray(o.when) ? [...known, ...sets, ...expand(atoms(o.when as Criterion[]))] : [...known, ...sets]
     const who = typeof o.w === 'string' ? o.w : typeof o.who === 'string' ? o.who : undefined
-    if (who && typeof o.t === 'string') { out.push({ path, text: o.t, known: own, who }); return out }
+    if (who && typeof o.t === 'string') { out.push({ path, text: o.t, known: [...own, ...selfIntro(who)], who }); return out }
     for (const [k, x] of Object.entries(o)) if (!['when', 'orWhen', 'remember'].includes(k)) strings(x, `${path}.${k}`, own, out)
   }
   return out
@@ -130,7 +137,8 @@ const legendAt = (id: string): Criterion[] => {
 function expand(cs: Criterion[]): Criterion[] {
   return cs.flatMap((c) => (c.key === 'legend' && c.op === '==' && typeof c.value === 'string' ? [c, ...legendAt(c.value)] : [c]))
 }
-const speaker = (who: string): Criterion[] => (SPEAKS[who] ? atoms([SPEAKS[who]]) : [])
+/** Реплика персонажа: он ею и входит в историю, плюс условия, при которых он вообще пишет. */
+const speaker = (who: string): Criterion[] => [...selfIntro(who), ...(SPEAKS[who] ? atoms([SPEAKS[who]]) : [])]
 
 const mods = import.meta.glob(['./*.ts', '!./*.test.ts'], { eager: true }) as Record<string, Record<string, unknown>>
 function corpus(): Found[] {
@@ -169,7 +177,9 @@ function corpus(): Found[] {
       // реплики финала звучат до факта «финал был», остальное (ответы «Как там…?») — после
       else if (at === 'finales.FINALES') for (const [id, fs] of Object.entries(FINALES)) fs.forEach((f, i) => {
         const { m, sys, ...rest } = f
-        strings({ m, sys }, `${at}.${id}[${i}]`, arcAt(id, ARCS[id].eps.length - 1), out)
+        // remember финала применяется до его реплик — он и знакомит
+        const sets = (f.remember ?? []).filter((o) => o.op === '=' && o.value === true).map((o): Criterion => ({ key: o.key, op: '==', value: true }))
+        strings({ m, sys }, `${at}.${id}[${i}]`, [...arcAt(id, ARCS[id].eps.length - 1), ...sets], out)
         strings(rest, `${at}.${id}[${i}]`, finale(id), out)
       })
       else if (at === 'legends.LEGENDS') for (const [id, x] of Object.entries(LEGENDS)) strings(x, `${at}.${id}`, legendAt(id), out)
@@ -191,8 +201,8 @@ function corpus(): Found[] {
       // исход Дня выплаты звучит по своему правилу — его условия известны
       else if (at === 'payday.OUTCOME') for (const [id, x] of Object.entries(v as object)) strings(x, `${at}.${id}`, expand(atoms(paydayRules.find((r) => r.name === 'Payday_' + id)?.when ?? [])), out)
       // по своим правилам: посредники разблокировки, телефон у Карине (она забирает его, пока жена Алика)
-      else if (at === 'rude.VIA_BORIS') strings(v, at, atoms([SPEAKS.boris]), out)
-      else if (['rude.VIA_KARINE', 'rude.KARINE_HINT', 'rude.PHONE_KARINE'].includes(at)) strings(v, at, atoms([WORLD.karineHome]), out)
+      else if (at === 'rude.VIA_BORIS') strings(v, at, speaker('boris'), out)
+      else if (['rude.VIA_KARINE', 'rude.KARINE_HINT', 'rude.PHONE_KARINE'].includes(at)) strings(v, at, speaker('karine').concat(atoms([WORLD.karineHome])), out)
       else if (typeof v !== 'function') strings(v, at, [], out)
     }
   }

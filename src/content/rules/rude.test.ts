@@ -146,6 +146,7 @@ describe('лестница грубости: ступени', () => {
     const { game } = makeGame()
     heat(game, 3)
     await fire(game, 'rude')
+    game.S.mem['intro.karine'] = true // Карине уже писала — через незнакомого посредника не извиняются
     const via = fresh(game).find((c) => c.act === 'via')!
     expect(via.arg).toBe('karine')
     const s = await says(game, 'sorry')
@@ -292,6 +293,7 @@ describe('лестница грубости: ветки', () => {
     for (let i = 0; i < 20; i++) expect((await game.fire('AlikIdle'))?.name).not.toBe('Idle_ColdWar')
     expect(game.S.msgs.length).toBeGreaterThanOrEqual(n0)
     game.S.ctx = { offended: true }
+    game.S.mem['intro.karine'] = true // одна из реплик холодной войны про Карине — она к этому времени уже писала
     const got: string[] = []
     for (let i = 0; i < 200 && got.length < T.COLD_WAR.length; i++) {
       game.S.stats.sent += 3
