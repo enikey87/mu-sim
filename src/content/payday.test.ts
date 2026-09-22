@@ -103,18 +103,30 @@ describe('День выплаты', () => {
     expect(whos).not.toContain('rubik')
     expect(new Set(whos).size).toBe(whos.length)
   })
-  it('доля за сервиз ссылается на зачтённое на застолье, а не требует его заново', async () => {
+  // застолье уже списало 6 000 и уменьшило долг на 1 000 — партия приходит к выплате с этими числами
+  const afterFeast = (g: Game) => { g.S.day = 340; g.S.ach.q_tamada = 1; g.S.debt = 239000 }
+  it('доля за сервиз добирает разницу: с зачтённым на застолье выходит названная сумма', async () => {
     const { game } = makeGame()
-    game.S.day = 340
-    game.S.ach.q_tamada = 1
+    afterFeast(game)
     await game.enterNode('payday', 'announce')
     await choose(game, 'bag')
     const n = game.S.msgs.length
     await choose(game, 'share')
     const out = texts(game, n).join('\n')
-    // сервиз посчитан в долг ещё на застолье: тётя Гоар спорит с оценкой, а не предъявляет ущерб заново
     expect(out).toMatch(/зачли шесть тысяч/)
-    expect(out).toMatch(/сорок пять/)
-    expect(out).toMatch(/К выплате: 195\s000 ₽/)
+    expect(out).toMatch(/тридцать девять сверху/)
+    // 239 000 − 39 000: вместе с зачтёнными шестью тысячами сервиз стоит ровно названные сорок пять
+    expect(out).toMatch(/К выплате: 200\s000 ₽/)
+  })
+  it('отказ делиться берёт больше названного — и это объявлено до долей, а не спрятано в числе', async () => {
+    const { game } = makeGame()
+    afterFeast(game)
+    await game.enterNode('payday', 'announce')
+    await choose(game, 'bag')
+    const n = game.S.msgs.length
+    await choose(game, 'refuse')
+    const out = texts(game, n).join('\n')
+    expect(out).toMatch(/они услышали «по рублю»/)
+    expect(out).toMatch(/К выплате: 180\s500 ₽/) // 239 000 − 39 000 − 19 500
   })
 })
