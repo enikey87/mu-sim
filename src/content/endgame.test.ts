@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { makeGame } from '../test/helpers'
+import { ENDGAME_FORMALITIES } from './endgame'
 import type { Game } from '../engine/game'
 
 const messages = (game: Game, from = 0) =>
@@ -73,5 +74,18 @@ describe('бесконечная группа после Дня выплаты',
 
     const reply = await game.fire('PlayerSays', { intent: 'request', tone: 'neutral' })
     expect(reply?.name).toBe('Endgame_Request')
+  })
+
+  it('счёт формальностей ведёт игра: юбилей звучит на своём счёте, номера в текстах не спорят с ним', async () => {
+    const { game } = makeGame()
+    finishPayday(game)
+    for (let i = 0; i < 9; i++) await game.endgameFormality()
+    expect(game.S.mem['endgame.forms']).toBe(9)
+    const before = game.S.msgs.length
+    await game.endgameFormality()
+    expect(game.S.mem['endgame.forms']).toBe(10)
+    expect(messages(game, before).join(' ')).toMatch(/Десять формальностей/)
+    // «Формальность №1» выпадала бы и на пятидесятой: номер в пуле спорит со счётом
+    expect(ENDGAME_FORMALITIES.join(' ')).not.toMatch(/№/)
   })
 })
