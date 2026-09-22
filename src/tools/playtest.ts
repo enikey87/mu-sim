@@ -83,7 +83,8 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
     if (game.S.ending && game.S.ending !== ending) {
       ending = game.S.ending
       const e = ENDINGS.find((x) => x.id === ending)
-      asides.push({ at: game.S.msgs.length, text: `(экран концовки: «${e?.title ?? ending}». Игрок выбрал «играть дальше»)` })
+      asides.push({ at: game.S.msgs.length, text: `(экран концовки: «${e?.title ?? ending}». Игрок закрыл экран)` })
+      game.closeEnding() // как игрок: закрыть экран итогов — после Дня выплаты это включает эндгейм
     }
     const moo = game.S.stats.moo
     clock.runTimers() // «Мууу» и прочее отложенное
