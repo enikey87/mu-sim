@@ -148,6 +148,25 @@ describe('excuse generator', () => {
     const X0 = api(5, 0)
     for (let i = 0; i < 300; i++) expect(esc.some((e) => X0.excuse().texts.join(' ').includes(e))).toBe(false)
   })
+  it('constr:true только если constr() взял из CONSTR, не из ESC', () => {
+    const esc = ([...D.ESC1, ...D.ESC2, ...D.ESC3] as Entry<string>[]).map(valueOf)
+    const X = api(11, 3)
+    let escOnSite = 0, flagged = 0
+    for (let i = 0; i < 3000; i++) {
+      const e = X.excuse()
+      const text = e.texts.join(' ')
+      // шаблон «я на объекте. …» — два слота constr(); «время на объекте» в сроке не считается
+      if (!/я на объекте\./i.test(text)) continue
+      if (!esc.some((s) => text.includes(s))) continue
+      if (e.constr) flagged++
+      else escOnSite++
+    }
+    expect(escOnSite, 'ESC на объекте без флага').toBeGreaterThan(0)
+    expect(flagged, 'флаг на чистом ESC').toBe(0)
+  })
+  it('оправдание просрочки не ссылается на общий опыт игрока', () => {
+    expect(D.PREV_B.map(valueOf).join(' ')).not.toMatch(/ты сам видел/)
+  })
   it('legendary excuses appear and never repeat', () => {
     const X = api(9)
     const legends: string[] = []

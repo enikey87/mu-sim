@@ -461,7 +461,13 @@ export class Game {
   /** Реплики Алика (или участника { w, t }). Иногда с опечаткой и исправлением. */
   async say(items: SayItem[], legend = false, who?: string): Promise<Msg[]> {
     if (this.disposed) throw new GameDisposed()
-    if (this.S.ctx?.type === 'reactOnly') this.S.ctx = null // Алик ответил словами — «а ответить словами?» уже не к месту
+    // слова перекрывают «ответь на стикер/реакцию/фото» — иначе вариант живёт до следующего дня
+    if (this.S.ctx?.type && ['reactOnly', 'sticker', 'photo', 'voice', 'transfer', 'fwd', 'short', 'readonly'].includes(this.S.ctx.type)) {
+      delete this.S.ctx.type
+      delete this.S.ctx.amount
+      delete this.S.ctx.s
+      if (!Object.keys(this.S.ctx).length) this.S.ctx = null
+    }
     // ответить можно на последнее сказанное: воспоминание, реплика легенды или персонажа ставятся после своей реплики
     if (this.S.ctx) { delete this.S.ctx.memory; delete this.S.ctx.legend; delete this.S.ctx.chorus }
     const out: Msg[] = []
@@ -706,7 +712,10 @@ export class Game {
       // клятвы и сроки («Клянусь лавашом», «как бетон застынет») — не тема разговора
       if ((D.OATH as Entry<string>[]).some((o) => m.text.startsWith(valueOf(o)))) continue
       let text = m.text
-      for (const p of this.S.promises) text = text.split(p.t).join('')
+      // срок в сообщении — не тема: «После обеда…» иначе цепляет еду; регистр и точка в конце не мешают
+      for (const p of this.S.promises) text = text.replace(new RegExp(p.t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '')
+      text = text.replace(/^[.\s,;:!?…—–-]+|[.\s,;:!?…—–-]+$/g, '').trim()
+      if (!text) continue
       const hit = Object.entries(TOPICS).find(([k, t]) => t.re.test(text) && !this.topicMuted(k))
       if (hit) { this.topicText = text; return hit[0] }
     }
@@ -1224,7 +1233,10 @@ export class Game {
   /** Утверждение, к которому Алик может сам вернуться: сказано 10+ дней назад, ещё не вспоминал. */
   callbackCandidate(): Claim | undefined {
     const mem = this.S.mem
-    return CLAIMS.find((c) => c.updates && mem['said.' + c.key] !== undefined && this.S.day - Number(mem['said.' + c.key]) >= 10 && !mem['cb.' + c.key])
+    // «помнишь, я говорил» — только своё; версию из семейного чата (Гарик) себе не приписывает
+    return CLAIMS.find((c) => c.updates && mem['said.' + c.key] !== undefined
+      && (mem['by.' + c.key] === undefined || mem['by.' + c.key] === 'alik')
+      && this.S.day - Number(mem['said.' + c.key]) >= 10 && !mem['cb.' + c.key])
   }
   async callback(): Promise<void> {
     const c = this.callbackCandidate()

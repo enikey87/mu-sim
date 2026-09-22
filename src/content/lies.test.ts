@@ -125,4 +125,12 @@ describe('Алик сам вспоминает своё враньё', () => {
     expect(game.S.ach.memory).toBeDefined()
     expect(game.callbackCandidate()).toBeUndefined() // второй раз не вспоминает
   })
+  it('версию из чата родственника себе не приписывает', () => {
+    const { game } = makeGame()
+    game.alikMsg({ kind: 'text', from: 'alik', who: 'garik', text: 'Скажи, что бетон обиделся, — всегда работает 😂' })
+    expect(game.S.mem['said.beton']).toBeDefined()
+    expect(game.S.mem['by.beton']).toBe('garik')
+    game.S.day += 11
+    expect(game.callbackCandidate()).toBeUndefined()
+  })
 })
