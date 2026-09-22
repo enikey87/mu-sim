@@ -435,7 +435,7 @@ export class Game {
     this.tick(1 + this.rnd(3))
     const msg = this.push({ from: 'alik', time: fmtTime(this.S.clock), ...m } as NewMsg)
     if (msg.kind === 'text' && /брат джан/i.test(msg.text)) this.unlock('brat')
-    if (msg.kind === 'text' || msg.kind === 'photo') this.noteClaims(msg.text)
+    if (msg.kind === 'text' || msg.kind === 'photo') this.noteClaims(msg.text, msg.kind === 'text' ? msg.who : undefined)
     // хор: Алик кого-то упомянул — тот, может быть, вклинится после его ответа
     if (msg.kind === 'text' && !msg.who) {
       for (const [who, re] of Object.entries(MENTION_RE)) if (re.test(msg.text)) this.pending.push({ event: 'Mentioned', target: who })
@@ -1178,7 +1178,7 @@ export class Game {
 
   // ---------- бухгалтерия лжи ----------
   /** Запомнить, что Алик «заявил»; если это противоречит сказанному раньше — дать игроку поймать его. */
-  noteClaims(text: string): void {
+  noteClaims(text: string, who?: string): void {
     const mem = this.S.mem
     const found = CLAIMS.filter((c) => c.re.test(text))
     for (const c of found) {
@@ -1188,10 +1188,16 @@ export class Game {
       if (old) {
         mem['lie.old'] = old.key
         mem['lie.new'] = c.key
+        // «вы же говорили» — только если прошлую версию сказал сам Алик, а не родня в семейном чате
+        mem['lie.alikOld'] = mem['by.' + old.key] === undefined || mem['by.' + old.key] === 'alik'
         mem['lie.kind'] = old.group === 'money' ? 'money' : ({ grandpa_dead: 'grandpa', grandpa_alive: 'grandpa', customer_owes: 'customer', customer_paid: 'customer', sent: 'sent', no_money: 'sent' } as Record<string, string>)[c.key] ?? 'other'
       }
     }
-    for (const c of found) { if (mem['said.' + c.key] === undefined) mem['said.' + c.key] = this.S.day; mem['saidLast.' + c.key] = this.S.day }
+    for (const c of found) {
+      if (mem['said.' + c.key] === undefined) mem['said.' + c.key] = this.S.day
+      mem['saidLast.' + c.key] = this.S.day
+      mem['by.' + c.key] = who ?? 'alik'
+    }
   }
   lie(): { old: Claim; new: Claim } | null {
     const o = claimByKey(String(this.S.mem['lie.old'] ?? '')), n = claimByKey(String(this.S.mem['lie.new'] ?? ''))

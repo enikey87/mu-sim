@@ -100,6 +100,13 @@ describe('поймать на лжи', () => {
     game.alikMsg({ kind: 'text', from: 'alik', text: 'Заказчик Грант мне не платит.' })
     game.alikMsg({ kind: 'text', from: 'alik', who: 'grant', text: 'Молодой человек, я Алику всё заплатил ещё в марте.' })
     expect(game.S.mem['lie.kind']).toBe('customer')
+    expect(game.S.mem['lie.alikOld']).toBe(true) // прошлую версию сказал сам Алик — «вы же говорили» уместно
+  })
+  it('версию сказал не Алик — игрок не приписывает её ему', () => {
+    const { game } = makeGame()
+    game.alikMsg({ kind: 'text', from: 'alik', who: 'nune', text: 'Деньги в сейфе, ключ у меня.' })
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в фундаменте, брат.' })
+    if (game.S.mem['lie.old'] !== undefined) expect(game.S.mem['lie.alikOld']).toBe(false)
   })
 })
 

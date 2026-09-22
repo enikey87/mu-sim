@@ -174,7 +174,7 @@ export const ARCS: Record<string, Arc> = {
   alik_death: {
     title: 'Похороны Алика',
     minDay: 240,
-    follow: [gate(missing('finale.alik_death'))('Алик, вы живы?'), gate(gte('arc.alik_death', 2), lte('arc.alik_death', 3))('Как похороны?'), gate(missing('finale.alik_death'))('Алик, вы там как, на том свете?'), 'Как вы там, Алик?'],
+    follow: [gate(missing('finale.alik_death'))('Алик, вы живы?'), gate(gte('arc.alik_death', 4), lte('arc.alik_death', 5))('Как похороны?'), gate(missing('finale.alik_death'))('Алик, вы там как, на том свете?'), 'Как вы там, Алик?'],
     eps: [
       // Карине ушла к Рубику — вместо неё пишет мама Алика
       {

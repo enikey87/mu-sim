@@ -1,6 +1,6 @@
 // Бухгалтерия лжи: что Алик «заявил», что чему противоречит, как он вспоминает и выкручивается.
 // Утверждения распознаются в тексте реплик — отдельно размечать сотни фраз не нужно.
-import type { Entry } from '../engine/rules'
+import { gate, is, type Entry } from '../engine/rules'
 import { needs } from './world'
 
 export interface Claim {
@@ -72,11 +72,12 @@ export function conflicts(a: string, b: string): boolean {
 export const pairKey = (a: string, b: string): string => [a, b].sort().join('|')
 
 // --- реплики игрока: «Поймать на лжи»
-export const P_LIE = [
-  'Алик, вы же говорили: {old}. А теперь — {new}?',
+export const P_LIE: Entry<string>[] = [
+  // «вы же говорили» — только про версию самого Алика; прошлую могла сказать и родня в семейном чате
+  gate(is('lie.alikOld'))('Алик, вы же говорили: {old}. А теперь — {new}?'),
   'Стоп. Так {old} или {new}?',
   'Я записываю: сначала {old}, теперь {new}. Это как?',
-  'Алик, у вас {old}, а сегодня уже {new}. Определитесь.',
+  gate(is('lie.alikOld'))('Алик, у вас {old}, а теперь уже {new}. Определитесь.'),
 ]
 
 // --- как Алик выкручивается
