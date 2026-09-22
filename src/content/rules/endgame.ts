@@ -1,10 +1,11 @@
 import type { Game } from '../../engine/game'
 import { type Rule, eq, is } from '../../engine/rules'
 import type { GameEvent } from './events'
+import { endgame } from '../memkeys'
 
 type R = Rule<Game, GameEvent>
 
-const active = is('endgame.active')
+const active = is(endgame.active)
 
 export const endgameRules: R[] = [
   {

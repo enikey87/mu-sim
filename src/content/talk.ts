@@ -5,6 +5,7 @@ import { ARCS } from './arcs'
 import type { GameState } from '../engine/state'
 import { type Entry, type FactOp, set } from '../engine/rules'
 import { needs } from './world'
+import { grantPaid } from './memkeys'
 
 /** Вопрос, ответ и (необязательно) когда вопрос уместен: по состоянию и по тому, что Алик только что сказал. */
 export type TalkPair = readonly [string, string, ((S: GameState, said: string) => boolean)?]
@@ -65,5 +66,5 @@ export const talkPairs = (kind: TalkKind, sub: string): readonly Entry<TalkPair>
   (kind === 'legend' ? LEGENDS[sub]?.talk : kind === 'chorus' ? CHORUS_TALK[sub] : MEMORY_TALK) ?? []
 export const talkId = (kind: TalkKind, sub: string, i: number) => `TALK:${kind}:${sub}:${i}`
 export const TALK_REMEMBER: Record<string, FactOp[]> = {
-  [talkId('chorus', 'grant', 0)]: [set('grant.paid', true)],
+  [talkId('chorus', 'grant', 0)]: [set(grantPaid, true)],
 }

@@ -1,6 +1,7 @@
 // Тексты для новых возможностей системы правил: обещания, которые наступают, хор персонажей,
 // состояния мира со сроком (свадьба, болезнь Бориса, «Алик умер»).
 import { type Criterion, type Entry, named, exists, is, eq, gte, ne, missing, set, gate } from '../engine/rules'
+import { cryptoHodl, garikConcrete, garikCut, grandpaDying, intro, met, mourning, nivaAway, nuneDekretOver, payday } from './memkeys'
 
 // Мир последователен: кто и что есть в истории и в каком оно положении — факты, их ставит серия (remember), ступень суда
 // или ход, где персонаж входит в историю. Реплика, которая на них опирается, объявляет это сама — needs('crane')('…').
@@ -10,62 +11,62 @@ export const WORLD = {
   /** Борис научился писать (серия «Это Борис тебе написал. Сам!»). */
   borisWrites: named('borisWrites', gte('arc.boris', 4)),
   /** Бараны как тема разговора: Борис, «фото платёжки» с бараном. */
-  baran: named('baran', is('intro.baran')),
+  baran: named('baran', is(intro('baran'))),
   razmik: named('razmik', exists('arc.razmik')),
   crane: named('crane', exists('arc.razmik')),
   rubik: named('rubik', exists('arc.rubik')),
   twin: named('twin', gte('arc.grant', 5)),
-  arsen: named('arsen', is('intro.arsen')),
-  grachik: named('grachik', is('intro.grachik')),
+  arsen: named('arsen', is(intro('arsen'))),
+  grachik: named('grachik', is(intro('grachik'))),
   /** Прораб Мкртич вошёл в историю (сам написал или его представили). */
-  mkrtich: named('mkrtich', is('intro.mkrtich')),
+  mkrtich: named('mkrtich', is(intro('mkrtich'))),
   /** Тётя Гоар вошла в историю (домофон, отмазка с её ролью, сцена). */
-  goar: named('goar', is('intro.goar')),
+  goar: named('goar', is(intro('goar'))),
   /** Судья Ашот вошёл в историю (заседание, кум в сериале про бетон). */
-  judge: named('judge', is('intro.judge')),
+  judge: named('judge', is(intro('judge'))),
   /** Дядя Самвел вошёл в историю (свадьба, семейный чат, его сообщение). */
-  samvel: named('samvel', is('intro.samvel')),
+  samvel: named('samvel', is(intro('samvel'))),
   /** Бухгалтер Нуне вошла в историю. */
-  nune: named('nune', is('intro.nune')),
+  nune: named('nune', is(intro('nune'))),
   /** Карине вошла в историю (написала сама или Алик представил жену). */
-  karine: named('karine', is('intro.karine')),
+  karine: named('karine', is(intro('karine'))),
   /** Заказчик Грант вошёл в историю. */
-  grant: named('grant', is('intro.grant')),
+  grant: named('grant', is(intro('grant'))),
   /** «Нива» вошла в историю (сериал, бартер, её собственное «би-бип»). */
-  niva: named('niva', is('intro.niva')),
+  niva: named('niva', is(intro('niva'))),
   /** Гагик из Абовяна — из отмазок Алика. */
-  gagik: named('gagik', is('intro.gagik')),
+  gagik: named('gagik', is(intro('gagik'))),
   /** Алик — тамада (свадьба Самвела). */
-  tamada: named('tamada', is('intro.tamada')),
+  tamada: named('tamada', is(intro('tamada'))),
   /** История с декретом Нуне началась (о нём можно говорить). */
   dekret: named('dekret', exists('arc.nune')),
   /** Декрет идёт: Нуне из него не вышла и её не уволили (финал «Настоящая ведомость»). */
-  dekretNow: named('dekretNow', exists('arc.nune'), missing('nune.dekretOver'), ne('finale.nune', 'ledger')),
+  dekretNow: named('dekretNow', exists('arc.nune'), missing(nuneDekretOver), ne('finale.nune', 'ledger')),
   /** У Нуне родился ребёнок (серия «Нуне родила!»). */
   nuneBaby: named('nuneBaby', gte('arc.nune', 3)),
   /** Гарик вошёл в историю (сам написал, сериал, семейный чат). */
-  garik: named('garik', is('intro.garik')),
-  garikFree: named('garikFree', missing('garik.concrete')),
+  garik: named('garik', is(intro('garik'))),
+  garikFree: named('garikFree', missing(garikConcrete)),
   /** Гарик на связи: не сидит в фундаменте без интернета. */
-  garikOnline: named('garikOnline', missing('garik.cut')),
+  garikOnline: named('garikOnline', missing(garikCut)),
   /** Алик хоть раз назвал сроком «завтра» — теперь на это слово можно ссылаться. */
   saidTomorrow: named('saidTomorrow', is('said.tomorrow')),
   /** В семье прощаются: дедушка умирает или хоронят Алика. */
-  mourning: named('mourning', is('mourning')),
-  grandpaDying: named('grandpaDying', is('grandpa.dying')),
+  mourning: named('mourning', is(mourning)),
+  grandpaDying: named('grandpaDying', is(grandpaDying)),
   karineHome: named('karineHome', ne('finale.rubik', 'karine')),
   karineGone: named('karineGone', eq('finale.rubik', 'karine')),
   /** Игрок знает Карине: она уже писала сама. */
-  karineKnown: named('karineKnown', is('met.karine'), ne('finale.rubik', 'karine')),
+  karineKnown: named('karineKnown', is(met('karine')), ne('finale.rubik', 'karine')),
   razmikUp: named('razmikUp', exists('arc.razmik'), missing('finale.razmik')),
-  nivaHome: named('nivaHome', missing('niva.away')),
-  nivaAway: named('nivaAway', is('niva.away')),
+  nivaHome: named('nivaHome', missing(nivaAway)),
+  nivaAway: named('nivaAway', is(nivaAway)),
   /** Игрок оставил деньги в «Лаваш-коине», и его ещё не продали в День выплаты. */
-  lavashHeld: named('lavashHeld', is('crypto.hodl'), missing('payday.chain')),
+  lavashHeld: named('lavashHeld', is(cryptoHodl), missing(payday.chain)),
 }
 export type WorldKey = keyof typeof WORLD
 export const needs = (...keys: WorldKey[]) => gate(...keys.map((k) => WORLD[k]))
-export const meet = (...ids: string[]) => ids.map((id) => set('intro.' + id, true))
+export const meet = (...ids: string[]) => ids.map((id) => set(intro('') + id, true))
 
 /** Кто пишет в чат сам (хор, семейный чат, родня на крик) только при условии; остальные — всегда. */
 export const SPEAKS: Record<string, Criterion> = { boris: WORLD.borisWrites, arsen: WORLD.arsen, karine: WORLD.karineHome, razmik: WORLD.razmik, rubik: WORLD.rubik, garik: WORLD.garikOnline }

@@ -13,6 +13,7 @@ import { P_LIE } from '../lies'
 import { TOPICS } from '../topics'
 import { WORLD, SPEAKS, needs } from '../world'
 import { fmtDayMonth } from '../../engine/time'
+import { HEAT, alikDead, blocked, court, lie, mourning } from '../memkeys'
 
 type R = Rule<Game, GameEvent>
 
@@ -52,17 +53,17 @@ const offer = (o: OfferSpec): R => ({
 export const choiceRules: R[] = [
   // поймать на лжи — важнее всего: момент уходит со следующей репликой
   offer({
-    name: 'CatchLie', when: [exists('lie.old')], act: 'catchLie', tone: 'neutral', bonus: 6,
+    name: 'CatchLie', when: [exists(lie.old)], act: 'catchLie', tone: 'neutral', bonus: 6,
     text: (g) => { const l = g.lie()!; return g.playerLine(() => g.X.fill(g.draw('P_LIE', P_LIE), { old: l.old.say, new: l.new.say })) },
   }),
   // извиниться после грубости
   offer({ name: 'Sorry', when: [is('ctx.offended')], act: 'sorry', tone: 'polite', bonus: 5, text: (g) => fromD(g, 'P_SORRY') }),
   // лестница грубости: заблокирован — извиниться можно только через Бориса; ссора горячая — можно мычать
   // посредник — лучший из тех, кто есть: Борис, Карине, мама Алика (один вариант на слот); обращение к посреднику — без «Алик, …»
-  offer({ name: 'Via_boris', slot: 'via', when: [is('blocked'), SPEAKS.boris], act: 'via', arg: () => 'boris', tone: 'polite', bonus: 7, text: (g) => g.draw('P_VIA_BORIS', ['Борис, передай Алику: прости меня', 'Попросить Бориса передать извинения', 'Борис, скажи ему «бее» от меня. Мирное']) }),
-  offer({ name: 'Via_karine', slot: 'via', when: [is('blocked'), WORLD.karineHome, WORLD.karine], act: 'via', arg: () => 'karine', tone: 'polite', bonus: 6, text: (g) => g.draw('P_VIA_KARINE', ['Карине, передайте Алику: я извиняюсь', 'Попросить Карине передать извинения']) }),
-  offer({ name: 'Via_mama', slot: 'via', when: [is('blocked')], act: 'via', arg: () => 'mama', tone: 'polite', bonus: 6, text: (g) => g.draw('P_VIA_MAMA', ['Попросить маму Алика передать извинения']) }),
-  offer({ name: 'Moo', when: [is('ctx.offended'), gte('rude.heat', 1)], odds: 0.5, act: 'moo', tone: 'neutral', bonus: 4, text: (g) => fromArr(g, 'P_MOO', ['Мууу.', 'Мууууу 🐄', 'Му. (Это значит «мир».)']) }),
+  offer({ name: 'Via_boris', slot: 'via', when: [is(blocked), SPEAKS.boris], act: 'via', arg: () => 'boris', tone: 'polite', bonus: 7, text: (g) => g.draw('P_VIA_BORIS', ['Борис, передай Алику: прости меня', 'Попросить Бориса передать извинения', 'Борис, скажи ему «бее» от меня. Мирное']) }),
+  offer({ name: 'Via_karine', slot: 'via', when: [is(blocked), WORLD.karineHome, WORLD.karine], act: 'via', arg: () => 'karine', tone: 'polite', bonus: 6, text: (g) => g.draw('P_VIA_KARINE', ['Карине, передайте Алику: я извиняюсь', 'Попросить Карине передать извинения']) }),
+  offer({ name: 'Via_mama', slot: 'via', when: [is(blocked)], act: 'via', arg: () => 'mama', tone: 'polite', bonus: 6, text: (g) => g.draw('P_VIA_MAMA', ['Попросить маму Алика передать извинения']) }),
+  offer({ name: 'Moo', when: [is('ctx.offended'), gte(HEAT, 1)], odds: 0.5, act: 'moo', tone: 'neutral', bonus: 4, text: (g) => fromArr(g, 'P_MOO', ['Мууу.', 'Мууууу 🐄', 'Му. (Это значит «мир».)']) }),
 
   // ответ на то, ЧТО прислал Алик
   offer({ name: 'Photo', when: [eq('ctx.type', 'photo')], act: 'photo', tone: 'neutral', bonus: 3, text: (g) => fromD(g, 'P_PHOTO') }),
@@ -105,7 +106,7 @@ export const choiceRules: R[] = [
   }),
   offer({ name: 'Congrats', slot: 'rel', specificity: 2, weight: 1, when: [exists('ctx.rel'), is('ctx.festive')], act: 'congrats', tone: 'polite', text: (g) => fromD(g, 'P_CONGRATS') }),
   offer({ name: 'Condole', slot: 'rel', specificity: 2, weight: 1, when: [exists('ctx.rel'), is('ctx.sad')], act: 'condole', tone: 'polite', text: (g) => fromD(g, 'P_CONDOLE') }),
-  offer({ name: 'Mourn', when: [is('mourning')], odds: 0.5, act: 'condole', tone: 'polite', bonus: 1, text: (g) => fromD(g, 'P_CONDOLE') }),
+  offer({ name: 'Mourn', when: [is(mourning)], odds: 0.5, act: 'condole', tone: 'polite', bonus: 1, text: (g) => fromD(g, 'P_CONDOLE') }),
 
   offer({ name: 'Doubt', when: [is('ctx.constr')], act: 'defend', tone: 'neutral', bonus: 1, text: (g) => fromD(g, 'P_DOUBT') }),
 
@@ -128,22 +129,22 @@ export const choiceRules: R[] = [
 
   // сериалы: про текущий — всегда, про любой незаконченный — иногда
   offer({
-    name: 'ArcDeath', slot: 'arc', when: [is('alik_dead'), is('deathCanAdvance')], act: 'arc', tone: 'polite', bonus: 2,
+    name: 'ArcDeath', slot: 'arc', when: [is(alikDead), is('deathCanAdvance')], act: 'arc', tone: 'polite', bonus: 2,
     text: (g) => freshFromArr(g, 'F_alik_death', ARCS.alik_death.follow), arg: () => 'alik_death',
   }),
   offer({
     // вопрос про сериал — только если он к чему-то приведёт (иначе «Как Нуне?» трижды подряд → «пока без новостей»)
-    name: 'Arc', slot: 'arc', when: [missing('alik_dead'), exists('ctx.arc'), is('ctx.arcCanAdvance')], act: 'arc', tone: 'polite', bonus: 1,
+    name: 'Arc', slot: 'arc', when: [missing(alikDead), exists('ctx.arc'), is('ctx.arcCanAdvance')], act: 'arc', tone: 'polite', bonus: 1,
     text: (g, f) => freshFromArr(g, 'F_' + f['ctx.arc'], ARCS[String(f['ctx.arc'])].follow), arg: (_g, f) => String(f['ctx.arc']),
   }),
   offer({
-    name: 'ArcAny', slot: 'arc', when: [missing('alik_dead'), exists('arcUnfinished')], odds: 0.2, act: 'arc', tone: 'polite',
+    name: 'ArcAny', slot: 'arc', when: [missing(alikDead), exists('arcUnfinished')], odds: 0.2, act: 'arc', tone: 'polite',
     text: (g, f) => freshFromArr(g, 'F_' + f.arcUnfinished, ARCS[String(f.arcUnfinished)].follow), arg: (_g, f) => String(f.arcUnfinished),
   }),
 
   // дело в суде открыто — игрок может его продолжить (угроза двигает линию суда)
   offer({
-    name: 'Court', when: [gte('court', 1), lte('court', 6)], odds: 0.35, tone: 'threat',
+    name: 'Court', when: [gte(court, 1), lte(court, 6)], odds: 0.35, tone: 'threat',
     text: (g) => fromArr(g, 'P_COURT', ['Увидимся в суде, Алик.', 'Я подаю в суд. Серьёзно.', 'Мой адвокат с вами свяжется.', 'Жду повестку, Алик.', 'До встречи в зале суда.', 'Суд всё решит.', needs('arsen')('Передайте Арсену: я готов.'), 'Я иду до конца. До самого Страсбурга.', 'Готовьте документы, Алик.', 'Суд — не свадьба, там не отмажешься.', 'Я нашёл юриста. Настоящего, с дипломом.', 'Иск готов. Осталось распечатать.']),
   }),
   // «Это корова?» — только сразу после «Мууу», а не всю игру

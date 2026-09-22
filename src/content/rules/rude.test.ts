@@ -5,7 +5,7 @@ import type { Game } from '../../engine/game'
 import type { Facts } from '../../engine/rules'
 import type { Msg } from '../../engine/state'
 import * as T from '../rude'
-import { HEAT } from './rude'
+import { HEAT } from '../memkeys'
 import { valueOf, spec, during, type Entry } from '../../engine/rules'
 
 const texts = (game: Game, from: number) => game.S.msgs.slice(from).map((m) => (m.kind === 'text' || m.kind === 'sys' ? m.text : m.kind === 'sticker' ? m.e : ''))

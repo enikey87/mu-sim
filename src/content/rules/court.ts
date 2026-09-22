@@ -6,6 +6,7 @@ import type { GameEvent } from './events'
 import { COURT, COURT_AFTER, COURT_LAWYER_AGAIN } from '../quests'
 import { THREAT_AGAIN } from '../misc'
 import { meet } from '../world'
+import { count, court, intro } from '../memkeys'
 
 type R = Rule<Game, GameEvent>
 const threat = eq('tone', 'threat')
@@ -16,25 +17,25 @@ async function saySaid(game: Game, lines: ReadonlyArray<readonly [string, string
 
 export const courtRules: R[] = [
   {
-    name: 'Court_Start', event: 'PlayerMessage', when: [threat], remember: [add('count.threat'), set('court', 1)],
+    name: 'Court_Start', event: 'PlayerMessage', when: [threat], remember: [add(count.threat), set(court, 1)],
     respond: async ({ game }) => { game.mood(-1); await game.say([game.uniq(game.X.threat)]); game.goOffline(1) },
   },
   // ступень 1 — юрист: здесь Арсен входит в историю, если его ещё не было
   {
-    name: 'Court_Lawyer', event: 'PlayerMessage', when: [threat, eq('court', 1), missing('intro.arsen')], bonus: 1,
-    remember: [add('count.threat'), add('court'), ...meet('arsen')],
+    name: 'Court_Lawyer', event: 'PlayerMessage', when: [threat, eq(court, 1), missing(intro('arsen'))], bonus: 1,
+    remember: [add(count.threat), add(court), ...meet('arsen')],
     respond: async ({ game }) => { game.unlock('memory'); await saySaid(game, COURT[1]) },
   },
   {
-    name: 'Court_Lawyer_Again', event: 'PlayerMessage', when: [threat, eq('court', 1), is('intro.arsen')], bonus: 1,
-    remember: [add('count.threat'), add('court')],
+    name: 'Court_Lawyer_Again', event: 'PlayerMessage', when: [threat, eq(court, 1), is(intro('arsen'))], bonus: 1,
+    remember: [add(count.threat), add(court)],
     respond: async ({ game }) => { game.unlock('memory'); await saySaid(game, COURT_LAWYER_AGAIN) },
   },
   {
     // претензия, апелляция, Страсбург, решение — по ступеням
-    name: 'Court_Step', event: 'PlayerMessage', when: [threat, gte('court', 1), lte('court', 6)], remember: [add('count.threat'), add('court')],
+    name: 'Court_Step', event: 'PlayerMessage', when: [threat, gte(court, 1), lte(court, 6)], remember: [add(count.threat), add(court)],
     respond: async ({ game }) => {
-      const stage = Number(game.S.mem.court) - 1 // память уже сдвинута на следующую ступень
+      const stage = Number(game.S.mem[court]) - 1 // память уже сдвинута на следующую ступень
       game.unlock('memory')
       if (stage === 3) return game.enterNode('court', game.scenes.court.start)
       await saySaid(game, COURT[stage])
@@ -43,7 +44,7 @@ export const courtRules: R[] = [
   },
   {
     // дело прошло все инстанции
-    name: 'Court_After', event: 'PlayerMessage', when: [threat, gte('court', 7)], remember: [add('count.threat')],
+    name: 'Court_After', event: 'PlayerMessage', when: [threat, gte(court, 7)], remember: [add(count.threat)],
     respond: async ({ game }) => {
       await game.say([game.line('COURT_AFTER', [...COURT_AFTER, ...THREAT_AGAIN], { fallback: game.X.threat })!])
     },

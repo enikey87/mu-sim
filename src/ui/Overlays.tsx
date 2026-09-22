@@ -3,6 +3,7 @@ import { useGame } from './useGame'
 import { ENDINGS } from '../content/finales'
 import { ARCS } from '../content/arcs'
 import { useModal } from './useModal'
+import { payday } from '../content/memkeys'
 
 export function Toast() {
   const game = useGame()
@@ -116,14 +117,14 @@ export function EndingScreen({ onReset }: { onReset: () => void }) {
         <small>Концовка {Object.keys(S.endings).length} из {ENDINGS.length}</small>
         <h2>{e.title}</h2>
         <p>{e.text}</p>
-        {e.id.startsWith('payday_') && typeof S.mem['payday.chain'] === 'string' && (
+        {e.id.startsWith('payday_') && typeof S.mem[payday.chain] === 'string' && (
           <>
-            <blockquote className="grand" id="grandExcuse">«{S.mem['payday.chain']}»</blockquote>
+            <blockquote className="grand" id="grandExcuse">«{S.mem[payday.chain]}»</blockquote>
             <button
               className="secondary"
               id="copyExcuse"
               onClick={() => {
-                const text = `Алик, где деньги? — великая отмазка Дня выплаты:\n«${S.mem['payday.chain']}»`
+                const text = `Алик, где деньги? — великая отмазка Дня выплаты:\n«${S.mem[payday.chain]}»`
                 void copyText(text).then((ok) => game.flash(ok ? 'Скопировано' : 'Не удалось скопировать'))
               }}
             >

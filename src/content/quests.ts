@@ -4,6 +4,7 @@
 import type { Scene } from './scenes'
 import { gate, missing } from '../engine/rules'
 import { needs } from './world'
+import { courtVerdict, cryptoHodl, intro } from './memkeys'
 
 export const QUESTS: Record<string, Scene> = {
   q_hash: {
@@ -64,7 +65,7 @@ export const QUESTS: Record<string, Scene> = {
         ],
       },
       yes: {
-        fx: { days: 1, debt: -1000, mood: 3, ach: 'q_tamada', set: { 'intro.goar': true } },
+        fx: { days: 1, debt: -1000, mood: 3, ach: 'q_tamada', set: { [intro('goar')]: true } },
         sys: 'Вы вели застолье шесть часов. Работа: +5 000 ₽ к долгу Алика. Сервиз тёти Гоар: −6 000 ₽. Итог: долг Алика уменьшился на 1 000 ₽.',
         a: ['Ты — огонь! Гости плакали. Сервиз тёти Гоар тоже пострадал — она его на застолье привезла. Бухгалтерия уже посчитала, спорить поздно.'],
       },
@@ -102,7 +103,7 @@ export const QUESTS: Record<string, Scene> = {
         a: [needs('nivaHome')(needs('niva')('Спасибо, брат! Я на такси — «Нива» обиделась. Банк, кстати, закрыт: санитарный день. Место держи, завтра приеду.')), 'Спасибо, брат! Я на такси. Банк, кстати, закрыт: санитарный день. Место держи, завтра приеду.'],
         then: 'promise',
       },
-      no: { a: [needs('samvel')('Эх. Место занял дядя Самвел. Со свадебным кортежем. Банк теперь тоже гуляет.'), gate(missing('intro.samvel'))('Эх. Место занял свадебный кортеж. Банк теперь тоже гуляет.')] },
+      no: { a: [needs('samvel')('Эх. Место занял дядя Самвел. Со свадебным кортежем. Банк теперь тоже гуляет.'), gate(missing(intro('samvel')))('Эх. Место занял свадебный кортеж. Банк теперь тоже гуляет.')] },
     },
   },
 
@@ -139,7 +140,7 @@ export const QUESTS: Record<string, Scene> = {
       },
       back: { a: ['Из крипты не возвращают, брат. Это же блокчейн. Цепочка. Я на ней, как на привязи.'], opts: [{ t: 'Какой курс?', go: 'rate' }] },
       lavash: { fx: { debt: -500, legend: null }, sys: 'Вы получили 50 лавашей. Они черствеют.', a: ['Вывел! Пятьсот рублей — я вычел. Кушай, пока курс не упал.'] },
-      hodl: { fx: { set: { 'crypto.hodl': true } }, a: [needs('garikFree')(needs('garik')('Правильно, держим! Гарик тоже держит. Он всё держит — у него хаш на них куплен.')), 'Правильно, держим! Кум тоже держит. Он всё держит — у него хаш на них куплен.'], then: 'promise' },
+      hodl: { fx: { set: { [cryptoHodl]: true } }, a: [needs('garikFree')(needs('garik')('Правильно, держим! Гарик тоже держит. Он всё держит — у него хаш на них куплен.')), 'Правильно, держим! Кум тоже держит. Он всё держит — у него хаш на них куплен.'], then: 'promise' },
     },
   },
 
@@ -184,7 +185,7 @@ export const QUESTS: Record<string, Scene> = {
     start: 'ask',
     nodes: {
       ask: {
-        fx: { set: { 'intro.goar': true } },
+        fx: { set: { [intro('goar')]: true } },
         a: ['Брат, срочное дело. Коза тёти Гоар застряла на крыше. Ты высоты не боишься? Сниму — отдам сразу!'],
         opts: [{ t: 'Лезу за козой', go: 'climb', tone: 'polite' }, { t: 'Вызовите МЧС', go: 'mchs' }],
       },
@@ -204,7 +205,7 @@ export const COURT_SCENE: Scene = {
   start: 'hearing',
   nodes: {
     hearing: {
-      fx: { set: { 'intro.judge': true } },
+      fx: { set: { [intro('judge')]: true } },
       sys: 'Вам пришла повестка: суд Абовянского района, судья — Ашот Воздухонесян. Однофамилец. Наверное.',
       who: 'judge', a: ['Заседание открыто. Истец, говорите. Коротко, у меня хаш стынет.'],
       opts: [
@@ -214,16 +215,16 @@ export const COURT_SCENE: Scene = {
       ],
     },
     debt: {
-      fx: { ach: 'court', set: { 'court.verdict': 1 } },
+      fx: { ach: 'court', set: { [courtVerdict]: 1 } },
       who: 'judge', a: ['Суд установил: должен. Суд также установил: не может. Решение: пусть будет должен, но с уважением. Заседание закрыто, хаш открыт.'],
     },
     screens: {
-      fx: { ach: 'court', set: { 'court.verdict': 2 } },
+      fx: { ach: 'court', set: { [courtVerdict]: 2 } },
       who: 'judge', a: ['Суд изучил переписку. Суд смеялся сорок минут. Решение: ответчику — выговор за «когда рак на Арагаце свистнет», истцу — пятьдесят рублей.'],
       then: 'transfer',
     },
     moo: {
-      fx: { ach: 'court', set: { 'court.verdict': 3 } },
+      fx: { ach: 'court', set: { [courtVerdict]: 3 } },
       who: 'goar', a: ['Ме-е-е. (Это коза. Она свидетель.)'],
       who2: 'judge', a2: ['Свидетель — коза — подтверждает мычание. Суд удовлетворяет иск частично: коровой. Корову предоставит ответчик. Когда найдёт.'],
     },

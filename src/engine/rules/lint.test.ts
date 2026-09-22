@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { lintRules } from './lint'
-import { eq } from './criteria'
+import { eq, named } from './criteria'
 import type { Rule } from './types'
 
 type R = Rule<unknown>
@@ -35,5 +35,20 @@ describe('линтер правил', () => {
     expect(lintRules([r('Wide', { bonus: 2 }), r('Other', { event: 'F', when: [eq('x', 1)] })])).toEqual([])
     expect(lintRules([r('Cond', { bonus: 2, when: [eq('y', 1)] }), r('Narrow', { when: [eq('x', 1)] })])).toEqual([])
     expect(lintRules([r('Wide', { bonus: 2 }), r('Offer', { when: [eq('x', 1)] })], ['E'])).toEqual([])
+  })
+  it('неизвестный ключ факта: опечатка = молча мёртвое условие', () => {
+    const known = (key: string) => key.startsWith('ok.')
+    const issues = lintRules([
+      r('Good', { when: [eq('ok.a', 1)] }),
+      r('Typo', { when: [eq('okz.a', 1)] }),
+      r('TypoInRemember', { remember: [{ key: 'okz.b', op: '=', value: true }] }),
+      r('Named', { when: [named('Метка', eq('okz.c', 1))] }), // метка не ключ — проверяются дети
+      r('NamedOk', { when: [named('Метка', eq('ok.b', 1))] }),
+      r('BareAll', { when: [{ key: 'okz.d', op: 'all' }] }), // контейнер без детей — нечего проверять
+      r('EventScope', { when: [{ key: 'okz.e', op: '==', value: 1, scope: 'event' }] }), // факты события — не ключи
+    ], [], { keyCheck: known })
+    expect(issues.map((i) => [i.rule, i.kind])).toEqual([['Typo', 'unknown-key'], ['TypoInRemember', 'unknown-key'], ['Named', 'unknown-key']])
+    // без keyCheck гейт молчит — проверка opt-in
+    expect(lintRules([r('Any', { when: [eq('whatever', 1)] })])).toEqual([])
   })
 })

@@ -69,7 +69,7 @@ export function conflicts(a: string, b: string): boolean {
   return CONTRA.some(([x, y]) => (x === a && y === b) || (x === b && y === a))
 }
 
-export const pairKey = (a: string, b: string): string => [a, b].sort().join('|')
+export { pairKey } from './memkeys'
 
 // --- реплики игрока: «Поймать на лжи»
 export const P_LIE: Entry<string>[] = [

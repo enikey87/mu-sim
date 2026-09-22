@@ -16,7 +16,8 @@ import { FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUF
 import { STARTS } from '../content/quests'
 import { allRules } from '../content/rules'
 import type { GameEvent } from '../content/rules/events'
-import { CLAIMS, claimByKey, conflicts, pairKey, CALLBACK_OPEN, type Claim } from '../content/lies'
+import { CLAIMS, claimByKey, conflicts, CALLBACK_OPEN, type Claim } from '../content/lies'
+import * as memkeys from '../content/memkeys'
 import {
   ENDGAME_CHOICES, ENDGAME_FALLBACK, ENDGAME_FORMALITIES, ENDGAME_GROUP, ENDGAME_INTRO, ENDGAME_JUBILEES,
   ENDGAME_LEAVE, ENDGAME_MONEY, ENDGAME_MUTE, ENDGAME_OPEN, ENDGAME_RENAMES, ENDGAME_RETURNERS, ENDGAME_VENDETTA,
@@ -453,8 +454,8 @@ export class Game {
 
   alikMsg<M extends NewMsg>(m: M): Msg {
     // персонаж написал сам — он в истории (intro) и игрок его встречал (met, для переклички в День выплаты)
-    if (m.kind === 'text' && m.who) { this.S.mem['met.' + m.who] = true; this.S.mem['intro.' + m.who] = true }
-    this.S.mem['alik.day'] = this.S.day
+    if (m.kind === 'text' && m.who) { this.S.mem[memkeys.met(m.who)] = true; this.S.mem[memkeys.intro(m.who)] = true }
+    this.S.mem[memkeys.alikDay] = this.S.day
     this.tick(1 + this.rnd(3))
     const msg = this.push({ from: 'alik', time: fmtTime(this.S.clock), ...m } as NewMsg)
     if (msg.kind === 'text' && /брат джан/i.test(msg.text)) this.unlock('brat')
@@ -552,7 +553,7 @@ export class Game {
   }
   moo(): void {
     this.S.stats.moo++
-    this.S.mem.mooAt = this.S.stats.sent
+    this.S.mem[memkeys.mooAt] = this.S.stats.sent
     if (!this.busy && !this.S.scene) this.S.choices = null // появится «Это корова?»
     if (this.S.stats.moo >= 10) this.unlock('moo10')
     const m: Moo = { id: this.seq++, text: 'М' + 'у'.repeat(4 + this.rnd(8)), left: 5 + this.rnd(45), top: 15 + this.rnd(60) }
@@ -689,18 +690,18 @@ export class Game {
       legend: this.legend(),
       'ctx.topic': this.topicOfLast(),
       // «Мууу» прозвучало после последнего сообщения игрока — только тогда про корову и спрашивают
-      mooFresh: S.mem.mooAt === S.stats.sent,
-      sinceRude: S.stats.sent - Number(S.mem.rudeAt ?? -99),
+      mooFresh: S.mem[memkeys.mooAt] === S.stats.sent,
+      sinceRude: S.stats.sent - Number(S.mem[memkeys.rudeAt] ?? -99),
       // сколько раз игрок извинялся за последние 6 ходов («крик → мир → крик → мир»)
-      sorrySwing: String(S.mem.sorryAt ?? '').split(',').filter((n) => n && S.stats.sent - Number(n) <= 6).length,
+      sorrySwing: String(S.mem[memkeys.sorryAt] ?? '').split(',').filter((n) => n && S.stats.sent - Number(n) <= 6).length,
       // температура ссоры не уходит ниже нуля (после примирения ещё тикают отложенные «остывания»)
-      'rude.heat': Math.max(0, Number(S.mem['rude.heat'] ?? 0)),
+      [memkeys.HEAT]: Math.max(0, Number(S.mem[memkeys.HEAT] ?? 0)),
       'has.boris': S.items.some((n) => /Борис/.test(n)),
       'has.niva': S.items.some((n) => /Нива/.test(n)),
       // Календарное обещание живо в день срока; событийное — в ход, когда его факт стал истиной.
       promiseLive: !!pr && (pr.condition ? pr.met === S.day : pr.due === S.day),
       period: this.period(), night: this.isNight(), offline: S.offlineDays > 0, scene: S.scene?.id,
-      sinceAlik: S.day - Number(S.mem['alik.day'] ?? S.day),
+      sinceAlik: S.day - Number(S.mem[memkeys.alikDay] ?? S.day),
       lateCount: this.lateCount(),
       // сама — не больше одной серии в день: три легенды денег за день — уже не сюжет, а шум
       arcAvailable: this.availableArcs().length > 0 && !Object.values(S.arcs).some((a) => a.last === S.day),
@@ -709,12 +710,12 @@ export class Game {
       quests: Object.keys(S.ach).filter((k) => k.startsWith('q_')).length,
       callbackReady: !!this.callbackCandidate(),
       arcUnfinished: this.unfinishedArc(),
-      deathCanAdvance: !!S.mem.alik_dead && this.arcCanAdvance('alik_death', true),
+      deathCanAdvance: !!S.mem[memkeys.alikDead] && this.arcCanAdvance('alik_death', true),
       'ctx.type': c.type, 'ctx.amount': c.amount, 'ctx.s': c.s, 'ctx.shortTimey': c.s ? TIMEY.test(c.s) : false,
       'ctx.when': c.when, 'ctx.whenNever': c.whenNever, 'ctx.rel': c.rel?.n, 'ctx.relYou': c.rel?.you ?? c.rel?.n, 'ctx.sad': c.sad, 'ctx.festive': c.festive, 'ctx.revived': c.revived,
       'ctx.constr': c.constr, 'ctx.legendary': c.legendary, 'ctx.arc': c.arc, 'ctx.quote': c.quote,
       // спросить про сериал есть смысл: будет новая серия, или сериал закончен и сегодня про финал ещё не спрашивали
-      'ctx.arcCanAdvance': c.arc ? this.arcCanAdvance(c.arc, true) || (S.arcs[c.arc]?.i >= ARCS[c.arc].eps.length && S.mem['doneAsked.' + c.arc] !== S.day) : false,
+      'ctx.arcCanAdvance': c.arc ? this.arcCanAdvance(c.arc, true) || (S.arcs[c.arc]?.i >= ARCS[c.arc].eps.length && S.mem[memkeys.doneAsked(c.arc)] !== S.day) : false,
       'arc.done': c.arc ? this.S.arcs[c.arc]?.i >= ARCS[c.arc].eps.length : false,
       'ctx.legend': c.legend, 'ctx.chorus': c.chorus, 'ctx.memory': c.memory,
       'ctx.group': c.group, 'ctx.wrong': c.wrong, 'ctx.deleted': c.deleted, 'ctx.offended': c.offended,
@@ -776,7 +777,7 @@ export class Game {
     for (const q of queue) if (await this.rules.fire(this, q, this.facts, { floor: this.floor() })) break
   }
   private async fulfillConditionalPromise(): Promise<void> {
-    const promise = !this.S.mem.alik_dead && !this.S.mem.blocked
+    const promise = !this.S.mem[memkeys.alikDead] && !this.S.mem[memkeys.blocked]
       ? this.S.promises.findIndex((p) => p.condition && p.met === undefined && this.S.mem[p.condition] === true)
       : -1
     if (promise < 0) return
@@ -786,7 +787,7 @@ export class Game {
     }
     const legend = this.legend()
     if (legend && LEGENDS[legend]?.condition === record.condition) {
-      const arc = this.S.mem['legend.arc']
+      const arc = this.S.mem[memkeys.legendArc]
       this.setLegend(null, typeof arc === 'string' ? arc : undefined)
     }
     await this.fire('PromiseConditionMet', { promise })
@@ -802,7 +803,7 @@ export class Game {
   // ---------- варианты игрока ----------
   buildChoices(): Choice[] {
     const S = this.S
-    if (S.mem['endgame.active']) return ENDGAME_CHOICES.map((c) => ({ ...c }))
+    if (S.mem[memkeys.endgame.active]) return ENDGAME_CHOICES.map((c) => ({ ...c }))
     if (S.scene) {
       const n = this.scenes[S.scene.id].nodes[S.scene.node]
       // поймать на лжи можно и посреди сцены — это её прерывает
@@ -825,7 +826,7 @@ export class Game {
     const P2 = (a: string, b: string) => this.playerLine(() => `${this.draw(a, D[a])} ${this.draw(b, D[b])}`)
     const one = (key: string, arr: readonly Entry<string>[]) => this.playerLine(() => this.draw(key, arr))
     // общие реплики зависят от стадии: вежливый режим Алика, блок, поздние дни
-    if (S.mem.polite && this.chance(0.6)) out.push({ text: one('P_POL_POLITE', P_POL_POLITE), tone: 'polite' })
+    if (S.mem[memkeys.polite] && this.chance(0.6)) out.push({ text: one('P_POL_POLITE', P_POL_POLITE), tone: 'polite' })
     else out.push({ text: P2('P_POL_A', 'P_POL_B'), tone: 'polite' })
     if (out.length < 3) {
       // нейтральная реплика знает время: ночь, вечер пятницы, поздние дни ожидания
@@ -835,8 +836,8 @@ export class Game {
         : S.day >= 300 && this.chance(0.4) ? this.freshPlayer('P_NEU_B_LATE', P_NEU_B_LATE) : null
       out.push({ text: tail ? `${this.draw('P_NEU_A', D.P_NEU_A)} ${tail}` : P2('P_NEU_A', 'P_NEU_B'), tone: 'neutral' })
     }
-    if (S.mem.blocked) out.push({ text: one('P_RUDE_BLOCKED', P_RUDE_BLOCKED), tone: 'rude' })
-    else if (S.mem.polite) out.push({ text: one('P_RUDE_POLITE', P_RUDE_POLITE), tone: 'rude' })
+    if (S.mem[memkeys.blocked]) out.push({ text: one('P_RUDE_BLOCKED', P_RUDE_BLOCKED), tone: 'rude' })
+    else if (S.mem[memkeys.polite]) out.push({ text: one('P_RUDE_POLITE', P_RUDE_POLITE), tone: 'rude' })
     else {
       const topic = facts['ctx.topic'] && this.chance(0.6) ? this.freshPlayer('PR_' + facts['ctx.topic'], TOPICS[String(facts['ctx.topic'])].r.filter((_, i) => TOPICS[String(facts['ctx.topic'])].rneed?.[i]?.test(this.topicText) ?? true)) : null
       out.push({ text: topic ?? P2('P_RUDE_A', 'P_RUDE_B'), tone: 'rude' })
@@ -905,9 +906,9 @@ export class Game {
     if ((tone === 'rude' || tone === 'threat') && !o.scene) this.unlock(tone)
     if (tone === 'cow') this.unlock('cow')
     if (!o.scene) this.triggerFeel(o)
-    if (o.act !== 'topic') S.mem.topicRun = 0 // серия вопросов по одной теме прервалась
-    if (o.act === 'sorry') S.mem.sorryAt = [...String(S.mem.sorryAt ?? '').split(',').filter(Boolean), S.stats.sent].slice(-4).join(',') // для «качелей»
-    if (tone === 'rude') S.mem.rudeAt = S.stats.sent
+    if (o.act !== 'topic') S.mem[memkeys.topicRun] = 0 // серия вопросов по одной теме прервалась
+    if (o.act === 'sorry') S.mem[memkeys.sorryAt] = [...String(S.mem[memkeys.sorryAt] ?? '').split(',').filter(Boolean), S.stats.sent].slice(-4).join(',') // для «качелей»
+    if (tone === 'rude') S.mem[memkeys.rudeAt] = S.stats.sent
     S.choices = null
     this.drain(1)
     this.save()
@@ -928,7 +929,7 @@ export class Game {
       // реакция на сообщение игрока; иногда — вместо ответа
       let reactOnly = false
       // реакция — Алика: не бывает, когда он не видит (заблокирован) или телефон у Карине
-      if (!o.scene && !S.mem.blocked && !S.mem['phone.karine'] && this.chance(0.18) && mine.kind === 'text') {
+      if (!o.scene && !S.mem[memkeys.blocked] && !S.mem[memkeys.phoneKarine] && this.chance(0.18) && mine.kind === 'text') {
         await this.sleep(600)
         if (this.disposed) return
         this.replaceMsg(mine, { react: this.draw('R_' + tone, L.REACT[tone] ?? L.REACT.neutral) })
@@ -1022,9 +1023,9 @@ export class Game {
     const done = legendSpec?.condition ? this.S.mem[legendSpec.condition] === true : false
     const until = done ? undefined : legendSpec?.until
     // срок из легенды — после серии обязательно, дальше изредка: одна и та же клятва «как „Нива“ заведётся» приедается
-    const recent = this.S.stats.sent - Number(this.S.mem.legendPromiseAt ?? -99) < 4
+    const recent = this.S.stats.sent - Number(this.S.mem[memkeys.legendPromiseAt] ?? -99) < 4
     const fromLegend = !!until && (legend || (!recent && this.chance(0.4)))
-    if (fromLegend) this.S.mem.legendPromiseAt = this.S.stats.sent
+    if (fromLegend) this.S.mem[memkeys.legendPromiseAt] = this.S.stats.sent
     const p = this.uniq(() => {
       const q = this.X.promise()
       if (fromLegend) this.alignPromise(q, until!, legendSpec?.condition)
@@ -1119,8 +1120,8 @@ export class Game {
 
   async transfer(): Promise<void> {
     await this.typingFor(1200)
-    const amount = Number(this.S.mem.nextTransfer ?? 50)
-    delete this.S.mem.nextTransfer
+    const amount = Number(this.S.mem[memkeys.nextTransfer] ?? 50)
+    delete this.S.mem[memkeys.nextTransfer]
     this.S.debt -= amount
     this.S.money += amount
     if (++this.S.stats.fifty >= 5) this.unlock('fifty5')
@@ -1221,37 +1222,37 @@ export class Game {
     const found = CLAIMS.filter((c) => c.re.test(text))
     for (const c of found) {
       // где деньги — меняется по сюжету: противоречие ловится, только если старое место звучало недавно (не «Нива» полгода назад)
-      const fresh = (o: Claim) => o.group !== 'money' || this.S.day - Number(mem['saidLast.' + o.key] ?? mem['said.' + o.key]) <= 14
-      const old = CLAIMS.find((o) => mem['said.' + o.key] !== undefined && conflicts(o.key, c.key) && !mem['caught.' + pairKey(o.key, c.key)] && fresh(o))
+      const fresh = (o: Claim) => o.group !== 'money' || this.S.day - Number(mem[memkeys.saidLast(o.key)] ?? mem[memkeys.said(o.key)]) <= 14
+      const old = CLAIMS.find((o) => mem[memkeys.said(o.key)] !== undefined && conflicts(o.key, c.key) && !mem[memkeys.caughtPair(o.key, c.key)] && fresh(o))
       if (old) {
-        mem['lie.old'] = old.key
-        mem['lie.new'] = c.key
+        mem[memkeys.lie.old] = old.key
+        mem[memkeys.lie.new] = c.key
         // «вы же говорили» — только если прошлую версию сказал сам Алик, а не родня в семейном чате
-        mem['lie.alikOld'] = mem['by.' + old.key] === undefined || mem['by.' + old.key] === 'alik'
-        mem['lie.kind'] = old.group === 'money' ? 'money' : ({ grandpa_dead: 'grandpa', grandpa_alive: 'grandpa', customer_owes: 'customer', customer_paid: 'customer', sent: 'sent', no_money: 'sent' } as Record<string, string>)[c.key] ?? 'other'
+        mem[memkeys.lie.alikOld] = mem[memkeys.byClaim(old.key)] === undefined || mem[memkeys.byClaim(old.key)] === 'alik'
+        mem[memkeys.lie.kind] = old.group === 'money' ? 'money' : ({ grandpa_dead: 'grandpa', grandpa_alive: 'grandpa', customer_owes: 'customer', customer_paid: 'customer', sent: 'sent', no_money: 'sent' } as Record<string, string>)[c.key] ?? 'other'
       }
     }
     for (const c of found) {
-      if (mem['said.' + c.key] === undefined) mem['said.' + c.key] = this.S.day
-      mem['saidLast.' + c.key] = this.S.day
-      mem['by.' + c.key] = who ?? 'alik'
+      if (mem[memkeys.said(c.key)] === undefined) mem[memkeys.said(c.key)] = this.S.day
+      mem[memkeys.saidLast(c.key)] = this.S.day
+      mem[memkeys.byClaim(c.key)] = who ?? 'alik'
     }
   }
   lie(): { old: Claim; new: Claim } | null {
-    const o = claimByKey(String(this.S.mem['lie.old'] ?? '')), n = claimByKey(String(this.S.mem['lie.new'] ?? ''))
+    const o = claimByKey(String(this.S.mem[memkeys.lie.old] ?? '')), n = claimByKey(String(this.S.mem[memkeys.lie.new] ?? ''))
     return o && n ? { old: o, new: n } : null
   }
   forgetLie(): void {
-    delete this.S.mem['lie.old']
-    delete this.S.mem['lie.new']
-    delete this.S.mem['lie.kind']
+    delete this.S.mem[memkeys.lie.old]
+    delete this.S.mem[memkeys.lie.new]
+    delete this.S.mem[memkeys.lie.kind]
   }
   /** Алик пойман: запомнить пару, отдать реплику, счётчик растёт. */
   async caught(line: string): Promise<void> {
     const l = this.lie()
-    if (l) this.S.mem['caught.' + pairKey(l.old.key, l.new.key)] = true
+    if (l) this.S.mem[memkeys.caughtPair(l.old.key, l.new.key)] = true
     this.forgetLie()
-    const n = Number(this.S.mem.caught ?? 0)
+    const n = Number(this.S.mem[memkeys.caughtCount] ?? 0)
     this.unlock('liar')
     if (n >= 3) this.unlock('liar3')
     this.mood(-1)
@@ -1262,16 +1263,16 @@ export class Game {
   callbackCandidate(): Claim | undefined {
     const mem = this.S.mem
     // «помнишь, я говорил» — только своё; версию из семейного чата (Гарик) себе не приписывает
-    return CLAIMS.find((c) => c.updates && mem['said.' + c.key] !== undefined
-      && (mem['by.' + c.key] === undefined || mem['by.' + c.key] === 'alik')
-      && this.S.day - Number(mem['said.' + c.key]) >= 10 && !mem['cb.' + c.key])
+    return CLAIMS.find((c) => c.updates && mem[memkeys.said(c.key)] !== undefined
+      && (mem[memkeys.byClaim(c.key)] === undefined || mem[memkeys.byClaim(c.key)] === 'alik')
+      && this.S.day - Number(mem[memkeys.said(c.key)]) >= 10 && !mem[memkeys.cb(c.key)])
   }
   async callback(): Promise<void> {
     const c = this.callbackCandidate()
     // продолжение истории может опираться на то, чего ещё нет в мире (Борис) — тогда в другой раз
     const upd = c && this.decks.pick('CB_' + c.key, c.updates!, this.lineFacts())
     if (!c || !upd) return this.excuseTurn()
-    this.S.mem['cb.' + c.key] = this.S.day
+    this.S.mem[memkeys.cb(c.key)] = this.S.day
     await this.say([this.uniq(() => `${this.X.g('ADDR')}, ${this.draw('CB_OPEN', CALLBACK_OPEN)} ${c.say}? ${upd}`)])
     this.unlock('memory')
     await this.promiseLine()
@@ -1303,7 +1304,7 @@ export class Game {
     if (ep.remember) this.rules.applyOps(ep.remember, {})
     if (ep.legend !== undefined) this.setLegend(ep.legend, arc)
     // серия без своей легенды возвращает легенду своего сериала: свадьба идёт — значит, деньги «после свадьбы»
-    else if (arc && this.S.mem['legend.of.' + arc]) this.setLegend(String(this.S.mem['legend.of.' + arc]), arc)
+    else if (arc && this.S.mem[memkeys.legendOf(arc)]) this.setLegend(String(this.S.mem[memkeys.legendOf(arc)]), arc)
     const m = this.open(ep.m)
     for (const x of m) this.seen.mark(typeof x === 'string' ? x : x.t)
     this.markTopical(await this.say(m))
@@ -1322,22 +1323,22 @@ export class Game {
   setLegend(id: string | null, arc?: string): void {
     const m = this.S.mem
     // после Дня выплаты деньги «выплачены» — новые легенды о том, где они, спорили бы с утром выплаты
-    if (id !== null && m['payday.chain']) return
+    if (id !== null && m[memkeys.payday.chain]) return
     if (id === null) {
-      if (arc) delete m['legend.of.' + arc]
-      if (!arc || m['legend.arc'] === arc) { delete m['legend.id']; delete m['legend.arc'] }
+      if (arc) delete m[memkeys.legendOf(arc)]
+      if (!arc || m[memkeys.legendArc] === arc) { delete m[memkeys.legendId]; delete m[memkeys.legendArc] }
       return
     }
-    if (arc) m['legend.of.' + arc] = id
-    m['legend.id'] = id
-    m['legend.day'] = this.S.day
-    if (arc) m['legend.arc'] = arc
+    if (arc) m[memkeys.legendOf(arc)] = id
+    m[memkeys.legendId] = id
+    m[memkeys.legendDay] = this.S.day
+    if (arc) m[memkeys.legendArc] = arc
   }
   /** Текущая легенда (если не устарела). */
   legend(): string | undefined {
     const m = this.S.mem
-    const id = m['legend.id'] as string | undefined
-    return id && this.S.day - Number(m['legend.day'] ?? -99) <= 30 ? id : undefined
+    const id = m[memkeys.legendId] as string | undefined
+    return id && this.S.day - Number(m[memkeys.legendDay] ?? -99) <= 30 ? id : undefined
   }
   /** Финал сериала: обычный (последний эпизод) или частный из FINALES. */
   async playFinale(id: string, f: Finale | null): Promise<void> {
@@ -1346,15 +1347,15 @@ export class Game {
     if (ep.legend === undefined) this.setLegend(null, id)
     await this.playEpisode(ep, id)
     // реплики финала звучат в мире до него: «Нуне уволена. Из декрета» — пока она ещё в декрете
-    this.S.mem['finale.' + id] = f?.id ?? 'default'
+    this.S.mem[memkeys.finaleOf(id)] = f?.id ?? 'default'
     if (f) this.unlock(`fin_${id}_${f.id}`)
   }
   finaleOf(id: string): Finale | undefined {
-    const fid = this.S.mem['finale.' + id]
+    const fid = this.S.mem[memkeys.finaleOf(id)]
     return FINALES[id]?.find((f) => f.id === fid)
   }
   finaleTitle(id: string): string | undefined {
-    if (!this.S.mem['finale.' + id]) return undefined
+    if (!this.S.mem[memkeys.finaleOf(id)]) return undefined
     return this.finaleOf(id)?.title ?? DEFAULT_FINALE[id]
   }
   /** Ответы на «Как там…?» после финала — свои у каждого финала. */
@@ -1386,19 +1387,19 @@ export class Game {
   closeEnding(): void {
     const id = this.S.ending
     this.S.ending = null
-    if (id?.startsWith('payday_') && !this.S.mem['endgame.active']) this.startEndgame(id.slice(7))
+    if (id?.startsWith('payday_') && !this.S.mem[memkeys.endgame.active]) this.startEndgame(id.slice(7))
     this.save()
     this.emit()
   }
 
   private startEndgame(outcome: string): void {
     const S = this.S
-    S.mem['endgame.active'] = true
-    S.mem['endgame.started'] = S.day
-    S.mem['endgame.forms'] = 0
-    S.mem['endgame.exits'] = 0
-    S.mem['endgame.mutes'] = 0
-    S.mem['endgame.renames'] = 0
+    S.mem[memkeys.endgame.active] = true
+    S.mem[memkeys.endgame.started] = S.day
+    S.mem[memkeys.endgame.forms] = 0
+    S.mem[memkeys.endgame.exits] = 0
+    S.mem[memkeys.endgame.mutes] = 0
+    S.mem[memkeys.endgame.renames] = 0
     S.scene = null
     S.ctx = null
     S.offlineDays = 0
@@ -1419,16 +1420,16 @@ export class Game {
       return
     }
     if (action === 'mute') {
-      S.mem['endgame.mutes'] = Number(S.mem['endgame.mutes'] ?? 0) + 1
+      S.mem[memkeys.endgame.mutes] = Number(S.mem[memkeys.endgame.mutes] ?? 0) + 1
       this.sys('Вы отключили уведомления')
       await this.say([this.draw('ENDGAME_MUTE', ENDGAME_MUTE)])
       const name = this.draw('ENDGAME_RENAMES', ENDGAME_RENAMES)
-      S.mem['endgame.renames'] = Number(S.mem['endgame.renames'] ?? 0) + 1
+      S.mem[memkeys.endgame.renames] = Number(S.mem[memkeys.endgame.renames] ?? 0) + 1
       this.sys(`Алик изменил название группы на «${name}»`)
       return
     }
 
-    S.mem['endgame.exits'] = Number(S.mem['endgame.exits'] ?? 0) + 1
+    S.mem[memkeys.endgame.exits] = Number(S.mem[memkeys.endgame.exits] ?? 0) + 1
     this.sys('Вы покинули группу')
     const back = this.decks.pick('ENDGAME_RETURNERS', ENDGAME_RETURNERS, this.lineFacts())
     if (back) {
@@ -1441,8 +1442,8 @@ export class Game {
   }
 
   async endgameFormality(): Promise<void> {
-    const n = Number(this.S.mem['endgame.forms'] ?? 0) + 1
-    this.S.mem['endgame.forms'] = n
+    const n = Number(this.S.mem[memkeys.endgame.forms] ?? 0) + 1
+    this.S.mem[memkeys.endgame.forms] = n
     await this.say([this.draw('ENDGAME_FORMALITIES', ENDGAME_FORMALITIES)])
     const jubilee = ENDGAME_JUBILEES[n]
     if (jubilee) await this.say([jubilee])
