@@ -14,7 +14,7 @@ const HOURS = [14, 20, 9, 2, 17, 12]
 /** Что бот сделал за ход: выбрал вариант i из offered, ответил на допработу, зарядил телефон, промолчал. */
 export type Act =
   | { kind: 'send'; i: number; offered: string[]; at: number }
-  | { kind: 'job'; yes: boolean }
+  | { kind: 'job'; yes: boolean; at?: number }
   | { kind: 'charge' }
   | { kind: 'idle' }
 
@@ -58,7 +58,7 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
   const next = (): Act => {
     if (game.dead) return { kind: 'charge' }
     const job = game.S.msgs.find((m) => m.kind === 'job' && !m.answered)
-    if (job) return { kind: 'job', yes: bot.random() < 0.5 }
+    if (job) return { kind: 'job', yes: bot.random() < 0.5, at: game.S.msgs.length }
     if (game.S.stats.sent >= 5 && bot.random() < PROFILE[style].idle) return { kind: 'idle' }
     const offered = game.choices.map((c) => c.text)
     return { kind: 'send', i: pick(bot, style, game.choices), offered, at: game.S.msgs.length }
@@ -109,6 +109,7 @@ function line(m: Msg): string {
 export function transcript(p: Played): string {
   const offers = new Map<number, string>()
   for (const a of p.acts) if (a.kind === 'send') offers.set(a.at, a.offered.map((o, i) => `${i === a.i ? '▶' : ' '} ${o}`).join('\n    '))
+  const jobs = new Set(p.acts.flatMap((a) => (a.kind === 'job' && a.at !== undefined ? [a.at] : [])))
   const ending = p.game.S.ending ? ENDINGS.find((e) => e.id === p.game.S.ending) : null
   const out = [`Партия ${p.seed}: сообщений игрока — ${p.game.S.stats.sent}, в конце — ${p.game.S.day}-й день ожидания денег${ending ? `, концовка «${ending.title}»` : ''}`]
   const aside = (i: number) => { for (const a of p.asides) if (a.at === i) out.push(a.text) }
@@ -116,6 +117,7 @@ export function transcript(p: Played): string {
     aside(i)
     const o = offers.get(i)
     if (o && m.kind === 'text' && m.from === 'me') out.push(`    варианты:\n    ${o}`)
+    if (jobs.has(i)) out.push('    (ответ на допработу)')
     out.push(line(m))
   })
   aside(p.game.S.msgs.length)
