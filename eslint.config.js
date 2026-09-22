@@ -22,11 +22,11 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': 'off',
-      // контент и тесты часто держат намеренный any у словарей/сцен
-      '@typescript-eslint/no-explicit-any': 'off',
+      // намеренный any у словарей/сцен — точечным disable с причиной, а не глобально
+      '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
-      // подписки на game version / sheet — deps намеренно узкие
-      'react-hooks/exhaustive-deps': 'off',
+      // узкие deps у подписок — точечным disable с причиной
+      'react-hooks/exhaustive-deps': 'error',
     },
   },
   {

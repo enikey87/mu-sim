@@ -126,6 +126,7 @@ export function Chat() {
     const incoming = added.filter(isIncoming).length
     if (following.current) scrollToBottom()
     else if (incoming) setUnread((n) => n + incoming)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- триггер один: version растёт на каждый emit, msgs читаются по previousCount
   }, [version])
 
   // Клавиатура, поворот телефона и переносы текста тоже меняют доступную высоту без нового сообщения.

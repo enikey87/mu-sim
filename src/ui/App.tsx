@@ -1,4 +1,4 @@
-import { Component, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Component, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Game } from '../engine/game'
 import { GameContext, useGame } from './useGame'
 import { StatusBar, ChatHeader, StatsBar } from './Header'
@@ -79,7 +79,7 @@ function Phone({ onReset }: { onReset: () => void }) {
     return () => p.removeEventListener('animationend', clear)
   }, [game.feelId, game.feel])
 
-  const setSheetOpen = (v: boolean) => { game.sheetOpen = v; setSheet(v) }
+  const setSheetOpen = useCallback((v: boolean) => { game.sheetOpen = v; setSheet(v) }, [game])
 
   useEffect(() => {
     if (!sheet) return
@@ -88,7 +88,7 @@ function Phone({ onReset }: { onReset: () => void }) {
 
   useEffect(() => {
     if (game.S.ending || game.dead) setSheetOpen(false)
-  }, [game.S.ending, game.dead])
+  }, [game.S.ending, game.dead, setSheetOpen])
 
   const reset = () => {
     if (!confirm('Стереть всё и начать заново?')) return
