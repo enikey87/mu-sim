@@ -25,12 +25,14 @@ describe('память Алика', () => {
     const { game } = makeGame()
     game.S.day = 301 // «триста дней» — приоритет 0
     game.S.ach.court = 190 // суд — приоритет 1
+    game.S.mem['intro.judge'] = true // судья представился на заседании
     expect(game.line('MEMORY', MEMORY)).toMatch(/Судья Ашот/)
     expect(game.line('MEMORY', MEMORY)).toMatch(/Триста дней/)
   })
   it('крик после суда — Алик вспоминает суд (приоритет над обычными)', () => {
     const { game } = makeGame()
     game.S.mem.court = 5
+    game.S.mem['intro.judge'] = true
     expect(game.line('RUDE_AGAIN', RUDE_AGAIN)).toMatch(/суде/)
   })
   it('«уже сказано» переживает перезагрузку', () => {

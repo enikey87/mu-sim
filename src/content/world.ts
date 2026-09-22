@@ -19,6 +19,10 @@ export const WORLD = {
   grachik: named('grachik', exists('arc.grandpa')),
   /** Прораб Мкртич вошёл в историю (сам написал или его представили). */
   mkrtich: named('mkrtich', is('intro.mkrtich')),
+  /** Тётя Гоар вошла в историю (домофон, отмазка с её ролью, сцена). */
+  goar: named('goar', is('intro.goar')),
+  /** Судья Ашот вошёл в историю (заседание, кум в сериале про бетон). */
+  judge: named('judge', is('intro.judge')),
   /** Алик — тамада (свадьба Самвела). */
   tamada: named('tamada', is('intro.tamada')),
   /** История с декретом Нуне началась (о нём можно говорить). */

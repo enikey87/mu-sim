@@ -34,7 +34,7 @@ describe('линия суда', () => {
     expect(game.S.ach.strasbourg).toBeDefined()
     const after = await threat(game)
     expect(after.r).toBe('Court_After')
-    expect([...COURT_AFTER, ...THREAT_AGAIN.map(valueOf)]).toContain(after.t.at(-1))
+    expect([...COURT_AFTER.map(valueOf), ...THREAT_AGAIN.map(valueOf)]).toContain(after.t.at(-1))
     expect(game.S.mem['count.threat']).toBe(8)
   })
   it('Арсен уже писал (племянник) — на ступени 1 не представляется второй раз', async () => {

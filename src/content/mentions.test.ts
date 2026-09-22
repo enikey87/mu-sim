@@ -30,6 +30,8 @@ export const MENTION: Array<[WorldKey, RegExp]> = [
   ['arsen', /Арсен/],
   ['grachik', /Грачик/],
   ['mkrtich', /Мкртич/],
+  ['goar', /Гоар/],
+  ['judge', /Ашот/],
   ['dekret', /декрет/i],
   ['nuneBaby', /ребёнок спит|с ребёнком на руках/i],
   // «тамада» — роль, а не персонаж: у любого застолья свой тамада; «Алик — тамада» размечено needs('tamada') вручную
@@ -46,6 +48,12 @@ export const STATE: Array<[string, RegExp, string[]]> = [
 const atoms = (cs: readonly Criterion[]): Criterion[] => cs.flatMap((c) => (c.op === 'all' ? [c, ...atoms(c.all ?? [])] : [c]))
 const num = (c: Criterion) => (typeof c.value === 'number' ? c.value : NaN)
 /** Что серии arc до n-й оставили в памяти (remember, последняя запись побеждает): true — факт есть, false — снят. */
+/** Факты, которые сцена ставит сама (fx.set): знакомство происходит в ней же. */
+const ownSets = (sc: unknown): Criterion[] =>
+  Object.values((sc as { nodes?: Record<string, { fx?: { set?: Record<string, unknown> } }> })?.nodes ?? {})
+    .flatMap((n) => Object.keys(n.fx?.set ?? {}))
+    .map((key): Criterion => ({ key, op: '==', value: true }))
+
 function setBy(arc: string, n: number): Criterion[] {
   const last = new Map<string, unknown>()
   for (const e of (ARCS[arc]?.eps ?? []).slice(0, n)) for (const o of e.remember ?? []) if (o.op === '=') last.set(o.key, o.value)
@@ -177,9 +185,9 @@ function corpus(): Found[] {
           if (who in STATEFUL) for (const f of said) f.stateOf = STATEFUL[who]
           out.push(...said)
         }
-      else if (at === 'quests.QUESTS') for (const [id, x] of Object.entries(v as object)) strings(x, `${at}.${id}`, expand(atoms(QUEST_WHEN[id] ?? [])), out)
+      else if (at === 'quests.QUESTS') for (const [id, x] of Object.entries(v as object)) strings(x, `${at}.${id}`, [...expand(atoms(QUEST_WHEN[id] ?? [])), ...ownSets(x)], out)
       // суд: ступень 1 вводит юриста Арсена (правило Court_Lawyer — remember до реплик)
-      else if (['quests.COURT', 'quests.COURT_LAWYER_AGAIN', 'quests.COURT_SCENE', 'quests.COURT_AFTER'].includes(at)) strings(v, at, atoms([WORLD.arsen]), out)
+      else if (['quests.COURT', 'quests.COURT_LAWYER_AGAIN', 'quests.COURT_SCENE', 'quests.COURT_AFTER'].includes(at)) strings(v, at, [...atoms([WORLD.arsen]), ...ownSets(v)], out)
       // исход Дня выплаты звучит по своему правилу — его условия известны
       else if (at === 'payday.OUTCOME') for (const [id, x] of Object.entries(v as object)) strings(x, `${at}.${id}`, expand(atoms(paydayRules.find((r) => r.name === 'Payday_' + id)?.when ?? [])), out)
       // по своим правилам: посредники разблокировки, телефон у Карине (она забирает его, пока жена Алика)
