@@ -1,7 +1,7 @@
 // Мир последователен: персонаж или предмет, который появляется по ходу истории, упоминается только под требованием
 // (needs / when / структура: серия сериала, финал, реплика персонажа). Регулярки — здесь, в проверке контента: игра текст не разбирает.
 import { describe, it, expect } from 'vitest'
-import { Gated, describeCriterion, valueOf, type Criterion, type Entry } from '../engine/rules'
+import { Gated, describeCriterion, valueOf, type Criterion, type Entry, type FactOp } from '../engine/rules'
 import { WORLD, SPEAKS, type WorldKey } from './world'
 import { ARCS, CAST } from './arcs'
 import { FINALES } from './finales'
@@ -29,6 +29,7 @@ export const MENTION: Array<[WorldKey, RegExp]> = [
   ['twin', /близнец/i],
   ['arsen', /Арсен/],
   ['grachik', /Грачик/],
+  ['mkrtich', /Мкртич/],
   ['dekret', /декрет/i],
   ['nuneBaby', /ребёнок спит|с ребёнком на руках/i],
   // «тамада» — роль, а не персонаж: у любого застолья свой тамада; «Алик — тамада» размечено needs('tamada') вручную
@@ -96,7 +97,9 @@ function strings(v: unknown, path: string, known: Criterion[], out: Found[]): Fo
   else if (Array.isArray(v)) v.forEach((x, i) => strings(x, `${path}[${i}]`, known, out))
   else if (v && typeof v === 'object' && !(v instanceof RegExp)) {
     const o = v as Record<string, unknown>
-    const own = Array.isArray(o.when) ? [...known, ...expand(atoms(o.when as Criterion[]))] : known
+    // реплика, которая сама вводит персонажа (remember), может его назвать: знакомство и упоминание — одно и то же сообщение
+    const sets = Array.isArray(o.remember) ? (o.remember as FactOp[]).filter((f) => f.op === '=' && f.value === true).map((f): Criterion => ({ key: f.key, op: '==', value: true })) : []
+    const own = Array.isArray(o.when) ? [...known, ...sets, ...expand(atoms(o.when as Criterion[]))] : [...known, ...sets]
     const who = typeof o.w === 'string' ? o.w : typeof o.who === 'string' ? o.who : undefined
     if (who && typeof o.t === 'string') { out.push({ path, text: o.t, known: own, who }); return out }
     for (const [k, x] of Object.entries(o)) if (!['when', 'orWhen', 'remember'].includes(k)) strings(x, `${path}.${k}`, own, out)
@@ -137,6 +140,18 @@ function corpus(): Found[] {
       ].includes(at)) continue
       // утверждение ловится в уже сказанной (размеченной) реплике — say лишь его пересказ
       if (at === 'lies.CLAIMS') { strings((v as Array<Record<string, unknown>>).map(({ updates }) => updates), at, [], out); continue }
+      // «у прораба Мкртича свадьба» — отмазка называет роль и тем самым знакомит: движок пишет факт (meetRel)
+      if (at === 'excuses.D') {
+        const d = v as Record<string, unknown>
+        for (const [k, x] of Object.entries(d)) {
+          if (k !== 'REL') { strings(x, `${at}.${k}`, [], out); continue }
+          for (const [i, e] of (x as Entry<string>[]).entries()) {
+            const id = valueOf(e).split('|')[3]
+            strings(e, `${at}.REL[${i}]`, id ? [{ key: 'intro.' + id, op: '==', value: true }] : [], out)
+          }
+        }
+        continue
+      }
       if (at === 'arcs.ARCS') for (const [id, a] of Object.entries(ARCS)) {
         a.eps.forEach((e, k) => strings(e, `${at}.${id}.eps[${k}]`, arcAt(id, k), out))
         // «Как там…?» предлагается с первой серии и до после финала

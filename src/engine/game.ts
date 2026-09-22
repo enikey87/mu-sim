@@ -1,6 +1,6 @@
 // Игра: состояние, сообщения, ход Алика, «живость». Решения — что ответить, что предложить игроку,
 // что сделать Алику — принимает система правил (engine/rules/, content/rules/*).
-import { make, D, low, cap, type ExcuseApi, type Promise3, type PromiseCondition } from '../content/excuses'
+import { make, D, low, cap, type ExcuseApi, type Promise3, type PromiseCondition, type Rel } from '../content/excuses'
 import { makeScenes, type Scene, type Line } from '../content/scenes'
 import { TRIBUNAL } from '../content/rude'
 import { PAYDAY_HOOKS } from '../content/rules/payday'
@@ -424,7 +424,8 @@ export class Game {
   sys(text: string): Msg { return this.push({ kind: 'sys', text }) }
 
   alikMsg<M extends NewMsg>(m: M): Msg {
-    if (m.kind === 'text' && m.who) this.S.mem['met.' + m.who] = true // «кого игрок встречал» — для переклички в День выплаты
+    // персонаж написал сам — он в истории (intro) и игрок его встречал (met, для переклички в День выплаты)
+    if (m.kind === 'text' && m.who) { this.S.mem['met.' + m.who] = true; this.S.mem['intro.' + m.who] = true }
     this.S.mem['alik.day'] = this.S.day
     this.tick(1 + this.rnd(3))
     const msg = this.push({ from: 'alik', time: fmtTime(this.S.clock), ...m } as NewMsg)
@@ -950,6 +951,10 @@ export class Game {
     }
   }
 
+  /** Отмазка назвала родню по роли («у прораба Мкртича свадьба») — значит, познакомила с ним. */
+  meetRel(r?: Rel): void {
+    if (r?.id) this.rules.applyOps(meet(r.id), {})
+  }
   recordPromise(p?: { text: string; d: number | null; due?: Due; condition?: PromiseCondition } | null): void {
     if (!p) return
     if (p.condition && this.S.mem[p.condition] === true) return
@@ -1031,6 +1036,7 @@ export class Game {
     if (this.legend()) return this.promiseLine(undefined, true)
     const ex = this.uniq(() => this.X.excuse({ preferLong: this.S.politeStreak >= 3 }))
     if (ex.legendary) this.unlock('legend')
+    this.meetRel(ex.r)
     this.recordPromise(ex.p)
     const msgs = await this.say(ex.texts, ex.legendary)
     this.markTopical(msgs)
@@ -1554,6 +1560,7 @@ export class Game {
       return
     }
     const ex = this.uniq(() => this.X.excuse())
+    this.meetRel(ex.r)
     this.recordPromise(ex.p)
     this.push({ ...base, kind: 'text', text: ex.texts.join(' ') })
   }

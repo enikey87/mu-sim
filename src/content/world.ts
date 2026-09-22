@@ -17,6 +17,8 @@ export const WORLD = {
   twin: named('twin', gte('arc.grant', 5)),
   arsen: named('arsen', is('intro.arsen')),
   grachik: named('grachik', exists('arc.grandpa')),
+  /** Прораб Мкртич вошёл в историю (сам написал или его представили). */
+  mkrtich: named('mkrtich', is('intro.mkrtich')),
   /** Алик — тамада (свадьба Самвела). */
   tamada: named('tamada', is('intro.tamada')),
   /** История с декретом Нуне началась (о нём можно говорить). */
