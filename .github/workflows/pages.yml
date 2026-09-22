@@ -14,13 +14,13 @@ permissions:
   pages: write
   id-token: write
 
-concurrency:
-  group: pages-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   build:
     runs-on: ubuntu-latest
+    # новые прогоны вытесняют старые: сборка предыдущего коммита больше не нужна
+    concurrency:
+      group: pages-build-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -45,6 +45,10 @@ jobs:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
+    # начатая публикация досчитывается, следующая встаёт в очередь: отмена оставляет деплой незавершённым
+    concurrency:
+      group: pages-deploy-${{ github.ref }}
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
