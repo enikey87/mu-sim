@@ -71,13 +71,15 @@ export const ENDGAME_LEAVE = [
 export interface EndgameReturner extends LineSpec {
   who: string
   name: string
+  /** Женский род в системной строке: «Нуне добавила вас обратно». */
+  she?: true
 }
 
 export const ENDGAME_RETURNERS: Entry<EndgameReturner>[] = [
   needs('borisWrites')({ who: 'boris', name: 'Борис', t: 'Бее.', when: [is('met.boris')] }),
   { who: 'samvel', name: 'Дядя Самвел', t: 'Из семейной группы без тоста не уходят.', when: [is('met.samvel')] },
-  needs('dekret')({ who: 'nune', name: 'Нуне', t: 'По документам вы всё ещё участник.', when: [is('met.nune')] }),
-  needs('karineHome')({ who: 'karine', name: 'Карине', t: 'Алик, верни человека. Потом потеряем.', when: [is('met.karine')] }),
+  needs('dekret')({ who: 'nune', name: 'Нуне', she: true, t: 'По документам вы всё ещё участник.', when: [is('met.nune')] }),
+  needs('karineHome')({ who: 'karine', name: 'Карине', she: true, t: 'Алик, верни человека. Потом потеряем.', when: [is('met.karine')] }),
   { who: 'grant', name: 'Заказчик Грант', t: 'Молодой человек, я тоже выходил. Безрезультатно.', when: [is('met.grant')] },
   needs('razmik')({ who: 'razmik', name: 'Размик', t: 'Отсюда видно: выхода нет.', when: [is('met.razmik')] }),
 ]

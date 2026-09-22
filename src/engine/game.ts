@@ -877,7 +877,7 @@ export class Game {
     this.save()
     if (this.disposed) { this.inPlayerTurn = false; return }
     if (this.dead) {
-      this.sys('Не доставлено: телефон Алика выключен.')
+      this.sys('Не доставлено: у вас сел телефон.')
       S.ctx = null
       this.save()
       this.inPlayerTurn = false
@@ -1391,7 +1391,7 @@ export class Game {
     this.sys('Вы покинули группу')
     const back = this.decks.pick('ENDGAME_RETURNERS', ENDGAME_RETURNERS, this.lineFacts())
     if (back) {
-      this.sys(`${back.name} добавил вас обратно`)
+      this.sys(`${back.name} ${back.she ? 'добавила' : 'добавил'} вас обратно`)
       await this.say([{ w: back.who, t: back.t }])
     } else {
       this.sys('Алик добавил вас обратно')

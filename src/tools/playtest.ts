@@ -119,7 +119,8 @@ export function transcript(p: Played): string {
   for (const a of p.acts) if (a.kind === 'send') offers.set(a.at, a.offered.map((o, i) => `${i === a.i ? '▶' : ' '} ${o}`).join('\n    '))
   const jobs = new Set(p.acts.flatMap((a) => (a.kind === 'job' && a.at !== undefined ? [a.at] : [])))
   const ending = p.game.S.ending ? ENDINGS.find((e) => e.id === p.game.S.ending) : null
-  const out = [`Партия ${p.seed}: сообщений игрока — ${p.game.S.stats.sent}, в конце — ${p.game.S.day}-й день ожидания денег${ending ? `, концовка «${ending.title}»` : ''}`]
+  const sent = p.game.S.msgs.filter((m) => m.kind === 'text' && m.from === 'me').length
+  const out = [`Партия ${p.seed}: сообщений игрока — ${sent}, в конце — ${p.game.S.day}-й день ожидания денег${ending ? `, концовка «${ending.title}»` : ''}`]
   const aside = (i: number) => { for (const a of p.asides) if (a.at === i) out.push(a.text) }
   p.game.S.msgs.forEach((m, i) => {
     aside(i)

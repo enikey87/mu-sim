@@ -174,14 +174,14 @@ export const ARCS: Record<string, Arc> = {
   alik_death: {
     title: 'Похороны Алика',
     minDay: 240,
-    follow: [gate(missing('finale.alik_death'))('Алик, вы живы?'), gate(gte('arc.alik_death', 4), lte('arc.alik_death', 5))('Как похороны?'), gate(missing('finale.alik_death'))('Алик, вы там как, на том свете?'), 'Как вы там, Алик?'],
+    follow: [gate(missing('finale.alik_death'))('Алик, вы живы?'), gate(gte('arc.alik_death', 2), lte('arc.alik_death', 3))('Как похороны?'), gate(missing('finale.alik_death'))('Алик, вы там как, на том свете?'), 'Как вы там, Алик?'],
     eps: [
       // Карине ушла к Рубику — вместо неё пишет мама Алика
       {
         m: [needs('karineHome')({ w: 'karine', t: 'Это Карине. Алик умер. Больше не пишите.' }), needs('karineGone')({ w: 'mama', t: 'Это мама Алика. Алик умер. Больше не пишите. Сынок, ты покушай хоть.' })],
         state: { key: 'alik_dead', days: 6 }, legend: 'dead',
       },
-      { m: [needs('karineHome')({ w: 'karine', t: 'Похороны послезавтра. Приходите. Хаш — со своим.' }), needs('karineGone')({ w: 'mama', t: 'Похороны послезавтра. Приходи, сынок. Хаш — со своим, я одна не наварю.' })] },
+      { m: [needs('karineHome')({ w: 'karine', t: 'Похороны на днях. Приходите. Хаш — со своим.' }), needs('karineGone')({ w: 'mama', t: 'Похороны на днях. Приходи, сынок. Хаш — со своим, я одна не наварю.' })] },
       { m: ['Брат, это я, Алик. Пишу с того света. Тут тоже денег нет, но есть вай-фай.'] },
       { m: ['Похороны прошли хорошо. Я пришёл, мне понравилось. Сказал тост. Все плакали, потом смеялись, потом опять плакали — когда поняли, что я жив.'], remember: [set('alik_dead', false)], legend: null },
       { m: [needs('samvel')('Поминки плавно перешли в свадьбу. Самвел сделал предложение вдове. Моей. Разбираемся.')], then: 'promise' },

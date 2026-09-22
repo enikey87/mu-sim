@@ -219,7 +219,7 @@ describe('Game: батарея', () => {
     await game.send('Алик, привет')
     expect(game.dead).toBe(true)
     expect(game.S.ach.dead).toBeDefined()
-    expect(game.S.msgs.at(-1)).toMatchObject({ kind: 'sys', text: 'Не доставлено: телефон Алика выключен.' })
+    expect(game.S.msgs.at(-1)).toMatchObject({ kind: 'sys', text: 'Не доставлено: у вас сел телефон.' })
     await game.send('ещё')
     expect(game.S.stats.sent).toBe(4)
     const n = game.S.msgs.length
