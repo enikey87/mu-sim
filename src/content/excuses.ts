@@ -9,7 +9,7 @@ export type DrawFn = <T = any>(key: string, arr: readonly Entry<T>[], noRefill?:
 /** n — кто, g — кого; you — как его назовёт игрок, если Алик сказал «мой»/«я». */
 /** id — кто это из CAST, если отмазка называет его роль: такая реплика знакомит с персонажем. */
 export interface Rel { n: string; g: string; you?: string; id?: string }
-export const PROMISE_CONDITIONS = ['beton.set', 'boris.smetaReady', 'grant.paid', 'nune.dekretOver', 'nune.keyPassed'] as const
+export const PROMISE_CONDITIONS = ['beton.set', 'boris.smetaReady', 'grant.paid', 'nune.dekretOver', 'nune.keyPassed', 'act.signed', 'tax.thawed', 'boris.married'] as const
 export type PromiseCondition = typeof PROMISE_CONDITIONS[number]
 /** Срок: календарный (`d`/`due`), событийный (`condition`) или неопределённый (`d: null`). */
 export interface When { t: string; d: number | null; due?: Due; condition?: PromiseCondition }
@@ -276,7 +276,7 @@ D.WHEN = [
   { t: 'на следующей неделе, в начале или в конце', d: 7 },
   needs('dekretNow')(needs('nune')({ t: 'как Нуне из декрета выйдет', d: null, condition: 'nune.dekretOver' })),
   gate(exists('arc.beton'), missing('beton.set'))({ t: 'как бетон застынет', d: null, condition: 'beton.set' }),
-  { t: 'после приёмки второго этажа', d: null }, { t: 'как акт подпишут', d: null },
+  { t: 'после приёмки второго этажа', d: null }, gate(missing('act.signed'))({ t: 'как акт подпишут', d: null, condition: 'act.signed' }),
   needs('crane')({ t: 'когда кран вернётся', d: null }), { t: 'после Вардавара', d: null }, { t: 'как отопление дадут', d: null },
   gate(gte('month', 3), lte('month', 10))({ t: 'к зиме', d: null }), { t: 'к Пасхе', d: null }, { t: 'как объект в Абовяне сдадим', d: null },
   { t: 'когда налоговая уйдёт', d: null }, needs('nivaHome')(needs('niva')({ t: 'после техосмотра «Нивы»', d: null })), { t: 'в конце квартала', d: 45, due: { quarter: true } },
@@ -659,7 +659,7 @@ export function make(draw: DrawFn, getTier: () => number = () => 0, rng: Rng = m
     () => { const p = promise(); return { texts: [`${g('ADDR')}, я уже в банке стою. ${absurd()}. ${cap(p.text)}.`], p }; },
     () => { const r = rel(), p = promise(); return { texts: [`Ара, как раз хотел тебе писать! ${reason()}. Плюс у ${r.g} ${ev()}. ${g('OATH')}, ${p.text}.`], p, r }; },
     () => { const p = promise(); return { texts: [`${g('ADDR')}, я на объекте. ${constr()}. ${constr()}. Вот так живём.`, `${cap(p.text)}.`], p, constr: true }; },
-    () => { const p = promise(); return { texts: [`${g('ADDR')}, прораб звонил: ${low(constr())}. Без акта денег нет. ${cap(p.text)}.`], p, constr: true }; },
+    gate(missing('act.signed'))(() => { const p = promise(); return { texts: [`${g('ADDR')}, прораб звонил: ${low(constr())}. Без акта денег нет. ${cap(p.text)}.`], p, constr: true }; }),
     () => { const p = promise(); return { texts: [`Сначала хорошая новость: ${low(constr())}. Плохая: ${low(absurd())}.`, `${g('OATH')}, ${p.text}.`], p, constr: true }; },
     () => { const r = rel(), p = promise(); return { texts: [`${g('ADDR')}, ${r.n} передаёт: «${constr()}». Я верю. ${cap(p.text)}.`], p, r, constr: true }; },
     () => { const p = promise(); return { texts: [`${g('ADDR')}, три причины. Первая: ${low(constr())}. Вторая: ${low(absurd())}. Третья — ты сам знаешь.`, `${cap(p.text)}.`], p, constr: true }; },
