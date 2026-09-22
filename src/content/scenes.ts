@@ -657,7 +657,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
         // условие Карине — ванная: запоминается, на него потом ссылаются (родня на крик, День выплаты)
         text: {
           fx: { mood: 1, set: { 'rude.heat': 1, 'bath.asked': true } },
-          a: [needs('karineHome')(needs('karine')('Текстом — только через Карине.')), needs('karineGone')('Текстом — только через маму. Она передаст. С комментариями.')],
+          a: [needs('karineHome', 'karine')('Текстом — только через Карине.'), gate(WORLD.karineHome, missing('intro.karine'))('Текстом — только через жену. Она передаст.'), needs('karineGone')('Текстом — только через маму. Она передаст. С комментариями.')],
           who2: 'karine', a2: [
             gate(lte('ritual.count', 1))('Я одобрила мир. Условие: переложите нам ванную. Бесплатно. Вы же теперь почти брат.'),
             gate(gte('ritual.count', 2))('Опять мириться? Условие то же: ванная. Я её уже третий раз обещаю соседке показать.'),

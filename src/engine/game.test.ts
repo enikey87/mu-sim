@@ -340,11 +340,12 @@ describe('Game: сохранение', () => {
 })
 
 describe('Game: сцены целиком', () => {
-  it('каждый узел каждой сцены проходится без ошибок', async () => {
-    const { game } = makeGame({ seed: 11 })
+  // свежая партия на узел: в одной партии сцены успевают познакомить игрока со всеми, и дыра в разметке не видна
+  it('каждый узел каждой сцены проходится без ошибок в нетронутом мире', async () => {
     let visited = 0
-    for (const [sid, sc] of Object.entries(game.scenes)) {
+    for (const [sid, sc] of Object.entries(makeGame({ seed: 11 }).game.scenes)) {
       for (const nid of Object.keys(sc.nodes)) {
+        const { game } = makeGame({ seed: 11 })
         game.S.scene = null
         game.S.offlineDays = 0
         await game.enterNode(sid, sc.start) // инициализировать переменные сцены
@@ -355,10 +356,10 @@ describe('Game: сцены целиком', () => {
           expect(cs.length, `${sid}.${nid}`).toBeGreaterThan(0)
           for (const c of cs) expect(c.text, `${sid}.${nid}`).toMatch(/\S/)
         }
+        expect(JSON.stringify(game.S.msgs), `${sid}.${nid}`).not.toMatch(/undefined|NaN/)
       }
     }
     expect(visited).toBeGreaterThan(80)
-    expect(JSON.stringify(game.S.msgs)).not.toMatch(/undefined|NaN/)
   })
   it('выбор в сцене ведёт по ветке; «null» закрывает сцену', async () => {
     const { game } = makeGame({ seed: 2 })
