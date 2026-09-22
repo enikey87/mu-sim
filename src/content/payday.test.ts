@@ -103,4 +103,18 @@ describe('День выплаты', () => {
     expect(whos).not.toContain('rubik')
     expect(new Set(whos).size).toBe(whos.length)
   })
+  it('доля за сервиз ссылается на зачтённое на застолье, а не требует его заново', async () => {
+    const { game } = makeGame()
+    game.S.day = 340
+    game.S.ach.q_tamada = 1
+    await game.enterNode('payday', 'announce')
+    await choose(game, 'bag')
+    const n = game.S.msgs.length
+    await choose(game, 'share')
+    const out = texts(game, n).join('\n')
+    // сервиз посчитан в долг ещё на застолье: тётя Гоар спорит с оценкой, а не предъявляет ущерб заново
+    expect(out).toMatch(/зачли шесть тысяч/)
+    expect(out).toMatch(/сорок пять/)
+    expect(out).toMatch(/К выплате: 195\s000 ₽/)
+  })
 })
