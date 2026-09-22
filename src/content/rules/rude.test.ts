@@ -6,7 +6,7 @@ import type { Facts } from '../../engine/rules'
 import type { Msg } from '../../engine/state'
 import * as T from '../rude'
 import { HEAT } from './rude'
-import { valueOf, spec, type Entry } from '../../engine/rules'
+import { valueOf, spec, during, type Entry } from '../../engine/rules'
 
 const texts = (game: Game, from: number) => game.S.msgs.slice(from).map((m) => (m.kind === 'text' || m.kind === 'sys' ? m.text : m.kind === 'sticker' ? m.e : ''))
 const whos = (game: Game, from: number) => game.S.msgs.slice(from).filter((m): m is Extract<Msg, { kind: 'text' }> => m.kind === 'text').map((m) => m.who ?? 'alik')
@@ -90,6 +90,24 @@ describe('лестница грубости: ступени', () => {
     expect(game.S.offlineDays).toBe(0)
     expect(game.S.ctx?.offended).toBe(true) // можно извиниться
   })
+  it('Карине забрала телефон до конца дня: назавтра с первой реплики снова отвечает Алик', async () => {
+    const { game } = makeGame()
+    game.rules.applyOps([during('phone.karine', 1)], {})
+    expect((await fire(game, 'neutral')).r).toBe('Phone_Karine_PlayerMessage')
+    game.nextDay(1)
+    expect((await fire(game, 'neutral')).r).not.toMatch(/Karine/)
+  })
+  it('пока телефон у Карине, реакций Алика на сообщения нет', async () => {
+    const { game } = makeGame()
+    const mine: Msg[] = []
+    for (let i = 0; i < 30; i++) {
+      game.S.mem['phone.karine'] = true
+      const n = game.S.msgs.length
+      await game.send('Алик, извините, есть новости?')
+      mine.push(game.S.msgs[n])
+    }
+    expect(mine.some((m) => m.kind === 'text' && m.react)).toBe(false)
+  })
   it('S2 — пропущенные от мамы и голосовое с расшифровкой', async () => {
     const { game } = makeGame()
     heat(game, 2)
@@ -128,6 +146,7 @@ describe('лестница грубости: ступени', () => {
     const { game } = makeGame()
     heat(game, 3)
     await fire(game, 'rude')
+    game.S.mem['intro.karine'] = true // Карине уже писала — через незнакомого посредника не извиняются
     const via = fresh(game).find((c) => c.act === 'via')!
     expect(via.arg).toBe('karine')
     const s = await says(game, 'sorry')
@@ -138,6 +157,14 @@ describe('лестница грубости: ступени', () => {
     expect(game.S.mem.blocked).toBe(false)
     expect(texts(game, n)).toContain('Алик Воздухонесян разблокировал вас')
     expect(game.rules.match({ event: 'AlikTurn' }, game.facts())?.name).not.toBe('Turn_Blocked')
+  })
+  it('в блоке Карине подсказывает посредника один раз: второе извинение просто не доставлено', async () => {
+    const { game } = makeGame()
+    game.S.mem.blocked = true
+    expect((await says(game, 'sorry')).r).toBe('Says_sorry_blocked_karine')
+    const again = await says(game, 'sorry')
+    expect(again.r).toBe('Says_sorry_blocked_hinted')
+    expect(texts(game, again.n)).not.toContain(T.KARINE_HINT)
   })
   it('посредник — лучший из тех, кто есть: Борис, если он уже в истории; мама, если Карине ушла к Рубику', async () => {
     const { game } = makeGame()
@@ -266,6 +293,7 @@ describe('лестница грубости: ветки', () => {
     for (let i = 0; i < 20; i++) expect((await game.fire('AlikIdle'))?.name).not.toBe('Idle_ColdWar')
     expect(game.S.msgs.length).toBeGreaterThanOrEqual(n0)
     game.S.ctx = { offended: true }
+    game.S.mem['intro.karine'] = true // одна из реплик холодной войны про Карине — она к этому времени уже писала
     const got: string[] = []
     for (let i = 0; i < 200 && got.length < T.COLD_WAR.length; i++) {
       game.S.stats.sent += 3

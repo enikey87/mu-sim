@@ -4,6 +4,7 @@ import { Game } from '../engine/game'
 import { manualClock } from '../engine/clock'
 import { seededRng, type Rng } from '../engine/rng'
 import { CAST } from '../content/arcs'
+import { ENDINGS } from '../content/finales'
 import type { Choice, Msg } from '../engine/state'
 
 export type Style = 'curious' | 'polite' | 'hothead'
@@ -13,7 +14,7 @@ const HOURS = [14, 20, 9, 2, 17, 12]
 /** Что бот сделал за ход: выбрал вариант i из offered, ответил на допработу, зарядил телефон, промолчал. */
 export type Act =
   | { kind: 'send'; i: number; offered: string[]; at: number }
-  | { kind: 'job'; yes: boolean }
+  | { kind: 'job'; yes: boolean; at?: number }
   | { kind: 'charge' }
   | { kind: 'idle' }
 
@@ -51,13 +52,14 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
   watch?.(game)
   const bot = seededRng(seed * 7919 + 17)
   const acts: Act[] = []
+  let ending: string | null = null
   const asides: Aside[] = []
   const notify = game.notify.bind(game)
   game.notify = (icon, app, text) => { asides.push({ at: game.S.msgs.length, text: `(уведомление телефона: ${icon} ${app} — ${text})` }); notify(icon, app, text) }
   const next = (): Act => {
     if (game.dead) return { kind: 'charge' }
     const job = game.S.msgs.find((m) => m.kind === 'job' && !m.answered)
-    if (job) return { kind: 'job', yes: bot.random() < 0.5 }
+    if (job) return { kind: 'job', yes: bot.random() < 0.5, at: game.S.msgs.length }
     if (game.S.stats.sent >= 5 && bot.random() < PROFILE[style].idle) return { kind: 'idle' }
     const offered = game.choices.map((c) => c.text)
     return { kind: 'send', i: pick(bot, style, game.choices), offered, at: game.S.msgs.length }
@@ -76,6 +78,13 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
       await game.send(game.choices[a.i])
       // перед репликой игрока может встать разделитель дня — варианты привязываем к самой реплике
       if (!replay) a.at = game.S.msgs.findIndex((m, i) => i >= a.at && m.kind === 'text' && m.from === 'me')
+    }
+    // концовка — экран с итогами: дальше игрок играет уже «после финала», и это видно в расшифровке
+    if (game.S.ending && game.S.ending !== ending) {
+      ending = game.S.ending
+      const e = ENDINGS.find((x) => x.id === ending)
+      asides.push({ at: game.S.msgs.length, text: `(экран концовки: «${e?.title ?? ending}». Игрок закрыл экран)` })
+      game.closeEnding() // как игрок: закрыть экран итогов — после Дня выплаты это включает эндгейм
     }
     const moo = game.S.stats.moo
     clock.runTimers() // «Мууу» и прочее отложенное
@@ -108,12 +117,16 @@ function line(m: Msg): string {
 export function transcript(p: Played): string {
   const offers = new Map<number, string>()
   for (const a of p.acts) if (a.kind === 'send') offers.set(a.at, a.offered.map((o, i) => `${i === a.i ? '▶' : ' '} ${o}`).join('\n    '))
-  const out = [`Партия ${p.seed}: сообщений игрока — ${p.game.S.stats.sent}, в конце — ${p.game.S.day}-й день ожидания денег`]
+  const jobs = new Set(p.acts.flatMap((a) => (a.kind === 'job' && a.at !== undefined ? [a.at] : [])))
+  const ending = p.game.S.ending ? ENDINGS.find((e) => e.id === p.game.S.ending) : null
+  const sent = p.game.S.msgs.filter((m) => m.kind === 'text' && m.from === 'me').length
+  const out = [`Партия ${p.seed}: сообщений игрока — ${sent}, в конце — ${p.game.S.day}-й день ожидания денег${ending ? `, концовка «${ending.title}»` : ''}`]
   const aside = (i: number) => { for (const a of p.asides) if (a.at === i) out.push(a.text) }
   p.game.S.msgs.forEach((m, i) => {
     aside(i)
     const o = offers.get(i)
     if (o && m.kind === 'text' && m.from === 'me') out.push(`    варианты:\n    ${o}`)
+    if (jobs.has(i)) out.push('    (ответ на допработу)')
     out.push(line(m))
   })
   aside(p.game.S.msgs.length)

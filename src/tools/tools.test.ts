@@ -27,8 +27,8 @@ describe('линтер правил', () => {
 
 
 describe('покрытие правил', () => {
-  it('за 10 партий (2 — с грубым игроком) срабатывают все правила, кроме заведомо редких', async () => {
-    const r = await ruleCoverage([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 500, undefined, 2)
+  it('за 16 партий (2 — с грубым игроком) срабатывают все правила, кроме заведомо редких', async () => {
+    const r = await ruleCoverage([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], 500, undefined, 2)
     if (process.env.RULES_REPORT) process.stdout.write('\n' + formatCoverage(r) + '\n')
     // Ветки по стилю и post-payday проверяются детерминированно в finales, rude, dialog и endgame тестах.
     const deterministic = new Set([...rudeRules, ...rudeSaysRules, ...endgameRules].map((x) => x.name).concat('Opt_Via_boris', 'Opt_Via_karine', 'Opt_Via_mama', 'Opt_Moo'))

@@ -59,7 +59,7 @@ export const choiceRules: R[] = [
   // лестница грубости: заблокирован — извиниться можно только через Бориса; ссора горячая — можно мычать
   // посредник — лучший из тех, кто есть: Борис, Карине, мама Алика (один вариант на слот); обращение к посреднику — без «Алик, …»
   offer({ name: 'Via_boris', slot: 'via', when: [is('blocked'), SPEAKS.boris], act: 'via', arg: () => 'boris', tone: 'polite', bonus: 7, text: (g) => g.draw('P_VIA_BORIS', ['Борис, передай Алику: прости меня', 'Попросить Бориса передать извинения', 'Борис, скажи ему «бее» от меня. Мирное']) }),
-  offer({ name: 'Via_karine', slot: 'via', when: [is('blocked'), WORLD.karineHome], act: 'via', arg: () => 'karine', tone: 'polite', bonus: 6, text: (g) => g.draw('P_VIA_KARINE', ['Карине, передайте Алику: я извиняюсь', 'Попросить Карине передать извинения']) }),
+  offer({ name: 'Via_karine', slot: 'via', when: [is('blocked'), WORLD.karineHome, WORLD.karine], act: 'via', arg: () => 'karine', tone: 'polite', bonus: 6, text: (g) => g.draw('P_VIA_KARINE', ['Карине, передайте Алику: я извиняюсь', 'Попросить Карине передать извинения']) }),
   offer({ name: 'Via_mama', slot: 'via', when: [is('blocked')], act: 'via', arg: () => 'mama', tone: 'polite', bonus: 6, text: (g) => g.draw('P_VIA_MAMA', ['Попросить маму Алика передать извинения']) }),
   offer({ name: 'Moo', when: [is('ctx.offended'), gte('rude.heat', 1)], odds: 0.5, act: 'moo', tone: 'neutral', bonus: 4, text: (g) => fromArr(g, 'P_MOO', ['Мууу.', 'Мууууу 🐄', 'Му. (Это значит «мир».)']) }),
 
@@ -81,7 +81,8 @@ export const choiceRules: R[] = [
   offer({ name: 'ReactOnly', when: [eq('ctx.type', 'reactOnly')], act: 'reactQ', tone: 'neutral', bonus: 3, // «👍 — это да или нет?» — с той реакцией, что Алик поставил на самом деле
     text: (g) => { const m = [...g.S.msgs].reverse().find((x) => x.kind === 'text' && x.from === 'me'); const r = (m?.kind === 'text' && m.react) || '👍'; return fromArr(g, 'REACT_Q', L.REACT_Q).replace('👍', r) } }),
   offer({ name: 'Deleted', when: [is('ctx.deleted')], act: 'deletedQ', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'DEL_Q', L.DEL_Q) }),
-  offer({ name: 'Group', when: [is('ctx.group')], act: 'group', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'GQ', GROUP_Q) }),
+  // процитировать можно только то, что в этом чате сказали
+  offer({ name: 'Group', when: [is('ctx.group')], act: 'group', tone: 'neutral', bonus: 3, text: (g, f) => (f['ctx.quote'] && g.chance(0.4) ? `«${f['ctx.quote']}»?!` : fromArr(g, 'GQ', GROUP_Q)) }),
   offer({ name: 'Wrong', when: [is('ctx.wrong')], act: 'wrong', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'WQ', WRONG_Q) }),
   offer({ name: 'Legend', when: [is('ctx.legendary')], act: 'legendQ', tone: 'polite', bonus: 2, text: (g) => fromD(g, 'P_LEGEND') }),
 
@@ -103,6 +104,7 @@ export const choiceRules: R[] = [
   }),
   offer({ name: 'Congrats', slot: 'rel', specificity: 2, weight: 1, when: [exists('ctx.rel'), is('ctx.festive')], act: 'congrats', tone: 'polite', text: (g) => fromD(g, 'P_CONGRATS') }),
   offer({ name: 'Condole', slot: 'rel', specificity: 2, weight: 1, when: [exists('ctx.rel'), is('ctx.sad')], act: 'condole', tone: 'polite', text: (g) => fromD(g, 'P_CONDOLE') }),
+  offer({ name: 'Mourn', when: [is('mourning')], odds: 0.5, act: 'condole', tone: 'polite', bonus: 1, text: (g) => fromD(g, 'P_CONDOLE') }),
 
   offer({ name: 'Doubt', when: [is('ctx.constr')], act: 'defend', tone: 'neutral', bonus: 1, text: (g) => fromD(g, 'P_DOUBT') }),
 

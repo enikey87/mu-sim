@@ -15,20 +15,22 @@ const scene = (id: string, when: R['when'] = [], weight: R['weight'] = 1): R => 
 })
 const eveningBoost = (f: Facts) => (f.period === 'evening' || f.period === 'friday' ? 3 : 1)
 export const sceneRules: R[] = [
-  scene('meet'), scene('card'), scene('barter'), scene('redo'), scene('choice'),
+  scene('meet'), scene('card'), scene('barter'), scene('choice'),
+  { ...scene('redo'), once: true }, // «заказчик жалуется на плитку» — один раз: игрок уже съездил и проверил
   // истории, которые случаются один раз: «новый объект», «займи 5000», «если спросят — ты не работал», кредит
   { ...scene('newjob'), once: true },
   // «это Арсен, племянник» — знакомство: если Арсен уже в истории (суд, фундамент), второй раз не представляется
   scene('nephew', [missing('intro.arsen')]),
-  scene('customer', [gte('day', 200)]),
-  { ...scene('lend', [gte('mood', 4)]), once: true },
-  scene('toast', [], eveningBoost), // застолье — чаще вечером и в пятницу
+  { ...scene('customer', [gte('day', 200)]), once: true }, // «позвони заказчику сам» — один раз
+  { ...scene('lend', [gte('mood', 4), gte('money', 5000)]), once: true }, // «займи 5000» — если на карте есть 5000
+  scene('toast', [missing('mourning')], eveningBoost), // застолье — чаще вечером и в пятницу, и не когда в семье прощаются
   { ...scene('tax', [gte('count.threat', 1)], 2), once: true }, // «если спросят — ты у меня не работал» — после угроз судом
   { ...scene('wife', [gte('count.rude', 1), missing('met.karine'), WORLD.karineHome]), once: true }, // Карине знакомится один раз: «Вы кто такой?» дважды — нелепо
   scene('invoice', [gte('day', 215)]),
   { ...scene('loan', [gte('day', 230)]), once: true }, // кредит «на твоё имя» — один раз
-  scene('deathbed', [gte('day', 240), lte('mood', 6)], 2), // умирать Алик начинает, когда дела плохи
-  { ...scene('heir', [gte('arc.grandpa', 4), gte('arc.boris', 4)], 3), once: true }, // «долг перешёл Борису» — когда Борис уже есть // наследство — один раз, после того как дедушка переписал завещание
+  // умирать Алик начинает, когда дела плохи, и только один раз: после похорон и воскрешения смертный одр уже был
+  { ...scene('deathbed', [gte('day', 240), lte('mood', 6), missing('mourning')], 2), once: true },
+  { ...scene('heir', [gte('arc.grandpa', 4), gte('arc.boris', 4)], 3), once: true }, // наследство: после того как дедушка переписал завещание и когда Борис уже есть
 ]
 
 // ---- мини-квесты (PickQuest): свой слот в ходе Алика, каждый — один раз за игру ----
@@ -39,9 +41,10 @@ export const QUEST_WHEN: Record<string, R['when']> = {
   q_niva: [eq('legend', 'niva_stuck')], // «толкни „Ниву“» — эпизод сериала «Нива», а не его повторная завязка
   q_crypto: [gte('day', 200), missing('legend')],
   q_witness: [gte('day', 210)],
+  q_tamada: [missing('mourning')], // вести застолье, пока в семье прощаются, — нельзя
 }
 export const questRules: R[] = [
-  quest('q_hash'), quest('q_niva', QUEST_WHEN.q_niva), quest('q_tamada'), quest('q_lottery'), quest('q_parking'),
+  quest('q_hash'), quest('q_niva', QUEST_WHEN.q_niva), quest('q_tamada', QUEST_WHEN.q_tamada), quest('q_lottery'), quest('q_parking'),
   quest('q_mama'), quest('q_crypto', QUEST_WHEN.q_crypto), quest('q_photo'), quest('q_witness', QUEST_WHEN.q_witness), quest('q_goat'),
 ]
 

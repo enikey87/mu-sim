@@ -1,8 +1,11 @@
 // Несостыковки из партии пользователя (docs/PLAYTEST_ISSUES.md): каждая — тестом, чтобы не вернулась.
 import { describe, it, expect } from 'vitest'
 import { makeGame } from '../test/helpers'
-import { GROUP } from './arcs'
-import { CONDOLE_REVIVED, GREET_A } from './misc'
+import { ARCS, GROUP } from './arcs'
+import { D } from './excuses'
+import { ENDGAME_RETURNERS } from './endgame'
+import { CONDOLE_REVIVED, GREET_A, FLOOR } from './misc'
+import { SPEND } from './life'
 import { WORLD, needs } from './world'
 import { valueOf, type Entry } from '../engine/rules'
 import type { Game } from '../engine/game'
@@ -20,12 +23,94 @@ describe('несостыковки из партии пользователя', 
     expect(game.S.msgs.some((m) => m.kind === 'text' && m.who === 'boris')).toBe(false)
     expect(GROUP.boris.length).toBeGreaterThan(0)
   })
+  it('после выселения квартплата с карты не списывается', () => {
+    const { game } = makeGame()
+    game.S.mem.evicted = true
+    const spends = Array.from({ length: 200 }, () => game.draw('SPEND', SPEND))
+    expect(spends).not.toContain('Квартплата')
+    expect(new Set(spends).size).toBeGreaterThan(3)
+  })
+  it('Алик вспоминает подаренное словами, а не ярлыком из досье', async () => {
+    const { game } = makeGame()
+    game.S.items.push('Место на кране (40 м)')
+    game.S.stats.sent = 20
+    const n = game.S.msgs.length
+    for (let i = 0; i < 12 && !texts(game, n).some((t) => /отдал тебе/.test(t)); i++) { game.S.rules.cooldown = {}; await game.fire('AlikTurn') }
+    const line = texts(game, n).find((t) => /отдал тебе/.test(t))!
+    expect(line).toContain('«Место на кране»')
+    expect(line).not.toContain('(40 м)')
+  })
+  it('акт взаимозачёта не вычитает одну позицию дважды', async () => {
+    const { game } = makeGame()
+    const seen: string[] = []
+    for (let i = 0; i < 4; i++) {
+      game.S.scene = null
+      await game.enterNode('invoice', 'ask')
+      const doc = game.S.msgs.findLast((m) => m.kind === 'doc')
+      if (doc?.kind === 'doc') seen.push(...doc.rows.map(([t]) => t.replace(/\s*\([^)]*\)\s*$/, '')))
+    }
+    expect(seen.length).toBeGreaterThan(8)
+    expect(new Set(seen).size).toBe(seen.length)
+  })
+  it('срок-условие не выдаётся после того, как событие уже случилось', async () => {
+    const { game } = makeGame()
+    game.setLegend('boris_wedding', 'boris')
+    const n0 = game.S.msgs.length
+    await game.promiseLine(undefined, true)
+    expect(texts(game, n0).join(' ')).toMatch(/свадьбы Бориса/)
+    game.S.mem['boris.married'] = true // свадьба сыграна
+    const n1 = game.S.msgs.length
+    for (let i = 0; i < 10; i++) await game.promiseLine(undefined, true)
+    expect(texts(game, n1).join(' ')).not.toMatch(/свадьбы Бориса/)
+  })
+  it('«Кто это? А, …» — только если Алик не писал со вчера', () => {
+    const { game } = makeGame()
+    const excuses = () => Array.from({ length: 200 }, () => game.X.excuse().texts.join(' ')).join('\n')
+    game.S.mem['alik.day'] = game.S.day
+    expect(excuses()).not.toMatch(/Кто это\?/)
+    game.S.mem['alik.day'] = game.S.day - 1
+    expect(excuses()).toMatch(/Кто это\?/)
+  })
+  it('«терпение восстановлено»: событие вроде «продали микроволновку» — один раз, занятия — повторяются', () => {
+    const { game } = makeGame()
+    game.S.money = 1000 // нищета: только тогда в пуле есть «продали микроволновку»
+    const floor = (turns: number) => { game.S.stats.sent += turns; return game.line('FLOOR', FLOOR) ?? 'Вы полежали на полу. Терпение восстановлено.' }
+    const got = Array.from({ length: 40 }, () => floor(20))
+    expect(got.filter((t) => /микроволновку/.test(t))).toHaveLength(1)
+    // пул исчерпан (перерыв не прошёл) — системное сообщение всё равно от лица игры, без обращений Алика
+    const dry = Array.from({ length: 30 }, () => floor(0))
+    expect(dry.every((t) => t.startsWith('Вы '))).toBe(true)
+  })
+  it('займ 5000: деньги уходят с карты; нет 5000 на карте — Алик не просит', async () => {
+    const { game } = makeGame()
+    game.S.money = 3000
+    game.S.mood = 8
+    for (let i = 0; i < 30; i++) expect((await game.fire('PickScene'))?.name).not.toBe('Scene_lend')
+    game.S.money = 9000
+    await game.enterNode('lend', 'yes')
+    expect(game.S.money).toBe(4000)
+  })
+  it('после семейного чата игрок цитирует только то, что в нём сказали', async () => {
+    const { game } = makeGame()
+    const quotes = new Set<string>()
+    for (let i = 0; i < 15; i++) {
+      const n = game.S.msgs.length
+      await game.groupChat()
+      const said = game.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' && m.who ? [m.text] : []))
+      for (let k = 0; k < 10; k++) {
+        const q = game.choices.find((c) => c.act === 'group' && c.text.startsWith('«'))
+        if (q) { quotes.add(q.text); expect(said.some((t) => t.startsWith(q.text.slice(1, -3))), q.text).toBe(true) }
+        game.S.choices = null
+      }
+    }
+    expect(quotes.size).toBeGreaterThan(2)
+  })
   it('бартер и акт до сериала «Баран Борис»: баран без имени, корма для Бориса нет', () => {
     const { game } = makeGame()
     game.S.mem['intro.baran'] = true
     const open = <T,>(a: readonly Parameters<typeof game.open<T>>[0][number][]) => game.open<T>(a)
-    const barter = () => Array.from({ length: 80 }, () => String(game.scenes.barter.init!(game.rng, open).n))
-    const rows = () => Array.from({ length: 40 }, () => (game.scenes.invoice.init!(game.rng, open).rows as Array<[string, number]>).map(([t]) => t)).flat()
+    const barter = () => Array.from({ length: 80 }, () => String(game.scenes.barter.init!(game.rng, open, game.S.day).n))
+    const rows = () => Array.from({ length: 40 }, () => (game.scenes.invoice.init!(game.rng, open, game.S.day).rows as Array<[string, number]>).map(([t]) => t)).flat()
     expect(barter()).toContain('баран без имени')
     expect(barter().join(' ')).not.toMatch(/Борис/)
     expect(rows().join(' ')).not.toMatch(/Борис/)
@@ -254,6 +339,74 @@ describe('несостыковки из плейтеста ботами, рау�
     game.S.mem['count.rude'] = 1
     game.S.mem['met.karine'] = true
     for (let i = 0; i < 30; i++) expect((await game.rules.match({ event: 'PickScene', facts: {} }, game.facts()))?.name).not.toBe('Scene_wife')
+  })
+  it('«три дня» в оправдании за пропажу — только после трёх дней молчания', () => {
+    const { game } = makeGame()
+    const excused = () => game.open(D.BACK_B as Entry<string>[]).some((t) => /три дня/.test(t))
+    expect(excused()).toBe(false)
+    game.S.mem['alik.day'] = game.S.day - 3
+    expect(excused()).toBe(true)
+  })
+  it('в траур игроку предлагают соболезнование', async () => {
+    const { game } = makeGame()
+    const offered = () => game.rules.collect({ event: 'BuildChoices' }, game.facts()).some((r) => r.name === 'Opt_Mourn')
+    expect(Array.from({ length: 30 }, offered).some(Boolean)).toBe(false)
+    await game.playArc('grandpa')
+    expect(Array.from({ length: 30 }, offered).some(Boolean)).toBe(true)
+  })
+  it('на «завтра» ссылаются только после того, как Алик его назвал сроком', () => {
+    const { game } = makeGame()
+    const pool = (k: string) => game.open(D[k] as Entry<string>[])
+    const quoted = () => ['P_POL_B', 'P_RUDE_B', 'VOICE_A'].flatMap(pool).filter((t) => /«завтра»/.test(t))
+    expect(quoted()).toEqual([])
+    game.recordPromise({ text: 'завтра — закину', d: 1, tomorrow: true })
+    expect(quoted().length).toBe(3)
+  })
+  it('обратно в группу добавляет только тот, кто уже писал сам', () => {
+    const { game } = makeGame()
+    expect(game.open(ENDGAME_RETURNERS)).toEqual([])
+    game.S.mem['met.samvel'] = true
+    expect(game.open(ENDGAME_RETURNERS).map((r) => r.who)).toEqual(['samvel'])
+  })
+  it('свадьбу и похороны своим героям устраивает их сериал, а не генератор отмазок', async () => {
+    const { game } = makeGame()
+    await game.playArc('grandpa')
+    for (const id of ['goar', 'mkrtich', 'gagik', 'samvel', 'garik']) game.S.mem['intro.' + id] = true
+    const own = /(Самвела(?!-)|Гарика|Гоар|Мкртича|Гагика|Грачика)[^.!?]*?(похорон|поминк|умер|свадьб|женил|крестин|юбилей|обручен|родила|роды)/i
+    const said: string[] = []
+    for (let i = 0; i < 600; i++) said.push(game.X.excuse({}).texts.join(' '))
+    expect(said.filter((t) => own.test(t))).toEqual([])
+    expect(said.some((t) => /Самвела|Гарика|Гоар|Мкртича|Гагика|Грачика/.test(t))).toBe(true)
+  })
+  it('пока в семье прощаются, застолья и смертного одра не бывает', async () => {
+    const { game } = makeGame()
+    game.S.day = 250
+    game.S.mood = 5
+    await game.playArc('grandpa') // «дедушка умирает»
+    expect(game.holds(WORLD.mourning)).toBe(true)
+    const offered = async () => {
+      const names = new Set<string>()
+      for (let i = 0; i < 60; i++) {
+        names.add((await game.rules.match({ event: 'PickScene', facts: {} }, game.facts()))?.name ?? '')
+        names.add((await game.rules.match({ event: 'PickQuest', facts: {} }, game.facts()))?.name ?? '')
+      }
+      return names
+    }
+    const mourned = await offered()
+    expect([...mourned].filter((n) => /toast|deathbed|tamada/.test(n))).toEqual([])
+    await game.playArc('grandpa') // «дедушка опять не умер» — траур снят
+    expect(game.holds(WORLD.mourning)).toBe(false)
+    const after = await offered()
+    expect([...after].some((n) => /toast|deathbed|tamada/.test(n))).toBe(true)
+  })
+  it('«дедушка ещё умирает?» спрашивают, только пока он умирает', async () => {
+    const { game } = makeGame()
+    const dying = () => game.open(ARCS.grandpa.follow).includes('Алик, дедушка ещё умирает?')
+    expect(dying()).toBe(false)
+    await game.playArc('grandpa')
+    expect(dying()).toBe(true)
+    await game.playArc('grandpa')
+    expect(dying()).toBe(false)
   })
   it('имя после приставки — с большой буквы', async () => {
     const { low } = await import('./excuses')

@@ -73,7 +73,10 @@ export const turnRules: R[] = [
     name: 'Turn_Memory', event: 'AlikTurn', when: [gte('sent', 8)], specificity: 0, weight: 7, cooldown: { turns: 4 },
     respond: async ({ game, facts }) => {
       const item = facts.latestItem && String(facts.latestItem)
-      const pool = item ? [{ id: 'MEMORY_ITEM_' + item, t: `Помнишь, я отдал тебе: ${item}? Всё ещё у тебя?`, prio: 2 }, ...MEMORY] : MEMORY
+      // без пояснения из досье и в кавычках: «Место на кране (40 м)» → «Место на кране»
+      const short = item && item.replace(/\s*\([^()]*\)\s*$/, '')
+      const named = short && (short.startsWith('«') ? short : `«${short}»`)
+      const pool = named ? [{ id: 'MEMORY_ITEM_' + item, t: `Помнишь, я отдал тебе ${named}? Всё ещё у тебя?`, prio: 2 }, ...MEMORY] : MEMORY
       const t = game.line('MEMORY', pool)
       if (t) { await game.say([t]); game.unlock('memory') } else await game.excuseTurn()
     },

@@ -6,6 +6,7 @@ import { manualClock, realClock } from './clock'
 import { Game } from './game'
 import { seededRng } from './rng'
 import { SAVE_KEY } from './state'
+import { fmtTime } from './time'
 import { ARCS } from '../content/arcs'
 
 describe('Game: начало и ход', () => {
@@ -218,7 +219,7 @@ describe('Game: батарея', () => {
     await game.send('Алик, привет')
     expect(game.dead).toBe(true)
     expect(game.S.ach.dead).toBeDefined()
-    expect(game.S.msgs.at(-1)).toMatchObject({ kind: 'sys', text: 'Не доставлено: телефон Алика выключен.' })
+    expect(game.S.msgs.at(-1)).toMatchObject({ kind: 'sys', text: 'Не доставлено: у вас сел телефон.' })
     await game.send('ещё')
     expect(game.S.stats.sent).toBe(4)
     const n = game.S.msgs.length
@@ -253,6 +254,27 @@ describe('Game: возвращение после паузы', () => {
     expect(g2.title).toMatch(/^\(\d\)/)
     expect(g2.S.battery).toBe(100)
     expect(g2.S.ach.away).toBeDefined()
+  })
+  it('«который час» в реплике — настоящий час переписки, а не зашитый', async () => {
+    const { game } = makeGame({ hour: 2 })
+    game.S.clock = 2 * 60 + 5
+    const n = game.S.msgs.length
+    await game.say(['{Night}, брат…'])
+    expect(game.S.msgs.slice(n).map((m) => (m.kind === 'text' ? m.text : '')).join(' ')).toContain('Два часа ночи')
+    game.S.clock = 3 * 60 + 40
+    const n2 = game.S.msgs.length
+    await game.say(['{night}, брат…'])
+    expect(game.S.msgs.slice(n2).map((m) => (m.kind === 'text' ? m.text : '')).join(' ')).toContain('три часа ночи')
+  })
+  it('непрочитанные пришли до «сейчас»: время суток в репликах совпадает с часами переписки', () => {
+    const { game } = makeGame({ hour: 2 })
+    game.awayBurst(5, 1)
+    const now = fmtTime(game.S.clock)
+    expect(now.startsWith('02:')).toBe(true)
+    expect(game.S.msgs.slice(-5).every((m) => m.time! <= now)).toBe(true)
+    expect(game.period()).toBe('night')
+    game.tick(9 * 60) // переписка дошла до 11 утра — уже не «почему не спишь»
+    expect(game.period()).toBe('day')
   })
   it('короткая пауза и новая игра — без непрочитанных', () => {
     const { game } = makeGame({ away: 5 })
@@ -329,11 +351,12 @@ describe('Game: сохранение', () => {
 })
 
 describe('Game: сцены целиком', () => {
-  it('каждый узел каждой сцены проходится без ошибок', async () => {
-    const { game } = makeGame({ seed: 11 })
+  // свежая партия на узел: в одной партии сцены успевают познакомить игрока со всеми, и дыра в разметке не видна
+  it('каждый узел каждой сцены проходится без ошибок в нетронутом мире', async () => {
     let visited = 0
-    for (const [sid, sc] of Object.entries(game.scenes)) {
+    for (const [sid, sc] of Object.entries(makeGame({ seed: 11 }).game.scenes)) {
       for (const nid of Object.keys(sc.nodes)) {
+        const { game } = makeGame({ seed: 11 })
         game.S.scene = null
         game.S.offlineDays = 0
         await game.enterNode(sid, sc.start) // инициализировать переменные сцены
@@ -344,10 +367,10 @@ describe('Game: сцены целиком', () => {
           expect(cs.length, `${sid}.${nid}`).toBeGreaterThan(0)
           for (const c of cs) expect(c.text, `${sid}.${nid}`).toMatch(/\S/)
         }
+        expect(JSON.stringify(game.S.msgs), `${sid}.${nid}`).not.toMatch(/undefined|NaN/)
       }
     }
     expect(visited).toBeGreaterThan(80)
-    expect(JSON.stringify(game.S.msgs)).not.toMatch(/undefined|NaN/)
   })
   it('выбор в сцене ведёт по ветке; «null» закрывает сцену', async () => {
     const { game } = makeGame({ seed: 2 })

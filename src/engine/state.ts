@@ -45,6 +45,8 @@ export interface Ctx {
   legendary?: boolean
   arc?: string
   group?: boolean
+  /** Что сказали в семейном чате — игрок может это процитировать. */
+  quote?: string
   wrong?: boolean
   deleted?: boolean
   offended?: boolean

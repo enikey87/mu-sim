@@ -1,7 +1,7 @@
 // Игра: состояние, сообщения, ход Алика, «живость». Решения — что ответить, что предложить игроку,
 // что сделать Алику — принимает система правил (engine/rules/, content/rules/*).
-import { make, D, low, cap, type ExcuseApi, type Promise3, type PromiseCondition } from '../content/excuses'
-import { makeScenes, type Scene, type Line } from '../content/scenes'
+import { make, D, low, cap, type ExcuseApi, type Promise3, type PromiseCondition, type Rel } from '../content/excuses'
+import { makeScenes, invKey, type Scene, type Line } from '../content/scenes'
 import { TRIBUNAL } from '../content/rude'
 import { PAYDAY_HOOKS } from '../content/rules/payday'
 import { QUEST_WHEN } from '../content/rules/world'
@@ -24,15 +24,15 @@ import { type Rng, mathRng, rndInt, shuffle, chance } from './rng'
 import { Decks } from './deck'
 import { Seen, type Keyed } from './uniq'
 import {
-  RuleSet, makeHub, Lines, resolver, test, isOpen, valueOf,
+  RuleSet, makeHub, Lines, resolver, test, isOpen, valueOf, set,
   type Criterion, type Entry, type Facts, type Resolver, type Rule, type Trace, type Query, type Priority, type Line as PoolLine, type LineOpts, type Picked,
 } from './rules'
-import { MENTION_RE } from '../content/world'
+import { MENTION_RE, WORLD } from '../content/world'
 import { type Clock, realClock, isManualClock } from './clock'
 import { type Audio, silentAudio } from './audio'
 import { typo } from './typo'
 import { classifyUserInput, type ClassifiedInput } from './input'
-import { dueIn, dateOf, fmtDate, fmtTime, periodOf, tierOf, TIERS, type Due, type Period } from './time'
+import { dueIn, dateOf, fmtDate, fmtTime, nightHour, periodOf, tierOf, TIERS, type Due, type Period } from './time'
 import {
   type GameState, type Msg, type NewMsg, type Choice, type Ctx, type Tone, type Storage,
   type InputCategory, freshState, loadState, saveState, SAVE_KEY, MAX_PATIENCE,
@@ -359,6 +359,10 @@ export class Game {
     this.uniq(() => `${this.draw(ka, a)} ${this.draw(kb, b)}`)
   addrLine = (key: string, arr: readonly Entry<string>[]): string => this.uniq(() => `${this.X.g('ADDR')}, ${this.draw(key, arr)}`)
 
+  /** Подставить состояние в текст: {debt} и {money} — деньги, {night} — который час по часам переписки. */
+  fillMoney = (t: string): string =>
+    t.replace('{debt}', this.S.debt.toLocaleString('ru-RU')).replace('{money}', this.S.money.toLocaleString('ru-RU')).replace('{night}', nightHour(this.S.clock)).replace('{Night}', cap(nightHour(this.S.clock)))
+
   get ctx(): Ctx | null { return this.S.ctx }
   setCtx(c: Ctx | null): void { this.S.ctx = c }
 
@@ -366,9 +370,9 @@ export class Game {
   realHour(): number {
     return this.hour ?? new Date(this.clock.now()).getHours()
   }
-  /** Время суток — настоящее (как в мессенджере), день недели — по календарю игры. */
+  /** Время суток — по часам переписки (день начинается с настоящего времени), день недели — по календарю игры. */
   period(): Period {
-    return periodOf(this.realHour(), dateOf(this.S.day).getDay())
+    return periodOf(Math.floor(this.S.clock / 60), dateOf(this.S.day).getDay())
   }
   isNight = (): boolean => this.period() === 'night'
   /** Время суток игрока в минутах: новый день переписки начинается «сейчас». */
@@ -385,6 +389,7 @@ export class Game {
   }
   nextDay(n: number): void {
     this.S.day += n
+    this.rules.settle()
     this.S.clock = this.realMinutes()
     this.push({ kind: 'sep', text: fmtDate(this.S.day) })
     if (this.inPlayerTurn) this.dayMovedInTurn = true
@@ -407,6 +412,7 @@ export class Game {
   push<M extends NewMsg>(m: M): Msg {
     if (this.disposed) throw new GameDisposed()
     const msg = { ...m, id: this.S.nextId++ } as Msg
+    if ((msg.kind === 'text' || msg.kind === 'sys') && msg.text.includes('{')) msg.text = this.fillMoney(msg.text)
     this.S.msgs.push(msg)
     this.touchMsgs(this.S.msgs.length - 1)
     this.emit()
@@ -423,11 +429,13 @@ export class Game {
   sys(text: string): Msg { return this.push({ kind: 'sys', text }) }
 
   alikMsg<M extends NewMsg>(m: M): Msg {
-    if (m.kind === 'text' && m.who) this.S.mem['met.' + m.who] = true // «кого игрок встречал» — для переклички в День выплаты
+    // персонаж написал сам — он в истории (intro) и игрок его встречал (met, для переклички в День выплаты)
+    if (m.kind === 'text' && m.who) { this.S.mem['met.' + m.who] = true; this.S.mem['intro.' + m.who] = true }
+    this.S.mem['alik.day'] = this.S.day
     this.tick(1 + this.rnd(3))
     const msg = this.push({ from: 'alik', time: fmtTime(this.S.clock), ...m } as NewMsg)
     if (msg.kind === 'text' && /брат джан/i.test(msg.text)) this.unlock('brat')
-    if (msg.kind === 'text' || msg.kind === 'photo') this.noteClaims(msg.text)
+    if (msg.kind === 'text' || msg.kind === 'photo') this.noteClaims(msg.text, msg.kind === 'text' ? msg.who : undefined)
     // хор: Алик кого-то упомянул — тот, может быть, вклинится после его ответа
     if (msg.kind === 'text' && !msg.who) {
       for (const [who, re] of Object.entries(MENTION_RE)) if (re.test(msg.text)) this.pending.push({ event: 'Mentioned', target: who })
@@ -640,12 +648,13 @@ export class Game {
     const c = S.ctx ?? {}
     const pr = extra.promise !== undefined ? S.promises[Number(extra.promise)] : undefined
     return {
-      day: S.day, tier: S.tier, mood: S.mood, sent: S.stats.sent, moo: S.stats.moo, patience: S.patience,
+      day: S.day, tier: S.tier, mood: S.mood, sent: S.stats.sent, moo: S.stats.moo, patience: S.patience, money: S.money, debt: S.debt, fifty: S.stats.fifty,
       dow: dateOf(S.day).getDay(), month: dateOf(S.day).getMonth() + 1,
       // прогресс сериалов: arc.grandpa = номер серии
       ...Object.fromEntries(Object.entries(S.arcs).map(([id, st]) => ['arc.' + id, st.i])),
       // ачивки и трофеи — условия для финалов сериалов и концовок
       ...Object.fromEntries(Object.keys(S.ach).map((k) => ['ach.' + k, true])),
+      ...Object.fromEntries(Object.entries(S.ach).map(([k, day]) => ['since.' + k, S.day - day])),
       items: S.items.length,
       latestItem: S.items.at(-1),
       legend: this.legend(),
@@ -662,6 +671,7 @@ export class Game {
       // Календарное обещание живо в день срока; событийное — в ход, когда его факт стал истиной.
       promiseLive: !!pr && (pr.condition ? pr.met === S.day : pr.due === S.day),
       period: this.period(), night: this.isNight(), offline: S.offlineDays > 0, scene: S.scene?.id,
+      sinceAlik: S.day - Number(S.mem['alik.day'] ?? S.day),
       lateCount: this.lateCount(),
       // сама — не больше одной серии в день: три легенды денег за день — уже не сюжет, а шум
       arcAvailable: this.availableArcs().length > 0 && !Object.values(S.arcs).some((a) => a.last === S.day),
@@ -673,7 +683,7 @@ export class Game {
       deathCanAdvance: !!S.mem.alik_dead && this.arcCanAdvance('alik_death', true),
       'ctx.type': c.type, 'ctx.amount': c.amount, 'ctx.s': c.s, 'ctx.shortTimey': c.s ? TIMEY.test(c.s) : false,
       'ctx.when': c.when, 'ctx.whenNever': c.whenNever, 'ctx.rel': c.rel?.n, 'ctx.relYou': c.rel?.you ?? c.rel?.n, 'ctx.sad': c.sad, 'ctx.festive': c.festive, 'ctx.revived': c.revived,
-      'ctx.constr': c.constr, 'ctx.legendary': c.legendary, 'ctx.arc': c.arc,
+      'ctx.constr': c.constr, 'ctx.legendary': c.legendary, 'ctx.arc': c.arc, 'ctx.quote': c.quote,
       // спросить про сериал есть смысл: будет новая серия, или сериал закончен и сегодня про финал ещё не спрашивали
       'ctx.arcCanAdvance': c.arc ? this.arcCanAdvance(c.arc, true) || (S.arcs[c.arc]?.i >= ARCS[c.arc].eps.length && S.mem['doneAsked.' + c.arc] !== S.day) : false,
       'arc.done': c.arc ? this.S.arcs[c.arc]?.i >= ARCS[c.arc].eps.length : false,
@@ -763,7 +773,7 @@ export class Game {
       const catchLie = this.rules.collect({ event: 'BuildChoices' }, this.facts()).find((r) => r.name === 'Opt_CatchLie')
       const lieOpt = catchLie ? [catchLie.offer!(this.rules.ctx(this, catchLie, { event: 'BuildChoices' }, this.facts())) as Choice] : []
       return [...lieOpt, ...(n.opts ?? []).map((o, i) => {
-        const gen = (): string => (typeof o.t === 'function' ? o.t(S.scene!.vars) : Array.isArray(o.t) ? this.draw<string>(`${S.scene!.id}.${S.scene!.node}.o${i}`, o.t) : o.t)
+        const gen = (): string => this.fillMoney(typeof o.t === 'function' ? o.t(S.scene!.vars) : Array.isArray(o.t) ? this.draw<string>(`${S.scene!.id}.${S.scene!.node}.o${i}`, o.t) : o.t)
         const t = gen().length > 8 ? this.playerLine(gen) : gen()
         return { text: t, tone: o.tone ?? 'polite', scene: S.scene!.id, go: o.go } as Choice
       })]
@@ -795,7 +805,7 @@ export class Game {
       const topic = facts['ctx.topic'] && this.chance(0.6) ? this.freshPlayer('PR_' + facts['ctx.topic'], TOPICS[String(facts['ctx.topic'])].r.filter((_, i) => TOPICS[String(facts['ctx.topic'])].rneed?.[i]?.test(this.topicText) ?? true)) : null
       out.push({ text: topic ?? P2('P_RUDE_A', 'P_RUDE_B'), tone: 'rude' })
     }
-    return out.slice(0, 4)
+    return out.slice(0, 4).map((c) => (c.text.includes('{') ? { ...c, text: this.fillMoney(c.text) } : c))
   }
   get choices(): Choice[] {
     return (this.S.choices ??= this.buildChoices())
@@ -867,7 +877,7 @@ export class Game {
     this.save()
     if (this.disposed) { this.inPlayerTurn = false; return }
     if (this.dead) {
-      this.sys('Не доставлено: телефон Алика выключен.')
+      this.sys('Не доставлено: у вас сел телефон.')
       S.ctx = null
       this.save()
       this.inPlayerTurn = false
@@ -881,8 +891,8 @@ export class Game {
 
       // реакция на сообщение игрока; иногда — вместо ответа
       let reactOnly = false
-      // заблокировал — значит, не видит: реакции на недоставленное не бывает
-      if (!o.scene && !S.mem.blocked && this.chance(0.18) && mine.kind === 'text') {
+      // реакция — Алика: не бывает, когда он не видит (заблокирован) или телефон у Карине
+      if (!o.scene && !S.mem.blocked && !S.mem['phone.karine'] && this.chance(0.18) && mine.kind === 'text') {
         await this.sleep(600)
         if (this.disposed) return
         this.replaceMsg(mine, { react: this.draw('R_' + tone, L.REACT[tone] ?? L.REACT.neutral) })
@@ -923,7 +933,8 @@ export class Game {
       if (S.patience === 0) {
         await this.sleep(600)
         if (this.disposed) return
-        this.sys(this.draw('FLOOR', FLOOR))
+        // без fallback: он проходит через украшение реплик Алика и получает обращение («Сынок, слушай, вы полежали…»)
+        this.sys(this.line('FLOOR', FLOOR) ?? 'Вы полежали на полу. Терпение восстановлено.')
         S.patience = MAX_PATIENCE
         this.unlock('floor')
       }
@@ -945,9 +956,14 @@ export class Game {
     }
   }
 
-  recordPromise(p?: { text: string; d: number | null; due?: Due; condition?: PromiseCondition } | null): void {
+  /** Отмазка назвала родню по роли («у прораба Мкртича свадьба») — значит, познакомила с ним. */
+  meetRel(r?: Rel): void {
+    if (r?.id) this.rules.applyOps(meet(r.id), {})
+  }
+  recordPromise(p?: { text: string; d: number | null; due?: Due; condition?: PromiseCondition; tomorrow?: boolean } | null): void {
     if (!p) return
     if (p.condition && this.S.mem[p.condition] === true) return
+    if (p.tomorrow) this.rules.applyOps([set('said.tomorrow', true)], {})
     const due = p.d == null ? null : this.S.day + (p.due ? dueIn(p.due, this.S.day) : p.d)
     this.S.promises.push({ t: p.text, made: this.S.day, due, condition: p.condition })
     if (due !== null && due > this.S.day) this.rules.schedule({ at: due, kind: 'event', event: 'PromiseDue', facts: { promise: this.S.promises.length - 1 } })
@@ -965,7 +981,9 @@ export class Game {
   /** Обещание. Пока жива легенда денег — срок чаще вытекает из неё («как ключ выйдет»); legend = true — всегда из неё. */
   async promiseLine(prefix?: string, legend?: boolean): Promise<void> {
     const legendSpec = this.legend() ? LEGENDS[this.legend()!] : undefined
-    const until = legendSpec?.until
+    // событие легенды уже случилось («свадьба Бориса прошла») — обещать «сразу после него» поздно
+    const done = legendSpec?.condition ? this.S.mem[legendSpec.condition] === true : false
+    const until = done ? undefined : legendSpec?.until
     // срок из легенды — после серии обязательно, дальше изредка: одна и та же клятва «как „Нива“ заведётся» приедается
     const recent = this.S.stats.sent - Number(this.S.mem.legendPromiseAt ?? -99) < 4
     const fromLegend = !!until && (legend || (!recent && this.chance(0.4)))
@@ -1026,6 +1044,7 @@ export class Game {
     if (this.legend()) return this.promiseLine(undefined, true)
     const ex = this.uniq(() => this.X.excuse({ preferLong: this.S.politeStreak >= 3 }))
     if (ex.legendary) this.unlock('legend')
+    this.meetRel(ex.r)
     this.recordPromise(ex.p)
     const msgs = await this.say(ex.texts, ex.legendary)
     this.markTopical(msgs)
@@ -1129,16 +1148,19 @@ export class Game {
     await this.sleep(600)
     this.sys('Алик добавил вас в группу «Стройка под ключ 🏗️ Семья»')
     const members = shuffle(this.rng, Object.keys(GROUP).filter((w) => this.canSpeak(w))).slice(0, 4 + this.rnd(3))
+    const said: string[] = []
     for (const w of members) {
       const t = this.seen.pickFresh(() => this.draw('G_' + w, GROUP[w]), (x) => x)
       if (this.seen.has(t)) continue // у участника кончились новые фразы — в этот раз молчит
       this.seen.mark(t)
+      said.push(t)
       await this.say([{ w, t }])
     }
     await this.say([this.uniq(() => this.draw('GOOPS', GROUP_OOPS))])
     this.sys('Алик удалил вас из группы')
     this.unlock('group')
-    this.S.ctx = { group: true }
+    const short = said.filter((t) => t.length <= 60)
+    this.S.ctx = { group: true, quote: short.length ? short[this.rnd(short.length)].replace(/[.!?…]+$/, '') : undefined }
   }
 
   async wrongChat(): Promise<void> {
@@ -1157,7 +1179,7 @@ export class Game {
 
   // ---------- бухгалтерия лжи ----------
   /** Запомнить, что Алик «заявил»; если это противоречит сказанному раньше — дать игроку поймать его. */
-  noteClaims(text: string): void {
+  noteClaims(text: string, who?: string): void {
     const mem = this.S.mem
     const found = CLAIMS.filter((c) => c.re.test(text))
     for (const c of found) {
@@ -1167,10 +1189,16 @@ export class Game {
       if (old) {
         mem['lie.old'] = old.key
         mem['lie.new'] = c.key
+        // «вы же говорили» — только если прошлую версию сказал сам Алик, а не родня в семейном чате
+        mem['lie.alikOld'] = mem['by.' + old.key] === undefined || mem['by.' + old.key] === 'alik'
         mem['lie.kind'] = old.group === 'money' ? 'money' : ({ grandpa_dead: 'grandpa', grandpa_alive: 'grandpa', customer_owes: 'customer', customer_paid: 'customer', sent: 'sent', no_money: 'sent' } as Record<string, string>)[c.key] ?? 'other'
       }
     }
-    for (const c of found) { if (mem['said.' + c.key] === undefined) mem['said.' + c.key] = this.S.day; mem['saidLast.' + c.key] = this.S.day }
+    for (const c of found) {
+      if (mem['said.' + c.key] === undefined) mem['said.' + c.key] = this.S.day
+      mem['saidLast.' + c.key] = this.S.day
+      mem['by.' + c.key] = who ?? 'alik'
+    }
   }
   lie(): { old: Claim; new: Claim } | null {
     const o = claimByKey(String(this.S.mem['lie.old'] ?? '')), n = claimByKey(String(this.S.mem['lie.new'] ?? ''))
@@ -1273,11 +1301,12 @@ export class Game {
   }
   /** Финал сериала: обычный (последний эпизод) или частный из FINALES. */
   async playFinale(id: string, f: Finale | null): Promise<void> {
-    this.S.mem['finale.' + id] = f?.id ?? 'default'
     const ep = f ?? ARCS[id].eps.at(-1)!
     // финал закрывает легенду своего сериала («ключ не тот» → «мы должны всем»)
     if (ep.legend === undefined) this.setLegend(null, id)
     await this.playEpisode(ep, id)
+    // реплики финала звучат в мире до него: «Нуне уволена. Из декрета» — пока она ещё в декрете
+    this.S.mem['finale.' + id] = f?.id ?? 'default'
     if (f) this.unlock(`fin_${id}_${f.id}`)
   }
   finaleOf(id: string): Finale | undefined {
@@ -1299,7 +1328,8 @@ export class Game {
     await this.sleep(600)
     this.sys('Дядя Самвел добавил вас в группу «Стройка под ключ 🏗️ Семья». Тема: «Дело №1. Плиточник против уважения»')
     for (const [w, t] of this.open(TRIBUNAL)) await this.say([{ w, t }])
-    this.sys(`Голосование «Простить плиточника?» — Да: 1 (Гарик). Нет: ${5 + this.rnd(4)}.${this.canSpeak('boris') ? ' Бее: 1.' : ''}`)
+    const yes = this.holds(WORLD.garik) ? '1 (Гарик)' : '1 (кто-то из родни)'
+    this.sys(`Голосование «Простить плиточника?» — Да: ${yes}. Нет: ${5 + this.rnd(4)}.${this.canSpeak('boris') ? ' Бее: 1.' : ''}`)
     await this.enterNode('tribunal', 'verdict')
   }
 
@@ -1362,7 +1392,7 @@ export class Game {
     this.sys('Вы покинули группу')
     const back = this.decks.pick('ENDGAME_RETURNERS', ENDGAME_RETURNERS, this.lineFacts())
     if (back) {
-      this.sys(`${back.name} добавил вас обратно`)
+      this.sys(`${back.name} ${back.she ? 'добавила' : 'добавил'} вас обратно`)
       await this.say([{ w: back.who, t: back.t }])
     } else {
       this.sys('Алик добавил вас обратно')
@@ -1391,19 +1421,20 @@ export class Game {
     const sc = this.scenes[sid]
     // новая сцена — старый контекст («что вы удалили?», «при чём тут тётя?») больше не к месту
     if (!S.scene || S.scene.id !== sid) {
-      S.scene = { id: sid, node: nid, vars: sc.init ? sc.init(this.rng, (arr) => this.open(arr)) : {} }
+      S.scene = { id: sid, node: nid, vars: sc.init ? sc.init(this.rng, (arr) => this.open(arr), S.day) : {} }
       S.ctx = null
     }
     S.scene.node = nid
     const n = sc.nodes[nid]
     const v = S.scene.vars
-    const res = (x: Line) => (typeof x === 'function' ? x(v) : x)
+    const res = (x: Line) => this.fillMoney(typeof x === 'function' ? x(v) : x)
     const gen = (key: string, arr: Line | Entry<Line>[]) => () => res(Array.isArray(arr) ? this.draw(`${sid}.${nid}.${key}`, arr) : arr)
     const variant = (key: string, arr: Entry<Line>[]) => this.uniq(gen(key, arr))
 
     const fx = n.fx ?? {}
     if (fx.days) this.nextDay(fx.days)
     if (fx.debt) S.debt += fx.debt
+    if (fx.money) S.money += fx.money
     if (fx.mood) this.mood(fx.mood)
     if (fx.barter) { S.debt -= v.v; S.items.push(v.n) }
     if (fx.invoice) S.debt -= v.total
@@ -1417,6 +1448,8 @@ export class Game {
     if (n.doc) {
       await this.typingFor(2000, 'отправляет документ…')
       this.alikMsg({ kind: 'doc', from: 'alik', title: `АКТ ВЗАИМОЗАЧЁТА № ${100 + this.rnd(900)}`, rows: v.rows, total: v.total })
+      // позиция вычтена — во втором акте её уже не будет
+      this.rules.applyOps((v.rows as Array<[string, number]>).map(([t]) => set(invKey(t), true)), {})
       await this.sleep(600)
       this.sys(`Алик вычел из долга ${v.total.toLocaleString('ru-RU')} ₽ по акту.`)
     }
@@ -1519,7 +1552,6 @@ export class Game {
   }
   private awayMsg(): void {
     const r = this.rng.random()
-    this.tick(20 + this.rnd(200))
     const base = { from: 'alik' as const, time: fmtTime(this.S.clock) }
     if (r < 0.35) { this.push({ ...base, kind: 'text', text: this.addrLine('IDLE', L.IDLE) }); return }
     if (r < 0.5) { const s = this.draw('STICKERS', L.STICKERS); this.push({ ...base, kind: 'sticker', e: s.e, c: s.c }); return }
@@ -1545,13 +1577,18 @@ export class Game {
       return
     }
     const ex = this.uniq(() => this.X.excuse())
+    this.meetRel(ex.r)
     this.recordPromise(ex.p)
     this.push({ ...base, kind: 'text', text: ex.texts.join(' ') })
   }
   awayBurst(n: number, days: number, why?: string): void {
     this.nextDay(days)
     this.push({ kind: 'sys', text: `${why ? why + ' — ' : ''}непрочитанные сообщения`, unread: true })
-    for (let i = 0; i < n; i++) this.awayMsg()
+    // пришли, пока игрока не было, — до «сейчас»: иначе часы переписки убегают вперёд настоящих
+    const now = this.S.clock
+    const times = Array.from({ length: n }, () => now - this.rnd(Math.min(now, 360) + 1)).sort((a, b) => a - b)
+    for (const t of times) { this.S.clock = t; this.awayMsg() }
+    this.S.clock = now
     this.unread = n
     this.title = `(${n}) Алик, где деньги?`
     this.unlock('away')

@@ -1,7 +1,7 @@
 // Мир последователен: персонаж или предмет, который появляется по ходу истории, упоминается только под требованием
 // (needs / when / структура: серия сериала, финал, реплика персонажа). Регулярки — здесь, в проверке контента: игра текст не разбирает.
 import { describe, it, expect } from 'vitest'
-import { Gated, describeCriterion, valueOf, type Criterion, type Entry } from '../engine/rules'
+import { Gated, describeCriterion, valueOf, type Criterion, type Entry, type FactOp } from '../engine/rules'
 import { WORLD, SPEAKS, type WorldKey } from './world'
 import { ARCS, CAST } from './arcs'
 import { FINALES } from './finales'
@@ -29,22 +29,46 @@ export const MENTION: Array<[WorldKey, RegExp]> = [
   ['twin', /близнец/i],
   ['arsen', /Арсен/],
   ['grachik', /Грачик/],
-  ['dekret', /декрет|ребёнок спит|с ребёнком на руках/i],
+  ['mkrtich', /Мкртич/],
+  ['goar', /Гоар/],
+  ['judge', /Ашот/],
+  ['samvel', /Самвел/],
+  ['nune', /Нуне/],
+  ['karine', /Карине/],
+  ['grant', /Грант/],
+  ['niva', /Нив[аеуыо]/],
+  ['gagik', /Гагик/],
+  ['garik', new RegExp(W + 'Гарик')],
+  ['dekret', /декрет/i],
+  ['nuneBaby', /ребёнок спит|с ребёнком на руках/i],
   // «тамада» — роль, а не персонаж: у любого застолья свой тамада; «Алик — тамада» размечено needs('tamada') вручную
 ]
 /** У персонажа меняется положение: упоминание должно явно учесть его (любой факт из списка). */
 export const STATE: Array<[string, RegExp, string[]]> = [
-  ['Гарик (фундамент)', /Гарик/, ['garikFree', 'garik.concrete', 'arc.garik', 'finale.garik']],
-  ['Карине (ушла к Рубику)', /Карине|[Жж]ена сказала/, ['karineHome', 'finale.rubik', 'arc.rubik']],
-  ['Размик (на кране)', /Размик[^.!?]*кран|кран[^.!?]*Размик|с крана/i, ['razmikUp', 'finale.razmik', 'arc.razmik']],
-  ['«Нива» (в бегах)', /Нив[аеуыо]/, ['nivaHome', 'niva.away', 'arc.niva', 'finale.niva', 'has.niva']],
+// серия и финал фиксируют положение (в их контексте есть finale.*); просто «сериал начался» — нет
+  ['Гарик (фундамент)', /Гарик/, ['garikFree', 'garik.concrete', 'finale.garik']],
+  ['Карине (ушла к Рубику)', /Карине|[Жж]ена сказала/, ['karineHome', 'finale.rubik']],
+  ['Размик (на кране)', /Размик[^.!?]*кран|кран[^.!?]*Размик|с крана/i, ['razmikUp', 'finale.razmik']],
+  ['«Нива» (в бегах)', /Нив[аеуыо]/, ['nivaHome', 'niva.away', 'finale.niva', 'has.niva']],
 ]
 
 const atoms = (cs: readonly Criterion[]): Criterion[] => cs.flatMap((c) => (c.op === 'all' ? [c, ...atoms(c.all ?? [])] : [c]))
 const num = (c: Criterion) => (typeof c.value === 'number' ? c.value : NaN)
-/** Серии arc до n-й что-то ставят в память (remember): факты «есть с этой серии». */
-const setBy = (arc: string, n: number): string[] =>
-  (ARCS[arc]?.eps ?? []).slice(0, n).flatMap((e) => (e.remember ?? []).filter((o) => o.op === '=' && o.value === true).map((o) => o.key))
+/** Что серии arc до n-й оставили в памяти (remember, последняя запись побеждает): true — факт есть, false — снят. */
+/** Персонаж пишет сам — этим он и входит в историю (движок пишет intro.<кто> на его сообщении). */
+const selfIntro = (who: string): Criterion[] => [{ key: 'intro.' + who, op: '==', value: true }]
+
+/** Факты, которые сцена ставит сама (fx.set): знакомство происходит в ней же. */
+const ownSets = (sc: unknown): Criterion[] =>
+  Object.values((sc as { nodes?: Record<string, { fx?: { set?: Record<string, unknown> } }> })?.nodes ?? {})
+    .flatMap((n) => Object.keys(n.fx?.set ?? {}))
+    .map((key): Criterion => ({ key, op: '==', value: true }))
+
+function setBy(arc: string, n: number): Criterion[] {
+  const last = new Map<string, unknown>()
+  for (const e of (ARCS[arc]?.eps ?? []).slice(0, n)) for (const o of e.remember ?? []) if (o.op === '=') last.set(o.key, o.value)
+  return [...last].flatMap(([key, v]): Criterion[] => (v === true ? [{ key, op: '==', value: true }] : v === false ? [{ key, op: '!exist' }] : []))
+}
 /** Условие c следует из известного known: то же самое или сильнее (серия дальше, финал — после всех серий, факт поставила серия). */
 function implied(c: Criterion, known: Criterion[]): boolean {
   const arc = c.key.startsWith('arc.') ? c.key.slice(4) : null
@@ -52,13 +76,17 @@ function implied(c: Criterion, known: Criterion[]): boolean {
     || (arc !== null && (c.op === 'exist' || c.op === '>=') && (
       k.key === 'finale.' + arc && (k.op === 'exist' || k.op === '==')
       || k.key === c.key && k.op === '>=' && num(k) >= (c.op === 'exist' ? 1 : num(c))))
-    || (c.op === '==' && c.value === true && k.key.startsWith('arc.') && k.op === '>=' && setBy(k.key.slice(4), num(k)).includes(c.key))
-    || (c.op === '!=' && k.key === c.key && k.op === '!exist'))
+    || (k.key.startsWith('arc.') && k.op === '>=' && setBy(k.key.slice(4), num(k)).some((f) => describeCriterion(f) === describeCriterion(c)))
+    // финал сериала идёт после всех его серий — значит, всё, что они записали, уже в мире
+    || (k.key.startsWith('finale.') && (k.op === 'exist' || k.op === '==') && setBy(k.key.slice(7), ARCS[k.key.slice(7)]?.eps.length ?? 0).some((f) => describeCriterion(f) === describeCriterion(c)))
+    || (c.op === '!=' && k.key === c.key && (k.op === '!exist' || (k.op === '==' && k.value !== c.value))))
 }
 const holds = (key: WorldKey, known: Criterion[]) => atoms([WORLD[key]]).filter((a) => a.op !== 'all').every((a) => implied(a, known))
 
 /** Упоминание верно при любом положении персонажа: совет, отмазка, шутка, воспоминание. */
 const ANY_STATE = new Set<string>([
+  // вопросы «Как там…?» — при любом положении
+  'Есть новости про «Ниву»?', 'Алик, как там «Нива»?', 'Как там Гарик?', 'Алик, что с Гариком?',
   // Гарик советует из любого положения — из фундамента у него трубочка и интернет
   'Скажи, что бетон обиделся, — всегда работает 😂', 'Я своему уже третий год говорю «завтра».', 'Отправь ему 50 рублей, они это любят.',
   'Скажи, что «Нива» уехала. Проверено.', 'Можно я ему напишу, что я налоговая?',
@@ -85,22 +113,23 @@ interface Found { path: string; text: string; known: Criterion[]; who?: string; 
 function strings(v: unknown, path: string, known: Criterion[], out: Found[]): Found[] {
   if (typeof v === 'string') out.push({ path, text: v, known })
   else if (v instanceof Gated) strings(v.v, path, [...known, ...expand(atoms(v.when))], out)
-  else if (Array.isArray(v) && v.length === 2 && typeof v[0] === 'string' && v[0] in CAST && typeof v[1] === 'string') out.push({ path, text: v[1], known, who: v[0] })
+  else if (Array.isArray(v) && v.length === 2 && typeof v[0] === 'string' && v[0] in CAST && typeof v[1] === 'string') out.push({ path, text: v[1], known: [...known, ...selfIntro(v[0])], who: v[0] })
   else if (Array.isArray(v)) v.forEach((x, i) => strings(x, `${path}[${i}]`, known, out))
   else if (v && typeof v === 'object' && !(v instanceof RegExp)) {
     const o = v as Record<string, unknown>
-    const own = Array.isArray(o.when) ? [...known, ...expand(atoms(o.when as Criterion[]))] : known
+    // реплика, которая сама вводит персонажа (remember), может его назвать: знакомство и упоминание — одно и то же сообщение
+    const sets = Array.isArray(o.remember) ? (o.remember as FactOp[]).filter((f) => f.op === '=' && f.value === true).map((f): Criterion => ({ key: f.key, op: '==', value: true })) : []
+    const own = Array.isArray(o.when) ? [...known, ...sets, ...expand(atoms(o.when as Criterion[]))] : [...known, ...sets]
     const who = typeof o.w === 'string' ? o.w : typeof o.who === 'string' ? o.who : undefined
-    if (who && typeof o.t === 'string') { out.push({ path, text: o.t, known: own, who }); return out }
+    if (who && typeof o.t === 'string') { out.push({ path, text: o.t, known: [...own, ...selfIntro(who)], who }); return out }
     for (const [k, x] of Object.entries(o)) if (!['when', 'orWhen', 'remember'].includes(k)) strings(x, `${path}.${k}`, own, out)
   }
   return out
 }
 
-const setFacts = (id: string, n: number): Criterion[] => setBy(id, n).map((key) => ({ key, op: '==', value: true }))
 /** Серия k идёт, финала ещё нет (факт финала ставится после его реплик). */
-const arcAt = (id: string, k: number): Criterion[] => [{ key: 'arc.' + id, op: '>=', value: k + 1 }, { key: 'finale.' + id, op: '!exist' }, ...setFacts(id, k + 1)]
-const finale = (id: string): Criterion[] => [{ key: 'finale.' + id, op: 'exist' }, { key: 'arc.' + id, op: '>=', value: ARCS[id].eps.length }, ...setFacts(id, ARCS[id].eps.length)]
+const arcAt = (id: string, k: number): Criterion[] => [{ key: 'arc.' + id, op: '>=', value: k + 1 }, { key: 'finale.' + id, op: '!exist' }, ...setBy(id, k + 1)]
+const finale = (id: string): Criterion[] => [{ key: 'finale.' + id, op: 'exist' }, { key: 'arc.' + id, op: '>=', value: ARCS[id].eps.length }, ...setBy(id, ARCS[id].eps.length)]
 // легенду могут ставить разные серии — известно только общее для всех
 const legendSets: Record<string, Criterion[][]> = {}
 for (const [id, a] of Object.entries(ARCS)) a.eps.forEach((e, k) => { if (typeof e.legend === 'string') (legendSets[e.legend] ??= []).push(arcAt(id, k)) })
@@ -113,7 +142,8 @@ const legendAt = (id: string): Criterion[] => {
 function expand(cs: Criterion[]): Criterion[] {
   return cs.flatMap((c) => (c.key === 'legend' && c.op === '==' && typeof c.value === 'string' ? [c, ...legendAt(c.value)] : [c]))
 }
-const speaker = (who: string): Criterion[] => (SPEAKS[who] ? atoms([SPEAKS[who]]) : [])
+/** Реплика персонажа: он ею и входит в историю, плюс условия, при которых он вообще пишет. */
+const speaker = (who: string): Criterion[] => [...selfIntro(who), ...(SPEAKS[who] ? atoms([SPEAKS[who]]) : [])]
 
 const mods = import.meta.glob(['./*.ts', '!./*.test.ts'], { eager: true }) as Record<string, Record<string, unknown>>
 function corpus(): Found[] {
@@ -131,15 +161,30 @@ function corpus(): Found[] {
       ].includes(at)) continue
       // утверждение ловится в уже сказанной (размеченной) реплике — say лишь его пересказ
       if (at === 'lies.CLAIMS') { strings((v as Array<Record<string, unknown>>).map(({ updates }) => updates), at, [], out); continue }
+      // «у прораба Мкртича свадьба» — отмазка называет роль и тем самым знакомит: движок пишет факт (meetRel)
+      if (at === 'excuses.D') {
+        const d = v as Record<string, unknown>
+        for (const [k, x] of Object.entries(d)) {
+          if (k !== 'REL') { strings(x, `${at}.${k}`, [], out); continue }
+          for (const [i, e] of (x as Entry<string>[]).entries()) {
+            const id = valueOf(e).split('|')[3]
+            strings(e, `${at}.REL[${i}]`, id ? [{ key: 'intro.' + id, op: '==', value: true }] : [], out)
+          }
+        }
+        continue
+      }
       if (at === 'arcs.ARCS') for (const [id, a] of Object.entries(ARCS)) {
         a.eps.forEach((e, k) => strings(e, `${at}.${id}.eps[${k}]`, arcAt(id, k), out))
-        strings(a.follow, `${at}.${id}.follow`, arcAt(id, 0), out)
+        // «Как там…?» предлагается с первой серии и до после финала
+        strings(a.follow, `${at}.${id}.follow`, [{ key: 'arc.' + id, op: '>=', value: 1 }], out)
       }
-      else if (at === 'arcs.ARC_DONE') for (const [id, x] of Object.entries(v as object)) strings(x, `${at}.${id}`, finale(id), out)
+      else if (at === 'arcs.ARC_DONE') for (const [id, x] of Object.entries(v as object)) strings(x, `${at}.${id}`, [...finale(id), { key: 'finale.' + id, op: '==', value: 'default' }], out)
       // реплики финала звучат до факта «финал был», остальное (ответы «Как там…?») — после
       else if (at === 'finales.FINALES') for (const [id, fs] of Object.entries(FINALES)) fs.forEach((f, i) => {
         const { m, sys, ...rest } = f
-        strings({ m, sys }, `${at}.${id}[${i}]`, arcAt(id, ARCS[id].eps.length - 1), out)
+        // remember финала применяется до его реплик — он и знакомит
+        const sets = (f.remember ?? []).filter((o) => o.op === '=' && o.value === true).map((o): Criterion => ({ key: o.key, op: '==', value: true }))
+        strings({ m, sys }, `${at}.${id}[${i}]`, [...arcAt(id, ARCS[id].eps.length - 1), ...sets], out)
         strings(rest, `${at}.${id}[${i}]`, finale(id), out)
       })
       else if (at === 'legends.LEGENDS') for (const [id, x] of Object.entries(LEGENDS)) strings(x, `${at}.${id}`, legendAt(id), out)
@@ -155,14 +200,14 @@ function corpus(): Found[] {
           if (who in STATEFUL) for (const f of said) f.stateOf = STATEFUL[who]
           out.push(...said)
         }
-      else if (at === 'quests.QUESTS') for (const [id, x] of Object.entries(v as object)) strings(x, `${at}.${id}`, expand(atoms(QUEST_WHEN[id] ?? [])), out)
+      else if (at === 'quests.QUESTS') for (const [id, x] of Object.entries(v as object)) strings(x, `${at}.${id}`, [...expand(atoms(QUEST_WHEN[id] ?? [])), ...ownSets(x)], out)
       // суд: ступень 1 вводит юриста Арсена (правило Court_Lawyer — remember до реплик)
-      else if (['quests.COURT', 'quests.COURT_LAWYER_AGAIN', 'quests.COURT_SCENE', 'quests.COURT_AFTER'].includes(at)) strings(v, at, atoms([WORLD.arsen]), out)
+      else if (['quests.COURT', 'quests.COURT_LAWYER_AGAIN', 'quests.COURT_SCENE', 'quests.COURT_AFTER'].includes(at)) strings(v, at, [...atoms([WORLD.arsen]), ...ownSets(v)], out)
       // исход Дня выплаты звучит по своему правилу — его условия известны
       else if (at === 'payday.OUTCOME') for (const [id, x] of Object.entries(v as object)) strings(x, `${at}.${id}`, expand(atoms(paydayRules.find((r) => r.name === 'Payday_' + id)?.when ?? [])), out)
       // по своим правилам: посредники разблокировки, телефон у Карине (она забирает его, пока жена Алика)
-      else if (at === 'rude.VIA_BORIS') strings(v, at, atoms([SPEAKS.boris]), out)
-      else if (['rude.VIA_KARINE', 'rude.KARINE_HINT', 'rude.PHONE_KARINE'].includes(at)) strings(v, at, atoms([WORLD.karineHome]), out)
+      else if (at === 'rude.VIA_BORIS') strings(v, at, speaker('boris'), out)
+      else if (['rude.VIA_KARINE', 'rude.KARINE_HINT', 'rude.PHONE_KARINE'].includes(at)) strings(v, at, speaker('karine').concat(atoms([WORLD.karineHome])), out)
       else if (typeof v !== 'function') strings(v, at, [], out)
     }
   }
@@ -198,10 +243,10 @@ describe('упоминания в контенте', () => {
   })
   it('проверка ловит упоминание без требования и принимает требование, серию и финал', () => {
     const bare = strings(['Кран уехал.', 'Гарик на рынке.', ['boris', 'Бее.'], { w: 'karine', t: 'Алик!' }], 'x', [], [])
-    expect(problems(bare)).toHaveLength(4)
+    expect(problems(bare)).toHaveLength(5) // «Гарик на рынке» — и не представлен, и положение не учтено
     expect(problems(strings([new Gated([SPEAKS.boris], ['boris', 'Бее.'])], 'x', [], []))).toEqual([])
     expect(problems(strings([new Gated([WORLD.crane], 'Кран уехал.')], 'x', [], []))).toEqual([])
-    expect(problems(strings({ t: 'Гарик на рынке.', when: [WORLD.garikFree] }, 'x', [], []))).toEqual([])
+    expect(problems(strings({ t: 'Гарик на рынке.', when: [WORLD.garik, WORLD.garikFree] }, 'x', [], []))).toEqual([])
     expect(problems(strings('Размик слез с крана.', 'x', finale('razmik'), []))).toEqual([])
     expect(problems(strings('Близнец.', 'x', arcAt('grant', 3), []))).toHaveLength(1)
     expect(problems(strings('Близнец.', 'x', arcAt('grant', 4), []))).toEqual([])

@@ -9,7 +9,7 @@ import * as L from './life'
 import { allRules } from './rules'
 import { Decks } from '../engine/deck'
 import { seededRng } from '../engine/rng'
-import { valueOf, type Entry } from '../engine/rules'
+import { Gated, valueOf, type Entry } from '../engine/rules'
 
 const sources = import.meta.glob(['../**/*.ts', '../**/*.tsx', '!../**/*.test.*'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>
 const allSource = Object.values(sources).join('\n')
@@ -35,9 +35,11 @@ describe('scenes', () => {
     }
   })
   it('every node says or shows something; achievements exist', () => {
-    const vars = { v: 1, n: 'баран', p: 'x', rows: [['a', 1]], total: 1, r: ['a', 'b', 'c'] }
-    const txt = (l: Line) => (typeof l === 'function' ? l(vars) : l)
+    const base = { v: 1, n: 'баран', p: 'x', rows: [['a', 1]], total: 1, r: ['a', 'b', 'c'] }
+    const all = <T,>(arr: readonly Entry<T>[]) => arr.map(valueOf)
     for (const [sid, sc] of Object.entries(scenes)) {
+      const vars = { ...base, ...sc.init?.(seededRng(1), all, 200) }
+      const txt = (l: Line) => (typeof l === 'function' ? l(vars) : l)
       for (const [nid, n] of Object.entries(sc.nodes)) {
         const has = n.a || n.a2 || n.sys || n.sys2 || n.opts || n.then || n.doc || n.hook
         expect(has, `${sid}.${nid}`).toBeTruthy()
@@ -50,14 +52,17 @@ describe('scenes', () => {
   it('scene init functions produce the vars their lines use', () => {
     const rng = seededRng(1)
     const all = <T,>(arr: readonly Entry<T>[]) => arr.map(valueOf)
-    expect(scenes.barter.init!(rng, all)).toMatchObject({ n: expect.any(String), v: expect.any(Number) })
-    const inv = scenes.invoice.init!(rng, all)
+    expect(scenes.barter.init!(rng, all, 200)).toMatchObject({ n: expect.any(String), v: expect.any(Number) })
+    const inv = scenes.invoice.init!(rng, all, 200)
     expect(inv.total).toBe(inv.rows.reduce((n: number, r: [string, number]) => n + r[1], 0))
-    expect(scenes.choice.init!(rng, all).r).toHaveLength(3)
+    expect(scenes.choice.init!(rng, all, 200).r).toHaveLength(3)
   })
 })
 
 describe('arcs and cast', () => {
+  it('у каждого сериала есть вопрос «Как там…?», уместный при любом положении', () => {
+    for (const [id, a] of Object.entries(ARCS)) expect(a.follow.some((f) => !(f instanceof Gated)), id).toBe(true)
+  })
   it('arcs are well-formed, last episode unlocks an existing achievement, done-lines exist', () => {
     for (const [id, a] of Object.entries(ARCS)) {
       expect(a.eps.length, id).toBeGreaterThanOrEqual(5)

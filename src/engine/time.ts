@@ -11,6 +11,14 @@ export const fmtShortDate = (day: number): string =>
 export const fmtTime = (m: number): string =>
   `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
 
+/** Который час по часам переписки словами: «три часа ночи», «час ночи», «полночь». */
+export function nightHour(clock: number): string {
+  const h = Math.floor(clock / 60) % 24
+  if (h === 0) return 'полночь'
+  const words = ['', 'час', 'два часа', 'три часа', 'четыре часа', 'пять', 'шесть', 'семь']
+  return `${words[h] ?? String(h)} ${h < 5 ? 'ночи' : 'утра'}`
+}
+
 export type Period = 'night' | 'morning' | 'lunch' | 'friday' | 'evening' | 'day'
 
 export function periodOf(hour: number, dow: number): Period {

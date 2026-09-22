@@ -4,7 +4,7 @@
 // go: 'node' | 'scene:node' | null (конец). Нет opts — сцена закончилась.
 import type { ExcuseApi } from './excuses'
 import type { Rng } from '../engine/rng'
-import { type Entry, gate, missing, gte, lte } from '../engine/rules'
+import { type Entry, gate, missing, gte, lte, valueOf } from '../engine/rules'
 import { needs, WORLD } from './world'
 import { QUESTS, COURT_SCENE } from './quests'
 import { PAYDAY_SCENE } from './payday'
@@ -13,7 +13,7 @@ export type Vars = Record<string, any>
 export type Line = string | ((v: Vars) => string)
 export interface SceneOpt { t: Line | string[]; go: string | null; tone?: 'polite' | 'neutral' | 'rude' }
 export interface SceneFx {
-  days?: number; debt?: number; mood?: number; ach?: string; barter?: boolean; invoice?: boolean
+  days?: number; debt?: number; money?: number; mood?: number; ach?: string; barter?: boolean; invoice?: boolean
   legend?: string | null
   /** Записать факты в память мира; during — факт = true на N дней. */
   set?: Record<string, number | boolean>; during?: { key: string; days: number }
@@ -27,9 +27,33 @@ export interface SceneNode {
   hook?: string
   opts?: SceneOpt[]
 }
+/** Ключ строки акта без пояснения в скобках: одну и ту же позицию не вычитают дважды. */
+export const invKey = (t: string): string => 'inv.' + t.replace(/\s*\([^)]*\)\s*$/, '')
+/** Позиции акта, которые ещё не вычитали. */
+const invoiceRows = (rows: Entry<[string, number]>[]): Entry<[string, number]>[] =>
+  rows.map((r) => gate(missing(invKey(valueOf(r)[0])))(r))
+
 /** init: open(список) — элементы, уместные сейчас (needs). */
-export interface Scene { start: string; init?: (rng: Rng, open: <T>(arr: readonly Entry<T>[]) => T[]) => Vars; nodes: Record<string, SceneNode> }
+export interface Scene { start: string; init?: (rng: Rng, open: <T>(arr: readonly Entry<T>[]) => T[], day: number) => Vars; nodes: Record<string, SceneNode> }
 // до сериала «Баран Борис» баран ещё без имени: иначе сериал потом «знакомит» с Борисом второй раз
+const REDO = [
+  {
+    claim: 'Сынок, беда. Заказчик говорит, плитка отвалилась. Пока не переделаешь — денег нет.',
+    maybe: 'Всё может отвалиться, брат. Даже я от тебя. Съезди посмотри.',
+    seen: 'Плитка на месте. Идеально ровная.',
+    fine: 'Алик, плитка на месте!',
+    back: ['Это заказчик её сам обратно приклеил. Теперь спорит, кто кому должен.', 'Значит, она отвалилась и прилипла обратно. От стыда.'],
+    left: 'Тогда пусть висит отвалившаяся. На твоей совести.',
+  },
+  {
+    claim: 'Брат, заказчик звонил: затирка потемнела. Надо переделать, иначе не платит.',
+    maybe: 'Всё темнеет, брат. Даже я — от твоих сообщений. Съезди посмотри.',
+    seen: 'Затирка белая, швы ровные.',
+    fine: 'Алик, затирка белая!',
+    back: ['Это заказчик её сам отмыл. Теперь спорит, кто кому должен.', 'Значит, она потемнела и посветлела обратно. От стыда.'],
+    left: 'Тогда пусть темнеет. На твоей совести.',
+  },
+]
 const BARTER = [
   needs('boris', 'baran')({ n: 'баран Борис', v: 3000, p: 'Породистый! Умеет смотреть на Арарат.' }),
   gate(WORLD.baran, missing('arc.boris'))({ n: 'баран без имени', v: 3000, p: 'Откликается на «эй». Имя придумаешь сам.' }),
@@ -99,7 +123,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
             { t: 'Я уже заплатил за ваш столик…', go: 'cafe3' },
           ],
         },
-        cafe2: { a: [needs('nivaHome')('Серьёзно, брат. Я как раз ехал, но «Нива» не хотела.'), 'Серьёзнее не бывает. Там был хаш.'], then: 'promise' },
+        cafe2: { a: [needs('nivaHome')(needs('niva')('Серьёзно, брат. Я как раз ехал, но «Нива» не хотела.')), 'Серьёзнее не бывает. Там был хаш.'], then: 'promise' },
         cafe3: {
           fx: { debt: 1800 },
           sys: 'Долг Алика вырос на 1 800 ₽ (его кофе и хачапури).',
@@ -130,7 +154,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
           a: [
             () => `${A()}, скинь номер карты, прямо сейчас переведу!`,
             () => `${A()}, я у банкомата! Номер карты, быстро!`,
-            () => 'Слушай, продиктуй номер карты, я записать не успел в прошлый раз.',
+            gate(lte('fifty', 0))(() => 'Слушай, продиктуй номер карты, я записать не успел в прошлый раз.'),
           ],
           opts: [
             { t: ['Отправить номер карты', 'Скинуть номер карты ещё раз'], go: 'sent' },
@@ -149,7 +173,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
         bank: {
           a: [
             'Эээ, а у меня как раз другой банк. Между банками комиссия! Я не могу тебя так грабить.',
-            'В этот банк не перевожу, там работает бывшая жена Гарика.',
+            needs('garik')('В этот банк не перевожу, там работает бывшая жена Гарика.'),
             'Этот банк мне не нравится, у них логотип грустный.',
             'Ара, у меня приложение только армянского банка. Он в твой не умеет.',
           ],
@@ -284,7 +308,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
           ],
         },
         yes: {
-          fx: { debt: 5000, ach: 'lend' },
+          fx: { debt: 5000, money: -5000, ach: 'lend' },
           sys: 'Вы перевели Алику 5 000 ₽. Долг Алика вырос.',
           a: ['Брат! Ты святой человек! Всем расскажу! В пятницу — всё.', 'Вот это брат! Я знал! Пятница — наша.'],
         },
@@ -302,9 +326,11 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
 
     redo: {
       start: 'ask',
+      // одна претензия на всю сцену: проверка и ответы Алика — про неё же
+      init: (rng) => REDO[Math.floor(rng.random() * REDO.length)],
       nodes: {
         ask: {
-          a: ['Сынок, беда. Заказчик говорит, плитка отвалилась. Пока не переделаешь — денег нет.', 'Брат, заказчик звонил: затирка потемнела. Надо переделать, иначе не платит.'],
+          a: [(v: Vars) => v.claim],
           opts: [
             { t: 'Не может такого быть!', go: 'nope' },
             { t: 'Приеду посмотрю', go: 'look' },
@@ -312,19 +338,19 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
         },
         look: {
           fx: { days: 1, ach: 'redo' },
-          sys: [needs('baran')('Вы съездили на объект. Плитка на месте. Идеально ровная. Рядом стоит баран и смотрит на вас.'), 'Вы съездили на объект. Всё идеально. Заказчик сказал, что Алика не видел полгода.'],
+          sys: [(v: Vars) => `Вы съездили на объект. ${v.seen} Заказчик сказал, что Алика не видел полгода.`],
           opts: [
-            { t: 'Алик, плитка на месте!', go: 'look2' },
+            { t: (v: Vars) => v.fine, go: 'look2' },
             { t: 'Кто это вообще придумал?', go: 'ramq' },
           ],
         },
-        look2: { a: ['Это заказчик её сам обратно приклеил. Теперь спорит, кто кому должен.', 'Значит, она отвалилась и прилипла обратно. От стыда.'], then: 'promise' },
+        look2: { a: [(v: Vars) => v.back[0], (v: Vars) => v.back[1]], then: 'promise' },
         ramq: { a: ['Технадзор. Он строгий, но молчаливый. Если молчит — всё хорошо. Значит, скоро заплатят.'] },
         nope: {
-          a: ['Всё может отвалиться, брат. Даже я от тебя. Съезди посмотри.'],
+          a: [(v: Vars) => v.maybe],
           opts: [{ t: 'Ладно, еду', go: 'look' }, { t: 'Не поеду', go: 'no' }],
         },
-        no: { a: ['Тогда пусть висит отвалившаяся. На твоей совести.'], then: 'promise' },
+        no: { a: [(v: Vars) => v.left], then: 'promise' },
       },
     },
 
@@ -345,7 +371,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
           a: ['Вай, как сказал! Все пьют за тебя! Кум Вазген сказал, что ты его сын.'],
           then: 'transfer',
         },
-        debt: { fx: { mood: -1 }, a: ['Эээ… Я зачитал. Все замолчали. Дядя Самвел поперхнулся. Больше так не делай, брат.'] },
+        debt: { fx: { mood: -1 }, a: [needs('samvel')('Эээ… Я зачитал. Все замолчали. Дядя Самвел поперхнулся. Больше так не делай, брат.'), gate(missing('intro.samvel'))('Эээ… Я зачитал. Все замолчали. Тамада поперхнулся. Больше так не делай, брат.')] },
         mom: { fx: { mood: 3, ach: 'toast' }, a: ['ЗА МАМУ! Брат, все встали. Ты теперь почётный армянин.'], then: 'promise' },
       },
     },
@@ -362,7 +388,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
           ],
         },
         which: {
-          a: [needs('baran')('Особняк в Абовяне. Три этажа, бассейн, фонтан с бараном.'), needs('garikFree')('Шашлычная Гарика. Нужен пол из плитки. И стены. И потолок.'), 'Церковь в селе. Богоугодно, брат. Бог точно заплатит.'],
+          a: [needs('baran')('Особняк в Абовяне. Три этажа, бассейн, фонтан с бараном.'), needs('garikFree')(needs('garik')('Шашлычная Гарика. Нужен пол из плитки. И стены. И потолок.')), 'Церковь в селе. Богоугодно, брат. Бог точно заплатит.'],
           opts: [{ t: 'Пойду', go: 'go' }, { t: 'Нет', go: 'first' }],
         },
         go: {
@@ -405,6 +431,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
       nodes: {
         start: {
           who: 'karine',
+          fx: { set: { 'intro.karine': true } },
           a: ['Это Карине, жена Алика. Вы кто такой и почему пишете моему мужу каждый день?'],
           opts: [
             { t: 'Я работал на Алика, он мне должен', go: 'tell' },
@@ -471,7 +498,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
         revive: {
           fx: { days: 1 },
           a: ['БРАТ! Я ВЫЖИЛ! Врач сказал, это был голод. Поел хаша — как новенький!'],
-          a2: [needs('karineHome')('Кстати, долг ты простил. При свидетелях. Карине подтвердит.'), needs('karineGone')('Кстати, долг ты простил. При свидетелях. Мама подтвердит.')],
+          a2: [needs('karineHome', 'karine')('Кстати, долг ты простил. При свидетелях. Карине подтвердит.'), gate(WORLD.karineHome, missing('intro.karine'))('Кстати, долг ты простил. При свидетелях. Жена подтвердит.'), needs('karineGone')('Кстати, долг ты простил. При свидетелях. Мама подтвердит.')],
           opts: [
             { t: 'Я прощал УМИРАЮЩЕГО!', go: 'legal', tone: 'neutral' },
             { t: 'Алик…', go: 'legal' },
@@ -493,21 +520,21 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
 
     invoice: {
       start: 'ask',
-      init: (rng, open) => {
-        const rows = open<[string, number]>([
-          ['Хранение твоих денег (6 мес.)', 7200], ['Моральный ущерб Алику от твоих сообщений', 15000], ['Амортизация терпения', 3000],
+      init: (rng, open, day) => {
+        const rows = open<[string, number]>(invoiceRows([
+          [`Хранение твоих денег (${Math.max(1, Math.round(day / 30))} мес.)`, 7200], ['Моральный ущерб Алику от твоих сообщений', 15000], ['Амортизация терпения', 3000],
           ['Бензин до банка (не доехал)', 2400], ['Консультации по отмазкам', 5000], ['Аренда воздуха на объекте', 1800],
           ['Хаш, съеденный за твоё здоровье', 900], ['Налог на ожидание', 4500], needs('tamada')(['Тосты за тебя (услуги тамады)', 3000]),
           needs('boris')(['Корм для Бориса (он тебя любит)', 1200]), ['Стикеры авторские', 700], needs('nivaHome')(['Амортизация «Нивы» (ехала к тебе, не доехала)', 3300]),
           ['Валерьянка Алику', 650], ['Ремонт нервов', 8000],
-        ]);
+        ]));
         for (let i = rows.length - 1; i > 0; i--) { const j = Math.floor(rng.random() * (i + 1)); [rows[i], rows[j]] = [rows[j], rows[i]]; }
         const pick = rows.slice(0, 4 + Math.floor(rng.random() * 3));
         return { rows: pick, total: pick.reduce((n, r) => n + r[1], 0) };
       },
       nodes: {
         ask: {
-          a: ['Брат, бухгалтерия подготовила акт взаимозачёта. Всё по закону, смотри:', needs('dekret')('Нуне из декрета прислала акт. Я сам в шоке, но цифры есть цифры:')],
+          a: ['Брат, бухгалтерия подготовила акт взаимозачёта. Всё по закону, смотри:', needs('dekret')(needs('nune')('Нуне из декрета прислала акт. Я сам в шоке, но цифры есть цифры:'))],
           doc: true,
           fx: { invoice: true, ach: 'invoice' },
           opts: [
@@ -516,7 +543,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
             { t: 'Подписываю…', go: 'sign' },
           ],
         },
-        rob: { a: ['Это не грабёж, это бухгалтерия. Нуне считала. На калькуляторе с печатью.', needs('boris')('Грабёж — это когда без акта. А тут акт. С печатью. Печать — Борис, копытом.')], then: 'promise' },
+        rob: { a: [needs('nune')('Это не грабёж, это бухгалтерия. Нуне считала. На калькуляторе с печатью.'), needs('boris')('Грабёж — это когда без акта. А тут акт. С печатью. Печать — Борис, копытом.'), 'Это не грабёж, это бухгалтерия. Считали на калькуляторе с печатью.'], then: 'promise' },
         plan: { a: ['Конечно, я же не зверь! Ты мне — по пятьдесят рублей в месяц. Как я тебе. Справедливо.'] },
         sign: {
           fx: { debt: -500 },
@@ -587,6 +614,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
       nodes: {
         verdict: {
           who: 'samvel',
+          fx: { set: { 'intro.samvel': true } },
           a: ['Суд удаляется на совещание. Совещание — это хаш. Последнее слово подсудимого?'],
           opts: [
             { t: 'Признаю. Больше не буду кричать.', go: 'guilty', tone: 'polite' },
@@ -597,7 +625,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
         guilty: {
           fx: { mood: 2, ach: 'tribunal', during: { key: 'polite', days: 10 }, set: { 'rude.heat': 0, blocked: false } },
           who: 'samvel', a: ['Приговор: прощён. Условно. Алик десять дней будет с тобой вежливым. Это страшнее, поверь.'],
-          sys2: 'Самвел удалил вас из группы',
+          sys2: 'Дядя удалил вас из группы',
         },
         lawyer: {
           fx: { ach: 'tribunal', during: { key: 'polite', days: 10 }, set: { 'rude.heat': 0, blocked: false } },
@@ -635,7 +663,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
         // условие Карине — ванная: запоминается, на него потом ссылаются (родня на крик, День выплаты)
         text: {
           fx: { mood: 1, set: { 'rude.heat': 1, 'bath.asked': true } },
-          a: [needs('karineHome')('Текстом — только через Карине.'), needs('karineGone')('Текстом — только через маму. Она передаст. С комментариями.')],
+          a: [needs('karineHome', 'karine')('Текстом — только через Карине.'), gate(WORLD.karineHome, missing('intro.karine'))('Текстом — только через жену. Она передаст.'), needs('karineGone')('Текстом — только через маму. Она передаст. С комментариями.')],
           who2: 'karine', a2: [
             gate(lte('ritual.count', 1))('Я одобрила мир. Условие: переложите нам ванную. Бесплатно. Вы же теперь почти брат.'),
             gate(gte('ritual.count', 2))('Опять мириться? Условие то же: ванная. Я её уже третий раз обещаю соседке показать.'),
