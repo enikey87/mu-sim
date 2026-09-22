@@ -960,9 +960,10 @@ export class Game {
   meetRel(r?: Rel): void {
     if (r?.id) this.rules.applyOps(meet(r.id), {})
   }
-  recordPromise(p?: { text: string; d: number | null; due?: Due; condition?: PromiseCondition } | null): void {
+  recordPromise(p?: { text: string; d: number | null; due?: Due; condition?: PromiseCondition; tomorrow?: boolean } | null): void {
     if (!p) return
     if (p.condition && this.S.mem[p.condition] === true) return
+    if (p.tomorrow) this.rules.applyOps([set('said.tomorrow', true)], {})
     const due = p.d == null ? null : this.S.day + (p.due ? dueIn(p.due, this.S.day) : p.d)
     this.S.promises.push({ t: p.text, made: this.S.day, due, condition: p.condition })
     if (due !== null && due > this.S.day) this.rules.schedule({ at: due, kind: 'event', event: 'PromiseDue', facts: { promise: this.S.promises.length - 1 } })

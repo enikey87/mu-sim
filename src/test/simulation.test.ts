@@ -4,17 +4,19 @@ import { makeGame, botTurn, alikTexts, FIX_RE } from './helpers'
 import { SAD, TIMEY } from '../engine/game'
 import type { Choice, Ctx } from '../engine/state'
 import { D } from '../content/excuses'
+import { WORLD } from '../content/world'
 
-interface Step { choice: Choice | null; ctxBefore: Ctx | null; replies: string[] }
+interface Step { choice: Choice | null; ctxBefore: Ctx | null; mourning: boolean; replies: string[] }
 
 async function play(seed: number, turns: number) {
   const { game } = makeGame({ seed })
   const steps: Step[] = []
   for (let i = 0; i < turns; i++) {
     const ctxBefore = game.S.ctx ? { ...game.S.ctx } : null
+    const mourning = game.holds(WORLD.mourning)
     const from = game.S.msgs.length
     const choice = await botTurn(game)
-    steps.push({ choice, ctxBefore, replies: alikTexts(game.S.msgs.slice(from)) })
+    steps.push({ choice, ctxBefore, mourning, replies: alikTexts(game.S.msgs.slice(from)) })
   }
   return { game, steps }
 }
@@ -38,7 +40,7 @@ describe.each([1, 2, 3])('симуляция, seed %i', (seed) => {
       if (!c?.act) continue
       const ctx = s.ctxBefore ?? {}
       if (c.act === 'congrats') expect(ctx.sad, 'поздравление после печального события').not.toBe(true)
-      if (c.act === 'condole') expect(ctx.sad, 'соболезнование без повода').toBe(true)
+      if (c.act === 'condole') expect(ctx.sad === true || s.mourning, 'соболезнование без повода').toBe(true)
       if (c.act === 'shortQ') expect(TIMEY.test(ctx.s ?? ''), `«это когда?» на «${ctx.s}»`).toBe(true)
       if (c.act === 'voiceText') expect(s.replies.join(' '), 'ответ на «текстом» — про корову').not.toMatch(/коров|мычан/i)
       if (c.act === 'idleReply') expect(ctx.type).toBe('idle')

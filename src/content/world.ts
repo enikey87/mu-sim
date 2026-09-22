@@ -48,6 +48,8 @@ export const WORLD = {
   garikFree: named('garikFree', missing('garik.concrete')),
   /** Гарик на связи: не сидит в фундаменте без интернета. */
   garikOnline: named('garikOnline', missing('garik.cut')),
+  /** Алик хоть раз назвал сроком «завтра» — теперь на это слово можно ссылаться. */
+  saidTomorrow: named('saidTomorrow', is('said.tomorrow')),
   /** В семье прощаются: дедушка умирает или хоронят Алика. */
   mourning: named('mourning', is('mourning')),
   grandpaDying: named('grandpaDying', is('grandpa.dying')),

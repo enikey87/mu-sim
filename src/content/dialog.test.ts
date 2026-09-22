@@ -2,6 +2,8 @@
 import { describe, it, expect } from 'vitest'
 import { makeGame } from '../test/helpers'
 import { ARCS, GROUP } from './arcs'
+import { D } from './excuses'
+import { ENDGAME_RETURNERS } from './endgame'
 import { CONDOLE_REVIVED, GREET_A, FLOOR } from './misc'
 import { SPEND } from './life'
 import { WORLD, needs } from './world'
@@ -337,6 +339,34 @@ describe('несостыковки из плейтеста ботами, рау�
     game.S.mem['count.rude'] = 1
     game.S.mem['met.karine'] = true
     for (let i = 0; i < 30; i++) expect((await game.rules.match({ event: 'PickScene', facts: {} }, game.facts()))?.name).not.toBe('Scene_wife')
+  })
+  it('«три дня» в оправдании за пропажу — только после трёх дней молчания', () => {
+    const { game } = makeGame()
+    const excused = () => game.open(D.BACK_B as Entry<string>[]).some((t) => /три дня/.test(t))
+    expect(excused()).toBe(false)
+    game.S.mem['alik.day'] = game.S.day - 3
+    expect(excused()).toBe(true)
+  })
+  it('в траур игроку предлагают соболезнование', async () => {
+    const { game } = makeGame()
+    const offered = () => game.rules.collect({ event: 'BuildChoices' }, game.facts()).some((r) => r.name === 'Opt_Mourn')
+    expect(Array.from({ length: 30 }, offered).some(Boolean)).toBe(false)
+    await game.playArc('grandpa')
+    expect(Array.from({ length: 30 }, offered).some(Boolean)).toBe(true)
+  })
+  it('на «завтра» ссылаются только после того, как Алик его назвал сроком', () => {
+    const { game } = makeGame()
+    const pool = (k: string) => game.open(D[k] as Entry<string>[])
+    const quoted = () => ['P_POL_B', 'P_RUDE_B', 'VOICE_A'].flatMap(pool).filter((t) => /«завтра»/.test(t))
+    expect(quoted()).toEqual([])
+    game.recordPromise({ text: 'завтра — закину', d: 1, tomorrow: true })
+    expect(quoted().length).toBe(3)
+  })
+  it('обратно в группу добавляет только тот, кто уже писал сам', () => {
+    const { game } = makeGame()
+    expect(game.open(ENDGAME_RETURNERS)).toEqual([])
+    game.S.mem['met.samvel'] = true
+    expect(game.open(ENDGAME_RETURNERS).map((r) => r.who)).toEqual(['samvel'])
   })
   it('свадьбу и похороны своим героям устраивает их сериал, а не генератор отмазок', async () => {
     const { game } = makeGame()
