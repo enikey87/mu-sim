@@ -32,7 +32,7 @@ import { type Clock, realClock, isManualClock } from './clock'
 import { type Audio, silentAudio } from './audio'
 import { typo } from './typo'
 import { classifyUserInput, type ClassifiedInput } from './input'
-import { dueIn, dateOf, fmtDate, fmtTime, periodOf, tierOf, TIERS, type Due, type Period } from './time'
+import { dueIn, dateOf, fmtDate, fmtTime, nightHour, periodOf, tierOf, TIERS, type Due, type Period } from './time'
 import {
   type GameState, type Msg, type NewMsg, type Choice, type Ctx, type Tone, type Storage,
   type InputCategory, freshState, loadState, saveState, SAVE_KEY, MAX_PATIENCE,
@@ -359,8 +359,9 @@ export class Game {
     this.uniq(() => `${this.draw(ka, a)} ${this.draw(kb, b)}`)
   addrLine = (key: string, arr: readonly Entry<string>[]): string => this.uniq(() => `${this.X.g('ADDR')}, ${this.draw(key, arr)}`)
 
-  /** Текущие деньги в тексте: {debt} — долг Алика, {money} — на карте игрока. */
-  fillMoney = (t: string): string => t.replace('{debt}', this.S.debt.toLocaleString('ru-RU')).replace('{money}', this.S.money.toLocaleString('ru-RU'))
+  /** Подставить состояние в текст: {debt} и {money} — деньги, {night} — который час по часам переписки. */
+  fillMoney = (t: string): string =>
+    t.replace('{debt}', this.S.debt.toLocaleString('ru-RU')).replace('{money}', this.S.money.toLocaleString('ru-RU')).replace('{night}', nightHour(this.S.clock)).replace('{Night}', cap(nightHour(this.S.clock)))
 
   get ctx(): Ctx | null { return this.S.ctx }
   setCtx(c: Ctx | null): void { this.S.ctx = c }
@@ -411,6 +412,7 @@ export class Game {
   push<M extends NewMsg>(m: M): Msg {
     if (this.disposed) throw new GameDisposed()
     const msg = { ...m, id: this.S.nextId++ } as Msg
+    if ((msg.kind === 'text' || msg.kind === 'sys') && msg.text.includes('{')) msg.text = this.fillMoney(msg.text)
     this.S.msgs.push(msg)
     this.touchMsgs(this.S.msgs.length - 1)
     this.emit()
@@ -803,7 +805,7 @@ export class Game {
       const topic = facts['ctx.topic'] && this.chance(0.6) ? this.freshPlayer('PR_' + facts['ctx.topic'], TOPICS[String(facts['ctx.topic'])].r.filter((_, i) => TOPICS[String(facts['ctx.topic'])].rneed?.[i]?.test(this.topicText) ?? true)) : null
       out.push({ text: topic ?? P2('P_RUDE_A', 'P_RUDE_B'), tone: 'rude' })
     }
-    return out.slice(0, 4)
+    return out.slice(0, 4).map((c) => (c.text.includes('{') ? { ...c, text: this.fillMoney(c.text) } : c))
   }
   get choices(): Choice[] {
     return (this.S.choices ??= this.buildChoices())

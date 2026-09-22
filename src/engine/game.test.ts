@@ -255,6 +255,17 @@ describe('Game: возвращение после паузы', () => {
     expect(g2.S.battery).toBe(100)
     expect(g2.S.ach.away).toBeDefined()
   })
+  it('«который час» в реплике — настоящий час переписки, а не зашитый', async () => {
+    const { game } = makeGame({ hour: 2 })
+    game.S.clock = 2 * 60 + 5
+    const n = game.S.msgs.length
+    await game.say(['{Night}, брат…'])
+    expect(game.S.msgs.slice(n).map((m) => (m.kind === 'text' ? m.text : '')).join(' ')).toContain('Два часа ночи')
+    game.S.clock = 3 * 60 + 40
+    const n2 = game.S.msgs.length
+    await game.say(['{night}, брат…'])
+    expect(game.S.msgs.slice(n2).map((m) => (m.kind === 'text' ? m.text : '')).join(' ')).toContain('три часа ночи')
+  })
   it('непрочитанные пришли до «сейчас»: время суток в репликах совпадает с часами переписки', () => {
     const { game } = makeGame({ hour: 2 })
     game.awayBurst(5, 1)
