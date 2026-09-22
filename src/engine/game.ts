@@ -643,7 +643,7 @@ export class Game {
     const c = S.ctx ?? {}
     const pr = extra.promise !== undefined ? S.promises[Number(extra.promise)] : undefined
     return {
-      day: S.day, tier: S.tier, mood: S.mood, sent: S.stats.sent, moo: S.stats.moo, patience: S.patience, money: S.money,
+      day: S.day, tier: S.tier, mood: S.mood, sent: S.stats.sent, moo: S.stats.moo, patience: S.patience, money: S.money, debt: S.debt, fifty: S.stats.fifty,
       dow: dateOf(S.day).getDay(), month: dateOf(S.day).getMonth() + 1,
       // прогресс сериалов: arc.grandpa = номер серии
       ...Object.fromEntries(Object.entries(S.arcs).map(([id, st]) => ['arc.' + id, st.i])),

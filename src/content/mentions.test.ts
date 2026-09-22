@@ -38,6 +38,7 @@ export const MENTION: Array<[WorldKey, RegExp]> = [
   ['grant', /Грант/],
   ['niva', /Нив[аеуыо]/],
   ['gagik', /Гагик/],
+  ['garik', new RegExp(W + 'Гарик')],
   ['dekret', /декрет/i],
   ['nuneBaby', /ребёнок спит|с ребёнком на руках/i],
   // «тамада» — роль, а не персонаж: у любого застолья свой тамада; «Алик — тамада» размечено needs('tamada') вручную
@@ -242,10 +243,10 @@ describe('упоминания в контенте', () => {
   })
   it('проверка ловит упоминание без требования и принимает требование, серию и финал', () => {
     const bare = strings(['Кран уехал.', 'Гарик на рынке.', ['boris', 'Бее.'], { w: 'karine', t: 'Алик!' }], 'x', [], [])
-    expect(problems(bare)).toHaveLength(4)
+    expect(problems(bare)).toHaveLength(5) // «Гарик на рынке» — и не представлен, и положение не учтено
     expect(problems(strings([new Gated([SPEAKS.boris], ['boris', 'Бее.'])], 'x', [], []))).toEqual([])
     expect(problems(strings([new Gated([WORLD.crane], 'Кран уехал.')], 'x', [], []))).toEqual([])
-    expect(problems(strings({ t: 'Гарик на рынке.', when: [WORLD.garikFree] }, 'x', [], []))).toEqual([])
+    expect(problems(strings({ t: 'Гарик на рынке.', when: [WORLD.garik, WORLD.garikFree] }, 'x', [], []))).toEqual([])
     expect(problems(strings('Размик слез с крана.', 'x', finale('razmik'), []))).toEqual([])
     expect(problems(strings('Близнец.', 'x', arcAt('grant', 3), []))).toHaveLength(1)
     expect(problems(strings('Близнец.', 'x', arcAt('grant', 4), []))).toEqual([])

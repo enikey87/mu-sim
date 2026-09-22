@@ -43,6 +43,8 @@ export const WORLD = {
   dekretNow: named('dekretNow', exists('arc.nune'), missing('nune.dekretOver'), ne('finale.nune', 'ledger')),
   /** У Нуне родился ребёнок (серия «Нуне родила!»). */
   nuneBaby: named('nuneBaby', gte('arc.nune', 3)),
+  /** Гарик вошёл в историю (сам написал, сериал, семейный чат). */
+  garik: named('garik', is('intro.garik')),
   garikFree: named('garikFree', missing('garik.concrete')),
   /** Гарик на связи: не сидит в фундаменте без интернета. */
   garikOnline: named('garikOnline', missing('garik.cut')),

@@ -4,6 +4,7 @@ import { Game } from '../engine/game'
 import { manualClock } from '../engine/clock'
 import { seededRng, type Rng } from '../engine/rng'
 import { CAST } from '../content/arcs'
+import { ENDINGS } from '../content/finales'
 import type { Choice, Msg } from '../engine/state'
 
 export type Style = 'curious' | 'polite' | 'hothead'
@@ -108,7 +109,8 @@ function line(m: Msg): string {
 export function transcript(p: Played): string {
   const offers = new Map<number, string>()
   for (const a of p.acts) if (a.kind === 'send') offers.set(a.at, a.offered.map((o, i) => `${i === a.i ? '▶' : ' '} ${o}`).join('\n    '))
-  const out = [`Партия ${p.seed}: сообщений игрока — ${p.game.S.stats.sent}, в конце — ${p.game.S.day}-й день ожидания денег`]
+  const ending = p.game.S.ending ? ENDINGS.find((e) => e.id === p.game.S.ending) : null
+  const out = [`Партия ${p.seed}: сообщений игрока — ${p.game.S.stats.sent}, в конце — ${p.game.S.day}-й день ожидания денег${ending ? `, концовка «${ending.title}»` : ''}`]
   const aside = (i: number) => { for (const a of p.asides) if (a.at === i) out.push(a.text) }
   p.game.S.msgs.forEach((m, i) => {
     aside(i)
