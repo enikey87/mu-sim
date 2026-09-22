@@ -93,6 +93,14 @@ describe('ответ по теме', () => {
     await game.enterNode('meet', game.scenes.meet.start)
     expect(game.S.ctx?.deleted).toBeUndefined()
   })
+  it('слова Алика снимают «ответь на стикер»', async () => {
+    const { game } = makeGame()
+    game.S.ctx = { type: 'sticker' }
+    expect(offered(game, (c) => c.act === 'stickerQ')).toBe(true)
+    await game.say(['Все деньги ушли на свадьбу Бориса.'])
+    expect(game.S.ctx?.type).toBeUndefined()
+    expect(offered(game, (c) => c.act === 'stickerQ' || /стикер/i.test(c.text))).toBe(false)
+  })
   it('ночью и вечером пятницы нейтральная реплика знает время', () => {
     const night = makeGame({ hour: 3 }).game
     let hit = false
@@ -104,6 +112,15 @@ describe('ответ по теме', () => {
     game.recordPromise({ text: 'как бетон застынет', d: null })
     game.alikMsg({ kind: 'text', from: 'alik', text: 'Клянусь лавашом, как бетон застынет — всё отдам.', topical: true })
     expect(game.topicOfLast()).toBeUndefined()
+  })
+  it('срок целиком — не тема: «После обеда…» не предлагает поесть', () => {
+    const { game } = makeGame()
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Санкции, брат. Против меня лично.', topical: true })
+    game.recordPromise({ text: 'после обеда, но не сегодняшнего — рассчитаюсь до копейки', d: 1 })
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'После обеда, но не сегодняшнего — рассчитаюсь до копейки.', topical: true })
+    expect(game.topicOfLast()).toBe('customs')
+    expect(offered(game, (c) => c.act === 'topic' && String(c.arg).startsWith('food:'))).toBe(false)
+    expect(offered(game, (c) => /поесть\?|ЕШЬ МЕНЬШЕ|Приятного аппетита|Вы всё время едите/i.test(c.text))).toBe(false)
   })
   it('поздравить — только если повод праздничный', () => {
     const { game } = makeGame()

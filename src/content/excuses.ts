@@ -551,7 +551,7 @@ D.PREV_A = [
   'Ты что, записываешь? Ладно,', 'Брат, у тебя память лучше, чем у налоговой,',
 ];
 D.PREV_B = [
-  'был високосный год.', 'по старому стилю.', 'но случилась свадьба.', 'в тот день был дождь, ты сам видел.',
+  'был високосный год.', 'по старому стилю.', 'но случилась свадьба.', 'в тот день был дождь.',
   'а в армянском календаре та дата ещё не наступила.', 'это была шутка, а шутки не считаются.',
   'я обещал «примерно», а примерно — это не точно.', 'но я же не сказал, какого года!',
   needs('boris')('тогда Борис заболел.'), 'тогда был пост, а в пост не платят.', 'тогда Меркурий был ретроградный.',
@@ -640,7 +640,15 @@ export function make(draw: DrawFn, getTier: () => number = () => 0, rng: Rng = m
     const text = draw('PFORM', [0, 1]) ? `${w.t} — ${v}` : `${v}, ${w.t}`;
     return { text, t: w.t, d: w.d, due: w.due, condition: w.condition, tomorrow: w.tomorrow };
   };
-  const constr = (): string => { const t = escTier(); return t ? g('ESC' + t) : g('CONSTR'); };
+  // ESC на месте «стройки» — не стройка: «Я сам там работал» к санкциям не подходит
+  let constrHits = 0, constrReal = 0
+  const constr = (): string => {
+    constrHits++
+    const t = escTier()
+    if (t) return g('ESC' + t)
+    constrReal++
+    return g('CONSTR')
+  }
   const absurd = (): string => { const t = escTier(); return t ? g('ESC' + t) : g('ABSURD'); };
   const reason = (): string => { const t = escTier(); if (t) return g('ESC' + t); const k = draw('RSRC', [0, 1, 1, 2]); return k === 2 ? g('GROT') : k ? g('CONSTR') : g('ABSURD'); };
 
@@ -682,8 +690,16 @@ export function make(draw: DrawFn, getTier: () => number = () => 0, rng: Rng = m
       if (l) return { texts: [l], legendary: true };
     }
     const tpl = preferLong && draw('LONGROLL', [0, 1]) ? draw('LONGT', [4, 8, 9, 12, 14, 16, 17, 18].map((k) => T[k])) : draw('TPL', T);
-    lastEv = null;
-    return { ...tpl(), ev: lastEv, legendary: false };
+    lastEv = null
+    constrHits = 0
+    constrReal = 0
+    const parts = tpl()
+    return {
+      ...parts,
+      constr: !!(parts.constr && constrHits > 0 && constrReal === constrHits),
+      ev: lastEv,
+      legendary: false,
+    }
   }
 
   const fill = (s: string, map: Record<string, string>): string => s.replace(/\{(\w+)\}/g, (_, k: string) => map[k] ?? '');
