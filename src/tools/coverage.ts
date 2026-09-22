@@ -5,7 +5,30 @@ import { manualClock } from '../engine/clock'
 import { seededRng } from '../engine/rng'
 import { specificityOf, lineId, spec } from '../engine/rules'
 import { MEMORY } from '../content/memory'
+import { rudeRules, rudeSaysRules } from '../content/rules/rude'
+import { endgameRules } from '../content/rules/endgame'
+import { RARE } from './rare'
 import { botTurn } from './bot'
+
+/** Почему правило не сработало в симуляции. У каждого класса, кроме последнего, есть прямой тест. */
+export type NeverClass = 'rare' | 'deterministic' | 'endgame' | 'unexplained'
+
+const DETERMINISTIC = new Set(
+  [...rudeRules, ...rudeSaysRules, ...endgameRules].map((r) => r.name)
+    .concat('Opt_Via_boris', 'Opt_Via_karine', 'Opt_Via_mama', 'Opt_Moo'),
+)
+const ENDGAME_ONLY = /^(Finale|Ending|Payday|Quiet)_/
+
+export const neverClass = (name: string): NeverClass =>
+  RARE.has(name) ? 'rare' : DETERMINISTIC.has(name) ? 'deterministic' : ENDGAME_ONLY.test(name) ? 'endgame' : 'unexplained'
+
+/** Где именно правило проверяется, если симуляция до него не доходит. */
+const NEVER_HINT: Record<NeverClass, string> = {
+  rare: 'прямой тест: content/rules/rare.test.ts',
+  deterministic: 'прямой тест: rude / dialog / endgame',
+  endgame: 'прямой тест: finales / payday / endgame',
+  unexplained: 'НЕ ОБЪЯСНЕНО — гейт покрытия обязан падать',
+}
 
 export interface CoverageReport {
   turns: number
@@ -21,7 +44,7 @@ export interface CoverageReport {
 }
 
 /** grumpy — номера партий (с конца), где бот много грубит: иначе лестница грубости не проходится. */
-export async function ruleCoverage(seeds: number[], turns: number, hours = [14, 3, 20, 8, 20, 13, 9], grumpy = 0): Promise<CoverageReport> {
+export async function ruleCoverage(seeds: number[], turns: number, hours = [14, 3, 20, 8, 20, 13, 9], grumpy = 0, opts: { freeText?: number } = {}): Promise<CoverageReport> {
   const fired: Record<string, number> = {}
   const events: CoverageReport['events'] = {}
   let total = 0
@@ -46,7 +69,7 @@ export async function ruleCoverage(seeds: number[], turns: number, hours = [14, 
       }
     }
     for (let k = 0; k < turns; k++) {
-      { const g = i >= seeds.length - grumpy; await botTurn(game, g ? 0.15 : 0.7, g ? 0.6 : 0.06) } // грубый бот почти не извиняется
+      { const g = i >= seeds.length - grumpy; await botTurn(game, g ? 0.15 : 0.7, g ? 0.6 : 0.06, opts.freeText ?? 0) } // грубый бот почти не извиняется
       // события «игрок молчит» бот сам не вызывает — дёргаем их иногда
       if (k % 7 === 0 && !game.busy && !game.dead) await game.fire('AlikIdle')
       total++
@@ -61,7 +84,13 @@ export function formatCoverage(r: CoverageReport): string {
   const lines = [`Ходов: ${r.turns}`, '', 'Событие                доля общих ответов   выборов']
   for (const [e, v] of Object.entries(r.events).sort((a, b) => b[1].total - a[1].total))
     lines.push(`${e.padEnd(22)} ${(r.weighted.includes(e) ? '— (по весам)' : Math.round((v.generic / v.total) * 100) + '%').padStart(12)}   ${String(v.total).padStart(8)}`)
-  lines.push('', `Ни разу не сработали (${r.never.length}):`, ...r.never.map((n) => '  ' + n))
+  const groups: Record<NeverClass, string[]> = { rare: [], deterministic: [], endgame: [], unexplained: [] }
+  for (const n of r.never) groups[neverClass(n)].push(n)
+  lines.push('', `Ни разу не сработали (${r.never.length}): редкие ${groups.rare.length} · детерминированные ${groups.deterministic.length} · только в финалах ${groups.endgame.length} · необъяснённые ${groups.unexplained.length}`)
+  for (const cls of ['unexplained', 'rare', 'deterministic', 'endgame'] as NeverClass[]) {
+    if (!groups[cls].length) continue
+    lines.push(`  ${cls} — ${NEVER_HINT[cls]}:`, ...groups[cls].map((n) => '    ' + n))
+  }
   lines.push('', `Память: не прозвучали (${r.unsaid.length}):`, ...r.unsaid.map((t) => '  ' + t.slice(0, 80)))
   lines.push('', 'Самые частые:', ...Object.entries(r.fired).sort((a, b) => b[1] - a[1]).slice(0, 15).map(([n, c]) => `  ${String(c).padStart(5)}  ${n}`))
   return lines.join('\n')

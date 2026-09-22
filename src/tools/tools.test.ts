@@ -2,10 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import { lintRules, type Rule } from '../engine/rules'
 import { allRules } from '../content/rules'
-import { ruleCoverage, formatCoverage } from './coverage'
-import { RARE } from './rare'
-import { rudeRules, rudeSaysRules } from '../content/rules/rude'
-import { endgameRules } from '../content/rules/endgame'
+import { ruleCoverage, formatCoverage, neverClass } from './coverage'
 
 describe('линтер правил', () => {
   it('в игре нет правил, которые никогда не могут победить, и правил без ответа', () => {
@@ -28,10 +25,9 @@ describe('линтер правил', () => {
 
 describe('покрытие правил', () => {
   it('за 16 партий (2 — с грубым игроком) срабатывают все правила, кроме заведомо редких', async () => {
-    const r = await ruleCoverage([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], 500, undefined, 2)
+    const r = await ruleCoverage([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], 500, undefined, 2, { freeText: 0.15 })
     if (process.env.RULES_REPORT) process.stdout.write('\n' + formatCoverage(r) + '\n')
-    // Ветки по стилю и post-payday проверяются детерминированно в finales, rude, dialog и endgame тестах.
-    const deterministic = new Set([...rudeRules, ...rudeSaysRules, ...endgameRules].map((x) => x.name).concat('Opt_Via_boris', 'Opt_Via_karine', 'Opt_Via_mama', 'Opt_Moo'))
-    expect(r.never.filter((n) => !RARE.has(n) && !deterministic.has(n) && !/^(Finale|Ending|Payday|Quiet)_/.test(n))).toEqual([])
+    // Классы «не сработало» и их прямые тесты — в coverage.ts; здесь только требование, чтобы необъяснённых не было.
+    expect(r.never.filter((n) => neverClass(n) === 'unexplained')).toEqual([])
   }, 300_000)
 })
