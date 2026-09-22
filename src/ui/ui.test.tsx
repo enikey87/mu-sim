@@ -5,6 +5,7 @@ import { App } from './App'
 import { messageRenderStats } from './Message'
 import { messageListRenderStats, messageListBuildStats } from './Chat'
 import { makeGame } from '../test/helpers'
+import { SAVE_KEY } from '../engine/state'
 import type { Game } from '../engine/game'
 
 function renderApp(game: Game, onReset = vi.fn()) {
@@ -583,5 +584,37 @@ describe('App', () => {
 
     await act(async () => { await game.deletedMsg() })
     expect(screen.getByText('🚫 Сообщение удалено')).toBeInTheDocument()
+  })
+})
+
+describe('лента как лог для скринридера', () => {
+  it('живая лента объявляет сообщения, «печатает…» и «Мууу» — нет', () => {
+    const { game } = makeGame()
+    renderApp(game)
+    const log = document.getElementById('chat')!
+    expect(log).toHaveAttribute('role', 'log')
+    expect(log).toHaveAttribute('aria-live', 'polite')
+    expect(document.querySelector('.moo-layer')).toHaveAttribute('aria-hidden', 'true')
+
+    act(() => { game.typing = 'печатает…'; game.emit() })
+    expect(document.querySelector('.typing-bubble')).toHaveAttribute('aria-hidden', 'true')
+  })
+})
+
+describe('экран падения', () => {
+  it('ошибка отрисовки показывает экран падения, кнопка стирает сохранение и зовёт onReset', () => {
+    const { game, storage } = makeGame()
+    game.save()
+    expect(storage.data[SAVE_KEY]).toBeTruthy()
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    Object.defineProperty(game.S, 'battery', { configurable: true, get() { throw new Error('boom') } })
+
+    const { onReset } = renderApp(game)
+    expect(screen.getByText(/Что-то сломалось/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Стереть сохранение и начать заново' }))
+
+    expect(onReset).toHaveBeenCalled()
+    expect(storage.data[SAVE_KEY]).toBeUndefined()
+    errors.mockRestore()
   })
 })

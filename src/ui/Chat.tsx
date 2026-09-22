@@ -146,15 +146,16 @@ export function Chat() {
 
   return (
     <div className="chat-shell">
-      <main className="chat" id="chat" ref={ref} onScroll={onScroll}>
-        <div className="moo-layer">
+      <main className="chat" id="chat" ref={ref} onScroll={onScroll} role="log" aria-live="polite">
+        <div className="moo-layer" aria-hidden="true">
           {game.moos.map((m) => (
             <div key={m.id} className="moo" style={{ left: `${m.left}%`, top: `${m.top}%` }}>{m.text}</div>
           ))}
         </div>
         <MessageList />
         {game.typing && (
-          <div className="typing-bubble" aria-label={game.typing}><span /><span /><span /></div>
+          // внутри живой ленты «печатает…» дублировало бы каждое входящее — читалке достаточно самого сообщения
+          <div className="typing-bubble" aria-hidden="true" aria-label={game.typing}><span /><span /><span /></div>
         )}
       </main>
       <div className="new-messages-slot" aria-live="polite">

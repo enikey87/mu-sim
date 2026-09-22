@@ -4,16 +4,17 @@
 // сбоку — «Мууу»-дипломатия, встречный иск, ритуал примирения, холодная война, привыкание; финал — вендетта.
 import type { Game } from '../../engine/game'
 import { type Rule, type Line, type Entry, eq, ne, gte, lte, is, add, set, missing, mapEntry, valueOf } from '../../engine/rules'
+import type { GameEvent } from './events'
 import { WORLD, SPEAKS } from '../world'
 import * as T from '../rude'
 import { RUDE_AGAIN } from '../misc'
 
-type R = Rule<Game>
+type R = Rule<Game, GameEvent>
 export const HEAT = 'rude.heat'
 const rude = eq('tone', 'rude')
 const cools = [add('count.rude'), add(HEAT)]
 // остывание — отложенное событие, а не отложенное «−1»: после примирения (температура = 0) старые остывания не уводят её в минус
-const cool = [{ event: 'RudeCool', delay: 20 }]
+const cool: R['trigger'] = [{ event: 'RudeCool', delay: 20 }]
 
 /** Реплика участника без повторов: пул [кто, текст]. */
 export async function sayFresh(game: Game, key: string, pool: readonly Entry<T.Said>[]): Promise<boolean> {
@@ -161,7 +162,7 @@ export const rudeRules: R[] = [
     name: 'Phone_Karine_' + event, event, when: [is('phone.karine')], bonus: 9,
     respond: async ({ game }) => { const t = game.line('PHONE_KARINE', T.PHONE_KARINE); if (t) await game.say([{ w: 'karine', t }]) },
   })),
-  ...['AlikIdle', 'StoryBeat', 'PeriodLine', 'PromiseDue'].map((event): R => ({ name: 'Quiet_PhoneKarine_' + event, event, when: [is('phone.karine')], bonus: 9, respond: () => {} })),
+  ...(['AlikIdle', 'StoryBeat', 'PeriodLine', 'PromiseDue'] as GameEvent[]).map((event): R => ({ name: 'Quiet_PhoneKarine_' + event, event, when: [is('phone.karine')], bonus: 9, respond: () => {} })),
   // состояния: блок, вежливость, вендетта перекрывают обычный ход
   { name: 'Turn_Blocked', event: 'AlikTurn', when: [is('blocked')], respond: async ({ game }) => { if (!(await sayFresh(game, 'ALT', T.RUDE_ALT))) await game.excuseTurn() } },
   {

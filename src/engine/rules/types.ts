@@ -40,8 +40,9 @@ export interface FactOp {
   forDays?: number
 }
 
-export interface Trigger {
-  event: string
+/** `E` — имена событий игры: движок generic, контент подставляет свой union (content/rules/events.ts). */
+export interface Trigger<E extends string = string> {
+  event: E
   facts?: Facts
   /** Через N игровых дней (иначе — сразу после ответа). */
   delay?: number
@@ -82,9 +83,9 @@ export interface RuleCtx<G> {
   get: (key: string, scope?: Scope, actor?: string) => Value
 }
 
-export interface Rule<G> {
+export interface Rule<G, E extends string = string> {
   name: string
-  event: string
+  event: E
   when: Criterion[]
   /** Правило только для событий от этого персонажа / к этому персонажу (+1 к специфичности каждое). */
   sender?: string
@@ -112,7 +113,7 @@ export interface Rule<G> {
   /** Из правил с одинаковым слотом сборщик берёт только лучшее. */
   slot?: string
   /** Следующие события (сразу — после ответа, то есть «после того как реплика прозвучала»). */
-  trigger?: Trigger[]
+  trigger?: Trigger<E>[]
 }
 
 // ---- трассировка ----

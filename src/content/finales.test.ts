@@ -132,7 +132,7 @@ describe('финалы сериалов: выбор', () => {
     toLast(game, 'samvel')
     await game.playArc('samvel')
     expect(game.S.mem['finale.samvel']).toBe('groom')
-    expect(game.S.mem.wedding).toBe(true)
+    expect(game.S.mem['wedding.samvel']).toBe(true)
   })
   it('грубил хоть раз — в женихи не берут', async () => {
     const { game } = makeGame()
@@ -196,7 +196,7 @@ describe('новые сериалы: фундамент, Рубик, Разми�
     const { game } = makeGame()
     game.S.arcs.razmik = { i: 5, last: -99 }
     await game.playArc('razmik')
-    expect(game.S.mem.wedding).toBe(true)
+    expect(game.S.mem['wedding.razmik']).toBe(true)
   })
   it('запасные условия: суд до Страсбурга вскрывает фундамент, новый объект сажает в кабину крана', async () => {
     const a = makeGame().game

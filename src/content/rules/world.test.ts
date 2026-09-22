@@ -179,18 +179,42 @@ describe('состояния мира со сроком', () => {
     const { game } = makeGame()
     await game.playArc('samvel')
     game.S.arcs.beton = { i: 1, last: 0 } // второй сериал уже идёт — ходы не перехватывает «второй сериал»
-    expect(game.S.mem.wedding).toBe(true)
+    expect(game.S.mem['wedding.samvel']).toBe(true)
     let noise = 0
     for (let i = 0; i < 150; i++) {
       game.S.stats.sent += 4
-      if (game.rules.match({ event: 'AlikTurn' }, game.facts())?.name === 'Turn_Wedding') noise++
+      if (game.rules.match({ event: 'AlikTurn' }, game.facts())?.name === 'Turn_Wedding_Samvel') noise++
     }
     expect(noise).toBeGreaterThan(3)
     game.S.day += 8
     await game.afterTurn()
-    expect(game.S.mem.wedding).toBeUndefined()
-    for (let i = 0; i < 60; i++) expect(game.rules.match({ event: 'AlikTurn' }, game.facts())?.name).not.toBe('Turn_Wedding')
+    expect(game.S.mem['wedding.samvel']).toBeUndefined()
+    for (let i = 0; i < 60; i++) expect(game.rules.match({ event: 'AlikTurn' }, game.facts())?.name).not.toBe('Turn_Wedding_Samvel')
     expect(WEDDING_NOISE.length).toBeGreaterThan(3)
+  })
+  it('две свадьбы разом: срок одной не гасит живую другую и не воскрешает истёкшую', async () => {
+    const { game } = makeGame()
+    game.S.arcs.boris = { i: 5, last: -99 }
+    await game.playArc('boris') // «Свадьба Бориса!» — факт на 5 дней
+    game.S.day += 3
+    await game.playArc('samvel') // свадьба Самвела — на 8 дней
+    expect(game.S.mem['wedding.boris']).toBe(true)
+    expect(game.S.mem['wedding.samvel']).toBe(true)
+
+    game.S.day += 3 // откат Бориса прошёл, свадьба Самвела ещё идёт
+    await game.afterTurn()
+    expect(game.S.mem['wedding.boris']).toBeUndefined()
+    expect(game.S.mem['wedding.samvel']).toBe(true)
+    let noise = 0
+    for (let i = 0; i < 150; i++) {
+      game.S.stats.sent += 4
+      if (game.rules.match({ event: 'AlikTurn' }, game.facts())?.name?.startsWith('Turn_Wedding')) noise++
+    }
+    expect(noise).toBeGreaterThan(0)
+
+    game.S.day += 6 // прошла и вторая: факт не воскресает
+    await game.afterTurn()
+    expect(game.S.mem['wedding.samvel']).toBeUndefined()
   })
   it('Борис болеет — на его доске; Алик об этом говорит', async () => {
     const { game } = makeGame()
@@ -242,7 +266,7 @@ describe('состояния мира со сроком', () => {
   })
   it('состояния в сериалах ссылаются на реальные эпизоды', () => {
     const states = Object.values(ARCS).flatMap((a) => a.eps.filter((e) => e.state).map((e) => e.state!.key))
-    expect(states).toEqual(expect.arrayContaining(['wedding', 'sick', 'alik_dead']))
+    expect(states).toEqual(expect.arrayContaining(['wedding.boris', 'wedding.samvel', 'wedding.razmik', 'sick', 'alik_dead']))
   })
 })
 

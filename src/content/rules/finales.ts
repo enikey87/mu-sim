@@ -2,10 +2,11 @@
 // Обычный финал — правило только с условием на сериал; частные финалы специфичнее и перекрывают его.
 import type { Game } from '../../engine/game'
 import { type Rule, eq } from '../../engine/rules'
+import type { GameEvent } from './events'
 import { ARCS } from '../arcs'
 import { FINALES, ENDINGS, type Finale } from '../finales'
 
-type R = Rule<Game>
+type R = Rule<Game, GameEvent>
 
 const finale = (arc: string, f: Finale | null, when = f?.when ?? [], alt = ''): R => ({
   name: `Finale_${arc}_${f?.id ?? 'default'}${alt}`, event: 'ArcFinale', when: [eq('arc', arc), ...when], priority: 'cinematic',

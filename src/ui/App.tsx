@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Component, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Game } from '../engine/game'
 import { GameContext, useGame } from './useGame'
 import { StatusBar, ChatHeader, StatsBar } from './Header'
@@ -23,15 +23,36 @@ export function App({ game, onReset, debug = false }: { game: Game; onReset: () 
     }
   }, [game])
 
+  // битое сохранение — самый вероятный виновник падения, поэтому стираем его до новой игры
+  const hardReset = () => { game.reset(); onReset() }
+
   return (
-    <GameContext.Provider value={game}>
-      {debug ? (
-        <div className="debug-layout"><Phone onReset={onReset} /><DebugPanel /></div>
-      ) : (
-        <Phone onReset={onReset} />
-      )}
-    </GameContext.Provider>
+    <Crash onReset={hardReset}>
+      <GameContext.Provider value={game}>
+        {debug ? (
+          <div className="debug-layout"><Phone onReset={onReset} /><DebugPanel /></div>
+        ) : (
+          <Phone onReset={onReset} />
+        )}
+      </GameContext.Provider>
+    </Crash>
   )
+}
+
+/** Падение отрисовки: без границы — белый экран без единой кнопки. */
+class Crash extends Component<{ onReset: () => void; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+  static getDerivedStateFromError() { return { failed: true } }
+  componentDidCatch(error: unknown) { console.error('[alik] интерфейс упал', error) }
+  render() {
+    if (!this.state.failed) return this.props.children
+    return (
+      <div className="crash">
+        <p>Что-то сломалось. Начать заново?</p>
+        <button onClick={this.props.onReset}>Стереть сохранение и начать заново</button>
+      </div>
+    )
+  }
 }
 
 function Phone({ onReset }: { onReset: () => void }) {
