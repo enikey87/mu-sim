@@ -19,8 +19,8 @@ import type { GameEvent } from '../content/rules/events'
 import { CLAIMS, claimByKey, conflicts, CALLBACK_OPEN, type Claim } from '../content/lies'
 import * as memkeys from '../content/memkeys'
 import {
-  ENDGAME_CHOICES, ENDGAME_FALLBACK, ENDGAME_FORMALITIES, ENDGAME_GROUP, ENDGAME_INTRO, ENDGAME_JUBILEES,
-  ENDGAME_LEAVE, ENDGAME_MONEY, ENDGAME_MUTE, ENDGAME_OPEN, ENDGAME_RENAMES, ENDGAME_RETURNERS, ENDGAME_VENDETTA,
+  ENDGAME_CHOICES, ENDGAME_FALLBACK, ENDGAME_FORMALITY_POOL, ENDGAME_GROUP, ENDGAME_INTRO, ENDGAME_JUBILEES,
+  ENDGAME_LEAVE, ENDGAME_MONEY, ENDGAME_MUTE, ENDGAME_OPEN, ENDGAME_RENAMES, ENDGAME_RETURNER_LINES, ENDGAME_RETURNERS, ENDGAME_VENDETTA,
 } from '../content/endgame'
 import { type Rng, mathRng, rndInt, shuffle, chance } from './rng'
 import { Decks } from './deck'
@@ -1418,7 +1418,8 @@ export class Game {
     const back = this.decks.pick('ENDGAME_RETURNERS', ENDGAME_RETURNERS, this.lineFacts())
     if (back) {
       this.sys(`${back.name} ${back.she ? 'добавила' : 'добавил'} вас обратно`)
-      await this.say([{ w: back.who, t: back.t }])
+      const lines = ENDGAME_RETURNER_LINES[back.who]
+      await this.say([{ w: back.who, t: lines ? this.draw(`ENDGAME_RETURNER.${back.who}`, lines) : back.t }])
     } else {
       this.sys('Алик добавил вас обратно')
     }
@@ -1428,7 +1429,7 @@ export class Game {
   async endgameFormality(): Promise<void> {
     const n = Number(this.S.mem[memkeys.endgame.forms] ?? 0) + 1
     this.S.mem[memkeys.endgame.forms] = n
-    await this.say([this.draw('ENDGAME_FORMALITIES', ENDGAME_FORMALITIES)])
+    await this.say([this.draw('ENDGAME_FORMALITIES', ENDGAME_FORMALITY_POOL)])
     const jubilee = ENDGAME_JUBILEES[n]
     if (jubilee) await this.say([jubilee])
     this.S.ctx = null

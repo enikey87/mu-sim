@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { makeGame } from '../test/helpers'
-import { ENDGAME_FORMALITIES } from './endgame'
+import {
+  ENDGAME_FORMALITIES, ENDGAME_FORMALITY_POOL, ENDGAME_LEAVE, ENDGAME_MONEY, ENDGAME_MUTE,
+  ENDGAME_RENAMES, ENDGAME_RETURNER_LINES, ENDGAME_RETURNERS,
+} from './endgame'
+import { valueOf } from '../engine/rules'
 import type { Game } from '../engine/game'
 
 const messages = (game: Game, from = 0) =>
@@ -87,5 +91,63 @@ describe('бесконечная группа после Дня выплаты',
     expect(messages(game, before).join(' ')).toMatch(/Десять формальностей/)
     // «Формальность №1» выпадала бы и на пятидесятой: номер в пуле спорит со счётом
     expect(ENDGAME_FORMALITIES.join(' ')).not.toMatch(/№/)
+  })
+
+  it('колоды эндгейма большие и без дублей: длинная партия не циклит одни строки', () => {
+    const pools: Array<[string, readonly string[], number]> = [
+      ['money', ENDGAME_MONEY, 150],
+      ['mute', ENDGAME_MUTE, 150],
+      ['leave', ENDGAME_LEAVE, 150],
+      ['formalities', ENDGAME_FORMALITY_POOL, 300],
+      ['renames', ENDGAME_RENAMES, 30],
+    ]
+    for (const [name, pool, min] of pools) {
+      expect(new Set(pool).size, name).toBe(pool.length)
+      expect(pool.length, name).toBeGreaterThanOrEqual(min)
+    }
+    // рукописные формальности остаются в пуле; составной кросс — основа объёма
+    expect(ENDGAME_FORMALITY_POOL.length).toBeGreaterThan(ENDGAME_FORMALITIES.length + 300)
+    expect(ENDGAME_FORMALITY_POOL.join(' ')).not.toMatch(/№/)
+  })
+
+  it('у каждого возвращателя ≥3 реплики: первая — та, что в записи ENDGAME_RETURNERS', () => {
+    const whos = ENDGAME_RETURNERS.map((e) => valueOf(e).who)
+    expect(whos).toHaveLength(6)
+    for (const who of whos) {
+      const lines = ENDGAME_RETURNER_LINES[who]
+      expect(lines, who).toBeDefined()
+      expect(lines.length, who).toBeGreaterThanOrEqual(3)
+      expect(new Set(lines).size, who).toBe(lines.length)
+      expect(lines, who).toContain(ENDGAME_RETURNERS.map((e) => valueOf(e)).find((r) => r.who === who)!.t)
+    }
+  })
+
+  it('колода возвращателя выдаёт каждую реплику по разу до повтора', () => {
+    const { game } = makeGame()
+    for (const [who, lines] of Object.entries(ENDGAME_RETURNER_LINES)) {
+      const drawn = lines.map(() => game.draw(`ENDGAME_RETURNER.${who}`, lines))
+      expect(new Set(drawn).size, who).toBe(lines.length)
+    }
+  })
+
+  it('тридцать формальностей подряд — без повторов: колода тянет длинную партию', async () => {
+    const { game } = makeGame()
+    finishPayday(game)
+    const before = game.S.msgs.length
+    for (let i = 0; i < 30; i++) await game.endgameFormality()
+    const said = messages(game, before).filter((t) => !/Десять формальностей/.test(t))
+    expect(new Set(said).size, said.join(' | ')).toBe(said.length)
+  })
+
+  it('возвращающий говорит реплику из своей колоды', async () => {
+    const { game } = makeGame()
+    finishPayday(game)
+    for (const who of Object.keys(ENDGAME_RETURNER_LINES)) game.S.mem[`met.${who}`] = true
+
+    const before = game.S.msgs.length
+    for (let i = 0; i < 12; i++) await game.send(game.choices.find((c) => c.act === 'endgameLeave')!)
+    const spoken = game.S.msgs.slice(before).flatMap((m) => (m.kind === 'text' && m.who && m.who !== 'alik' ? [m] : []))
+    expect(spoken.length).toBe(12)
+    for (const m of spoken) expect(ENDGAME_RETURNER_LINES[m.who!], `${m.who}: ${m.text}`).toContain(m.text)
   })
 })
