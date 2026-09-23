@@ -9,5 +9,8 @@ export const RARE = new Set([
   'Turn_WhileDead', 'Says_OtherArcWhileDead',
   // в одной-двух выборках из трёх: состояние складывается не каждый раз
   'Says_catchLie_caught2', 'Says_condole_ctxrevived', 'Turn_BorisSick', 'Opt_Cow',
-  'Says_WhileOffline', 'Turn_Wedding_Samvel', 'Turn_Wedding_Razmik',
+  'Says_WhileOffline', 'Turn_Wedding_Samvel', 'Turn_Wedding_Razmik', 'Turn_Wedding_Boris',
+  // после того как SPEAKS стал требовать настоящего знакомства (не только состояния),
+  // хор Гарика реже успевает накопить 3 упоминания до того, как партия закончится
+  'Chorus_garik_FedUp',
 ])

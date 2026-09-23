@@ -6,7 +6,7 @@ import type { Game } from '../../engine/game'
 import type { Facts } from '../../engine/rules'
 import { RARE } from '../../tools/rare'
 
-type Case = { event: string; facts?: Facts; setup?: (g: Game) => void }
+type Case = { event: string; facts?: Facts; target?: string; setup?: (g: Game) => void }
 const CASES: Record<string, Case> = {
   Due_Cosmic: { event: 'PromiseDue', facts: { promise: 0 }, setup: (g) => { g.S.tier = 3; g.recordPromise({ text: 'в пятницу — закину', d: 5 }); g.S.day += 5 } },
   Tone_Cow: { event: 'PlayerMessage', facts: { tone: 'cow' } },
@@ -31,6 +31,8 @@ const CASES: Record<string, Case> = {
   Says_sorry_sorrySwing3: { event: 'PlayerSays', facts: { intent: 'sorry' }, setup: (g) => { g.S.stats.sent = 10; g.S.mem.sorryAt = '8,9,10' } },
   Turn_Wedding_Samvel: { event: 'AlikTurn', setup: (g) => { g.S.mem['wedding.samvel'] = true } },
   Turn_Wedding_Razmik: { event: 'AlikTurn', setup: (g) => { g.S.mem['wedding.razmik'] = true } },
+  Turn_Wedding_Boris: { event: 'AlikTurn', setup: (g) => { g.S.mem['wedding.boris'] = true } },
+  Chorus_garik_FedUp: { event: 'Mentioned', target: 'garik', setup: (g) => { g.S.mem['intro.garik'] = true; g.S.actors.garik = { interjections: 3 } } },
 }
 
 /** Срабатывает ли правило (у многих есть шанс — пробуем на разных сидах). */
@@ -42,7 +44,7 @@ function fires(name: string, c: Case): boolean {
       if (game.rules.collect({ event: c.event }, game.facts()).some((r) => r.name === name)) return true
       continue
     }
-    const r = game.rules.match({ event: c.event, facts: c.facts ?? {} }, game.facts(c.facts ?? {}))
+    const r = game.rules.match({ event: c.event, target: c.target, facts: c.facts ?? {} }, game.facts(c.facts ?? {}))
     if (r?.name === name) return true
   }
   return false

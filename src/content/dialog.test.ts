@@ -93,6 +93,8 @@ describe('несостыковки из партии пользователя', 
   })
   it('после семейного чата игрок цитирует только то, что в нём сказали', async () => {
     const { game } = makeGame()
+    // без знакомства группа пуста — заводим часть родни, иначе groupChat() никого не зовёт
+    Object.assign(game.S.mem, { 'intro.arsen': true, 'intro.karine': true, 'intro.samvel': true, 'intro.nune': true, 'intro.mkrtich': true })
     const quotes = new Set<string>()
     for (let i = 0; i < 15; i++) {
       const n = game.S.msgs.length
