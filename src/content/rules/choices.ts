@@ -129,8 +129,9 @@ export const choiceRules: R[] = [
 
   // сериалы: про текущий — всегда, про любой незаконченный — иногда
   offer({
-    name: 'ArcDeath', slot: 'arc', when: [is(alikDead), is('deathCanAdvance')], act: 'arc', tone: 'polite', bonus: 2,
-    text: (g) => freshFromArr(g, 'F_alik_death', ARCS.alik_death.follow), arg: () => 'alik_death',
+    // единственный выход из смерти: вопрос не исчезает, даже если все недавно показывали
+    name: 'ArcDeath', slot: 'arc', when: [is(alikDead), is('deathCanAdvance')], act: 'arc', tone: 'polite', bonus: 5,
+    text: (g) => g.freshPlayer('F_alik_death', ARCS.alik_death.follow) ?? g.draw('F_alik_death', ARCS.alik_death.follow), arg: () => 'alik_death',
   }),
   offer({
     // вопрос про сериал — только если он к чему-то приведёт (иначе «Как Нуне?» трижды подряд → «пока без новостей»)

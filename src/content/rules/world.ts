@@ -72,7 +72,7 @@ export const promiseRules: R[] = [
     // в хорошем настроении Алик «держит слово» — 50 рублей ровно в срок
     name: 'Due_Kept', event: 'PromiseDue', when: [live, gte('mood', 8)], odds: 0.5, cooldown: { days: 10 }, priority: 'chatter',
     respond: async ({ game, facts }) => {
-      await game.say([game.uniq(() => game.draw('DUE_KEPT', PROMISE_DUE_KEPT))])
+      await game.say([dueLine(game, facts, 'DUE_KEPT', PROMISE_DUE_KEPT)])
       await game.transfer()
       // сдержал (на 50 ₽) — в журнале больше не «просрочено», упрекать нечем
       const p = game.S.promises[Number(facts.promise)]

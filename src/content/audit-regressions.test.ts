@@ -8,6 +8,8 @@ import { turnRules } from './rules/turn'
 import { dateOf } from '../engine/time'
 import { isOpen, test, valueOf, type Entry, type LineSpec } from '../engine/rules'
 import { playtest, transcript } from '../tools/playtest'
+import { PROMISE_DUE_KEPT, PROMISE_MET } from './world'
+import { ENDGAME_FORMALITIES, ENDGAME_RETURNERS } from './endgame'
 
 describe('регрессии первоначального аудита', () => {
   it('активная легенда не допускает независимую денежную отмазку', async () => {
@@ -123,5 +125,64 @@ describe('регрессии первоначального аудита', () =>
     expect(String(ARCS.tile.eps.at(-1)?.m[0])).toContain('Основной долг остался')
     expect(String(ARCS.beton.eps[3].m[0])).toContain('Фундамент не вскрывали')
     expect((valueOf(ARCS.grant.eps[3].m[0]) as { t: string }).t).toContain('Ваш долг — его обязательство')
+  })
+})
+
+describe('регрессии раунда 16', () => {
+  const texts = (entries: readonly Entry<unknown>[], facts: Record<string, string | number | boolean>) =>
+    entries.filter((e) => isOpen(e, facts)).map((e) => { const v = valueOf(e); return typeof v === 'string' ? v : (v as { t: string }).t })
+
+  it('«с того света» пишет мёртвый Алик: смерть длится до серии возвращения, а не шесть дней', async () => {
+    const { game } = makeGame()
+    game.S.day = 250
+    await game.playArc('alik_death')
+    for (let i = 0; i < 2; i++) { game.S.day += 10; await game.afterTurn(); await game.playArc('alik_death') }
+    expect(game.S.msgs.some((m) => m.kind === 'text' && m.text.includes('с того света'))).toBe(true)
+    expect(game.S.mem.alik_dead).toBe(true)
+    game.S.day += 10
+    await game.playArc('alik_death')
+    expect(game.S.mem.alik_dead).toBe(false)
+  })
+
+  it('выход из смерти предлагается, даже когда все вопросы про похороны недавно показывали', async () => {
+    const { game } = makeGame()
+    game.S.day = 250
+    await game.playArc('alik_death')
+    game.S.day += 2
+    while (game.freshPlayer('F_alik_death', ARCS.alik_death.follow) !== null) { /* исчерпать окно показанных */ }
+    game.S.choices = null
+    expect(game.buildChoices().some((c) => c.act === 'arc' && c.arg === 'alik_death')).toBe(true)
+  })
+
+  it('серия похорон без Самвела не остаётся одним обещанием, а после возвращения его не спрашивают про «тот свет»', () => {
+    const wake = ARCS.alik_death.eps[4].m
+    expect(texts(wake, {}).some((t) => t.startsWith('Поминки'))).toBe(true)
+    expect(texts(wake, {}).join(' ')).not.toMatch(/Самвел/)
+    expect(texts(ARCS.alik_death.follow, { 'arc.alik_death': 4 })).not.toContain('Алик, вы там как, на том свете?')
+    expect(texts(ARCS.alik_death.eps[5].m, { 'intro.karine': true }).join(' ')).not.toMatch(/^Алик жив/)
+  })
+
+  it('реплики легенд и обещаний не выдают старую новость и не обещают объяснений, которых не будет', () => {
+    expect(texts(LEGENDS.niva_back.lines, {}).join(' ')).not.toMatch(/вернулась/)
+    // заморозку ставят и Борис, и Рубик: до показаний Бориса легенда о нём не говорит
+    expect(texts(LEGENDS.frozen.lines, { 'intro.boris': true, 'arc.boris': 9 }).join(' ')).not.toMatch(/Борис/)
+    expect(PROMISE_MET.join(' ')).not.toMatch(/Сейчас объясню/)
+    for (const t of PROMISE_DUE_KEPT) expect(t).toContain('{t}')
+    expect(String(valueOf(ARCS.rubik.eps.find((e) => texts(e.m, {}).join(' ').includes('проверяет уровнем'))!.m[0]))).not.toMatch(/который день/)
+  })
+
+  it('перевод «держу слово» называет обещание, по которому пришёл', async () => {
+    const { game } = makeGame()
+    game.recordPromise({ text: 'как штукатурка высохнет', d: 3 })
+    const rule = game.rules.all.find((r) => r.name === 'Due_Kept')!
+    const facts = { ...game.facts(), promise: 0 }
+    const before = game.S.msgs.length
+    await rule.respond!(game.rules.ctx(game, rule, { event: 'PromiseDue', facts }, facts))
+    expect(game.S.msgs.slice(before).some((m) => m.kind === 'text' && m.text.includes('«как штукатурка высохнет»'))).toBe(true)
+  })
+
+  it('группа выплаты — не семейная, и последние 50 ₽ в ней уже не лежат', () => {
+    expect(texts(ENDGAME_RETURNERS, { 'met.samvel': true }).join(' ')).not.toMatch(/семейн/)
+    expect(ENDGAME_FORMALITIES.join(' ')).not.toMatch(/хранит последние 50/)
   })
 })
