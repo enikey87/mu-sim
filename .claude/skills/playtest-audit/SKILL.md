@@ -123,7 +123,7 @@ python3 .claude/skills/playtest-audit/oracle.py <каталог с seed-*.txt>
 
 ## 8. Закрытие цикла
 
-- `npx tsc --noEmit -p .`, `npm run lint`, `npx vitest run` — все зелёные.
+- `npm run typecheck`, `npm run lint`, `npx vitest run` — все зелёные. Не `npx tsc`: он берёт TS 6 из `node_modules/.bin`, а проект проверяется TS 7.
 - Запись в `docs/PLAYTEST_ISSUES.md`: что видно, почему, что сделано, урок.
 - Коммит по-английски, отдельным коммитом на логическую правку; тело коммита несёт негативный
   контроль и замер.
