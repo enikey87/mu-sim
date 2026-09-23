@@ -282,7 +282,7 @@ D.WHEN = [
   needs('dekretNow')(needs('nune')({ t: 'как Нуне из декрета выйдет', d: null, condition: nuneDekretOver })),
   gate(exists('arc.beton'), missing(betonSet))({ t: 'как бетон застынет', d: null, condition: betonSet }),
   { t: 'после приёмки второго этажа', d: null }, gate(missing(actSigned))({ t: 'как акт подпишут', d: null, condition: actSigned }),
-  needs('crane')({ t: 'когда кран вернётся', d: null }), { t: 'после Вардавара', d: null }, { t: 'как отопление дадут', d: null },
+  needs('crane')({ t: 'когда кран освободится', d: null }), { t: 'после Вардавара', d: null }, { t: 'как отопление дадут', d: null },
   gate(gte('month', 3), lte('month', 10))({ t: 'к зиме', d: null }), { t: 'к Пасхе', d: null }, { t: 'как объект в Абовяне сдадим', d: null },
   { t: 'когда налоговая уйдёт', d: null }, needs('nivaHome')(needs('niva')({ t: 'после техосмотра «Нивы»', d: null })), { t: 'в конце квартала', d: 45, due: { quarter: true } },
   needs('samvel')({ t: 'как дядя Самвел проснётся', d: 1 }), { t: 'после футбола', d: 1 }, { t: 'как снег в горах сойдёт', d: null },

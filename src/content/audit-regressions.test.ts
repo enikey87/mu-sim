@@ -10,7 +10,7 @@ import { isOpen, test, valueOf, type Entry, type LineSpec } from '../engine/rule
 import { playtest, transcript } from '../tools/playtest'
 import { PROMISE_DUE_KEPT, PROMISE_MET } from './world'
 import { ENDGAME_FORMALITIES, ENDGAME_RETURNERS } from './endgame'
-import { P_FRIDAY } from './topics'
+import { P_FRIDAY, TOPICS } from './topics'
 
 describe('регрессии первоначального аудита', () => {
   it('активная легенда не допускает независимую денежную отмазку', async () => {
@@ -189,6 +189,18 @@ describe('регрессии раунда 16', () => {
     game.recordPromise({ text: friday.t, ...friday })
     expect(texts(P_FRIDAY, game.lineFacts()).join(' ')).toMatch(/обещали/)
     expect((D.LEGENDARY as Entry<string>[]).map(valueOf).join(' ')).not.toMatch(/обещал к пятнице/)
+  })
+
+  it('цикл 2: сроки и ответы не опираются на то, чего не было', () => {
+    // кран никуда не уезжает — ни одного факта об этом нет
+    expect((D.WHEN as Entry<When>[]).map(valueOf).map((w) => w.t).join(' ')).not.toMatch(/кран вернётся/)
+    // «Банк правда работает?» — только если Алик говорил о банке, а не о Лос-Анджелесе
+    expect(TOPICS.customs.need?.[4]?.test('Грант в Лос-Анджелесе. Поэтому денег нет')).toBe(false)
+    expect(String(ARCS.beton.eps[3].m[0])).toContain('Дом — заказчика, Гранта')
+    expect(JSON.stringify(LEGENDS.niva_gone.talk)).not.toMatch(/не заводится/)
+    const { game } = makeGame()
+    const sys = (game.scenes.redo.nodes.look.sys as unknown as ((v: Record<string, string>) => string)[])[0]
+    expect(sys({ seen: '' })).not.toMatch(/полгода/)
   })
 
   it('группа выплаты — не семейная, и последние 50 ₽ в ней уже не лежат', () => {

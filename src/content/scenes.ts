@@ -341,7 +341,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
         },
         look: {
           fx: { days: 1, ach: 'redo' },
-          sys: [(v: Vars) => `Вы съездили на объект. ${v.seen} Заказчик сказал, что Алика не видел полгода.`],
+          sys: [(v: Vars) => `Вы съездили на объект. ${v.seen} Заказчик спросил, не видели ли вы Алика.`],
           opts: [
             { t: (v: Vars) => v.fine, go: 'look2' },
             { t: 'Кто это вообще придумал?', go: 'ramq' },
