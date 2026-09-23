@@ -1403,8 +1403,9 @@ export class Game {
       return
     }
     if (action === 'mute') {
-      S.mem[memkeys.endgame.mutes] = Number(S.mem[memkeys.endgame.mutes] ?? 0) + 1
-      this.sys('Вы отключили уведомления')
+      const mutes = Number(S.mem[memkeys.endgame.mutes] ?? 0) + 1
+      S.mem[memkeys.endgame.mutes] = mutes
+      this.sys(mutes === 1 ? 'Вы отключили уведомления' : 'Уведомления снова включены. Кем — неизвестно. Вы отключили их ещё раз')
       await this.say([this.draw('ENDGAME_MUTE', ENDGAME_MUTE)])
       const name = this.draw('ENDGAME_RENAMES', ENDGAME_RENAMES)
       S.mem[memkeys.endgame.renames] = Number(S.mem[memkeys.endgame.renames] ?? 0) + 1

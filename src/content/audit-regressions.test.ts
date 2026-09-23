@@ -12,7 +12,8 @@ import { CHORUS, PROMISE_DUE_KEPT, PROMISE_MET } from './world'
 import { ENDGAME_FORMALITIES, ENDGAME_RETURNERS } from './endgame'
 import { P_FRIDAY, TOPICS } from './topics'
 import { CLAIMS, GRAND, MORNING_CONTRA, PAYDAY_SCENE, ROLL, SOURCES } from './payday'
-import { P_LIE } from './lies'
+import { CLAIMS as LIE_CLAIMS, P_LIE } from './lies'
+import { MEMORY } from './memory'
 import * as RUDE from './rude'
 import { FWD, NOTIF, PERIOD } from './life'
 import { ARC_DONE, GROUP } from './arcs'
@@ -308,6 +309,25 @@ describe('регрессии раунда 16', () => {
     const first = texts(refuse, {})
     expect(first.length).toBeGreaterThan(0)
     expect(first.every((t) => t.includes('жена Алика'))).toBe(true)
+  })
+
+  it('цикл 7: повтор «отключить уведомления» признаёт, что их включили обратно', async () => {
+    const { game } = makeGame()
+    ;(game as unknown as { startEndgame: (o: string) => void }).startEndgame('coins')
+    const sys = () => game.S.msgs.flatMap((m) => (m.kind === 'sys' ? [m.text] : []))
+    await game.endgameAction('mute')
+    expect(sys().filter((t) => t.includes('отключили'))).toEqual(['Вы отключили уведомления'])
+    await game.endgameAction('mute')
+    expect(sys().filter((t) => t.includes('отключили')).at(-1)).toMatch(/снова включены/)
+  })
+
+  it('цикл 7: сейф, сервиз, пятница и застолье — без того, чего не было', () => {
+    expect(JSON.stringify(PERIOD)).not.toMatch(/свадьба не отпускает/)
+    expect(JSON.stringify(MEMORY)).not.toMatch(/ищет, кто разбил сервиз/)
+    expect(JSON.stringify(SOURCES)).not.toMatch(/Малыш Алик наконец отдал ключ/)
+    expect(JSON.stringify(LIE_CLAIMS)).not.toMatch(/Ключ всё ещё в пути/)
+    expect(JSON.stringify(MORNING_CONTRA.map((c) => c.say))).not.toMatch(/Какой ещё ключ/)
+    expect(texts(P_FRIDAY, { 'said.friday': true }).join(' ')).not.toMatch(/Сегодня пятница — день, когда/)
   })
 
   it('группа выплаты — не семейная, и последние 50 ₽ в ней уже не лежат', () => {
