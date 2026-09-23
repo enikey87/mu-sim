@@ -1,6 +1,6 @@
 // Сквозные сюжеты, другие участники чата, групповой чат, «не тот чат».
 // Эпизод: m — сообщения (строка — от Алика, { w, t } — от участника), fx, sys, then: 'promise'.
-import { type Entry, type FactOp, set, gate, is, missing, gte, lte } from '../engine/rules'
+import { type Entry, type FactOp, set, gate, is, eq, missing, gte, lte } from '../engine/rules'
 import { needs, meet, WORLD } from './world'
 import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, garikConcrete, garikCut, grandpaDying, grantPaid, houseOnGarik, intro, met, mourning, nivaAway, nuneDekretOver, nuneKeyPassed, sick, taxFrozen, wedding } from './memkeys'
 
@@ -60,7 +60,7 @@ export const ARCS: Record<string, Arc> = {
   },
   beton: {
     title: 'Деньги в фундаменте',
-    follow: ['Деньги ещё в фундаменте?', 'Фундамент вскрыли?', 'Как там мои деньги в бетоне?', 'Алик, что с фундаментом?'],
+    follow: ['Деньги ещё в фундаменте?', gate(eq('arc.beton', 3))('Фундамент вскрыли?'), 'Как там мои деньги в бетоне?', 'Алик, что с фундаментом?'],
     eps: [
       { m: ['Брат, я нёс тебе деньги. Честно, наличкой, в конверте. Срезал через объект, споткнулся об ведро прораба Мкртича — конверт упал в опалубку. А там как раз лили.', 'Твои деньги в фундаменте. Я видел, как они тонули. Медленно, красиво. Как «Титаник». Я даже честь отдал.'], remember: [set(betonSet, true, { delay: 28 }), ...meet('mkrtich')], then: 'promise', legend: 'beton_money' },
       { remember: meet('goar'), m: ['Место отметили. Мкртич воткнул арматурину с тряпочкой. Тряпочку унесла коза тёти Гоар. Место примерно знаем. Плюс-минус дом.'] },

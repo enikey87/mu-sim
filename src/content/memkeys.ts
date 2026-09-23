@@ -98,7 +98,7 @@ export const MEM_PREFIXES: readonly string[] = [
 
 /** Факты события (собираются в facts() на каждый fire) — не mem, но валидатор обязан их знать. */
 export const EVENT_KEYS: ReadonlySet<string> = new Set([
-  'day', 'dow', 'month', 'sent', 'moo', 'tier', 'mood', 'patience', 'money', 'debt', 'fifty',
+  'day', 'dow', 'month', 'dom', 'sent', 'moo', 'tier', 'mood', 'patience', 'money', 'debt', 'fifty',
   'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sorrySwing', 'promiseLive',
   'period', 'night', 'offline', 'scene', 'sinceAlik', 'lateCount', 'arcAvailable',
   'arcsStarted', 'arcsDone', 'quests', 'callbackReady', 'arcUnfinished', 'deathCanAdvance',

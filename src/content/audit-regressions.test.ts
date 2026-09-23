@@ -2,16 +2,17 @@ import { describe, expect, it } from 'vitest'
 import { makeGame } from '../test/helpers'
 import { ARCS } from './arcs'
 import { D, type When } from './excuses'
-import { LEGENDS } from './legends'
+import { CHORUS_LEGEND, LEGENDS } from './legends'
 import { QUESTS } from './quests'
 import { turnRules } from './rules/turn'
 import { dateOf } from '../engine/time'
 import { isOpen, test, valueOf, type Entry, type LineSpec } from '../engine/rules'
 import { playtest, transcript } from '../tools/playtest'
-import { PROMISE_DUE_KEPT, PROMISE_MET } from './world'
+import { CHORUS, PROMISE_DUE_KEPT, PROMISE_MET } from './world'
 import { ENDGAME_FORMALITIES, ENDGAME_RETURNERS } from './endgame'
 import { P_FRIDAY, TOPICS } from './topics'
-import { CLAIMS, ROLL, SOURCES } from './payday'
+import { CLAIMS, GRAND, ROLL, SOURCES } from './payday'
+import { FWD, NOTIF, PERIOD } from './life'
 import { ARC_DONE } from './arcs'
 
 describe('регрессии первоначального аудита', () => {
@@ -218,6 +219,26 @@ describe('регрессии раунда 16', () => {
     expect(first.join(' ')).not.toMatch(/ещё раз|сорок раз/)
     expect(JSON.stringify(game.scenes)).not.toMatch(/Учусь на экономиста/)
     expect(texts(ARCS.alik_death.eps[4].m, {}).every((t) => t.includes('тогда'))).toBe(true)
+  })
+
+  it('цикл 4: соболезнуют умершему, Грант «всё заплатил» — только когда это факт, сроки и праздники по календарю', () => {
+    expect(texts(D.P_CONDOLE as Entry<string>[], { 'grandpa.dying': true, mourning: true }).join(' ')).not.toMatch(/соболезн/i)
+    expect(texts(D.P_CONDOLE as Entry<string>[], { alik_dead: true }).join(' ')).toMatch(/соболезн/i)
+    expect(texts(CHORUS.grant, {}).join(' ')).not.toMatch(/заплатил|оплачено/)
+    const la = CHORUS_LEGEND.grant.map(valueOf).find((l) => typeof l !== 'string' && /Лос-Андж/.test(l.t)) as LineSpec
+    expect(la.when?.some((c) => c.key === 'grant.paid' && c.op === '!exist')).toBe(true)
+    expect(texts(ARCS.beton.follow, { 'arc.beton': 2 })).not.toContain('Фундамент вскрыли?')
+    expect(texts(PERIOD.evening, { 'wedding.samvel': true }).join(' ')).not.toMatch(/дома|футбол/)
+    expect(JSON.stringify([PERIOD, GRAND])).not.toMatch(/тамада не отпускает|ты её снимал с крыши/)
+    expect(JSON.stringify(LEGENDS)).not.toMatch(/третий раз гадает/)
+    expect(JSON.stringify(CLAIMS)).not.toMatch(/Вы сомневались/)
+    const landlord = NOTIF.find((n) => /Жду до пятницы/.test(n.t))!
+    expect((landlord.when ?? []).every((c) => test(c, { dow: 5 }))).toBe(false)
+    const builder = FWD.find((f) => /Днём строителя/.test(JSON.stringify(valueOf(f))))!
+    expect(isOpen(builder, { month: 8, dom: 29 })).toBe(false)
+    expect(isOpen(builder, { month: 8, dom: 9 })).toBe(true)
+    const { game } = makeGame()
+    expect(game.facts().dom).toBe(dateOf(game.S.day).getDate())
   })
 
   it('группа выплаты — не семейная, и последние 50 ₽ в ней уже не лежат', () => {

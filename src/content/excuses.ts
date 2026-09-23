@@ -3,7 +3,7 @@ import { type Rng, mathRng } from '../engine/rng'
 import type { Due } from '../engine/time'
 import { type Entry, gate, eq, gte, lt, lte, matches, missing, exists, is, of } from '../engine/rules'
 import { needs, WORLD } from './world'
-import { actSigned, betonSet, borisMarried, borisSmetaReady, count, evicted, grantPaid, met, nuneDekretOver, nuneKeyPassed, sick, taxThawed, tileCornerRemoved } from './memkeys'
+import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, count, evicted, grantPaid, met, nuneDekretOver, nuneKeyPassed, sick, taxThawed, tileCornerRemoved } from './memkeys'
 
 // draw(key, arr) выдаёт уместный сейчас элемент «из колоды» (без повторов до конца колоды); noRefill — после исчерпания null
 export type DrawFn = <T = unknown>(key: string, arr: readonly Entry<T>[], noRefill?: boolean) => T
@@ -608,7 +608,8 @@ D.P_WHEN = ['Точно {t}?', '«{T}» — это точно? Записыва�
 D.P_WHEN_OK = ['Запомнил: {t}. Не подведите.', '{T}? Хорошо, жду.'];
 D.PROMISE_OK = ['Не подведу, брат.', 'Вот и договорились.', 'Записывай, записывай. Я тоже записал.', 'Жди. Ожидание — это тоже работа.', 'Правильно. Главное — верить.'];
 D.P_WHY_REL = ['А при чём тут {n}?', 'Алик, а {n} тут каким боком?', 'Ну а я тут при чём, если {n}?', 'Алик, при чём тут {n}? Должны мне вы.'];
-D.P_CONDOLE = ['Соболезную…', 'Мои соболезнования. А по деньгам?', 'Держитесь там.', 'Сочувствую. Правда.'];
+// соболезнуют умершему: дедушка только «умирает», а траур у него — тоже
+D.P_CONDOLE = [gate(is(alikDead))('Соболезную…'), gate(is(alikDead))('Мои соболезнования. А по деньгам?'), 'Держитесь там.', 'Сочувствую. Правда.'];
 D.CONDOLE_A = ['Спасибо, брат. Держимся.', 'Спасибо, джан. Тяжело, но хаш помогает.', 'Спасибо. Ты настоящий друг.', 'Спасибо… Я передам. Там оценят.'];
 D.CONDOLE_B = ['Про деньги — сам понимаешь, не время.', 'Деньги сейчас — это неуважение.', 'Как отойдём — сразу рассчитаюсь.', 'Горе горем, а долг — потом.'];
 D.P_CONGRATS = ['Поздравьте от меня! 🎉', 'Моё почтение всей семье! А по деньгам?', 'Ого! Поздравляю! 🎊', 'Передавайте мои поздравления!'];

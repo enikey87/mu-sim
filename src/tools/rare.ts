@@ -9,6 +9,6 @@ export const RARE = new Set([
   'Turn_WhileDead', 'Says_OtherArcWhileDead',
   // в одной-двух выборках из трёх: состояние складывается не каждый раз
   'Says_catchLie_caught2', 'Opt_Cow',
-  'Turn_Wedding_Razmik', 'Turn_Wedding_Boris',
-  'Quest_q_niva', 'Turn_BorisSick',
+  'Turn_Wedding_Samvel', 'Turn_Wedding_Razmik', 'Turn_Wedding_Boris',
+  'Turn_BorisSick',
 ])
