@@ -45,6 +45,8 @@ export const taxThawed = 'tax.thawed'
 export const actSigned = 'act.signed'
 export const grantPaid = 'grant.paid'
 export const rubikFined = 'rubik.fined'
+/** Игрок сдавал кровь — только тогда донорский центр благодарит. */
+export const bloodGiven = 'blood.given'
 export const nuneKeyPassed = 'nune.keyPassed'
 export const nuneDekretOver = 'nune.dekretOver'
 export const grandpaDying = 'grandpa.dying'
@@ -98,7 +100,7 @@ export const MEM_PREFIXES: readonly string[] = [
 
 /** Факты события (собираются в facts() на каждый fire) — не mem, но валидатор обязан их знать. */
 export const EVENT_KEYS: ReadonlySet<string> = new Set([
-  'day', 'dow', 'month', 'sent', 'moo', 'tier', 'mood', 'patience', 'money', 'debt', 'fifty',
+  'day', 'dow', 'month', 'dom', 'sent', 'moo', 'tier', 'mood', 'patience', 'money', 'debt', 'fifty',
   'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sorrySwing', 'promiseLive',
   'period', 'night', 'offline', 'scene', 'sinceAlik', 'lateCount', 'arcAvailable',
   'arcsStarted', 'arcsDone', 'quests', 'callbackReady', 'arcUnfinished', 'deathCanAdvance',
@@ -107,7 +109,7 @@ export const EVENT_KEYS: ReadonlySet<string> = new Set([
 export const EVENT_PREFIXES: readonly string[] = ['arc.', 'ach.', 'since.', 'ctx.', 'has.']
 
 export const MEM_KEYS: ReadonlySet<string> = new Set([
-  HEAT, blocked, blockedHint, polite, alikDead, mourning, evicted, vendetta, court, courtVerdict,
+  HEAT, blocked, blockedHint, polite, bloodGiven, alikDead, mourning, evicted, vendetta, court, courtVerdict,
   ritualCount, ritualCut, caughtCount, cryptoHodl, bathAsked, mamaCalls, phoneKarine, alikDay, mooAt, sorryAt,
   rudeAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway,
   garikConcrete, garikCut, houseOnGarik, borisMarried, borisSmetaReady, taxFrozen, taxThawed,

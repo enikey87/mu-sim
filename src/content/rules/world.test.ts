@@ -247,9 +247,10 @@ describe('состояния мира со сроком', () => {
       const t = game.S.msgs.slice(from).filter((m) => m.kind === 'text').map((m) => (m.kind === 'text' ? m.text : ''))
       expect(has([...DEAD_KARINE, ...DEAD_ALIK], t)).toBe(true)
     }
-    game.S.day += 6
+    // смерть без срока: «с того света» пишет мёртвый Алик, живым его делает только серия возвращения
+    game.S.day += 30
     await game.afterTurn()
-    expect(game.S.mem.alik_dead).toBeUndefined()
+    expect(game.S.mem.alik_dead).toBe(true)
   })
   it('во время смерти продвигаются только похороны, а возвращение сразу снимает состояние', async () => {
     const { game } = makeGame()
@@ -268,7 +269,7 @@ describe('состояния мира со сроком', () => {
   })
   it('состояния в сериалах ссылаются на реальные эпизоды', () => {
     const states = Object.values(ARCS).flatMap((a) => a.eps.filter((e) => e.state).map((e) => e.state!.key))
-    expect(states).toEqual(expect.arrayContaining(['wedding.boris', 'wedding.samvel', 'wedding.razmik', 'sick', 'alik_dead']))
+    expect(states).toEqual(expect.arrayContaining(['wedding.boris', 'wedding.samvel', 'wedding.razmik', 'sick']))
   })
 })
 

@@ -474,7 +474,7 @@ export class Game {
       if (!Object.keys(this.S.ctx).length) this.S.ctx = null
     }
     // ответить можно на последнее сказанное: воспоминание, реплика легенды или персонажа ставятся после своей реплики
-    if (this.S.ctx) { delete this.S.ctx.memory; delete this.S.ctx.legend; delete this.S.ctx.chorus }
+    if (this.S.ctx) { delete this.S.ctx.memory; delete this.S.ctx.legend; delete this.S.ctx.chorus; delete this.S.ctx.wrong }
     const out: Msg[] = []
     for (const x of items) {
       let text = typeof x === 'string' ? x : x.t
@@ -660,7 +660,7 @@ export class Game {
     const pr = extra.promise !== undefined ? S.promises[Number(extra.promise)] : undefined
     return {
       day: S.day, tier: S.tier, mood: S.mood, sent: S.stats.sent, moo: S.stats.moo, patience: S.patience, money: S.money, debt: S.debt, fifty: S.stats.fifty,
-      dow: dateOf(S.day).getDay(), month: dateOf(S.day).getMonth() + 1,
+      dow: dateOf(S.day).getDay(), month: dateOf(S.day).getMonth() + 1, dom: dateOf(S.day).getDate(),
       // прогресс сериалов: arc.grandpa = номер серии
       ...Object.fromEntries(Object.entries(S.arcs).map(([id, st]) => ['arc.' + id, st.i])),
       // ачивки и трофеи — условия для финалов сериалов и концовок
@@ -983,6 +983,7 @@ export class Game {
     if (!p) return
     if (p.condition && this.S.mem[p.condition] === true) return
     if (p.tomorrow) this.rules.applyOps([set('said.tomorrow', true)], {})
+    if (p.due && 'weekday' in p.due && p.due.weekday === 5) this.rules.applyOps([set('said.friday', true)], {})
     const due = p.d == null ? null : this.S.day + (p.due ? dueIn(p.due, this.S.day) : p.d)
     this.S.promises.push({ t: p.text, made: this.S.day, due, condition: p.condition })
     if (due !== null && due > this.S.day) this.scheduleEvent(due, 'PromiseDue', { promise: this.S.promises.length - 1 })
@@ -994,6 +995,7 @@ export class Game {
     p.d = null
     p.due = undefined
     p.condition = condition
+    p.tomorrow = undefined // срок из легенды — не «завтра»: иначе said.tomorrow без слова «завтра»
     return p
   }
   /** «Клянусь мамой, завтра — всё отдам» + запись в журнал. */
@@ -1401,8 +1403,9 @@ export class Game {
       return
     }
     if (action === 'mute') {
-      S.mem[memkeys.endgame.mutes] = Number(S.mem[memkeys.endgame.mutes] ?? 0) + 1
-      this.sys('Вы отключили уведомления')
+      const mutes = Number(S.mem[memkeys.endgame.mutes] ?? 0) + 1
+      S.mem[memkeys.endgame.mutes] = mutes
+      this.sys(mutes === 1 ? 'Вы отключили уведомления' : 'Уведомления снова включены. Кем — неизвестно. Вы отключили их ещё раз')
       await this.say([this.draw('ENDGAME_MUTE', ENDGAME_MUTE)])
       const name = this.draw('ENDGAME_RENAMES', ENDGAME_RENAMES)
       S.mem[memkeys.endgame.renames] = Number(S.mem[memkeys.endgame.renames] ?? 0) + 1

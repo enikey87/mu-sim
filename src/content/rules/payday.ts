@@ -3,7 +3,7 @@ import type { Game } from '../../engine/game'
 import { type Rule, eq, gte, is, exists, missing } from '../../engine/rules'
 import type { GameEvent } from './events'
 import { SOURCES, SOURCES_TOPUP, ROLL, CLAIMS, GRAND, GRAND_FALLBACK, SLOTS, CONTRADICTIONS, MORNING_CONTRA, OUTCOME, type Source, type Call, type Claim } from '../payday'
-import { caughtCount, count, cryptoHodl, payday as pd, paydayScene } from '../memkeys'
+import { alikDead, caughtCount, count, cryptoHodl, payday as pd, paydayScene } from '../memkeys'
 
 type R = Rule<Game, GameEvent>
 const NAMES = ['Гарик', 'Борис', 'Гоар', 'мама', 'Рубик', 'Размик', 'Нуне', 'Карине', 'Страсбург', 'малыш', '«Нив', 'Грант']
@@ -121,11 +121,11 @@ const outcome = (id: string, when: R['when'], extra: Partial<R> = {}): R => ({
 export const paydayRules: R[] = [
   // запуск: третий акт — когда сошлись линии (3+ законченных сериала после 330-го дня) или просто поздно
   {
-    name: 'Beat_Payday', event: 'StoryBeat', when: [gte('day', 330), gte('arcsDone', 3), missing(paydayScene), missing(pd.at)], bonus: 10, once: true, priority: 'cinematic',
+    name: 'Beat_Payday', event: 'StoryBeat', when: [gte('day', 330), gte('arcsDone', 3), missing(paydayScene), missing(pd.at), missing(alikDead)], bonus: 10, once: true, priority: 'cinematic',
     respond: ({ game }) => game.enterNode('payday', 'announce'),
   },
   {
-    name: 'Beat_Payday_Late', event: 'StoryBeat', when: [gte('day', 420), gte('sent', 150)], bonus: 9, once: true, priority: 'cinematic',
+    name: 'Beat_Payday_Late', event: 'StoryBeat', when: [gte('day', 420), gte('sent', 150), missing(alikDead)], bonus: 9, once: true, priority: 'cinematic',
     respond: async ({ game }) => { if (game.S.mem[paydayScene] || game.S.mem[pd.at]) return false; await game.enterNode('payday', 'announce') },
   },
   outcome('real', [is('ach.saint'), gte(caughtCount, 3), is('ach.court'), gte('quests', 5)]),

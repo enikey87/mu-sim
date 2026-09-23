@@ -17,7 +17,7 @@ export const ANNOUNCE_PHOTO = 'Алик прислал фото: мешок из
 export interface Source extends LineSpec { amount: number }
 export const SOURCES: Source[] = [
   // сериалы
-  { t: 'Сейф открыли! Малыш Алик наконец отдал ключ. Внутри 120 000 и соска.', when: [exists('finale.nune')], prio: 2, amount: 120000 },
+  { t: 'Сейф открыли! Второй ключ нашёлся — у малыша в игрушках. Внутри 120 000 и соска.', when: [exists('finale.nune')], prio: 2, amount: 120000 },
   { t: '«Нива» же у тебя! Загляни в бардачок: там 80 000 и грузинский сыр. Я говорил — деньги в «Ниве». Ты просто не искал. Сыр верни.', when: [WORLD.niva, eq('finale.niva', 'chose')], prio: 2, amount: 80000 },
   { t: '«Нива» прислала из Батуми перевод. 60 000. Подпись: «Не ищи. Но деньги — вот».', when: [WORLD.niva, eq('finale.niva', 'default')], prio: 2, amount: 60000 },
   { t: 'Борис-прораб выписал премию. Всей бригаде. И тебе. Премия — 50 000. И клок шерсти.', when: [eq('finale.boris', 'brigadir')], prio: 2, amount: 50000 },
@@ -27,7 +27,7 @@ export const SOURCES: Source[] = [
   { t: 'Дедушка Грачик выдал из шаурмичной кассы. 30 000 и шаурму. Шаурму тоже тебе.', when: [exists('finale.grandpa')], prio: 1, amount: 30000 },
   { t: 'Гарик принёс 25 000. Копил, пока сидел в фундаменте: там не на что тратить.', when: [exists('finale.garik')], prio: 1, amount: 25000 },
   { t: 'Самвел раздал свадебные конверты. Сорок свадеб — сорок конвертов. 60 000.', when: [WORLD.samvel, exists('finale.samvel')], prio: 1, amount: 60000 },
-  { t: 'Размик слез с крана и вернул аванс. Сказал: «Брату плиточнику — нужнее». 45 000.', when: [exists('finale.razmik')], prio: 1, amount: 45000 },
+  { t: 'Размик сбросился. Сказал: «Брату плиточнику — нужнее». 45 000.', when: [exists('finale.razmik')], prio: 1, amount: 45000 },
   { t: 'Инспектор Рубик подписал акт! Грант оплатил объект. 55 000 — твои.', when: [WORLD.grant, exists('finale.rubik')], prio: 1, amount: 55000 },
   { t: 'Суд по плитке закончился. Нам вернули залог. 35 000.', when: [exists('finale.tile')], prio: 1, amount: 35000 },
   { t: 'Я с того света принёс. 20 000. Там, оказывается, тоже бывают выплаты.', when: [exists('finale.alik_death')], prio: 1, amount: 20000 },
@@ -55,7 +55,7 @@ export const ROLL: Entry<Call>[] = [
   { who: 'judge', t: 'Присутствую неофициально. С хашем.', when: [is(met('judge'))], prio: 1 },
   needs('razmikUp')({ who: 'razmik', t: 'Я с крана вижу — всё честно. Пока.', when: [is(met('razmik'))], prio: 1 }),
   needs('rubik')({ who: 'rubik', t: 'Проверяю подлинность купюр. Все — подозрительно ровные.', when: [is(met('rubik'))], prio: 1 }),
-  gate(exists('arc.garik'), missing(garikConcrete), WORLD.garikOnline)({ who: 'garik', t: 'Я только что из фундамента. Что пропустил?', when: [is(met('garik'))], prio: 1 }),
+  gate(exists('arc.garik'), missing(garikConcrete), WORLD.garikOnline)({ who: 'garik', t: 'Я теперь без фундамента. Непривычно. Что пропустил?', when: [is(met('garik'))], prio: 1 }),
   { who: 'mama', t: 'Сынок, покушай сначала. Деньги не убегут. Хотя от Алика — убегут.', when: [is(met('mama'))], prio: 1 },
   needs('arsen')({ who: 'arsen', t: 'Я как юрист фиксирую: выплата — прецедент. Внесу в диплом.', when: [is(met('arsen'))], prio: 1 }),
 ]
@@ -67,8 +67,8 @@ export const CLAIMS: Entry<Claim>[] = [
   needs('karineHome')({ who: 'karine', t: 'Ванная. Вы обещали переложить ванную. Считаю по рыночной. С плиткой.', when: [is(bathAsked)], cut: 60000 }),
   { who: 'goar', t: 'А кто будет платить за мою козу? Кого-то четыре часа снимали с крыши — её или вас, я уже не помню, но четыре часа помню. Моральный ущерб — козе.', when: [is('ach.q_goat')], prio: 2, cut: 60000 },
   { who: 'goar', t: 'А сервиз? За него мне зачли шесть тысяч. Я пересчитала — сорок пять. Значит, тридцать девять сверху.', when: [is('ach.q_tamada')], prio: 2, cut: 39000 },
-  { who: 'grant', t: 'Моральный ущерб. Вы сомневались, что я — это я. При свидетелях.', when: [exists('finale.grant')], prio: 1, cut: 40000 },
-  { who: 'razmik', t: 'Я выше в очереди. Буквально. Сорок метров.', when: [exists('finale.razmik')], prio: 1, cut: 50000 },
+  { who: 'grant', t: 'Моральный ущерб. Меня при вас называли близнецом. При свидетелях.', when: [exists('finale.grant')], prio: 1, cut: 40000 },
+  { who: 'razmik', t: 'Я в очереди первый. Раньше — по высоте, теперь — по привычке.', when: [exists('finale.razmik')], prio: 1, cut: 50000 },
   { who: 'rubik', t: 'Штраф за взятку. Та самая ровная плитка. Я не забыл.', when: [exists('finale.rubik'), missing(rubikFined)], prio: 1, cut: 30000 },
   { who: 'judge', t: 'Судебные издержки. Хаш, коньяк, мантия в химчистку.', when: [is('ach.court')], prio: 1, cut: 25000 },
   needs('dekret')({ who: 'nune', t: 'Налог с выплаты. Я из декрета, но налог — это святое.', cut: 30000 }),
@@ -113,7 +113,7 @@ export const GRAND: Record<Slot, Line[]> = {
   blocker: [
     needs('goar')({ t: 'там их узнала коза тёти Гоар — она видела их на суде — и забодала,', when: [is('ach.q_goat'), is('ach.court')], prio: 2 }),
     { t: 'там их проверил инспектор Рубик и нашёл подозрительно ровными,', when: [exists('finale.rubik')], prio: 2 },
-    needs('goar')({ t: 'там их увидела коза тёти Гоар — ты её снимал с крыши, она помнит — и съела,', when: [is('ach.q_goat')], prio: 2 }),
+    needs('goar')({ t: 'там их увидела коза тёти Гоар — та, с крыши, она всё помнит — и съела,', when: [is('ach.q_goat')], prio: 2 }),
     { t: 'там на них обиделся бетон,', when: [exists('finale.beton')], prio: 2 },
     { t: 'там мама сказала: «Не трогай, это на чёрный день», а сегодня как раз чёрный,', when: [is('ach.q_mama')], prio: 2 },
     { t: 'там их увидел Гарик и попросился с ними в фундамент,', when: [exists('finale.garik')], prio: 2 },
@@ -191,12 +191,12 @@ export const OUTCOME: Record<string, { lines: Array<Entry<string | [string, stri
 
 /** Противоречие со сказанным утром того же дня: утром «сейф открыли», в отмазке «ключ проглотил». */
 export const MORNING_CONTRA: Array<{ morning: RegExp; link: RegExp; say: string }> = [
-  { morning: /Сейф открыли/, link: /сейф/, say: 'Стоп. Утром вы писали: «Сейф открыли!» Какой ещё ключ?' },
-  { morning: /бардачок/, link: /«Нив/, say: 'Стоп. Утром деньги были в бардачке «Нивы». Которая у меня.' },
-  { morning: /Грант перевёл/, link: /Лос-Анджелес|Гранту/, say: 'Стоп. Грант утром сам перевёл. И он тут, в чате.' },
-  { morning: /Фундамент вскрыли/, link: /бетон|фундамент/, say: 'Стоп. Фундамент утром вскрыли. При всех.' },
-  { morning: /Борис-прораб выписал премию/, link: /Борис как прораб выдал|Борис съел/, say: 'Стоп. Борис утром сам всем премию раздал.' },
-  { morning: /Размик слез с крана/, link: /Размик/, say: 'Стоп. Размик утром слез и вернул аванс.' },
+  { morning: /Сейф открыли/, link: /сейф/, say: 'Стоп. Сегодня же писали: «Сейф открыли!» Что там ещё лежало?' },
+  { morning: /бардачок/, link: /«Нив/, say: 'Стоп. Сегодня деньги были в бардачке «Нивы». Которая у меня.' },
+  { morning: /Грант перевёл/, link: /Лос-Анджелес|Гранту/, say: 'Стоп. Грант сегодня сам перевёл. И он тут, в чате.' },
+  { morning: /конверт из фундамента/, link: /бетон|фундамент/, say: 'Стоп. Сегодня же фундамент вскрыли и конверт достали. При всех.' },
+  { morning: /Борис-прораб выписал премию/, link: /Борис как прораб выдал|Борис съел/, say: 'Стоп. Борис сегодня сам всем премию раздал.' },
+  { morning: /Размик сбросился/, link: /Размик/, say: 'Стоп. Размик сегодня сам сбросился.' },
 ]
 export const CONTRADICTIONS: Array<{ link: RegExp; when: (m: Record<string, unknown>) => boolean; say: string }> = [
   { link: /Грузию/, when: (m) => m['finale.niva'] === 'chose', say: 'Стоп. «Нива» уже вернулась — ко мне. С деньгами.' },
@@ -228,7 +228,7 @@ export const PAYDAY_SCENE: Scene = {
       ],
     },
     share: { who: 'samvel', a: ['Вот это воспитание! Начинаем.'], hook: 'claims' },
-    refuse: { fx: { set: { [payday.refused]: true } }, who: 'karine', a: [gate(is(bathAsked))('Ни рубля? Тогда я забираю ванную силой. И все за мной.'), gate(missing(bathAsked))('Ни рубля? Тогда я забираю ванную. Переложишь нам — считай, отдал. И все за мной.')], a2: ['Брат, ты сказал «ни рубля» — они услышали «по рублю». Армянский слух. Я бессилен.'], hook: 'claims' },
+    refuse: { fx: { set: { [payday.refused]: true } }, who: 'karine', a: [gate(is(bathAsked))('Ни рубля? Тогда я забираю ванную силой. И все за мной.'), gate(missing(bathAsked), is(met('karine')))('Ни рубля? Тогда я забираю ванную. Переложишь нам — считай, отдал. И все за мной.'), gate(missing(bathAsked), missing(met('karine')), WORLD.karineHome)('Я жена Алика, если что. Ни рубля? Тогда я забираю ванную. Переложишь нам — считай, отдал. И все за мной.')], a2: ['Брат, ты сказал «ни рубля» — они услышали «по рублю». Армянский слух. Я бессилен.'], hook: 'claims' },
     grand: {
       a: [GRAND_OPEN], hook: 'grand',
       opts: [

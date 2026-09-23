@@ -80,16 +80,16 @@ export interface EndgameReturner {
 
 export const ENDGAME_RETURNERS: Entry<EndgameReturner>[] = [
   gate(is(met('boris')))(needs('borisWrites')({ who: 'boris', name: 'Борис', t: 'Бее.' })),
-  gate(is(met('samvel')))({ who: 'samvel', name: 'Дядя Самвел', t: 'Из семейной группы без тоста не уходят.' }),
+  gate(is(met('samvel')))({ who: 'samvel', name: 'Дядя Самвел', t: 'Из группы без тоста не уходят. Даже из этой.' }),
   gate(is(met('nune')))(needs('dekret')({ who: 'nune', name: 'Нуне', she: true, t: 'По документам вы всё ещё участник.' })),
   gate(is(met('karine')))(needs('karineHome')({ who: 'karine', name: 'Карине', she: true, t: 'Алик, верни человека. Потом потеряем.' })),
   gate(is(met('grant')))({ who: 'grant', name: 'Заказчик Грант', t: 'Молодой человек, я тоже выходил. Безрезультатно.' }),
-  gate(is(met('razmik')))(needs('razmik')({ who: 'razmik', name: 'Размик', t: 'Отсюда видно: выхода нет.' })),
+  gate(is(met('razmik')))(needs('razmik')({ who: 'razmik', name: 'Размик', t: 'Я сверху видел, куда ведёт выход. Никуда.' })),
 ]
 
 export const ENDGAME_FORMALITIES = [
   'Формальность: подпиши акт о том, что акт больше не нужен.',
-  'Надо выбрать, кто хранит последние 50 рублей. Предлагаю меня: я привык.',
+  'Надо выбрать, кто хранит квитанцию на последние 50 рублей. Предлагаю меня: я привык.',
   'Голосуем: считать ли «когда-нибудь» датой. Я уже проголосовал за всех.',
   'Подтверди получение непрочитанного сообщения.',
   'Нужен ответственный за закрытие группы. Поздравляю.',
