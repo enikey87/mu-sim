@@ -20,7 +20,7 @@ export function ChatHeader({ onInfo }: { onInfo: () => void }) {
       <div className={'avatar' + (game.S.ram ? ' ram' : '')} id="avatar">{game.S.ram ? '🐏' : 'А'}</div>
       <div className="who">
         <div className="name">Алик Воздухонесян</div>
-        <div className={'status ' + game.status.cls} id="status">{game.status.text}</div>
+        <div className={'status ' + game.ui.status.cls} id="status">{game.ui.status.text}</div>
       </div>
       <button
         className="icon-btn"
