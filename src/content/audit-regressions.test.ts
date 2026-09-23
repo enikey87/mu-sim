@@ -3,7 +3,7 @@ import { makeGame } from '../test/helpers'
 import { ARCS } from './arcs'
 import { D, type When } from './excuses'
 import { CHORUS_LEGEND, LEGENDS } from './legends'
-import { QUESTS } from './quests'
+import { COURT_SCENE, QUESTS } from './quests'
 import { turnRules } from './rules/turn'
 import { dateOf } from '../engine/time'
 import { isOpen, test, valueOf, type Entry, type LineSpec } from '../engine/rules'
@@ -11,9 +11,11 @@ import { playtest, transcript } from '../tools/playtest'
 import { CHORUS, PROMISE_DUE_KEPT, PROMISE_MET } from './world'
 import { ENDGAME_FORMALITIES, ENDGAME_RETURNERS } from './endgame'
 import { P_FRIDAY, TOPICS } from './topics'
-import { CLAIMS, GRAND, MORNING_CONTRA, ROLL, SOURCES } from './payday'
+import { CLAIMS, GRAND, MORNING_CONTRA, PAYDAY_SCENE, ROLL, SOURCES } from './payday'
+import { P_LIE } from './lies'
+import * as RUDE from './rude'
 import { FWD, NOTIF, PERIOD } from './life'
-import { ARC_DONE } from './arcs'
+import { ARC_DONE, GROUP } from './arcs'
 
 describe('регрессии первоначального аудита', () => {
   it('активная легенда не допускает независимую денежную отмазку', async () => {
@@ -275,6 +277,37 @@ describe('регрессии раунда 16', () => {
     const blood = NOTIF.find((n) => n.app === 'Донорский центр')!
     expect((blood.when ?? []).every((c) => test(c, {}))).toBe(false)
     expect((blood.when ?? []).every((c) => test(c, { 'blood.given': true }))).toBe(true)
+  })
+
+  it('цикл 6: «после свадьбы Бориса» — после, а не в день приглашения', async () => {
+    const { game } = makeGame()
+    game.S.arcs.boris = { i: 5, last: 0 }
+    await game.playArc('boris')
+    expect(game.S.msgs.some((m) => m.kind === 'text' && m.text.includes('Свадьба Бориса! Приходи!'))).toBe(true)
+    expect(game.S.mem['boris.married']).toBeUndefined()
+    game.S.day += 5
+    await game.afterTurn()
+    expect(game.S.mem['boris.married']).toBe(true)
+  })
+
+  it('цикл 6: утверждения о том, чего в переписке не было', () => {
+    const frozenTalk = LEGENDS.frozen.talk!
+    const asked = frozenTalk.filter((e) => JSON.stringify(e).includes('Что именно Борис рассказал'))
+    expect(asked.every((e) => !isOpen(e, { 'intro.boris': true, 'intro.niva': true, 'arc.boris': 9 }))).toBe(true)
+    expect(JSON.stringify(frozenTalk)).not.toMatch(/Про сейф/)
+    expect(JSON.stringify(ARCS.boris.eps)).not.toMatch(/писать учил/)
+    expect(JSON.stringify(COURT_SCENE)).not.toMatch(/выговор за «когда рак/)
+    expect(JSON.stringify(GROUP)).not.toMatch(/я уже написал ему/)
+    expect(JSON.stringify(RUDE)).not.toMatch(/не я их позвал/)
+    expect(texts(P_LIE, { 'lie.alikOld': true }).join(' ')).not.toMatch(/у вас \{old\}/)
+    const bank = NOTIF.find((n) => /это хобби/.test(n.t))!
+    expect((bank.when ?? []).every((c) => test(c, { fifty: 1 }))).toBe(false)
+    expect(bank.t).not.toMatch(/в месяц/)
+    const refuse = PAYDAY_SCENE.nodes.refuse.a!
+    // Карине ещё не писала: её первая реплика говорит, кто она
+    const first = texts(refuse, {})
+    expect(first.length).toBeGreaterThan(0)
+    expect(first.every((t) => t.includes('жена Алика'))).toBe(true)
   })
 
   it('группа выплаты — не семейная, и последние 50 ₽ в ней уже не лежат', () => {

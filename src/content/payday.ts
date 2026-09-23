@@ -228,7 +228,7 @@ export const PAYDAY_SCENE: Scene = {
       ],
     },
     share: { who: 'samvel', a: ['Вот это воспитание! Начинаем.'], hook: 'claims' },
-    refuse: { fx: { set: { [payday.refused]: true } }, who: 'karine', a: [gate(is(bathAsked))('Ни рубля? Тогда я забираю ванную силой. И все за мной.'), gate(missing(bathAsked))('Ни рубля? Тогда я забираю ванную. Переложишь нам — считай, отдал. И все за мной.')], a2: ['Брат, ты сказал «ни рубля» — они услышали «по рублю». Армянский слух. Я бессилен.'], hook: 'claims' },
+    refuse: { fx: { set: { [payday.refused]: true } }, who: 'karine', a: [gate(is(bathAsked))('Ни рубля? Тогда я забираю ванную силой. И все за мной.'), gate(missing(bathAsked), is(met('karine')))('Ни рубля? Тогда я забираю ванную. Переложишь нам — считай, отдал. И все за мной.'), gate(missing(bathAsked), missing(met('karine')), WORLD.karineHome)('Я жена Алика, если что. Ни рубля? Тогда я забираю ванную. Переложишь нам — считай, отдал. И все за мной.')], a2: ['Брат, ты сказал «ни рубля» — они услышали «по рублю». Армянский слух. Я бессилен.'], hook: 'claims' },
     grand: {
       a: [GRAND_OPEN], hook: 'grand',
       opts: [
