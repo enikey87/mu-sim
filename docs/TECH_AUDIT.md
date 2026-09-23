@@ -56,7 +56,7 @@ CI (`.github/workflows/pages.yml`): `npm ci` → `npm audit --audit-level=high` 
 
 ### Ручная инкрементальная синхронизация ленты — принято
 
-`syncMessageNodes` (`src/ui/Chat.tsx:27`), `MessageList` (`:76`): creation/sync O(Δ), родитель всё ещё видит до `LIVE_RENDER_CAP = 1000` детей (`:23`). Не трогать до следующего удара о frame time; тогда — виртуализация, а не третий слой ручного кэша (см. `TECH_DEFECTS.md`).
+`syncMessageNodes` (`src/ui/Chat.tsx:28`), `MessageList` (`:76`): creation/sync O(Δ), родитель всё ещё видит до `LIVE_RENDER_CAP = 1000` детей (`:23`). Не трогать до следующего удара о frame time; тогда — виртуализация, а не третий слой ручного кэша (см. `TECH_DEFECTS.md`).
 
 ---
 
