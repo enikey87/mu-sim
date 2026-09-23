@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { makeGame } from '../test/helpers'
 import {
-  ENDGAME_FORMALITIES, ENDGAME_FORMALITY_POOL, ENDGAME_LEAVE, ENDGAME_MONEY, ENDGAME_MUTE,
+  ENDGAME_FORMALITIES, ENDGAME_LEAVE, ENDGAME_MONEY, ENDGAME_MUTE,
   ENDGAME_RENAMES, ENDGAME_RETURNER_LINES, ENDGAME_RETURNERS,
 } from './endgame'
 import { valueOf } from '../engine/rules'
@@ -95,22 +95,42 @@ describe('бесконечная группа после Дня выплаты',
 
   it('колоды эндгейма большие и без дублей: длинная партия не циклит одни строки', () => {
     const pools: Array<[string, readonly string[], number]> = [
-      ['money', ENDGAME_MONEY, 150],
-      ['mute', ENDGAME_MUTE, 150],
-      ['leave', ENDGAME_LEAVE, 150],
-      ['formalities', ENDGAME_FORMALITY_POOL, 300],
+      ['money', ENDGAME_MONEY, 60],
+      ['mute', ENDGAME_MUTE, 60],
+      ['leave', ENDGAME_LEAVE, 60],
+      ['formalities', ENDGAME_FORMALITIES, 150],
       ['renames', ENDGAME_RENAMES, 30],
     ]
     for (const [name, pool, min] of pools) {
       expect(new Set(pool).size, name).toBe(pool.length)
       expect(pool.length, name).toBeGreaterThanOrEqual(min)
     }
-    // рукописные формальности остаются в пуле; составной кросс — основа объёма
-    expect(ENDGAME_FORMALITY_POOL.length).toBeGreaterThan(ENDGAME_FORMALITIES.length + 300)
-    expect(ENDGAME_FORMALITY_POOL.join(' ')).not.toMatch(/№/)
+    expect(ENDGAME_FORMALITIES.join(' ')).not.toMatch(/№/)
   })
 
-  it('у каждого возвращателя ≥3 реплики: первая — та, что в записи ENDGAME_RETURNERS', () => {
+  it('одна шутка — один раз: ни одна пара строк не делит общий кусок ≥ 30 символов', () => {
+    // общая подстрока такой длины — это та же шутка в новой обёртке («Коллеги, X» / «Итак, X»), а не новая шутка
+    const shared = (a: string, b: string): number => {
+      let best = 0
+      for (let i = 0; i < a.length; i++) for (let len = best + 1; i + len <= a.length && len <= b.length; len++) {
+        if (b.includes(a.slice(i, i + len))) best = len
+      }
+      return best
+    }
+    const pools: Array<[string, readonly string[]]> = [
+      ['money', ENDGAME_MONEY],
+      ['mute', ENDGAME_MUTE],
+      ['leave', ENDGAME_LEAVE],
+      ['formalities', ENDGAME_FORMALITIES],
+    ]
+    for (const [name, pool] of pools) {
+      for (let i = 0; i < pool.length; i++) for (let j = i + 1; j < pool.length; j++) {
+        expect(shared(pool[i], pool[j]), `${name}: «${pool[i]}» / «${pool[j]}»`).toBeLessThan(30)
+      }
+    }
+  })
+
+  it('у каждого возвращателя ≥3 реплики, гейт знакомства — на его записи', () => {
     const whos = ENDGAME_RETURNERS.map((e) => valueOf(e).who)
     expect(whos).toHaveLength(6)
     for (const who of whos) {
@@ -118,7 +138,6 @@ describe('бесконечная группа после Дня выплаты',
       expect(lines, who).toBeDefined()
       expect(lines.length, who).toBeGreaterThanOrEqual(3)
       expect(new Set(lines).size, who).toBe(lines.length)
-      expect(lines, who).toContain(ENDGAME_RETURNERS.map((e) => valueOf(e)).find((r) => r.who === who)!.t)
     }
   })
 
