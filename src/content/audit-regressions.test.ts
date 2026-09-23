@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { makeGame } from '../test/helpers'
 import { ARCS } from './arcs'
@@ -14,6 +15,7 @@ import { P_FRIDAY, TOPICS } from './topics'
 import { CLAIMS, GRAND, MORNING_CONTRA, PAYDAY_SCENE, ROLL, SOURCES } from './payday'
 import { CLAIMS as LIE_CLAIMS, P_LIE } from './lies'
 import { MEMORY } from './memory'
+import * as TALK from './talk'
 import * as RUDE from './rude'
 import { FWD, NOTIF, PERIOD } from './life'
 import { ARC_DONE, GROUP } from './arcs'
@@ -328,6 +330,26 @@ describe('регрессии раунда 16', () => {
     expect(JSON.stringify(LIE_CLAIMS)).not.toMatch(/Ключ всё ещё в пути/)
     expect(JSON.stringify(MORNING_CONTRA.map((c) => c.say))).not.toMatch(/Какой ещё ключ/)
     expect(texts(P_FRIDAY, { 'said.friday': true }).join(' ')).not.toMatch(/Сегодня пятница — день, когда/)
+  })
+
+  it('цикл 8: «это вы кому?» — только сразу после сообщения не тому', async () => {
+    const { game } = makeGame()
+    await game.wrongChat()
+    expect(game.facts()['ctx.wrong']).toBe(true)
+    await game.say(['Брат, у меня сегодня хорошее настроение.'])
+    expect(game.facts()['ctx.wrong']).toBeFalsy()
+  })
+
+  it('цикл 8: звонок заказчику и вопросы Гранту не повторяют уже сказанное', () => {
+    const { game } = makeGame()
+    game.S.day = 250
+    const rule = game.rules.all.find((r) => r.name === 'Scene_customer')!
+    expect(rule.when.some((c) => c.key === 'grant.paid' && c.op === '!exist')).toBe(true)
+    expect(JSON.stringify(TALK)).not.toMatch(/вы правда ему всё заплатили/)
+    expect(JSON.stringify(D.CONDOLE_A)).not.toMatch(/Там оценят/)
+    expect(JSON.stringify(NOTIF)).not.toMatch(/Ваше заявление «Алик не платит» принято/)
+    // строка живёт внутри функции правила — JSON её не видит, проверяем исходник
+    expect(readFileSync('src/content/rules/choices.ts', 'utf8')).not.toMatch(/Суд — не свадьба/)
   })
 
   it('группа выплаты — не семейная, и последние 50 ₽ в ней уже не лежат', () => {

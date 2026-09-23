@@ -5,7 +5,7 @@ import type { GameEvent } from './events'
 import { WORLD, SPEAKS } from '../world'
 import { CHORUS_LEGEND } from '../legends'
 import { PROMISE_DUE, PROMISE_DUE_COSMIC, PROMISE_DUE_KEPT, PROMISE_MET, CHORUS, CHORUS_FED_UP, WEDDING_NOISE, BORIS_SICK, DEAD_KARINE, DEAD_ALIK } from '../world'
-import { alikDead, blocked, count, interjections, intro, met, mourning, sick } from '../memkeys'
+import { alikDead, blocked, count, grantPaid, interjections, intro, met, mourning, sick } from '../memkeys'
 
 type R = Rule<Game, GameEvent>
 
@@ -23,7 +23,8 @@ export const sceneRules: R[] = [
   { ...scene('newjob'), once: true },
   // «это Арсен, племянник» — знакомство: если Арсен уже в истории (суд, фундамент), второй раз не представляется
   scene('nephew', [missing(intro('arsen'))]),
-  { ...scene('customer', [gte('day', 200)]), once: true }, // «позвони заказчику сам» — один раз
+  // «позвони заказчику сам» — один раз и пока Грант сам не сказал, что заплатил: иначе звонок — повтор новости
+  { ...scene('customer', [gte('day', 200), missing(grantPaid)]), once: true },
   { ...scene('lend', [gte('mood', 4), gte('money', 5000)]), once: true }, // «займи 5000» — если на карте есть 5000
   scene('toast', [missing(mourning)], eveningBoost), // застолье — чаще вечером и в пятницу, и не когда в семье прощаются
   { ...scene('tax', [gte(count.threat, 1)], 2), once: true }, // «если спросят — ты у меня не работал» — после угроз судом
