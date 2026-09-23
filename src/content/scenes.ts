@@ -13,7 +13,7 @@ import { HEAT, bathAsked, blocked, cardSent, intro, polite, ritualCount, ritualC
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- форма переменных задаётся сценой
 export type Vars = Record<string, any>
 export type Line = string | ((v: Vars) => string)
-export interface SceneOpt { t: Line | string[]; go: string | null; tone?: 'polite' | 'neutral' | 'rude' }
+export interface SceneOpt { t: Line | Entry<string>[]; go: string | null; tone?: 'polite' | 'neutral' | 'rude' }
 export interface SceneFx {
   days?: number; debt?: number; money?: number; mood?: number; ach?: string; barter?: boolean; invoice?: boolean
   legend?: string | null
@@ -159,8 +159,8 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
             gate(is(cardSent))(() => 'Слушай, продиктуй номер карты, я записать не успел в прошлый раз.'),
           ],
           opts: [
-            { t: ['Отправить номер карты', 'Скинуть номер карты ещё раз'], go: 'sent' },
-            { t: 'Я его уже сорок раз отправлял!', go: 'knows' },
+            { t: ['Отправить номер карты', gate(is(cardSent))('Скинуть номер карты ещё раз')], go: 'sent' },
+            { t: [gate(is(cardSent))('Я его уже сорок раз отправлял!'), gate(missing(cardSent))('Он же у вас в договоре!')], go: 'knows' },
             { t: 'Лучше наличными', go: 'meet:ask' },
           ],
         },
@@ -199,7 +199,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
           then: 'promise',
         },
         knows: {
-          a: ['Знаю, но номер был записан на лаваше. Сам понимаешь. Скинь ещё раз.', 'Все сорок раз коза съела. Она любит цифры. Скинь ещё.'],
+          a: [gate(is(cardSent))('Знаю, но номер был записан на лаваше. Сам понимаешь. Скинь ещё раз.'), gate(is(cardSent))('Все сорок раз коза съела. Она любит цифры. Скинь ещё.'), gate(missing(cardSent))('Договор был записан на лаваше. Сам понимаешь. Скинь номер.')],
           opts: [
             { t: 'Ладно, отправляю', go: 'sent' },
             { t: 'Нет.', go: 'knows_no' },
@@ -294,7 +294,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
           ],
         },
         caught2: { fx: { ach: 'nephew' }, a: ['Потому что вы мне как брат, брат джан. Ой.'], a2: ['(Это Арсен.)'] },
-        age: { a: ['Мне 19. Учусь на экономиста. Дядя говорит, выйдет хороший бухгалтер. Я уже умею не платить.'] },
+        age: { a: ['Мне 19. Учусь на юриста. Дядя говорит, выйдет хороший юрист. Я уже умею не платить.'] },
         pass: { a: [() => `Передам. Он говорит: «${cap(P())}». Ой, то есть передаст, когда вернётся.`] },
       },
     },

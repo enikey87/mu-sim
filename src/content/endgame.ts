@@ -84,7 +84,7 @@ export const ENDGAME_RETURNERS: Entry<EndgameReturner>[] = [
   gate(is(met('nune')))(needs('dekret')({ who: 'nune', name: 'Нуне', she: true, t: 'По документам вы всё ещё участник.' })),
   gate(is(met('karine')))(needs('karineHome')({ who: 'karine', name: 'Карине', she: true, t: 'Алик, верни человека. Потом потеряем.' })),
   gate(is(met('grant')))({ who: 'grant', name: 'Заказчик Грант', t: 'Молодой человек, я тоже выходил. Безрезультатно.' }),
-  gate(is(met('razmik')))(needs('razmik')({ who: 'razmik', name: 'Размик', t: 'Отсюда видно: выхода нет.' })),
+  gate(is(met('razmik')))(needs('razmik')({ who: 'razmik', name: 'Размик', t: 'Я сверху видел, куда ведёт выход. Никуда.' })),
 ]
 
 export const ENDGAME_FORMALITIES = [

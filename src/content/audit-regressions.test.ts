@@ -11,6 +11,8 @@ import { playtest, transcript } from '../tools/playtest'
 import { PROMISE_DUE_KEPT, PROMISE_MET } from './world'
 import { ENDGAME_FORMALITIES, ENDGAME_RETURNERS } from './endgame'
 import { P_FRIDAY, TOPICS } from './topics'
+import { CLAIMS, ROLL, SOURCES } from './payday'
+import { ARC_DONE } from './arcs'
 
 describe('регрессии первоначального аудита', () => {
   it('активная легенда не допускает независимую денежную отмазку', async () => {
@@ -157,7 +159,7 @@ describe('регрессии раунда 16', () => {
 
   it('серия похорон без Самвела не остаётся одним обещанием, а после возвращения его не спрашивают про «тот свет»', () => {
     const wake = ARCS.alik_death.eps[4].m
-    expect(texts(wake, {}).some((t) => t.startsWith('Поминки'))).toBe(true)
+    expect(texts(wake, {}).some((t) => /поминки/i.test(t))).toBe(true)
     expect(texts(wake, {}).join(' ')).not.toMatch(/Самвел/)
     expect(texts(ARCS.alik_death.follow, { 'arc.alik_death': 4 })).not.toContain('Алик, вы там как, на том свете?')
     expect(texts(ARCS.alik_death.eps[5].m, { 'intro.karine': true }).join(' ')).not.toMatch(/^Алик жив/)
@@ -201,6 +203,21 @@ describe('регрессии раунда 16', () => {
     const { game } = makeGame()
     const sys = (game.scenes.redo.nodes.look.sys as unknown as ((v: Record<string, string>) => string)[])[0]
     expect(sys({ seen: '' })).not.toMatch(/полгода/)
+  })
+
+  it('цикл 3: Размик после финала не «наверху», Гарик не «только что» из фундамента, карта — не «ещё раз» в первый раз', () => {
+    const payday = JSON.stringify([SOURCES, ROLL, CLAIMS])
+    expect(payday).not.toMatch(/Сорок метров|слез с крана|только что из фундамента/)
+    expect(JSON.stringify(ENDGAME_RETURNERS)).not.toMatch(/Отсюда видно/)
+    expect(ARC_DONE.garik.join(' ')).not.toMatch(/теперь блогер/)
+    expect(texts(D.P_NEU_B as Entry<string>[], {}).join(' ')).not.toMatch(/«Завтра» — это какой день/)
+    expect(JSON.stringify(D)).not.toMatch(/Телефон выключаю/)
+    const { game } = makeGame()
+    const card = game.scenes.card.nodes
+    const first = [...card.ask.opts!.flatMap((o) => (Array.isArray(o.t) ? texts(o.t, {}) : [])), ...texts(card.knows.a as Entry<string>[], {})]
+    expect(first.join(' ')).not.toMatch(/ещё раз|сорок раз/)
+    expect(JSON.stringify(game.scenes)).not.toMatch(/Учусь на экономиста/)
+    expect(texts(ARCS.alik_death.eps[4].m, {}).every((t) => t.includes('тогда'))).toBe(true)
   })
 
   it('группа выплаты — не семейная, и последние 50 ₽ в ней уже не лежат', () => {
