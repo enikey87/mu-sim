@@ -90,6 +90,11 @@ describe('лестница грубости: ступени', () => {
     expect(game.S.offlineDays).toBe(0)
     expect(game.S.ctx?.offended).toBe(true) // можно извиниться
   })
+  it('пока Самвел сам не писал, в его пуле уместна только реплика знакомства', () => {
+    const { game } = makeGame()
+    const eligible = game.lines.eligible('RF_samvel', T.RUDE_FAMILY.samvel, game.lineFacts())
+    expect(eligible.map((p) => p.text)).toEqual(['Мальчик, я Самвел. На моего племянника кричу только я. Встань в очередь, она с 1987 года.'])
+  })
   it('Карине забрала телефон до конца дня: назавтра с первой реплики снова отвечает Алик', async () => {
     const { game } = makeGame()
     game.rules.applyOps([during('phone.karine', 1)], {})
