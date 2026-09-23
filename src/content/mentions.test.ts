@@ -2,8 +2,10 @@
 // (needs / when / структура: серия сериала, финал, реплика персонажа). Регулярки — здесь, в проверке контента: игра текст не разбирает.
 import { describe, it, expect } from 'vitest'
 import { Gated, describeCriterion, valueOf, type Criterion, type Entry, type FactOp } from '../engine/rules'
-import { WORLD, SPEAKS, type WorldKey } from './world'
-import { ARCS, CAST } from './arcs'
+import { WORLD, SPEAKS, CHORUS, type WorldKey } from './world'
+import { ARCS, CAST, GROUP } from './arcs'
+import { RUDE_FAMILY } from './rude'
+import { makeGame } from '../test/helpers'
 import { FINALES } from './finales'
 import { LEGENDS } from './legends'
 import { TOPICS } from './topics'
@@ -250,6 +252,16 @@ describe('упоминания в контенте', () => {
     expect(problems(strings('Размик слез с крана.', 'x', finale('razmik'), []))).toEqual([])
     expect(problems(strings('Близнец.', 'x', arcAt('grant', 3), []))).toHaveLength(1)
     expect(problems(strings('Близнец.', 'x', arcAt('grant', 4), []))).toEqual([])
+  })
+  // Статическая проверка выше слепа именно к этому классу: known всегда содержит intro.<who>==true
+  // для любой реплики этого персонажа (см. selfIntro), поэтому SPEAKS-критерий вида is(intro(x))
+  // формально «выполнен» независимо от реального гейта. Кто может заговорить сам первым — проверяет
+  // только рантайм: на свежей партии никто из семейного чата/хора/лестницы грубости говорить не должен.
+  it('на свежей партии никто из семейного чата, хора и лестницы грубости не может заговорить сам', () => {
+    const { game } = makeGame()
+    const speakers = new Set([...Object.keys(GROUP), ...Object.keys(CHORUS), ...Object.keys(RUDE_FAMILY)])
+    expect(speakers.size).toBeGreaterThan(5)
+    for (const who of speakers) expect(game.canSpeak(who), who).toBe(false)
   })
 })
 

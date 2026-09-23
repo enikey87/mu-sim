@@ -58,6 +58,10 @@ export const WORLD = {
   karineGone: named('karineGone', eq('finale.rubik', 'karine')),
   /** Игрок знает Карине: она уже писала сама. */
   karineKnown: named('karineKnown', is(met('karine')), ne('finale.rubik', 'karine')),
+  /** Карине вошла в историю (сама или Алик представил) и не ушла — можно писать самой, без требования, что именно она писала лично. */
+  karineSpeaks: named('karineSpeaks', is(intro('karine')), ne('finale.rubik', 'karine')),
+  /** Гарик вошёл в историю и сейчас не в фундаменте без связи — можно писать самому. */
+  garikKnown: named('garikKnown', is(intro('garik')), missing(garikCut)),
   razmikUp: named('razmikUp', exists('arc.razmik'), missing('finale.razmik')),
   nivaHome: named('nivaHome', missing(nivaAway)),
   nivaAway: named('nivaAway', is(nivaAway)),
@@ -68,8 +72,12 @@ export type WorldKey = keyof typeof WORLD
 export const needs = (...keys: WorldKey[]) => gate(...keys.map((k) => WORLD[k]))
 export const meet = (...ids: string[]) => ids.map((id) => set(intro('') + id, true))
 
-/** Кто пишет в чат сам (хор, семейный чат, родня на крик) только при условии; остальные — всегда. */
-export const SPEAKS: Record<string, Criterion> = { boris: WORLD.borisWrites, arsen: WORLD.arsen, karine: WORLD.karineHome, razmik: WORLD.razmik, rubik: WORLD.rubik, garik: WORLD.garikOnline }
+/** Кто пишет в чат сам (хор, семейный чат, родня на крик) только при условии знакомства, а не просто состояния; остальные — всегда. */
+export const SPEAKS: Record<string, Criterion> = {
+  boris: WORLD.borisWrites, arsen: WORLD.arsen, razmik: WORLD.razmik, rubik: WORLD.rubik,
+  karine: WORLD.karineSpeaks, garik: WORLD.garikKnown,
+  samvel: WORLD.samvel, nune: WORLD.nune, mkrtich: WORLD.mkrtich, grant: WORLD.grant,
+}
 
 // --- обещание наступило: Алик пишет сам, до игрока ({t} — текст обещания)
 export const PROMISE_DUE = [

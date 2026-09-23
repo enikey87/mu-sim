@@ -24,6 +24,19 @@ describe('несостыковки из партии пользователя', 
     expect(game.S.msgs.some((m) => m.kind === 'text' && m.who === 'boris')).toBe(false)
     expect(GROUP.boris.length).toBeGreaterThan(0)
   })
+  it('«Опять» на отправке номера карты звучит только со второго раза', async () => {
+    const { game } = makeGame()
+    const sysTexts = (n: number) => game.S.msgs.slice(n).flatMap((m) => (m.kind === 'sys' ? [m.text] : []))
+    let n = game.S.msgs.length
+    await game.enterNode('card', 'sent')
+    expect(sysTexts(n).some((t) => t.includes('Опять'))).toBe(false)
+    expect(sysTexts(n)).toContain('Вы отправили номер карты.')
+    await game.enterNode('card', 'bank')
+    game.S.scene = null
+    n = game.S.msgs.length
+    await game.enterNode('card', 'sent')
+    expect(sysTexts(n).some((t) => t.includes('Опять'))).toBe(true)
+  })
   it('после выселения квартплата с карты не списывается', () => {
     const { game } = makeGame()
     game.S.mem.evicted = true
@@ -93,6 +106,8 @@ describe('несостыковки из партии пользователя', 
   })
   it('после семейного чата игрок цитирует только то, что в нём сказали', async () => {
     const { game } = makeGame()
+    // без знакомства группа пуста — заводим часть родни, иначе groupChat() никого не зовёт
+    Object.assign(game.S.mem, { 'intro.arsen': true, 'intro.karine': true, 'intro.samvel': true, 'intro.nune': true, 'intro.mkrtich': true })
     const quotes = new Set<string>()
     for (let i = 0; i < 15; i++) {
       const n = game.S.msgs.length

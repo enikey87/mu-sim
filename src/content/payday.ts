@@ -58,14 +58,12 @@ export const ROLL: Entry<Call>[] = [
   gate(exists('arc.garik'), missing(garikConcrete), WORLD.garikOnline)({ who: 'garik', t: 'Я только что из фундамента. Что пропустил?', when: [is(met('garik'))], prio: 1 }),
   { who: 'mama', t: 'Сынок, покушай сначала. Деньги не убегут. Хотя от Алика — убегут.', when: [is(met('mama'))], prio: 1 },
   needs('arsen')({ who: 'arsen', t: 'Я как юрист фиксирую: выплата — прецедент. Внесу в диплом.', when: [is(met('arsen'))], prio: 1 }),
-  { who: 'samvel', t: 'Кто пригласил плиточника? А, это его выплата. Садись, дорогой, во главу стола.' },
-  needs('karineHome')({ who: 'karine', t: 'Это Карине. Я пришла посмотреть на чудо.' }),
 ]
 
 /** Дележ: каждый требует долю. cut — сколько уходит. */
 export interface Claim extends LineSpec { who: string; cut: number }
 export const CLAIMS: Entry<Claim>[] = [
-  { who: 'samvel', t: 'Сначала — подарок молодым. Какие молодые — неважно, свадьба всегда идёт.', cut: 50000 },
+  needs('samvel')({ who: 'samvel', t: 'Сначала — подарок молодым. Какие молодые — неважно, свадьба всегда идёт.', cut: 50000 }),
   needs('karineHome')({ who: 'karine', t: 'Ванная. Вы обещали переложить ванную. Считаю по рыночной. С плиткой.', when: [is(bathAsked)], cut: 60000 }),
   { who: 'goar', t: 'А кто будет платить за мою козу? Кого-то четыре часа снимали с крыши — её или вас, я уже не помню, но четыре часа помню. Моральный ущерб — козе.', when: [is('ach.q_goat')], prio: 2, cut: 60000 },
   { who: 'goar', t: 'А сервиз? За него мне зачли шесть тысяч. Я пересчитала — сорок пять. Значит, тридцать девять сверху.', when: [is('ach.q_tamada')], prio: 2, cut: 39000 },

@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
+import { CLAIMS, ROLL } from './payday'
 
 const texts = (g: Game, n = 0) => g.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' || m.kind === 'sys' ? [m.text] : []))
 const choose = async (g: Game, go: string) => { g.S.choices = null; const c = g.choices.find((x) => x.go === go); expect(c, go).toBeDefined(); await g.send(c!) }
@@ -128,5 +129,15 @@ describe('День выплаты', () => {
     const out = texts(game, n).join('\n')
     expect(out).toMatch(/они услышали «по рублю»/)
     expect(out).toMatch(/К выплате: 180\s500 ₽/) // 239 000 − 39 000 − 19 500
+  })
+  it('доля и перекличка Самвела/Карине уместны только после знакомства', () => {
+    const { game } = makeGame()
+    const whos = (pool: ReturnType<typeof game.lines.eligible>) => pool.map((p) => (p.spec as { who?: string }).who)
+    expect(whos(game.lines.eligible('PD_CLAIM', CLAIMS, game.lineFacts()))).not.toContain('samvel')
+    const roll = whos(game.lines.eligible('PD_ROLL', ROLL, game.lineFacts()))
+    expect(roll).not.toContain('samvel')
+    expect(roll).not.toContain('karine')
+    game.S.mem['intro.samvel'] = true
+    expect(whos(game.lines.eligible('PD_CLAIM', CLAIMS, game.lineFacts()))).toContain('samvel')
   })
 })

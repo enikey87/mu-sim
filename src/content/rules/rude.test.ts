@@ -6,7 +6,7 @@ import type { Facts } from '../../engine/rules'
 import type { Msg } from '../../engine/state'
 import * as T from '../rude'
 import { HEAT } from '../memkeys'
-import { valueOf, spec, during, type Entry } from '../../engine/rules'
+import { valueOf, spec, during, isOpen, type Entry } from '../../engine/rules'
 
 const texts = (game: Game, from: number) => game.S.msgs.slice(from).map((m) => (m.kind === 'text' || m.kind === 'sys' ? m.text : m.kind === 'sticker' ? m.e : ''))
 const whos = (game: Game, from: number) => game.S.msgs.slice(from).filter((m): m is Extract<Msg, { kind: 'text' }> => m.kind === 'text').map((m) => m.who ?? 'alik')
@@ -56,6 +56,7 @@ describe('лестница грубости: ступени', () => {
   })
   it('после примирения старые остывания не уводят ссору в минус: следующий крик снова поднимает лестницу', async () => {
     const { game } = makeGame()
+    game.S.mem['intro.karine'] = true // Карине уже появилась (иначе некому писать вместо Алика)
     for (let i = 0; i < 3; i++) { game.S.offlineDays = 0; await fire(game, 'rude') }
     heat(game, 0) // суд/ритуал помирили
     game.nextDay(21)
@@ -73,7 +74,8 @@ describe('лестница грубости: ступени', () => {
   })
   it('S1 — второй крик подряд: вместо Алика пишет родня, у каждого свой перерыв', async () => {
     const { game } = makeGame()
-    game.S.mem['intro.arsen'] = true // Арсен уже появился (иначе пишут двое)
+    // все трое уже появились — иначе некому из них заговорить вместо Алика
+    Object.assign(game.S.mem, { 'intro.arsen': true, 'intro.karine': true, 'intro.samvel': true })
     heat(game, 1)
     const seen = new Set<string>()
     for (let i = 0; i < 3; i++) {
@@ -89,6 +91,21 @@ describe('лестница грубости: ступени', () => {
     expect(seen.size).toBe(3) // все трое по очереди: каждый на перерыве 4 дня
     expect(game.S.offlineDays).toBe(0)
     expect(game.S.ctx?.offended).toBe(true) // можно извиниться
+  })
+  it('пока Самвел сам не писал, в его пуле уместна только реплика знакомства', () => {
+    const { game } = makeGame()
+    const eligible = game.lines.eligible('RF_samvel', T.RUDE_FAMILY.samvel, game.lineFacts())
+    expect(eligible.map((p) => p.text)).toEqual(['Мальчик, я Самвел. На моего племянника кричу только я. Встань в очередь, она с 1987 года.'])
+  })
+  it('голосовое от Самвела и альтернативный отправитель «Нива» уместны только после знакомства', () => {
+    const { game } = makeGame()
+    const open = (pool: readonly Entry<T.Said>[], match: string) => pool.filter((e) => isOpen(e, game.lineFacts())).map(valueOf).some(([, t]) => t.includes(match))
+    expect(open(T.RUDE_CALLS_VOICE, 'Это Самвел')).toBe(false)
+    expect(open(T.RUDE_ALT, 'Пишу с «Нивы»')).toBe(false)
+    game.S.mem['intro.samvel'] = true
+    game.S.mem['intro.niva'] = true
+    expect(open(T.RUDE_CALLS_VOICE, 'Это Самвел')).toBe(true)
+    expect(open(T.RUDE_ALT, 'Пишу с «Нивы»')).toBe(true)
   })
   it('Карине забрала телефон до конца дня: назавтра с первой реплики снова отвечает Алик', async () => {
     const { game } = makeGame()

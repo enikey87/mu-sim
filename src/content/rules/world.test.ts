@@ -137,6 +137,7 @@ describe('хор: упомянутый персонаж вклинивается
     let spoke = 0
     for (let seed = 1; seed <= 30; seed++) {
       const { game } = makeGame({ seed })
+      Object.assign(game.S.mem, { 'intro.garik': true, 'intro.karine': true })
       game.alikMsg({ kind: 'text', from: 'alik', text: 'Гарик в горах, Карине у мамы, Борис болеет.' })
       const from = game.S.msgs.length
       await game.afterTurn()
@@ -158,6 +159,7 @@ describe('хор: упомянутый персонаж вклинивается
   })
   it('упоминают слишком часто — персонажу надоело (по порядку, один раз)', async () => {
     const { game } = makeGame()
+    game.S.mem['intro.garik'] = true
     game.S.actors.garik = { interjections: 3 }
     const lines: string[] = []
     for (let i = 0; i < 80 && lines.length < 3; i++) {

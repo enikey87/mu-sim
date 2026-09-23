@@ -4,11 +4,11 @@
 // go: 'node' | 'scene:node' | null (конец). Нет opts — сцена закончилась.
 import type { ExcuseApi } from './excuses'
 import type { Rng } from '../engine/rng'
-import { type Entry, gate, missing, gte, lte, valueOf } from '../engine/rules'
+import { type Entry, gate, is, missing, gte, lte, valueOf } from '../engine/rules'
 import { needs, WORLD } from './world'
 import { QUESTS, COURT_SCENE } from './quests'
 import { PAYDAY_SCENE } from './payday'
-import { HEAT, bathAsked, blocked, intro, polite, ritualCount, ritualCut } from './memkeys'
+import { HEAT, bathAsked, blocked, cardSent, intro, polite, ritualCount, ritualCut } from './memkeys'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- форма переменных задаётся сценой
 export type Vars = Record<string, any>
@@ -156,7 +156,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
           a: [
             () => `${A()}, скинь номер карты, прямо сейчас переведу!`,
             () => `${A()}, я у банкомата! Номер карты, быстро!`,
-            gate(lte('fifty', 0))(() => 'Слушай, продиктуй номер карты, я записать не успел в прошлый раз.'),
+            gate(is(cardSent))(() => 'Слушай, продиктуй номер карты, я записать не успел в прошлый раз.'),
           ],
           opts: [
             { t: ['Отправить номер карты', 'Скинуть номер карты ещё раз'], go: 'sent' },
@@ -166,13 +166,14 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
         },
         sent: {
           fx: { ach: 'card' },
-          sys: 'Вы отправили номер карты. Опять.',
+          sys: [gate(missing(cardSent))('Вы отправили номер карты.'), gate(is(cardSent))('Вы отправили номер карты. Опять.')],
           a: ['Это какой банк?', 'А это какой банк, я не понял?', 'Так, а банк какой?'],
           opts: [
             { t: 'Сбер', go: 'bank' }, { t: 'Т-Банк', go: 'bank' }, { t: 'ВТБ', go: 'bank' }, { t: 'Альфа', go: 'bank' },
           ],
         },
         bank: {
+          fx: { set: { [cardSent]: true } },
           a: [
             'Эээ, а у меня как раз другой банк. Между банками комиссия! Я не могу тебя так грабить.',
             needs('garik')('В этот банк не перевожу, там работает бывшая жена Гарика.'),
