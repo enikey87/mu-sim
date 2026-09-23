@@ -51,6 +51,7 @@ export const WORLD = {
   garikOnline: named('garikOnline', missing(garikCut)),
   /** Алик хоть раз назвал сроком «завтра» — теперь на это слово можно ссылаться. */
   saidTomorrow: named('saidTomorrow', is('said.tomorrow')),
+  saidFriday: named('saidFriday', is('said.friday')),
   /** В семье прощаются: дедушка умирает или хоронят Алика. */
   mourning: named('mourning', is(mourning)),
   grandpaDying: named('grandpaDying', is(grandpaDying)),

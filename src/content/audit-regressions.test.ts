@@ -10,6 +10,7 @@ import { isOpen, test, valueOf, type Entry, type LineSpec } from '../engine/rule
 import { playtest, transcript } from '../tools/playtest'
 import { PROMISE_DUE_KEPT, PROMISE_MET } from './world'
 import { ENDGAME_FORMALITIES, ENDGAME_RETURNERS } from './endgame'
+import { P_FRIDAY } from './topics'
 
 describe('регрессии первоначального аудита', () => {
   it('активная легенда не допускает независимую денежную отмазку', async () => {
@@ -129,7 +130,7 @@ describe('регрессии первоначального аудита', () =>
 })
 
 describe('регрессии раунда 16', () => {
-  const texts = (entries: readonly Entry<unknown>[], facts: Record<string, string | number | boolean>) =>
+  const texts = (entries: readonly Entry<unknown>[], facts: Parameters<typeof isOpen>[1] | Record<string, string | number | boolean>) =>
     entries.filter((e) => isOpen(e, facts)).map((e) => { const v = valueOf(e); return typeof v === 'string' ? v : (v as { t: string }).t })
 
   it('«с того света» пишет мёртвый Алик: смерть длится до серии возвращения, а не шесть дней', async () => {
@@ -179,6 +180,15 @@ describe('регрессии раунда 16', () => {
     const before = game.S.msgs.length
     await rule.respond!(game.rules.ctx(game, rule, { event: 'PromiseDue', facts }, facts))
     expect(game.S.msgs.slice(before).some((m) => m.kind === 'text' && m.text.includes('«как штукатурка высохнет»'))).toBe(true)
+  })
+
+  it('«вы обещали в пятницу» — только если Алик обещал пятницу', () => {
+    expect(texts(P_FRIDAY, {}).join(' ')).not.toMatch(/обещал/)
+    const { game } = makeGame()
+    const friday = (D.WHEN as Entry<When>[]).map(valueOf).find((w) => w.due && 'weekday' in w.due && w.due.weekday === 5)!
+    game.recordPromise({ text: friday.t, ...friday })
+    expect(texts(P_FRIDAY, game.lineFacts()).join(' ')).toMatch(/обещали/)
+    expect((D.LEGENDARY as Entry<string>[]).map(valueOf).join(' ')).not.toMatch(/обещал к пятнице/)
   })
 
   it('группа выплаты — не семейная, и последние 50 ₽ в ней уже не лежат', () => {
