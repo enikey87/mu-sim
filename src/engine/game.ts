@@ -995,6 +995,7 @@ export class Game {
     p.d = null
     p.due = undefined
     p.condition = condition
+    p.tomorrow = undefined // срок из легенды — не «завтра»: иначе said.tomorrow без слова «завтра»
     return p
   }
   /** «Клянусь мамой, завтра — всё отдам» + запись в журнал. */

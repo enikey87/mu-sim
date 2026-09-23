@@ -1,6 +1,6 @@
-import { type Entry, type LineSpec, gate, gte, lte, eq, ne, missing, set } from '../engine/rules'
+import { type Entry, type LineSpec, gate, gte, lte, eq, ne, is, missing, set } from '../engine/rules'
 import { needs, WORLD } from './world'
-import { count, evicted, wedding } from './memkeys'
+import { bloodGiven, count, evicted, wedding } from './memkeys'
 
 // «Живость»: Алик пишет сам, режим дня, стикеры, пересылки, удаления, правки,
 // опечатки, реакции, уведомления телефона.
@@ -116,7 +116,7 @@ export const NOTIF: Notif[] = [
   { icon: '📞', app: 'Коллекторы', t: 'Мы знаем, где живёт ваш Алик. Он нам тоже должен. Давайте дружить.' },
   { icon: '👩', app: 'Мама', t: 'Сынок, я продала дачу, чтобы ты дождался Алика.' },
   { icon: '🏠', app: 'Хозяин квартиры', t: 'Выселяю. Можешь пожить у Алика, он же тебе как отец.', when: [gte('day', 250)], remember: [set(evicted, true)] },
-  { icon: '🩸', app: 'Донорский центр', t: 'Спасибо, что пришли сдать кровь! Вы наш герой. Приходите ещё.' },
+  { icon: '🩸', app: 'Донорский центр', t: 'Спасибо, что пришли сдать кровь! Вы наш герой. Приходите ещё.', when: [is(bloodGiven)] },
   { icon: '⚰️', app: 'Ритуальные услуги', t: 'Скидка 10% на похороны для должников… то есть кредиторов Воздухонесяна. Промокод: БРАТДЖАН' },
   { icon: '🏥', app: 'Поликлиника', t: 'Анализы готовы: гречка в крови превышена в 4 раза.' },
   { icon: '🧑', app: 'Серёга', t: 'Братан, я тоже работал на Алика. В 2011-м. Жду до сих пор.' },

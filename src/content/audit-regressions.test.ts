@@ -11,7 +11,7 @@ import { playtest, transcript } from '../tools/playtest'
 import { CHORUS, PROMISE_DUE_KEPT, PROMISE_MET } from './world'
 import { ENDGAME_FORMALITIES, ENDGAME_RETURNERS } from './endgame'
 import { P_FRIDAY, TOPICS } from './topics'
-import { CLAIMS, GRAND, ROLL, SOURCES } from './payday'
+import { CLAIMS, GRAND, MORNING_CONTRA, ROLL, SOURCES } from './payday'
 import { FWD, NOTIF, PERIOD } from './life'
 import { ARC_DONE } from './arcs'
 
@@ -239,6 +239,42 @@ describe('регрессии раунда 16', () => {
     expect(isOpen(builder, { month: 8, dom: 9 })).toBe(true)
     const { game } = makeGame()
     expect(game.facts().dom).toBe(dateOf(game.S.day).getDate())
+  })
+
+  it('цикл 5: срок из легенды — не «завтра»; День выплаты ждёт возвращения Алика', async () => {
+    const { game } = makeGame()
+    const p = { text: 'расплачусь завтра', t: 'завтра', d: 1, tomorrow: true }
+    ;(game as unknown as { alignPromise: (p: object, until: string) => object }).alignPromise(p, 'как ключ выйдет')
+    game.recordPromise(p as Parameters<typeof game.recordPromise>[0])
+    expect(game.S.mem['said.tomorrow']).toBeUndefined()
+
+    for (const late of [false, true]) {
+      const { game: g } = makeGame()
+      g.S.day = late ? 500 : 340
+      g.S.stats.sent = late ? 200 : 100
+      if (!late) for (const id of ['boris', 'nune', 'grant']) g.S.arcs[id] = { i: ARCS[id].eps.length, last: 0 }
+      const beat = () => g.rules.collect({ event: 'StoryBeat' }, g.facts()).map((r) => r.name).filter((n) => n.startsWith('Beat_Payday'))
+      expect(beat(), late ? 'поздний' : 'сошлись линии').toEqual([late ? 'Beat_Payday_Late' : 'Beat_Payday'])
+      g.S.mem.alik_dead = true
+      expect(beat()).toEqual([])
+    }
+  })
+
+  it('цикл 5: повторы и утверждения без факта', () => {
+    expect(texts(LEGENDS.beton_money.lines, { 'intro.grant': true, 'grant.paid': true }).join(' ')).not.toMatch(/Грант не заплатит/)
+    expect(JSON.stringify(LEGENDS.grant.lines)).not.toMatch(/плитка слишком ровная/)
+    expect(JSON.stringify(D)).not.toMatch(/в прошлый раз, ты не оценил/)
+    expect(JSON.stringify(ARCS.nune.eps)).toMatch(/Ключ у малыша Нуне/)
+    expect(JSON.stringify(ARCS.beton.eps[2])).not.toMatch(/"Подтверждаю\./)
+    expect(JSON.stringify(MORNING_CONTRA.map((c) => c.say))).not.toMatch(/утром/i)
+    // пара противоречия мертва, если её «утренний» источник переписали: каждая находит свой доход
+    const incomes = SOURCES.map((x) => valueOf(x).t)
+    for (const c of MORNING_CONTRA) expect(incomes.some((t) => c.morning.test(t)), String(c.morning)).toBe(true)
+    const links = Object.values(GRAND).flat().map((l) => { const v = valueOf(l); return typeof v === 'string' ? v : v.t })
+    for (const c of MORNING_CONTRA) expect(links.some((t) => c.link.test(t)), String(c.link)).toBe(true)
+    const blood = NOTIF.find((n) => n.app === 'Донорский центр')!
+    expect((blood.when ?? []).every((c) => test(c, {}))).toBe(false)
+    expect((blood.when ?? []).every((c) => test(c, { 'blood.given': true }))).toBe(true)
   })
 
   it('группа выплаты — не семейная, и последние 50 ₽ в ней уже не лежат', () => {

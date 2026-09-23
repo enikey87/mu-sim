@@ -42,7 +42,7 @@ describe('День выплаты', () => {
     expect(chain).toMatch(/сейф|«Нив|Борис|коз|суд|хаш/)
     game.S.choices = null
     // утром «Сейф открыли» / «Нива вернулась» — в отмазке это же место: есть что поймать
-    expect(game.choices.find((c) => c.go === 'catch')!.text).toMatch(/^Стоп\. (Утром|Борис|«Нива»|Грант)/)
+    expect(game.choices.find((c) => c.go === 'catch')!.text).toMatch(/^Стоп\. (Сегодня|Утром|Борис|«Нива»|Грант)/)
     const debt = game.S.debt
     await choose(game, 'catch')
     expect(game.S.mem.payday).toBe('coins')
