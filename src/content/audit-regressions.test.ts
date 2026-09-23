@@ -230,8 +230,10 @@ describe('регрессии раунда 16', () => {
     expect(texts(D.P_CONDOLE as Entry<string>[], { 'grandpa.dying': true, mourning: true }).join(' ')).not.toMatch(/соболезн/i)
     expect(texts(D.P_CONDOLE as Entry<string>[], { alik_dead: true }).join(' ')).toMatch(/соболезн/i)
     expect(texts(CHORUS.grant, {}).join(' ')).not.toMatch(/заплатил|оплачено/)
+    // «всё заплатил» — новость одной серии Гранта: реплика легенды Лос-Анджелеса её не объявляет и факт не пишет
     const la = CHORUS_LEGEND.grant.map(valueOf).find((l) => typeof l !== 'string' && /Лос-Андж/.test(l.t)) as LineSpec
-    expect(la.when?.some((c) => c.key === 'grant.paid' && c.op === '!exist')).toBe(true)
+    expect(la.t).not.toMatch(/всё заплатил/)
+    expect(la.remember ?? []).toEqual([])
     expect(texts(ARCS.beton.follow, { 'arc.beton': 2 })).not.toContain('Фундамент вскрыли?')
     expect(texts(PERIOD.evening, { 'wedding.samvel': true }).join(' ')).not.toMatch(/дома|футбол/)
     expect(JSON.stringify([PERIOD, GRAND])).not.toMatch(/тамада не отпускает|ты её снимал с крыши/)

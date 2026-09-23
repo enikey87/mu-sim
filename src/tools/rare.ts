@@ -10,5 +10,5 @@ export const RARE = new Set([
   // в одной-двух выборках из трёх: состояние складывается не каждый раз
   'Says_catchLie_caught2',
   'Turn_Wedding_Samvel', 'Turn_Wedding_Razmik', 'Turn_Wedding_Boris',
-  'Turn_BorisSick', 'Chorus_garik_FedUp',
+  'Turn_BorisSick',
 ])
