@@ -49,6 +49,7 @@ export const nuneKeyPassed = 'nune.keyPassed'
 export const nuneDekretOver = 'nune.dekretOver'
 export const grandpaDying = 'grandpa.dying'
 export const betonSet = 'beton.set'
+export const cardSent = 'card.sent'
 
 export const payday = {
   at: 'payday.at', sum: 'payday.sum', chain: 'payday.chain', caught: 'payday.caught',
@@ -110,7 +111,7 @@ export const MEM_KEYS: ReadonlySet<string> = new Set([
   ritualCount, ritualCut, caughtCount, cryptoHodl, bathAsked, mamaCalls, phoneKarine, alikDay, mooAt, sorryAt,
   rudeAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway,
   garikConcrete, garikCut, houseOnGarik, borisMarried, borisSmetaReady, taxFrozen, taxThawed,
-  actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, paydayScene,
+  actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene,
   ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lie),
 ])
 
