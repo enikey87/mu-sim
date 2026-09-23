@@ -61,13 +61,13 @@ function Phone({ onReset }: { onReset: () => void }) {
   const phone = useRef<HTMLDivElement>(null)
 
   // заголовок вкладки: «(3) Алик, где деньги?»
-  useEffect(() => { document.title = game.title }, [game.title])
+  useEffect(() => { document.title = game.ui.title }, [game.ui.title])
 
   // отклик на смысл ввода (без подписи категории); снимаем класс на animationend
   useEffect(() => {
     const p = phone.current
-    if (!p || !game.feelId || !game.feel) return
-    const cls = `feel-${game.feel}`
+    if (!p || !game.ui.feelId || !game.ui.feel) return
+    const cls = `feel-${game.ui.feel}`
     p.classList.remove('feel-shake', 'feel-intimidate', 'feel-sorry', 'feel-moo')
     void p.offsetWidth
     p.classList.add(cls)
@@ -77,18 +77,18 @@ function Phone({ onReset }: { onReset: () => void }) {
     }
     p.addEventListener('animationend', clear)
     return () => p.removeEventListener('animationend', clear)
-  }, [game.feelId, game.feel])
+  }, [game.ui.feelId, game.ui.feel])
 
-  const setSheetOpen = useCallback((v: boolean) => { game.sheetOpen = v; setSheet(v) }, [game])
+  const setSheetOpen = useCallback((v: boolean) => { game.ui.sheetOpen = v; setSheet(v) }, [game])
 
   useEffect(() => {
     if (!sheet) return
-    return () => { game.sheetOpen = false }
+    return () => { game.ui.sheetOpen = false }
   }, [sheet, game])
 
   useEffect(() => {
-    if (game.S.ending || game.dead) setSheetOpen(false)
-  }, [game.S.ending, game.dead, setSheetOpen])
+    if (game.S.ending || game.ui.dead) setSheetOpen(false)
+  }, [game.S.ending, game.ui.dead, setSheetOpen])
 
   const reset = () => {
     if (!confirm('Стереть всё и начать заново?')) return
@@ -96,7 +96,7 @@ function Phone({ onReset }: { onReset: () => void }) {
     onReset()
   }
 
-  const blocked = sheet || game.dead || !!game.S.ending
+  const blocked = sheet || game.ui.dead || !!game.S.ending
 
   return (
     <div className="phone" ref={phone}>

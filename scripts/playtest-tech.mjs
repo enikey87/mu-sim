@@ -15,7 +15,7 @@ async function fresh(page) {
 }
 
 async function waitIdle(page) {
-  await page.waitForFunction(() => window.__alik && !window.__alik.busy && !window.__alik.dead, null, { timeout: 20000 })
+  await page.waitForFunction(() => window.__alik && !window.__alik.ui.busy && !window.__alik.ui.dead, null, { timeout: 20000 })
 }
 
 async function run(label, device) {

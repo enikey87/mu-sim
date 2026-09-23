@@ -35,7 +35,7 @@ describe('Game: начало и ход', () => {
     expect(fresh.some((m) => 'from' in m && m.from === 'alik') || game.S.ctx?.type === 'reactOnly').toBe(true)
     expect(game.S.stats.sent).toBe(1)
     expect(game.S.ach.first).toBeDefined()
-    expect(game.busy).toBe(false)
+    expect(game.ui.busy).toBe(false)
     expect(JSON.parse(storage.data[SAVE_KEY]).stats.sent).toBe(1)
   })
   it('ход игрока всегда двигает календарь на 1–3 дня (после ответа и хора)', async () => {
@@ -68,7 +68,7 @@ describe('Game: начало и ход', () => {
   it('ввод встраивается в правила: просьба — отмазка, извинение — примирение', async () => {
     const { game } = makeGame({ debug: true })
     await game.send('Алик, пожалуйста, переведите деньги')
-    expect(game.trace.some((entry) => entry.event === 'PlayerSays' && entry.chosen.includes('Says_request'))).toBe(true)
+    expect(game.ui.trace.some((entry) => entry.event === 'PlayerSays' && entry.chosen.includes('Says_request'))).toBe(true)
     expect(game.S.ctx).toMatchObject({ when: expect.any(String) })
 
     game.S.mem['rude.heat'] = 2
@@ -85,7 +85,7 @@ describe('Game: начало и ход', () => {
     await game.send('ВЕРНИ ДЕНЬГИ!!!')
     expect(game.S.mem['count.rude']).toBe(1)
     expect(game.S.mem['rude.heat']).toBe(1)
-    expect(game.trace.some((entry) => entry.event === 'PlayerSays' && entry.chosen.some((n) => n.startsWith('Says_request')))).toBe(true)
+    expect(game.ui.trace.some((entry) => entry.event === 'PlayerSays' && entry.chosen.some((n) => n.startsWith('Says_request')))).toBe(true)
   })
   it('насилие и запугивание из поля ввода не попадают в судебную ветку', async () => {
     const violence = makeGame().game
@@ -105,31 +105,31 @@ describe('Game: начало и ход', () => {
     const audio = { ...silentAudio, vibrate: (p: number | number[]) => { vibes.push(p) } }
     const request = makeGame({ audio }).game
     await request.send('Алик, пожалуйста, переведите деньги')
-    expect(request.feel).toBeNull()
-    expect(request.feelId).toBe(0)
+    expect(request.ui.feel).toBeNull()
+    expect(request.ui.feelId).toBe(0)
 
     const shout = makeGame({ audio }).game
     await shout.send('СКОЛЬКО МОЖНО ЖДАТЬ!!!')
-    expect(shout.feel).toBe('shake')
-    expect(shout.feelId).toBe(1)
+    expect(shout.ui.feel).toBe('shake')
+    expect(shout.ui.feelId).toBe(1)
     expect(vibes).toContainEqual([80, 40, 80])
 
     const benign = makeGame({ audio }).game
     await benign.send('АЛИК!!!')
-    expect(benign.feel).toBeNull()
+    expect(benign.ui.feel).toBeNull()
 
     const scare = makeGame({ audio }).game
     await scare.send('Знаю, где ты живёшь')
-    expect(scare.feel).toBe('intimidate')
+    expect(scare.ui.feel).toBe('intimidate')
     expect(vibes).toContainEqual([120, 50, 120, 50, 200])
 
     const sorry = makeGame({ audio }).game
     await sorry.send('Извини, я погорячился')
-    expect(sorry.feel).toBe('sorry')
+    expect(sorry.ui.feel).toBe('sorry')
 
     const moo = makeGame({ audio }).game
     await moo.send('Мууу')
-    expect(moo.feel).toBe('moo')
+    expect(moo.ui.feel).toBe('moo')
     expect(moo.feelFor({ text: 'Мууууу 🐄', tone: 'neutral', act: 'moo' })).toBe('moo')
   })
   it('свой текст посреди сцены прерывает её и продолжает обычный цикл', async () => {
@@ -138,8 +138,8 @@ describe('Game: начало и ход', () => {
     expect(game.S.scene).not.toBeNull()
     await game.send('Когда вы оплатите долг?')
     expect(game.S.scene).toBeNull()
-    expect(game.trace.some((entry) => entry.chosen.includes('Says_request'))).toBe(true)
-    expect(game.busy).toBe(false)
+    expect(game.ui.trace.some((entry) => entry.chosen.includes('Says_request'))).toBe(true)
+    expect(game.ui.busy).toBe(false)
   })
   it('пустое сообщение и повторная отправка во время ответа игнорируются', async () => {
     const { game } = makeGame()
@@ -156,7 +156,7 @@ describe('Game: начало и ход', () => {
     game.rules.add({ name: 'Test_Boom', event: 'PlayerMessage', when: [], specificity: 99, respond: () => { throw new Error('boom') } })
     await game.send('Ну как там?')
     expect(errors).toHaveBeenCalledWith('[alik] ход прерван ошибкой', expect.anything())
-    expect(game.busy).toBe(false)
+    expect(game.ui.busy).toBe(false)
     expect(game.choices.length).toBeGreaterThan(0)
     const sent = game.S.stats.sent
     await game.send('Алло')
@@ -182,7 +182,7 @@ describe('Game: начало и ход', () => {
     game.rules.add({ name: 'Test_BadOffer', event: 'BuildChoices', when: [], specificity: 99, offer: () => { throw new Error('boom') } })
     game.rules.add({ name: 'Test_Boom2', event: 'PlayerMessage', when: [], specificity: 99, respond: () => { throw new Error('boom') } })
     await game.send('Ну как там?')
-    expect(game.busy).toBe(false)
+    expect(game.ui.busy).toBe(false)
     expect(game.choices).toEqual([])
     errors.mockRestore()
   })
@@ -193,7 +193,7 @@ describe('Game: начало и ход', () => {
     game.rules.add({ name: 'Test_IdleBoom', event: 'AlikIdle', when: [], specificity: 99, respond: () => { throw new Error('boom') } })
     await game.onIdle()
     expect(errors).toHaveBeenCalledWith('[alik] ход прерван ошибкой', expect.anything())
-    expect(game.busy).toBe(false)
+    expect(game.ui.busy).toBe(false)
     expect(game.choices.length).toBeGreaterThan(0)
     errors.mockRestore()
   })
@@ -206,7 +206,7 @@ describe('Game: начало и ход', () => {
       if (!(c.scene && c.text.length <= 8)) mine.push(c.text)
       game.S.offlineDays = 0
       await game.send(c)
-      if (game.dead) await game.charge()
+      if (game.ui.dead) await game.charge()
     }
     expect(new Set(mine).size).toBe(mine.length)
   })
@@ -264,26 +264,26 @@ describe('Game: батарея', () => {
     game.S.battery = 1
     game.S.stats.sent = 3
     await game.send('Алик, привет')
-    expect(game.dead).toBe(true)
+    expect(game.ui.dead).toBe(true)
     expect(game.S.ach.dead).toBeDefined()
     expect(game.S.msgs.at(-1)).toMatchObject({ kind: 'sys', text: 'Не доставлено: у вас сел телефон.' })
     await game.send('ещё')
     expect(game.S.stats.sent).toBe(4)
     const n = game.S.msgs.length
     await game.charge()
-    expect(game.dead).toBe(false)
-    expect(game.busy).toBe(false)
+    expect(game.ui.dead).toBe(false)
+    expect(game.ui.busy).toBe(false)
     expect(game.S.battery).toBe(100)
     expect(game.S.msgs.slice(n).some((m) => m.kind === 'sys' && m.unread)).toBe(true)
-    expect(game.unread).toBeGreaterThan(0)
+    expect(game.ui.unread).toBeGreaterThan(0)
     await game.send('Алик, привет')
-    expect(game.unread).toBe(0)
+    expect(game.ui.unread).toBe(0)
   })
   it('на 15% — уведомление о низком заряде', () => {
     const { game } = makeGame()
     game.S.battery = 16
     game.drain(1)
-    expect(game.notif?.text).toMatch(/Низкий заряд/)
+    expect(game.ui.notif?.text).toMatch(/Низкий заряд/)
   })
 })
 
@@ -297,8 +297,8 @@ describe('Game: возвращение после паузы', () => {
     g1.save()
     clock.advance(3 * 3600_000)
     const g2 = new Game({ storage, clock, rng: seededRng(2), noTimers: true, hour: 14 })
-    expect(g2.unread).toBeGreaterThan(0)
-    expect(g2.title).toMatch(/^\(\d\)/)
+    expect(g2.ui.unread).toBeGreaterThan(0)
+    expect(g2.ui.title).toMatch(/^\(\d\)/)
     expect(g2.S.battery).toBe(100)
     expect(g2.S.ach.away).toBeDefined()
   })
@@ -325,7 +325,7 @@ describe('Game: возвращение после паузы', () => {
   })
   it('короткая пауза и новая игра — без непрочитанных', () => {
     const { game } = makeGame({ away: 5 })
-    expect(game.unread).toBe(0)
+    expect(game.ui.unread).toBe(0)
   })
   it('скрытая вкладка 3+ минуты — пачка сообщений', () => {
     const { game, clock } = makeGame()
@@ -333,7 +333,7 @@ describe('Game: возвращение после паузы', () => {
     game.onVisibility(true)
     clock.advance(5 * 60_000)
     game.onVisibility(false)
-    expect(game.unread).toBeGreaterThan(0)
+    expect(game.ui.unread).toBeGreaterThan(0)
   })
 })
 
@@ -354,7 +354,7 @@ describe('Game: Алик пишет сам (таймеры)', () => {
       clock.runTimers()
       await new Promise((r) => setTimeout(r, 0))
       await new Promise((r) => setTimeout(r, 0))
-      if (game.S.msgs.length > before || game.notif) acted++
+      if (game.S.msgs.length > before || game.ui.notif) acted++
       if (i === 0) game.armIdle()
     }
     expect(acted).toBeGreaterThan(0)
@@ -365,7 +365,7 @@ describe('Game: Алик пишет сам (таймеры)', () => {
   it('status «печатает…» и прочие статусы меняются сами', () => {
     const clock = manualClock()
     const game = new Game({ storage: memStorage(), clock, rng: seededRng(4), hour: 3 })
-    expect(game.status.text).toMatch(/был\(а\) в 03:/)
+    expect(game.ui.status.text).toMatch(/был\(а\) в 03:/)
     game.dispose()
   })
 })
@@ -374,11 +374,11 @@ describe('Game: сохранение', () => {
   it('перезагрузка продолжает игру и помнит показанные реплики', async () => {
     const storage = memStorage()
     const { game } = makeGame({ storage, seed: 8 })
-    for (let i = 0; i < 15; i++) { game.S.offlineDays = 0; await game.send(game.choices[0]) ; if (game.dead) await game.charge() }
+    for (let i = 0; i < 15; i++) { game.S.offlineDays = 0; await game.send(game.choices[0]) ; if (game.ui.dead) await game.charge() }
     const texts = alikTexts(game.S.msgs)
     const again = new Game({ storage, clock: manualClock(), rng: seededRng(8), noTimers: true, hour: 14 })
     expect(again.S.stats.sent).toBe(game.S.stats.sent)
-    for (let i = 0; i < 15; i++) { again.S.offlineDays = 0; await again.send(again.choices[0]); if (again.dead) await again.charge() }
+    for (let i = 0; i < 15; i++) { again.S.offlineDays = 0; await again.send(again.choices[0]); if (again.ui.dead) await again.charge() }
     const newTexts = alikTexts(again.S.msgs).slice(texts.length)
     for (const t of newTexts) if (!/^\*|\*$|автозамена|Телефон новый|^Не «/.test(t)) expect(texts).not.toContain(t)
   })
@@ -491,9 +491,9 @@ describe('Game: мелочи', () => {
     const clock = manualClock()
     const game = new Game({ storage: memStorage(), clock, rng: seededRng(1), noTimers: true })
     game.moo()
-    expect(game.moos).toHaveLength(1)
+    expect(game.ui.moos).toHaveLength(1)
     clock.runTimers()
-    expect(game.moos).toHaveLength(0)
+    expect(game.ui.moos).toHaveLength(0)
     game.toggleMute()
     expect(game.S.muted).toBe(true)
   })
@@ -569,11 +569,11 @@ describe('Game: dispose отменяет async', () => {
     const audio = { ...silentAudio, moo: () => { moos++ } }
     const game = new Game({ storage: memStorage(), clock, rng: seededRng(1), noTimers: true, hour: 14, audio })
     game.moo()
-    expect(game.moos).toHaveLength(1)
+    expect(game.ui.moos).toHaveLength(1)
     expect(moos).toBe(1)
     game.dispose()
     clock.runTimers()
-    expect(game.moos).toHaveLength(1)
+    expect(game.ui.moos).toHaveLength(1)
     expect(moos).toBe(1)
     expect(game.pendingTimers()).toBe(0)
   })
@@ -583,14 +583,14 @@ describe('Game: dispose отменяет async', () => {
     const game = new Game({ storage: memStorage(), clock: realClock(), rng: seededRng(1), noTimers: true, hour: 14 })
     game.die()
     const charge = game.charge()
-    expect(game.charging).toBe(1)
+    expect(game.ui.charging).toBe(1)
     expect(vi.getTimerCount()).toBeGreaterThan(0)
     game.dispose()
     expect(game.pendingTimers()).toBe(0)
     expect(vi.getTimerCount()).toBe(0)
     await charge
-    expect(game.charging).toBe(1)
-    expect(game.dead).toBe(true)
+    expect(game.ui.charging).toBe(1)
+    expect(game.ui.dead).toBe(true)
   })
 
   it('гонка: callback начался → dispose → следующий await без эффектов', async () => {

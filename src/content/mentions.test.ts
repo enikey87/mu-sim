@@ -271,7 +271,7 @@ describe('упоминания в партиях ботом', () => {
           check(game, shown(m as Msg), m.kind)
           if (m.kind === 'text' && m.who && !game.canSpeak(m.who)) bad.push(`seed ${seed}: пишет ${m.who} — «${m.text.slice(0, 60)}»`)
           const out = push(m)
-          if (!game.busy) for (const c of game.S.choices ?? []) check(game, c.text, 'вариант')
+          if (!game.ui.busy) for (const c of game.S.choices ?? []) check(game, c.text, 'вариант')
           return out
         }
       })

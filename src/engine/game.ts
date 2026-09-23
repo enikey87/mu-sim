@@ -27,21 +27,19 @@ import { Decks } from './deck'
 import { Seen, type Keyed } from './uniq'
 import {
   RuleSet, makeHub, Lines, resolver, test, isOpen, valueOf, set,
-  type Criterion, type Entry, type Facts, type Resolver, type Rule, type Trace, type Query, type Priority, type Line as PoolLine, type LineOpts, type Picked,
+  type Criterion, type Entry, type Facts, type Resolver, type Rule, type Query, type Priority, type Line as PoolLine, type LineOpts, type Picked,
 } from './rules'
 import { MENTION_RE, WORLD } from '../content/world'
 import { type Clock, realClock, isManualClock } from './clock'
 import { type Audio, silentAudio } from './audio'
 import { typo } from './typo'
+import { UiState, type Moo, type SendFeel } from './ui-state'
 import { classifyUserInput, type ClassifiedInput } from './input'
 import { dueIn, dateOf, fmtDate, fmtTime, nightHour, periodOf, tierOf, TIERS, type Due, type Period } from './time'
 import {
   type GameState, type Msg, type NewMsg, type Choice, type Ctx, type Tone, type Storage,
   type InputCategory, freshState, loadState, saveState, SAVE_KEY, MAX_PATIENCE,
 } from './state'
-
-/** Отклик на отправку: смысл понят, категория на экране не показывается. */
-export type SendFeel = 'shake' | 'intimidate' | 'sorry' | 'moo'
 
 /** Отмена async после dispose — ловится на entry points, игроку не показывается. */
 export class GameDisposed extends Error {
@@ -66,10 +64,6 @@ export interface GameOptions {
   typos?: boolean
 }
 
-export interface TraceEntry extends Trace { id: number; day: number }
-
-export interface Notif { id: number; icon: string; app: string; text: string }
-export interface Moo { id: number; text: string; left: number; top: number }
 
 // Регулярки событий в тексте Алика; ввод игрока классифицирует engine/input.ts.
 export const TIMEY = /^(Завтра|Скоро|Вечером|Щас|Минуту|Уже почти|Сейчас не могу|Перезвоню|Наберу)/
@@ -97,21 +91,8 @@ export class Game {
   readonly lines: Lines
   readonly D = D
 
-  // --- состояние интерфейса (не сохраняется)
-  status = { text: 'был недавно', cls: '' }
-  typing: string | null = null
-  toast: string | null = null
-  notif: Notif | null = null
-  moos: Moo[] = []
-  busy = false
-  dead = false
-  charging: number | null = null
-  unread = 0
-  feel: SendFeel | null = null
-  feelId = 0
-  title = 'Алик, где деньги?'
-  /** Последние выборы правил — для отладочной панели (?debug). */
-  trace: TraceEntry[] = []
+  /** Состояние интерфейса (не сохраняется) — ui-state.ts. */
+  readonly ui = new UiState()
 
   private storage: Storage | null
   private hour: number | null
@@ -158,7 +139,7 @@ export class Game {
     }).add(...allRules)
     if (opts.debug) {
       this.rules.tracer = (t) => {
-        this.trace = [{ ...t, id: this.seq++, day: this.S.day }, ...this.trace].slice(0, 40)
+        this.ui.trace = [{ ...t, id: this.seq++, day: this.S.day }, ...this.ui.trace].slice(0, 40)
       }
     }
     this.rawAudio.setMuted(this.S.muted)
@@ -233,7 +214,7 @@ export class Game {
 
   /** Ошибка в середине хода: партия не должна умереть вместе с ним. */
   private recoverTurn(e: unknown): void {
-    this.busy = false
+    this.ui.busy = false
     this.inPlayerTurn = false
     if (e instanceof GameDisposed) return
     console.error('[alik] ход прерван ошибкой', e)
@@ -472,8 +453,8 @@ export class Game {
 
   async typingFor(ms: number, label = 'печатает…'): Promise<void> {
     ms = Math.min(5000, Math.max(800, ms)) * (this.isNight() ? 1.5 : 1)
-    const show = () => { this.typing = label; this.status = { text: label, cls: 'typing' }; this.emit() }
-    const hide = () => { this.typing = null; this.status = { text: 'в сети', cls: 'online' }; this.emit() }
+    const show = () => { this.ui.typing = label; this.ui.status = { text: label, cls: 'typing' }; this.emit() }
+    const hide = () => { this.ui.typing = null; this.ui.status = { text: 'в сети', cls: 'online' }; this.emit() }
     show()
     if (this.chance(0.2)) {
       await this.sleep(ms * 0.6); hide(); await this.sleep(1000 + this.rnd(1200)); show()
@@ -518,7 +499,7 @@ export class Game {
   }
 
   setStatus(text: string, cls = ''): void {
-    this.status = { text, cls }
+    this.ui.status = { text, cls }
     this.emit()
   }
   restStatus(): void {
@@ -529,11 +510,11 @@ export class Game {
 
   /** Короткий тост поверх чата (ачивка, «Скопировано»…). Длительность — wall clock. */
   flash(text: string, ms = 2600): void {
-    this.toast = text
+    this.ui.toast = text
     if (this.toastWall) clearTimeout(this.toastWall)
     this.toastWall = window.setTimeout(() => {
       this.toastWall = 0
-      this.toast = null
+      this.ui.toast = null
       this.emit()
     }, ms)
     this.emit()
@@ -554,11 +535,11 @@ export class Game {
   moo(): void {
     this.S.stats.moo++
     this.S.mem[memkeys.mooAt] = this.S.stats.sent
-    if (!this.busy && !this.S.scene) this.S.choices = null // появится «Это корова?»
+    if (!this.ui.busy && !this.S.scene) this.S.choices = null // появится «Это корова?»
     if (this.S.stats.moo >= 10) this.unlock('moo10')
     const m: Moo = { id: this.seq++, text: 'М' + 'у'.repeat(4 + this.rnd(8)), left: 5 + this.rnd(45), top: 15 + this.rnd(60) }
-    this.moos.push(m)
-    this.schedule(() => { this.moos = this.moos.filter((x) => x !== m); this.emit() }, 3100)
+    this.ui.moos.push(m)
+    this.schedule(() => { this.ui.moos = this.ui.moos.filter((x) => x !== m); this.emit() }, 3100)
     this.audio.moo()
     this.emit()
   }
@@ -582,11 +563,11 @@ export class Game {
 
   // ---------- уведомления, батарея ----------
   notify(icon: string, app: string, text: string): void {
-    this.notif = { id: this.seq++, icon, app, text }
+    this.ui.notif = { id: this.seq++, icon, app, text }
     if (this.notifWall) clearTimeout(this.notifWall)
     this.notifWall = window.setTimeout(() => {
       this.notifWall = 0
-      this.notif = null
+      this.ui.notif = null
       this.emit()
     }, 4200)
     this.audio.vibrate(30)
@@ -594,7 +575,7 @@ export class Game {
   }
   dismissNotif(): void {
     if (this.notifWall) { clearTimeout(this.notifWall); this.notifWall = 0 }
-    this.notif = null
+    this.ui.notif = null
     this.emit()
   }
   randomNotif(): void {
@@ -610,7 +591,7 @@ export class Game {
     this.notify(n.icon, n.app, text)
   }
   drain(n = 1): void {
-    if (this.dead) return
+    if (this.ui.dead) return
     const before = this.S.battery
     this.S.battery = Math.max(0, this.S.battery - n)
     if (before > 15 && this.S.battery <= 15) this.notify('🪫', 'Система', `Низкий заряд батареи: ${this.S.battery}%`)
@@ -618,7 +599,7 @@ export class Game {
     this.emit()
   }
   die(): void {
-    this.dead = true
+    this.ui.dead = true
     this.clearSchedule(this.idleT)
     this.clearSchedule(this.statusT)
     this.unlock('dead')
@@ -626,17 +607,17 @@ export class Game {
     this.emit()
   }
   async charge(): Promise<void> {
-    if (!this.dead || this.charging !== null || this.disposed) return
+    if (!this.ui.dead || this.ui.charging !== null || this.disposed) return
     try {
       for (let p = 1; p <= 100; p += 9) {
         if (this.disposed) return
-        this.charging = p; this.emit(); await this.sleep(120)
+        this.ui.charging = p; this.emit(); await this.sleep(120)
       }
       if (this.disposed) return
-      this.charging = null
+      this.ui.charging = null
       this.S.battery = 100
-      this.dead = false
-      this.busy = false
+      this.ui.dead = false
+      this.ui.busy = false
       this.emit()
       this.awayBurst(2 + this.rnd(3), 1 + this.rnd(2), 'Пока телефон заряжался')
       this.armIdle()
@@ -865,8 +846,8 @@ export class Game {
   private triggerFeel(o: Choice): void {
     const feel = this.feelFor(o)
     if (!feel) return
-    this.feel = feel
-    this.feelId++
+    this.ui.feel = feel
+    this.ui.feelId++
     if (feel === 'shake') this.audio.vibrate([80, 40, 80])
     else if (feel === 'intimidate') this.audio.vibrate([120, 50, 120, 50, 200])
     this.emit()
@@ -884,9 +865,9 @@ export class Game {
     const o: Choice = parsed
       ? { text: opt as string, tone: parsed.tone, category: parsed.category, act: parsed.intent }
       : opt as Choice
-    if (this.busy || this.dead || this.disposed || !o.text.trim()) return
+    if (this.ui.busy || this.ui.dead || this.disposed || !o.text.trim()) return
     const S = this.S
-    this.busy = true
+    this.ui.busy = true
     this.inPlayerTurn = true
     this.dayMovedInTurn = false
     this.clearSchedule(this.idleT)
@@ -913,7 +894,7 @@ export class Game {
     this.drain(1)
     this.save()
     if (this.disposed) { this.inPlayerTurn = false; return }
-    if (this.dead) {
+    if (this.ui.dead) {
       this.sys('Не доставлено: у вас сел телефон.')
       S.ctx = null
       this.save()
@@ -962,7 +943,7 @@ export class Game {
       await this.rules.runDue(this, this.facts, { floor: this.floor() })
       if (this.disposed) return
       // сюжетный ход: только вне сцены, если Алик не «пропал» и в этом ходу ещё не было сцены или серии
-      if (!S.scene && !o.scene && !S.offlineDays && !this.dead && this.arcAt !== S.stats.sent) await this.fire('StoryBeat')
+      if (!S.scene && !o.scene && !S.offlineDays && !this.ui.dead && this.arcAt !== S.stats.sent) await this.fire('StoryBeat')
       await this.fire('CheckEnding')
       if (this.disposed) return
 
@@ -983,14 +964,14 @@ export class Game {
       }
       if (this.chance(0.12)) this.randomNotif()
       this.restStatus()
-      this.busy = false
+      this.ui.busy = false
       S.choices = this.buildChoices()
       this.save()
       this.emit()
       this.armIdle()
     } finally {
       this.inPlayerTurn = false
-      this.busy = false // страховка: иначе падение в середине хода запирает игру до перезагрузки
+      this.ui.busy = false // страховка: иначе падение в середине хода запирает игру до перезагрузки
     }
   }
 
@@ -1509,9 +1490,9 @@ export class Game {
   async answerJob(id: number, yes: boolean): Promise<void> {
     try {
       const m = this.S.msgs.find((x) => x.id === id)
-      if (!m || m.kind !== 'job' || m.answered || this.busy || this.dead || this.disposed) return
+      if (!m || m.kind !== 'job' || m.answered || this.ui.busy || this.ui.dead || this.disposed) return
       this.replaceMsg(m, { answered: true })
-      this.busy = true
+      this.ui.busy = true
       this.clearSchedule(this.idleT)
       const reply = this.playerLine(() => (yes ? this.draw('JY', JOB_YES_P) : this.draw('JN', JOB_NO_P)))
       this.seen.mark(reply)
@@ -1529,7 +1510,7 @@ export class Game {
         await this.say([this.uniq(this.X.jobNo)])
       }
       this.S.ctx = null
-      this.busy = false
+      this.ui.busy = false
       this.S.choices = this.buildChoices()
       this.save()
       this.emit()
@@ -1541,43 +1522,42 @@ export class Game {
   armIdle(): void {
     this.clearSchedule(this.idleT)
     // Алик пишет сам редко: не в начале игры, не раньше чем через 1,5–3 минуты тишины, не больше двух раз подряд
-    if (this.disposed || this.noTimers || this.dead || this.idleCount >= 2 || this.S.stats.sent < 5) return
+    if (this.disposed || this.noTimers || this.ui.dead || this.idleCount >= 2 || this.S.stats.sent < 5) return
     this.idleT = this.schedule(() => void this.onIdle(), (90000 + this.rnd(90000)) * (this.idleCount + 1) * 1.5 ** this.idleCount)
   }
-  sheetOpen = false
   async onIdle(): Promise<void> {
     try {
-      if (this.disposed || this.busy || this.dead || this.sheetOpen || (typeof document !== 'undefined' && document.hidden)) return this.armIdle()
+      if (this.disposed || this.ui.busy || this.ui.dead || this.ui.sheetOpen || (typeof document !== 'undefined' && document.hidden)) return this.armIdle()
       this.idleCount++
-      this.busy = true
+      this.ui.busy = true
       this.drain(1)
-      if (!this.dead) {
+      if (!this.ui.dead) {
         await this.fire('AlikIdle')
-        if (this.disposed) { this.busy = false; return }
+        if (this.disposed) { this.ui.busy = false; return }
         await this.afterTurn()
         this.S.choices = this.buildChoices()
         this.save()
       }
-      this.busy = false
+      this.ui.busy = false
       this.emit()
-      if (!this.dead && !this.disposed) { this.restStatus(); this.armIdle() }
+      if (!this.ui.dead && !this.disposed) { this.restStatus(); this.armIdle() }
     } catch (e) { this.recoverTurn(e) }
   }
   armStatus(): void {
     this.clearSchedule(this.statusT)
-    if (this.disposed || this.noTimers || this.dead) return
+    if (this.disposed || this.noTimers || this.ui.dead) return
     this.statusT = this.schedule(async () => {
       try {
         if (this.disposed) return
-        if (!this.busy && !this.dead && this.S.offlineDays === 0) {
+        if (!this.ui.busy && !this.ui.dead && this.S.offlineDays === 0) {
           if (this.chance(0.2)) {
             // «печатает…» — и ничего не приходит
-            this.typing = 'печатает…'
+            this.ui.typing = 'печатает…'
             this.setStatus('печатает…', 'typing')
             await this.sleep(1500 + this.rnd(2500))
             if (this.disposed) return
-            this.typing = null
-            if (!this.busy) this.setStatus('в сети', 'online')
+            this.ui.typing = null
+            if (!this.ui.busy) this.setStatus('в сети', 'online')
           } else if (this.isNight()) this.setStatus(`был(а) в ${this.realHHMM()}`)
           else this.setStatus(this.draw('WANDER', STATUS_WANDER), 'online')
         }
@@ -1588,8 +1568,8 @@ export class Game {
 
   // ---------- возвращение после паузы ----------
   clearUnread(): void {
-    this.unread = 0
-    this.title = 'Алик, где деньги?'
+    this.ui.unread = 0
+    this.ui.title = 'Алик, где деньги?'
   }
   private awayMsg(): void {
     const r = this.rng.random()
@@ -1630,8 +1610,8 @@ export class Game {
     const times = Array.from({ length: n }, () => now - this.rnd(Math.min(now, 360) + 1)).sort((a, b) => a - b)
     for (const t of times) { this.S.clock = t; this.awayMsg() }
     this.S.clock = now
-    this.unread = n
-    this.title = `(${n}) Алик, где деньги?`
+    this.ui.unread = n
+    this.ui.title = `(${n}) Алик, где деньги?`
     this.unlock('away')
     this.notify('💬', 'Алик Воздухонесян', `${n} ${n < 5 ? 'новых сообщения' : 'новых сообщений'}`)
     this.audio.beep()
@@ -1649,7 +1629,7 @@ export class Game {
   onVisibility(hidden: boolean): void {
     if (hidden) { this.hiddenAt = this.clock.now(); this.save(); return }
     const gapMin = (this.clock.now() - this.hiddenAt) / 60000
-    if (this.hiddenAt && gapMin >= 3 && !this.busy && !this.dead && this.S.stats.sent) this.awayBurst(Math.min(4, 1 + Math.floor(gapMin / 10)), 1)
+    if (this.hiddenAt && gapMin >= 3 && !this.ui.busy && !this.ui.dead && this.S.stats.sent) this.awayBurst(Math.min(4, 1 + Math.floor(gapMin / 10)), 1)
   }
 
   // ---------- начало ----------

@@ -7,13 +7,13 @@ import { payday } from '../content/memkeys'
 
 export function Toast() {
   const game = useGame()
-  return <div className={'toast' + (game.toast ? '' : ' hidden')} id="toast" role="status">{game.toast}</div>
+  return <div className={'toast' + (game.ui.toast ? '' : ' hidden')} id="toast" role="status">{game.ui.toast}</div>
 }
 
 /** Уведомление телефона, выезжает сверху. */
 export function Notification() {
   const game = useGame()
-  const n = game.notif
+  const n = game.ui.notif
   return (
     <div className={'notif' + (n ? ' show' : '')} id="notif" onClick={() => game.dismissNotif()} role="alert" aria-hidden={!n}>
       {n && (
@@ -55,7 +55,7 @@ async function copyText(text: string): Promise<boolean> {
 /** «Телефон сел» и зарядка. */
 export function DeadScreen() {
   const game = useGame()
-  const active = game.dead
+  const active = game.ui.dead
   const dialogRef = useRef<HTMLDivElement>(null)
   useModal({ active, dialogRef })
 
@@ -70,14 +70,14 @@ export function DeadScreen() {
           aria-label="Телефон сел"
           tabIndex={-1}
         >
-          {game.charging === null ? (
+          {game.ui.charging === null ? (
             <>
               <div className="dead-icon">🔌</div>
               <div>Телефон сел</div>
               <button id="chargeBtn" onClick={() => void game.charge()}>Поставить на зарядку</button>
             </>
           ) : (
-            <><div className="dead-icon">⚡</div><div id="chg">{game.charging}%</div></>
+            <><div className="dead-icon">⚡</div><div id="chg">{game.ui.charging}%</div></>
           )}
         </div>
       )}

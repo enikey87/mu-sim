@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useGame } from './useGame'
-import type { TraceEntry } from '../engine/game'
+import type { TraceEntry } from '../engine/ui-state'
 
 // Факты, которые почти всегда есть и только шумят
 const NOISY = /^(once\.|said\.|cb\.|caught\.)/
@@ -16,7 +16,7 @@ export function DebugPanel() {
     <aside className="debug" aria-label="Отладка правил">
       <div className="debug-head">
         <b>Правила</b>
-        <span>{game.rules.all.length} правил · показаны последние {game.trace.length} выборов</span>
+        <span>{game.rules.all.length} правил · показаны последние {game.ui.trace.length} выборов</span>
       </div>
 
       <details className="debug-mem">
@@ -28,7 +28,7 @@ export function DebugPanel() {
       </details>
 
       <ol className="debug-list">
-        {game.trace.map((t) => <Entry key={t.id} t={t} open={open === t.id} onToggle={() => setOpen(open === t.id ? null : t.id)} />)}
+        {game.ui.trace.map((t) => <Entry key={t.id} t={t} open={open === t.id} onToggle={() => setOpen(open === t.id ? null : t.id)} />)}
       </ol>
     </aside>
   )

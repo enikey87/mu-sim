@@ -57,7 +57,7 @@ describe('App', () => {
     const { game } = makeGame({ seed: 2 })
     renderApp(game)
     const texts = game.choices.map((c) => c.text)
-    act(() => { game.busy = true; game.emit() })
+    act(() => { game.ui.busy = true; game.emit() })
     const locked = document.querySelectorAll('.choices button')
     expect(locked.length).toBe(texts.length)
     expect(document.querySelector('#choices')).toHaveAttribute('aria-busy', 'true')
@@ -69,7 +69,7 @@ describe('App', () => {
       expect(b.textContent).toMatch(/^\?{2,4}$/)
     }
     for (const t of texts) expect(screen.queryByText(t)).toBeNull()
-    act(() => { game.busy = false; game.emit() })
+    act(() => { game.ui.busy = false; game.emit() })
     expect(document.querySelector('#choices')).toHaveAttribute('aria-busy', 'false')
     for (const t of texts) expect(screen.getAllByText(t).some((el) => el.closest('.choices'))).toBe(true)
   })
@@ -80,10 +80,10 @@ describe('App', () => {
     const chat = document.querySelector('#chat') as HTMLElement
     const box = mockScrollBox(chat)
 
-    act(() => { game.busy = true; game.emit() })
+    act(() => { game.ui.busy = true; game.emit() })
     expect(box.top()).toBe(box.bottom())
     box.setClient(220) // настоящие многострочные варианты отняли ещё 80 px у чата
-    act(() => { game.busy = false; game.emit() })
+    act(() => { game.ui.busy = false; game.emit() })
     expect(box.top()).toBe(580)
     expect(box.top()).toBe(box.bottom())
   })
@@ -175,7 +175,7 @@ describe('App', () => {
 
     await user.clear(input)
     await user.type(input, 'Черновик')
-    act(() => { game.busy = true; game.emit() })
+    act(() => { game.ui.busy = true; game.emit() })
     expect(input).toBeDisabled()
     expect(screen.getByLabelText('Отправить')).toBeDisabled()
     expect(input.value).toBe('Черновик')
@@ -258,12 +258,12 @@ describe('App', () => {
     const dialog = screen.getByRole('dialog', { name: 'Досье на Алика' })
     expect(dialog).toHaveAttribute('aria-modal', 'true')
     expect(document.activeElement).toBe(screen.getByLabelText('Закрыть'))
-    expect(game.sheetOpen).toBe(true)
+    expect(game.ui.sheetOpen).toBe(true)
     expect(document.querySelector('.phone-surface')).toHaveAttribute('inert')
     act(() => { fireEvent.keyDown(document, { key: 'Escape' }) })
     expect(screen.queryByRole('dialog', { name: 'Досье на Алика' })).toBeNull()
     expect(document.activeElement).toBe(info)
-    expect(game.sheetOpen).toBe(false)
+    expect(game.ui.sheetOpen).toBe(false)
     expect(document.querySelector('.phone-surface')).not.toHaveAttribute('inert')
   })
 
@@ -302,11 +302,11 @@ describe('App', () => {
     const { game } = makeGame()
     renderApp(game)
     fireEvent.click(screen.getByTitle('Обещания и ачивки'))
-    expect(game.sheetOpen).toBe(true)
+    expect(game.ui.sheetOpen).toBe(true)
     const before = game.S.msgs.length
     await act(async () => { await game.onIdle() })
     expect(game.S.msgs.length).toBe(before)
-    expect(game.busy).toBe(false)
+    expect(game.ui.busy).toBe(false)
   })
 
   it('досье поверх уведомления: фон inert, клик по notif не dismiss', () => {
@@ -596,7 +596,7 @@ describe('лента как лог для скринридера', () => {
     expect(log).toHaveAttribute('aria-live', 'polite')
     expect(document.querySelector('.moo-layer')).toHaveAttribute('aria-hidden', 'true')
 
-    act(() => { game.typing = 'печатает…'; game.emit() })
+    act(() => { game.ui.typing = 'печатает…'; game.emit() })
     expect(document.querySelector('.typing-bubble')).toHaveAttribute('aria-hidden', 'true')
   })
 })

@@ -221,7 +221,7 @@ describe('Алик пишет сам (AlikIdle)', () => {
     const n = game.S.msgs.length
     await game.fire('AlikIdle')
     expect(game.S.msgs.length).toBe(n)
-    expect(game.notif).not.toBeNull()
+    expect(game.ui.notif).not.toBeNull()
   })
   it('в обычном режиме пишет сам', async () => {
     let wrote = 0
