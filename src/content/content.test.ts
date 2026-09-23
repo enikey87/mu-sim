@@ -113,6 +113,11 @@ describe('dictionaries', () => {
       // подстановки — только у трат с карты
       expect(/\{\w+\}/.test(n.t), n.t).toBe(!!n.spend)
     }
+    // одноразовые уведомления не выдают того, чего не было: карта продолжает списывать и дальше
+    const blood = L.NOTIF.find((n) => n.app === 'Донорский центр')!
+    expect(blood.t).not.toMatch(/снова/)
+    const bankFifty = L.NOTIF.find((n) => n.app === 'Банк' && /50\s?₽ в месяц/.test(n.t))!
+    expect(bankFifty.t).not.toMatch(/заблокирован/)
   })
   it('player templates only use known placeholders', () => {
     for (const k of Object.keys(D).filter((k) => k.startsWith('P_'))) {
