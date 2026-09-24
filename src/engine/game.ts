@@ -15,6 +15,12 @@ import { SPEAKS, meet } from '../content/world'
 import { ALIK_STATUS, FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_WANDER, OATH_FORMS } from '../content/misc'
 import { STARTS } from '../content/quests'
 import { BILLS, billDue, billDueAt, billStreak, billUnpaid, lightOff, netRation, phoneWarn, type BillId } from '../content/bills'
+import {
+  LOANS, THINGS, MOM_DONE_TEXT,
+  creditStage, creditOffer, creditBroke, momDone,
+  sold, momHelp, loanTaken, loanDueAt, nextLoan, nextThing, allSold, nextMom,
+  type LoanId, type ThingId,
+} from '../content/credit'
 import { allRules } from '../content/rules'
 import type { GameEvent, Offer } from '../content/rules/events'
 import { CLAIMS, claimByKey, conflicts, CALLBACK_OPEN, type Claim } from '../content/lies'
@@ -173,7 +179,7 @@ export class Game {
     this.rawAudio.setMuted(this.S.muted)
 
     if (!this.S.msgs.length) this.seed()
-    else this.scheduleBills()
+    else { this.scheduleBills(); this.scheduleCredits() }
     void this.checkAway(opts.away ?? null)
     if (!this.S.choices) this.S.choices = this.buildChoices()
     this.restStatus()
@@ -450,6 +456,7 @@ export class Game {
         ? 'Банк: остаток критический. Гречка и достоинство — разные статьи расходов.'
         : 'Банк обеспокоен остатком. Рекомендуем не ждать Алика.'
       this.notify('🏦', 'Банк', warn)
+      if (after === 'bottom') this.maybeCreditOffer()
     }
     return true
   }
@@ -486,6 +493,97 @@ export class Game {
       if (id === 'transit' && streak >= 2) this.rules.applyOps([set(netRation, true)], {})
     }
     this.scheduleBills()
+    if (this.moneyLevel() === 'bottom') this.maybeCreditOffer()
+  }
+  /** Расписание платежей по взятым кредитам. */
+  scheduleCredits(): void {
+    if (this.moneySealed()) return
+    for (const loan of LOANS) {
+      if (!this.S.mem[loanTaken(loan.id)]) continue
+      const atKey = loanDueAt(loan.id)
+      const existing = Number(this.S.mem[atKey] ?? 0)
+      if (existing > this.S.day) continue
+      const at = this.S.day + dueIn(loan.due, this.S.day)
+      this.S.mem[atKey] = at
+      this.scheduleEvent(at, 'CreditDue', { credit: loan.id })
+    }
+  }
+  /** Списать платёж по займу; отказ по микрозайму → ступень «нечем платить». */
+  chargeCredit(id: LoanId): void {
+    if (this.moneySealed()) return
+    const loan = LOANS.find((l) => l.id === id)
+    if (!loan || !this.S.mem[loanTaken(id)]) return
+    delete this.S.mem[loanDueAt(id)]
+    if (this.adjustMoney(-loan.payment, loan.label)) {
+      this.scheduleCredits()
+      return
+    }
+    this.notify('🏦', 'Банк', `Не прошло: недостаточно средств. ${loan.label}, ${loan.payment.toLocaleString('ru-RU')} ₽.`)
+    if (id === 'micro' && !this.S.mem[creditBroke]) {
+      this.rules.applyOps([set(creditBroke, true), set(creditStage, 4)], {})
+      this.notify('🏦', 'МФО', 'Платёж не прошёл. Мы не злимся. Мы записываем')
+    }
+    this.scheduleCredits()
+    if (this.moneyLevel() === 'bottom') this.maybeCreditOffer()
+  }
+  /**
+   * На дне: предложить следующую ступень лестницы, либо маму, если лестница кончилась
+   * или игрок продал всё, так и не взяв кредит.
+   */
+  maybeCreditOffer(): void {
+    if (this.moneySealed() || this.moneyLevel() !== 'bottom') return
+    if (this.S.mem[creditOffer]) return
+    const stage = Number(this.S.mem[creditStage] ?? 0)
+    // мама: лестница кончилась, или всё продано без единого займа
+    if (this.S.mem[creditBroke] || (allSold(this.S.mem) && stage === 0)) {
+      this.tryMomHelp()
+      return
+    }
+    // после микрозайма новых кредитов нет — капают платежи
+    if (stage >= 3) return
+    const loan = nextLoan(stage)
+    if (!loan) return
+    this.rules.applyOps([set(creditOffer, true)], {})
+    this.notify('🏦', 'Банк', loan.offer)
+  }
+  takeCredit(): void {
+    if (this.moneySealed() || !this.S.mem[creditOffer]) return
+    const stage = Number(this.S.mem[creditStage] ?? 0)
+    const loan = nextLoan(stage)
+    if (!loan) return
+    this.rules.applyOps([
+      set(creditOffer, false),
+      set(creditStage, loan.stage),
+      set(loanTaken(loan.id), true),
+    ], {})
+    this.adjustMoney(loan.amount, `Кредит: ${loan.label.replace(/^Платёж по /, '').replace(/^Платёж /, '')}`)
+    this.scheduleCredits()
+  }
+  sellThing(id?: ThingId): void {
+    if (this.moneySealed() || !this.S.mem[creditOffer]) return
+    const thing = id ? THINGS.find((t) => t.id === id) : nextThing(this.S.mem)
+    if (!thing || this.S.mem[sold(thing.id)]) return
+    this.rules.applyOps([set(creditOffer, false), set(sold(thing.id), true)], {})
+    this.adjustMoney(thing.amount, thing.done)
+    this.notify('🏷', 'Авито', thing.done)
+    // продажа могла не вытащить со дна — снова предложить
+    if (this.moneyLevel() === 'bottom') this.maybeCreditOffer()
+  }
+  tryMomHelp(): void {
+    if (this.moneySealed() || this.S.mem[momDone]) return
+    const help = nextMom(this.S.mem)
+    if (!help) {
+      this.rules.applyOps([set(momDone, true)], {})
+      this.notify('👩', 'Мама', MOM_DONE_TEXT)
+      return
+    }
+    this.rules.applyOps([set(momHelp(help.id), true)], {})
+    this.adjustMoney(help.amount, `Мама: ${help.text}`)
+    this.notify('👩', 'Мама', help.text)
+    if (!nextMom(this.S.mem)) {
+      this.rules.applyOps([set(momDone, true)], {})
+      this.notify('👩', 'Мама', MOM_DONE_TEXT)
+    }
   }
   /** Закрыть кнопки допработ в ленте (после Дня выплаты). */
   sealOpenJobs(): void {
@@ -1848,6 +1946,7 @@ export class Game {
     this.S.clock = this.realMinutes()
     if (st.first) this.push({ kind: 'text', from: 'alik', time: fmtTime(this.S.clock), text: st.first })
     this.scheduleBills()
+    this.scheduleCredits()
   }
 
   // для отображения

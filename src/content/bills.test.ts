@@ -27,7 +27,8 @@ describe('платежи по календарю', () => {
     expect(game.S.money).toBe(100)
     expect(game.S.mem[billUnpaid('rent')]).toBe(true)
     expect(game.S.mem[lightOff]).toBe(true)
-    expect(game.ui.notif?.text).toMatch(/недостаточно средств/i)
+    // на дне следом предложение кредита перекрывает последнюю СМС
+    expect(game.ui.notif?.text).toMatch(/недостаточно средств|Всё будет/i)
   })
   it('после выселения коммуналка не списывается', () => {
     const { game } = makeGame()

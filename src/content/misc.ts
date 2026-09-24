@@ -2,6 +2,7 @@
 import { type Line, eq, gate, gte, is, ne, of, set } from '../engine/rules'
 import { needs, WORLD } from './world'
 import { alikDead, blocked, bloodGiven, court, endgame, phoneKarine, polite, sick, threatClaim, wedding } from './memkeys'
+import { sold } from './credit'
 // повторяемые занятия — после перерыва; события («продали микроволновку») — один раз
 export const FLOOR: Line[] = [
   'Вы полежали на полу 15 минут. Терпение восстановлено.', 'Вы вышли на балкон и посчитали голубей. Терпение восстановлено.',
@@ -11,9 +12,10 @@ export const FLOOR: Line[] = [
   'Вы съели доширак без специй — специи на чёрный день. Терпение восстановлено.',
   'Вы позвонили маме. Мама спросила про Алика. Терпение восстановлено не полностью.',
 ].map((t): Line => ({ t, repeat: true, cooldown: { turns: 60 } })).concat([
-  // нищета — факт уровня moneyBottom, не сырое число (docs/design/money.md)
+  // нищета — факт уровня moneyBottom; кровь и память о проданном — с фактами (docs/design/money.md)
   gate(is('moneyBottom'))({ remember: [set(bloodGiven, true)], t: 'Вы сдали кровь за деньги. Терпение восстановлено, гемоглобин — нет.', repeat: true, cooldown: { turns: 60 } }),
-  gate(is('moneyBottom'))('Вы продали микроволновку. Терпение восстановлено.'), 'Вы написали завещание: всё — Алику, пусть подавится. Терпение восстановлено.',
+  gate(is(sold('microwave')))('Вы вспомнили про микроволновку. Её уже нет. Терпение восстановлено.'),
+  'Вы написали завещание: всё — Алику, пусть подавится. Терпение восстановлено.',
   'Вы примерили гроб в ритуальном салоне. Удобно. Терпение восстановлено.',
 ])
 
