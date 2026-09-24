@@ -106,7 +106,7 @@ export interface Rule<G, E extends string = string> {
   priority?: Priority
   /** Записи в память перед ответом (applyFacts): ответ видит их; при false откатываются. */
   remember?: FactOp[]
-  /** Ответ. Вернуть false — «ничего не сделал»: правило остаётся как было, а fire отдаёт null. */
+  /** Ответ. Вернуть false — «ничего не сделал»: commit откатывается, fire пробует следующее подходящее правило. */
   respond?: (ctx: RuleCtx<G>) => void | boolean | Promise<void | boolean>
   /** Для событий-сборщиков: что правило предлагает. */
   offer?: (ctx: RuleCtx<G>) => unknown

@@ -26,6 +26,8 @@ export interface RuleSetOptions {
 export interface FireOptions {
   /** Порог приоритета: правила ниже него отклоняются. */
   floor?: Priority
+  /** Имена правил, уже промолчавших в этом `fire` — match их не берёт (иначе вечная тишина заслоняет остальных). */
+  skip?: ReadonlySet<string>
 }
 
 export class RuleSet<G> {
@@ -106,11 +108,16 @@ export class RuleSet<G> {
   /** Лучшее правило для запроса или null. */
   match(q: Query, facts: Facts = q.facts ?? {}, opts: FireOptions = {}): Rule<G> | null {
     const floor = PRIORITY[opts.floor ?? 'idle']
+    const skip = opts.skip
     const trace: Candidate[] | null = this.tracer ? [] : null
     let best = -1
     const tied: Rule<G>[] = []
     for (const r of this.rules(q.event)) {
       const s = specificityOf(r)
+      if (skip?.has(r.name)) {
+        trace?.push({ name: r.name, specificity: s, ok: false, failed: ['уже промолчало в этом выборе'] })
+        continue
+      }
       if (best !== -1 && s < best) {
         if (!trace) break
         // для объяснения — досчитываем остальных, не тратя случайность на их шанс
@@ -240,25 +247,31 @@ export class RuleSet<G> {
   /**
    * Вызвать событие: лучшее правило → память → ответ → цепочка событий.
    * factsFor пересобирает факты на каждое событие цепочки (чтобы видеть свежую память).
-   * Промолчавшее правило (respond вернул false) откатывается и null — вызывающий отвечает сам.
+   * Промолчавшее правило (respond → false) откатывается; fire берёт следующее подходящее —
+   * иначе правило, которое молчит всегда, заслоняло бы остальных на каждом ходе.
+   * Если промолчали все — null, вызывающий отвечает сам.
    */
   async fire(game: G, q: Query, factsFor: (extra: Facts) => Facts, opts: FireOptions = {}, depth = 0): Promise<Rule<G> | null> {
     if (depth > 8) throw new Error(`Rule trigger chain too deep at ${q.event}`)
-    const facts = factsFor(q.facts ?? {})
-    const r = this.match(q, facts, opts)
-    if (!r) return null
-    const undo = this.commit(r, q)
-    const res = await r.respond?.(this.ctx(game, r, q, facts))
-    const responded = res !== false
-    if (!responded) undo()
-    for (const t of r.trigger ?? []) {
-      if (t.ifResponded && !responded) continue
-      if (t.probability !== undefined && this.rng.random() >= t.probability) continue
-      const next: Query = { event: t.event, facts: t.facts, sender: t.sender ?? q.sender, target: t.target ?? q.target }
-      if (t.delay) this.schedule({ at: this.now().day + t.delay, kind: 'event', ...next })
-      else await this.fire(game, next, factsFor, opts, depth + 1)
+    const skip = new Set(opts.skip ?? [])
+    while (true) {
+      const facts = factsFor(q.facts ?? {})
+      const r = this.match(q, facts, { ...opts, skip })
+      if (!r) return null
+      const undo = this.commit(r, q)
+      const res = await r.respond?.(this.ctx(game, r, q, facts))
+      const responded = res !== false
+      if (!responded) undo()
+      for (const t of r.trigger ?? []) {
+        if (t.ifResponded && !responded) continue
+        if (t.probability !== undefined && this.rng.random() >= t.probability) continue
+        const next: Query = { event: t.event, facts: t.facts, sender: t.sender ?? q.sender, target: t.target ?? q.target }
+        if (t.delay) this.schedule({ at: this.now().day + t.delay, kind: 'event', ...next })
+        else await this.fire(game, next, factsFor, opts, depth + 1)
+      }
+      if (responded) return r
+      skip.add(r.name)
     }
-    return responded ? r : null
   }
 
   /** Вызвать все наступившие отложенные события. */
