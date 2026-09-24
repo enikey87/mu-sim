@@ -1,11 +1,11 @@
 // День выплаты: шаги сцены (hook) собираются из событий партии; исход выбирают правила PaydayOutcome.
 import type { Game } from '../../engine/game'
 import { type Rule, eq, gte, is, exists, missing } from '../../engine/rules'
-import type { GameEvent } from './events'
+import type { GameEvent, Offer } from './events'
 import { SOURCES, SOURCES_TOPUP, ROLL, CLAIMS, GRAND, GRAND_FALLBACK, SLOTS, CONTRADICTIONS, MORNING_CONTRA, OUTCOME, type Source, type Call, type Claim } from '../payday'
 import { alikDead, caughtCount, count, cryptoHodl, payday as pd, paydayScene } from '../memkeys'
 
-type R = Rule<Game, GameEvent>
+type R = Rule<Game, GameEvent, Offer>
 const NAMES = ['Гарик', 'Борис', 'Гоар', 'мама', 'Рубик', 'Размик', 'Нуне', 'Карине', 'Страсбург', 'малыш', '«Нив', 'Грант']
 const fmt = (n: number) => n.toLocaleString('ru-RU')
 
@@ -110,11 +110,11 @@ const outcome = (id: string, when: R['when'], extra: Partial<R> = {}): R => ({
     if (o.sys) game.sys(o.sys.replace('{debt}', fmt(game.S.debt)).replace('{sum}', fmt(Number(game.S.mem[pd.sum] ?? game.S.debt))))
     for (const l of game.open(o.lines)) await game.say([typeof l === 'string' ? l : { w: l[0], t: l[1] }])
     // долг меняем до печати выплаты: после paydayScene adjustDebt уже не пустит
-    if (id === 'real' || id === 'coins') { game.S.money += game.S.debt; game.adjustDebt(-game.S.debt) }
+    if (id === 'real' || id === 'coins') { game.adjustMoney(game.S.debt, 'День выплаты'); game.adjustDebt(-game.S.debt) }
     if (id === 'lavash') { game.adjustDebt(-game.S.debt); game.S.items.push('Лаваш × 240 000') }
     if (id === 'niva') { game.adjustDebt(-Math.min(5000, game.S.debt)); game.S.items.push('«Нива» (выплата)') }
     if (id === 'notyou') game.S.items.push('Место на кране (40 м)')
-    if (id === 'default') { if (game.adjustDebt(-50)) game.S.money += 50 }
+    if (id === 'default') { if (game.adjustDebt(-50)) game.adjustMoney(50, 'День выплаты') }
     game.S.mem[paydayScene] = id
     game.sealOpenJobs()
     game.S.mem[pd.sum] = undefined

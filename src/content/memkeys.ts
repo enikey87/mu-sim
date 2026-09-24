@@ -101,6 +101,7 @@ export const ACTOR_KEYS: ReadonlySet<string> = new Set([sick, interjections])
 /** Факты события (собираются в facts() на каждый fire) — не mem, но валидатор обязан их знать; сверка с facts() — factkeys.test.ts. */
 export const EVENT_KEYS: ReadonlySet<string> = new Set([
   'day', 'dow', 'month', 'dom', 'sent', 'moo', 'tier', 'mood', 'patience', 'money', 'debt', 'fifty',
+  'moneyNormal', 'moneyLow', 'moneyBottom',
   'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sorrySwing', 'promiseLive',
   'period', 'night', 'offline', 'scene', 'sinceAlik', 'lateCount', 'arcAvailable',
   'arcsStarted', 'arcsDone', 'quests', 'callbackReady', 'arcUnfinished', 'deathCanAdvance',

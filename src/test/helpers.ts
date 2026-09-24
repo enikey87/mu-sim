@@ -20,7 +20,7 @@ export interface TestGame { game: Game; clock: ManualClock; storage: ReturnType<
 export function makeGame(opts: Partial<GameOptions> & { seed?: number } = {}): TestGame {
   const clock = (opts.clock as ManualClock) ?? manualClock()
   const storage = (opts.storage as ReturnType<typeof memStorage>) ?? memStorage()
-  const game = new Game({ hour: 14, noTimers: true, typos: false, ...opts, clock, storage, rng: opts.rng ?? seededRng(opts.seed ?? 1) })
+  const game = new Game({ hour: 14, noTimers: true, typos: false, strictSilence: true, ...opts, clock, storage, rng: opts.rng ?? seededRng(opts.seed ?? 1) })
   return { game, clock, storage }
 }
 

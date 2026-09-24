@@ -15,7 +15,7 @@ import { SPEAKS, meet } from '../content/world'
 import { FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_WANDER, OATH_FORMS } from '../content/misc'
 import { STARTS } from '../content/quests'
 import { allRules } from '../content/rules'
-import type { GameEvent } from '../content/rules/events'
+import type { GameEvent, Offer } from '../content/rules/events'
 import { CLAIMS, claimByKey, conflicts, CALLBACK_OPEN, type Claim } from '../content/lies'
 import * as memkeys from '../content/memkeys'
 import {
@@ -50,6 +50,9 @@ const literalRe = (t: string): RegExp => {
   return re
 }
 
+/** Строгий режим молчания: правило промолчало, но изменило S. Ход её не глотает — иначе проверка слепа. */
+export class SilenceBreach extends Error {}
+
 /** Отмена async после dispose — ловится на entry points, игроку не показывается. */
 export class GameDisposed extends Error {
   override name = 'GameDisposed'
@@ -71,6 +74,8 @@ export interface GameOptions {
   debug?: boolean
   /** Опечатки Алика (в тестах выключены, чтобы проверять тексты дословно) */
   typos?: boolean
+  /** Промолчавшее правило, оставившее след в S, — ошибка (в тестах включено; снимок S на каждое правило стоит времени) */
+  strictSilence?: boolean
 }
 
 
@@ -97,7 +102,7 @@ export class Game {
   readonly seen: Seen
   readonly X: ExcuseApi
   readonly scenes: Record<string, Scene>
-  readonly rules: RuleSet<Game>
+  readonly rules: RuleSet<Game, Offer>
   /** Выбор реплик как в Hades: требования, приоритет, «уже сказано». */
   readonly lines: Lines
   readonly D = D
@@ -154,11 +159,12 @@ export class Game {
     this.scenes = makeScenes(this.X)
     this.S.rules.said ??= {} // старые сохранения
     this.lines = new Lines(this.S.rules.said, this.rng, () => ({ turn: this.S.stats.sent, day: this.S.day }))
-    this.rules = new RuleSet<Game>({
+    this.rules = new RuleSet<Game, Offer>({
       rng: this.rng,
       hub: makeHub(this.S.mem, this.S.actors),
       state: this.S.rules,
       now: () => ({ turn: this.S.stats.sent, day: this.S.day }),
+      silence: opts.strictSilence ? (_, r) => this.silenceCheck(r.name) : undefined,
     }).add(...allRules)
     if (opts.debug) {
       this.rules.tracer = (t) => {
@@ -238,6 +244,7 @@ export class Game {
 
   /** Ошибка в середине хода: партия не должна умереть вместе с ним. */
   private recoverTurn(e: unknown): void {
+    if (e instanceof SilenceBreach) throw e
     this.ui.busy = false
     this.inPlayerTurn = false
     if (e instanceof GameDisposed) return
@@ -290,6 +297,12 @@ export class Game {
     const x = this.decks.pick(key, arr, this.lineFacts())
     if (x === null) throw new Error(`Колода ${key}: ни одного элемента, уместного сейчас`)
     return x
+  }
+  /** Снимок S для строгого режима молчания: всё, кроме учёта выбора равных (groups) — его двигает сам match. */
+  private silenceCheck(rule: string): () => void {
+    const stamp = () => { const { msgs, rules, ...rest } = this.S; return JSON.stringify([rest, msgs.length, msgs.at(-1)?.id, { ...rules, groups: null }]) }
+    const before = stamp()
+    return () => { if (stamp() !== before) throw new SilenceBreach(`Правило ${rule} промолчало, но оставило след в S`) }
   }
   lineFacts(): Resolver {
     return resolver(this.rules.hub, { event: 'line' }, this.facts())
@@ -403,6 +416,39 @@ export class Game {
   adjustDebt(delta: number): boolean {
     if (this.debtSealed()) return false
     this.S.debt += delta
+    return true
+  }
+  // Дно ≤ 6000 (как старый FLOOR); «мало» ≤ 9000 — предупреждение до дна. Старт 12400.
+  static readonly MONEY_LOW = 9000
+  static readonly MONEY_BOTTOM = 6000
+  moneyLevel(): 'normal' | 'low' | 'bottom' {
+    const m = this.S.money
+    if (m <= Game.MONEY_BOTTOM) return 'bottom'
+    if (m <= Game.MONEY_LOW) return 'low'
+    return 'normal'
+  }
+  /** После Дня выплаты механика денег выключена. */
+  moneySealed(): boolean {
+    return this.debtSealed() || !!this.S.mem[memkeys.endgame.active]
+  }
+  /** Единственная точка изменения S.money: СМС банка + смена уровня. */
+  adjustMoney(delta: number, reason: string): boolean {
+    if (this.moneySealed()) return false
+    if (delta === 0) return true
+    const before = this.moneyLevel()
+    this.S.money = Math.max(0, this.S.money + delta)
+    const after = this.moneyLevel()
+    const amount = Math.abs(delta).toLocaleString('ru-RU')
+    const bal = this.S.money.toLocaleString('ru-RU')
+    const kind = delta < 0 ? 'Списание' : 'Поступление'
+    this.notify('🏦', 'Банк', `${kind} ${amount} ₽. ${reason}. Баланс: ${bal} ₽`)
+    const rank = { normal: 2, low: 1, bottom: 0 }
+    if (rank[after] < rank[before]) {
+      const warn = after === 'bottom'
+        ? 'Банк: остаток критический. Гречка и достоинство — разные статьи расходов.'
+        : 'Банк обеспокоен остатком. Рекомендуем не ждать Алика.'
+      this.notify('🏦', 'Банк', warn)
+    }
     return true
   }
   /** Закрыть кнопки допработ в ленте (после Дня выплаты). */
@@ -626,13 +672,12 @@ export class Game {
     const p = this.linePicked('NOTIF', L.NOTIF)
     if (!p) return
     const n = p.spec as L.Notif
-    let text = p.text
     if (n.spend) {
       const spend = 90 + this.rnd(40) * 10
-      this.S.money = Math.max(0, this.S.money - spend)
-      text = this.X.fill(text, { spend: String(spend), what: this.draw('SPEND', L.SPEND), money: this.S.money.toLocaleString('ru-RU') })
+      this.adjustMoney(-spend, this.draw('SPEND', L.SPEND))
+      return
     }
-    this.notify(n.icon, n.app, text)
+    this.notify(n.icon, n.app, p.text)
   }
   // ---------- телефон: что Game делает по событиям Battery ----------
   private onPhoneDead(): void {
@@ -696,8 +741,10 @@ export class Game {
     for (const id in S.arcs) progress['arc.' + id] = S.arcs[id].i
     for (const k in S.ach) progress['ach.' + k] = true
     for (const k in S.ach) progress['since.' + k] = S.day - S.ach[k]
+    const moneyLv = this.moneyLevel()
     return {
       day: S.day, tier: S.tier, mood: S.mood, sent: S.stats.sent, moo: S.stats.moo, patience: S.patience, money: S.money, debt: S.debt, fifty: S.stats.fifty,
+      moneyNormal: moneyLv === 'normal', moneyLow: moneyLv === 'low', moneyBottom: moneyLv === 'bottom',
       dow: date.getDay(), month: date.getMonth() + 1, dom: date.getDate(),
       ...progress,
       items: S.items.length,
@@ -834,7 +881,8 @@ export class Game {
       const n = this.scenes[S.scene.id].nodes[S.scene.node]
       // поймать на лжи можно и посреди сцены — это её прерывает
       const catchLie = this.rules.collect({ event: 'BuildChoices' }, this.facts()).find((r) => r.name === 'Opt_CatchLie')
-      const lieOpt = catchLie ? [catchLie.offer!(this.rules.ctx(this, catchLie, { event: 'BuildChoices' }, this.facts())) as Choice] : []
+      const lie = catchLie?.offer?.(this.rules.ctx(this, catchLie, { event: 'BuildChoices' }, this.facts()))
+      const lieOpt = lie ? [lie] : []
       return [...lieOpt, ...(n.opts ?? []).map((o, i) => {
         const gen = (): string => this.fillMoney(typeof o.t === 'function' ? o.t(S.scene!.vars) : Array.isArray(o.t) ? this.draw<string>(`${S.scene!.id}.${S.scene!.node}.o${i}`, o.t) : o.t)
         const t = gen().length > 8 ? this.playerLine(gen) : gen()
@@ -846,7 +894,7 @@ export class Game {
     const out: Choice[] = []
     for (const r of this.rules.collect({ event: 'BuildChoices' }, facts)) {
       if (out.length >= 2) break
-      const c = r.offer?.(this.rules.ctx(this, r, { event: 'BuildChoices' }, facts)) as Choice | null
+      const c = r.offer?.(this.rules.ctx(this, r, { event: 'BuildChoices' }, facts))
       if (c) out.push(c)
     }
     const P2 = (a: string, b: string) => this.playerLine(() => `${this.draw(a, D[a])} ${this.draw(b, D[b])}`)
@@ -1157,7 +1205,7 @@ export class Game {
     this.alikMsg({ kind: 'transfer', from: 'alik', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE), amount })
     this.S.ctx = { type: 'transfer', amount }
     if (this.adjustDebt(-amount)) {
-      this.S.money += amount
+      this.adjustMoney(amount, 'Перевод от Алика')
       if (++this.S.stats.fifty >= 5) this.unlock('fifty5')
     }
   }
@@ -1343,7 +1391,7 @@ export class Game {
     this.markTopical(await this.say(m))
     if (typeof ep.legend === 'string' && this.S.ctx) this.S.ctx.legend = ep.legend // новая легенда — есть что переспросить
     if (ep.fx?.debt) this.adjustDebt(ep.fx.debt)
-    if (ep.fx?.pay && this.adjustDebt(-ep.fx.pay)) this.S.money += ep.fx.pay
+    if (ep.fx?.pay && this.adjustDebt(-ep.fx.pay)) this.adjustMoney(ep.fx.pay, 'Выплата')
     if (ep.item) this.S.items.push(ep.item)
     if (ep.state) this.rules.applyOps([{ key: ep.state.key, op: '=', value: true, forDays: ep.state.days, scope: ep.state.actor ? 'target' : 'world' }], { target: ep.state.actor })
     if (ep.fx?.days) this.nextDay(ep.fx.days)
@@ -1516,7 +1564,7 @@ export class Game {
     const fx = n.fx ?? {}
     if (fx.days) this.nextDay(fx.days)
     if (fx.debt) this.adjustDebt(fx.debt)
-    if (fx.money) S.money += fx.money
+    if (fx.money) this.adjustMoney(fx.money, 'По карте')
     if (fx.mood) this.mood(fx.mood)
     if (fx.barter && this.adjustDebt(-v.v)) S.items.push(v.n)
     const invoiced = !!fx.invoice && this.adjustDebt(-v.total)
@@ -1655,7 +1703,7 @@ export class Game {
       case 'voice': deliver({ kind: 'voice', from: 'alik', len: 10 + this.rnd(50) }); return
       case 'transfer':
         if (this.adjustDebt(-50)) {
-          this.S.money += 50
+          this.adjustMoney(50, 'Перевод от Алика')
           this.S.stats.fifty++
         }
         deliver({ kind: 'transfer', from: 'alik', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE), amount: 50 })
