@@ -5,7 +5,8 @@ import type { GameEvent, Offer } from './events'
 import { WORLD, SPEAKS } from '../world'
 import { CHORUS_LEGEND } from '../legends'
 import { PROMISE_DUE, PROMISE_DUE_COSMIC, PROMISE_DUE_KEPT, PROMISE_MET, CHORUS, CHORUS_FED_UP, WEDDING_NOISE, BORIS_SICK, DEAD_KARINE, DEAD_ALIK } from '../world'
-import { alikDead, blocked, count, grantPaid, interjections, intro, met, mourning, sick } from '../memkeys'
+import { alikDead, blocked, count, grantPaid, interjections, intro, met, mourning, payday, sick } from '../memkeys'
+import { JournalForAmnesty } from './criteria'
 
 type R = Rule<Game, GameEvent, Offer>
 
@@ -31,6 +32,8 @@ export const sceneRules: R[] = [
   { ...scene('wife', [gte(count.rude, 1), missing(met('karine')), WORLD.karineHome]), once: true }, // Карине знакомится один раз: «Вы кто такой?» дважды — нелепо
   scene('invoice', [gte('day', 215)]),
   { ...scene('loan', [gte('day', 230)]), once: true }, // кредит «на твоё имя» — один раз
+  // амнистия обещаний — один раз, при 8+ просроченных и пока не начался День выплаты (после него журнал ни на что не влияет)
+  { ...scene('amnesty', [JournalForAmnesty, missing(payday.chain)]), once: true, specificity: 1 }, // распухший журнал важнее розыгрыша обычных сцен
   // умирать Алик начинает, когда дела плохи, и только один раз: после похорон и воскрешения смертный одр уже был
   { ...scene('deathbed', [gte('day', 240), lte('mood', 6), missing(mourning)], 2), once: true },
   { ...scene('heir', [gte('arc.grandpa', 4), gte('arc.boris', 4)], 3), once: true }, // наследство: после того как дедушка переписал завещание и когда Борис уже есть

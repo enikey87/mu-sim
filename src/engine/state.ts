@@ -78,7 +78,11 @@ export interface PromiseRec {
   condition?: PromiseCondition
   met?: number
   asked?: boolean
+  /** День амнистии: срок больше не припомнишь. Не `asked` — то «припомнил» или «сдержал на 50 ₽». */
+  amnesty?: number
 }
+/** Просрочено — одно определение для lateCount, кнопки «вы обещали» и досье: срок с датой прошёл, не припомнено, не амнистировано. */
+export const isLate = (p: PromiseRec, day: number): boolean => p.due != null && p.due < day && !p.asked && p.amnesty === undefined
 
 export interface GameState {
   day: number

@@ -34,7 +34,7 @@ export function Sheet({ onClose, onReset }: { onClose: () => void; onReset: () =
           {v.promises.slice().reverse().map((p, i) => (
             <li key={i}>
               «{p.text}» <br />
-              <small>{p.late ? <span className="late">❌ просрочено</span> : '⏳'} срок: {p.due == null ? '∞ когда-нибудь' : fmtDate(p.due)}</small>
+              <small>{p.amnesty != null ? <span className="amnesty">🕊 амнистия {fmtDate(p.amnesty)}</span> : p.late ? <span className="late">❌ просрочено</span> : '⏳'} срок: {p.due == null ? '∞ когда-нибудь' : fmtDate(p.due)}</small>
             </li>
           ))}
         </ul>
