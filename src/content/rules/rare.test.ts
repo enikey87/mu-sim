@@ -1,10 +1,11 @@
-// Правила из списка RARE (tools.test.ts) в симуляции срабатывают редко — здесь каждое вызывается напрямую.
-// Новое правило в RARE = новая строка здесь; иначе статистический тест молча перестаёт его проверять.
+// Правила из списков RARE и RARE_FLAKY (tools/rare.ts) статистический гейт сторожить не может —
+// здесь каждое вызывается напрямую. Новое правило в списке = новая строка здесь; иначе гейт
+// молча перестаёт его проверять.
 import { describe, it, expect } from 'vitest'
 import { makeGame } from '../../test/helpers'
 import type { Game } from '../../engine/game'
 import type { Facts } from '../../engine/rules'
-import { RARE } from '../../tools/rare'
+import { RARE_ALL } from '../../tools/rare'
 
 type Case = { event: string; facts?: Facts; target?: string; setup?: (g: Game) => void }
 const CASES: Record<string, Case> = {
@@ -56,9 +57,9 @@ describe('редкие правила — детерминированно', () 
   it('каждый случай срабатывает', () => {
     for (const [name, c] of Object.entries(CASES)) expect(fires(name, c), name).toBe(true)
   })
-  // Кейсы и список редких не связаны: правило, которое симуляция уверенно покрывает,
-  // уходит из RARE, но прямой случай остаётся страховкой, пока его кто-то не удалит осознанно.
-  it('у каждой записи RARE есть случай', () => {
-    expect([...RARE].filter((name) => !CASES[name])).toEqual([])
+  // Кейсы и списки не связаны: правило, которое симуляция уверенно покрывает, уходит из списка,
+  // но прямой случай остаётся страховкой, пока его кто-то не удалит осознанно.
+  it('у каждой записи RARE и RARE_FLAKY есть случай', () => {
+    expect([...RARE_ALL].filter((name) => !CASES[name])).toEqual([])
   })
 })
