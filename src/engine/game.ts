@@ -19,7 +19,7 @@ import { BILLS, billDue, billDueAt, billStreak, billUnpaid, lightOff, netRation,
 import {
   LOANS, THINGS, MOM_DONE_TEXT,
   creditStage, creditOffer, creditBroke, momDone,
-  sold, momHelp, loanTaken, loanDueAt, nextLoan, nextThing, allSold, nextMom,
+  sold, momHelp, loanTaken, loanDueAt, loanFailed, nextLoan, nextThing, allSold, nextMom,
   type LoanId, type ThingId,
 } from '../content/credit'
 import { allRules } from '../content/rules'
@@ -98,6 +98,10 @@ export type SayItem = string | { w: string; t: string }
 /** Что пришло, пока игрока не было: виды сообщений пачки непрочитанных. */
 export type AwayKind = 'text' | 'sticker' | 'fwd' | 'deleted' | 'voice' | 'transfer' | 'excuse' | 'formality' | 'coldWar'
 
+const POOR_REPEAT_DAYS = 14
+/** Минимум сообщений игрока между клятвами легенды — одна защита на все пути (#179). */
+const LEGEND_VOW_GAP = 8
+
 export class Game {
   /** Только чтение: подмена состояния целиком (`this.S = …`) — один из обходов долга из аудита #142. */
   readonly S: GameState
@@ -146,8 +150,6 @@ export class Game {
   private dayMovedInTurn = false
   /** Списания дня для одного СМС («Списания: Связь …, Проездной …», #178). */
   private bankCharges: { day: number; parts: string[] } | null = null
-  /** Уже сообщили об отказе по займу — повтор до успешного платежа молчит (#178). */
-  private creditFailSms = new Set<string>()
 
   constructor(opts: GameOptions = {}) {
     this.storage = opts.storage === undefined ? (typeof localStorage !== 'undefined' ? localStorage : null) : opts.storage
@@ -313,6 +315,13 @@ export class Game {
     this.storage?.removeItem(SAVE_KEY)
   }
 
+  /** Интро показано или пропущено: единственный факт, который интро ставит партии. */
+  introDone(): void {
+    if (this.S.introShown) return
+    this.S.introShown = true
+    this.save()
+  }
+
   // ---------- helpers ----------
   /** Следующий уместный сейчас элемент колоды (needs/gate). */
   draw = <T>(key: string, arr: readonly Entry<T>[]): T => {
@@ -425,6 +434,16 @@ export class Game {
     if (this.shown.size > 60) this.shown.delete(this.shown.values().next().value!)
     return t
   }
+  /**
+   * Реплика бедности: пока пул уровня не исчерпан — без повторов, дальше редко и по кругу: одна строка
+   * на окно в POOR_REPEAT_DAYS дней. Бедность держится до Дня выплаты — голос не должен смолкать (#184).
+   */
+  poorLine(key: string, arr: readonly Entry<string>[]): string | null {
+    const fresh = this.freshPlayer(key, arr)
+    if (fresh !== null) return fresh
+    const open = arr.filter((e) => isOpen(e, this.lineFacts())).map(valueOf)
+    return open.length ? open[Math.floor(this.S.day / POOR_REPEAT_DAYS) % open.length] : null
+  }
   pair = (ka: string, a: readonly Entry<string>[], kb: string, b: readonly Entry<string>[]): string =>
     this.uniq(() => `${this.draw(ka, a)} ${this.draw(kb, b)}`)
   addrLine = (key: string, arr: readonly Entry<string>[]): string => this.uniq(() => `${this.X.g('ADDR')}, ${this.draw(key, arr)}`)
@@ -446,7 +465,7 @@ export class Game {
     setCount(this.S, 'debt', countOf(this.S, 'debt') + delta)
     return true
   }
-  // Дно ≤ 6000 (как старый FLOOR); «мало» ≤ 9000 — предупреждение до дна. Старт 12400.
+  // Дно ≤ 6000 (как старый FLOOR); «мало» ≤ 9000 — предупреждение до дна. Старт — START_MONEY.
   static readonly MONEY_LOW = 9000
   static readonly MONEY_BOTTOM = 6000
   moneyLevel(): 'normal' | 'low' | 'bottom' {
@@ -523,10 +542,8 @@ export class Game {
     } else {
       const streak = Number(this.S.mem[billStreak(id)] ?? 0) + 1
       this.rules.applyOps([set(billUnpaid(id), true), set(billStreak(id), streak)], {})
-      // повтор той же неоплаты — не новость (#178 / CLAUDE.md «один раз»)
-      if (streak === 1) {
-        this.notify('🏦', 'Банк', `Не прошло: недостаточно средств. ${bill.label}, ${bill.amount.toLocaleString('ru-RU')} ₽. Достоинство не принимается.`)
-      }
+      // неоплата — факт и последствия, а не ежедневное эхо: банк говорит один раз за полосу (#184/#178)
+      if (streak === 1) this.notify('🏦', 'Банк', `Не прошло: недостаточно средств. ${bill.label}, ${bill.amount.toLocaleString('ru-RU')} ₽. Достоинство не принимается.`)
       if (id === 'rent' && streak >= 1) this.rules.applyOps([set(lightOff, true)], {})
       if (id === 'phone' && streak >= 1) this.rules.applyOps([set(phoneWarn, true)], {})
       if (id === 'phone' && streak >= 2) this.rules.applyOps([set(netRation, true)], {})
@@ -571,13 +588,13 @@ export class Game {
     delete this.S.mem[loanDueAt(id)]
     if (this.adjustMoney(-loan.payment, loan.label, { quiet: true })) {
       this.queueBankCharge(loan.label, loan.payment)
-      this.creditFailSms.delete(id)
+      this.rules.applyOps([set(loanFailed(id), false)], {}) // платёж прошёл — полоса неоплат закрыта
       this.scheduleCredits()
       return
     }
-    // повтор отказа по тому же займу — не новость, пока деньги не появились (#178)
-    if (!this.creditFailSms.has(id)) {
-      this.creditFailSms.add(id)
+    // банк говорит один раз за полосу неоплат, а не каждую неделю (#184/#178)
+    if (!this.S.mem[loanFailed(id)]) {
+      this.rules.applyOps([set(loanFailed(id), true)], {})
       this.notify('🏦', 'Банк', `Не прошло: недостаточно средств. ${loan.label}, ${loan.payment.toLocaleString('ru-RU')} ₽.`)
     }
     if (id === 'micro' && !this.S.mem[creditBroke]) {
@@ -1149,15 +1166,15 @@ export class Game {
     const money = level && P_MONEY[level]
     if (S.mem[memkeys.polite] && this.chance(0.6)) out.push({ text: one('P_POL_POLITE', P_POL_POLITE), tone: 'polite' })
     else {
-      // бедность — своими словами, но без повторов: пул исчерпан — обычная вежливая реплика
-      const poor = money && this.chance(level === 'bottom' ? 0.7 : 0.4) ? this.freshPlayer(`P_MONEY_${level}_POL`, money.polite) : null
+      // бедность — своими словами: пул уровня без повторов, исчерпанный звучит редко (#184)
+      const poor = money && this.chance(level === 'bottom' ? 0.7 : 0.4) ? this.poorLine(`P_MONEY_${level}_POL`, money.polite) : null
       out.push({ text: poor ?? P2('P_POL_A', 'P_POL_B'), tone: 'polite' })
     }
     if (out.length < 3) {
       const period = this.period()
       // отчаяние — своё намерение, чаще на дне; вежливый вариант выше остаётся при любом уровне
-      const cry = money && level && this.chance(level === 'bottom' ? 0.6 : 0.3) ? this.freshPlayer(`P_DESPERATE_${level}`, P_DESPERATE[level]) : null
-      const poor = !cry && money && this.chance(0.5) ? this.freshPlayer(`P_MONEY_${level}_NEU`, money.neutral) : null
+      const cry = money && level && this.chance(level === 'bottom' ? 0.6 : 0.3) ? this.poorLine(`P_DESPERATE_${level}`, P_DESPERATE[level]) : null
+      const poor = !cry && money && this.chance(0.5) ? this.poorLine(`P_MONEY_${level}_NEU`, money.neutral) : null
       if (cry) out.push({ text: cry, tone: 'neutral', act: 'desperate' })
       else if (poor) out.push({ text: poor, tone: 'neutral' })
       else {
@@ -1377,6 +1394,15 @@ export class Game {
     if (due !== null && due > this.S.day) this.scheduleEvent(due, 'PromiseDue', { promise: this.S.promises.length - 1 })
     if (this.S.promises.length >= 20) this.unlock('promises20')
   }
+  /** Пора снова назвать срок легенды: перерыв прошёл (#179). Серия, заведшая легенду, открывает гейт сама (setLegend). */
+  private legendDue(): boolean {
+    return this.S.stats.sent - Number(this.S.mem[memkeys.legendPromiseAt] ?? -99) >= LEGEND_VOW_GAP
+  }
+  /** Срок легенды второй раз в журнал не пишем — повтор не новость (#179). Ключ — условие срока: тексты клятвы разные. */
+  private recordPromiseOnce(p: Promise3): void {
+    if (p.condition && this.S.promises.some((x) => x.condition === p.condition)) return
+    this.recordPromise(p)
+  }
   private alignPromise(p: Promise3, until: string, condition?: PromiseCondition): Promise3 {
     p.text = p.text.replace(p.t, until)
     p.t = until
@@ -1393,9 +1419,8 @@ export class Game {
     // событие легенды уже случилось («свадьба Бориса прошла») — обещать «сразу после него» поздно
     const done = legendSpec?.condition ? this.S.mem[legendSpec.condition] === true : false
     const until = done ? undefined : legendSpec?.until
-    // срок из легенды — после серии обязательно, дальше изредка: одна и та же клятва «как „Нива“ заведётся» приедается
-    const recent = this.S.stats.sent - Number(this.S.mem[memkeys.legendPromiseAt] ?? -99) < 4
-    const fromLegend = !!until && (legend || (!recent && this.chance(0.4)))
+    // срок из легенды — не чаще, чем раз в LEGEND_VOW_GAP сообщений игрока: одна и та же клятва приедается (#179)
+    const fromLegend = !!until && this.legendDue() && (legend || this.chance(0.4))
     if (fromLegend) this.S.mem[memkeys.legendPromiseAt] = this.S.stats.sent
     const p = this.uniq(() => {
       const q = this.X.promise()
@@ -1405,7 +1430,8 @@ export class Game {
       const form = this.line('OATH_FORMS', OATH_FORMS) ?? '{o}, {p}.'
       return { text: form.replace('{o}', this.X.g('OATH')).replace('{P}', cap(q.text)).replace('{p}', q.text), q }
     })
-    this.recordPromise(p.q)
+    if (fromLegend) this.recordPromiseOnce(p.q)
+    else this.recordPromise(p.q)
     await this.say([p.text])
     this.S.ctx = { ...(this.S.ctx ?? {}), ...this.ctxFromPromise(p.q) }
   }
@@ -1452,7 +1478,7 @@ export class Game {
   }
 
   async excuseTurn(): Promise<void> {
-    if (this.legend()) return this.promiseLine(undefined, true)
+    if (this.legend() && this.legendDue()) return this.promiseLine(undefined, true)
     const festive = this.line('HOLIDAY', HOLIDAY_EXCUSES)
     if (festive) { await this.say([festive]); return }
     const ex = this.uniq(() => this.X.excuse({ preferLong: this.S.politeStreak >= 3 }))
@@ -1724,6 +1750,8 @@ export class Game {
     if (arc) m[memkeys.legendOf(arc)] = id
     m[memkeys.legendId] = id
     m[memkeys.legendDay] = this.S.day
+    // серия завела легенду — её срок звучит сразу (новость); дальше гейт закрыт на LEGEND_VOW_GAP сообщений (#179)
+    m[memkeys.legendPromiseAt] = this.S.stats.sent - LEGEND_VOW_GAP
     if (arc) m[memkeys.legendArc] = arc
   }
   /** Текущая легенда (если не устарела). */
@@ -2127,10 +2155,11 @@ export class Game {
       }
       case 'excuse': {
         const legend = this.legend()
-        if (legend) {
+        if (legend && this.legendDue()) {
           const spec = LEGENDS[legend]
           const promise = this.alignPromise(this.X.promise(), spec.until, spec.condition)
-          this.recordPromise(promise)
+          this.S.mem[memkeys.legendPromiseAt] = this.S.stats.sent
+          this.recordPromiseOnce(promise)
           deliver({ kind: 'text', from: 'alik', text: promise.text })
           return
         }

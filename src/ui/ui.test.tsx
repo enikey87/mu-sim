@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent, act, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { App } from './App'
@@ -672,5 +672,86 @@ describe('экран падения', () => {
     expect(onReset).toHaveBeenCalled()
     expect(storage.data[SAVE_KEY]).toBeUndefined()
     errors.mockRestore()
+  })
+})
+
+describe('интро новой партии', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  const renderIntro = (game: Game, gate = false) =>
+    render(<App game={game} onReset={vi.fn()} intro introGate={gate} />)
+
+  const prologue = (game: Game) => {
+    const alik = game.S.msgs.find((m) => m.kind === 'text' && m.from === 'alik' && !m.who)!
+    const sys = game.S.msgs.find((m) => m.kind === 'sys')!
+    return { alik: alik.kind === 'text' ? alik.text : '', gap: sys.kind === 'sys' ? sys.text : '' }
+  }
+
+  it('по умолчанию без интро: обычный рендер App его не включает', () => {
+    const { game } = makeGame()
+    renderApp(game)
+    expect(document.querySelector('.intro')).toBeNull()
+  })
+
+  it('новая партия: интро показывает тот же пролог, что в чате, и само уходит в чат с отметкой', () => {
+    vi.useFakeTimers()
+    const { game } = makeGame({ seed: 1 })
+    const p = prologue(game)
+    renderIntro(game)
+    const intro = document.querySelector('.intro')!
+    act(() => { vi.advanceTimersByTime(400) })
+    expect(within(intro as HTMLElement).getByText(p.alik)).toBeInTheDocument()
+    act(() => { vi.advanceTimersByTime(12200) })
+    expect(game.S.introShown).toBe(true)
+    expect(document.querySelector('.intro')).toBeNull()
+    expect(within(document.getElementById('chat')! as HTMLElement).getByText(p.alik)).toBeInTheDocument()
+    expect(document.querySelector('.intro-gap')).toBeNull()
+    expect(screen.getByText(p.gap)).toBeInTheDocument()
+  })
+
+  it('перезагрузка посреди партии: отметка в сохранении — интро не показывает', () => {
+    const { game } = makeGame()
+    game.introDone()
+    renderIntro(game)
+    expect(document.querySelector('.intro')).toBeNull()
+  })
+
+  it('касание во время анимации — сразу чат', () => {
+    vi.useFakeTimers()
+    const { game } = makeGame()
+    renderIntro(game)
+    act(() => { vi.advanceTimersByTime(1000) })
+    act(() => { fireEvent.click(document.querySelector('.intro')!) })
+    expect(document.querySelector('.intro')).toBeNull()
+    expect(game.S.introShown).toBe(true)
+  })
+
+  it('первый запуск: до касания анимация не идёт, «Коснитесь, чтобы начать»', () => {
+    vi.useFakeTimers()
+    const { game } = makeGame()
+    renderIntro(game, true)
+    expect(screen.getByText('Коснитесь, чтобы начать')).toBeInTheDocument()
+    act(() => { vi.advanceTimersByTime(3000) })
+    expect(document.querySelector('.intro-note')).toBeNull()
+    act(() => { fireEvent.click(document.querySelector('.intro')!) })
+    act(() => { vi.advanceTimersByTime(500) })
+    expect(document.querySelector('.intro-note')).not.toBeNull()
+  })
+
+  it('prefers-reduced-motion: статичная версия — обещание, строка завязки и титул сразу', () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('matchMedia', () => ({ matches: true }))
+    const { game } = makeGame()
+    const p = prologue(game)
+    renderIntro(game)
+    const intro = document.querySelector('.intro')!
+    expect(within(intro as HTMLElement).getByText(p.gap)).toBeInTheDocument()
+    expect(intro.querySelector('.intro-title-big')!.textContent).toContain('Алик,')
+    act(() => { vi.advanceTimersByTime(2600) })
+    expect(document.querySelector('.intro')).toBeNull()
+    expect(game.S.introShown).toBe(true)
   })
 })

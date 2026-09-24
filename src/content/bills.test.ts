@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { makeGame , setMoney} from '../test/helpers'
-import { BILLS, billUnpaid, lightOff, billDueAt } from './bills'
+import { BILLS, billUnpaid, billStreak, lightOff, billDueAt } from './bills'
 import { dueIn } from '../engine/time'
 
 describe('платежи по календарю', () => {
@@ -15,11 +15,31 @@ describe('платежи по календарю', () => {
   it('хватает денег — списание через adjustMoney, неоплаты нет', () => {
     const { game } = makeGame()
     const before = game.S.money
+    const phone = BILLS.find((b) => b.id === 'phone')!
     game.chargeBill('phone')
     game.flushBankCharges()
-    expect(game.S.money).toBe(before - 550)
+    expect(game.S.money).toBe(before - phone.amount)
     expect(game.S.mem[billUnpaid('phone')]).toBe(false)
     expect(game.ui.notif?.text).toMatch(/Списание/)
+  })
+  it('неоплата не эхо: банк говорит один раз за полосу, а не каждый срок (#184)', () => {
+    const { game } = makeGame()
+    const said: string[] = []
+    const orig = game.notify.bind(game)
+    game.notify = (icon: string, app: string, text: string): void => { said.push(text); orig(icon, app, text) }
+    const refusals = (): number => said.filter((t) => /недостаточно средств/i.test(t)).length
+    setMoney(game, 100)
+    game.chargeBill('phone')
+    expect(refusals()).toBe(1)
+    game.chargeBill('phone') // срок прошёл снова, полоса та же
+    expect(game.S.mem[billStreak('phone')]).toBe(2)
+    expect(refusals()).toBe(1) // эха нет
+    setMoney(game, 2000)
+    game.chargeBill('phone') // заплатили — полоса закрыта
+    expect(game.S.mem[billStreak('phone')]).toBe(0)
+    setMoney(game, 100)
+    game.chargeBill('phone') // новый срыв — банк говорит снова
+    expect(refusals()).toBe(2)
   })
   it('не хватает — СМС отказа, unpaid и последствие', () => {
     const { game } = makeGame()
@@ -29,26 +49,6 @@ describe('платежи по календарю', () => {
     expect(game.S.mem[billUnpaid('rent')]).toBe(true)
     expect(game.S.mem[lightOff]).toBe(true)
     expect(game.ui.notif?.text).toMatch(/недостаточно средств/i)
-  })
-  it('повтор той же неоплаты — без второго СМС; последствие остаётся (#178)', () => {
-    const { game } = makeGame()
-    setMoney(game, 100)
-    const texts: string[] = []
-    const notify = game.notify.bind(game)
-    game.notify = (icon, app, text) => { texts.push(text); notify(icon, app, text) }
-    game.chargeBill('phone')
-    expect(texts.filter((t) => /недостаточно/i.test(t))).toHaveLength(1)
-    // новый срок той же связи — снова отказать
-    game.S.mem[billDueAt('phone')] = game.S.day
-    game.chargeBill('phone')
-    expect(texts.filter((t) => /недостаточно/i.test(t))).toHaveLength(1)
-    expect(game.S.mem[billUnpaid('phone')]).toBe(true)
-    expect(Number(game.S.mem['bills.phone.streak'])).toBe(2)
-    // негативный контроль: streak сбросили — снова СМС
-    game.S.mem['bills.phone.streak'] = 0
-    game.S.mem[billDueAt('phone')] = game.S.day
-    game.chargeBill('phone')
-    expect(texts.filter((t) => /недостаточно/i.test(t))).toHaveLength(2)
   })
   it('«Завтра списание» — только коммуналка; связь молчит (#178)', async () => {
     const { game } = makeGame()

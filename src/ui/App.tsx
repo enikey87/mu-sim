@@ -1,4 +1,4 @@
-import { Component, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Component, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Game } from '../engine/game'
 import { GameContext, useGame } from './useGame'
 import { StatusBar, ChatHeader, StatsBar } from './Header'
@@ -7,10 +7,11 @@ import { Choices, Composer } from './Input'
 import { Sheet } from './Sheet'
 import { Toast, Notification, DeadScreen, EndingScreen } from './Overlays'
 import { DebugPanel } from './DebugPanel'
-import { uiOf, viewOf } from './view'
+import { Intro } from './Intro'
+import { uiOf, viewOf, introOf } from './view'
 
 /** Корень: единственный компонент с Game в руках — отдаёт дереву фасад, а живую игру только DebugPanel. */
-export function App({ game, onReset, debug = false }: { game: Game; onReset: () => void; debug?: boolean }) {
+export function App({ game, onReset, debug = false, intro = false, introGate = false }: { game: Game; onReset: () => void; debug?: boolean; intro?: boolean; introGate?: boolean }) {
   const ui = uiOf(game)
   // звук разрешается первым касанием; «вернулся к вкладке» — пачка непрочитанных
   useEffect(() => {
@@ -33,9 +34,9 @@ export function App({ game, onReset, debug = false }: { game: Game; onReset: () 
     <Crash onReset={hardReset}>
       <GameContext.Provider value={ui}>
         {debug ? (
-          <div className="debug-layout"><Phone onReset={onReset} /><DebugPanel game={game} /></div>
+          <div className="debug-layout"><Phone onReset={onReset} intro={intro} introGate={introGate} /><DebugPanel game={game} /></div>
         ) : (
-          <Phone onReset={onReset} />
+          <Phone onReset={onReset} intro={intro} introGate={introGate} />
         )}
       </GameContext.Provider>
     </Crash>
@@ -58,10 +59,13 @@ class Crash extends Component<{ onReset: () => void; children: ReactNode }, { fa
   }
 }
 
-function Phone({ onReset }: { onReset: () => void }) {
+function Phone({ onReset, intro, introGate }: { onReset: () => void; intro: boolean; introGate: boolean }) {
   const game = useGame()
   const [sheet, setSheet] = useState(false)
   const phone = useRef<HTMLDivElement>(null)
+  // пролог не меняется по ходу партии — снимок интро стабилен, цепочка анимации не перезапускается
+  const introData = useMemo(() => (intro ? introOf(game) : null), [game, intro])
+  const [introGone, setIntroGone] = useState(false)
 
   // заголовок вкладки: «(3) Алик, где деньги?»
   useEffect(() => { document.title = game.ui.title }, [game.ui.title])
@@ -100,7 +104,8 @@ function Phone({ onReset }: { onReset: () => void }) {
     onReset()
   }
 
-  const blocked = sheet || game.battery.dead || !!endingId
+  const introUp = !!introData && !introGone
+  const blocked = sheet || game.battery.dead || !!endingId || introUp
 
   return (
     <div className="phone" ref={phone}>
@@ -119,6 +124,7 @@ function Phone({ onReset }: { onReset: () => void }) {
       <DeadScreen />
       <EndingScreen onReset={reset} />
       {sheet && <Sheet onClose={() => setSheetOpen(false)} onReset={reset} />}
+      {introData && !introGone && <Intro data={introData} gate={introGate} onDone={() => setIntroGone(true)} />}
     </div>
   )
 }

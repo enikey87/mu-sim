@@ -8,6 +8,8 @@ export const SAVE_KEY = 'alik-save-v4'
 /** Отметка устройства, а не партии: просьба «займи 50» уже звучала — вторая партия говорит другим текстом. */
 export const LEND50_SEEN_KEY = 'alik-lend50-seen'
 export const DEBT0 = 240000
+/** Старт с запасом: дно должно наступить по пути к Дню выплаты, а не в первые ходы (#184). */
+export const START_MONEY = 28000
 export const MAX_PATIENCE = 5
 export const START_DAY = 184
 
@@ -126,6 +128,8 @@ export interface GameState {
   /** Полученные концовки: id → день; ending — концовка, экран которой сейчас открыт. */
   endings: Record<string, number>
   ending: string | null
+  /** Интро на экране блокировки показано (или пропущено): повтор — только на новой партии. */
+  introShown: boolean
 }
 
 export function freshState(): GameState {
@@ -134,7 +138,7 @@ export function freshState(): GameState {
     msgs: [], nextId: 1, ach: {}, promises: [], seen: [], bags: {}, items: [],
     stats: { moo: 0, fifty: 0, sent: 0 },
     offlineDays: 0, ram: false, muted: false, scene: null, ctx: null, choices: null, arcs: {}, tier: 0,
-    battery: 100, money: 12400, lastSeen: 0, mem: {}, actors: {}, rules: freshRuleState(), endings: {}, ending: null,
+    battery: 100, money: START_MONEY, lastSeen: 0, mem: {}, actors: {}, rules: freshRuleState(), endings: {}, ending: null, introShown: false,
   })
 }
 

@@ -85,6 +85,25 @@ describe('кредитная лестница', () => {
     expect(game.S.mem[momHelp('pension')]).toBe(true)
   })
 
+  it('отказ по займу не эхо: банк говорит один раз за полосу (#184)', () => {
+    const { game } = makeGame()
+    const said: string[] = []
+    const orig = game.notify.bind(game)
+    game.notify = (icon: string, app: string, text: string): void => { said.push(text); orig(icon, app, text) }
+    const refusals = (): number => said.filter((t) => /недостаточно средств/i.test(t)).length
+    game.S.mem[loanTaken('consumer')] = true
+    setMoney(game, 100)
+    game.chargeCredit('consumer')
+    expect(refusals()).toBe(1)
+    game.chargeCredit('consumer') // следующая неделя, полоса та же
+    expect(refusals()).toBe(1) // эха нет
+    setMoney(game, 30000)
+    game.chargeCredit('consumer') // платёж прошёл — полоса закрыта
+    setMoney(game, 100)
+    game.chargeCredit('consumer') // новый срыв — банк говорит снова
+    expect(refusals()).toBe(2)
+  })
+
   it('после broke мама выручает; после последней — mom.done', () => {
     const { game } = makeGame()
     game.S.mem[creditBroke] = true
