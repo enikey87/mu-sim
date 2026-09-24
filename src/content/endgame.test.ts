@@ -5,28 +5,45 @@ import {
   ENDGAME_RENAMES, ENDGAME_RETURNER_LINES, ENDGAME_RETURNERS,
 } from './endgame'
 import { valueOf } from '../engine/rules'
+import { flush } from '../test/helpers'
 import type { Game } from '../engine/game'
 
 const messages = (game: Game, from = 0) =>
   game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' || m.kind === 'sys' ? [m.text] : []))
 
-function finishPayday(game: Game, outcome = 'default'): void {
+/** День выплаты закрыт: группа, вступление и просьба «займи 50» — как их видит игрок. */
+async function finishPayday(game: Game, outcome = 'default'): Promise<void> {
   game.S.mem.payday = outcome
   game.S.ending = `payday_${outcome}`
   game.S.endings[`payday_${outcome}`] = game.S.day
-  game.closeEnding()
+  await game.closeEnding()
+  await flush()
+}
+
+/** Просьба отвечена: три обычных действия вернулись (сама сцена — content/lend50.test.ts). */
+async function answerAsk(game: Game): Promise<void> {
+  await game.send(game.choices.find((c) => c.act === 'lend50Serious')!)
+}
+
+/** Закрыть День выплаты и пройти просьбу — эндгейм в обычном цикле. */
+async function enterGame(game: Game, outcome = 'default'): Promise<void> {
+  await finishPayday(game, outcome)
+  await answerAsk(game)
 }
 
 describe('бесконечная группа после Дня выплаты', () => {
-  it('открывается один раз и сохраняет результат концовки', () => {
+  it('открывается один раз и сохраняет результат концовки', async () => {
     const { game } = makeGame()
     game.adjustDebt(-game.S.debt)
     game.S.money = 252400
 
-    finishPayday(game, 'real')
+    const day = game.S.day
+    await finishPayday(game, 'real')
 
     expect(game.S.mem['endgame.active']).toBe(true)
-    expect(game.S.mem['endgame.started']).toBe(game.S.day)
+    expect(game.S.mem['endgame.started']).toBe(day)
+    expect(game.choices.map((c) => c.act)).toEqual(['lend50Yes', 'lend50Serious', 'lend50No']) // просьба ждёт ответа
+    await answerAsk(game)
     expect(game.S.debt).toBe(0)
     expect(game.S.money).toBe(252400)
     expect(messages(game).join(' ')).toMatch(/ВЫПЛАТА ЗАКРЫТА/)
@@ -34,15 +51,15 @@ describe('бесконечная группа после Дня выплаты',
 
     const count = game.S.msgs.length
     game.S.ending = 'payday_real'
-    game.closeEnding()
+    await game.closeEnding()
     expect(game.S.msgs).toHaveLength(count)
   })
 
-  it('учитывает вендетту только во вступлении', () => {
+  it('учитывает вендетту только во вступлении', async () => {
     const { game } = makeGame()
     game.S.endings.vendetta = game.S.day - 1
 
-    finishPayday(game)
+    await enterGame(game)
 
     expect(messages(game).join(' ')).toMatch(/вне политики/)
     expect(game.choices.map((c) => c.act)).toEqual(['endgameMoney', 'endgameMute', 'endgameLeave'])
@@ -50,7 +67,7 @@ describe('бесконечная группа после Дня выплаты',
 
   it('возвращает игрока, будит уведомления и продолжает формальности', async () => {
     const { game } = makeGame()
-    finishPayday(game)
+    await enterGame(game)
 
     for (const act of ['endgameLeave', 'endgameMute', 'endgameMoney']) {
       const before = game.S.msgs.length
@@ -68,7 +85,7 @@ describe('бесконечная группа после Дня выплаты',
 
   it('заменяет старые сюжетные ходы и новые концовки общим циклом', async () => {
     const { game } = makeGame()
-    finishPayday(game)
+    await finishPayday(game)
     game.S.day = 500
     game.S.stats.sent = 400
     game.S.mem.vendetta = true // сюжетная концовка в эндгейме не наступает
@@ -83,7 +100,7 @@ describe('бесконечная группа после Дня выплаты',
 
   it('«Параллельная вселенная» — единственный выход из группы: на 800-й день, один раз, потом снова группа', async () => {
     const { game } = makeGame()
-    finishPayday(game)
+    await enterGame(game)
     game.S.day = 900
     game.S.stats.sent = 400
     const from = game.S.msgs.length
@@ -92,7 +109,7 @@ describe('бесконечная группа после Дня выплаты',
     expect(game.S.endings.multiverse).toBe(900)
     expect(messages(game, from).join(' ')).toMatch(/параллельной вселенной/)
     const debt = game.S.debt
-    game.closeEnding()
+    await game.closeEnding()
     expect(game.S.mem['endgame.active']).toBe(true)
     expect(game.S.debt).toBe(debt)
     expect(game.choices.map((c) => c.act)).toEqual(['endgameMoney', 'endgameMute', 'endgameLeave'])
@@ -102,7 +119,7 @@ describe('бесконечная группа после Дня выплаты',
 
   it('до 800-го дня «Параллельной вселенной» в эндгейме нет, а вне эндгейма её нет вовсе', async () => {
     const { game } = makeGame()
-    finishPayday(game)
+    await finishPayday(game)
     game.S.day = 799
     game.S.stats.sent = 400
     expect((await game.fire('CheckEnding'))?.name).toBe('Endgame_NoEnding')
@@ -114,7 +131,7 @@ describe('бесконечная группа после Дня выплаты',
 
   it('счёт формальностей ведёт игра: юбилей звучит на своём счёте, номера в текстах не спорят с ним', async () => {
     const { game } = makeGame()
-    finishPayday(game)
+    await finishPayday(game)
     for (let i = 0; i < 9; i++) await game.endgameFormality()
     expect(game.S.mem['endgame.forms']).toBe(9)
     const before = game.S.msgs.length
@@ -187,7 +204,7 @@ describe('бесконечная группа после Дня выплаты',
 
   it('исчерпав запас, возвращатель перестаёт возвращать — дальше возвращает Алик', async () => {
     const { game } = makeGame()
-    finishPayday(game)
+    await enterGame(game)
     game.S.mem['met.samvel'] = true // единственный допустимый возвращатель
     const before = game.S.msgs.length
     for (let i = 0; i <= ENDGAME_RETURNER_LINES.samvel.length; i++) await game.send(game.choices.find((c) => c.act === 'endgameLeave')!)
@@ -201,7 +218,7 @@ describe('бесконечная группа после Дня выплаты',
 
   it('тридцать формальностей подряд — без повторов: колода тянет длинную партию', async () => {
     const { game } = makeGame()
-    finishPayday(game)
+    await finishPayday(game)
     const before = game.S.msgs.length
     for (let i = 0; i < 30; i++) await game.endgameFormality()
     const said = messages(game, before).filter((t) => !/Десять формальностей/.test(t))
@@ -210,7 +227,7 @@ describe('бесконечная группа после Дня выплаты',
 
   it('возвращающий говорит реплику из своей колоды', async () => {
     const { game } = makeGame()
-    finishPayday(game)
+    await enterGame(game)
     for (const who of Object.keys(ENDGAME_RETURNER_LINES)) game.S.mem[`met.${who}`] = true
 
     const before = game.S.msgs.length

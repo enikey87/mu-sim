@@ -5,6 +5,8 @@ import type { PromiseCondition, Rel } from '../content/excuses'
 import type { Vars } from '../content/scenes'
 
 export const SAVE_KEY = 'alik-save-v4'
+/** Отметка устройства, а не партии: просьба «займи 50» уже звучала — вторая партия говорит другим текстом. */
+export const LEND50_SEEN_KEY = 'alik-lend50-seen'
 export const DEBT0 = 240000
 export const MAX_PATIENCE = 5
 export const START_DAY = 184
