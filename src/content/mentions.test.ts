@@ -14,6 +14,7 @@ import { make } from './excuses'
 import { makeScenes } from './scenes'
 import { sceneRules, QUEST_WHEN } from './rules/world'
 import { paydayRules } from './rules/payday'
+import { REFERRAL } from './rules/court'
 import { seededRng } from '../engine/rng'
 import { playtest } from '../tools/playtest'
 import { met } from './memkeys'
@@ -226,6 +227,8 @@ function corpus(): Found[] {
     const sets = Object.values(sc.nodes).flatMap((n) => Object.keys(n.fx?.set ?? {})).map((key): Criterion => ({ key, op: '==', value: true }))
     strings(sc, `scenes.${id}`, [...atoms(rule?.when ?? []), ...sets], out)
   }
+  // строки перевода угрозы в суд — не в пуле, а в REFERRAL (CLAUDE.md: новый путь → в линтер)
+  strings(Object.values(REFERRAL), 'rules.court.REFERRAL', [], out)
   return out
 }
 

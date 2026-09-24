@@ -3,7 +3,11 @@
 import { describe, it, expect } from 'vitest'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { playtest, transcript, worldDump } from './playtest'
+import { is, missing } from '../engine/rules'
+import { playtest, transcript, worldDump, deathGated, requiresKey } from './playtest'
+import { alikDead } from '../content/memkeys'
+import type { Game } from '../engine/game'
+import type { Rule } from '../engine/rules'
 
 describe('плейтест', () => {
   it('тот же seed — та же партия; запись действий проигрывается в ту же переписку', async () => {
@@ -20,6 +24,25 @@ describe('плейтест', () => {
     const a = await playtest(4, 10)
     const acts = a.acts.map((x) => (x.kind === 'send' ? { ...x, offered: ['не то'] } : x))
     await expect(playtest(4, 0, acts)).rejects.toThrow(/replay/)
+  })
+  it('речь после молчащего правила не приписывается ему', async () => {
+    const p = await playtest(9, 8, undefined, (g: Game) => {
+      g.S.mem[alikDead] = true
+      g.rules.add({
+        name: 'Quiet_Probe_Silent', event: 'AlikTurn', when: [is(alikDead)], specificity: 10_000,
+        respond: () => false,
+      })
+    })
+    const attributed = p.world.flatMap((f) => f.said).filter((s) => s.r === 'Quiet_Probe_Silent')
+    expect(attributed).toEqual([])
+  }, 60_000)
+  it('requiresKey: missing(alik_dead) — не гейт смерти; is(alik_dead) — гейт', () => {
+    expect(requiresKey(missing(alikDead), alikDead)).toBe(false)
+    expect(requiresKey(is(alikDead), alikDead)).toBe(true)
+    const liveOnly = [{ name: 'Live', event: 'X', when: [missing(alikDead)] }] as Rule<Game>[]
+    const deadGate = [{ name: 'Dead', event: 'X', when: [is(alikDead)] }] as Rule<Game>[]
+    expect(deathGated(liveOnly)).toEqual([])
+    expect(deathGated(deadGate)).toEqual(['Dead'])
   })
 })
 
