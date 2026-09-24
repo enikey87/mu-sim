@@ -395,7 +395,7 @@ export class Game {
   get ctx(): Ctx | null { return this.S.ctx }
   setCtx(c: Ctx | null): void { this.S.ctx = c }
 
-  /** День выплаты закрыт — долг больше не меняется (ENDGAME.md). */
+  /** День выплаты закрыт — долг больше не меняется (docs/design/endgame.md). */
   debtSealed(): boolean {
     return this.S.mem[memkeys.paydayScene] != null
   }
