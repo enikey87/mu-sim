@@ -1,0 +1,231 @@
+<title>Интро: экран блокировки</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;700&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{--bg:#f6f4ef;--surface:#fdfcf9;--ink:#1d2129;--muted:#5d6470;--line:#ddd9cf;--code:#efece4;--acc:#b4531f;--acc-bg:#f6e6da;--ok:#1e7a3c;--ok-bg:#e3f1e6;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#131416;--surface:#1b1c1e;--ink:#e8e6e1;--muted:#a4a9b0;--line:#2f3237;--code:#25282c;--acc:#ec9a6a;--acc-bg:#3a2519;--ok:#6fcf8c;--ok-bg:#1c3324;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#131416;--surface:#1b1c1e;--ink:#e8e6e1;--muted:#a4a9b0;--line:#2f3237;--code:#25282c;--acc:#ec9a6a;--acc-bg:#3a2519;--ok:#6fcf8c;--ok-bg:#1c3324;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16.5px/1.6 "IBM Plex Sans",system-ui,sans-serif;padding:32px 16px 72px}
+.wrap{max-width:820px;margin:0 auto;display:flex;flex-direction:column;gap:34px}
+h1,h2,h3{font-family:"Archivo Narrow","Arial Narrow",sans-serif;margin:0;line-height:1.15;text-wrap:balance}
+h1{font-size:clamp(30px,5.5vw,44px)} h2{font-size:25px;padding-bottom:6px;border-bottom:1px solid var(--line)} h3{font-size:18px}
+p{margin:0;max-width:72ch} ul,ol{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:6px;max-width:74ch}
+code{font-family:"IBM Plex Mono",monospace;font-size:.84em;background:var(--code);padding:1px 5px;border-radius:4px}
+section{display:flex;flex-direction:column;gap:12px}
+.eyebrow{font:500 12px "IBM Plex Mono",monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.chip{display:inline-block;font:500 12px "IBM Plex Mono",monospace;padding:3px 9px;border-radius:999px}
+.c-acc{color:var(--acc);background:var(--acc-bg)} .c-ok{color:var(--ok);background:var(--ok-bg)}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:520px;font-size:15px}
+th,td{text-align:left;vertical-align:top;padding:8px 11px;border-bottom:1px solid var(--line)}
+th{font:500 11.5px "IBM Plex Mono",monospace;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);background:var(--bg)}
+tr:last-child td{border-bottom:0}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap;font-family:"IBM Plex Mono",monospace;font-size:13px}
+.demo{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+.phone{width:280px;height:560px;border-radius:38px;background:#0c0d10;padding:10px;box-shadow:0 10px 30px rgba(0,0,0,.25);flex:none;margin:0 auto}
+.scr{position:relative;width:100%;height:100%;border-radius:30px;overflow:hidden;color:#fff;font-family:-apple-system,"IBM Plex Sans",system-ui,sans-serif;background:linear-gradient(160deg,#3a2a5a,#1a1f3a 55%,#0e1424);cursor:pointer;user-select:none}
+.clock{position:absolute;top:44px;left:0;right:0;text-align:center}
+.clock .d{font-size:14px;opacity:.85}
+.clock .t{font-size:60px;font-weight:300;letter-spacing:-1px;line-height:1.05}
+.cnt{position:absolute;top:150px;left:0;right:0;text-align:center;font-size:12.5px;opacity:0;transition:opacity .4s}
+.cnt b{font-variant-numeric:tabular-nums;font-size:15px}
+.stack{position:absolute;left:10px;right:10px;top:178px;bottom:70px;display:flex;flex-direction:column;gap:6px;overflow:hidden}
+.n{background:rgba(255,255,255,.18);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-radius:14px;padding:7px 10px;font-size:12.5px;line-height:1.3;animation:in .35s ease-out both}
+.n .h{display:flex;justify-content:space-between;opacity:.8;font-size:11px;margin-bottom:1px}
+.n.me{background:rgba(120,180,255,.28)}
+@keyframes in{from{opacity:0;transform:translateY(-14px) scale(.97)}to{opacity:1;transform:none}}
+.hint{position:absolute;bottom:22px;left:0;right:0;text-align:center;font-size:13px;opacity:.85;animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.35}}
+.moo{position:absolute;font-weight:700;font-size:22px;color:#ffe9a8;opacity:0;pointer-events:none;text-shadow:0 2px 8px rgba(0,0,0,.4)}
+.moo.go{animation:moo 1.8s ease-out forwards}
+@keyframes moo{0%{opacity:0;transform:scale(.6)}20%{opacity:1;transform:scale(1.1)}100%{opacity:0;transform:translateY(-30px) scale(1)}}
+.gap{position:absolute;left:22px;right:22px;top:230px;text-align:center;font-style:italic;font-size:19px;line-height:1.35;opacity:0;transition:opacity .5s;z-index:2;text-shadow:0 2px 10px rgba(0,0,0,.5)}
+.stack{transition:opacity .5s}
+.title{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(8,10,18,.72);opacity:0;transition:opacity .5s;pointer-events:none}
+.title .big{font-family:"Archivo Narrow",sans-serif;font-weight:700;font-size:38px;text-align:center;line-height:1.05}
+.title .small{font-size:13px;opacity:.8}
+.chat{position:absolute;inset:0;background:#f2f2f6;color:#111;display:flex;flex-direction:column;transform:translateY(100%);transition:transform .4s ease-in}
+.chat .top{background:#fff;padding:26px 12px 8px;font-weight:600;font-size:14px;border-bottom:1px solid #ddd}
+.chat .body{padding:10px;display:flex;flex-direction:column;gap:6px;font-size:12.5px}
+.chat .a{align-self:flex-start;background:#fff;border-radius:12px;padding:6px 9px;max-width:85%}
+.chat .me{align-self:flex-end;background:#d7ebff;border-radius:12px;padding:6px 9px;max-width:85%}
+.chat .sys{align-self:center;color:#777;font-style:italic;font-size:12px;text-align:center}
+.side{flex:1;min-width:260px;display:flex;flex-direction:column;gap:10px}
+.side button{font:600 15px "IBM Plex Sans",sans-serif;background:var(--ink);color:var(--bg);border:0;border-radius:8px;padding:9px 14px;cursor:pointer;align-self:flex-start}
+.side label{font-size:14.5px;display:flex;gap:8px;align-items:center}
+.q{background:var(--surface);border:1px dashed var(--line);border-radius:8px;padding:14px 16px}
+footer{color:var(--muted);font-size:13.5px;border-top:1px solid var(--line);padding-top:14px}
+@media (prefers-reduced-motion:reduce){.n,.moo.go,.hint{animation:none}}
+</style>
+
+<div class="wrap">
+<header style="display:flex;flex-direction:column;gap:12px">
+  <div class="eyebrow">mu-sim · документ механики · черновик docs/design/intro.md</div>
+  <h1>Интро: экран блокировки</h1>
+  <div><span class="chip c-acc">на обсуждении · версия 4</span></div>
+  <p>Каждая новая партия начинается не с чата, а с экрана блокировки телефона. Алик обещает, дни летят, уведомления копятся — и только потом игрок открывает чат. Ниже — черновик документа и живой макет. Макет — не код игры, а набросок ритма и тона.</p>
+</header>
+
+<section>
+  <h2>Макет</h2>
+  <div class="demo">
+    <div class="phone"><div class="scr" id="scr" role="button" tabindex="0" aria-label="Интро: коснитесь, чтобы начать">
+      <div class="clock"><div class="d" id="date">пятница, 18 сентября</div><div class="t" id="time">09:41</div></div>
+      <div class="cnt" id="cnt">Дней после сдачи: <b id="days">0</b></div>
+      <div class="stack" id="stack"></div>
+      <div class="gap" id="gap"></div>
+      <div class="moo" id="moo">Мууууу</div>
+      <div class="title" id="title"><div class="big">Алик,<br>где деньги?</div></div>
+      <div class="hint" id="hint">Коснитесь, чтобы начать</div>
+      <div class="chat" id="chat"><div class="top">Алик Воздухонесян</div><div class="body" id="cbody"></div></div>
+    </div></div>
+    <div class="side">
+      <p style="font-size:15px">Коснись экрана телефона. Анимация идёт около 12 секунд и сама уезжает вверх в чат. Касание во время анимации — сразу в чат.</p>
+      <label><input type="checkbox" id="snd" checked> звук «Мууу» (синтез, как в игре)</label>
+      <button id="again">Ещё раз, с другой завязкой</button>
+      <p style="font-size:14px;color:var(--muted)">Завязка выбирается случайно из восьми настоящих (<code>STARTS</code> в <code>content/quests.ts</code>). Первое уведомление и начало чата — одна и та же завязка.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Идея</h2>
+  <p>Перед первой репликой игрок видит экран блокировки. Приходит уведомление от Алика — обещание из завязки партии, игрок отвечает «Жду 🙏». Дата начинает листаться, сверху сыплются уведомления: «Завтра», стикер «🏗️», «В понедельник, какой — не скажу», списание из банка. Счётчик «Дней после сдачи» бежит до 184. Где-то на фоне — «Мууу». Строка завязки («…Пятниц было двадцать шесть…»), титул «Алик, где деньги?» — и экран сам уезжает вверх, открывая чат. Всё — примерно за 12 секунд.</p>
+</section>
+
+<section>
+  <h2>Зачем</h2>
+  <ul>
+    <li>Сейчас партия открывается сразу в чате: пролог из трёх строк легко пролистать, и главная мысль — «ты ждёшь полгода, обещания копятся» — проходит незамеченной.</li>
+    <li>Интро показывает правила без объяснений: обещания копятся, календарь бежит, банк напоминает о деньгах, корова мычит.</li>
+    <li>Это тот же телефон, что и вся игра: нового мира и нового стиля не нужно.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Как играется</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Время</th><th>Что на экране</th></tr></thead>
+    <tbody>
+      <tr><td class="num">до старта</td><td>На первом запуске — экран блокировки «Коснитесь, чтобы начать»: касание разрешает браузеру звук. После «Начать заново» анимация идёт сразу.</td></tr>
+      <tr><td class="num">0,3 с</td><td>Уведомление «Алик: …» — обещание из завязки партии. Следом «Вы: …».</td></tr>
+      <tr><td class="num">1,8–6 с</td><td>Дата листается, счётчик «Дней после сдачи» бежит до 184. Сыплются 5–6 уведомлений: обещания, стикер, банк.</td></tr>
+      <tr><td class="num">5 с</td><td>«Мууууу» — звук и надпись.</td></tr>
+      <tr><td class="num">6,3–9,3 с</td><td>Уведомления гаснут. Крупно, одна на экране — строка завязки: «…прошло 184 дня. Пятниц было двадцать шесть…» Держится 3 секунды.</td></tr>
+      <tr><td class="num">9,3–11,8 с</td><td>Строка гаснет — титул «Алик, где деньги?», 2,5 секунды.</td></tr>
+      <tr><td class="num">11,8 с</td><td>Экран сам уезжает вверх, под ним чат с тем же прологом. Касание в любой момент — сразу сюда.</td></tr>
+    </tbody>
+  </table></div>
+  <ul>
+    <li><b>Когда:</b> на каждой новой партии — первый запуск и «Начать заново». Перезагрузка страницы посреди партии интро не показывает.</li>
+    <li><b>Пропуск:</b> касание во время анимации — сразу в чат.</li>
+    <li><b>Из досье</b> интро повторно не открывается.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Факты мира</h2>
+  <ul>
+    <li>Завязка партии выбирается <b>до</b> интро, и интро показывает именно её: первое уведомление = первое сообщение Алика в чате, «Вы: …» = ответ игрока, строка завязки = системная строка в чате. Иначе в интро «деньги в пятницу», а в чате «завтра, край — послезавтра».</li>
+    <li>«Интро показано» — отметка в сохранении новой партии: перезагрузка не повторяет его, «Начать заново» создаёт новую партию, и интро идёт снова.</li>
+    <li>Число «184» и дата — из состояния новой партии, а не текстом.</li>
+    <li>Промежуточные уведомления (обещания, стикер, банк) — из существующих пулов, без имён персонажей, которых игрок ещё не встречал.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Ограничения</h2>
+  <ul>
+    <li>Около 12 секунд от старта до чата, в конце экран уезжает сам — никаких действий игрока. Касание в любой момент — сразу в чат.</li>
+    <li><code>prefers-reduced-motion</code>: без полёта уведомлений и листания — статичный экран с обещанием, строкой завязки и титулом.</li>
+    <li>Только CSS и уже существующие элементы интерфейса: без картинок, шрифтов и библиотек анимации, бандл почти не растёт.</li>
+    <li>Тесты и бот стартуют без интро: e2e, плейтест и <code>scripts/playtest-tech.mjs</code> не должны ждать анимацию. Способ — параметр вроде <code>?nointro</code> или флаг тестового окружения.</li>
+    <li>Звук — только после касания (правило браузера) и только если звук в игре включён.</li>
+    <li>Интро не меняет ни одного факта партии, кроме отметки «показано».</li>
+  </ul>
+</section>
+
+<section>
+  <h2>MVP</h2>
+  <ol>
+    <li>Экран блокировки с «Коснитесь, чтобы начать» на каждой новой партии.</li>
+    <li>Уведомление с обещанием завязки и ответ игрока, 4–5 уведомлений из пулов, листающаяся дата и счётчик до 184.</li>
+    <li>«Мууу» (звук и надпись), строка завязки, титул «Алик, где деньги?»; затем экран сам уезжает в чат.</li>
+    <li>Пропуск касанием — сразу в чат, статичная версия для <code>prefers-reduced-motion</code>, запуск без интро для тестов и бота.</li>
+  </ol>
+  <h3>После MVP</h3>
+  <ul>
+    <li>Свои промежуточные уведомления под каждую из 8 завязок.</li>
+    <li>Вибрация на уведомлениях.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Решения автора</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Вопрос</th><th>Решение</th></tr></thead>
+    <tbody>
+      <tr><td>Вариант</td><td>А — экран блокировки телефона</td></tr>
+      <tr><td>Когда показывать</td><td>На каждой новой партии</td></tr>
+      <tr><td>Звук</td><td>«Мууу» — да</td></tr>
+      <tr><td>Титул «Алик, где деньги?»</td><td>Да</td></tr>
+      <tr><td>Повтор из досье</td><td>Нет</td></tr>
+      <tr><td>Тайминги</td><td>Как в первой версии макета; 4-секундная версия отклонена</td></tr>
+      <tr><td>Читаемость</td><td>Строка «…прошло 184 дня…» и титул держатся на экране достаточно, чтобы прочитать: по ~3 и ~2,5 с, каждый — один на экране</td></tr>
+      <tr><td>Переход в чат</td><td>Экран уезжает сам</td></tr>
+      <tr><td>Касание во время интро</td><td>Сразу свайп в чат</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2>Открытые вопросы</h2>
+  <div class="q"><ul>
+    <li><b>Сигнал уведомлений</b> тоже звучит, или в интро только «Мууу»?</li>
+    <li><b>Экран «Коснитесь, чтобы начать» на первом запуске</b> — оставить? Без него анимация стартует сама, но «Мууу» будет беззвучным: браузер не даст звук без касания. После «Начать заново» этого экрана нет в любом случае.</li>
+  </ul></div>
+</section>
+
+<footer>Черновик. В <code>main</code> ничего не несу и задачи не завожу до твоей команды.</footer>
+</div>
+
+<script>
+const STARTS=[
+ ['Сынок, объект принят, заказчик доволен! Ты молодец, плитка — как зеркало. Деньги в пятницу.','Спасибо, Алик! Жду 🙏','…прошло 184 дня…'],
+ ['Брат, заказчик плачет от счастья! Такой плитки он не видел даже в Дубае. Деньги завтра, край — послезавтра.','Отлично, Алик! Жду.','…прошло 184 дня. Завтра так и не наступило…'],
+ ['Джан, объект сдали! Деньги уже у меня в руках. Почти. Буквально в пятницу.','Хорошо, Алик, спасибо!','…прошло 184 дня. Пятниц было двадцать шесть…'],
+ ['Золотые руки! Плитка легла, как на свадьбе. Деньги после праздника.','А какого праздника?','…прошло 184 дня. Праздники не кончаются…'],
+ ['Брат, сдали! Заказчик дал аванс, но аванс съел бетон. Остальное — к концу месяца.','Жду к концу месяца, Алик.','…прошло 184 дня. Месяц кончился шесть раз…'],
+ ['Сынок, всё приняли, всё подписали, деньги переводом. Реквизиты скинь!','Скинул, Алик: 2202 **** **** 4815. Жду!','…прошло 184 дня. Перевод в пути…'],
+ ['Ахпер, работа — шедевр! Деньги как только заказчик заплатит. А он заплатит — я его кум.','Спасибо, Алик. Жду.','…прошло 184 дня. Кум не заплатил…'],
+ ['Брат, приняли! Деньги наличными, в конверте, на днях привезу лично.','Спасибо! Буду ждать дома.','…прошло 184 дня. Конверт в пути…'],
+];
+const MID=[['Алик','Завтра всё будет, брат'],['Алик','🏗️ Стикер'],['Банк','Списание 340 ₽. Продукты. Баланс: 12 060 ₽'],['Алик','В понедельник, какой — не скажу'],['Алик','Деньги в пути. Путь длинный'],['Банк','Списание 128 ₽. Кофе с горя. Баланс: 11 932 ₽']];
+const MON=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+const WD=['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'];
+const H=new Date(Date.UTC(2026,2,18));
+const fmt=d=>{const x=new Date(H.getTime()+d*864e5);return `${WD[x.getUTCDay()]}, ${x.getUTCDate()} ${MON[x.getUTCMonth()]}`};
+const $=id=>document.getElementById(id);
+let st='idle',timers=[],start=null,ac=null;
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const T=(ms,f)=>timers.push(setTimeout(f,ms));
+function note(app,txt,me){const n=document.createElement('div');n.className='n'+(me?' me':'');n.innerHTML=`<div class="h"><span>${app}</span><span>сейчас</span></div>${txt}`;const s=$('stack');s.prepend(n);while(s.children.length>6)s.lastChild.remove()}
+function moo(){const m=$('moo');m.style.left=(30+Math.random()*120)+'px';m.style.top=(260+Math.random()*120)+'px';m.classList.remove('go');void m.offsetWidth;m.classList.add('go');
+ if(!$('snd').checked)return;try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();const o=ac.createOscillator(),g=ac.createGain(),f=ac.createBiquadFilter();o.type='sawtooth';f.type='lowpass';f.frequency.value=700;const t=ac.currentTime,d=1.8;o.frequency.setValueAtTime(120,t);o.frequency.linearRampToValueAtTime(95,t+d);g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.25,t+.25);g.gain.linearRampToValueAtTime(.2,t+d-.4);g.gain.linearRampToValueAtTime(0,t+d);o.connect(f).connect(g).connect(ac.destination);o.start(t);o.stop(t+d)}catch(e){}}
+function reset(){timers.forEach(clearTimeout);timers=[];st='idle';$('stack').style.opacity=1;$('moo').style.display='';start=STARTS[Math.floor(Math.random()*STARTS.length)];$('stack').innerHTML='';$('cnt').style.opacity=0;$('gap').style.opacity=0;$('title').style.opacity=0;$('chat').style.transform='translateY(100%)';$('hint').style.display='';$('days').textContent='184';$('days').textContent='0';$('date').textContent=fmt(0);$('time').textContent='09:41'}
+function titleNow(){timers.forEach(clearTimeout);timers=[];$('days').textContent='184';$('date').textContent=fmt(184);$('cnt').style.opacity=1;$('gap').textContent=start[2];$('gap').style.opacity=1;$('title').style.opacity=1;st='title'}
+function play(){st='play';$('hint').style.display='none';
+ if(reduce){note('Алик',start[0]);note('Вы',start[1],true);titleNow();T(2500,toChat);return}
+ T(300,()=>note('Алик',start[0]));T(1100,()=>note('Вы',start[1],true));
+ T(1800,()=>{$('cnt').style.opacity=1;const t0=performance.now();const tick=()=>{const k=Math.min(1,(performance.now()-t0)/4200);const d=Math.round(184*k*k*(3-2*k));$('days').textContent=d;$('date').textContent=fmt(d);$('time').textContent=String(8+Math.floor(k*13)).padStart(2,'0')+':'+String(Math.floor(k*59)).padStart(2,'0');if(k<1&&st==='play')requestAnimationFrame(tick)};requestAnimationFrame(tick)});
+ MID.forEach((m,i)=>T(2100+i*650,()=>note(m[0],m[1])));
+ T(5000,moo);
+ T(6300,()=>{$('stack').style.opacity=0;$('moo').style.display='none';$('gap').textContent=start[2];$('gap').style.opacity=1});
+ T(9300,()=>{$('gap').style.opacity=0;$('title').style.opacity=1;st='title'});
+ T(11800,toChat);}
+function toChat(){st='chat';$('cbody').innerHTML=`<div class="a">${start[0]}</div><div class="me">${start[1]}</div><div class="sys">${start[2]}</div>`;$('chat').style.transform='translateY(0)'}
+function tap(){if(st==='idle')play();else if(st==='play'||st==='title'){timers.forEach(clearTimeout);timers=[];toChat()}}
+$('scr').addEventListener('click',tap);$('scr').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();tap()}});
+$('again').addEventListener('click',reset);
+reset();
+</script>
