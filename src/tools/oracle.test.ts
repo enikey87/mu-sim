@@ -241,6 +241,13 @@ describe('оракул: сторож у каждой проверки', () => {
     expect(oracle(synthetic(payday)).verdict!.violations.same_day_repeat).toBeUndefined()
     expect(oracle(synthetic(['[система] Алик скрыл от вас статус', '[система] Алик скрыл от вас статус'])).verdict!.violations.same_day_repeat).toBe(1)
   })
+  it('Поступление — повторяемое; два перевода подряд не notif_event_repeat', () => {
+    const lines = [
+      '(уведомление телефона: 🏦 Банк — Поступление 50 ₽. Перевод от Алика. Баланс: 12 450 ₽)',
+      '(уведомление телефона: 🏦 Банк — Поступление 50 ₽. Перевод от Алика. Баланс: 12 500 ₽)',
+    ]
+    expect(oracle(synthetic(lines)).verdict!.violations.notif_event_repeat).toBeUndefined()
+  })
   it('факты на момент сообщения: после последнего кадра — его «после», а не пустота', () => {
     const late = (mem: Record<string, unknown>) => ({ frames: [{ at: 0, before: {}, mem, said: [], fired: [] }], rules: { deathGated: [] }, coverage: {} })
     const line = ['[10:00] Алик: Вы же обещали в пятницу']
