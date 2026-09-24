@@ -1,7 +1,9 @@
 // Игровой календарь и режим дня по реальным часам.
-export const HANDOVER = new Date(2026, 2, 18) // дата сдачи объекта
+const [Y, M, D] = [2026, 2, 18] // дата сдачи объекта
+export const HANDOVER = new Date(Y, M, D)
 
-export const dateOf = (day: number): Date => new Date(HANDOVER.getTime() + day * 864e5)
+// день месяца, а не +day×24 ч: сутки с переходом на летнее время длятся 23 или 25 ч, и дата уезжала на вчера
+export const dateOf = (day: number): Date => new Date(Y, M, D + day)
 // Intl-форматирование дорогое, а facts() зовёт его на каждую выборку реплики: день → строка не меняется
 const byDay = (opts: Intl.DateTimeFormatOptions) => {
   const cache = new Map<number, string>()
