@@ -471,11 +471,15 @@ describe('Game: пачка непрочитанных подчиняется м�
     expect(game.ui.unread).toBe(0)
     expect([game.S.promises.length, game.S.debt, game.S.money]).toEqual([promises + 1, debt, money])
     expect(game.S.ending).toBe('payday_coins')
-    // каждое Quiet_PaydayOpen_* охраняет своё событие, пока экран концовки открыт
+    // без Quiet болтовня нашлась бы: обида + тепло → Idle/Away_ColdWar; срок обещания уже записан выше
+    game.S.mem[HEAT] = 1
+    game.S.ctx = { offended: true }
+    game.S.offlineDays = 0
+    // каждое Quiet_PaydayOpen_* глушит своё событие, пока экран концовки открыт (#259)
     for (const event of ['AlikAway', 'AlikIdle', 'StoryBeat', 'PeriodLine', 'PromiseDue', 'Mentioned'] as const) {
       const n = game.S.msgs.length
       expect((await game.fire(event))?.name, event).toBe('Quiet_PaydayOpen_' + event)
-      expect(game.S.msgs.slice(n)).toEqual([])
+      expect(game.S.msgs.slice(n), event).toEqual([])
     }
     await game.closeEnding()
     expect(game.S.mem['endgame.active']).toBe(true)
@@ -515,6 +519,24 @@ describe('Game: пачка непрочитанных подчиняется м�
       const r = game.rules.match({ event: 'AlikAway', facts: {} }, game.facts())
       expect(r?.name, `seed ${seed}`).not.toBe('Away_ColdWar')
       expect(['Away_Offline', 'Quiet_Offended_AlikAway']).toContain(r?.name)
+    }
+  })
+  // #259: Idle_ColdWar — тот же гейт offline; путь игрока — onIdle после грубости
+  it('после первой грубости пропавший Алик в простое не пишет холодную войну', async () => {
+    const pool = new Set(COLD_WAR.map(valueOf))
+    for (let seed = 1; seed <= 30; seed++) {
+      const { game } = makeGame({ seed })
+      game.S.stats.sent = 6
+      await game.send({ text: 'Ты вор и мошенник!!!', tone: 'rude' })
+      expect(game.S.offlineDays).toBeGreaterThan(0)
+      expect(game.S.ctx?.offended).toBe(true)
+      expect(game.facts().offline).toBe(true)
+      const idle = game.rules.match({ event: 'AlikIdle', facts: {} }, game.facts())
+      expect(idle?.name, `seed ${seed}`).not.toBe('Idle_ColdWar')
+      const from = game.S.msgs.length
+      await game.onIdle()
+      const body = arrived(game, from)
+      expect(body.some((m) => m.kind === 'text' && pool.has(m.text)), `seed ${seed}`).toBe(false)
     }
   })
   it('посреди сцены пачки нет — как и болтовни простоя; сцена продолжается', async () => {
