@@ -851,7 +851,9 @@ export class Game {
     const n = p.spec as L.Notif
     if (n.spend) {
       const spend = 90 + this.rnd(40) * 10
-      this.adjustMoney(-spend, this.draw('SPEND', L.SPEND))
+      const why = this.draw('SPEND', L.SPEND)
+      // отказ банка звучит: иначе трата исчезает молча (#185)
+      if (!this.adjustMoney(-spend, why)) this.notify('🏦', 'Банк', `Не прошло: недостаточно средств. ${why}, ${spend.toLocaleString('ru-RU')} ₽.`)
       return
     }
     this.notify(n.icon, n.app, p.text)
@@ -1899,13 +1901,17 @@ export class Game {
     // та же природа отказа, что и у серии: запечатанный долг — узел не двигает и календарь (#189)
     const refused = debtFx && this.debtSealed()
     if (fx.days && !refused) this.nextDay(fx.days)
-    let debtMoved = !!fx.debt && this.adjustDebt(fx.debt)
-    if (fx.money) this.adjustMoney(fx.money, 'По карте')
+    // платёж с карты идёт первым: не прошёл — узел не брал денег и не берёт их следствий (#185)
+    const pays = (fx.money ?? 0) < 0
+    const paid = !pays || this.adjustMoney(fx.money!, 'По карте')
+    if (pays && !paid) this.notify('🏦', 'Банк', `Не прошло: недостаточно средств. Перевод ${Math.abs(fx.money!).toLocaleString('ru-RU')} ₽ не ушёл.`)
+    if (!pays && fx.money) this.adjustMoney(fx.money, 'По карте')
+    let debtMoved = !!fx.debt && paid && this.adjustDebt(fx.debt)
     if (fx.mood) this.mood(fx.mood)
     if (fx.barter && this.adjustDebt(-v.v)) { S.items.push(v.n); debtMoved = true }
     const invoiced = !!fx.invoice && this.adjustDebt(-v.total)
     debtMoved ||= invoiced
-    if (fx.ach) this.unlock(fx.ach)
+    if (fx.ach && paid) this.unlock(fx.ach)
     if (fx.amnesty) this.amnesty()
     if (fx.legend !== undefined) this.setLegend(fx.legend)
     if (fx.set) this.rules.applyOps(Object.entries(fx.set).map(([key, value]) => ({ key, op: '=' as const, value })), {})
