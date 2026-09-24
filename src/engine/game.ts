@@ -751,6 +751,11 @@ export class Game {
     this.emit()
   }
   restStatus(): void {
+    // в блоке / «смерти» / у Карине шапка не врёт «в сети» рядом со «скрыл статус» (#223)
+    if (this.S.mem[memkeys.blocked] || this.S.mem[memkeys.alikDead] || this.S.mem[memkeys.phoneKarine]) {
+      this.setStatus('не в сети')
+      return
+    }
     if (this.S.offlineDays > 0) this.setStatus('был давно')
     else if (this.isNight()) this.setStatus(`был(а) в ${this.realHHMM()}`)
     else this.setStatus(this.chance(0.5) ? 'был недавно' : 'в сети', 'online')
@@ -1272,11 +1277,9 @@ export class Game {
         this.sys('Алик Воздухонесян сменил фото профиля. На фото — баран')
         this.unlock('ram')
       }
-      // подпись профиля — после хода, а не правилом StoryBeat: серию она не вытесняет; одна за ход
-      // блок / смерть / телефон / эндгейм — без статуса; «скрыл» только в живом блоке (#192)
-      const quietStatus = S.mem[memkeys.blocked] || S.mem[memkeys.alikDead] || S.mem[memkeys.phoneKarine] || S.mem[memkeys.endgame.active]
+      // подпись профиля — одно место молчания (#223): quietStatus; «скрыл» только в живом блоке
+      const quietStatus = !!(S.mem[memkeys.blocked] || S.mem[memkeys.alikDead] || S.mem[memkeys.phoneKarine] || S.mem[memkeys.endgame.active])
       if (S.mem[memkeys.blocked] && !S.mem[memkeys.endgame.active] && !S.mem[memkeys.alikDead] && !S.mem[memkeys.phoneKarine]) {
-        // в блоке статусов нет: об этом игрок узнаёт один раз за блок, факт сбрасывает Rude_Block
         if (!S.mem[memkeys.statusHidden]) {
           S.mem[memkeys.statusHidden] = true
           this.sys(STATUS_HIDDEN)
@@ -1630,7 +1633,12 @@ export class Game {
     // серия, которая двигает долг, объявляет это в sys — объявление только о том, что случилось
     const debtFx = !!(ep.fx?.debt || ep.fx?.pay)
     let debtMoved = !!ep.fx?.debt && this.adjustDebt(ep.fx.debt)
-    if (ep.fx?.pay && this.adjustDebt(-ep.fx.pay)) { this.adjustMoney(ep.fx.pay, 'Выплата'); debtMoved = true }
+    if (ep.fx?.pay && this.adjustDebt(-ep.fx.pay)) {
+      this.adjustMoney(ep.fx.pay, 'Выплата')
+      // перевод Алика (в т.ч. финал) — тот же факт, что читает ответ на «спасибо» (#223)
+      if (++this.S.stats.fifty >= 5) this.unlock('fifty5')
+      debtMoved = true
+    }
     if (ep.item) this.S.items.push(ep.item)
     if (ep.state) this.rules.applyOps([{ key: ep.state.key, op: '=', value: true, forDays: ep.state.days, scope: ep.state.actor ? 'target' : 'world' }], { target: ep.state.actor })
     if (ep.fx?.days) this.nextDay(ep.fx.days)
@@ -1956,7 +1964,9 @@ export class Game {
       try {
         if (this.disposed) return
         if (!this.ui.busy && !this.battery.dead && this.S.offlineDays === 0) {
-          if (this.chance(0.2)) {
+          if (this.S.mem[memkeys.blocked] || this.S.mem[memkeys.alikDead] || this.S.mem[memkeys.phoneKarine]) {
+            this.setStatus('не в сети')
+          } else if (this.chance(0.2)) {
             // «печатает…» — и ничего не приходит
             this.ui.typing = 'печатает…'
             this.setStatus('печатает…', 'typing')

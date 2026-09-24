@@ -143,12 +143,14 @@ describe('финалы сериалов: выбор', () => {
     await game.playArc('samvel')
     expect(game.S.mem['finale.samvel']).toBe('default')
   })
-  it('запасное условие: «Нива» выбирает того, кто о ней спрашивал', async () => {
+  it('финал с fx.pay увеличивает fifty — ответ на «спасибо» видит перевод', async () => {
     const { game } = makeGame()
-    game.S.mem['asked.niva'] = 5
-    toLast(game, 'niva')
-    await game.playArc('niva')
-    expect(game.S.mem['finale.niva']).toBe('chose')
+    SETUP['razmik.swap'](game)
+    toLast(game, 'razmik')
+    const before = game.S.stats.fifty
+    await game.playArc('razmik')
+    expect(game.S.mem['finale.razmik']).toBe('swap')
+    expect(game.S.stats.fifty).toBe(before + 1)
   })
   it('вопрос «Как там…?» считается и после финала отвечает репликами этого финала', async () => {
     const { game } = makeGame()
