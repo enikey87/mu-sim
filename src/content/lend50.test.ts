@@ -5,10 +5,18 @@ import { flush, makeGame, memStorage } from '../test/helpers'
 import type { Game } from '../engine/game'
 import { uiOf, viewOf } from '../ui/view'
 import {
-  LEND50_LINK, LEND50_LOCKED, LEND50_NO, LEND50_NUNE, LEND50_RENAME, LEND50_SERIOUS, LEND50_SYS, LEND50_YES,
+  ENDGAME_CHOICES, LEND50_ASK, LEND50_ASK_AGAIN, LEND50_LINK, LEND50_LOCKED, LEND50_NO, LEND50_NUNE,
+  LEND50_RENAME, LEND50_SERIOUS, LEND50_SYS, LEND50_YES,
 } from './endgame'
 
 const texts = (g: Game, from = 0) => g.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' || m.kind === 'sys' ? [m.text] : []))
+const alikBeforeSys = (t: string[]) => {
+  const sys = t.indexOf(LEND50_SYS)
+  expect(sys).toBeGreaterThan(0)
+  const start = t.findIndex((y) => y === LEND50_ASK[0] || y === LEND50_ASK_AGAIN[0])
+  expect(start).toBeGreaterThanOrEqual(0)
+  return t.slice(start, sys)
+}
 
 /** День выплаты закрыт — как игрок: экран итогов закрывает эндгейм. */
 const enter = async (g: Game, outcome = 'default'): Promise<number> => {
@@ -29,14 +37,18 @@ const pick = async (g: Game, act: string) => {
 const descOf = (g: Game, id: string) => viewOf(uiOf(g)).ach.find((a) => a.id === id)!.desc
 
 describe('«Займи 50»', () => {
-  it('просьба идёт за вступлением, подводка — три реплики, «Верну» последняя, системное сразу за ней', async () => {
+  it('просьба идёт за вступлением, подводка — ≤3 реплик, «Верну» последняя, системное сразу за ней', async () => {
     const { game } = makeGame()
     const from = await enter(game)
     const t = texts(game, from)
     const intro = t.findIndex((x) => /Остаток выплачен|Французский оригинал|Деньги настоящие|Не хватает одной монеты/.test(x))
     const ask = t.indexOf('Брат. Слушай сюда. Только не смейся.')
     expect(ask).toBeGreaterThan(intro)
-    expect(t.slice(ask, ask + 3)).toEqual(['Брат. Слушай сюда. Только не смейся.', 'Займи 50 ₽.', 'Верну. Ты меня знаешь.'])
+    const lead = alikBeforeSys(t)
+    expect(lead.length).toBeLessThanOrEqual(3)
+    expect(lead.length).toBeGreaterThan(0)
+    expect(lead.at(-1)).toBe('Верну. Ты меня знаешь.')
+    expect(lead).toEqual(['Брат. Слушай сюда. Только не смейся.', 'Займи 50 ₽.', 'Верну. Ты меня знаешь.'])
     expect(game.S.mem['lend50.asked']).toBe(true)
     expect(t.slice(-2)).toEqual([LEND50_SYS, LEND50_LINK])
     expect(game.choices.map((c) => c.act)).toEqual(['lend50Yes', 'lend50Serious', 'lend50No'])
@@ -50,6 +62,75 @@ describe('«Займи 50»', () => {
     const ask = t.indexOf('Брат. Слушай сюда. Только не смейся.')
     expect(ask).toBeGreaterThan(t.indexOf('Алик добавил вас'))
     expect(ask).toBeGreaterThan(t.findIndex((x) => /Остаток выплачен|Французский оригинал|Деньги настоящие|Не хватает одной монеты/.test(x)))
+  })
+  it('пока пауза и подводка — busy: ход игрока не вклинивается', async () => {
+    const { game } = makeGame()
+    let release!: () => void
+    const gate = new Promise<void>((r) => { release = r })
+    const orig = game.sleep
+    game.sleep = async (ms) => {
+      if (ms === 1500) { await gate; return }
+      return orig(ms)
+    }
+    game.S.mem.payday = 'default'
+    game.S.ending = 'payday_default'
+    game.S.endings.payday_default = game.S.day
+    const done = game.closeEnding()
+    await flush()
+    expect(game.ui.busy).toBe(true)
+    expect(game.S.mem['lend50.asked']).toBeUndefined()
+    const before = game.S.msgs.length
+    await game.send(ENDGAME_CHOICES[0])
+    expect(game.S.msgs.length).toBe(before)
+    release()
+    await done
+    await flush()
+    expect(game.ui.busy).toBe(false)
+    expect(game.S.mem['lend50.asked']).toBe(true)
+    expect(game.choices.map((c) => c.act)).toEqual(['lend50Yes', 'lend50Serious', 'lend50No'])
+  })
+  it('кнопки просьбы переживают «Мууу», простой и скрытие вкладки', async () => {
+    const { game, clock } = makeGame()
+    await enter(game)
+    const acts = () => game.choices.map((c) => c.act)
+    expect(acts()).toEqual(['lend50Yes', 'lend50Serious', 'lend50No'])
+    game.moo()
+    expect(acts()).toEqual(['lend50Yes', 'lend50Serious', 'lend50No'])
+    game.S.choices = null
+    expect(acts()).toEqual(['lend50Yes', 'lend50Serious', 'lend50No'])
+    await game.onVisibility(true)
+    clock.advance(5 * 60_000)
+    await game.onVisibility(false)
+    expect(acts()).toEqual(['lend50Yes', 'lend50Serious', 'lend50No'])
+  })
+  it('перезагрузка посреди просьбы доигрывает её: и реплики, и системная пометка', async () => {
+    const storage = memStorage()
+    const { game } = makeGame({ storage })
+    game.S.mem.payday = 'default'
+    game.S.ending = 'payday_default'
+    game.S.endings.payday_default = game.S.day
+    game.S.mem['endgame.active'] = true
+    game.S.mem['endgame.started'] = game.S.day
+    // сирота: одна реплика просьбы без SYS — как после закрытия вкладки посреди подводки
+    game.S.msgs.push({ kind: 'text', from: 'alik', text: LEND50_ASK[0], id: game.S.nextId++, time: '12:00' })
+    game.save()
+    const again = makeGame({ storage })
+    await flush()
+    expect(again.game.S.mem['lend50.asked']).toBe(true)
+    const t = texts(again.game)
+    expect(t.filter((x) => x === LEND50_ASK[0]).length).toBe(1)
+    expect(t).toContain(LEND50_SYS)
+    expect(t).toContain(LEND50_LINK)
+    expect(t.indexOf('Верну. Ты меня знаешь.')).toBeLessThan(t.indexOf(LEND50_SYS))
+    expect(again.game.choices.map((c) => c.act)).toEqual(['lend50Yes', 'lend50Serious', 'lend50No'])
+  })
+  it('реплики просьбы без опечаток: текст «Верну» точный на многих сидах', async () => {
+    for (let seed = 1; seed <= 40; seed++) {
+      const { game } = makeGame({ seed, typos: true })
+      await enter(game)
+      expect(texts(game)).toContain('Верну. Ты меня знаешь.')
+      expect(texts(game).some((x) => /Верн/.test(x) && x !== 'Верну. Ты меня знаешь.')).toBe(false)
+    }
   })
   it('«Перевёл»: ответ, переименование группы, ачивка с описанием про портфель', async () => {
     const { game } = makeGame()
@@ -67,6 +148,7 @@ describe('«Займи 50»', () => {
     expect(descOf(game, 'lend50')).toMatch(/Одолжил Алику 50 ₽/)
     expect(t.join(' ')).not.toMatch(/Вам перевод|Возврат/) // перевод настоящий, и он не игровой
     expect([game.S.money, game.S.debt]).toEqual([money, debt])
+    expect(game.choices.map((c) => c.act)).toEqual(ENDGAME_CHOICES.map((c) => c.act))
   })
   it('«Не дам»: ответ, ачивка про первого человека, ни денег, ни переименования', async () => {
     const { game } = makeGame()
@@ -123,6 +205,8 @@ describe('«Займи 50»', () => {
     const t = texts(g2)
     expect(t).toContain('Опять я. Опять 50. Это уже традиция, брат.')
     expect(t).not.toContain('Брат. Слушай сюда. Только не смейся.')
+    expect(alikBeforeSys(t).at(-1)).toBe('Верну. Ты меня знаешь.')
+    expect(alikBeforeSys(t).length).toBeLessThanOrEqual(3)
   })
   it('воспоминание требует фактов: без ответа молчит, после ответа звучит один раз', async () => {
     const { game } = makeGame()
@@ -135,5 +219,14 @@ describe('«Займи 50»', () => {
     expect(mem()).toBe(1)
     for (let i = 0; i < 3; i++) await game.endgameFormality()
     expect(mem()).toBe(1)
+  })
+  // негативный контроль #219: buildChoices без ветки asked снова стирает кнопки
+  it('buildChoices отдаёт кнопки просьбы из факта asked, а не из залипшего S.choices', async () => {
+    const { game } = makeGame()
+    await enter(game)
+    game.S.choices = ENDGAME_CHOICES.map((c) => ({ ...c })) // как после idle/away до фикса
+    expect(game.buildChoices().map((c) => c.act)).toEqual(['lend50Yes', 'lend50Serious', 'lend50No'])
+    game.S.choices = null
+    expect(game.choices.map((c) => c.act)).toEqual(['lend50Yes', 'lend50Serious', 'lend50No'])
   })
 })
