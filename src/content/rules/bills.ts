@@ -18,7 +18,7 @@ export const billRules: R[] = [
     name: 'Bill_Warn', event: 'BillWarn', when: [], priority: 'system',
     respond: ({ game, facts }) => {
       const id = billOf(facts)
-      if (!id || game.moneySealed()) return
+      if (!id || game.moneySealed() || !game.billEventLive(id, facts.at, 'BillWarn')) return
       const bill = BILLS.find((b) => b.id === id)!
       if (bill.skip?.(game.S.mem)) return
       game.rules.applyOps([set(billDue(id), true)], {})
@@ -29,7 +29,7 @@ export const billRules: R[] = [
     name: 'Bill_Due', event: 'BillDue', when: [], priority: 'system',
     respond: ({ game, facts }) => {
       const id = billOf(facts)
-      if (!id || game.moneySealed()) return
+      if (!id || game.moneySealed() || !game.billEventLive(id, facts.at, 'BillDue')) return
       game.chargeBill(id)
     },
   },
