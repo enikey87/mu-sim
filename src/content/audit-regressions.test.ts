@@ -405,13 +405,22 @@ describe('регрессии раунда 16', () => {
       expect(isOpen(e, { [threatClaim]: 'court' }), `${name}: Вардан`).toBe(false)
       expect(isOpen(e, { [threatClaim]: 'police' }), `${name}: Вардан`).toBe(true)
     }
-    // живая проверка: факт пишет само сообщение игрока, а не гейт на подставленных фактах.
-    // своя партия на образец: чужой ход иначе оставил бы в памяти прошлый предмет
+    // живая проверка: факт пишет само сообщение игрока, ответ — из пула по этому факту.
+    // своя партия на образец и сид: ответ, который назвал чужую инстанцию хоть раз, — дефект;
+    // своя инстанция, если её строка открыта, должна прозвучать хоть раз — иначе гейт мёртв
     for (const [text, want] of CLAIM_SAMPLES) {
-      const { game } = makeGame()
-      await game.send(text)
-      expect(game.S.mem[threatClaim], text).toBe(want)
-      expect(alikTexts(game.S.msgs).at(-1) ?? '', text).not.toMatch(/Коллектор/)
+      const own = SUBJECT.find(([id]) => id === want)![1]
+      let hits = 0
+      for (let seed = 1; seed <= 16; seed++) {
+        const { game } = makeGame({ seed })
+        await game.send(text)
+        expect(game.S.mem[threatClaim], text).toBe(want)
+        const said = alikTexts(game.S.msgs)
+        for (const t of said) for (const [id, re] of SUBJECT) if (id !== want) expect(t, `${text} (сид ${seed})`).not.toMatch(re)
+        if (said.some((t) => own.test(t))) hits++
+      }
+      const reachable = texts(D.THREAT_A as Entry<unknown>[], { [threatClaim]: want }).some((t) => own.test(t))
+      if (reachable) expect(hits, text).toBeGreaterThan(0)
     }
   })
 
@@ -453,5 +462,63 @@ describe('регрессии раунда 16', () => {
     expect(holds(decided[0], { court: 7 })).toBe(true)
     // и ни одно воспоминание не объявляет письмо с решением до ступени
     for (const l of line(/письмо|«Отстаньте»/)) expect(holds(l, { 'ach.strasbourg': true, 'since.strasbourg': 9, court: 6 })).toBe(false)
+  })
+
+  // пул реплик: открыт и гейт записи, и собственные условия LineSpec (isOpen видит только гейт)
+  const spoken = (pool: readonly Entry<unknown>[], facts: Record<string, string | number | boolean>) => pool.filter((e) => isOpen(e, facts))
+    .map((e) => valueOf(e)).map((v) => (typeof v === 'string' ? { t: v } : (v as LineSpec)))
+    .filter((l) => (l.when ?? []).every((c) => test(c, facts))).map((l) => l.t).join(' ')
+
+  it('цикл 10: Страсбург — до решения ступени письмо Дня выплаты первое, после — пересмотр', async () => {
+    const say = (g: ReturnType<typeof makeGame>['game'], n: number) =>
+      g.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' || m.kind === 'sys' ? [m.text] : [])).join('\n')
+    const threat = async (g: ReturnType<typeof makeGame>['game']) => { g.S.offlineDays = 0; const n = g.S.msgs.length; await g.send('Я подаю в суд. Серьёзно.'); return say(g, n) }
+    const memo = (facts: Parameters<typeof test>[1]) => MEMORY.map(valueOf)
+      .filter((l): l is LineSpec => typeof l !== 'string' && /Страсбург/.test(l.t) && (l.when ?? []).every((c) => test(c, facts))).map((l) => l.t)
+    for (const decided of [false, true]) {
+      const { game } = makeGame()
+      Object.assign(game.S.mem, { court: 5, 'met.arsen': true, 'intro.arsen': true })
+      expect(await threat(game)).toMatch(/ушло в Европейский суд/) // ступень 5: дело ушло, решения нет
+      expect(game.S.ach.strasbourg).toBeDefined()
+      if (decided) expect(await threat(game)).toMatch(/Страсбург вынес решение/)
+      expect(game.S.mem.court).toBe(decided ? 7 : 6)
+      const n = game.S.msgs.length
+      expect((await game.fire('PaydayOutcome'))?.name).toBe('Payday_strasbourg')
+      const letter = say(game, n)
+      expect(letter).toMatch(/письмо из Страсбурга/)
+      // пересмотр — только тому, кому ступень уже объявила решение
+      if (decided) expect(letter).toMatch(/передумали/)
+      else expect(letter).not.toMatch(/передумали|Разбирайтесь/)
+      const b = game.S.msgs.length
+      await game.fire('PaydayButton', { outcome: 'strasbourg' })
+      expect(say(game, b)).toMatch(/ещё одно письмо/)
+      // после письма воспоминание не говорит, что Страсбург думает
+      game.S.day += 5 // воспоминание — о прошлом: не в день письма
+      expect(memo(game.lineFacts()).join(' ')).not.toMatch(/думает/)
+      if (!decided) {
+        // решение ступени после письма — второе письмо, а не первая новость
+        const verdict = await threat(game)
+        expect(verdict).toMatch(/ещё одно письмо/)
+        expect(verdict).not.toMatch(/вынес решение/)
+        expect(game.S.mem.court).toBe(7)
+      }
+    }
+    // звенья великой отмазки: ответ Страсбурга — только после ступени решения
+    const verdict = spoken(GRAND.verdict, { 'ach.strasbourg': true, court: 6 })
+    expect(verdict).not.toMatch(/Страсбург ответил/)
+    expect(verdict).toMatch(/думает/)
+    expect(spoken(GRAND.verdict, { 'ach.strasbourg': true, court: 7 })).toMatch(/Страсбург ответил: «Разбирайтесь сами/)
+  })
+
+  it('цикл 10: разморозку и премию объявляют один раз', () => {
+    // счета разморозила легенда — утро Дня выплаты не объявляет разморозку второй раз
+    const src = (f: Record<string, string | boolean>) => spoken(SOURCES, f)
+    expect(src({ 'finale.boris': 'default' })).toMatch(/разморозила/)
+    expect(src({ 'finale.boris': 'default', 'tax.thawed': true })).not.toMatch(/разморозила/)
+    expect(src({ 'finale.boris': 'default', 'tax.thawed': true })).toMatch(/90 000/)
+    // финал Бориса раздал зарплату; премию объявляет утро выплаты — воспоминание её не называет
+    const boris = MEMORY.map(valueOf).filter((l): l is LineSpec => typeof l !== 'string' && /Борис-прораб/.test(l.t))
+    expect(boris.length).toBeGreaterThan(0)
+    for (const l of boris) expect(l.t).not.toMatch(/преми/)
   })
 })

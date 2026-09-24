@@ -3,10 +3,10 @@
 import type { Game } from '../../engine/game'
 import { type Rule, eq, gte, lte, add, set, is, missing } from '../../engine/rules'
 import type { GameEvent } from './events'
-import { COURT, COURT_AFTER, COURT_LAWYER_AGAIN } from '../quests'
+import { COURT, COURT_AFTER, COURT_LAWYER_AGAIN, COURT_VERDICT_AFTER_LETTER } from '../quests'
 import { THREAT_AGAIN } from '../misc'
 import { meet } from '../world'
-import { count, court, intro } from '../memkeys'
+import { count, court, intro, paydayScene } from '../memkeys'
 
 type R = Rule<Game, GameEvent>
 const threat = eq('tone', 'threat')
@@ -41,6 +41,12 @@ export const courtRules: R[] = [
       await saySaid(game, COURT[stage])
       if (stage === 5) game.unlock('strasbourg')
     },
+  },
+  {
+    // ступень 6, когда письмо из Страсбурга уже пришло в День выплаты: решение не объявляется первым
+    name: 'Court_Verdict_Lettered', event: 'PlayerMessage', when: [threat, eq(court, 6), eq(paydayScene, 'strasbourg')], bonus: 1,
+    remember: [add(count.threat), add(court)],
+    respond: async ({ game }) => { game.unlock('memory'); await saySaid(game, COURT_VERDICT_AFTER_LETTER) },
   },
   {
     // дело прошло все инстанции
