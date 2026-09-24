@@ -11,11 +11,11 @@ export const RARE = new Set([
   'Away_Offline', 'Court_Verdict_Lettered',
   // окно состояния или счётчик, который складывается не в каждой партии
   'Opt_Cow', 'Says_catchLie_caught2', 'Says_catchLie_liekind_grandpa',
-  'Turn_Wedding_Samvel', 'Turn_Wedding_Razmik', 'Turn_Wedding_Boris', 'Turn_BorisSick', 'Quest_q_niva', 'Scene_lend', 'Chorus_garik_FedUp',
+  'Turn_Wedding_Samvel', 'Turn_Wedding_Razmik', 'Turn_Wedding_Boris', 'Turn_BorisSick', 'Quest_q_niva',
   'Idle_Offline', 'Says_sorry_blocked_boris',
   // «держу слово» — только в хорошем настроении и не в самой партии из каждого пакета (4/5/0/5/4/10/0/3/6/0)
   'Due_Kept',
-  // частные финалы и концовки по стилю партии
-  'Finale_beton_opened', 'Finale_beton_opened_or', 'Finale_grant_ally', 'Finale_razmik_shift_or',
-  'Ending_alik', 'Payday_coins', 'Ending_payday_coins',
+  // частные финалы и концовки по стилю партии (z ≥ required; нули в т.ч. вне CI — #230)
+  'Finale_beton_opened', 'Finale_grant_ally',
+  'Ending_alik',
 ])
