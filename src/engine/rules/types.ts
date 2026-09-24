@@ -48,8 +48,6 @@ export interface Trigger<E extends string = string> {
   delay?: number
   /** Шанс, что событие вообще будет вызвано (0..1). */
   probability?: number
-  /** Вызвать, только если ответ правила что-то сделал (respond не вернул false). */
-  ifResponded?: boolean
   /** Отправитель/получатель следующего события (по умолчанию — те же, что у текущего). */
   sender?: string
   target?: string
@@ -97,7 +95,7 @@ export interface Rule<G, E extends string = string, O = unknown> {
   bonus?: number
   /** Вес при выборе среди равных по специфичности. */
   weight?: number | ((facts: Facts) => number)
-  /** Шанс сработать при выполненных условиях (0..1). */
+  /** Шанс сработать при выполненных условиях (0..1): один бросок на событие — повторный match после молчания соседа его не перебрасывает. */
   odds?: number
   /** Один раз за игру (matchOnce). Промолчавшее правило (respond → false) разовый шанс не тратит — отметка откатывается. */
   once?: boolean
@@ -110,8 +108,8 @@ export interface Rule<G, E extends string = string, O = unknown> {
   /**
    * Ответ. Вернуть false — «ничего не сделал»: движок откатывает только то, что записал сам (once, cooldown,
    * remember), и пробует следующее подходящее правило. Свои записи в игру ответ обязан не делать, пока не решил
-   * говорить: их движок не видит (у игры это ловит строгий режим — RuleSetOptions.silence). Триггеры без
-   * ifResponded срабатывают и у промолчавшего правила.
+   * говорить: их движок не видит (у игры это ловит строгий режим — RuleSetOptions.silence). Триггеры
+   * промолчавшего правила не срабатывают: оно не случилось.
    */
   respond?: (ctx: RuleCtx<G>) => void | boolean | Promise<void | boolean>
   /** Для событий-сборщиков: что правило предлагает. */
