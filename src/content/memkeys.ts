@@ -105,7 +105,7 @@ export const EVENT_KEYS: ReadonlySet<string> = new Set([
   'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sorrySwing', 'promiseLive',
   'period', 'night', 'offline', 'scene', 'sinceAlik', 'lateCount', 'arcAvailable',
   'arcsStarted', 'arcsDone', 'quests', 'callbackReady', 'arcUnfinished', 'deathCanAdvance',
-  'intent', 'tone', 'arg', 'category', 'arc', 'argArcDone', 'greet', 'promise',
+  'intent', 'tone', 'arg', 'category', 'arc', 'argArcDone', 'greet', 'promise', 'somedayCount',
 ])
 
 export const MEM_KEYS: ReadonlySet<string> = new Set([

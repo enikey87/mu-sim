@@ -22,4 +22,6 @@ export const PROVEN: Record<string, string> = Object.fromEntries([
   'Endgame_Turn', 'Endgame_Idle', 'Endgame_Away', 'Endgame_Formality', 'Endgame_NoEnding',
   // финалы, до которых бот доходил только после выплаты — а там теперь тишина (#136); обиженный + пачка — редкое совпадение
   'Finale_beton_ledger', 'Away_ColdWar', 'Quiet_Offended_AlikAway',
+  // бот копит не больше 3 просрочек к Дню выплаты: 60 % обещаний — «когда-нибудь», датированные он припоминает кнопкой (#149)
+  'Scene_amnesty',
 ].map((name) => [name, reason]))

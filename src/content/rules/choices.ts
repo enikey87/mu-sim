@@ -117,7 +117,7 @@ export const choiceRules: R[] = [
       let idx = -1
       return {
         text: (g: Game) => {
-          const late = g.S.promises.filter((p) => p.due != null && p.due < g.S.day && !p.asked)
+          const late = g.latePromises()
           const p = late[g.rnd(late.length)]
           idx = g.S.promises.indexOf(p)
           return fromD(g, 'P_PREV', { t: p.t, date: fmtDayMonth(p.made) })

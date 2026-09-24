@@ -103,6 +103,7 @@ const CASES: Record<string, Case> = {
   Finale_beton_ledger: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem.caught = 2 } },
   Away_ColdWar: { event: 'AlikAway', setup: offended },
   Quiet_Offended_AlikAway: { event: 'AlikAway', setup: offended },
+  Scene_amnesty: { event: 'PickScene', setup: (g) => { for (let i = 0; i < 8; i++) g.recordPromise({ text: `завтра №${i}`, d: 1 }); g.S.day += 5 } },
 }
 
 function fires(name: string, c: Case): boolean {
