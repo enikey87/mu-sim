@@ -28,8 +28,9 @@ export const RARE_FLAKY = new Set([
   'Opt_Cow', 'Away_Offline',
   // ловля на лжи: вторая ступень счётчика; ложь про дедушку — с тех пор как отмазки из пачки попадают в бухгалтерию (#101)
   'Says_catchLie_caught2', 'Says_catchLie_liekind_grandpa',
-  // окно состояния: свадьба Самвела / Размика / Бориса, сцена «жена», квест «Нива», вердикт после письма
+  // окно состояния: свадьба Самвела / Размика / Бориса, сцена «жена», квест «Нива», вердикт после письма, больной Борис
   'Turn_Wedding_Samvel', 'Turn_Wedding_Razmik', 'Turn_Wedding_Boris', 'Scene_wife', 'Quest_q_niva', 'Court_Verdict_Lettered',
+  'Turn_BorisSick',
 ])
 
 /** Оба списка вместе: для классов «не сработало» — и для прямых случаев в rare.test.ts. */

@@ -27,7 +27,8 @@ describe('платежи по календарю', () => {
     expect(game.S.money).toBe(100)
     expect(game.S.mem[billUnpaid('rent')]).toBe(true)
     expect(game.S.mem[lightOff]).toBe(true)
-    expect(game.ui.notif?.text).toMatch(/недостаточно средств/i)
+    // на дне следом предложение кредита перекрывает последнюю СМС
+    expect(game.ui.notif?.text).toMatch(/недостаточно средств|Всё будет/i)
   })
   it('после выселения коммуналка не списывается', () => {
     const { game } = makeGame()
@@ -93,5 +94,39 @@ describe('платежи по календарю', () => {
     await game.fire('BillDue', { bill: 'phone', at })
     await game.fire('BillDue', { bill: 'phone' })
     expect(game.S.money).toBe(after)
+  })
+  it('два платежа в один день — каждое списание ровно одно за несколько сроков', async () => {
+    const { game } = makeGame()
+    game.S.money = 10_000_000
+    const pending = (id: string) => game.rules.state.schedule.filter(
+      (e) => e.kind === 'event' && e.event === 'BillDue' && (e as { facts?: { bill?: string } }).facts?.bill === id,
+    )
+    for (let round = 0; round < 4; round++) {
+      const day = game.S.day
+      game.S.mem[billDueAt('rent')] = day
+      game.S.mem[billDueAt('transit')] = day
+      game.rules.state.schedule = game.rules.state.schedule.filter((e) => !(e.kind === 'event' && e.event === 'BillDue'))
+      game.rules.schedule({ at: day, kind: 'event', event: 'BillDue', facts: { bill: 'rent' } })
+      game.rules.schedule({ at: day, kind: 'event', event: 'BillDue', facts: { bill: 'transit' } })
+      await game.rules.runDue(game, game.facts)
+      expect(pending('rent'), `после списания round ${round}`).toHaveLength(1)
+      expect(pending('transit'), `после списания round ${round}`).toHaveLength(1)
+      const next = Math.min(Number(game.S.mem[billDueAt('rent')]), Number(game.S.mem[billDueAt('transit')]))
+      expect(next).toBeGreaterThan(day)
+      game.S.day = next
+    }
+  })
+  it('негативный контроль: existing > day снова плодит дубли', () => {
+    const { game } = makeGame()
+    const day = game.S.day
+    game.S.mem[billDueAt('phone')] = day
+    game.rules.state.schedule = game.rules.state.schedule.filter((e) => !(e.kind === 'event' && e.event === 'BillDue' && (e as { facts?: { bill?: string } }).facts?.bill === 'phone'))
+    // старое условие existing > day: сегодня не «строгое будущее» → поставили бы ещё раз
+    const buggyWouldReschedule = !(Number(game.S.mem[billDueAt('phone')]) > day)
+    expect(buggyWouldReschedule).toBe(true)
+    game.scheduleBills()
+    const phoneDues = game.rules.state.schedule.filter((e) => e.kind === 'event' && e.event === 'BillDue' && (e as { facts?: { bill?: string } }).facts?.bill === 'phone')
+    expect(phoneDues).toHaveLength(0)
+    expect(Number(game.S.mem[billDueAt('phone')])).toBe(day)
   })
 })
