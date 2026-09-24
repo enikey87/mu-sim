@@ -132,6 +132,7 @@ describe('кредитная лестница', () => {
     const at = Number(game.S.mem[loanDueAt('consumer')])
     game.S.day = at
     await game.fire('CreditDue', { credit: 'consumer', at })
+    game.flushBankCharges()
     expect(game.S.money).toBe(50000 - LOANS[0].payment)
     await game.fire('CreditDue', { credit: 'consumer', at })
     await game.fire('CreditDue', { credit: 'consumer' })
@@ -155,7 +156,7 @@ describe('кредитная лестница', () => {
     }
     const weeks = Math.ceil((game.S.day - start) / 7)
     for (const l of LOANS) {
-      const n = texts.filter((t) => t.startsWith('Списание') && t.includes(l.label)).length
+      const n = texts.filter((t) => t.includes(l.label) && /Списани/.test(t)).length
       expect(n, l.id).toBeGreaterThanOrEqual(weeks - 1)
       expect(n, l.id).toBeLessThanOrEqual(weeks)
     }

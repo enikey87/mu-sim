@@ -144,6 +144,10 @@ export class Game {
   /** Ход игрока: nextDay уже был (offline / fx.days) — обычный +1…3 в конце не дублируем. */
   private inPlayerTurn = false
   private dayMovedInTurn = false
+  /** Списания дня для одного СМС («Списания: Связь …, Проездной …», #178). */
+  private bankCharges: { day: number; parts: string[] } | null = null
+  /** Уже сообщили об отказе по займу — повтор до успешного платежа молчит (#178). */
+  private creditFailSms = new Set<string>()
 
   constructor(opts: GameOptions = {}) {
     this.storage = opts.storage === undefined ? (typeof localStorage !== 'undefined' ? localStorage : null) : opts.storage
@@ -455,8 +459,8 @@ export class Game {
   moneySealed(): boolean {
     return this.debtSealed() || !!this.S.mem[memkeys.endgame.active]
   }
-  /** Единственная точка изменения S.money: СМС банка + смена уровня. */
-  adjustMoney(delta: number, reason: string): boolean {
+  /** Единственная точка изменения S.money: СМС банка + смена уровня. `quiet` — без СМС списания (дайджест дня, #178). */
+  adjustMoney(delta: number, reason: string, opts?: { quiet?: boolean }): boolean {
     if (this.moneySealed()) return false
     if (delta === 0) return true
     if (delta < 0 && -delta > this.S.money) return false
@@ -465,8 +469,10 @@ export class Game {
     const after = this.moneyLevel()
     const amount = Math.abs(delta).toLocaleString('ru-RU')
     const bal = countOf(this.S, 'money').toLocaleString('ru-RU')
-    const kind = delta < 0 ? 'Списание' : 'Поступление'
-    this.notify('🏦', 'Банк', `${kind} ${amount} ₽. ${reason}. Баланс: ${bal} ₽`)
+    if (!opts?.quiet) {
+      const kind = delta < 0 ? 'Списание' : 'Поступление'
+      this.notify('🏦', 'Банк', `${kind} ${amount} ₽. ${reason}. Баланс: ${bal} ₽`)
+    }
     const rank = { normal: 2, low: 1, bottom: 0 }
     if (rank[after] < rank[before]) {
       const warn = after === 'bottom'
@@ -511,12 +517,16 @@ export class Game {
     if (!bill || bill.skip?.(this.S.mem)) return
     this.rules.applyOps([set(billDue(id), false)], {})
     delete this.S.mem[billDueAt(id)]
-    if (this.adjustMoney(-bill.amount, bill.label)) {
+    if (this.adjustMoney(-bill.amount, bill.label, { quiet: true })) {
       this.rules.applyOps([set(billUnpaid(id), false), set(billStreak(id), 0)], {})
+      this.queueBankCharge(bill.label, bill.amount)
     } else {
       const streak = Number(this.S.mem[billStreak(id)] ?? 0) + 1
       this.rules.applyOps([set(billUnpaid(id), true), set(billStreak(id), streak)], {})
-      this.notify('🏦', 'Банк', `Не прошло: недостаточно средств. ${bill.label}, ${bill.amount.toLocaleString('ru-RU')} ₽. Достоинство не принимается.`)
+      // повтор той же неоплаты — не новость (#178 / CLAUDE.md «один раз»)
+      if (streak === 1) {
+        this.notify('🏦', 'Банк', `Не прошло: недостаточно средств. ${bill.label}, ${bill.amount.toLocaleString('ru-RU')} ₽. Достоинство не принимается.`)
+      }
       if (id === 'rent' && streak >= 1) this.rules.applyOps([set(lightOff, true)], {})
       if (id === 'phone' && streak >= 1) this.rules.applyOps([set(phoneWarn, true)], {})
       if (id === 'phone' && streak >= 2) this.rules.applyOps([set(netRation, true)], {})
@@ -524,6 +534,22 @@ export class Game {
     }
     this.scheduleBills()
     if (this.moneyLevel() === 'bottom') this.maybeCreditOffer()
+  }
+  /** Накопить успешные списания дня в одно СМС. */
+  private queueBankCharge(label: string, amount: number): void {
+    if (!this.bankCharges || this.bankCharges.day !== this.S.day) this.bankCharges = { day: this.S.day, parts: [] }
+    this.bankCharges.parts.push(`${label} ${amount.toLocaleString('ru-RU')} ₽`)
+  }
+  /** Одно СМС на все тихие списания текущего дня (#178). */
+  flushBankCharges(): void {
+    const dig = this.bankCharges
+    this.bankCharges = null
+    if (!dig?.parts.length || dig.day !== this.S.day) return
+    const bal = countOf(this.S, 'money').toLocaleString('ru-RU')
+    const text = dig.parts.length === 1
+      ? `Списание ${dig.parts[0]}. Баланс: ${bal} ₽`
+      : `Списания: ${dig.parts.join(', ')}. Баланс: ${bal} ₽`
+    this.notify('🏦', 'Банк', text)
   }
   /** Расписание платежей по взятым кредитам. */
   scheduleCredits(): void {
@@ -543,11 +569,17 @@ export class Game {
     const loan = LOANS.find((l) => l.id === id)
     if (!loan || !this.S.mem[loanTaken(id)]) return
     delete this.S.mem[loanDueAt(id)]
-    if (this.adjustMoney(-loan.payment, loan.label)) {
+    if (this.adjustMoney(-loan.payment, loan.label, { quiet: true })) {
+      this.queueBankCharge(loan.label, loan.payment)
+      this.creditFailSms.delete(id)
       this.scheduleCredits()
       return
     }
-    this.notify('🏦', 'Банк', `Не прошло: недостаточно средств. ${loan.label}, ${loan.payment.toLocaleString('ru-RU')} ₽.`)
+    // повтор отказа по тому же займу — не новость, пока деньги не появились (#178)
+    if (!this.creditFailSms.has(id)) {
+      this.creditFailSms.add(id)
+      this.notify('🏦', 'Банк', `Не прошло: недостаточно средств. ${loan.label}, ${loan.payment.toLocaleString('ru-RU')} ₽.`)
+    }
     if (id === 'micro' && !this.S.mem[creditBroke]) {
       this.rules.applyOps([set(creditBroke, true), set(creditStage, 4)], {})
       this.notify('🏦', 'МФО', 'Платёж не прошёл. Мы не злимся. Мы записываем')
@@ -1075,6 +1107,7 @@ export class Game {
   async afterTurn(): Promise<void> {
     try {
       await this.rules.runDue(this, this.facts, { floor: this.floor() })
+      this.flushBankCharges()
       await this.fulfillConditionalPromise()
       await this.flushChorus()
     } catch (e) { this.swallowDisposed(e) }
