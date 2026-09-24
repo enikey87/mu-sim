@@ -42,6 +42,11 @@ export class RuleSet<G, O = unknown> {
   readonly all: Rule<G, string, O>[] = []
   /** Если задан — получает трассировку каждого выбора. */
   tracer: ((t: Trace) => void) | null = null
+  /**
+   * Исход ответа правила. Плейтест атрибутирует push правилу, чей respond сейчас идёт:
+   * `onRespond(r, true)` — до вызова respond; `onRespond(r, false)` — промолчало (после).
+   */
+  onRespond: ((rule: Rule<G, string, O>, ok: boolean) => void) | null = null
   readonly hub: Hub
   readonly state: RuleState
   private rng: Rng
@@ -279,9 +284,13 @@ export class RuleSet<G, O = unknown> {
       if (!r) return null
       const check = this.silence?.(game, r)
       const undo = this.commit(r, q)
+      this.onRespond?.(r, true) // до respond: push внутри ответа видит это правило
       const res = await r.respond?.(this.ctx(game, r, q, facts))
       const responded = res !== false
-      if (!responded) { undo(); check?.(); skip.add(r.name); continue } // не случилось — и триггеров нет
+      if (!responded) {
+        this.onRespond?.(r, false) // промолчало — снять атрибуцию
+        undo(); check?.(); skip.add(r.name); continue
+      }
       for (const t of r.trigger ?? []) {
         if (t.probability !== undefined && this.rng.random() >= t.probability) continue
         const next: Query = { event: t.event, facts: t.facts, sender: t.sender ?? q.sender, target: t.target ?? q.target }

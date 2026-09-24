@@ -56,7 +56,7 @@ const worldFacts = (game: Game): Record<string, unknown> => {
 }
 
 /** Условие требует факт (не «факта нет»): `missing(alik_dead)` — это правило живого Алика, а не гейт смерти. */
-const requiresKey = (c: Criterion, key: string): boolean =>
+export const requiresKey = (c: Criterion, key: string): boolean =>
   c.op === 'all' ? (c.all ?? []).some((x) => requiresKey(x, key)) : c.key === key && (c.op === 'exist' || (c.op === '==' && c.value === true))
 
 /** Правила с гейтом `alik_dead`: оракул судит о реплике по этому списку, а не по имени. Считается по правилам партии — тест может снять гейт. */
@@ -103,10 +103,10 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
   const asides: Aside[] = []
   const world: WorldFrame[] = []
   const firedBuf: WorldFrame['fired'] = []
-  // сообщение принадлежит последнему выбранному правилу (match, не сбор кнопок): respond идёт сразу за выбором
+  // сообщение принадлежит правилу, чей respond сейчас идёт (onRespond до/после); молчание снимает атрибуцию
   let lastRule: string | null = null
+  game.rules.onRespond = (r, ok) => { lastRule = ok ? r.name : null }
   game.rules.tracer = (t) => {
-    if (t.mode === 'match' && t.chosen.length) lastRule = t.chosen[0]
     if (t.chosen.length) firedBuf.push({ event: t.event, chosen: [...t.chosen] })
   }
   const ruleOf = new Map<number, string | null>()

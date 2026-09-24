@@ -118,6 +118,26 @@ describe('обещания наступают', () => {
   it('у реплик — свой текст обещания', () => {
     expect(PROMISE_DUE.map(valueOf).every((t) => t.includes('{t}') || t.includes('тот самый'))).toBe(true)
   })
+  it('мёртвый Алик не исполняет условное обещание', async () => {
+    const { game } = makeGame()
+    game.recordPromise({ text: 'как Грант заплатит — отдам', d: null, condition: 'grant.paid' })
+    game.S.mem['grant.paid'] = true
+    game.S.mem.alik_dead = true
+    const before = game.S.msgs.length
+    await game.afterTurn()
+    expect(game.S.promises[0].met).toBeUndefined()
+    expect(game.S.msgs).toHaveLength(before)
+  })
+  it('негативный контроль: Condition_Met при смерти говорит — защита только в fulfillConditionalPromise', async () => {
+    const { game } = makeGame()
+    game.recordPromise({ text: 'как Грант заплатит — отдам', d: null, condition: 'grant.paid' })
+    game.S.mem['grant.paid'] = true
+    game.S.mem.alik_dead = true
+    game.S.promises[0].met = game.S.day
+    const before = game.S.msgs.length
+    await game.fire('PromiseConditionMet', { promise: 0 })
+    expect(game.S.msgs.length).toBeGreaterThan(before)
+  })
   it('событийное условие исполняет обещание ровно один раз', async () => {
     const { game } = makeGame()
     game.setLegend('grant', 'grant')
