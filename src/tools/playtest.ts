@@ -3,8 +3,12 @@
 import { Game } from '../engine/game'
 import { manualClock } from '../engine/clock'
 import { seededRng, type Rng } from '../engine/rng'
+import { allRules } from '../content/rules'
 import { CAST } from '../content/arcs'
 import { ENDINGS } from '../content/finales'
+import { NOTIF } from '../content/life'
+import { alikDead } from '../content/memkeys'
+import { type Criterion } from '../engine/rules'
 import type { Choice, Msg } from '../engine/state'
 
 export type Style = 'curious' | 'polite' | 'hothead'
@@ -25,18 +29,43 @@ export interface WorldFrame {
   turn: number
   at: number
   day: number
+  /** Факты на начало хода: иначе ход, объявивший событие, выглядит его нарушением. */
+  before: Record<string, unknown>
   mem: Record<string, unknown>
   fired: { event: string; chosen: string[] }[]
+  said: { w: string; k: string }[]
   sys: string[]
   asides: string[]
+  /** Пачка непрочитанных: приходит мимо движка правил, потому и отдельным полем. */
+  away: string[]
+  notif: { text: string; fails: string[] }[]
 }
 export interface Played { seed: number; style: Style; hour: number; acts: Act[]; asides: Aside[]; world: WorldFrame[]; game: Game }
 
-/** Ключи, по которым оракул отличает состояния мира от шума текста. */
-const WORLD_KEYS = [
-  'alik_dead', 'mourning', 'blood.given', 'said.friday', 'grant.paid', 'finale.razmik', 'arc.razmik',
-  'boris.married', 'endgame.mutes', 'endgame.active', 'payday.at',
-] as const
+/** Ключи мира для оракула; сериалы — из `facts()`, они живут в `S.arcs`, а не в `S.mem`. */
+const WORLD_KEYS = ['alik_dead', 'mourning', 'blood.given', 'said.friday', 'endgame.mutes'] as const
+const WORLD_PREFIXES = ['arc.', 'finale.'] as const
+
+const worldFacts = (game: Game): Record<string, unknown> => {
+  const facts = game.facts()
+  const mem: Record<string, unknown> = {}
+  for (const k of Object.keys(facts)) if (WORLD_PREFIXES.some((p) => k.startsWith(p))) mem[k] = facts[k]
+  for (const k of WORLD_KEYS) if (game.S.mem[k] !== undefined) mem[k] = game.S.mem[k]
+  return mem
+}
+
+const namesKey = (c: Criterion, key: string): boolean =>
+  c.op === 'all' ? (c.all ?? []).some((x) => namesKey(x, key)) : c.key === key
+
+/** Правила с гейтом `alik_dead`: оракул судит о реплике по этому списку, а не по имени. */
+export const DEATH_GATED: readonly string[] = allRules.filter((r) => (r.when ?? []).some((c) => namesKey(c, alikDead))).map((r) => r.name).sort()
+
+/** Ложные условия самой строки уведомления: `holds` — разбор выборщика, иначе именованные врут. */
+function notifFails(game: Game, app: string, text: string): string[] {
+  const entry = NOTIF.find((n) => n.app === app && n.t === text)
+  if (!entry) return []
+  return (entry.when ?? []).filter((c) => !game.holds(c)).map((c) => c.key)
+}
 
 /** Характер бота: доля контекстных вариантов, доля грубости, шанс промолчать (Алик пишет сам). */
 const PROFILE: Record<Style, { ctx: number; rude: number; idle: number; polite: number }> = {
@@ -65,7 +94,6 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
   const hour = HOURS[seed % HOURS.length]
   const clock = manualClock(Date.parse('2026-09-14T12:00:00Z') + (seed % 7) * 864e5)
   const game = new Game({ storage: null, clock, rng: seededRng(seed), noTimers: true, hour })
-  watch?.(game)
   const bot = seededRng(seed * 7919 + 17)
   const acts: Act[] = []
   let ending: string | null = null
@@ -73,24 +101,42 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
   const world: WorldFrame[] = []
   const firedBuf: WorldFrame['fired'] = []
   game.rules.tracer = (t) => { if (t.chosen.length) firedBuf.push({ event: t.event, chosen: [...t.chosen] }) }
+  const notifBuf: WorldFrame['notif'] = []
   const notify = game.notify.bind(game)
-  game.notify = (icon, app, text) => { asides.push({ at: game.S.msgs.length, text: `(уведомление телефона: ${icon} ${app} — ${text})` }); notify(icon, app, text) }
+  game.notify = (icon, app, text) => {
+    asides.push({ at: game.S.msgs.length, text: `(уведомление телефона: ${icon} ${app} — ${text})` })
+    notifBuf.push({ text: `${app} — ${text}`, fails: notifFails(game, app, text) })
+    notify(icon, app, text)
+  }
+  const awayBuf: WorldFrame['away'] = []
+  const awayIdx = new Set<number>()
+  const burst = game.awayBurst.bind(game)
+  game.awayBurst = (n, days, why) => {
+    const from = game.S.msgs.length
+    burst(n, days, why)
+    for (let i = from; i < game.S.msgs.length; i++) awayIdx.add(i)
+    awayBuf.push(...game.S.msgs.slice(from).map(line))
+  }
   let msgAt = 0
   let asideAt = 0
+  // watch — после приборов: сценарий теста до первой партии иначе не попадает в дамп
+  watch?.(game)
+  let memAt: Record<string, unknown> = worldFacts(game)
   const snap = (turn: number) => {
-    const mem: Record<string, unknown> = {}
-    for (const k of WORLD_KEYS) if (game.S.mem[k] !== undefined) mem[k] = game.S.mem[k]
-    // finale.* / arc.* — любые линии, не только razmik
-    for (const k of Object.keys(game.S.mem)) {
-      if ((k.startsWith('finale.') || k.startsWith('arc.')) && !(k in mem)) mem[k] = game.S.mem[k]
-    }
-    const sys = game.S.msgs.slice(msgAt).filter((m) => m.kind === 'sys').map((m) => m.text)
+    const mem = worldFacts(game)
+    const range = game.S.msgs.slice(msgAt)
+    const said = range.flatMap((m, i) => {
+      if (m.kind === 'sep' || m.kind === 'sys' || awayIdx.has(msgAt + i)) return []
+      return [{ w: m.from === 'me' ? 'me' : (('who' in m && m.who) || 'alik'), k: m.kind as string }]
+    })
     world.push({
-      turn, at: game.S.msgs.length, day: game.S.day, mem,
-      fired: firedBuf.splice(0), sys, asides: asides.slice(asideAt).map((a) => a.text),
+      turn, at: game.S.msgs.length, day: game.S.day, before: memAt, mem,
+      fired: firedBuf.splice(0), said, sys: range.filter((m) => m.kind === 'sys').map((m) => m.text),
+      asides: asides.slice(asideAt).map((a) => a.text), away: awayBuf.splice(0), notif: notifBuf.splice(0),
     })
     msgAt = game.S.msgs.length
     asideAt = asides.length
+    memAt = mem
   }
   const next = (): Act => {
     if (game.battery.dead) return { kind: 'charge' }
@@ -134,15 +180,19 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
 export function worldDump(p: Played): object {
   const dead = p.world.filter((f) => f.mem.alik_dead).length
   const mutes = p.world.some((f) => Number(f.mem['endgame.mutes'] ?? 0) > 0)
-  const blood = p.world.some((f) => f.mem['blood.given'])
   return {
     seed: p.seed,
+    rules: { deathGated: DEATH_GATED },
     coverage: {
       dead_frames: dead,
       had_mute: mutes,
-      had_blood: blood,
+      had_blood: p.world.some((f) => f.mem['blood.given']),
       had_friday: p.world.some((f) => f.mem['said.friday']),
+      // окно серии, а не её факт: на старой ветке факт гас по таймеру, а серия оставалась открытой
+      frames_with_arc: p.world.filter((f) => f.mem['arc.alik_death'] !== undefined).length,
       had_razmik_finale: p.world.some((f) => f.mem['finale.razmik'] !== undefined),
+      notifications: p.world.reduce((n, f) => n + f.notif.length, 0),
+      away_messages: p.world.reduce((n, f) => n + f.away.length, 0),
     },
     frames: p.world,
   }

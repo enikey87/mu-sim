@@ -1,0 +1,1080 @@
+{
+ "seed": 1,
+ "rules": {
+  "deathGated": [
+   "Opt_Arc",
+   "Opt_ArcAny",
+   "Opt_ArcDeath",
+   "Quiet_Dead_AlikIdle",
+   "Quiet_Dead_PeriodLine",
+   "Quiet_Dead_PromiseConditionMet",
+   "Quiet_Dead_PromiseDue",
+   "Quiet_Dead_StoryBeat",
+   "Says_OtherArcWhileDead",
+   "Says_WhileDead",
+   "Tone_WhileDead",
+   "Turn_WhileDead"
+  ]
+ },
+ "coverage": {
+  "dead_frames": 0,
+  "had_mute": true,
+  "had_blood": false,
+  "had_friday": false,
+  "frames_with_arc": 0,
+  "had_razmik_finale": false,
+  "notifications": 42,
+  "away_messages": 11
+ },
+ "frames": [
+  {
+   "turn": 106,
+   "at": 0,
+   "day": 358,
+   "before": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 0
+   },
+   "mem": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 0
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Leave"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "samvel",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Вы покинули группу",
+    "Дядя Самвел добавил вас обратно"
+   ],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 107,
+   "at": 7,
+   "day": 359,
+   "before": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 0
+   },
+   "mem": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 0
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Leave"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "nune",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Вы покинули группу",
+    "Нуне добавила вас обратно"
+   ],
+   "asides": [
+    "(на фоне кто-то протяжно: «Мууууу»)"
+   ],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 108,
+   "at": 13,
+   "day": 362,
+   "before": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 0
+   },
+   "mem": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 1
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Mute"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Вы отключили уведомления",
+    "Алик изменил название группы на «НЕ БЕСПОКОИТЬ (СРОЧНО)»"
+   ],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 109,
+   "at": 21,
+   "day": 364,
+   "before": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 1
+   },
+   "mem": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 1
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Leave"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "grant",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Вы покинули группу",
+    "Заказчик Грант добавил вас обратно",
+    "Вы поорали в подушку. Терпение восстановлено."
+   ],
+   "asides": [
+    "(на фоне кто-то протяжно: «Мууууу»)"
+   ],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 110,
+   "at": 28,
+   "day": 367,
+   "before": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 1
+   },
+   "mem": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 1
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Leave"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "nune",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Вы покинули группу",
+    "Нуне добавила вас обратно"
+   ],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 111,
+   "at": 33,
+   "day": 369,
+   "before": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 1
+   },
+   "mem": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 1
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Money"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 112,
+   "at": 39,
+   "day": 370,
+   "before": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 1
+   },
+   "mem": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 2
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Mute"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Вы отключили уведомления",
+    "Алик изменил название группы на «ВЫПЛАТА ЗАКРЫТА ✅ (ЕЩЁ ВОПРОС)»"
+   ],
+   "asides": [
+    "(уведомление телефона: 💼 hh.ru — Вакансия: плиточник, 150 000 ₽, оплата каждую пятницу. Откликнуться?)"
+   ],
+   "away": [],
+   "notif": [
+    {
+     "text": "hh.ru — Вакансия: плиточник, 150 000 ₽, оплата каждую пятницу. Откликнуться?",
+     "fails": []
+    }
+   ]
+  },
+  {
+   "turn": 113,
+   "at": 47,
+   "day": 373,
+   "before": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 2
+   },
+   "mem": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 2
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Leave"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "samvel",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Вы покинули группу",
+    "Дядя Самвел добавил вас обратно"
+   ],
+   "asides": [
+    "(на фоне кто-то протяжно: «Мууууу»)"
+   ],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 114,
+   "at": 52,
+   "day": 376,
+   "before": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 2
+   },
+   "mem": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 2
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Money"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Вы полежали на полу. Терпение восстановлено."
+   ],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 115,
+   "at": 56,
+   "day": 377,
+   "before": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 2
+   },
+   "mem": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 2
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Money"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 116,
+   "at": 61,
+   "day": 379,
+   "before": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 2
+   },
+   "mem": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 2
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Money"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [],
+   "asides": [
+    "(на фоне кто-то протяжно: «Мууууу»)"
+   ],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 117,
+   "at": 69,
+   "day": 381,
+   "before": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 2
+   },
+   "mem": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 2
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Leave"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "nune",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Вы покинули группу",
+    "Нуне добавила вас обратно"
+   ],
+   "asides": [
+    "(на фоне кто-то протяжно: «Мууууу»)"
+   ],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 118,
+   "at": 77,
+   "day": 384,
+   "before": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 2
+   },
+   "mem": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 2
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Leave"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "grant",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Вы покинули группу",
+    "Заказчик Грант добавил вас обратно"
+   ],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 119,
+   "at": 84,
+   "day": 387,
+   "before": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 2
+   },
+   "mem": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 3
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Mute"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Вы отключили уведомления",
+    "Алик изменил название группы на «ТОЛЬКО ФОРМАЛЬНОСТИ 24/7»",
+    "Вы вышли на балкон и посчитали голубей. Терпение восстановлено."
+   ],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 120,
+   "at": 90,
+   "day": 390,
+   "before": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 3
+   },
+   "mem": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 4
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Mute"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Вы отключили уведомления",
+    "Алик изменил название группы на «ПЛИТОЧНИК ОТВЕТЬ»"
+   ],
+   "asides": [
+    "(на фоне кто-то протяжно: «Мууууу»)"
+   ],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 121,
+   "at": 94,
+   "day": 391,
+   "before": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 4
+   },
+   "mem": {
+    "arc.grandpa": 6,
+    "arc.nune": 6,
+    "arc.beton": 8,
+    "arc.done": false,
+    "mourning": false,
+    "endgame.mutes": 4
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Money"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [],
+   "asides": [],
+   "away": [],
+   "notif": []
+  }
+ ],
+ "fixture": "mute-ed718f8: сид 1, окно мьюта (ходы 106–121), обрезано из прогона PLAYTEST_SEEDS"
+}
