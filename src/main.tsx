@@ -17,7 +17,7 @@ const newGame = () => {
     away: q.has('away') ? Number(q.get('away')) : null,
     debug: q.has('debug'),
   })
-  ;(window as unknown as { __alik: Game }).__alik = game // для отладки из консоли
+  ;(window as unknown as { __alik: Game }).__alik = game // API для scripts/playtest-tech.mjs (и консоли): что он вызывает, проверяет src/tools/window-api.test.ts
   return game
 }
 
