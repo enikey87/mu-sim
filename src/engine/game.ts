@@ -24,6 +24,7 @@ import {
 } from '../content/endgame'
 import { type Rng, mathRng, rndInt, shuffle, chance } from './rng'
 import { Decks } from './deck'
+import { Battery, type BatteryHost } from './battery'
 import { Seen, type Keyed } from './uniq'
 import {
   RuleSet, makeHub, Lines, resolver, test, isOpen, valueOf, set,
@@ -74,7 +75,7 @@ export const FESTIVE = /свадьб|крестин|юбилей|обручен|
 
 export type SayItem = string | { w: string; t: string }
 
-export class Game {
+export class Game implements BatteryHost {
   S: GameState
   readonly rng: Rng
   readonly clock: Clock
@@ -93,6 +94,8 @@ export class Game {
 
   /** Состояние интерфейса (не сохраняется) — ui-state.ts. */
   readonly ui = new UiState()
+  /** Заряд и «телефон сел» — вся логика в battery.ts. */
+  readonly battery: Battery
 
   private storage: Storage | null
   private hour: number | null
@@ -125,6 +128,7 @@ export class Game {
     this.noTimers = !!opts.noTimers
     this.typos = opts.typos ?? true
     this.S = loadState(this.storage) ?? freshState()
+    this.battery = new Battery(this.S, this)
     this.decks = new Decks(this.S.bags, this.rng)
     this.seen = new Seen(this.S.seen)
     this.X = make(<T>(k: string, a: readonly Entry<T>[], nr?: boolean) => (nr ? this.decks.pick(k, a, this.lineFacts(), { noRepeat: true }) as T : this.draw(k, a)), () => this.S.tier, this.rng)
@@ -148,7 +152,7 @@ export class Game {
     this.checkAway(opts.away ?? null)
     if (!this.S.choices) this.S.choices = this.buildChoices()
     this.restStatus()
-    if (this.S.battery === 0) this.die()
+    if (this.battery.level === 0) this.battery.die()
     else { this.armIdle(); this.armStatus() }
     this.save()
   }
@@ -590,39 +594,25 @@ export class Game {
     }
     this.notify(n.icon, n.app, text)
   }
-  drain(n = 1): void {
-    if (this.ui.dead) return
-    const before = this.S.battery
-    this.S.battery = Math.max(0, this.S.battery - n)
-    if (before > 15 && this.S.battery <= 15) this.notify('🪫', 'Система', `Низкий заряд батареи: ${this.S.battery}%`)
-    if (this.S.battery === 0) this.die()
-    this.emit()
+  // ---------- колбеки Battery (BatteryHost) ----------
+  low(level: number): void {
+    this.notify('🪫', 'Система', `Низкий заряд батареи: ${level}%`)
   }
-  die(): void {
-    this.ui.dead = true
+  dead(): void {
     this.clearSchedule(this.idleT)
     this.clearSchedule(this.statusT)
     this.unlock('dead')
     this.save()
     this.emit()
   }
-  async charge(): Promise<void> {
-    if (!this.ui.dead || this.ui.charging !== null || this.disposed) return
-    try {
-      for (let p = 1; p <= 100; p += 9) {
-        if (this.disposed) return
-        this.ui.charging = p; this.emit(); await this.sleep(120)
-      }
-      if (this.disposed) return
-      this.ui.charging = null
-      this.S.battery = 100
-      this.ui.dead = false
-      this.ui.busy = false
-      this.emit()
-      this.awayBurst(2 + this.rnd(3), 1 + this.rnd(2), 'Пока телефон заряжался')
-      this.armIdle()
-      this.armStatus()
-    } catch (e) { this.swallowDisposed(e) }
+  chargeDone(): void {
+    this.ui.busy = false
+    this.awayBurst(2 + this.rnd(3), 1 + this.rnd(2), 'Пока телефон заряжался')
+    this.armIdle()
+    this.armStatus()
+  }
+  isDisposed(): boolean {
+    return this.disposed
   }
 
   // ---------- факты для правил ----------
@@ -865,7 +855,7 @@ export class Game {
     const o: Choice = parsed
       ? { text: opt as string, tone: parsed.tone, category: parsed.category, act: parsed.intent }
       : opt as Choice
-    if (this.ui.busy || this.ui.dead || this.disposed || !o.text.trim()) return
+    if (this.ui.busy || this.battery.dead || this.disposed || !o.text.trim()) return
     const S = this.S
     this.ui.busy = true
     this.inPlayerTurn = true
@@ -891,10 +881,10 @@ export class Game {
     if (o.act === 'sorry') S.mem[memkeys.sorryAt] = [...String(S.mem[memkeys.sorryAt] ?? '').split(',').filter(Boolean), S.stats.sent].slice(-4).join(',') // для «качелей»
     if (tone === 'rude') S.mem[memkeys.rudeAt] = S.stats.sent
     S.choices = null
-    this.drain(1)
+    this.battery.drain(1)
     this.save()
     if (this.disposed) { this.inPlayerTurn = false; return }
-    if (this.ui.dead) {
+    if (this.battery.dead) {
       this.sys('Не доставлено: у вас сел телефон.')
       S.ctx = null
       this.save()
@@ -943,7 +933,7 @@ export class Game {
       await this.rules.runDue(this, this.facts, { floor: this.floor() })
       if (this.disposed) return
       // сюжетный ход: только вне сцены, если Алик не «пропал» и в этом ходу ещё не было сцены или серии
-      if (!S.scene && !o.scene && !S.offlineDays && !this.ui.dead && this.arcAt !== S.stats.sent) await this.fire('StoryBeat')
+      if (!S.scene && !o.scene && !S.offlineDays && !this.battery.dead && this.arcAt !== S.stats.sent) await this.fire('StoryBeat')
       await this.fire('CheckEnding')
       if (this.disposed) return
 
@@ -1493,7 +1483,7 @@ export class Game {
   async answerJob(id: number, yes: boolean): Promise<void> {
     try {
       const m = this.S.msgs.find((x) => x.id === id)
-      if (!m || m.kind !== 'job' || m.answered || this.ui.busy || this.ui.dead || this.disposed) return
+      if (!m || m.kind !== 'job' || m.answered || this.ui.busy || this.battery.dead || this.disposed) return
       this.replaceMsg(m, { answered: true })
       this.ui.busy = true
       this.clearSchedule(this.idleT)
@@ -1525,16 +1515,16 @@ export class Game {
   armIdle(): void {
     this.clearSchedule(this.idleT)
     // Алик пишет сам редко: не в начале игры, не раньше чем через 1,5–3 минуты тишины, не больше двух раз подряд
-    if (this.disposed || this.noTimers || this.ui.dead || this.idleCount >= 2 || this.S.stats.sent < 5) return
+    if (this.disposed || this.noTimers || this.battery.dead || this.idleCount >= 2 || this.S.stats.sent < 5) return
     this.idleT = this.schedule(() => void this.onIdle(), (90000 + this.rnd(90000)) * (this.idleCount + 1) * 1.5 ** this.idleCount)
   }
   async onIdle(): Promise<void> {
     try {
-      if (this.disposed || this.ui.busy || this.ui.dead || this.ui.sheetOpen || (typeof document !== 'undefined' && document.hidden)) return this.armIdle()
+      if (this.disposed || this.ui.busy || this.battery.dead || this.ui.sheetOpen || (typeof document !== 'undefined' && document.hidden)) return this.armIdle()
       this.idleCount++
       this.ui.busy = true
-      this.drain(1)
-      if (!this.ui.dead) {
+      this.battery.drain(1)
+      if (!this.battery.dead) {
         await this.fire('AlikIdle')
         if (this.disposed) { this.ui.busy = false; return }
         await this.afterTurn()
@@ -1543,16 +1533,16 @@ export class Game {
       }
       this.ui.busy = false
       this.emit()
-      if (!this.ui.dead && !this.disposed) { this.restStatus(); this.armIdle() }
+      if (!this.battery.dead && !this.disposed) { this.restStatus(); this.armIdle() }
     } catch (e) { this.recoverTurn(e) }
   }
   armStatus(): void {
     this.clearSchedule(this.statusT)
-    if (this.disposed || this.noTimers || this.ui.dead) return
+    if (this.disposed || this.noTimers || this.battery.dead) return
     this.statusT = this.schedule(async () => {
       try {
         if (this.disposed) return
-        if (!this.ui.busy && !this.ui.dead && this.S.offlineDays === 0) {
+        if (!this.ui.busy && !this.battery.dead && this.S.offlineDays === 0) {
           if (this.chance(0.2)) {
             // «печатает…» — и ничего не приходит
             this.ui.typing = 'печатает…'
@@ -1626,13 +1616,13 @@ export class Game {
   checkAway(awayOverride: number | null): void {
     const gapMin = awayOverride ?? (this.S.lastSeen ? (this.clock.now() - this.S.lastSeen) / 60000 : 0)
     if (gapMin < 15 || !this.S.stats.sent) return
-    if (gapMin > 120) this.S.battery = 100 // телефон заряжался
+    if (gapMin > 120) this.battery.restore() // телефон заряжался
     this.awayBurst(Math.min(5, 1 + Math.floor(gapMin / 30)), Math.min(10, 1 + Math.floor(gapMin / 120)))
   }
   onVisibility(hidden: boolean): void {
     if (hidden) { this.hiddenAt = this.clock.now(); this.save(); return }
     const gapMin = (this.clock.now() - this.hiddenAt) / 60000
-    if (this.hiddenAt && gapMin >= 3 && !this.ui.busy && !this.ui.dead && this.S.stats.sent) this.awayBurst(Math.min(4, 1 + Math.floor(gapMin / 10)), 1)
+    if (this.hiddenAt && gapMin >= 3 && !this.ui.busy && !this.battery.dead && this.S.stats.sent) this.awayBurst(Math.min(4, 1 + Math.floor(gapMin / 10)), 1)
   }
 
   // ---------- начало ----------

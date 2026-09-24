@@ -87,8 +87,8 @@ function Phone({ onReset }: { onReset: () => void }) {
   }, [sheet, game])
 
   useEffect(() => {
-    if (game.S.ending || game.ui.dead) setSheetOpen(false)
-  }, [game.S.ending, game.ui.dead, setSheetOpen])
+    if (game.S.ending || game.battery.dead) setSheetOpen(false)
+  }, [game.S.ending, game.battery.dead, setSheetOpen])
 
   const reset = () => {
     if (!confirm('Стереть всё и начать заново?')) return
@@ -96,7 +96,7 @@ function Phone({ onReset }: { onReset: () => void }) {
     onReset()
   }
 
-  const blocked = sheet || game.ui.dead || !!game.S.ending
+  const blocked = sheet || game.battery.dead || !!game.S.ending
 
   return (
     <div className="phone" ref={phone}>

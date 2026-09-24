@@ -35,8 +35,8 @@ function JobButtons({ id }: { id: number }) {
   const game = useGame()
   return (
     <div className="job-btns">
-      <button disabled={game.ui.busy || game.ui.dead} onClick={() => void game.answerJob(id, true)}>Ладно, сделаю</button>
-      <button disabled={game.ui.busy || game.ui.dead} onClick={() => void game.answerJob(id, false)}>Нет, сначала деньги</button>
+      <button disabled={game.ui.busy || game.battery.dead} onClick={() => void game.answerJob(id, true)}>Ладно, сделаю</button>
+      <button disabled={game.ui.busy || game.battery.dead} onClick={() => void game.answerJob(id, false)}>Нет, сначала деньги</button>
     </div>
   )
 }

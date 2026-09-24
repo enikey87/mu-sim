@@ -55,7 +55,7 @@ async function copyText(text: string): Promise<boolean> {
 /** «Телефон сел» и зарядка. */
 export function DeadScreen() {
   const game = useGame()
-  const active = game.ui.dead
+  const active = game.battery.dead
   const dialogRef = useRef<HTMLDivElement>(null)
   useModal({ active, dialogRef })
 
@@ -70,14 +70,14 @@ export function DeadScreen() {
           aria-label="Телефон сел"
           tabIndex={-1}
         >
-          {game.ui.charging === null ? (
+          {game.battery.charging === null ? (
             <>
               <div className="dead-icon">🔌</div>
               <div>Телефон сел</div>
-              <button id="chargeBtn" onClick={() => void game.charge()}>Поставить на зарядку</button>
+              <button id="chargeBtn" onClick={() => void game.battery.charge()}>Поставить на зарядку</button>
             </>
           ) : (
-            <><div className="dead-icon">⚡</div><div id="chg">{game.ui.charging}%</div></>
+            <><div className="dead-icon">⚡</div><div id="chg">{game.battery.charging}%</div></>
           )}
         </div>
       )}
