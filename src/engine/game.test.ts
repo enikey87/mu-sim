@@ -423,6 +423,25 @@ describe('Game: пачка непрочитанных подчиняется м�
       expect(game.ui.unread).toBe(0)
     }
   })
+  // issue #188: путь игрока — первая грубость ставит «был давно» и ctx.offended; Away_ColdWar не перебивает Away_Offline
+  it('после первой грубости пропавший Алик в пачке «пока тебя не было» молчит', async () => {
+    const pool = new Set(COLD_WAR.map(valueOf))
+    for (let seed = 1; seed <= 30; seed++) {
+      const { game, clock } = makeGame({ seed })
+      game.S.stats.sent = 6
+      await game.send({ text: 'Ты вор и мошенник!!!', tone: 'rude' })
+      expect(game.S.offlineDays).toBeGreaterThan(0)
+      expect(game.S.ctx?.offended).toBe(true)
+      const from = game.S.msgs.length
+      await game.onVisibility(true)
+      clock.advance(40 * 60_000)
+      await game.onVisibility(false)
+      const body = arrived(game, from)
+      expect(body, `seed ${seed}`).toEqual([])
+      expect(game.ui.unread).toBe(0)
+      expect(body.some((m) => m.kind === 'text' && pool.has(m.text))).toBe(false)
+    }
+  })
   it('исход Дня выплаты определён, экран не закрыт: за ним тишина — ни пачки, ни простоя, ни обещаний, ни переводов', async () => {
     const { game, clock } = makeGame()
     // третий акт как в payday.test: партия с финалами, чтобы Beat_Payday и утро выплаты сложились
@@ -449,16 +468,23 @@ describe('Game: пачка непрочитанных подчиняется м�
     expect(game.ui.unread).toBe(0)
     expect([game.S.promises.length, game.S.debt, game.S.money]).toEqual([promises + 1, debt, money])
     expect(game.S.ending).toBe('payday_coins')
+    // каждое Quiet_PaydayOpen_* охраняет своё событие, пока экран концовки открыт
+    for (const event of ['AlikAway', 'AlikIdle', 'StoryBeat', 'PeriodLine', 'PromiseDue', 'Mentioned'] as const) {
+      const n = game.S.msgs.length
+      expect((await game.fire(event))?.name, event).toBe('Quiet_PaydayOpen_' + event)
+      expect(game.S.msgs.slice(n)).toEqual([])
+    }
     await game.closeEnding()
     expect(game.S.mem['endgame.active']).toBe(true)
   })
-  it('обиженный Алик: в пачке максимум одна колкость холодной войны, остальное — тишина', async () => {
+  it('обиженный Алик на связи: в пачке максимум одна колкость холодной войны, остальное — тишина', async () => {
     const pool = new Set(COLD_WAR.map(valueOf))
     const offendedPack = async (seed: number, n: number) => {
       const { game } = makeGame({ seed })
       game.S.stats.sent = 6
       game.S.mem[HEAT] = 1
       game.S.ctx = { offended: true }
+      expect(game.S.offlineDays).toBe(0)
       const from = game.S.msgs.length
       await game.awayBurst(n, 1)
       const body = arrived(game, from).filter((m) => m.kind !== 'sys')
@@ -473,6 +499,20 @@ describe('Game: пачка непрочитанных подчиняется м�
     let silent = 0
     for (let seed = 1; seed <= 30; seed++) silent += (await offendedPack(seed, 1)) === 0 ? 1 : 0
     expect(silent).toBeGreaterThan(0)
+  })
+  // негативный контроль #188: без ne(offline) Away_ColdWar снова перебивает пропажу
+  it('Away_ColdWar не берёт AlikAway, пока Алик пропал', async () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const { game } = makeGame({ seed })
+      game.S.stats.sent = 6
+      game.S.mem[HEAT] = 1
+      game.S.ctx = { offended: true }
+      game.S.offlineDays = 2
+      expect(game.facts().offline).toBe(true)
+      const r = game.rules.match({ event: 'AlikAway', facts: {} }, game.facts())
+      expect(r?.name, `seed ${seed}`).not.toBe('Away_ColdWar')
+      expect(['Away_Offline', 'Quiet_Offended_AlikAway']).toContain(r?.name)
+    }
   })
   it('посреди сцены пачки нет — как и болтовни простоя; сцена продолжается', async () => {
     for (let seed = 1; seed <= 10; seed++) {
