@@ -15,7 +15,7 @@ import { SPEAKS, meet } from '../content/world'
 import { FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_WANDER, OATH_FORMS } from '../content/misc'
 import { STARTS } from '../content/quests'
 import { allRules } from '../content/rules'
-import type { GameEvent } from '../content/rules/events'
+import type { GameEvent, Offer } from '../content/rules/events'
 import { CLAIMS, claimByKey, conflicts, CALLBACK_OPEN, type Claim } from '../content/lies'
 import * as memkeys from '../content/memkeys'
 import {
@@ -50,6 +50,9 @@ const literalRe = (t: string): RegExp => {
   return re
 }
 
+/** Строгий режим молчания: правило промолчало, но изменило S. Ход её не глотает — иначе проверка слепа. */
+export class SilenceBreach extends Error {}
+
 /** Отмена async после dispose — ловится на entry points, игроку не показывается. */
 export class GameDisposed extends Error {
   override name = 'GameDisposed'
@@ -71,6 +74,8 @@ export interface GameOptions {
   debug?: boolean
   /** Опечатки Алика (в тестах выключены, чтобы проверять тексты дословно) */
   typos?: boolean
+  /** Промолчавшее правило, оставившее след в S, — ошибка (в тестах включено; снимок S на каждое правило стоит времени) */
+  strictSilence?: boolean
 }
 
 
@@ -97,7 +102,7 @@ export class Game {
   readonly seen: Seen
   readonly X: ExcuseApi
   readonly scenes: Record<string, Scene>
-  readonly rules: RuleSet<Game>
+  readonly rules: RuleSet<Game, Offer>
   /** Выбор реплик как в Hades: требования, приоритет, «уже сказано». */
   readonly lines: Lines
   readonly D = D
@@ -154,11 +159,12 @@ export class Game {
     this.scenes = makeScenes(this.X)
     this.S.rules.said ??= {} // старые сохранения
     this.lines = new Lines(this.S.rules.said, this.rng, () => ({ turn: this.S.stats.sent, day: this.S.day }))
-    this.rules = new RuleSet<Game>({
+    this.rules = new RuleSet<Game, Offer>({
       rng: this.rng,
       hub: makeHub(this.S.mem, this.S.actors),
       state: this.S.rules,
       now: () => ({ turn: this.S.stats.sent, day: this.S.day }),
+      silence: opts.strictSilence ? (_, r) => this.silenceCheck(r.name) : undefined,
     }).add(...allRules)
     if (opts.debug) {
       this.rules.tracer = (t) => {
@@ -238,6 +244,7 @@ export class Game {
 
   /** Ошибка в середине хода: партия не должна умереть вместе с ним. */
   private recoverTurn(e: unknown): void {
+    if (e instanceof SilenceBreach) throw e
     this.ui.busy = false
     this.inPlayerTurn = false
     if (e instanceof GameDisposed) return
@@ -290,6 +297,12 @@ export class Game {
     const x = this.decks.pick(key, arr, this.lineFacts())
     if (x === null) throw new Error(`Колода ${key}: ни одного элемента, уместного сейчас`)
     return x
+  }
+  /** Снимок S для строгого режима молчания: всё, кроме учёта выбора равных (groups) — его двигает сам match. */
+  private silenceCheck(rule: string): () => void {
+    const stamp = () => { const { msgs, rules, ...rest } = this.S; return JSON.stringify([rest, msgs.length, msgs.at(-1)?.id, { ...rules, groups: null }]) }
+    const before = stamp()
+    return () => { if (stamp() !== before) throw new SilenceBreach(`Правило ${rule} промолчало, но оставило след в S`) }
   }
   lineFacts(): Resolver {
     return resolver(this.rules.hub, { event: 'line' }, this.facts())
@@ -868,7 +881,8 @@ export class Game {
       const n = this.scenes[S.scene.id].nodes[S.scene.node]
       // поймать на лжи можно и посреди сцены — это её прерывает
       const catchLie = this.rules.collect({ event: 'BuildChoices' }, this.facts()).find((r) => r.name === 'Opt_CatchLie')
-      const lieOpt = catchLie ? [catchLie.offer!(this.rules.ctx(this, catchLie, { event: 'BuildChoices' }, this.facts())) as Choice] : []
+      const lie = catchLie?.offer?.(this.rules.ctx(this, catchLie, { event: 'BuildChoices' }, this.facts()))
+      const lieOpt = lie ? [lie] : []
       return [...lieOpt, ...(n.opts ?? []).map((o, i) => {
         const gen = (): string => this.fillMoney(typeof o.t === 'function' ? o.t(S.scene!.vars) : Array.isArray(o.t) ? this.draw<string>(`${S.scene!.id}.${S.scene!.node}.o${i}`, o.t) : o.t)
         const t = gen().length > 8 ? this.playerLine(gen) : gen()
@@ -880,7 +894,7 @@ export class Game {
     const out: Choice[] = []
     for (const r of this.rules.collect({ event: 'BuildChoices' }, facts)) {
       if (out.length >= 2) break
-      const c = r.offer?.(this.rules.ctx(this, r, { event: 'BuildChoices' }, facts)) as Choice | null
+      const c = r.offer?.(this.rules.ctx(this, r, { event: 'BuildChoices' }, facts))
       if (c) out.push(c)
     }
     const P2 = (a: string, b: string) => this.playerLine(() => `${this.draw(a, D[a])} ${this.draw(b, D[b])}`)

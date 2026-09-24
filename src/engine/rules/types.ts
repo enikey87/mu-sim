@@ -83,7 +83,8 @@ export interface RuleCtx<G> {
   get: (key: string, scope?: Scope, actor?: string) => Value
 }
 
-export interface Rule<G, E extends string = string> {
+/** `O` — что правило-сборщик предлагает (`offer`): у игры это вариант ответа игрока. */
+export interface Rule<G, E extends string = string, O = unknown> {
   name: string
   event: E
   when: Criterion[]
@@ -98,18 +99,23 @@ export interface Rule<G, E extends string = string> {
   weight?: number | ((facts: Facts) => number)
   /** Шанс сработать при выполненных условиях (0..1). */
   odds?: number
-  /** Один раз за игру (matchOnce). Промолчавшее правило (respond → false) разовый шанс не тратит. */
+  /** Один раз за игру (matchOnce). Промолчавшее правило (respond → false) разовый шанс не тратит — отметка откатывается. */
   once?: boolean
   /** Перерыв после срабатывания; промолчавшее правило на перерыв не встаёт. */
   cooldown?: Cooldown
   /** Приоритет речи; по умолчанию 'default'. */
   priority?: Priority
-  /** Записи в память перед ответом (applyFacts): ответ видит их; при false откатываются. */
+  /** Записи в память перед ответом (applyFacts): ответ видит их; при false откатываются вместе с их forDays. */
   remember?: FactOp[]
-  /** Ответ. Вернуть false — «ничего не сделал»: commit откатывается, fire пробует следующее подходящее правило. */
+  /**
+   * Ответ. Вернуть false — «ничего не сделал»: движок откатывает только то, что записал сам (once, cooldown,
+   * remember), и пробует следующее подходящее правило. Свои записи в игру ответ обязан не делать, пока не решил
+   * говорить: их движок не видит (у игры это ловит строгий режим — RuleSetOptions.silence). Триггеры без
+   * ifResponded срабатывают и у промолчавшего правила.
+   */
   respond?: (ctx: RuleCtx<G>) => void | boolean | Promise<void | boolean>
   /** Для событий-сборщиков: что правило предлагает. */
-  offer?: (ctx: RuleCtx<G>) => unknown
+  offer?: (ctx: RuleCtx<G>) => O
   /** Из правил с одинаковым слотом сборщик берёт только лучшее. */
   slot?: string
   /** Следующие события (сразу — после ответа, то есть «после того как реплика прозвучала»). */
