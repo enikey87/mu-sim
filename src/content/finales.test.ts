@@ -235,7 +235,7 @@ describe('концовки игры', () => {
     expect(await check(game)).toBe('family')
     expect(game.S.endings.family).toBe(game.S.day)
     expect(game.S.ach.end_family).toBeDefined()
-    game.closeEnding()
+    await game.closeEnding()
     expect(game.S.ending).toBeNull()
     expect(await check(game)).toBeNull()
   })

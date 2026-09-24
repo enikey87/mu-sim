@@ -24,6 +24,7 @@ export const PROVEN: Record<string, string> = Object.fromEntries([
   'Payday_real', 'Payday_niva', 'Payday_notyou', 'Payday_lavash', 'Payday_strasbourg',
   'Endgame_Money', 'Endgame_Mute', 'Endgame_Leave', 'Endgame_Request',
   'Endgame_Turn', 'Endgame_Idle', 'Endgame_Away', 'Endgame_Formality', 'Endgame_NoEnding',
+  'Lend50_yes', 'Lend50_no', 'Lend50_serious',
   'Turn_LightOff', 'Turn_NetRation', 'Idle_PhoneWarn', 'Bill_Warn', 'Bill_Due',
   'Credit_Due', 'Says_creditTake', 'Says_creditSell',
   // финалы, до которых бот доходил только после выплаты — а там теперь тишина (#136); обиженный + пачка — редкое совпадение

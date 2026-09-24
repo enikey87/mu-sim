@@ -29,6 +29,7 @@ import * as memkeys from '../content/memkeys'
 import {
   ENDGAME_CHOICES, ENDGAME_FALLBACK, ENDGAME_FORMALITIES, ENDGAME_GROUP, ENDGAME_INTRO, ENDGAME_JUBILEES,
   ENDGAME_LEAVE, ENDGAME_MONEY, ENDGAME_MUTE, ENDGAME_OPEN, ENDGAME_RENAMES, ENDGAME_RETURNER_LINES, ENDGAME_RETURNERS, ENDGAME_VENDETTA, ENDGAME_ALIK_BACK,
+  LEND50_ASK, LEND50_ASK_AGAIN, LEND50_CHOICES, LEND50_LINK, LEND50_MEMORY, LEND50_NO, LEND50_NUNE, LEND50_RENAME, LEND50_SERIOUS, LEND50_SYS, LEND50_YES,
 } from '../content/endgame'
 import { type Rng, mathRng, rndInt, shuffle, chance } from './rng'
 import { Decks } from './deck'
@@ -46,7 +47,7 @@ import { UiState, type Moo, type SendFeel } from './ui-state'
 import { classifyUserInput, legalClaim, type ClassifiedInput } from './input'
 import { holidayOf, HOLIDAY_EXCUSES } from '../content/holidays'
 import { dueIn, dateOf, fmtDate, fmtDayMonth, fmtTime, nightHour, periodOf, tierOf, TIERS, type Due, type Period } from './time'
-import { type GameState, type Msg, type NewMsg, type Choice, type Ctx, type Tone, type Storage, type InputCategory, freshState, loadState, saveState, SAVE_KEY, MAX_PATIENCE, isLate, type PromiseRec } from './state'
+import { type GameState, type Msg, type NewMsg, type Choice, type Ctx, type Tone, type Storage, type InputCategory, freshState, loadState, saveState, SAVE_KEY, LEND50_SEEN_KEY, MAX_PATIENCE, isLate, type PromiseRec } from './state'
 
 /** Текст срока как буквальный шаблон без учёта регистра; кэш — topicOfLast зовётся из facts() на каждую реплику. */
 const LITERAL = new Map<string, RegExp>()
@@ -1688,15 +1689,19 @@ export class Game {
     this.unlock('end_' + id)
     this.emit()
   }
-  closeEnding(): void {
+  async closeEnding(): Promise<void> {
     const id = this.S.ending
     this.S.ending = null
-    if (id?.startsWith('payday_') && !this.S.mem[memkeys.endgame.active]) this.startEndgame(id.slice(7))
+    // вход в эндгейм: вступление и формальности, потом просьба — последовательность ждёт пауз,
+    // а факты и выборы ставит синхронно (тесты и случаи PROVEN зовут closeEnding без await)
+    if (id?.startsWith('payday_') && !this.S.mem[memkeys.endgame.active]) {
+      try { await this.startEndgame(id.slice(7)) } catch (e) { this.swallowDisposed(e) }
+    }
     this.save()
     this.emit()
   }
 
-  private startEndgame(outcome: string): void {
+  private async startEndgame(outcome: string): Promise<void> {
     const S = this.S
     S.mem[memkeys.endgame.active] = true
     S.mem[memkeys.endgame.started] = S.day
@@ -1714,6 +1719,29 @@ export class Game {
     const intro = S.endings.vendetta ? ENDGAME_VENDETTA : ENDGAME_INTRO[outcome] ?? ENDGAME_FALLBACK
     this.alikMsg({ kind: 'text', from: 'alik', text: intro })
     S.choices = ENDGAME_CHOICES.map((c) => ({ ...c }))
+    await this.sleep(1500)
+    const asked = !!this.storage?.getItem(LEND50_SEEN_KEY)
+    for (const text of asked ? LEND50_ASK_AGAIN : LEND50_ASK) await this.say([text])
+    this.sys(LEND50_SYS)
+    this.sys(LEND50_LINK)
+    this.storage?.setItem(LEND50_SEEN_KEY, '1') // отметка устройства, а не партии: она только выбирает текст
+    S.mem[memkeys.lend50.asked] = true
+    S.choices = LEND50_CHOICES.map((c) => ({ ...c }))
+  }
+
+  /** Ответ на «займи 50»: реплики и ачивка — без движения денег и долга (docs/design/lend-50.md). */
+  async endgameLend50(answer: string): Promise<void> {
+    const S = this.S
+    S.ctx = null
+    S.mem[memkeys.lend50.answer] = answer
+    if (answer === 'yes') {
+      await this.say([LEND50_YES])
+      S.mem[memkeys.endgame.renames] = Number(S.mem[memkeys.endgame.renames] ?? 0) + 1
+      this.sys(`Алик изменил название группы на «${LEND50_RENAME}»`)
+      if (this.canSpeak('nune')) await this.say([{ w: 'nune', t: LEND50_NUNE }])
+    } else if (answer === 'no') await this.say([this.draw('LEND50_NO', LEND50_NO)])
+    else await this.say([LEND50_SERIOUS])
+    this.unlock('lend50')
   }
 
   async endgameAction(action: 'money' | 'mute' | 'leave'): Promise<void> {
@@ -1755,7 +1783,8 @@ export class Game {
     const n = Number(this.S.mem[memkeys.endgame.forms] ?? 0) + 1
     this.S.mem[memkeys.endgame.forms] = n
     const jubilee = ENDGAME_JUBILEES[n]
-    return [this.draw('ENDGAME_FORMALITIES', ENDGAME_FORMALITIES), ...(jubilee ? [jubilee] : [])]
+    const memory = this.line('LEND50_MEMORY', LEND50_MEMORY)
+    return [this.draw('ENDGAME_FORMALITIES', ENDGAME_FORMALITIES), ...(memory ? [memory] : []), ...(jubilee ? [jubilee] : [])]
   }
   async endgameFormality(): Promise<void> {
     for (const text of this.formalityLines()) await this.say([text])

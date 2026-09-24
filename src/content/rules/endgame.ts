@@ -26,6 +26,11 @@ export const endgameRules: R[] = [
     name: 'Endgame_Request', event: 'PlayerSays', when: [active, eq('intent', 'request')], specificity: 100,
     respond: ({ game }) => game.endgameAction('money'),
   },
+  // «Займи 50»: кнопки просьбы отвечают репликой и ачивкой, денег и долга не двигают
+  ...([['yes', 'lend50Yes'], ['no', 'lend50No'], ['serious', 'lend50Serious']] as const).map(([answer, intent]): R => ({
+    name: 'Lend50_' + answer, event: 'PlayerSays', when: [active, eq('intent', intent)], specificity: 100,
+    respond: ({ game }) => game.endgameLend50(answer),
+  })),
   {
     name: 'Endgame_Turn', event: 'AlikTurn', when: [active], specificity: 100,
     respond: ({ game }) => game.endgameFormality(),

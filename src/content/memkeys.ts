@@ -80,6 +80,9 @@ export const endgame = {
   exits: 'endgame.exits', mutes: 'endgame.mutes', renames: 'endgame.renames',
 } as const
 
+/** «Займи 50» в эндгейме: просьба прозвучала и что игрок ответил (docs/design/lend-50.md). */
+export const lend50 = { asked: 'lend50.asked', answer: 'lend50.answer' } as const
+
 export const lie = { old: 'lie.old', new: 'lie.new', alikOld: 'lie.alikOld', kind: 'lie.kind' } as const
 
 export const said = (claim: string): string => `said.${claim}`
@@ -130,5 +133,5 @@ export const MEM_KEYS: ReadonlySet<string> = new Set([
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday,
   lightOff, netRation, phoneWarn,
   creditStage, creditOffer, creditBroke, momDone,
-  ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lie),
+  ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lend50), ...Object.values(lie),
 ])
