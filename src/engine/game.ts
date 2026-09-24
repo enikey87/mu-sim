@@ -35,7 +35,7 @@ import { type Clock, realClock, isManualClock } from './clock'
 import { type Audio, silentAudio } from './audio'
 import { typo } from './typo'
 import { UiState, type Moo, type SendFeel } from './ui-state'
-import { classifyUserInput, type ClassifiedInput } from './input'
+import { classifyUserInput, legalClaim, type ClassifiedInput } from './input'
 import { dueIn, dateOf, fmtDate, fmtDayMonth, fmtTime, nightHour, periodOf, tierOf, TIERS, type Due, type Period } from './time'
 import {
   type GameState, type Msg, type NewMsg, type Choice, type Ctx, type Tone, type Storage,
@@ -880,6 +880,8 @@ export class Game {
     let tone = o.tone
     // Готовая кнопка может быть помечена как rude, но текст с судом всё равно двигает ветку угроз.
     if (tone === 'rude' && !o.scene && this.classifyInput(o.text).category === 'threat') tone = 'threat'
+    // ответ ищет ту же инстанцию, которую назвал игрок
+    if (tone === 'threat' && !o.scene) S.mem[memkeys.threatClaim] = legalClaim(o.text)
     this.tick(1 + this.rnd(5))
     const mine = this.push({ kind: 'text', from: 'me', text: o.text, time: fmtTime(S.clock) })
     this.seen.mark(o.text)

@@ -47,6 +47,8 @@ export const grantPaid = 'grant.paid'
 export const rubikFined = 'rubik.fined'
 /** Игрок сдавал кровь — только тогда донорский центр благодарит. */
 export const bloodGiven = 'blood.given'
+/** Инстанция, которую игрок назвал в последней угрозе (LegalClaim в engine/input): ответ ищет тот же предмет. */
+export const threatClaim = 'threat.claim'
 export const nuneKeyPassed = 'nune.keyPassed'
 export const nuneDekretOver = 'nune.dekretOver'
 export const grandpaDying = 'grandpa.dying'
@@ -113,7 +115,7 @@ export const MEM_KEYS: ReadonlySet<string> = new Set([
   ritualCount, ritualCut, caughtCount, cryptoHodl, bathAsked, mamaCalls, phoneKarine, alikDay, mooAt, sorryAt,
   rudeAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway,
   garikConcrete, garikCut, houseOnGarik, borisMarried, borisSmetaReady, taxFrozen, taxThawed,
-  actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene,
+  actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim,
   ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lie),
 ])
 
