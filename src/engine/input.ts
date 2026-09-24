@@ -151,3 +151,26 @@ export function classifyUserInput(text: string): ClassifiedInput {
 
   return { category, tone, ...(intent ? { intent } : {}) }
 }
+
+export type LegalClaim = 'court' | 'police' | 'statement' | 'prosecutor' | 'lawyer' | 'collectors' | 'tax'
+/** Порядок — приоритет: «заявление в прокуратуру» — угроза прокурором, а не бумагой; «жалоба/заявление» — форма, а не адресат. */
+export const LEGAL_CLAIMS: ReadonlyArray<readonly [LegalClaim, readonly string[]]> = [
+  ['court', ['судеб', 'повестк', 'страсбург']],
+  ['police', ['полиц', 'участков']],
+  ['prosecutor', ['прокур']],
+  ['tax', ['налог']],
+  ['lawyer', ['адвокат', 'юрист']],
+  ['collectors', ['коллектор']],
+  ['statement', ['заявлен', 'жалоб']],
+]
+/** Короткие корни — целым словом, иначе угрозой суду станут «судьба» и «искренне». */
+const CLAIM_WORD: ReadonlyArray<readonly [LegalClaim, RegExp]> = [
+  ['court', /^(суд(а|е|ом|у|ы|ов)?|иск(а|е|ом|у|и|ов)?)$/u],
+  ['police', /^мент(а|у|ом|ы|ов|ам)?$/u],
+]
+/** Ни одной инстанции в угрозе — undefined: пул отвечает общим, а не чужим предметом. */
+export function legalClaim(text: string): LegalClaim | undefined {
+  const tokens = words(text)
+  for (const [claim, word] of CLAIM_WORD) if (tokens.some((w) => word.test(w))) return claim
+  return LEGAL_CLAIMS.find(([, stems]) => hasStem(tokens, stems))?.[0]
+}

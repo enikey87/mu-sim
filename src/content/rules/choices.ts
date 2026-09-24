@@ -88,14 +88,14 @@ export const choiceRules: R[] = [
   offer({ name: 'Wrong', when: [is('ctx.wrong')], act: 'wrong', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'WQ', WRONG_Q) }),
   offer({ name: 'Legend', when: [is('ctx.legendary')], act: 'legendQ', tone: 'polite', bonus: 2, text: (g) => fromD(g, 'P_LEGEND') }),
 
-  // срок обещания: переспросить (Алик клянётся) или принять к сведению (Алик подтверждает)
+  // срок обещания: только пока он ещё впереди относительно даты над перепиской (после +1…3 дня «завтра» уже вчера)
   offer({
-    name: 'When', slot: 'when', weight: 0.6, when: [exists('ctx.when')], act: 'promiseCheck', tone: 'neutral', bonus: 1,
-    text: (g, f) => fromD(g, 'P_WHEN', { t: String(f['ctx.when']), T: cap(String(f['ctx.when'])) }), arg: (_g, f) => String(f['ctx.when']),
+    name: 'When', slot: 'when', weight: 0.6, when: [exists('ctx.when'), is('ctx.whenFresh')], act: 'promiseCheck', tone: 'neutral', bonus: 1,
+    text: (g, f) => fromD(g, 'P_WHEN', { t: String(f['ctx.when']), T: cap(String(f['ctx.when'])), date: String(f['ctx.whenDate'] ?? '') }), arg: (_g, f) => String(f['ctx.when']),
   }),
   offer({
-    name: 'WhenOk', slot: 'when', weight: 0.4, when: [exists('ctx.when')], act: 'promiseOk', tone: 'polite', bonus: 1,
-    text: (g, f) => fromD(g, 'P_WHEN_OK', { t: String(f['ctx.when']), T: cap(String(f['ctx.when'])) }),
+    name: 'WhenOk', slot: 'when', weight: 0.4, when: [exists('ctx.when'), is('ctx.whenFresh')], act: 'promiseOk', tone: 'polite', bonus: 1,
+    text: (g, f) => fromD(g, 'P_WHEN_OK', { t: String(f['ctx.when']), T: cap(String(f['ctx.when'])), date: String(f['ctx.whenDate'] ?? '') }),
   }),
 
   // родственник: спросить «при чём тут он» / поздравить / посочувствовать — одна кнопка на слот

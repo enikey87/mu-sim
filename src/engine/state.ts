@@ -37,6 +37,10 @@ export interface Ctx {
   s?: string
   when?: string
   whenNever?: boolean
+  /** Игровой день, в который Алик назвал срок — варианты игрока сверяются с календарём. */
+  whenMade?: number
+  /** Абсолютный день срока (`null` — «когда-нибудь»). */
+  whenDue?: number | null
   rel?: Rel
   sad?: boolean
   festive?: boolean

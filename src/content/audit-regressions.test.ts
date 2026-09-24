@@ -1,13 +1,13 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { makeGame } from '../test/helpers'
+import { alikTexts, makeGame } from '../test/helpers'
 import { ARCS } from './arcs'
 import { D, type When } from './excuses'
 import { CHORUS_LEGEND, LEGENDS } from './legends'
 import { COURT_SCENE, QUESTS } from './quests'
 import { turnRules } from './rules/turn'
 import { dateOf } from '../engine/time'
-import { isOpen, test, valueOf, type Entry, type LineSpec } from '../engine/rules'
+import { Gated, isOpen, test, valueOf, type Entry, type LineSpec } from '../engine/rules'
 import { playtest, transcript } from '../tools/playtest'
 import { CHORUS, PROMISE_DUE_KEPT, PROMISE_MET } from './world'
 import { ENDGAME_FORMALITIES, ENDGAME_RETURNERS } from './endgame'
@@ -17,8 +17,21 @@ import { CLAIMS as LIE_CLAIMS, P_LIE } from './lies'
 import { MEMORY } from './memory'
 import * as TALK from './talk'
 import * as RUDE from './rude'
+import * as MISC from './misc'
 import { FWD, NOTIF, PERIOD } from './life'
 import { ARC_DONE, GROUP } from './arcs'
+import { LEGAL_CLAIMS, legalClaim, type LegalClaim } from '../engine/input'
+import { threatClaim } from './memkeys'
+
+/** Инстанция угрозы: тексты игрока → что игра обязана ответить. Проверяется и детектор, и пул. */
+const CLAIM_SAMPLES: Array<[string, LegalClaim]> = [
+  ['Я иду в суд!', 'court'], ['Я подаю в суд. Серьёзно.', 'court'], ['Я подам иск.', 'court'],
+  ['Завтра пойду в полицию!', 'police'], ['Вызову участкового.', 'police'],
+  ['Я пишу заявление.', 'statement'], ['Напишу жалобу.', 'statement'],
+  ['Напишу заявление в прокуратуру', 'prosecutor'],
+  ['Мой адвокат с вами свяжется.', 'lawyer'], ['Я нашёл юриста. Настоящего, с дипломом.', 'lawyer'],
+  ['Я найму коллекторов', 'collectors'], ['Напишу заявление в налоговую', 'tax'],
+]
 
 describe('регрессии первоначального аудита', () => {
   it('активная легенда не допускает независимую денежную отмазку', async () => {
@@ -357,5 +370,88 @@ describe('регрессии раунда 16', () => {
   it('группа выплаты — не семейная, и последние 50 ₽ в ней уже не лежат', () => {
     expect(texts(ENDGAME_RETURNERS, { 'met.samvel': true }).join(' ')).not.toMatch(/семейн/)
     expect(ENDGAME_FORMALITIES.join(' ')).not.toMatch(/хранит последние 50/)
+  })
+
+  it('цикл 9: пул ответов на угрозу говорит про инстанцию, которую игрок назвал', async () => {
+    const POOLS: Array<[string, readonly Entry<unknown>[]]> = [
+      ['THREAT_A', D.THREAT_A], ['APPEAL', RUDE.APPEAL], ['THREAT_AGAIN', MISC.THREAT_AGAIN],
+    ]
+    // чем строка отвечает. Гейт на чужой предмет — дефект в любом пуле: строка про Вардана не идёт тому, кто звал суд
+    const SUBJECT: Array<[LegalClaim, RegExp]> = [
+      ['court', /(?:^|\. )Суд[? —]|присяжн/i], ['police', /Полиция\?|Вардан/], ['statement', /^Заявление\?/],
+      ['prosecutor', /^Прокурор\?/], ['lawyer', /^Адвокат\?|^Юрист\?/], ['collectors', /^Коллекторы\?/], ['tax', /^Налоговая\?/],
+    ]
+    for (const [name, pool] of POOLS) for (const e of pool) {
+      const t = String(valueOf(e))
+      const named = SUBJECT.filter(([, re]) => re.test(t)).map(([id]) => id)
+      const claims = e instanceof Gated ? e.when.filter((c) => c.key === threatClaim).map((c) => String(c.value)) : []
+      expect(new Set(claims).size, `${name}: ${t}`).toBe(claims.length)
+      for (const c of claims) expect(named, `${name}: ${t}`).toContain(c)
+      // пул, который отвечает игроку, предметных строк без гейта не держит: ответ обязан быть про его слова
+      if (name === 'THREAT_A' && named.length) expect(claims, `${name}: ${t}`).toEqual(named)
+    }
+    // гейт не мёртвый: своему предмету строка открыта, чужому закрыта
+    const collector = (D.THREAT_A as Entry<unknown>[]).find((e) => /Коллектор/.test(String(valueOf(e))))!
+    expect(isOpen(collector, { [threatClaim]: 'collectors' })).toBe(true)
+    expect(isOpen(collector, { [threatClaim]: 'court' })).toBe(false)
+    expect(isOpen(collector, {})).toBe(false)
+    // инстанцию не назвали — общий ответ есть, и он не называет ни одной
+    const generic = texts(D.THREAT_A as Entry<unknown>[], {})
+    expect(generic.length).toBeGreaterThan(0)
+    expect(generic.join(' ')).not.toMatch(/суд|полиц|заявлен|прокурор|адвокат|юрист|коллектор|налогов/i)
+    // полиция — не суд: без полицейской угрозы про Вардана молчат все три пула
+    for (const [name, pool] of POOLS) for (const e of pool) {
+      if (!/Вардан/.test(String(valueOf(e)))) continue
+      expect(isOpen(e, { [threatClaim]: 'court' }), `${name}: Вардан`).toBe(false)
+      expect(isOpen(e, { [threatClaim]: 'police' }), `${name}: Вардан`).toBe(true)
+    }
+    // живая проверка: факт пишет само сообщение игрока, а не гейт на подставленных фактах.
+    // своя партия на образец: чужой ход иначе оставил бы в памяти прошлый предмет
+    for (const [text, want] of CLAIM_SAMPLES) {
+      const { game } = makeGame()
+      await game.send(text)
+      expect(game.S.mem[threatClaim], text).toBe(want)
+      expect(alikTexts(game.S.msgs).at(-1) ?? '', text).not.toMatch(/Коллектор/)
+    }
+  })
+
+  it('цикл 9: каждая инстанция достижима, и её значение в гейте — из реестра', () => {
+    for (const [text, want] of CLAIM_SAMPLES) expect(legalClaim(text), text).toBe(want)
+    expect(legalClaim('Готовьте документы, Алик.')).toBeUndefined()
+    for (const [id] of LEGAL_CLAIMS) expect(CLAIM_SAMPLES.some(([, w]) => w === id), id).toBe(true)
+  })
+
+  it('цикл 9: новость объявляет один источник, а не второй', () => {
+    // «Борис стал прорабом» — серия; строка легенды продолжает
+    expect(texts(LEGENDS.boris_object.lines, { 'arc.boris': 8 }).join(' ')).not.toMatch(/Он прораб/)
+    // объект закрывает финал Бориса, а не серия о назначении
+    expect(NOTIF.find((n) => /Баран-прораб/.test(n.t))!.t).not.toMatch(/сдал объект/)
+    // «Ищем Ниву всем селом» — серия; строка легенды не повторяет поиск
+    expect(texts(LEGENDS.niva_gone.lines, { 'arc.niva': 2 }).join(' ')).not.toMatch(/Ищем|Деньги с ней/)
+    // расчёт Гранта пишет его серия (grant.paid): реплика легенды его не объявляет
+    const law = CHORUS_LEGEND.grant.find((l) => typeof valueOf(l) !== 'string' && /beton_law/.test(JSON.stringify(valueOf(l))))!
+    expect(String((valueOf(law) as LineSpec).t)).not.toMatch(/рассчитал|заплат/)
+    // «опять» — только у того, что уже было: премию выписывает утро Дня выплаты, болезнь у Бориса одна
+    expect(JSON.stringify(MEMORY)).not.toMatch(/опять премию/)
+    expect(JSON.stringify(MISC.RUDE_AGAIN)).not.toMatch(/опять заболел/)
+    expect(NOTIF.find((n) => n.app === 'Госуслуги' && /угроза/.test(n.t))!.t).not.toMatch(/судом/)
+  })
+
+  it('цикл 9: решение Страсбурга объявляет ступень суда, а не воспоминание', () => {
+    // реплики памяти — LineSpec: их условия проверяются тем же test(), а не isOpen из колоды
+    const holds = (l: LineSpec, facts: Record<string, string | number | boolean>) => (l.when ?? []).every((c) => test(c, facts))
+    const line = (needle: RegExp) => MEMORY.map(valueOf).filter((l): l is LineSpec => typeof l !== 'string' && needle.test(l.t))
+    const pending = line(/Страсбург думает/)
+    const decided = line(/решение Страсбурга/)
+    expect(pending).toHaveLength(1)
+    expect(decided).toHaveLength(1)
+    // пока ступень не пройдена, письма нет: Страсбург думает
+    expect(holds(pending[0], { 'ach.strasbourg': true, 'since.strasbourg': 3, court: 6 })).toBe(true)
+    expect(holds(pending[0], { court: 7 })).toBe(false)
+    // ступень пройдена — воспоминание продолжает, а не пересказывает решение
+    expect(holds(decided[0], { court: 6, 'since.strasbourg': 9 })).toBe(false)
+    expect(holds(decided[0], { court: 7 })).toBe(true)
+    // и ни одно воспоминание не объявляет письмо с решением до ступени
+    for (const l of line(/письмо|«Отстаньте»/)) expect(holds(l, { 'ach.strasbourg': true, 'since.strasbourg': 9, court: 6 })).toBe(false)
   })
 })
