@@ -19,7 +19,7 @@ import { BILLS, billDue, billDueAt, billStreak, billUnpaid, lightOff, netRation,
 import {
   LOANS, THINGS, MOM_DONE_TEXT,
   creditStage, creditOffer, creditBroke, momDone,
-  sold, momHelp, loanTaken, loanDueAt, nextLoan, nextThing, allSold, nextMom,
+  sold, momHelp, loanTaken, loanDueAt, loanFailed, nextLoan, nextThing, allSold, nextMom,
   type LoanId, type ThingId,
 } from '../content/credit'
 import { allRules } from '../content/rules'
@@ -97,6 +97,8 @@ export const FESTIVE = /свадьб|крестин|юбилей|обручен|
 export type SayItem = string | { w: string; t: string }
 /** Что пришло, пока игрока не было: виды сообщений пачки непрочитанных. */
 export type AwayKind = 'text' | 'sticker' | 'fwd' | 'deleted' | 'voice' | 'transfer' | 'excuse' | 'formality' | 'coldWar'
+
+const POOR_REPEAT_DAYS = 14
 
 export class Game {
   /** Только чтение: подмена состояния целиком (`this.S = …`) — один из обходов долга из аудита #142. */
@@ -421,6 +423,16 @@ export class Game {
     if (this.shown.size > 60) this.shown.delete(this.shown.values().next().value!)
     return t
   }
+  /**
+   * Реплика бедности: пока пул уровня не исчерпан — без повторов, дальше редко и по кругу: одна строка
+   * на окно в POOR_REPEAT_DAYS дней. Бедность держится до Дня выплаты — голос не должен смолкать (#184).
+   */
+  poorLine(key: string, arr: readonly Entry<string>[]): string | null {
+    const fresh = this.freshPlayer(key, arr)
+    if (fresh !== null) return fresh
+    const open = arr.filter((e) => isOpen(e, this.lineFacts())).map(valueOf)
+    return open.length ? open[Math.floor(this.S.day / POOR_REPEAT_DAYS) % open.length] : null
+  }
   pair = (ka: string, a: readonly Entry<string>[], kb: string, b: readonly Entry<string>[]): string =>
     this.uniq(() => `${this.draw(ka, a)} ${this.draw(kb, b)}`)
   addrLine = (key: string, arr: readonly Entry<string>[]): string => this.uniq(() => `${this.X.g('ADDR')}, ${this.draw(key, arr)}`)
@@ -442,7 +454,7 @@ export class Game {
     setCount(this.S, 'debt', countOf(this.S, 'debt') + delta)
     return true
   }
-  // Дно ≤ 6000 (как старый FLOOR); «мало» ≤ 9000 — предупреждение до дна. Старт 12400.
+  // Дно ≤ 6000 (как старый FLOOR); «мало» ≤ 9000 — предупреждение до дна. Старт — START_MONEY.
   static readonly MONEY_LOW = 9000
   static readonly MONEY_BOTTOM = 6000
   moneyLevel(): 'normal' | 'low' | 'bottom' {
@@ -516,7 +528,8 @@ export class Game {
     } else {
       const streak = Number(this.S.mem[billStreak(id)] ?? 0) + 1
       this.rules.applyOps([set(billUnpaid(id), true), set(billStreak(id), streak)], {})
-      this.notify('🏦', 'Банк', `Не прошло: недостаточно средств. ${bill.label}, ${bill.amount.toLocaleString('ru-RU')} ₽. Достоинство не принимается.`)
+      // неоплата — факт и последствия, а не ежедневное эхо: банк говорит один раз за полосу (#184)
+      if (streak === 1) this.notify('🏦', 'Банк', `Не прошло: недостаточно средств. ${bill.label}, ${bill.amount.toLocaleString('ru-RU')} ₽. Достоинство не принимается.`)
       if (id === 'rent' && streak >= 1) this.rules.applyOps([set(lightOff, true)], {})
       if (id === 'phone' && streak >= 1) this.rules.applyOps([set(phoneWarn, true)], {})
       if (id === 'phone' && streak >= 2) this.rules.applyOps([set(netRation, true)], {})
@@ -544,10 +557,15 @@ export class Game {
     if (!loan || !this.S.mem[loanTaken(id)]) return
     delete this.S.mem[loanDueAt(id)]
     if (this.adjustMoney(-loan.payment, loan.label)) {
+      this.rules.applyOps([set(loanFailed(id), false)], {}) // платёж прошёл — полоса неоплат закрыта
       this.scheduleCredits()
       return
     }
-    this.notify('🏦', 'Банк', `Не прошло: недостаточно средств. ${loan.label}, ${loan.payment.toLocaleString('ru-RU')} ₽.`)
+    // банк говорит один раз за полосу неоплат, а не каждую неделю (#184)
+    if (!this.S.mem[loanFailed(id)]) {
+      this.rules.applyOps([set(loanFailed(id), true)], {})
+      this.notify('🏦', 'Банк', `Не прошло: недостаточно средств. ${loan.label}, ${loan.payment.toLocaleString('ru-RU')} ₽.`)
+    }
     if (id === 'micro' && !this.S.mem[creditBroke]) {
       this.rules.applyOps([set(creditBroke, true), set(creditStage, 4)], {})
       this.notify('🏦', 'МФО', 'Платёж не прошёл. Мы не злимся. Мы записываем')
@@ -1116,15 +1134,15 @@ export class Game {
     const money = level && P_MONEY[level]
     if (S.mem[memkeys.polite] && this.chance(0.6)) out.push({ text: one('P_POL_POLITE', P_POL_POLITE), tone: 'polite' })
     else {
-      // бедность — своими словами, но без повторов: пул исчерпан — обычная вежливая реплика
-      const poor = money && this.chance(level === 'bottom' ? 0.7 : 0.4) ? this.freshPlayer(`P_MONEY_${level}_POL`, money.polite) : null
+      // бедность — своими словами: пул уровня без повторов, исчерпанный звучит редко (#184)
+      const poor = money && this.chance(level === 'bottom' ? 0.7 : 0.4) ? this.poorLine(`P_MONEY_${level}_POL`, money.polite) : null
       out.push({ text: poor ?? P2('P_POL_A', 'P_POL_B'), tone: 'polite' })
     }
     if (out.length < 3) {
       const period = this.period()
       // отчаяние — своё намерение, чаще на дне; вежливый вариант выше остаётся при любом уровне
-      const cry = money && level && this.chance(level === 'bottom' ? 0.6 : 0.3) ? this.freshPlayer(`P_DESPERATE_${level}`, P_DESPERATE[level]) : null
-      const poor = !cry && money && this.chance(0.5) ? this.freshPlayer(`P_MONEY_${level}_NEU`, money.neutral) : null
+      const cry = money && level && this.chance(level === 'bottom' ? 0.6 : 0.3) ? this.poorLine(`P_DESPERATE_${level}`, P_DESPERATE[level]) : null
+      const poor = !cry && money && this.chance(0.5) ? this.poorLine(`P_MONEY_${level}_NEU`, money.neutral) : null
       if (cry) out.push({ text: cry, tone: 'neutral', act: 'desperate' })
       else if (poor) out.push({ text: poor, tone: 'neutral' })
       else {

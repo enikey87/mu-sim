@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { makeGame , setMoney} from '../test/helpers'
-import { BILLS, billUnpaid, lightOff, billDueAt } from './bills'
+import { BILLS, billUnpaid, billStreak, lightOff, billDueAt } from './bills'
 import { dueIn } from '../engine/time'
 
 describe('платежи по календарю', () => {
@@ -15,10 +15,30 @@ describe('платежи по календарю', () => {
   it('хватает денег — списание через adjustMoney, неоплаты нет', () => {
     const { game } = makeGame()
     const before = game.S.money
+    const phone = BILLS.find((b) => b.id === 'phone')!
     game.chargeBill('phone')
-    expect(game.S.money).toBe(before - 550)
+    expect(game.S.money).toBe(before - phone.amount)
     expect(game.S.mem[billUnpaid('phone')]).toBe(false)
     expect(game.ui.notif?.text).toMatch(/Списание/)
+  })
+  it('неоплата не эхо: банк говорит один раз за полосу, а не каждый срок (#184)', () => {
+    const { game } = makeGame()
+    const said: string[] = []
+    const orig = game.notify.bind(game)
+    game.notify = (icon: string, app: string, text: string): void => { said.push(text); orig(icon, app, text) }
+    const refusals = (): number => said.filter((t) => /недостаточно средств/i.test(t)).length
+    setMoney(game, 100)
+    game.chargeBill('phone')
+    expect(refusals()).toBe(1)
+    game.chargeBill('phone') // срок прошёл снова, полоса та же
+    expect(game.S.mem[billStreak('phone')]).toBe(2)
+    expect(refusals()).toBe(1) // эха нет
+    setMoney(game, 2000)
+    game.chargeBill('phone') // заплатили — полоса закрыта
+    expect(game.S.mem[billStreak('phone')]).toBe(0)
+    setMoney(game, 100)
+    game.chargeBill('phone') // новый срыв — банк говорит снова
+    expect(refusals()).toBe(2)
   })
   it('не хватает — СМС отказа, unpaid и последствие', () => {
     const { game } = makeGame()

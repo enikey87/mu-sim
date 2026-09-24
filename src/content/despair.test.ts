@@ -123,6 +123,7 @@ describe('отчаяние от бедности', () => {
     const low = makeGame({ seed: 3 }).game
     setMoney(low, Game.MONEY_LOW)
     for (let i = 0; i < 40; i++) {
+      setMoney(low, Game.MONEY_LOW) // уровень держим: партия тратит деньги, и «мало» уезжает в «дно»
       low.S.choices = null
       const c = low.buildChoices().find((x) => x.act === 'desperate')
       if (!c) continue
