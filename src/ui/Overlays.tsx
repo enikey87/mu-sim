@@ -1,9 +1,7 @@
 import { useRef } from 'react'
 import { useGame } from './useGame'
-import { ENDINGS } from '../content/finales'
-import { ARCS } from '../content/arcs'
 import { useModal } from './useModal'
-import { payday } from '../content/memkeys'
+import { viewOf } from './view'
 
 export function Toast() {
   const game = useGame()
@@ -88,8 +86,8 @@ export function DeadScreen() {
 /** Экран концовки: итоги и выбор — играть дальше или заново. */
 export function EndingScreen({ onReset }: { onReset: () => void }) {
   const game = useGame()
-  const S = game.S
-  const e = ENDINGS.find((x) => x.id === S.ending)
+  const v = viewOf(game)
+  const e = v.ending
   const active = !!e
   const dialogRef = useRef<HTMLDivElement>(null)
   useModal({
@@ -98,7 +96,6 @@ export function EndingScreen({ onReset }: { onReset: () => void }) {
     onEscape: () => game.closeEnding(),
   })
   if (!e) return null
-  const finales = Object.keys(ARCS).filter((id) => game.finaleTitle(id))
   return (
     <div
       className="ending"
@@ -114,17 +111,17 @@ export function EndingScreen({ onReset }: { onReset: () => void }) {
         tabIndex={-1}
       >
         <div className="ending-icon">{e.icon}</div>
-        <small>Концовка {Object.keys(S.endings).length} из {ENDINGS.length}</small>
+        <small>Концовка {v.endingCount} из {v.endingTotal}</small>
         <h2>{e.title}</h2>
         <p>{e.text}</p>
-        {e.id.startsWith('payday_') && typeof S.mem[payday.chain] === 'string' && (
+        {v.grandExcuse && (
           <>
-            <blockquote className="grand" id="grandExcuse">«{S.mem[payday.chain]}»</blockquote>
+            <blockquote className="grand" id="grandExcuse">«{v.grandExcuse}»</blockquote>
             <button
               className="secondary"
               id="copyExcuse"
               onClick={() => {
-                const text = `Алик, где деньги? — великая отмазка Дня выплаты:\n«${S.mem[payday.chain]}»`
+                const text = `Алик, где деньги? — великая отмазка Дня выплаты:\n«${v.grandExcuse}»`
                 void copyText(text).then((ok) => game.flash(ok ? 'Скопировано' : 'Не удалось скопировать'))
               }}
             >
@@ -133,10 +130,10 @@ export function EndingScreen({ onReset }: { onReset: () => void }) {
           </>
         )}
         <ul className="ending-stats">
-          <li>{S.day} дней после сдачи объекта</li>
-          <li>Долг Алика: {S.debt.toLocaleString('ru-RU')} ₽</li>
-          <li>Обещаний в журнале: {S.promises.length}</li>
-          {finales.map((id) => <li key={id}>{ARCS[id].title}: «{game.finaleTitle(id)}»</li>)}
+          <li>{v.day} дней после сдачи объекта</li>
+          <li>Долг Алика: {v.debt.toLocaleString('ru-RU')} ₽</li>
+          <li>Обещаний в журнале: {v.promises.length}</li>
+          {v.finales.map((f) => <li key={f.id}>{f.title}: «{f.finale}»</li>)}
         </ul>
         <div className="ending-btns">
           <button id="endingContinue" onClick={() => game.closeEnding()}>Играть дальше</button>

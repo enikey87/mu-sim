@@ -59,7 +59,9 @@ src/
             achievements.ts; world.ts — труппа как факты (WORLD, SPEAKS); memkeys.ts — реестр ключей памяти;
             rules/ — events (тип событий), criteria, turn, replies, choices, world, finales, rude,
             court, payday, endgame
-  ui/       React-телефон: чат со следованием ленты, досье, концовки, debug-панель
+  ui/       React-телефон: чат со следованием ленты, досье, концовки, debug-панель.
+            view.ts — единственный вход к состоянию: плоский снимок для показа (S, memkeys
+            и контент-константы не покидают его; страж — view.test.ts; DebugPanel — исключение)
   test/     помощники и большая симуляция
   tools/    бот для плейтестов, отчёт по правилам, список редких правил (rare.ts)
 ```
