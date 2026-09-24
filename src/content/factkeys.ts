@@ -38,6 +38,7 @@ export const FAMILIES: Record<string, (rest: string) => boolean> = {
   'topic.': topics, 'topicMute.': topics,
   'inv.': items,
   'wedding.': setOf(Object.keys(CAST)),
+  'bills.': (r) => /^(rent|phone|transit)\.(dueAt|due|unpaid|streak)$/.test(r),
 }
 
 /** Известный ли ключ факта: точный — из реестра, семейный — до элемента. Точное совпадение — раньше семейств. */

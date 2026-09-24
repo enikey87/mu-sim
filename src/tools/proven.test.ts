@@ -80,6 +80,7 @@ const CASES: Record<string, Case> = {
   Ending_payday_real: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'real' } },
   Ending_payday_niva: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'niva' } },
   Ending_payday_notyou: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'notyou' } },
+  Ending_payday_lavash: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'lavash' } },
   Payday_real: {
     event: 'PaydayOutcome',
     setup: (g) => {
@@ -89,6 +90,7 @@ const CASES: Record<string, Case> = {
   },
   Payday_niva: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['finale.niva'] = 'chose' } },
   Payday_notyou: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['finale.razmik'] = 'default'; g.S.mem['count.rude'] = 8 } },
+  Payday_lavash: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['payday.caught'] = true; g.S.mem['crypto.hodl'] = true } },
   Finale_razmik_swap: { event: 'ArcFinale', facts: { arc: 'razmik' }, setup: (g) => { g.S.mem['count.rude'] = 10; g.S.mem[HEAT] = 3 } },
   Says_via_mama: { event: 'PlayerSays', facts: { intent: 'via', arg: 'mama' } },
   Endgame_Money: { event: 'PlayerSays', facts: { intent: 'endgameMoney' }, setup: endgame },
@@ -100,7 +102,13 @@ const CASES: Record<string, Case> = {
   Endgame_Away: { event: 'AlikAway', setup: endgame },
   Endgame_Formality: { event: 'StoryBeat', setup: endgame },
   Endgame_NoEnding: { event: 'CheckEnding', setup: endgame },
+  Turn_LightOff: { event: 'AlikTurn', setup: (g) => { g.S.mem['light.off'] = true } },
+  Turn_NetRation: { event: 'AlikTurn', setup: (g) => { g.S.mem['net.ration'] = true } },
+  Idle_PhoneWarn: { event: 'AlikIdle', setup: (g) => { g.S.mem['phone.warn'] = true } },
+  Bill_Warn: { event: 'BillWarn', facts: { bill: 'phone' } },
+  Bill_Due: { event: 'BillDue', facts: { bill: 'phone' } },
   Finale_beton_ledger: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem.caught = 2 } },
+  Finale_nune_ledger: { event: 'ArcFinale', facts: { arc: 'nune' }, setup: (g) => { g.S.mem.caught = 2 } },
   Away_ColdWar: { event: 'AlikAway', setup: offended },
   Quiet_Offended_AlikAway: { event: 'AlikAway', setup: offended },
 }

@@ -92,6 +92,9 @@ export const caughtPair = (a: string, b: string): string => `caught.${pairKey(a,
 export const wedding = (who: string): string => `wedding.${who}`
 /** Активная сцена Дня выплаты (id узла) — факт на доске мира. */
 export const paydayScene = 'payday'
+export const lightOff = 'light.off'
+export const netRation = 'net.ration'
+export const phoneWarn = 'phone.warn'
 
 /** Ключи досок персонажей (S.actors), не мира. */
 export const sick = 'sick'
@@ -114,5 +117,6 @@ export const MEM_KEYS: ReadonlySet<string> = new Set([
   rudeAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway,
   garikConcrete, garikCut, houseOnGarik, borisMarried, borisSmetaReady, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday,
+  lightOff, netRation, phoneWarn,
   ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lie),
 ])
