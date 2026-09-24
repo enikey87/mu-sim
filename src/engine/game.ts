@@ -57,7 +57,8 @@ const literalRe = (t: string): RegExp => {
   return re
 }
 
-/** Строгий режим молчания: правило промолчало, но изменило S или видимый UI. Ход её не глотает — иначе проверка слепа. */
+/** Строгий режим молчания: правило промолчало, но изменило `S` или тост / уведомление / «Мууу».
+ *  Статус, «печатает…», звук, вибрация, unread и feel в снимок не входят (#218). */
 export class SilenceBreach extends Error {}
 
 /** Отмена async после dispose — ловится на entry points, игроку не показывается. */
@@ -319,7 +320,7 @@ export class Game {
       visible: { toast: this.ui.toast, notif: this.ui.notif, moos: this.ui.moos },
     })
     const before = stamp()
-    return () => { if (stamp() !== before) throw new SilenceBreach(`Правило ${rule} промолчало, но оставило след в S`) }
+    return () => { if (stamp() !== before) throw new SilenceBreach(`Правило ${rule} промолчало, но оставило след в S или тосте/уведомлении/«Мууу»`) }
   }
   lineFacts(): Resolver {
     return resolver(this.rules.hub, { event: 'line' }, this.facts())
