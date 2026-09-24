@@ -80,6 +80,8 @@ export interface PromiseRec {
   condition?: PromiseCondition
   met?: number
   asked?: boolean
+  /** Алик сдержал слово (50 ₽ вместо перевода долга): в журнале это отдельное состояние, а не «припомнил». */
+  kept?: boolean
   /** День амнистии: срок больше не припомнишь. Не `asked` — то «припомнил» или «сдержал на 50 ₽». */
   amnesty?: number
 }

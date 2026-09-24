@@ -6,6 +6,7 @@ import { messageRenderStats } from './Message'
 import { messageListRenderStats, messageListBuildStats } from './Chat'
 import { makeGame } from '../test/helpers'
 import { SAVE_KEY } from '../engine/state'
+import { fmtDate } from '../engine/time'
 import type { Game } from '../engine/game'
 
 function renderApp(game: Game, onReset = vi.fn()) {
@@ -273,6 +274,29 @@ describe('App', () => {
     fireEvent.click(within(dialog).getByText('Начать заново'))
     expect(onReset).toHaveBeenCalled()
     fireEvent.click(screen.getByLabelText('Закрыть'))
+  })
+
+  it('досье: у каждого состояния журнала свой значок', () => {
+    const { game } = makeGame()
+    const day = game.S.day
+    game.S.promises.push(
+      { t: 'завтра', made: day, due: day + 1 },
+      { t: 'в пятницу', made: day - 5, due: day - 1 },
+      { t: 'на днях', made: day - 6, due: day - 2, asked: true },
+      { t: 'сразу после свадьбы', made: day - 7, due: day - 3, asked: true, kept: true },
+      { t: 'до конца недели', made: day - 8, due: day - 4, amnesty: day - 1 },
+      { t: 'когда Арарат вернут', made: day, due: null },
+    )
+    renderApp(game)
+    fireEvent.click(screen.getByTitle('Обещания и ачивки'))
+    const dialog = screen.getByRole('dialog')
+    const line = (re: RegExp) => within(dialog).getByText(re).textContent
+    expect(line(/⏳ ждём/)).toContain(fmtDate(day + 1)) // ждём — со своим сроком
+    expect(line(/❌ просрочено/)).toContain(fmtDate(day - 1))
+    expect(line(/❓ припомнили/)).toContain(fmtDate(day - 2))
+    expect(line(/✅ сдержал — 50 ₽/)).toContain(fmtDate(day - 3))
+    expect(line(/🕊 амнистия/)).toContain(fmtDate(day - 1))
+    expect(line(/∞ когда-нибудь/)).not.toMatch(/⏳|просрочено/) // «когда-нибудь» — не «ждём»
   })
 
   it('Esc закрывает досье и возвращает фокус на кнопку досье', () => {
