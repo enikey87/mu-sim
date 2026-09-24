@@ -80,6 +80,9 @@ export const endgame = {
   exits: 'endgame.exits', mutes: 'endgame.mutes', renames: 'endgame.renames',
 } as const
 
+/** Праздник, который партия уже поздравила: «newYear@2027» — новый год тот же, но год другой. */
+export const holidayGreeted = 'holiday.greeted'
+
 /** «Займи 50» в эндгейме: просьба прозвучала и что игрок ответил (docs/design/lend-50.md). */
 export const lend50 = { asked: 'lend50.asked', answer: 'lend50.answer' } as const
 
@@ -131,7 +134,7 @@ export const MEM_KEYS: ReadonlySet<string> = new Set([
   rudeAt, thanksAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway,
   garikConcrete, garikCut, houseOnGarik, borisMarried, borisSmetaReady, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday,
-  lightOff, netRation, phoneWarn,
+  lightOff, netRation, phoneWarn, holidayGreeted,
   creditStage, creditOffer, creditBroke, momDone,
   ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lend50), ...Object.values(lie),
 ])

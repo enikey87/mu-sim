@@ -4,7 +4,9 @@ import { bloodGiven, count, endgame, evicted, wedding } from './memkeys'
 import { sold, momHelp } from './credit'
 
 const newYear = gate(eq('holiday', 'newYear'), missing(endgame.active))
-const march8 = gate(eq('holiday', 'march8'), missing(endgame.active))
+// 8 Марта: поздравление в сам день (08–09.03), а 06–07.03 — про подготовку: «С 8 Марта» накануне неправда
+const march8 = gate(eq('holiday', 'march8'), missing(endgame.active), gte('dom', 8))
+const march8Before = gate(eq('holiday', 'march8'), missing(endgame.active), lte('dom', 7))
 const holidayNewYear = [eq('holiday', 'newYear'), missing(endgame.active)] as const
 const holidayMarch8 = [eq('holiday', 'march8'), missing(endgame.active)] as const
 
@@ -69,6 +71,7 @@ export const FWD_HOLIDAY = [
   newYear({ f: 'Дзен-открытки 🌹', t: 'С Новым годом! 🥂 Шампанское открыто, сейф — на следующий год.' }),
   march8({ f: 'Дзен-открытки 🌹', t: 'С 8 Марта! 🌷 Пусть мужчины дарят цветы, а подрядчики — зарплату!' }),
   march8({ f: 'Дзен-открытки 🌹', t: 'С Международным женским днём! 🌹 Долги не вянут — в отличие от тюльпанов.' }),
+  march8Before({ f: 'Дзен-открытки 🌹', t: 'Скоро 8 Марта! 🌷 Готовьте цветы и списки должников.' }),
 ]
 export const FWD_NOTE = ['Видишь? Не я придумал.', 'Это для тебя переслал. Мудро, да?', 'Прочитай внимательно, брат.', 'Ой, это не тебе. Но тоже полезно.', 'Вот. Официально.', 'Мудрые люди всегда правы.'];
 export const FWD_Q = ['Алик, это что?', 'Зачем вы мне это переслали?', 'Алик, это к чему?', 'Это вы мне?'];
@@ -109,7 +112,8 @@ export const NOTIF: Notif[] = [
   { icon: '👩', app: 'Мама', t: 'Сынок, ты поел?', ...often }, { icon: '👩', app: 'Мама', t: 'Сынок, Алик заплатил?', ...often },
   { icon: '👩', app: 'Мама', t: 'Сынок, позвони маме.', ...often },
   { icon: '👩', app: 'Мама', t: 'Сынок, с Новым годом. Алик тебя поздравил? А перевёл?', when: [...holidayNewYear] },
-  { icon: '👩', app: 'Мама', t: 'Сынок, с 8 Марта. Цветы Алику не дари — пусть он тебе перевод сделает.', when: [...holidayMarch8] },
+  { icon: '👩', app: 'Мама', t: 'Сынок, с 8 Марта. Цветы Алику не дари — пусть он тебе перевод сделает.', when: [...holidayMarch8, gte('dom', 8)] },
+  { icon: '👩', app: 'Мама', t: 'Сынок, скоро женский день. Алика не поздравляй — поторапливай.', when: [...holidayMarch8, lte('dom', 7)] },
   { icon: '👩', app: 'Мама', t: 'Видела передачу про таких, как твой Алик. Там тоже не заплатили.' },
   { icon: '👩', app: 'Мама', t: 'Может, вернёшься домой? Тут тоже есть плитка.' },
   { icon: '🛒', app: 'Авито', t: 'Отзывы об «Алик Стройка под ключ» скрыты по жалобе владельца. Всех 48.' },
