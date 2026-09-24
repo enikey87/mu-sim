@@ -21,6 +21,11 @@ export const billRules: R[] = [
       if (!id || game.moneySealed() || !game.billEventLive(id, facts.at, 'BillWarn')) return
       const bill = BILLS.find((b) => b.id === id)!
       if (bill.skip?.(game.S.mem)) return
+      // «Завтра списание» — только крупный платёж; связь/проездной и так каждую неделю (#178)
+      if (id !== 'rent') {
+        game.rules.applyOps([set(billDue(id), true)], {})
+        return
+      }
       game.rules.applyOps([set(billDue(id), true)], {})
       game.notify('🏦', 'Банк', `Завтра списание: ${bill.label}, ${bill.amount.toLocaleString('ru-RU')} ₽. Успейте накопить достоинство.`)
     },
