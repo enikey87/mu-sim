@@ -8,13 +8,13 @@ import { manualClock } from '../engine/clock'
 import { seededRng } from '../engine/rng'
 import { specificityOf, lineId, spec } from '../engine/rules'
 import { MEMORY } from '../content/memory'
-import { RARE, RARE_ALL } from './rare'
+import { RARE } from './rare'
 import { PROVEN } from './proven'
 import { botTurn } from './bot'
 
 /**
  * Почему правило не сработало в симуляции.
- * `rare` — RARE / RARE_FLAKY (прямой случай в rare.test.ts).
+ * `rare` — RARE (прямой случай в rare.test.ts; членство — по широкому замеру).
  * `proven` — явное доказательство вне статистики (прямой тест или структурная недостижимость).
  * Больше нет освобождения по имени модуля или префиксу.
  */
@@ -28,7 +28,7 @@ export const COVERAGE_SAMPLES: number[][] = [
 ]
 
 export const neverClass = (name: string): NeverClass =>
-  RARE_ALL.has(name) ? 'rare' : name in PROVEN ? 'proven' : 'unexplained'
+  RARE.has(name) ? 'rare' : name in PROVEN ? 'proven' : 'unexplained'
 
 /** Где именно правило проверяется, если симуляция до него не доходит. */
 const NEVER_HINT: Record<NeverClass, string> = {
@@ -54,8 +54,6 @@ export interface MultiCoverage {
   samples: CoverageReport[]
   /** Ни разу ни в одной выборке — настоящая недостижимость для гейта. */
   never: string[]
-  /** Записи RARE, до которых стенд всё-таки дошёл: им место в RARE_FLAKY или под сторожем. */
-  rareReached: string[]
 }
 
 /** Пересечение «никогда»: имя есть в каждом списке never. */
@@ -65,10 +63,34 @@ export function neverInAllSamples(sampleNevers: string[][]): string[] {
   return sampleNevers[0].filter((name) => rest.every((s) => s.has(name)))
 }
 
-/** Записи RARE, которых нет в «ни разу ни в одной выборке»: стенд до правила дошёл. */
-export function rareReached(never: Iterable<string>, rare: Iterable<string> = RARE): string[] {
-  const neverSet = new Set(never)
-  return [...rare].filter((n) => !neverSet.has(n))
+/**
+ * Широкий замер (tools/coverage-measure.json, пишет `npm run rules:stable`): по правилу — срабатывания в каждом
+ * из пакетов по 16 партий. Решает, кому место в исключениях гейта, — вместо трёх выборок самого гейта, где
+ * граница «редкое / нет» мигала от любой правки текста.
+ */
+export interface Measure { packs: number[][]; rules: Record<string, number[]> }
+/** Доля пакетов, где правило не сработало ни разу. */
+export const zeroShare = (v: readonly number[]): number => v.filter((x) => x === 0).length / v.length
+/**
+ * Граница исключений с гистерезисом (z — доля пакетов замера, где правило молчит). Исключение (RARE / PROVEN)
+ * допустимо, только если стенд молчит хоть в одном пакете (z ≥ 0,1: «достигает не всегда»), и обязательно при
+ * z ≥ 0,3: шанс, что правка текста обнулит такое правило во всех трёх выборках CI, ≈ z³ ≥ 2,7 %. Между ними —
+ * решает автор: иначе правило на границе мигало бы от одного перемера к другому.
+ */
+export const RARE_ZERO_SHARE = { allowed: 0.1, required: 0.3 }
+
+/** Расхождения исключений с замером: исключение, которое стенд достигает почти всегда; редкое правило без исключения; пропуски. */
+export function exemptionIssues(m: Measure, exempt: ReadonlySet<string>, names: readonly string[]): string[] {
+  const issues: string[] = []
+  const known = new Set(names)
+  for (const n of Object.keys(m.rules)) if (!known.has(n)) issues.push(`${n}: в замере, но такого правила нет — перемерить (npm run rules:stable)`)
+  for (const n of exempt) {
+    const v = m.rules[n]
+    if (!v) issues.push(`${n}: исключение без замера — перемерить (npm run rules:stable)`)
+    else if (zeroShare(v) < RARE_ZERO_SHARE.allowed) issues.push(`${n}: исключение, а стенд доходит всегда (${v.join('/')}) — снять`)
+  }
+  for (const [n, v] of Object.entries(m.rules)) if (known.has(n) && !exempt.has(n) && zeroShare(v) >= RARE_ZERO_SHARE.required) issues.push(`${n}: редкое (${v.join('/')}) и без исключения — гейт будет мигать; в RARE с прямым случаем`)
+  return issues
 }
 
 /** grumpy — номера партий (с конца), где бот много грубит: иначе лестница грубости не проходится. */
@@ -118,7 +140,7 @@ export async function multiSampleCoverage(
   const reports: CoverageReport[] = []
   for (const seeds of samples) reports.push(await ruleCoverage(seeds, turns, undefined, grumpy, opts))
   const never = neverInAllSamples(reports.map((r) => r.never))
-  return { samples: reports, never, rareReached: rareReached(never) }
+  return { samples: reports, never }
 }
 
 export function formatCoverage(r: CoverageReport): string {
