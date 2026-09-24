@@ -119,7 +119,7 @@ export const viewOf = (u: GameUi): View => {
     }),
     endings: ENDINGS.map((e) => ({ id: e.id, title: e.title, icon: e.icon, got: !!S.endings[e.id] })),
     items: S.items,
-    ach: Object.entries(ACH).map(([k, [title, desc]]) => ({ id: k, title, desc, got: !!S.ach[k] })),
+    ach: Object.entries(ACH).map(([k, [title, desc]]) => ({ id: k, title, desc: typeof desc === 'function' ? desc(S) : desc, got: !!S.ach[k] })),
     achGot: Object.keys(S.ach).length,
     achTotal: Object.keys(ACH).length,
   }

@@ -449,7 +449,7 @@ describe('Game: пачка непрочитанных подчиняется м�
     expect(game.ui.unread).toBe(0)
     expect([game.S.promises.length, game.S.debt, game.S.money]).toEqual([promises + 1, debt, money])
     expect(game.S.ending).toBe('payday_coins')
-    game.closeEnding()
+    await game.closeEnding()
     expect(game.S.mem['endgame.active']).toBe(true)
   })
   it('обиженный Алик: в пачке максимум одна колкость холодной войны, остальное — тишина', async () => {
