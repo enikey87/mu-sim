@@ -16,7 +16,7 @@ export const creditRules: R[] = [
     name: 'Credit_Due', event: 'CreditDue', when: [], priority: 'system',
     respond: ({ game, facts }) => {
       const id = loanOf(facts)
-      if (!id || game.moneySealed()) return
+      if (!id || game.moneySealed() || !game.creditEventLive(id, facts.at)) return
       game.chargeCredit(id)
     },
   },

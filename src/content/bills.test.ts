@@ -60,9 +60,40 @@ describe('платежи по календарю', () => {
   })
   it('BillWarn ставит due и шлёт СМС', async () => {
     const { game } = makeGame()
-    await game.fire('BillWarn', { bill: 'transit' })
+    await game.fire('BillWarn', { bill: 'transit', at: game.S.mem[billDueAt('transit')] })
     expect(game.S.mem['bills.transit.due']).toBe(true)
     expect(game.ui.notif?.text).toMatch(/Завтра списание/)
+  })
+  it('у каждого счёта одно списание за срок, даже когда сроки двух счетов совпали (#181)', async () => {
+    const { game } = makeGame()
+    game.S.money = 1_000_000
+    const texts: string[] = []
+    const notify = game.notify.bind(game)
+    game.notify = (icon, app, text) => { texts.push(text); notify(icon, app, text) }
+    const pending = (id: string) => game.rules.state.schedule.filter((it) => it.kind === 'event' && it.event === 'BillDue' && it.facts?.bill === id).length
+    const start = game.S.day
+    const jumps = [1, 2, 3]
+    for (let i = 0; game.S.day < start + 140; i++) {
+      game.nextDay(jumps[i % 3])
+      await game.afterTurn()
+      for (const b of BILLS) expect(pending(b.id), `${b.id} на день ${game.S.day}`).toBe(1)
+    }
+    const weeks = Math.ceil((game.S.day - start) / 7)
+    for (const label of ['Связь', 'Проездной']) {
+      const n = texts.filter((t) => t.startsWith('Списание') && t.includes(label)).length
+      expect(n, label).toBeGreaterThanOrEqual(weeks - 1)
+      expect(n, label).toBeLessThanOrEqual(weeks)
+    }
+  })
+  it('устаревшее событие платежа из старого сохранения не списывает второй раз', async () => {
+    const { game } = makeGame()
+    const at = Number(game.S.mem[billDueAt('phone')])
+    game.S.day = at
+    await game.fire('BillDue', { bill: 'phone', at })
+    const after = game.S.money
+    await game.fire('BillDue', { bill: 'phone', at })
+    await game.fire('BillDue', { bill: 'phone' })
+    expect(game.S.money).toBe(after)
   })
   it('два платежа в один день — каждое списание ровно одно за несколько сроков', async () => {
     const { game } = makeGame()
