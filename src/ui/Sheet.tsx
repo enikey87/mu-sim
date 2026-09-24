@@ -11,6 +11,8 @@ const MARK: Record<PromiseRow['state'], (p: PromiseRow) => ReactNode> = {
   kept: (p) => <span className="kept">✅ сдержал — 50 ₽{due(p)}</span>,
   asked: (p) => <span className="asked">❓ припомнили{due(p)}</span>,
   late: (p) => <span className="late">❌ просрочено{due(p)}</span>,
+  event: () => <span className="event">⏳ ждём события</span>,
+  eventMet: () => <span className="eventMet">🎯 событие наступило</span>,
   someday: () => '∞ когда-нибудь',
   wait: (p) => <>⏳ ждём{due(p)}</>,
 }

@@ -233,6 +233,8 @@ body {
 .list .amnesty { color: var(--muted); }
 .list .kept { color: var(--accent); }
 .list .asked { color: var(--muted); }
+.list .event { color: var(--muted); }
+.list .eventMet { color: var(--accent); }
 .danger {
   margin-top: 16px; border: 0; background: var(--danger); color: #fff;
   padding: 9px 14px; border-radius: 10px; cursor: pointer; font: inherit;
