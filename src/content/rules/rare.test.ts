@@ -56,6 +56,7 @@ const CASES: Record<string, Case> = {
   Idle_PhoneWarn: { event: 'AlikIdle', setup: (g) => { g.S.mem['phone.warn'] = true } },
   Bill_Warn: { event: 'BillWarn', facts: { bill: 'phone' } },
   Bill_Due: { event: 'BillDue', facts: { bill: 'phone' } },
+  Says_sorry_blocked_boris: { event: 'PlayerSays', facts: { intent: 'sorry' }, setup: (g) => { g.S.mem.blocked = true; g.S.arcs.boris = { i: 4, last: 0 } } },
 }
 
 /** Срабатывает ли правило (у многих есть шанс — пробуем на разных сидах). */
