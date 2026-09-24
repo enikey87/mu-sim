@@ -3,7 +3,7 @@
 import { make, D, low, cap, type ExcuseApi, type Promise3, type PromiseCondition, type Rel } from '../content/excuses'
 import { makeScenes, invKey, type Scene, type Line } from '../content/scenes'
 import { COLD_WAR, TRIBUNAL } from '../content/rude'
-import { MIRROR, MIRROR_OPEN, MIRROR_REPLY, type Mirror } from '../content/mirror'
+import { MIRROR, MIRROR_AGAIN, MIRROR_OPEN, MIRROR_REPLY, type Mirror } from '../content/mirror'
 import { PAYDAY_HOOKS } from '../content/rules/payday'
 import { QUEST_WHEN } from '../content/rules/world'
 import { LEGENDS } from '../content/legends'
@@ -57,7 +57,8 @@ const literalRe = (t: string): RegExp => {
   return re
 }
 
-/** Строгий режим молчания: правило промолчало, но изменило S или видимый UI. Ход её не глотает — иначе проверка слепа. */
+/** Строгий режим молчания: правило промолчало, но изменило `S` или тост / уведомление / «Мууу».
+ *  Статус, «печатает…», звук, вибрация, unread и feel в снимок не входят (#218). */
 export class SilenceBreach extends Error {}
 
 /** Отмена async после dispose — ловится на entry points, игроку не показывается. */
@@ -319,7 +320,7 @@ export class Game {
       visible: { toast: this.ui.toast, notif: this.ui.notif, moos: this.ui.moos },
     })
     const before = stamp()
-    return () => { if (stamp() !== before) throw new SilenceBreach(`Правило ${rule} промолчало, но оставило след в S`) }
+    return () => { if (stamp() !== before) throw new SilenceBreach(`Правило ${rule} промолчало, но оставило след в S или тосте/уведомлении/«Мууу»`) }
   }
   lineFacts(): Resolver {
     return resolver(this.rules.hub, { event: 'line' }, this.facts())
@@ -1272,13 +1273,15 @@ export class Game {
         this.unlock('ram')
       }
       // подпись профиля — после хода, а не правилом StoryBeat: серию она не вытесняет; одна за ход
-      if (S.mem[memkeys.blocked]) {
+      // блок / смерть / телефон / эндгейм — без статуса; «скрыл» только в живом блоке (#192)
+      const quietStatus = S.mem[memkeys.blocked] || S.mem[memkeys.alikDead] || S.mem[memkeys.phoneKarine] || S.mem[memkeys.endgame.active]
+      if (S.mem[memkeys.blocked] && !S.mem[memkeys.endgame.active] && !S.mem[memkeys.alikDead] && !S.mem[memkeys.phoneKarine]) {
         // в блоке статусов нет: об этом игрок узнаёт один раз за блок, факт сбрасывает Rude_Block
         if (!S.mem[memkeys.statusHidden]) {
           S.mem[memkeys.statusHidden] = true
           this.sys(STATUS_HIDDEN)
         }
-      } else {
+      } else if (!quietStatus) {
         const status = this.line('ALIK_STATUS', ALIK_STATUS)
         if (status) this.sys(`Алик Воздухонесян изменил статус: «${status}»`)
       }
@@ -1887,7 +1890,10 @@ export class Game {
       if (!m || m.kind !== 'job' || m.answered || this.ui.busy || this.battery.dead || this.disposed) return
       // бросок генератора — только для зеркала: иначе обычный ответ сдвигает розыгрыш всей партии
       const open = answer === 'mirror' ? this.mirrors() : []
-      const mirror = open.length ? open[this.rnd(open.length)] : undefined
+      const unseen = open.filter((m) => !this.seen.has(m.me))
+      const pickFrom = unseen.length ? unseen : open
+      const mirror = pickFrom.length ? pickFrom[this.rnd(pickFrom.length)] : undefined
+      const again = !!mirror && unseen.length === 0
       if (answer === 'mirror' && !mirror) return
       this.replaceMsg(m, { answered: true })
       this.ui.busy = true
@@ -1897,8 +1903,11 @@ export class Game {
       this.seen.mark(reply)
       this.push({ kind: 'text', from: 'me', text: reply, time: fmtTime(this.S.clock) })
       if (mirror) {
-        // зеркало — реплика, не событие: ни долга, ни календаря, ни настроения; ответ — про эту же отмазку или общий
-        await this.say([this.chance(0.5) ? mirror.alik : this.uniq(() => this.draw('MIRROR_REPLY', MIRROR_REPLY))])
+        // зеркало — реплика, не событие: ни долга, ни календаря, ни настроения; повтор — отдельный ответ (#191)
+        await this.say([this.uniq(() => {
+          if (again) return this.draw('MIRROR_AGAIN', MIRROR_AGAIN)
+          return this.chance(0.5) ? mirror.alik : this.draw('MIRROR_REPLY', MIRROR_REPLY)
+        })])
       } else if (yes) {
         const add = 5000 + this.rnd(16) * 1000
         // после Дня выплаты работа ничего не двигает — ни долг, ни календарь

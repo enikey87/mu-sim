@@ -1,5 +1,7 @@
 // Целостность ключей памяти: ключ проверяется в конструкторе условия (is/gte/set…), а не в перечне пулов.
 import { describe, it, expect, vi } from 'vitest'
+import { readdirSync } from 'node:fs'
+import { join, relative } from 'node:path'
 import type { Criterion, Entry, LineSpec } from '../engine/rules'
 import { Gated } from '../engine/rules'
 import { ACTOR_KEYS, MEM_KEYS, caughtPair } from './memkeys'
@@ -20,12 +22,22 @@ const sinceGuarded = (where: string, cs: readonly Criterion[], bad: string[]) =>
   }
 }
 
-/** Контент, который при загрузке строит условия через конструкторы движка. */
-const CONTENT = [
-  './arcs', './finales', './legends', './memory', './life', './quests', './payday',
-  './scenes', './excuses', './topics', './misc', './mirror', './world', './holidays',
-  './credit', './bills', './endgame', './talk', './lies', './rude', './rules',
-] as const
+/** Все прод-модули content/ (без тестов): новый пул подхватывается без правки списка (#218). */
+const contentModules = (): string[] => {
+  const root = 'src/content'
+  const walk = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+      const p = join(dir, e.name)
+      if (e.isDirectory()) return walk(p)
+      if (!e.name.endsWith('.ts') || e.name.endsWith('.test.ts')) return []
+      return ['./' + relative(root, p).replace(/\\/g, '/').replace(/\.ts$/, '')]
+    })
+  return walk(root)
+}
+
+/** Ключи листьев условия — в том числе литералы `{ key, op }`, мимо конструкторов (#218). */
+const leafKeys = (cs: readonly Criterion[]): string[] =>
+  flat(cs).flatMap((c) => (c.key && c.op !== 'all' ? [c.key] : []))
 
 describe('реестр mem-ключей', () => {
   it('ключ из конструктора условия известен реестру — любой пул, без ручного списка', async () => {
@@ -33,7 +45,7 @@ describe('реестр mem-ключей', () => {
     const { watchFactKeys } = await import('../engine/rules/criteria')
     const keys: string[] = []
     watchFactKeys((k) => keys.push(k))
-    for (const m of CONTENT) await import(m)
+    for (const m of contentModules()) await import(m)
     // сцены строят gate при вызове makeScenes, не при импорте модуля
     const { makeScenes } = await import('./scenes')
     const { Decks } = await import('../engine/deck')
@@ -49,9 +61,20 @@ describe('реестр mem-ключей', () => {
     expect(keys.length).toBeGreaterThan(100)
   })
 
+  it('литеральные when в правилах — те же ключи, что и у конструкторов', async () => {
+    const { allRules } = await import('./rules')
+    const bad = allRules.flatMap((r) => leafKeys(r.when ?? []).filter((k) => !isFactKey(k)).map((k) => `${r.name}:${k}`))
+    expect(bad).toEqual([])
+  })
+
+  it('негативный контроль: литерал с опечаткой ключа краснеет', () => {
+    const typo = [{ key: 'promiseLvie', op: '==' as const, value: true }]
+    expect(leafKeys(typo).filter((k) => !isFactKey(k))).toEqual(['promiseLvie'])
+  })
+
   it('негативные контроли: опечатки из аудита и новый пул краснеют', async () => {
     vi.resetModules()
-    const { watchFactKeys, is, missing, gte } = await import('../engine/rules/criteria')
+    const { watchFactKeys, is, missing, gte, exists, ne, add } = await import('../engine/rules/criteria')
     const keys: string[] = []
     watchFactKeys((k) => keys.push(k))
     is('ach.q_hsah')
@@ -59,12 +82,22 @@ describe('реестр mem-ключей', () => {
     gte('arc.betno', 1)
     is('payday.chian')
     is('newpool.typo_key') // пул, которого старый сканер не перечислял
+    exists('exists.typo')
+    ne('ne.typo', true)
+    add('add.typo')
     watchFactKeys(null)
     const { isFactKey: check } = await import('./factkeys')
-    for (const k of ['ach.q_hsah', 'ach.rdeo', 'arc.betno', 'payday.chian', 'newpool.typo_key']) {
+    for (const k of ['ach.q_hsah', 'ach.rdeo', 'arc.betno', 'payday.chian', 'newpool.typo_key', 'exists.typo', 'ne.typo', 'add.typo']) {
       expect(keys).toContain(k)
       expect(check(k), k).toBe(false)
     }
+  })
+
+  it('негативный контроль: модуль вне ручного списка всё равно в обходе', () => {
+    const mods = contentModules()
+    expect(mods).toContain('./mirror')
+    expect(mods.some((m) => m.endsWith('/world') || m === './world')).toBe(true)
+    expect(mods.every((m) => !m.includes('.test'))).toBe(true)
   })
 
   it('fx.set / state сцен — ключи из объектов: обход сцен и серий', async () => {
@@ -128,7 +161,7 @@ describe('реестр mem-ключей', () => {
     const { LEGENDS } = await import('./legends')
     const { MEMORY } = await import('./memory')
     const { NOTIF } = await import('./life')
-    const { MIRROR, MIRROR_OPEN } = await import('./mirror')
+    const { MIRROR, MIRROR_AGAIN, MIRROR_OPEN } = await import('./mirror')
     const { WORLD, SPEAKS } = await import('./world')
     const { allRules } = await import('./rules')
     for (const [aid, arc] of Object.entries(ARCS)) {
@@ -152,6 +185,7 @@ describe('реестр mem-ключей', () => {
     for (const [k, c] of Object.entries(WORLD)) seeCrits(`WORLD.${k}`, [c])
     for (const [k, c] of Object.entries(SPEAKS)) seeCrits(`SPEAKS.${k}`, [c])
     MIRROR.forEach((e, i) => seeEntry(`mirror[${i}]`, e))
+    MIRROR_AGAIN.forEach((e, i) => seeEntry(`mirrorAgain[${i}]`, e))
     seeCrits('MIRROR_OPEN', [MIRROR_OPEN])
     expect(bad).toEqual([])
   })

@@ -132,7 +132,8 @@ describe('финалы сериалов: выбор', () => {
     toLast(game, 'samvel')
     await game.playArc('samvel')
     expect(game.S.mem['finale.samvel']).toBe('groom')
-    expect(game.S.mem['wedding.samvel']).toBe(true)
+    expect(game.S.mem['wedding.anush']).toBe(true)
+    expect(game.S.mem['wedding.samvel']).toBeUndefined()
   })
   it('грубил хоть раз — в женихи не берут', async () => {
     const { game } = makeGame()

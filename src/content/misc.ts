@@ -1,5 +1,5 @@
 // Мелкие тексты движка: «полежал на полу», застолье, платёжки, ответы на допработу и т.д.
-import { type Line, eq, gate, gte, is, ne, of, set } from '../engine/rules'
+import { type Line, eq, gate, gte, is, ne, of, set, type Entry } from '../engine/rules'
 import { needs, WORLD } from './world'
 import { alikDead, blocked, bloodGiven, court, endgame, phoneKarine, polite, sick, threatClaim, wedding } from './memkeys'
 import { sold } from './credit'
@@ -134,8 +134,9 @@ export const PROMISE_NEVER = [
 ]
 
 // Свободный ввод «спасибо» / «привет» (docs/design/greetings.md): свой ответ вместо обычного хода. Кошелёк игрока не трогаем (#125)
-export const THANKS = [
-  'Не за что, брат. Правда, не за что — я же ничего не перевёл.',
+export const THANKS: Entry<string>[] = [
+  // после перевода «я ничего не перевёл» — ложь: fifty считает поступления (#192)
+  gate(eq('fifty', 0))('Не за что, брат. Правда, не за что — я же ничего не перевёл.'),
   'Спасибо — это приятно. Приятнее только, когда платят. Говорят.',
   'Ты вежливый, брат. Я это ценю. Пока словами.',
   'Пожалуйста! За что — не понял, но пожалуйста.',
