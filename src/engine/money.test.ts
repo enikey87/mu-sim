@@ -30,17 +30,20 @@ describe('деньги: одна точка записи', () => {
     expect(found('((g.S as unknown) as { money: number }).money = 0')).toHaveLength(1)
     expect(found("Object.assign(g.S, { money: 10 })")).toHaveLength(1)
     expect(found("Reflect.set(g.S, 'money', 10)")).toHaveLength(1)
+    // законная точка записи счёта мимо adjustMoney — тоже запись: геттер её не пустит, страж обязан назвать
+    expect(found("setCount(g.S, 'money', 10)")).toHaveLength(1)
     // переменная без readonly не спасает: исключение — только сам adjustMoney
     expect(found('const w: { money: number } = g.S; w.money = 0')).toHaveLength(1)
     expect(found('g.S.moneyLevel()')).toEqual([])
   })
 
-  it('тип: прямая запись денег не компилируется', () => {
+  it('тип и геттер: прямая запись денег не компилируется и не проходит', () => {
     const { game: g } = makeGame()
     // @ts-expect-error money readonly: пишет только adjustMoney
-    g.S.money = 100
+    expect(() => { g.S.money = 100 }).toThrow(TypeError)
     // @ts-expect-error money readonly, в том числе приращением
-    g.S.money += 100
+    expect(() => { g.S.money += 100 }).toThrow(TypeError)
     expect(g.adjustMoney(0, 'проверка')).toBe(true) // законный путь жив
+    expect(g.S.money).toBe(12400)
   })
 })

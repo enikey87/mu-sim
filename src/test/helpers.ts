@@ -2,7 +2,7 @@
 import { Game, type GameOptions } from '../engine/game'
 import { manualClock, type ManualClock } from '../engine/clock'
 import { seededRng } from '../engine/rng'
-import type { Storage } from '../engine/state'
+import { setCount, type Storage } from '../engine/state'
 import type { Msg } from '../engine/state'
 
 export function memStorage(init: Record<string, string> = {}): Storage & { data: Record<string, string> } {
@@ -36,4 +36,4 @@ export const FIX_RE = /^\*|\*$|автозамена|Телефон новый|^�
 export { botTurn } from '../tools/bot'
 
 /** Деньги партии — только через adjustMoney: в тестах ставим их здесь, одной строкой и явно. */
-export const setMoney = (g: Game, n: number): void => { (g.S as { money: number }).money = n }
+export const setMoney = (g: Game, n: number): void => { setCount(g.S, 'money', n) }

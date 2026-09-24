@@ -22,7 +22,8 @@ const isField = (x: ts.Node, field: string): boolean => {
 const hasKey = (n: ts.Node | undefined, field: string): boolean =>
   !!n && ((ts.isStringLiteralLike(n) && n.text === field) ||
     (ts.isObjectLiteralExpression(n) && n.properties.some((p) => (p.name && ts.isIdentifier(p.name) && p.name.text === field) || (p.name && ts.isStringLiteralLike(p.name) && p.name.text === field) || ts.isSpreadAssignment(p))))
-const WRITERS = new Set(['Object.assign', 'Object.defineProperty', 'Object.defineProperties', 'Reflect.set', 'Reflect.defineProperty'])
+// `setCount` — законная точка записи счёта (state.ts): вне adjustDebt / adjustMoney она и есть обход.
+const WRITERS = new Set(['Object.assign', 'Object.defineProperty', 'Object.defineProperties', 'Reflect.set', 'Reflect.defineProperty', 'setCount'])
 
 /** Места записи поля в исходнике: «строка:столбец». allow — законная точка записи (например, adjustDebt в game.ts). */
 export function fieldWrites(file: string, field: string, allow?: (n: ts.Node, src: ts.SourceFile) => boolean): string[] {
