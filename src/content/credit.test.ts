@@ -12,7 +12,11 @@ describe('кредитная лестница', () => {
     game.S.money = 6001
     expect(game.adjustMoney(-1, 'Гречка')).toBe(true)
     expect(game.S.mem[creditOffer]).toBe(true)
-    expect(game.ui.notif?.text).toMatch(/Всё будет/)
+    // списание и «критический» идут первыми; оффер — в очереди (#211)
+    for (let i = 0; i < 8 && game.ui.notif && !/Всё будет|одобрен/i.test(game.ui.notif.text); i++) {
+      game.dismissNotif()
+    }
+    expect(game.ui.notif?.text).toMatch(/Всё будет|одобрен/i)
   })
 
   it('ступени не перепрыгнуть: без consumer нет refi', () => {
