@@ -2,12 +2,18 @@
 export const HANDOVER = new Date(2026, 2, 18) // дата сдачи объекта
 
 export const dateOf = (day: number): Date => new Date(HANDOVER.getTime() + day * 864e5)
-export const fmtDate = (day: number): string =>
-  dateOf(day).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
-export const fmtDayMonth = (day: number): string =>
-  dateOf(day).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
-export const fmtShortDate = (day: number): string =>
-  dateOf(day).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
+// Intl-форматирование дорогое, а facts() зовёт его на каждую выборку реплики: день → строка не меняется
+const byDay = (opts: Intl.DateTimeFormatOptions) => {
+  const cache = new Map<number, string>()
+  return (day: number): string => {
+    let s = cache.get(day)
+    if (s === undefined) cache.set(day, (s = dateOf(day).toLocaleDateString('ru-RU', opts)))
+    return s
+  }
+}
+export const fmtDate = byDay({ day: 'numeric', month: 'long', year: 'numeric' })
+export const fmtDayMonth = byDay({ day: 'numeric', month: 'long' })
+export const fmtShortDate = byDay({ day: 'numeric', month: 'short' })
 export const fmtTime = (m: number): string =>
   `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
 

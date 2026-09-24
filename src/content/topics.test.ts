@@ -122,6 +122,12 @@ describe('ответ по теме', () => {
     expect(offered(game, (c) => c.act === 'topic' && String(c.arg).startsWith('food:'))).toBe(false)
     expect(offered(game, (c) => /поесть\?|ЕШЬ МЕНЬШЕ|Приятного аппетита|Вы всё время едите/i.test(c.text))).toBe(false)
   })
+  it('срок — не тема и при повторном вызове: шаблон срока кэширован, поиск не продолжается с прошлого места', () => {
+    const { game } = makeGame()
+    game.recordPromise({ text: 'после обеда, но не сегодняшнего — рассчитаюсь до копейки', d: 1 })
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'После обеда, но не сегодняшнего — рассчитаюсь до копейки.', topical: true })
+    for (let i = 0; i < 3; i++) expect(game.topicOfLast(), `вызов ${i + 1}`).toBeUndefined()
+  })
   it('поздравить — только если повод праздничный', () => {
     const { game } = makeGame()
     game.S.ctx = { rel: { n: 'тёща' } as never, festive: false }

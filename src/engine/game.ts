@@ -42,6 +42,14 @@ import {
   type InputCategory, freshState, loadState, saveState, SAVE_KEY, MAX_PATIENCE,
 } from './state'
 
+/** Текст срока как буквальный шаблон без учёта регистра; кэш — topicOfLast зовётся из facts() на каждую реплику. */
+const LITERAL = new Map<string, RegExp>()
+const literalRe = (t: string): RegExp => {
+  let re = LITERAL.get(t)
+  if (!re) LITERAL.set(t, (re = new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')))
+  return re
+}
+
 /** Отмена async после dispose — ловится на entry points, игроку не показывается. */
 export class GameDisposed extends Error {
   override name = 'GameDisposed'
@@ -652,14 +660,17 @@ export class Game {
     const S = this.S
     const c = S.ctx ?? {}
     const pr = extra.promise !== undefined ? S.promises[Number(extra.promise)] : undefined
+    const date = dateOf(S.day)
+    // прогресс сериалов (arc.grandpa = номер серии), ачивки и трофеи — условия для финалов и концовок.
+    // Циклом, а не fromEntries со spread: facts() зовётся на каждую выборку реплики
+    const progress: Facts = {}
+    for (const id in S.arcs) progress['arc.' + id] = S.arcs[id].i
+    for (const k in S.ach) progress['ach.' + k] = true
+    for (const k in S.ach) progress['since.' + k] = S.day - S.ach[k]
     return {
       day: S.day, tier: S.tier, mood: S.mood, sent: S.stats.sent, moo: S.stats.moo, patience: S.patience, money: S.money, debt: S.debt, fifty: S.stats.fifty,
-      dow: dateOf(S.day).getDay(), month: dateOf(S.day).getMonth() + 1, dom: dateOf(S.day).getDate(),
-      // прогресс сериалов: arc.grandpa = номер серии
-      ...Object.fromEntries(Object.entries(S.arcs).map(([id, st]) => ['arc.' + id, st.i])),
-      // ачивки и трофеи — условия для финалов сериалов и концовок
-      ...Object.fromEntries(Object.keys(S.ach).map((k) => ['ach.' + k, true])),
-      ...Object.fromEntries(Object.entries(S.ach).map(([k, day]) => ['since.' + k, S.day - day])),
+      dow: date.getDay(), month: date.getMonth() + 1, dom: date.getDate(),
+      ...progress,
       items: S.items.length,
       latestItem: S.items.at(-1),
       legend: this.legend(),
@@ -723,7 +734,7 @@ export class Game {
       if ((D.OATH as Entry<string>[]).some((o) => m.text.startsWith(valueOf(o)))) continue
       let text = m.text
       // срок в сообщении — не тема: «После обеда…» иначе цепляет еду; регистр и точка в конце не мешают
-      for (const p of this.S.promises) text = text.replace(new RegExp(p.t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '')
+      for (const p of this.S.promises) text = text.replace(literalRe(p.t), '')
       text = text.replace(/^[.\s,;:!?…—–-]+|[.\s,;:!?…—–-]+$/g, '').trim()
       if (!text) continue
       const hit = Object.entries(TOPICS).find(([k, t]) => t.re.test(text) && !this.topicMuted(k))
