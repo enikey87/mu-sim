@@ -14,7 +14,7 @@ import { botTurn } from './bot'
 
 /**
  * Почему правило не сработало в симуляции.
- * `rare` — RARE / RARE_FLAKY (прямой случай в rare.test.ts).
+ * `rare` — RARE (прямой случай в rare.test.ts; членство — по широкому замеру).
  * `proven` — явное доказательство вне статистики (прямой тест или структурная недостижимость).
  * Больше нет освобождения по имени модуля или префиксу.
  */
@@ -72,11 +72,12 @@ export interface Measure { packs: number[][]; rules: Record<string, number[]> }
 /** Доля пакетов, где правило не сработало ни разу. */
 export const zeroShare = (v: readonly number[]): number => v.filter((x) => x === 0).length / v.length
 /**
- * Граница исключений: правило, молчащее хотя бы в каждом пятом пакете, гейт на трёх выборках сторожить
- * не может — оно исключение (RARE / PROVEN). Остальные — под гейтом: шанс, что правка текста обнулит
- * такое правило во всех трёх выборках, ≈ z³ ≤ 0,001 на правило (при 10 пакетах в замере).
+ * Граница исключений с гистерезисом (z — доля пакетов замера, где правило молчит). Исключение (RARE / PROVEN)
+ * допустимо, только если стенд молчит хоть в одном пакете (z ≥ 0,1: «достигает не всегда»), и обязательно при
+ * z ≥ 0,3: шанс, что правка текста обнулит такое правило во всех трёх выборках CI, ≈ z³ ≥ 2,7 %. Между ними —
+ * решает автор: иначе правило на границе мигало бы от одного перемера к другому.
  */
-export const RARE_ZERO_SHARE = 0.2
+export const RARE_ZERO_SHARE = { allowed: 0.1, required: 0.3 }
 
 /** Расхождения исключений с замером: исключение, которое стенд достигает почти всегда; редкое правило без исключения; пропуски. */
 export function exemptionIssues(m: Measure, exempt: ReadonlySet<string>, names: readonly string[]): string[] {
@@ -86,9 +87,9 @@ export function exemptionIssues(m: Measure, exempt: ReadonlySet<string>, names: 
   for (const n of exempt) {
     const v = m.rules[n]
     if (!v) issues.push(`${n}: исключение без замера — перемерить (npm run rules:stable)`)
-    else if (zeroShare(v) < RARE_ZERO_SHARE) issues.push(`${n}: исключение, а стенд доходит почти всегда (${v.join('/')}) — снять`)
+    else if (zeroShare(v) < RARE_ZERO_SHARE.allowed) issues.push(`${n}: исключение, а стенд доходит всегда (${v.join('/')}) — снять`)
   }
-  for (const [n, v] of Object.entries(m.rules)) if (known.has(n) && !exempt.has(n) && zeroShare(v) >= RARE_ZERO_SHARE) issues.push(`${n}: редкое (${v.join('/')}) и без исключения — гейт будет мигать; в RARE с прямым случаем`)
+  for (const [n, v] of Object.entries(m.rules)) if (known.has(n) && !exempt.has(n) && zeroShare(v) >= RARE_ZERO_SHARE.required) issues.push(`${n}: редкое (${v.join('/')}) и без исключения — гейт будет мигать; в RARE с прямым случаем`)
   return issues
 }
 

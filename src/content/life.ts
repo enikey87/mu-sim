@@ -1,6 +1,11 @@
 import { type Entry, type LineSpec, gate, gte, lte, eq, ne, is, missing, set } from '../engine/rules'
 import { needs, WORLD } from './world'
-import { bloodGiven, count, evicted, wedding } from './memkeys'
+import { bloodGiven, count, endgame, evicted, wedding } from './memkeys'
+
+const newYear = gate(eq('holiday', 'newYear'), missing(endgame.active))
+const march8 = gate(eq('holiday', 'march8'), missing(endgame.active))
+const holidayNewYear = [eq('holiday', 'newYear'), missing(endgame.active)] as const
+const holidayMarch8 = [eq('holiday', 'march8'), missing(endgame.active)] as const
 
 // «Живость»: Алик пишет сам, режим дня, стикеры, пересылки, удаления, правки,
 // опечатки, реакции, уведомления телефона.
@@ -57,6 +62,13 @@ export const FWD = [
   { f: 'Гороскоп для Скорпионов', t: 'Сегодня не лучший день для финансовых решений. И завтра тоже.' },
   needs('crane', 'samvel')({ f: 'Самвел', t: 'Кто взял мой кран? Верните кран, у меня свадьба.' }),
 ];
+/** Праздничные открытки — отдельный пул: закрытый гейт в FWD сдвигает колоду Decks (#148). */
+export const FWD_HOLIDAY = [
+  newYear({ f: 'Дзен-открытки 🌹', t: 'С Новым годом! 🎄 Пусть в новом году застынет бетон и оттают долги!' }),
+  newYear({ f: 'Дзен-открытки 🌹', t: 'С Новым годом! 🥂 Шампанское открыто, сейф — на следующий год.' }),
+  march8({ f: 'Дзен-открытки 🌹', t: 'С 8 Марта! 🌷 Пусть мужчины дарят цветы, а подрядчики — зарплату!' }),
+  march8({ f: 'Дзен-открытки 🌹', t: 'С Международным женским днём! 🌹 Долги не вянут — в отличие от тюльпанов.' }),
+]
 export const FWD_NOTE = ['Видишь? Не я придумал.', 'Это для тебя переслал. Мудро, да?', 'Прочитай внимательно, брат.', 'Ой, это не тебе. Но тоже полезно.', 'Вот. Официально.', 'Мудрые люди всегда правы.'];
 export const FWD_Q = ['Алик, это что?', 'Зачем вы мне это переслали?', 'Алик, это к чему?', 'Это вы мне?'];
 export const FWD_A = ['Это важная информация, брат.', 'Это знак.', 'Прочитай между строк.', 'Это чтобы ты понимал обстановку.', 'Просто красиво, решил поделиться.'];
@@ -95,6 +107,8 @@ export const NOTIF: Notif[] = [
   { icon: '🏦', app: 'Банк', t: 'Списание {spend} ₽. {what}. Баланс: {money} ₽', spend: true, repeat: true, cooldown: { turns: 8 } },
   { icon: '👩', app: 'Мама', t: 'Сынок, ты поел?', ...often }, { icon: '👩', app: 'Мама', t: 'Сынок, Алик заплатил?', ...often },
   { icon: '👩', app: 'Мама', t: 'Сынок, позвони маме.', ...often },
+  { icon: '👩', app: 'Мама', t: 'Сынок, с Новым годом. Алик тебя поздравил? А перевёл?', when: [...holidayNewYear] },
+  { icon: '👩', app: 'Мама', t: 'Сынок, с 8 Марта. Цветы Алику не дари — пусть он тебе перевод сделает.', when: [...holidayMarch8] },
   { icon: '👩', app: 'Мама', t: 'Видела передачу про таких, как твой Алик. Там тоже не заплатили.' },
   { icon: '👩', app: 'Мама', t: 'Может, вернёшься домой? Тут тоже есть плитка.' },
   { icon: '🛒', app: 'Авито', t: 'Отзывы об «Алик Стройка под ключ» скрыты по жалобе владельца. Всех 48.' },

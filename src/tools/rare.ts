@@ -15,6 +15,6 @@ export const RARE = new Set([
   'Turn_Wedding_Samvel', 'Turn_Wedding_Razmik', 'Turn_Wedding_Boris', 'Turn_BorisSick', 'Quest_q_niva', 'Scene_lend',
   'Idle_Offline', 'Says_condole_ctxrevived', 'Tone_Threat_Hot_Again', 'Says_sorry_blocked_karine', 'Says_via_boris',
   // частные финалы и концовки по стилю партии
-  'Finale_beton_opened', 'Finale_beton_opened_or', 'Finale_grant_ally', 'Finale_razmik_union', 'Finale_razmik_shift_or',
-  'Finale_garik_cutter', 'Ending_alik', 'Payday_strasbourg', 'Ending_payday_strasbourg',
+  'Finale_beton_opened', 'Finale_beton_opened_or', 'Finale_grant_ally', 'Finale_razmik_shift_or',
+  'Finale_garik_cutter', 'Ending_alik',
 ])

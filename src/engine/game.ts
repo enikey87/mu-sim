@@ -3,6 +3,7 @@
 import { make, D, low, cap, type ExcuseApi, type Promise3, type PromiseCondition, type Rel } from '../content/excuses'
 import { makeScenes, invKey, type Scene, type Line } from '../content/scenes'
 import { COLD_WAR, TRIBUNAL } from '../content/rude'
+import { MIRROR, MIRROR_OPEN, MIRROR_REPLY, type Mirror } from '../content/mirror'
 import { PAYDAY_HOOKS } from '../content/rules/payday'
 import { QUEST_WHEN } from '../content/rules/world'
 import { LEGENDS } from '../content/legends'
@@ -37,6 +38,7 @@ import { type Audio, silentAudio } from './audio'
 import { typo } from './typo'
 import { UiState, type Moo, type SendFeel } from './ui-state'
 import { classifyUserInput, legalClaim, type ClassifiedInput } from './input'
+import { holidayOf, HOLIDAY_EXCUSES } from '../content/holidays'
 import { dueIn, dateOf, fmtDate, fmtDayMonth, fmtTime, nightHour, periodOf, tierOf, TIERS, type Due, type Period } from './time'
 import { type GameState, type Msg, type NewMsg, type Choice, type Ctx, type Tone, type Storage, type InputCategory, freshState, loadState, saveState, SAVE_KEY, MAX_PATIENCE, isLate, type PromiseRec } from './state'
 
@@ -791,6 +793,7 @@ export class Game {
       day: S.day, tier: S.tier, mood: S.mood, sent: S.stats.sent, moo: S.stats.moo, patience: S.patience, money: S.money, debt: S.debt, fifty: S.stats.fifty,
       moneyNormal: moneyLv === 'normal', moneyLow: moneyLv === 'low', moneyBottom: moneyLv === 'bottom',
       dow: date.getDay(), month: date.getMonth() + 1, dom: date.getDate(),
+      holiday: holidayOf(S.day) ?? false,
       ...progress,
       items: S.items.length,
       latestItem: S.items.at(-1),
@@ -1209,6 +1212,8 @@ export class Game {
 
   async excuseTurn(): Promise<void> {
     if (this.legend()) return this.promiseLine(undefined, true)
+    const festive = this.line('HOLIDAY', HOLIDAY_EXCUSES)
+    if (festive) { await this.say([festive]); return }
     const ex = this.uniq(() => this.X.excuse({ preferLong: this.S.politeStreak >= 3 }))
     if (ex.legendary) this.unlock('legend')
     this.meetRel(ex.r)
@@ -1268,9 +1273,15 @@ export class Game {
     if (!fixed) this.S.ctx = { type: 'sticker' }
   }
 
+  /** Пересылки: базовый FWD + праздничные; отдельный ключ колоды в праздник — иначе Decks сдвигается. */
+  private fwdPool(): { key: string; pool: typeof L.FWD } {
+    if (this.facts().holiday) return { key: 'FWD_H', pool: [...L.FWD, ...L.FWD_HOLIDAY] }
+    return { key: 'FWD', pool: L.FWD }
+  }
   async forward(): Promise<void> {
     await this.typingFor(700)
-    const f = this.seen.pickFresh(() => this.draw('FWD', L.FWD), (x) => x)
+    const { key, pool } = this.fwdPool()
+    const f = this.seen.pickFresh(() => this.draw(key, pool), (x) => x)
     this.seen.mark(f.t)
     this.alikMsg({ kind: 'fwd', from: 'alik', f: f.f, text: f.t })
     this.unlock('fwd')
@@ -1650,17 +1661,33 @@ export class Game {
   }
 
   // ---------- допработа ----------
-  async answerJob(id: number, yes: boolean): Promise<void> {
+  /** Отмазки-зеркала, открытые сейчас: правдивые в этой партии и когда Алику есть чем возмутиться. */
+  mirrors(): Mirror[] {
+    return this.holds(MIRROR_OPEN) ? this.open(MIRROR) : []
+  }
+  canMirror(): boolean {
+    return this.mirrors().length > 0
+  }
+  /** Ответ на допработу: сделать, отказать или отказать отмазкой Алика ('mirror' — из открытых на момент нажатия). */
+  async answerJob(id: number, answer: boolean | 'mirror'): Promise<void> {
     try {
       const m = this.S.msgs.find((x) => x.id === id)
       if (!m || m.kind !== 'job' || m.answered || this.ui.busy || this.battery.dead || this.disposed) return
+      // бросок генератора — только для зеркала: иначе обычный ответ сдвигает розыгрыш всей партии
+      const open = answer === 'mirror' ? this.mirrors() : []
+      const mirror = open.length ? open[this.rnd(open.length)] : undefined
+      if (answer === 'mirror' && !mirror) return
       this.replaceMsg(m, { answered: true })
       this.ui.busy = true
       this.clearSchedule(this.idleT)
-      const reply = this.playerLine(() => (yes ? this.draw('JY', JOB_YES_P) : this.draw('JN', JOB_NO_P)))
+      const yes = answer === true
+      const reply = mirror ? mirror.me : this.playerLine(() => (yes ? this.draw('JY', JOB_YES_P) : this.draw('JN', JOB_NO_P)))
       this.seen.mark(reply)
       this.push({ kind: 'text', from: 'me', text: reply, time: fmtTime(this.S.clock) })
-      if (yes) {
+      if (mirror) {
+        // зеркало — реплика, не событие: ни долга, ни календаря, ни настроения; ответ — про эту же отмазку или общий
+        await this.say([this.chance(0.5) ? mirror.alik : this.uniq(() => this.draw('MIRROR_REPLY', MIRROR_REPLY))])
+      } else if (yes) {
         const add = 5000 + this.rnd(16) * 1000
         // после Дня выплаты работа ничего не двигает — ни долг, ни календарь
         if (!this.debtSealed()) this.nextDay(2 + this.rnd(3))
@@ -1751,7 +1778,8 @@ export class Game {
       case 'text': deliver({ kind: 'text', from: 'alik', text: this.addrLine('IDLE', L.IDLE) }); return
       case 'sticker': { const s = this.draw('STICKERS', L.STICKERS); deliver({ kind: 'sticker', from: 'alik', e: s.e, c: s.c }); return }
       case 'fwd': {
-        const f = this.seen.pickFresh(() => this.draw('FWD', L.FWD), (x) => x)
+        const { key, pool } = this.fwdPool()
+        const f = this.seen.pickFresh(() => this.draw(key, pool), (x) => x)
         this.seen.mark(f.t)
         deliver({ kind: 'fwd', from: 'alik', f: f.f, text: f.t })
         return
@@ -1780,6 +1808,8 @@ export class Game {
           deliver({ kind: 'text', from: 'alik', text: promise.text })
           return
         }
+        const festive = this.line('HOLIDAY', HOLIDAY_EXCUSES)
+        if (festive) { deliver({ kind: 'text', from: 'alik', text: festive }); return }
         const ex = this.uniq(() => this.X.excuse())
         this.meetRel(ex.r)
         this.recordPromise(ex.p)

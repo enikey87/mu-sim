@@ -35,15 +35,17 @@ describe('гистерезис покрытия', () => {
     expect(neverInAllSamples([['A'], ['B'], ['C']])).toEqual([])
   })
   it('граница исключений — по замеру, в обе стороны', () => {
-    const m: Measure = { packs: [], rules: { Often: [3, 2, 4, 1, 5], Rare: [0, 1, 0, 0, 2], Gone: [0, 0, 0, 0, 0] } }
+    const m: Measure = { packs: [], rules: { Often: [3, 2, 4, 1, 5, 2, 1, 3, 2, 4], Rare: [0, 1, 0, 0, 2, 1, 0, 1, 1, 1], Gone: Array(10).fill(0), Edge: [0, 1, 2, 3, 1, 0, 2, 1, 1, 2] } }
     // исключение, которое стенд достигает всегда, и редкое правило без исключения — оба красные
-    expect(exemptionIssues(m, new Set(['Often', 'Gone']), ['Often', 'Rare', 'Gone'])).toEqual([
+    expect(exemptionIssues(m, new Set(['Often', 'Gone']), ['Often', 'Rare', 'Gone', 'Edge'])).toEqual([
       expect.stringMatching(/^Often: исключение/), expect.stringMatching(/^Rare: редкое/),
     ])
-    expect(exemptionIssues(m, new Set(['Rare', 'Gone']), ['Often', 'Rare', 'Gone'])).toEqual([])
+    // полоса гистерезиса (молчит в 2 пакетах из 10): и в исключениях, и под гейтом — законно
+    expect(exemptionIssues(m, new Set(['Rare', 'Gone']), ['Often', 'Rare', 'Gone', 'Edge'])).toEqual([])
+    expect(exemptionIssues(m, new Set(['Rare', 'Gone', 'Edge']), ['Often', 'Rare', 'Gone', 'Edge'])).toEqual([])
     // исключение без замера и замер несуществующего правила — перемерить
-    expect(exemptionIssues(m, new Set(['Rare', 'Gone', 'New']), ['Often', 'Rare', 'Gone', 'New'])).toEqual([expect.stringMatching(/^New: исключение без замера/)])
-    expect(exemptionIssues(m, new Set(['Rare', 'Gone']), ['Rare', 'Gone'])).toEqual([expect.stringMatching(/^Often: в замере, но такого правила нет/)])
+    expect(exemptionIssues(m, new Set(['Rare', 'Gone', 'New']), ['Often', 'Rare', 'Gone', 'Edge', 'New'])).toEqual([expect.stringMatching(/^New: исключение без замера/)])
+    expect(exemptionIssues(m, new Set(['Rare', 'Gone']), ['Rare', 'Gone', 'Edge'])).toEqual([expect.stringMatching(/^Often: в замере, но такого правила нет/)])
     expect(zeroShare([0, 1, 0, 2])).toBe(0.5)
   })
   it('исключения гейта (RARE, PROVEN) совпадают с широким замером', () => {
@@ -51,7 +53,7 @@ describe('гистерезис покрытия', () => {
     expect(Object.keys(measure.rules).length).toBeGreaterThan(200) // замер не пустой: пустой прошёл бы любую сверку
     const exempt = new Set([...RARE, ...Object.keys(PROVEN)])
     expect(exemptionIssues(measure, exempt, allRules.map((r) => r.name))).toEqual([])
-    expect(RARE_ZERO_SHARE).toBeGreaterThan(0)
+    expect(RARE_ZERO_SHARE.allowed).toBeGreaterThan(0)
   })
   it('классы never — только rare / proven / unexplained; префикс не освобождает', () => {
     expect(neverClass('Tone_Cow')).toBe('rare')
