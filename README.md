@@ -32,7 +32,7 @@ npm run lint       # ESLint (в CI)
 npm run format     # Prettier --write (опционально; стиль плотный, массовый прогон отдельно)
 npm run build      # сборка в dist/
 npm run rules:report  # покрытие: 3 выборки × 16 партий; достижимость — хотя бы в одной; отчёт по классам never
-npm run rules:stable  # то же пересечение: запись RARE, до которой выборки дошли, должна уйти (уже в npm test)
+npm run rules:stable  # широкий замер (10 × 16 партий, ≈5 мин) → src/tools/coverage-measure.json; по нему npm test сверяет RARE / PROVEN
 npm run test:rules    # движок правил с покрытием (порог 100%)
 PLAYTEST_OUT=pt PLAYTEST_SEEDS=1-8 PLAYTEST_TURNS=300 npm run playtest  # партии ботом: переписка с вариантами и запись действий (seed воспроизводит партию)
 ```
