@@ -1,7 +1,7 @@
 // Мелкие тексты движка: «полежал на полу», застолье, платёжки, ответы на допработу и т.д.
-import { type Line, eq, gate, gte, is, ne, of, set, type Entry } from '../engine/rules'
+import { type Line, eq, gate, gte, is, of, set, type Entry } from '../engine/rules'
 import { needs, WORLD } from './world'
-import { alikDead, blocked, bloodGiven, court, endgame, phoneKarine, polite, sick, threatClaim, wedding } from './memkeys'
+import { bloodGiven, court, polite, sick, threatClaim, wedding } from './memkeys'
 import { sold } from './credit'
 // повторяемые занятия — после перерыва; события («продали микроволновку») — один раз
 export const FLOOR: Line[] = [
@@ -165,14 +165,13 @@ export const GREET_MORNING = [
 
 // Подпись профиля Алика (docs/design/alik-status.md): состояние мира одной системной строкой в конце хода.
 // Каждая — под фактом своего состояния и один раз за партию; без сроков и дат (текст без записи — не обещание).
-// Скрыт от игрока в блоке; при «смерти», телефоне у Карине и в эндгейме не меняется
-const statusShown = [ne(blocked, true), ne(alikDead, true), ne(phoneKarine, true), ne(endgame.active, true)]
+// Молчание в блоке / смерти / у Карине / эндгейме — только в sendTurn (quietStatus), не дублировать гейтами пула (#223).
 export const ALIK_STATUS: Line[] = [
-  needs('samvel')({ t: 'Тамада. До последнего тоста не беспокоить 🥂', when: [is(wedding('samvel')), WORLD.tamada, ...statusShown], prio: 1 }),
-  needs('boris', 'baran')({ t: 'Сиделка барана. Звонить шёпотом', when: [of('boris', is(sick)), ...statusShown], prio: 1 }),
-  needs('niva')({ t: 'Ищу «Ниву». Видели — звоните', when: [WORLD.nivaAway, ...statusShown], prio: 1 }),
-  needs('razmik')({ t: 'Снимаю Размика с крана. Не отвлекать, высоко', when: [WORLD.razmikUp, ...statusShown], prio: 1 }),
-  { t: 'Уважаемые клиенты! Ваше обращение очень важно для нас', when: [is(polite), ...statusShown], prio: 1 },
+  needs('samvel')({ t: 'Тамада. До последнего тоста не беспокоить 🥂', when: [is(wedding('samvel')), WORLD.tamada], prio: 1 }),
+  needs('boris', 'baran')({ t: 'Сиделка барана. Звонить шёпотом', when: [of('boris', is(sick))], prio: 1 }),
+  needs('niva')({ t: 'Ищу «Ниву». Видели — звоните', when: [WORLD.nivaAway], prio: 1 }),
+  needs('razmik')({ t: 'Снимаю Размика с крана. Не отвлекать, высоко', when: [WORLD.razmikUp], prio: 1 }),
+  { t: 'Уважаемые клиенты! Ваше обращение очень важно для нас', when: [is(polite)], prio: 1 },
 ]
 /** В блоке статус не сменить, и игрок узнаёт об этом один раз за блок. */
 export const STATUS_HIDDEN = 'Алик скрыл от вас статус'
