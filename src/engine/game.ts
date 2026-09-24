@@ -31,7 +31,7 @@ import {
   type Criterion, type Entry, type Facts, type Resolver, type Rule, type Query, type Priority, type Line as PoolLine, type LineOpts, type Picked,
 } from './rules'
 import { MENTION_RE, WORLD } from '../content/world'
-import { type Clock, realClock, isManualClock } from './clock'
+import { type Clock, type GameTimer, type WallTimer, realClock, isManualClock, wallClock } from './clock'
 import { type Audio, silentAudio } from './audio'
 import { typo } from './typo'
 import { UiState, type Moo, type SendFeel } from './ui-state'
@@ -101,16 +101,16 @@ export class Game {
   private hour: number | null
   private listeners = new Set<() => void>()
   private version = 0
-  private idleT = 0
-  private statusT = 0
+  private idleT: GameTimer | null = null
+  private statusT: GameTimer | null = null
   /** UI-таймеры вне game-clock — иначе ?fast гасит тост за десятки мс. */
-  private toastWall = 0
-  private notifWall = 0
+  private toastWall: WallTimer | null = null
+  private notifWall: WallTimer | null = null
   private idleCount = 0
   private seq = 1
   private resetting = false
   private disposed = false
-  private timerIds = new Set<number>()
+  private timerIds = new Set<GameTimer>()
   private sleepWaiters = new Set<(err?: GameDisposed) => void>()
   private noTimers: boolean
   private typos: boolean
@@ -207,7 +207,7 @@ export class Game {
     return this.timerIds.size
   }
 
-  private schedule(fn: () => void, ms: number): number {
+  private schedule(fn: () => void, ms: number): GameTimer {
     const id = this.clock.setTimeout(() => {
       this.timerIds.delete(id)
       if (!this.disposed) fn()
@@ -216,7 +216,8 @@ export class Game {
     return id
   }
 
-  private clearSchedule(id: number): void {
+  private clearSchedule(id: GameTimer | null): void {
+    if (id === null) return
     this.clock.clearTimeout(id)
     this.timerIds.delete(id)
   }
@@ -252,9 +253,9 @@ export class Game {
     this.disposed = true
     for (const id of [...this.timerIds]) this.clock.clearTimeout(id)
     this.timerIds.clear()
-    this.idleT = this.statusT = 0
-    if (this.toastWall) { clearTimeout(this.toastWall); this.toastWall = 0 }
-    if (this.notifWall) { clearTimeout(this.notifWall); this.notifWall = 0 }
+    this.idleT = this.statusT = null
+    if (this.toastWall !== null) { wallClock.clearTimeout(this.toastWall); this.toastWall = null }
+    if (this.notifWall !== null) { wallClock.clearTimeout(this.notifWall); this.notifWall = null }
     const err = new GameDisposed()
     for (const finish of this.sleepWaiters) finish(err)
     this.sleepWaiters.clear()
@@ -314,7 +315,7 @@ export class Game {
     if (this.disposed) return Promise.reject(new GameDisposed())
     return new Promise((resolve, reject) => {
       let settled = false
-      let id = 0
+      let id: GameTimer | null = null
       const finish = (err?: GameDisposed) => {
         if (settled) return
         settled = true
@@ -524,9 +525,9 @@ export class Game {
   /** Короткий тост поверх чата (ачивка, «Скопировано»…). Длительность — wall clock. */
   flash(text: string, ms = 2600): void {
     this.ui.toast = text
-    if (this.toastWall) clearTimeout(this.toastWall)
-    this.toastWall = window.setTimeout(() => {
-      this.toastWall = 0
+    if (this.toastWall !== null) wallClock.clearTimeout(this.toastWall)
+    this.toastWall = wallClock.setTimeout(() => {
+      this.toastWall = null
       this.ui.toast = null
       this.emit()
     }, ms)
@@ -577,9 +578,9 @@ export class Game {
   // ---------- уведомления, батарея ----------
   notify(icon: string, app: string, text: string): void {
     this.ui.notif = { id: this.seq++, icon, app, text }
-    if (this.notifWall) clearTimeout(this.notifWall)
-    this.notifWall = window.setTimeout(() => {
-      this.notifWall = 0
+    if (this.notifWall !== null) wallClock.clearTimeout(this.notifWall)
+    this.notifWall = wallClock.setTimeout(() => {
+      this.notifWall = null
       this.ui.notif = null
       this.emit()
     }, 4200)
@@ -587,7 +588,7 @@ export class Game {
     this.emit()
   }
   dismissNotif(): void {
-    if (this.notifWall) { clearTimeout(this.notifWall); this.notifWall = 0 }
+    if (this.notifWall !== null) { wallClock.clearTimeout(this.notifWall); this.notifWall = null }
     this.ui.notif = null
     this.emit()
   }
