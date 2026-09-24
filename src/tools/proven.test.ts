@@ -15,6 +15,12 @@ const endgame = (g: Game) => {
   g.S.endings.payday_default = g.S.day
   g.closeEnding()
 }
+/** Экран концовки выплаты открыт, эндгейм ещё не начат — окно Quiet_PaydayOpen_* (#190). */
+const paydayOpen = (g: Game) => {
+  g.S.mem.payday = 'default'
+  g.S.ending = 'payday_default'
+  g.S.endings.payday_default = g.S.day
+}
 
 const phone = (g: Game) => { g.rules.applyOps([during('phone.karine', 1)], {}) }
 const dead = (g: Game) => { g.S.mem.alik_dead = true }
@@ -75,7 +81,6 @@ const CASES: Record<string, Case> = {
   },
   Ending_vendetta: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem.vendetta = true } },
   Ending_payday_real: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'real' } },
-  Ending_multiverse: { event: 'CheckEnding', setup: (g) => { endgame(g); g.S.day = 800; g.S.stats.sent = 300 } },
   Ending_payday_niva: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'niva' } },
   Tone_Thanks: { event: 'PlayerMessage', facts: { tone: 'polite', category: 'gratitude' } },
   Tone_Greeting: { event: 'PlayerMessage', facts: { tone: 'polite', category: 'greeting' } },
@@ -96,18 +101,10 @@ const CASES: Record<string, Case> = {
   Finale_razmik_swap: { event: 'ArcFinale', facts: { arc: 'razmik' }, setup: (g) => { g.S.mem['count.rude'] = 10; g.S.mem[HEAT] = 3 } },
   Finale_razmik_union: { event: 'ArcFinale', facts: { arc: 'razmik' }, setup: (g) => { g.S.ach.customer = 1 } },
   Says_via_mama: { event: 'PlayerSays', facts: { intent: 'via', arg: 'mama' } },
-  Endgame_Money: { event: 'PlayerSays', facts: { intent: 'endgameMoney' }, setup: endgame },
-  Endgame_Mute: { event: 'PlayerSays', facts: { intent: 'endgameMute' }, setup: endgame },
-  Endgame_Leave: { event: 'PlayerSays', facts: { intent: 'endgameLeave' }, setup: endgame },
-  Endgame_Request: { event: 'PlayerSays', facts: { intent: 'request', tone: 'neutral' }, setup: endgame },
   Endgame_Turn: { event: 'AlikTurn', setup: endgame },
-  Endgame_Idle: { event: 'AlikIdle', setup: endgame },
-  Endgame_Away: { event: 'AlikAway', setup: endgame },
-  Endgame_Formality: { event: 'StoryBeat', setup: endgame },
-  Endgame_NoEnding: { event: 'CheckEnding', setup: endgame },
-  Lend50_yes: { event: 'PlayerSays', facts: { intent: 'lend50Yes' }, setup: endgame },
-  Lend50_no: { event: 'PlayerSays', facts: { intent: 'lend50No' }, setup: endgame },
-  Lend50_serious: { event: 'PlayerSays', facts: { intent: 'lend50Serious' }, setup: endgame },
+  Quiet_PaydayOpen_AlikAway: { event: 'AlikAway', setup: paydayOpen },
+  Quiet_PaydayOpen_PeriodLine: { event: 'PeriodLine', setup: paydayOpen },
+  Quiet_PaydayOpen_StoryBeat: { event: 'StoryBeat', setup: paydayOpen },
   Finale_beton_ledger: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem.caught = 2 } },
   Finale_nune_ledger: { event: 'ArcFinale', facts: { arc: 'nune' }, setup: (g) => { g.S.mem.caught = 2 } },
   Away_ColdWar: { event: 'AlikAway', setup: offended },

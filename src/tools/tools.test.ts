@@ -100,7 +100,7 @@ describe('гистерезис покрытия', () => {
   })
   it('классы never — только rare / proven / unexplained; префикс не освобождает', () => {
     expect(neverClass('Tone_Cow')).toBe('rare')
-    expect(neverClass('Endgame_Money')).toBe('proven')
+    expect(neverClass('Endgame_Turn')).toBe('proven')
     expect(neverClass('Quiet_BrandNew')).toBe('unexplained')
     expect(neverClass('Finale_made_up')).toBe('unexplained')
   })
