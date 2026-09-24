@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import { lintRules, type Rule } from '../engine/rules'
 import { allRules } from '../content/rules'
-import { isMemKey } from '../content/memkeys'
+import { isFactKey } from '../content/factkeys'
 import {
   multiSampleCoverage, formatCoverage, neverClass, neverInAllSamples, rareReached, COVERAGE_SAMPLES,
 } from './coverage'
@@ -11,7 +11,7 @@ import { RARE_ALL } from './rare'
 
 describe('линтер правил', () => {
   it('в игре нет правил, которые никогда не могут победить, и правил без ответа', () => {
-    expect(lintRules(allRules, ['BuildChoices'], { keyCheck: isMemKey })).toEqual([])
+    expect(lintRules(allRules, ['BuildChoices'], { keyCheck: isFactKey })).toEqual([])
   })
   it('находит перекрытое правило и правило без ответа', () => {
     const rules: Rule<unknown>[] = [

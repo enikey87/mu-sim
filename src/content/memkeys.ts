@@ -1,6 +1,7 @@
 // Реестр ключей памяти мира (S.mem) и досок персонажей (S.actors). Каждый строковый ключ
-// проходит через этот модуль: опечатка в ключе — молча мёртвое условие правила. Линтер правил
-// (tools.test.ts, keyCheck: isMemKey) и memkeys.test.ts не пускают неизвестные ключи.
+// проходит через этот модуль: опечатка в ключе — молча мёртвое условие правила. Точные ключи — здесь;
+// семейства (`arc.<id>`, `said.<claim>`…) — до конкретного элемента в factkeys.ts, и им же
+// сторожат линтер правил (tools.test.ts) и memkeys.test.ts.
 
 /** Ключ пары утверждений «пойманы на противоречии»; канонический формат — здесь, lies.ts реэкспортирует. */
 export const pairKey = (a: string, b: string): string => [a, b].sort().join('|')
@@ -54,6 +55,9 @@ export const nuneDekretOver = 'nune.dekretOver'
 export const grandpaDying = 'grandpa.dying'
 export const betonSet = 'beton.set'
 export const cardSent = 'card.sent'
+/** Алик хоть раз назвал сроком «завтра» / пятницу — на это слово можно ссылаться. */
+export const saidTomorrow = 'said.tomorrow'
+export const saidFriday = 'said.friday'
 
 export const payday = {
   at: 'payday.at', sum: 'payday.sum', chain: 'payday.chain', caught: 'payday.caught',
@@ -94,33 +98,21 @@ export const sick = 'sick'
 export const interjections = 'interjections'
 export const ACTOR_KEYS: ReadonlySet<string> = new Set([sick, interjections])
 
-/** Параметризованные namespace'ы mem-ключей. */
-export const MEM_PREFIXES: readonly string[] = [
-  'said.', 'saidLast.', 'by.', 'cb.', 'caught.', 'met.', 'intro.',
-  'asked.', 'doneAsked.', 'topic.', 'topicMute.', 'finale.', 'legend.of.', 'inv.', 'wedding.', 'count.',
-]
-
-/** Факты события (собираются в facts() на каждый fire) — не mem, но валидатор обязан их знать. */
+/** Факты события (собираются в facts() на каждый fire) — не mem, но валидатор обязан их знать; сверка с facts() — factkeys.test.ts. */
 export const EVENT_KEYS: ReadonlySet<string> = new Set([
   'day', 'dow', 'month', 'dom', 'sent', 'moo', 'tier', 'mood', 'patience', 'money', 'debt', 'fifty',
   'moneyNormal', 'moneyLow', 'moneyBottom',
   'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sorrySwing', 'promiseLive',
   'period', 'night', 'offline', 'scene', 'sinceAlik', 'lateCount', 'arcAvailable',
   'arcsStarted', 'arcsDone', 'quests', 'callbackReady', 'arcUnfinished', 'deathCanAdvance',
-  'intent', 'tone', 'arg', 'category', 'arc', 'argArcDone',
+  'intent', 'tone', 'arg', 'category', 'arc', 'argArcDone', 'greet', 'promise',
 ])
-export const EVENT_PREFIXES: readonly string[] = ['arc.', 'ach.', 'since.', 'ctx.', 'has.']
 
 export const MEM_KEYS: ReadonlySet<string> = new Set([
   HEAT, blocked, blockedHint, polite, bloodGiven, alikDead, mourning, evicted, vendetta, court, courtVerdict,
   ritualCount, ritualCut, caughtCount, cryptoHodl, bathAsked, mamaCalls, phoneKarine, alikDay, mooAt, sorryAt,
   rudeAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway,
   garikConcrete, garikCut, houseOnGarik, borisMarried, borisSmetaReady, taxFrozen, taxThawed,
-  actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim,
+  actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday,
   ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lie),
 ])
-
-/** Известный ли ключ факта: mem, доска персонажа или факт события. Точное совпадение — раньше префиксов. */
-export const isMemKey = (key: string): boolean =>
-  MEM_KEYS.has(key) || ACTOR_KEYS.has(key) || EVENT_KEYS.has(key)
-  || MEM_PREFIXES.some((p) => key.startsWith(p)) || EVENT_PREFIXES.some((p) => key.startsWith(p))

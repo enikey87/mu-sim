@@ -1,11 +1,14 @@
 // Тексты для новых возможностей системы правил: обещания, которые наступают, хор персонажей,
 // состояния мира со сроком (свадьба, болезнь Бориса, «Алик умер»).
 import { type Criterion, type Entry, named, exists, is, eq, gte, ne, missing, set, gate } from '../engine/rules'
-import { cryptoHodl, garikConcrete, garikCut, grandpaDying, grantPaid, intro, met, mourning, nivaAway, nuneDekretOver, payday } from './memkeys'
+import { cryptoHodl, garikConcrete, garikCut, grandpaDying, grantPaid, intro, met, mourning, nivaAway, nuneDekretOver, payday, saidFriday, saidTomorrow } from './memkeys'
 
 // Мир последователен: кто и что есть в истории и в каком оно положении — факты, их ставит серия (remember), ступень суда
 // или ход, где персонаж входит в историю. Реплика, которая на них опирается, объявляет это сама — needs('crane')('…').
 // Текст игра не разбирает; полноту разметки проверяет mentions.test.ts.
+/** Кого, кроме труппы чата (CAST), игра знакомит с игроком через intro/met. */
+export const EXTRAS: readonly string[] = ['baran', 'grachik', 'gagik', 'tamada']
+
 export const WORLD = {
   boris: named('boris', exists('arc.boris')),
   /** Борис научился писать (серия «Это Борис тебе написал. Сам!»). */
@@ -50,8 +53,8 @@ export const WORLD = {
   /** Гарик на связи: не сидит в фундаменте без интернета. */
   garikOnline: named('garikOnline', missing(garikCut)),
   /** Алик хоть раз назвал сроком «завтра» — теперь на это слово можно ссылаться. */
-  saidTomorrow: named('saidTomorrow', is('said.tomorrow')),
-  saidFriday: named('saidFriday', is('said.friday')),
+  saidTomorrow: named('saidTomorrow', is(saidTomorrow)),
+  saidFriday: named('saidFriday', is(saidFriday)),
   /** В семье прощаются: дедушка умирает или хоронят Алика. */
   mourning: named('mourning', is(mourning)),
   grandpaDying: named('grandpaDying', is(grandpaDying)),
