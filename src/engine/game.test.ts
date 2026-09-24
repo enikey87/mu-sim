@@ -9,6 +9,8 @@ import { seededRng } from './rng'
 import { SAVE_KEY } from './state'
 import { fmtTime } from './time'
 import { ARCS } from '../content/arcs'
+import { CLAIMS } from '../content/lies'
+import { MENTION_RE } from '../content/world'
 
 describe('Game: начало и ход', () => {
   it('новая игра: одна из завязок, 184-й день, 3–4 варианта реплик', () => {
@@ -746,3 +748,52 @@ describe('Game: dispose отменяет async', () => {
     expect(pending.size).toBe(0)
   })
 })
+
+describe('Game: пачка непрочитанных записывает в мир то же, что обычное сообщение Алика', () => {
+  /** Пачка из одних отмазок — тем же путём (правило AlikAway → awayMsg), но с заявлениями в каждом сообщении. */
+  const excusePack = async (seed: number) => {
+    const { game } = makeGame({ seed })
+    game.S.stats.sent = 6
+    game.rules.add({ name: 'Test_AwayExcuse', event: 'AlikAway', when: [], specificity: 50, respond: ({ game }) => game.awayMsg('excuse') })
+    const from = game.S.msgs.length
+    await game.awayBurst(4, 1)
+    return { game, texts: alikTexts(game.S.msgs.slice(from)) }
+  }
+  it('заявление из пачки — на доске: «вы же говорили» видит и то, что пришло без игрока', async () => {
+    let claims = 0
+    for (let seed = 1; seed <= 40; seed++) {
+      const { game, texts } = await excusePack(seed)
+      for (const c of CLAIMS.filter((c) => texts.some((t) => c.re.test(t)))) {
+        claims++
+        expect(game.S.mem[`said.${c.key}`], c.key).toBe(game.S.day)
+        expect(game.S.mem[`by.${c.key}`], c.key).toBe('alik')
+      }
+    }
+    expect(claims).toBeGreaterThan(5)
+  })
+  it('день речи Алика — день пачки: после неё он не «молчал»', async () => {
+    for (let seed = 1; seed <= 10; seed++) {
+      const { game } = await excusePack(seed)
+      expect(game.S.mem['alik.day']).toBe(game.S.day)
+      expect(game.facts().sinceAlik).toBe(0)
+    }
+  })
+  it('упомянутый в пачке вклинивается после следующего ответа Алика — как после обычного упоминания', async () => {
+    let mentioned = 0
+    for (let seed = 1; seed <= 60; seed++) {
+      const { game, texts } = await excusePack(seed)
+      const who = Object.entries(MENTION_RE).filter(([, re]) => texts.some((t) => re.test(t))).map(([w]) => w)
+      if (!who.length) continue
+      const events: string[] = []
+      game.rules.tracer = (t) => { events.push(`${t.event}:${t.target ?? ''}`) }
+      await game.afterTurn()
+      // хор — не больше одного персонажа за ход: прозвучавшие — непустое подмножество упомянутых
+      const heard = events.filter((e) => e.startsWith('Mentioned:')).map((e) => e.slice('Mentioned:'.length))
+      expect(heard.length, texts.join(' | ')).toBeGreaterThan(0)
+      for (const w of heard) expect(who).toContain(w)
+      mentioned++
+    }
+    expect(mentioned).toBeGreaterThan(0)
+  })
+})
+
