@@ -1,12 +1,59 @@
 import type { Game } from '../engine/game'
 import type { Msg } from '../engine/state'
+import type { UiState } from '../engine/ui-state'
 import { ACH } from '../content/achievements'
 import { ARCS } from '../content/arcs'
 import { ENDINGS } from '../content/finales'
 import { payday } from '../content/memkeys'
 
 /** Граница между движком и интерфейсом: единственный модуль UI, который знает устройство S и ключей памяти.
- *  Компоненты получают плоский снимок и не импортируют ни контент, ни memkeys. */
+ *  Компоненты получают фасад GameUi и плоский снимок; контент и memkeys не импортируют (страж — view.test.ts). */
+
+type UiView = Readonly<Pick<UiState, 'status' | 'typing' | 'toast' | 'notif' | 'moos' | 'busy' | 'feel' | 'feelId' | 'title'>> & { sheetOpen: boolean }
+type BatteryView = Readonly<Pick<Game['battery'], 'level' | 'dead' | 'charging'>> & Pick<Game['battery'], 'charge'>
+
+/** Игра глазами компонента: действия, подписка, эфемерное состояние экрана. S нет ни в типе, ни в объекте —
+ *  обход через каст получает undefined, а не память. */
+export type GameUi = Readonly<
+  Pick<Game, 'subscribe' | 'getVersion' | 'getMsgsEpoch' | 'getMsgsDirtyFrom' | 'ackMsgsDirty' | 'choices' | 'clockText' | 'gameDate'
+    | 'send' | 'answerJob' | 'playVoice' | 'castOf' | 'flash' | 'closeEnding' | 'dismissNotif' | 'toggleMute' | 'gesture' | 'onVisibility' | 'reset'>
+  & { ui: UiView; battery: BatteryView }
+>
+
+const REAL = new WeakMap<GameUi, Game>()
+const FACADE = new WeakMap<Game, GameUi>()
+
+export function uiOf(g: Game): GameUi {
+  let u = FACADE.get(g)
+  if (u) return u
+  const ui: UiView = {
+    get status() { return g.ui.status }, get typing() { return g.ui.typing }, get toast() { return g.ui.toast },
+    get notif() { return g.ui.notif }, get moos() { return g.ui.moos }, get busy() { return g.ui.busy },
+    get feel() { return g.ui.feel }, get feelId() { return g.ui.feelId }, get title() { return g.ui.title },
+    get sheetOpen() { return g.ui.sheetOpen }, set sheetOpen(v) { g.ui.sheetOpen = v },
+  }
+  const battery: BatteryView = {
+    get level() { return g.battery.level }, get dead() { return g.battery.dead }, get charging() { return g.battery.charging },
+    charge: () => g.battery.charge(),
+  }
+  u = {
+    ui, battery,
+    subscribe: g.subscribe, getVersion: g.getVersion, getMsgsEpoch: g.getMsgsEpoch, getMsgsDirtyFrom: g.getMsgsDirtyFrom, ackMsgsDirty: g.ackMsgsDirty,
+    get choices() { return g.choices }, get clockText() { return g.clockText }, get gameDate() { return g.gameDate },
+    send: (o) => g.send(o), answerJob: (id, yes) => g.answerJob(id, yes), playVoice: (m) => g.playVoice(m), castOf: (who) => g.castOf(who),
+    flash: (t, ms) => g.flash(t, ms), closeEnding: () => g.closeEnding(), dismissNotif: () => g.dismissNotif(),
+    toggleMute: () => g.toggleMute(), gesture: () => g.gesture(), onVisibility: (h) => g.onVisibility(h), reset: () => g.reset(),
+  }
+  FACADE.set(g, u)
+  REAL.set(u, g)
+  return u
+}
+
+const realOf = (u: GameUi): Game => {
+  const g = REAL.get(u)
+  if (!g) throw new Error('view: не фасад uiOf()')
+  return g
+}
 
 export type PaydayView = { daysLeft: number | null; sum: number | null }
 export type PromiseRow = { text: string; due: number | null; late: boolean }
@@ -38,7 +85,8 @@ export type View = {
   achTotal: number
 }
 
-export const viewOf = (g: Game): View => {
+export const viewOf = (u: GameUi): View => {
+  const g = realOf(u)
   const S = g.S
   const ending = S.ending ? ENDINGS.find((x) => x.id === S.ending) : undefined
   const chain = S.mem[payday.chain]
@@ -51,7 +99,7 @@ export const viewOf = (g: Game): View => {
     payday:
       S.scene?.id === 'payday'
         ? {
-            daysLeft: Number(S.mem[payday.at]) > S.day ? 1 : null,
+            daysLeft: Number(S.mem[payday.at]) > S.day ? Number(S.mem[payday.at]) - S.day : null,
             sum: S.mem[payday.sum] !== undefined ? Number(S.mem[payday.sum]) : null,
           }
         : { daysLeft: null, sum: null },
@@ -79,4 +127,4 @@ export const viewOf = (g: Game): View => {
 
 /** Лента — единственное, что не в снимке: инкрементальный канал MessageList читает сам массив
  *  (тот же объект, что и раньше; windowing и dirtyFrom считаются по нему в Chat). */
-export const feedMsgs = (g: Game): Msg[] => g.S.msgs
+export const feedMsgs = (u: GameUi): Msg[] => realOf(u).S.msgs

@@ -36,6 +36,8 @@ export function ChatHeader({ onInfo }: { onInfo: () => void }) {
   )
 }
 
+const days = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? 'день' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? 'дня' : 'дней')
+
 export function StatsBar() {
   const game = useGame()
   const v = viewOf(game)
@@ -44,7 +46,7 @@ export function StatsBar() {
       <span>Долг: <b id="debt">{v.debt.toLocaleString('ru-RU')} ₽</b></span>
       <span>Дней после сдачи: <b id="days">{v.day}</b></span>
       {/* День выплаты: отсчёт накануне и счётчик «к выплате», который тает на глазах */}
-      {v.payday.daysLeft !== null && <span id="paydayAt">До выплаты: <b>{v.payday.daysLeft} день</b></span>}
+      {v.payday.daysLeft !== null && <span id="paydayAt">До выплаты: <b>{v.payday.daysLeft} {days(v.payday.daysLeft)}</b></span>}
       {v.payday.sum !== null && <span id="paydaySum" className="payday-sum">К выплате: <b>{v.payday.sum.toLocaleString('ru-RU')} ₽</b></span>}
     </div>
   )
