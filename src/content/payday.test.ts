@@ -137,7 +137,7 @@ describe('День выплаты', () => {
     expect(new Set(whos).size).toBe(whos.length)
   })
   // застолье уже списало 6 000 и уменьшило долг на 1 000 — партия приходит к выплате с этими числами
-  const afterFeast = (g: Game) => { g.S.day = 340; g.S.ach.q_tamada = 1; g.S.debt = 239000 }
+  const afterFeast = (g: Game) => { g.S.day = 340; g.S.ach.q_tamada = 1; g.adjustDebt(239000 - g.S.debt) }
   it('доля за сервиз добирает разницу: с зачтённым на застолье выходит названная сумма', async () => {
     const { game } = makeGame()
     afterFeast(game)
