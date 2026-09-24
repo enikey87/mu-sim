@@ -1,11 +1,11 @@
-// Правила из списков RARE и RARE_FLAKY (tools/rare.ts) статистический гейт сторожить не может —
+// Правила из списка RARE (tools/rare.ts) статистический гейт сторожить не может —
 // здесь каждое вызывается напрямую. Новое правило в списке = новая строка здесь; иначе гейт
 // молча перестаёт его проверять.
 import { describe, it, expect } from 'vitest'
 import { makeGame } from '../../test/helpers'
 import type { Game } from '../../engine/game'
 import type { Facts } from '../../engine/rules'
-import { RARE_ALL } from '../../tools/rare'
+import { RARE } from '../../tools/rare'
 
 type Case = { event: string; facts?: Facts; target?: string; setup?: (g: Game) => void }
 const CASES: Record<string, Case> = {
@@ -36,6 +36,32 @@ const CASES: Record<string, Case> = {
   Turn_Wedding_Razmik: { event: 'AlikTurn', setup: (g) => { g.S.mem['wedding.razmik'] = true } },
   Turn_Wedding_Boris: { event: 'AlikTurn', setup: (g) => { g.S.mem['wedding.boris'] = true } },
   Chorus_garik_FedUp: { event: 'Mentioned', target: 'garik', setup: (g) => { g.S.mem['intro.garik'] = true; g.S.actors.garik = { interjections: 3 } } },
+  // частные финалы — условия как у игрока (finales.test.ts SETUP)
+  Finale_beton_opened: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem['count.rude'] = 6; g.S.mem['rude.heat'] = 2 } },
+  Finale_beton_opened_or: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem.court = 5 } },
+  Finale_grant_ally: { event: 'ArcFinale', facts: { arc: 'grant' }, setup: (g) => { g.S.ach.customer = 1 } },
+  Finale_razmik_shift_or: { event: 'ArcFinale', facts: { arc: 'razmik' }, setup: (g) => { g.S.ach.newjob = 1 } },
+  Finale_garik_cutter: { event: 'ArcFinale', facts: { arc: 'garik' }, setup: (g) => { g.S.ach.newjob = 1 } },
+  Ending_alik: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem['finale.garik'] = 'cutter'; g.S.ach.fence = 1 } },
+  // встречный иск на горячую угрозу — один раз, дальше «опять угрожаешь»
+  Tone_Threat_Hot_Again: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem['rude.heat'] = 2; g.S.rules.once.Tone_Threat_Hot = true } },
+  Says_sorry_blocked_karine: { event: 'PlayerSays', facts: { intent: 'sorry' }, setup: (g) => { g.S.mem.blocked = true } },
+  Says_via_boris: { event: 'PlayerSays', facts: { intent: 'via', arg: 'boris' }, setup: (g) => { g.S.mem.blocked = true } },
+  // бывшие PROVEN, до которых стенд доходит почти всегда (#133): под гейтом, случай — страховка
+  Quiet_Dead_AlikIdle: { event: 'AlikIdle', setup: (g) => { g.S.mem.alik_dead = true } },
+  Quiet_Dead_StoryBeat: { event: 'StoryBeat', setup: (g) => { g.S.mem.alik_dead = true } },
+  Quiet_Blocked_StoryBeat: { event: 'StoryBeat', setup: (g) => { g.S.mem.blocked = true } },
+  Turn_LightOff: { event: 'AlikTurn', setup: (g) => { g.S.mem['light.off'] = true } },
+  Turn_NetRation: { event: 'AlikTurn', setup: (g) => { g.S.mem['net.ration'] = true } },
+  Idle_PhoneWarn: { event: 'AlikIdle', setup: (g) => { g.S.mem['phone.warn'] = true } },
+  Bill_Warn: { event: 'BillWarn', facts: { bill: 'phone' } },
+  Bill_Due: { event: 'BillDue', facts: { bill: 'phone' } },
+  Credit_Due: { event: 'CreditDue', facts: { credit: 'consumer' }, setup: (g) => { g.S.mem['credit.consumer.taken'] = true; g.S.money = 50000 } },
+  Says_creditTake: { event: 'PlayerSays', facts: { intent: 'creditTake' }, setup: (g) => { g.S.mem['credit.offer'] = true; g.S.money = 1000 } },
+  Says_creditSell: { event: 'PlayerSays', facts: { intent: 'creditSell' }, setup: (g) => { g.S.mem['credit.offer'] = true; g.S.money = 1000 } },
+  Payday_coins: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['payday.caught'] = true } },
+  Ending_payday_coins: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'coins' } },
+  Says_sorry_blocked_boris: { event: 'PlayerSays', facts: { intent: 'sorry' }, setup: (g) => { g.S.mem.blocked = true; g.S.arcs.boris = { i: 4, last: 0 } } },
 }
 
 /** Срабатывает ли правило (у многих есть шанс — пробуем на разных сидах). */
@@ -59,7 +85,7 @@ describe('редкие правила — детерминированно', () 
   })
   // Кейсы и списки не связаны: правило, которое симуляция уверенно покрывает, уходит из списка,
   // но прямой случай остаётся страховкой, пока его кто-то не удалит осознанно.
-  it('у каждой записи RARE и RARE_FLAKY есть случай', () => {
-    expect([...RARE_ALL].filter((name) => !CASES[name])).toEqual([])
+  it('у каждой записи RARE есть случай', () => {
+    expect([...RARE].filter((name) => !CASES[name])).toEqual([])
   })
 })

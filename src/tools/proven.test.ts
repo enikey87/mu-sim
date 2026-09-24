@@ -22,13 +22,10 @@ const blocked = (g: Game) => { g.S.mem.blocked = true }
 const offended = (g: Game) => { g.S.mem[HEAT] = 1; g.S.ctx = { offended: true } }
 
 const CASES: Record<string, Case> = {
-  Quiet_Dead_AlikIdle: { event: 'AlikIdle', setup: dead },
   Quiet_Dead_AlikAway: { event: 'AlikAway', setup: dead },
-  Quiet_Dead_StoryBeat: { event: 'StoryBeat', setup: dead },
   Quiet_Dead_PeriodLine: { event: 'PeriodLine', setup: dead },
   Quiet_Dead_PromiseDue: { event: 'PromiseDue', facts: { promise: 0 }, setup: (g) => { dead(g); g.recordPromise({ text: 'в пятницу', d: 1 }); g.S.day += 1 } },
   Quiet_Blocked_AlikAway: { event: 'AlikAway', setup: blocked },
-  Quiet_Blocked_StoryBeat: { event: 'StoryBeat', setup: blocked },
   Quiet_Blocked_PeriodLine: { event: 'PeriodLine', setup: blocked },
   Quiet_Blocked_PromiseDue: { event: 'PromiseDue', facts: { promise: 0 }, setup: (g) => { blocked(g); g.recordPromise({ text: 'в пятницу', d: 1 }); g.S.day += 1 } },
   Quiet_PhoneKarine_AlikIdle: { event: 'AlikIdle', setup: phone },
@@ -112,14 +109,6 @@ const CASES: Record<string, Case> = {
   Lend50_yes: { event: 'PlayerSays', facts: { intent: 'lend50Yes' }, setup: endgame },
   Lend50_no: { event: 'PlayerSays', facts: { intent: 'lend50No' }, setup: endgame },
   Lend50_serious: { event: 'PlayerSays', facts: { intent: 'lend50Serious' }, setup: endgame },
-  Turn_LightOff: { event: 'AlikTurn', setup: (g) => { g.S.mem['light.off'] = true } },
-  Turn_NetRation: { event: 'AlikTurn', setup: (g) => { g.S.mem['net.ration'] = true } },
-  Idle_PhoneWarn: { event: 'AlikIdle', setup: (g) => { g.S.mem['phone.warn'] = true } },
-  Bill_Warn: { event: 'BillWarn', facts: { bill: 'phone' } },
-  Bill_Due: { event: 'BillDue', facts: { bill: 'phone' } },
-  Credit_Due: { event: 'CreditDue', facts: { credit: 'consumer' }, setup: (g) => { g.S.mem['credit.consumer.taken'] = true; g.S.money = 50000 } },
-  Says_creditTake: { event: 'PlayerSays', facts: { intent: 'creditTake' }, setup: (g) => { g.S.mem['credit.offer'] = true; g.S.money = 1000 } },
-  Says_creditSell: { event: 'PlayerSays', facts: { intent: 'creditSell' }, setup: (g) => { g.S.mem['credit.offer'] = true; g.S.money = 1000 } },
   Finale_beton_ledger: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem.caught = 2 } },
   Finale_nune_ledger: { event: 'ArcFinale', facts: { arc: 'nune' }, setup: (g) => { g.S.mem.caught = 2 } },
   Away_ColdWar: { event: 'AlikAway', setup: offended },
