@@ -1,5 +1,6 @@
 import { STARTS } from '../content/quests'
 import { describe, it, expect, vi, afterEach } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { makeGame, memStorage, alikTexts, flush } from '../test/helpers'
 import { ENDGAME_FORMALITIES, ENDGAME_JUBILEES } from '../content/endgame'
 import { silentAudio } from './audio'
@@ -794,6 +795,43 @@ describe('Game: пачка непрочитанных записывает в м
       mentioned++
     }
     expect(mentioned).toBeGreaterThan(0)
+  })
+})
+
+describe('Game: деньги на карте', () => {
+  it('adjustMoney пишет баланс, шлёт СМС и факты уровня', () => {
+    const { game } = makeGame()
+    expect(game.moneyLevel()).toBe('normal')
+    expect(game.facts().moneyNormal).toBe(true)
+    expect(game.adjustMoney(-4000, 'Продукты')).toBe(true)
+    expect(game.S.money).toBe(8400)
+    expect(game.moneyLevel()).toBe('low')
+    expect(game.ui.notif?.text).toMatch(/Банк обеспокоен/)
+    expect(game.adjustMoney(-3000, 'Гречка')).toBe(true)
+    expect(game.moneyLevel()).toBe('bottom')
+    expect(game.facts().moneyBottom).toBe(true)
+    expect(game.ui.notif?.text).toMatch(/критический/)
+  })
+  it('после выплаты и в эндгейме деньги не меняются', () => {
+    const { game } = makeGame()
+    game.S.mem.payday = 'default'
+    expect(game.moneySealed()).toBe(true)
+    const m = game.S.money
+    expect(game.adjustMoney(-100, 'Продукты')).toBe(false)
+    expect(game.S.money).toBe(m)
+    delete game.S.mem.payday
+    game.S.mem['endgame.active'] = true
+    expect(game.adjustMoney(50, 'Перевод от Алика')).toBe(false)
+    expect(game.S.money).toBe(m)
+  })
+  it('S.money в прод-коде пишется только внутри adjustMoney', () => {
+    const write = /S\.money\s*(?:\+=|-=|=)/g
+    const src = readFileSync('src/engine/game.ts', 'utf8')
+    const body = src.replace(/adjustMoney\([\s\S]*?\n {2}\}/, 'adjustMoney() {}')
+    expect(body.match(write) ?? []).toEqual([])
+    const content = ['src/content/rules/payday.ts', 'src/content/misc.ts', 'src/content/excuses.ts']
+      .map((f) => readFileSync(f, 'utf8')).join('\n')
+    expect(content.match(write) ?? []).toEqual([])
   })
 })
 
