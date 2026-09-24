@@ -47,8 +47,9 @@ export const endgameRules: R[] = [
     name: 'Endgame_NoEnding', event: 'CheckEnding', when: [active], specificity: 100, priority: 'system',
     respond: () => undefined,
   },
-  // за экраном концовки мир молчит: ни пачки, ни простоя, ни сюжета, ни обещаний — иначе после выплаты приходят отмазки и «переводы»
-  ...(['AlikAway', 'AlikIdle', 'StoryBeat', 'PeriodLine', 'PromiseDue'] as GameEvent[]).map((event): R => ({
+  // за экраном концовки мир молчит: ни пачки, ни простоя, ни сюжета, ни обещаний, ни хора —
+  // иначе после выплаты приходят отмазки, «переводы» и отложенные Mentioned из реплик сцены
+  ...(['AlikAway', 'AlikIdle', 'StoryBeat', 'PeriodLine', 'PromiseDue', 'Mentioned'] as GameEvent[]).map((event): R => ({
     name: 'Quiet_PaydayOpen_' + event, event, when: [paydayOpen], specificity: 100, priority: 'system', respond: () => {},
   })),
 ]

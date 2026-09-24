@@ -60,17 +60,20 @@ def msg_lines(path):
     """Строки расшифровки, каждая из которых — одно сообщение, с его номером в партии.
 
     Разделитель дня приходит в расшифровку с ведущим переводом строки, варианты и ответ на
-    допработу — с отступом, асайды — со скобки: всё это сообщениями не считается.
+    допработу — с отступом: это не сообщения. Асайды (со скобки: уведомления телефона, экран
+    концовки) отдаются с номером соседнего сообщения, но сами не нумеруются — по ним судят
+    уведомления и хозяина квартиры.
     """
     out = []
     i = 0
     for ln in open(path).read().split('\n'):
-        if not ln or ln.startswith('    ') or ln.startswith('('):
+        if not ln or ln.startswith('    '):
             continue
         if ln.startswith('Партия '):  # заголовок расшифровки
             continue
         out.append((i, ln))
-        i += 1
+        if not ln.startswith('('):
+            i += 1
     return out
 
 
@@ -116,8 +119,14 @@ def death_states(frames):
 
 
 def check_dead(frames, st, gated):
-    """Смерть: речь, пачка непрочитанных и День выплаты — пока стоит факт смерти."""
+    """Смерть: речь, пачка непрочитанных и День выплаты — пока стоит факт смерти.
+
+    Речь судится по правилу, которое её произнесло (said[].r): оправдано только сообщение,
+    чьё правило гейтнуто на смерть. «В ходе выбрано хоть одно гейтнутое правило» не считается —
+    кнопка игрока и молчащее Quiet_* есть в каждом мёртвом ходе. Сообщения игрока — не речь Алика.
+    """
     v = collections.Counter()
+    cov = collections.Counter()
     for i, f in enumerate(frames):
         if st[i] is None:
             continue
@@ -125,14 +134,19 @@ def check_dead(frames, st, gated):
         stepped = arc_stepped(b, m, 'alik_death')
         dead = bool(b.get('alik_dead'))
         # без списка гейтов (старый дамп) судить нечем: проверка молчит, и об этом сказано в coverage
-        if dead and not stepped and (f.get('said') or []) and gated:
-            if not any(n in gated for hit in (f.get('fired') or []) for n in hit.get('chosen') or []):
-                v['dead_speech'] += 1
+        if dead and not stepped and gated:
+            spoken = [s for s in (f.get('said') or []) if s.get('w') != 'me']
+            if spoken and any('r' not in s for s in spoken):
+                cov['frames_without_speech_rules'] += 1  # старый дамп: кто произнёс — неизвестно
+            else:
+                loud = sum(1 for s in spoken if s.get('r') not in gated)
+                if loud:
+                    v['dead_speech'] += loud
         if dead and f.get('away'):
             v['dead_away_loud'] += len(f['away'])
         if st[i] == 'dead' and 'payday.at' not in b and 'payday.at' in m:
             v['dead_payday'] += 1
-    return v
+    return v, cov
 
 
 def check_mute(frames):
@@ -272,6 +286,10 @@ def coverage(was, cov):
     return cov
 
 
+# Окна, которые можно потребовать через ORACLE_REQUIRE: опечатка — ошибка, а не тихий ноль.
+WINDOWS = ('dead', 'mute', 'blood', 'friday', 'arc', 'notif', 'away')
+
+
 def empty_windows(cov):
     """Окна, которых в выборке не было: молчащий ноль — не «чисто», а «не проверено»."""
     out = []
@@ -311,8 +329,11 @@ if __name__ == '__main__':
         if not gated:
             cov['games_without_rule_gates'] += 1
         st, dv = death_states(frames)
-        after = check_dead(frames, st, gated)
+        after, dc = check_dead(frames, st, gated)
         after.update(dv)
+        cov.update(dc)
+        if dc.get('frames_without_speech_rules'):
+            cov['games_without_speech_rules'] += 1
         # сколько кадров линия смерти остаётся открытой без факта — мера длины сломанного окна
         cov['dead_lost_frames'] += sum(1 for x in st if x == 'lost')
         after.update(check_notifications(frames))
@@ -340,6 +361,9 @@ if __name__ == '__main__':
     require = [x for x in (os.environ.get('ORACLE_REQUIRE') or '').split(',') if x]
     if os.environ.get('ORACLE_REQUIRE_DEAD'):
         require.append('dead')
+    unknown = sorted(set(x for x in require if x not in WINDOWS))
+    if unknown:
+        sys.exit('ORACLE_REQUIRE: неизвестное окно — ' + ', '.join(unknown) + '; есть: ' + ', '.join(WINDOWS))
     empty = sorted(set(x for x in require if cov.get(x + '_unexercised')))
     if empty:
         sys.exit('coverage: окно не наблюдалось — ' + ', '.join(empty) + ': проверка пуста')

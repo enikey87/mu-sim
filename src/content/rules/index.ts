@@ -11,5 +11,6 @@ import { rudeRules, rudeSaysRules } from './rude'
 import { courtRules } from './court'
 import { paydayRules } from './payday'
 import { endgameRules } from './endgame'
+import { billRules } from './bills'
 
-export const allRules: Rule<Game, GameEvent, Offer>[] = [...toneRules, ...storyRules, ...ignoreRules, ...periodRules, ...turnRules, ...idleRules, ...awayRules, ...replyRules, ...choiceRules, ...worldRules, ...finaleRules, ...endingRules, ...rudeRules, ...rudeSaysRules, ...courtRules, ...paydayRules, ...endgameRules]
+export const allRules: Rule<Game, GameEvent, Offer>[] = [...toneRules, ...storyRules, ...ignoreRules, ...periodRules, ...turnRules, ...idleRules, ...awayRules, ...replyRules, ...choiceRules, ...worldRules, ...finaleRules, ...endingRules, ...rudeRules, ...rudeSaysRules, ...courtRules, ...paydayRules, ...endgameRules, ...billRules]
