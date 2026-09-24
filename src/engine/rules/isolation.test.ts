@@ -7,14 +7,16 @@ import ts from 'typescript'
 import { afterEach, describe, expect, it } from 'vitest'
 
 const ROOT = 'src/engine/rules'
-/** Все расширения модулей TypeScript/JavaScript, которые компилятор включает в программу. */
-const PROD_EXT = /\.[cm]?tsx?$/
+/** Все JS/TS-модули, которые могут импортировать код (не только то, что парсит tsc как .ts). */
+const PROD_EXT = /\.(?:[cm]?tsx?|m?js|cjs)$/
 const walk = (dir: string): string[] =>
   readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]))
 const listProd = (): string[] => walk(ROOT).filter((f) => PROD_EXT.test(f) && !/\.test\./.test(f))
 
 function scriptKind(file: string): ts.ScriptKind {
   if (/\.[cm]?tsx$/.test(file)) return ts.ScriptKind.TSX
+  if (/\.jsx$/.test(file)) return ts.ScriptKind.JSX
+  if (/\.mjs$|\.cjs$|\.js$/.test(file)) return ts.ScriptKind.JS
   // MTS/CTS есть с TS 4.7; без них парсер всё равно читает импорты как у .ts
   if (file.endsWith('.mts') && 'MTS' in ts.ScriptKind) return (ts.ScriptKind as unknown as Record<string, ts.ScriptKind>).MTS
   if (file.endsWith('.cts') && 'CTS' in ts.ScriptKind) return (ts.ScriptKind as unknown as Record<string, ts.ScriptKind>).CTS
@@ -55,7 +57,7 @@ const resolveTarget = (file: string, spec: string): string =>
 function allowed(file: string, spec: string): boolean {
   if (spec.startsWith('<не строка')) return false
   if (!spec.startsWith('.')) return false // голый пакет / абсолютный путь / types-имя
-  const t = resolveTarget(file, spec).replace(/\.[cm]?tsx?$/, '')
+  const t = resolveTarget(file, spec).replace(/\.(?:[cm]?tsx?|m?js|cjs)$/, '')
   return t === 'src/engine/rng' || t === ROOT || t.startsWith(ROOT + '/')
 }
 
@@ -97,6 +99,17 @@ describe('изоляция engine/rules', () => {
     expect(allowed(sub, '../../../content/memkeys')).toBe(false)
     expect(allowed(sub, '../../rng')).toBe(true)
     expect(allowed(sub, '../types')).toBe(true)
+  })
+
+  it('негативный контроль: .mjs с импортом контента — в списке и краснеет', () => {
+    const mjs = join(ROOT, '_nc_leak.mjs')
+    writeFileSync(mjs, `import { MEM_KEYS } from '../../content/memkeys.js'\nexport const k = MEM_KEYS\n`)
+    leftovers.push(mjs)
+    expect(PROD_EXT.test(mjs)).toBe(true)
+    expect(listProd()).toContain(mjs)
+    for (const spec of specifiers(mjs)) {
+      expect(allowed(mjs, spec), `mjs: ${spec}`).toBe(false)
+    }
   })
 
   it('негативный контроль: .mts с импортом контента — в списке и краснеет', () => {

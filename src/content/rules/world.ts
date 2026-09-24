@@ -1,6 +1,7 @@
 // Правила новых возможностей: выбор сцен, наступившие обещания, хор персонажей, состояния мира.
 import type { Game } from '../../engine/game'
 import { type Rule, type Facts, type Entry, eq, ne, gte, lte, is, add, of, missing } from '../../engine/rules'
+
 import type { GameEvent, Offer } from './events'
 import { WORLD, SPEAKS } from '../world'
 import { CHORUS_LEGEND } from '../legends'
@@ -61,7 +62,7 @@ const dueLine = (game: Game, f: Facts, key: string, arr: readonly Entry<string>[
   return game.uniq(() => `${game.X.g('ADDR')}, ${game.X.fill(game.draw(key, arr), { t: p.t })}`)
 }
 // срок актуален: обещание есть и его не «переписали» в когда-нибудь
-const live = { key: 'promiseLive', op: '==' as const, value: true }
+const live = eq('promiseLive', true)
 export const promiseRules: R[] = [
   {
     // не через ход: наступивший срок — событие, а не фон
