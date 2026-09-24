@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { playtest, transcript } from './playtest'
+import { playtest, transcript, worldDump } from './playtest'
 
 describe('плейтест', () => {
   it('тот же seed — та же партия; запись действий проигрывается в ту же переписку', async () => {
@@ -13,6 +13,8 @@ describe('плейтест', () => {
     expect(a.acts.some((x) => x.kind === 'send')).toBe(true)
     const r = await playtest(4, 0, a.acts)
     expect(transcript(r)).toBe(transcript(a))
+    expect(a.world.length).toBe(a.acts.length)
+    expect(worldDump(a)).toEqual(expect.objectContaining({ seed: 4, frames: expect.any(Array) }))
   }, 60_000)
   it('расхождение с записью — ошибка, а не другая партия', async () => {
     const a = await playtest(4, 10)
@@ -34,6 +36,7 @@ describe.runIf(process.env.PLAYTEST_OUT)('прогон для разбора', (
       const p = await playtest(seed, Number(process.env.PLAYTEST_TURNS ?? 300))
       writeFileSync(join(out, `seed-${seed}.txt`), transcript(p))
       writeFileSync(join(out, `seed-${seed}.json`), JSON.stringify({ seed, style: p.style, hour: p.hour, acts: p.acts }))
+      writeFileSync(join(out, `seed-${seed}.world.json`), JSON.stringify(worldDump(p)))
     }
   }, 1_800_000)
 })
