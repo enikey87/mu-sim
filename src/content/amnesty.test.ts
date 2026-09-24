@@ -77,8 +77,8 @@ describe('амнистия обещаний', () => {
     expect(sys(game, from)).toContainEqual(expect.stringContaining('обнулено: 9'))
     expect(alik(game, from).join(' ')).toMatch(/по-братски/)
     const rows = viewOf(uiOf(game)).promises
-    expect(rows.slice(0, 9).map((r) => [r.late, r.amnesty])).toEqual(rows.slice(0, 9).map(() => [false, day]))
-    expect(rows[9]).toMatchObject({ late: false, amnesty: null })
+    expect(rows.slice(0, 9).map((r) => [r.state, r.amnesty])).toEqual(rows.slice(0, 9).map(() => ['amnesty', day]))
+    expect(rows[9]).toMatchObject({ state: 'someday', amnesty: null })
     expect(rows[count]).toMatchObject({ amnesty: null })
   })
 
