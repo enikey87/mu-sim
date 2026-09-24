@@ -15,6 +15,6 @@ export const RARE = new Set([
   // в одной-двух выборках из трёх: состояние складывается не каждый раз
   'Says_catchLie_caught2',
   'Turn_Wedding_Samvel', 'Turn_Wedding_Razmik',
-  // квест «Нива»: сдвиг пула кнопок срока меняет траекторию бота (был в покрытии на main)
-  'Quest_q_niva',
+  // квест «Нива» / вердикт после письма Страсбурга: сдвиг траекторий уводит путь из выборок
+  'Quest_q_niva', 'Court_Verdict_Lettered',
 ])

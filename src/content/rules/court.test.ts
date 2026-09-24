@@ -53,4 +53,12 @@ describe('линия суда', () => {
     expect((await threat(game)).r).toBe('Tone_Threat_Hot')
     expect((await threat(game)).r).toBe('Court_Start')
   })
+  it('после письма Страсбурга в День выплаты — отдельный вердикт, не общая ступень', async () => {
+    const { game } = makeGame()
+    game.S.mem.court = 6
+    game.S.mem.payday = 'strasbourg'
+    const { r, t } = await threat(game)
+    expect(r).toBe('Court_Verdict_Lettered')
+    expect(t.join(' ')).toMatch(/Страсбург|письм/i)
+  })
 })
