@@ -72,6 +72,8 @@ export const sold = (id: ThingId): string => `sold.${id}`
 export const momHelp = (id: MomId): string => `mom.${id}`
 export const loanTaken = (id: LoanId): string => `credit.${id}.taken`
 export const loanDueAt = (id: LoanId): string => `credit.${id}.dueAt`
+/** Полоса неоплат по займу: банк говорит один раз за полосу, не каждую неделю (#184). */
+export const loanFailed = (id: LoanId): string => `credit.${id}.failed`
 
 export const nextLoan = (stage: number): Loan | null =>
   LOANS.find((l) => l.stage === stage + 1) ?? null

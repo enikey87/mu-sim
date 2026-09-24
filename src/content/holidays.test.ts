@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest'
 import { makeGame, alikTexts } from '../test/helpers'
 import { FWD, FWD_HOLIDAY, NOTIF } from './life'
 import { holidayOf, HOLIDAY_EXCUSES } from './holidays'
+import { dateOf } from '../engine/time'
 import { endgame } from './memkeys'
 import { spec } from '../engine/rules'
 
@@ -101,7 +102,9 @@ describe('праздники', () => {
     expect(String(first)).toMatch(/^newYear@\d{4}$/)
     await game.send({ text: 'Спасибо!', tone: 'polite' })
     expect(greeted()).toBe(first) // тайл больше не поздравляет: отметка держит праздник и год
-    game.S.day += 365 // тот же праздник, но год новый
+    // тот же праздник, но год новый: день ставим в само окно, а не «+365» — ход двигает календарь на 1–3 дня
+    const year = dateOf(game.S.day).getFullYear()
+    while (!(holidayOf(game.S.day) === 'newYear' && dateOf(game.S.day).getFullYear() > year)) game.S.day++
     await game.send({ text: 'Спасибо!', tone: 'polite' })
     expect(greeted()).not.toBe(first)
     expect(said().at(-1)).toMatch(/Новым годом|Ёлка|шампанское|Новый год на носу|Первый день года|по-новому/)

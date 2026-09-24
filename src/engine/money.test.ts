@@ -2,6 +2,7 @@ import { join } from 'node:path'
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 import { makeGame } from '../test/helpers'
+import { START_MONEY } from './state'
 import { fieldWrites, fieldWritesIn, inMethod, sources } from '../test/field'
 
 // Деньги пишет только Game.adjustMoney: прямую запись `S.money = …` не пропускает тип (readonly в GameState),
@@ -44,6 +45,6 @@ describe('деньги: одна точка записи', () => {
     // @ts-expect-error money readonly, в том числе приращением
     expect(() => { g.S.money += 100 }).toThrow(TypeError)
     expect(g.adjustMoney(0, 'проверка')).toBe(true) // законный путь жив
-    expect(g.S.money).toBe(12400)
+    expect(g.S.money).toBe(START_MONEY)
   })
 })

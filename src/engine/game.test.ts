@@ -14,6 +14,7 @@ import { COLD_WAR } from '../content/rude'
 import { HEAT } from '../content/memkeys'
 import { valueOf } from './rules'
 import { MENTION_RE } from '../content/world'
+import { P_MONEY, P_DESPERATE } from '../content/topics'
 
 describe('Game: начало и ход', () => {
   it('новая игра: одна из завязок, 184-й день, 3–4 варианта реплик', () => {
@@ -205,11 +206,14 @@ describe('Game: начало и ход', () => {
   })
   it('реплики игрока не повторяются', async () => {
     const { game } = makeGame({ seed: 3 })
+    // пул бедности на дне исчерпывается за партию и дальше звучит редко по кругу (#184): повторы там
+    // разрешены осознанно, их темп сторожит тест «бедность не смолкает» ниже
+    const poor = new Set([...P_MONEY.low.polite, ...P_MONEY.low.neutral, ...P_MONEY.bottom.polite, ...P_MONEY.bottom.neutral, ...P_DESPERATE.low, ...P_DESPERATE.bottom].map(valueOf))
     const mine: string[] = []
     for (let i = 0; i < 80; i++) {
       const c = game.choices.find((x) => x.tone === 'polite' && !x.act) ?? game.choices[0]
       // короткие кнопки сцен («Сбер», «Алик…») по замыслу не перефразируются — их не считаем
-      if (!(c.scene && c.text.length <= 8)) mine.push(c.text)
+      if (!(c.scene && c.text.length <= 8) && !poor.has(c.text)) mine.push(c.text)
       game.S.offlineDays = 0
       await game.send(c)
       if (game.battery.dead) await game.battery.charge()
@@ -894,6 +898,7 @@ describe('Game: пачка непрочитанных записывает в м
 describe('Game: деньги на карте', () => {
   it('adjustMoney пишет баланс, шлёт СМС и факты уровня', () => {
     const { game } = makeGame()
+    setMoney(game, 12400) // уровень «мало»/«дно» проверяем от фиксированного баланса, а не от стартового
     const drain = (re: RegExp) => {
       for (let i = 0; i < 8 && game.ui.notif && !re.test(game.ui.notif.text); i++) game.dismissNotif()
       expect(game.ui.notif?.text).toMatch(re)
@@ -920,6 +925,18 @@ describe('Game: деньги на карте', () => {
     expect(game.ui.notif?.text).toMatch(/критический/)
     game.dismissNotif()
     expect(game.ui.notif?.text).toMatch(/Всё будет|одобрен/i)
+  })
+  it('бедность не смолкает: исчерпанный пул уровня звучит редко и по кругу (#184)', () => {
+    const { game } = makeGame()
+    setMoney(game, 1000)
+    const at = (day: number): string | null => { game.S.day = day; return game.poorLine('P_DESPERATE_bottom', P_DESPERATE.bottom) }
+    const fresh = [at(300), at(300), at(300), at(300)]
+    expect(new Set(fresh).size).toBe(4) // весь пул уровня — без повторов
+    const fallback = at(300)
+    expect(fallback).not.toBeNull() // исчерпанный пул не молчит
+    expect(at(301)).toBe(fallback) // внутри окна строка та же
+    expect(at(300 + 14)).not.toBe(fallback) // следующее окно — другая строка
+    expect(at(300 + 56)).toBe(fallback) // через полный круг — снова она: не чаще, чем раз в 14 дней
   })
   it('после выплаты и в эндгейме деньги не меняются', () => {
     const { game } = makeGame()
