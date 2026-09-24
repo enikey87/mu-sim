@@ -21,5 +21,7 @@ export const PROVEN: Record<string, string> = Object.fromEntries([
   'Endgame_Money', 'Endgame_Mute', 'Endgame_Leave', 'Endgame_Request',
   'Endgame_Turn', 'Endgame_Idle', 'Endgame_Away', 'Endgame_Formality', 'Endgame_NoEnding',
   'Turn_LightOff', 'Turn_NetRation', 'Idle_PhoneWarn', 'Bill_Warn', 'Bill_Due',
+  // финалы, до которых бот доходил только после выплаты — а там теперь тишина (#136); обиженный + пачка — редкое совпадение
   'Finale_beton_ledger', 'Finale_nune_ledger', 'Finale_razmik_swap', 'Says_via_mama',
+  'Away_ColdWar', 'Quiet_Offended_AlikAway',
 ].map((name) => [name, reason]))

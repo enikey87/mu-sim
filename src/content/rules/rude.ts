@@ -183,6 +183,12 @@ export const rudeRules: R[] = [
       await game.say([t])
     },
   },
+  // обиженный и пачка «пока тебя не было»: максимум одна колкость холодной войны (перерыв тот же), остальное — тишина
+  {
+    name: 'Away_ColdWar', event: 'AlikAway', when: [gte(HEAT, 1), is('ctx.offended')], bonus: 1, odds: 0.7, cooldown: { turns: 2 },
+    respond: ({ game }) => game.awayMsg('coldWar'),
+  },
+  { name: 'Quiet_Offended_AlikAway', event: 'AlikAway', when: [gte(HEAT, 1), is('ctx.offended')], respond: () => {} },
 ]
 
 // извинения: во время блока не доставляются; после серии криков — только ритуал
