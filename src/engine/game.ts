@@ -3,16 +3,17 @@
 import { make, D, low, cap, type ExcuseApi, type Promise3, type PromiseCondition, type Rel } from '../content/excuses'
 import { makeScenes, invKey, type Scene, type Line } from '../content/scenes'
 import { COLD_WAR, TRIBUNAL } from '../content/rude'
+import { MIRROR, MIRROR_OPEN, MIRROR_REPLY, type Mirror } from '../content/mirror'
 import { PAYDAY_HOOKS } from '../content/rules/payday'
 import { QUEST_WHEN } from '../content/rules/world'
 import { LEGENDS } from '../content/legends'
-import { TOPICS, P_NEU_B_LATE, P_RUDE_BLOCKED, P_RUDE_POLITE, P_POL_POLITE, P_NIGHT, P_FRIDAY } from '../content/topics'
+import { TOPICS, P_NEU_B_LATE, P_RUDE_BLOCKED, P_RUDE_POLITE, P_POL_POLITE, P_NIGHT, P_FRIDAY, P_MONEY, P_DESPERATE } from '../content/topics'
 import { FINALES, ENDINGS, DEFAULT_FINALE, type Finale } from '../content/finales'
 import { ARCS, ARC_DONE, CAST, type Episode, GROUP, GROUP_OOPS, WRONG_TO, WRONG_WHAT, WRONG_OOPS } from '../content/arcs'
 import * as L from '../content/life'
 import { ACH } from '../content/achievements'
 import { SPEAKS, meet } from '../content/world'
-import { ALIK_STATUS, FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_WANDER, OATH_FORMS } from '../content/misc'
+import { ALIK_STATUS, FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_HIDDEN, STATUS_WANDER, OATH_FORMS } from '../content/misc'
 import { STARTS } from '../content/quests'
 import { BILLS, billDue, billDueAt, billStreak, billUnpaid, lightOff, netRation, phoneWarn, type BillId } from '../content/bills'
 import {
@@ -1045,16 +1046,30 @@ export class Game {
     }
     const P2 = (a: string, b: string) => this.playerLine(() => `${this.draw(a, D[a])} ${this.draw(b, D[b])}`)
     const one = (key: string, arr: readonly Entry<string>[]) => this.playerLine(() => this.draw(key, arr))
-    // общие реплики зависят от стадии: вежливый режим Алика, блок, поздние дни
+    // общие реплики зависят от стадии: вежливый режим Алика, блок, поздние дни, деньги на карте
+    const lv = this.moneyLevel()
+    const level = lv === 'normal' ? null : lv
+    const money = level && P_MONEY[level]
     if (S.mem[memkeys.polite] && this.chance(0.6)) out.push({ text: one('P_POL_POLITE', P_POL_POLITE), tone: 'polite' })
-    else out.push({ text: P2('P_POL_A', 'P_POL_B'), tone: 'polite' })
+    else {
+      // бедность — своими словами, но без повторов: пул исчерпан — обычная вежливая реплика
+      const poor = money && this.chance(level === 'bottom' ? 0.7 : 0.4) ? this.freshPlayer(`P_MONEY_${level}_POL`, money.polite) : null
+      out.push({ text: poor ?? P2('P_POL_A', 'P_POL_B'), tone: 'polite' })
+    }
     if (out.length < 3) {
-      // нейтральная реплика знает время: ночь, вечер пятницы, поздние дни ожидания
       const period = this.period()
+      // отчаяние — своё намерение, чаще на дне; вежливый вариант выше остаётся при любом уровне
+      const cry = money && level && this.chance(level === 'bottom' ? 0.6 : 0.3) ? this.freshPlayer(`P_DESPERATE_${level}`, P_DESPERATE[level]) : null
+      const poor = !cry && money && this.chance(0.5) ? this.freshPlayer(`P_MONEY_${level}_NEU`, money.neutral) : null
+      if (cry) out.push({ text: cry, tone: 'neutral', act: 'desperate' })
+      else if (poor) out.push({ text: poor, tone: 'neutral' })
+      else {
+      // нейтральная реплика знает время: ночь, вечер пятницы, поздние дни ожидания
       const tail = period === 'night' && this.chance(0.5) ? this.freshPlayer('P_NIGHT', P_NIGHT)
         : period === 'friday' && this.chance(0.5) ? this.freshPlayer('P_FRIDAY', P_FRIDAY)
         : S.day >= 300 && this.chance(0.4) ? this.freshPlayer('P_NEU_B_LATE', P_NEU_B_LATE) : null
       out.push({ text: tail ? `${this.draw('P_NEU_A', D.P_NEU_A)} ${tail}` : P2('P_NEU_A', 'P_NEU_B'), tone: 'neutral' })
+      }
     }
     if (S.mem[memkeys.blocked]) out.push({ text: one('P_RUDE_BLOCKED', P_RUDE_BLOCKED), tone: 'rude' })
     else if (S.mem[memkeys.polite]) out.push({ text: one('P_RUDE_POLITE', P_RUDE_POLITE), tone: 'rude' })
@@ -1217,8 +1232,16 @@ export class Game {
         this.unlock('ram')
       }
       // подпись профиля — после хода, а не правилом StoryBeat: серию она не вытесняет; одна за ход
-      const status = this.line('ALIK_STATUS', ALIK_STATUS)
-      if (status) this.sys(`Алик Воздухонесян изменил статус: «${status}»`)
+      if (S.mem[memkeys.blocked]) {
+        // в блоке статусов нет: об этом игрок узнаёт один раз за блок, факт сбрасывает Rude_Block
+        if (!S.mem[memkeys.statusHidden]) {
+          S.mem[memkeys.statusHidden] = true
+          this.sys(STATUS_HIDDEN)
+        }
+      } else {
+        const status = this.line('ALIK_STATUS', ALIK_STATUS)
+        if (status) this.sys(`Алик Воздухонесян изменил статус: «${status}»`)
+      }
       if (this.chance(0.12)) this.randomNotif()
       this.restStatus()
       this.ui.busy = false
@@ -1771,17 +1794,33 @@ export class Game {
   }
 
   // ---------- допработа ----------
-  async answerJob(id: number, yes: boolean): Promise<void> {
+  /** Отмазки-зеркала, открытые сейчас: правдивые в этой партии и когда Алику есть чем возмутиться. */
+  mirrors(): Mirror[] {
+    return this.holds(MIRROR_OPEN) ? this.open(MIRROR) : []
+  }
+  canMirror(): boolean {
+    return this.mirrors().length > 0
+  }
+  /** Ответ на допработу: сделать, отказать или отказать отмазкой Алика ('mirror' — из открытых на момент нажатия). */
+  async answerJob(id: number, answer: boolean | 'mirror'): Promise<void> {
     try {
       const m = this.S.msgs.find((x) => x.id === id)
       if (!m || m.kind !== 'job' || m.answered || this.ui.busy || this.battery.dead || this.disposed) return
+      // бросок генератора — только для зеркала: иначе обычный ответ сдвигает розыгрыш всей партии
+      const open = answer === 'mirror' ? this.mirrors() : []
+      const mirror = open.length ? open[this.rnd(open.length)] : undefined
+      if (answer === 'mirror' && !mirror) return
       this.replaceMsg(m, { answered: true })
       this.ui.busy = true
       this.clearSchedule(this.idleT)
-      const reply = this.playerLine(() => (yes ? this.draw('JY', JOB_YES_P) : this.draw('JN', JOB_NO_P)))
+      const yes = answer === true
+      const reply = mirror ? mirror.me : this.playerLine(() => (yes ? this.draw('JY', JOB_YES_P) : this.draw('JN', JOB_NO_P)))
       this.seen.mark(reply)
       this.push({ kind: 'text', from: 'me', text: reply, time: fmtTime(this.S.clock) })
-      if (yes) {
+      if (mirror) {
+        // зеркало — реплика, не событие: ни долга, ни календаря, ни настроения; ответ — про эту же отмазку или общий
+        await this.say([this.chance(0.5) ? mirror.alik : this.uniq(() => this.draw('MIRROR_REPLY', MIRROR_REPLY))])
+      } else if (yes) {
         const add = 5000 + this.rnd(16) * 1000
         // после Дня выплаты работа ничего не двигает — ни долг, ни календарь
         if (!this.debtSealed()) this.nextDay(2 + this.rnd(3))

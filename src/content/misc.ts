@@ -173,4 +173,6 @@ export const ALIK_STATUS: Line[] = [
   needs('razmik')({ t: 'Снимаю Размика с крана. Не отвлекать, высоко', when: [WORLD.razmikUp, ...statusShown], prio: 1 }),
   { t: 'Уважаемые клиенты! Ваше обращение очень важно для нас', when: [is(polite), ...statusShown], prio: 1 },
 ]
+/** В блоке статус не сменить, и игрок узнаёт об этом один раз за блок. */
+export const STATUS_HIDDEN = 'Алик скрыл от вас статус'
 

@@ -78,6 +78,7 @@ const CASES: Record<string, Case> = {
   },
   Ending_vendetta: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem.vendetta = true } },
   Ending_payday_real: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'real' } },
+  Ending_multiverse: { event: 'CheckEnding', setup: (g) => { endgame(g); g.S.day = 800; g.S.stats.sent = 300 } },
   Ending_payday_niva: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'niva' } },
   Tone_Thanks: { event: 'PlayerMessage', facts: { tone: 'polite', category: 'gratitude' } },
   Tone_Greeting: { event: 'PlayerMessage', facts: { tone: 'polite', category: 'greeting' } },
