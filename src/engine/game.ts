@@ -7,7 +7,7 @@ import { MIRROR, MIRROR_OPEN, MIRROR_REPLY, type Mirror } from '../content/mirro
 import { PAYDAY_HOOKS } from '../content/rules/payday'
 import { QUEST_WHEN } from '../content/rules/world'
 import { LEGENDS } from '../content/legends'
-import { TOPICS, P_NEU_B_LATE, P_RUDE_BLOCKED, P_RUDE_POLITE, P_POL_POLITE, P_NIGHT, P_FRIDAY } from '../content/topics'
+import { TOPICS, P_NEU_B_LATE, P_RUDE_BLOCKED, P_RUDE_POLITE, P_POL_POLITE, P_NIGHT, P_FRIDAY, P_MONEY, P_DESPERATE } from '../content/topics'
 import { FINALES, ENDINGS, DEFAULT_FINALE, type Finale } from '../content/finales'
 import { ARCS, ARC_DONE, CAST, type Episode, GROUP, GROUP_OOPS, WRONG_TO, WRONG_WHAT, WRONG_OOPS } from '../content/arcs'
 import * as L from '../content/life'
@@ -948,16 +948,30 @@ export class Game {
     }
     const P2 = (a: string, b: string) => this.playerLine(() => `${this.draw(a, D[a])} ${this.draw(b, D[b])}`)
     const one = (key: string, arr: readonly Entry<string>[]) => this.playerLine(() => this.draw(key, arr))
-    // общие реплики зависят от стадии: вежливый режим Алика, блок, поздние дни
+    // общие реплики зависят от стадии: вежливый режим Алика, блок, поздние дни, деньги на карте
+    const lv = this.moneyLevel()
+    const level = lv === 'normal' ? null : lv
+    const money = level && P_MONEY[level]
     if (S.mem[memkeys.polite] && this.chance(0.6)) out.push({ text: one('P_POL_POLITE', P_POL_POLITE), tone: 'polite' })
-    else out.push({ text: P2('P_POL_A', 'P_POL_B'), tone: 'polite' })
+    else {
+      // бедность — своими словами, но без повторов: пул исчерпан — обычная вежливая реплика
+      const poor = money && this.chance(level === 'bottom' ? 0.7 : 0.4) ? this.freshPlayer(`P_MONEY_${level}_POL`, money.polite) : null
+      out.push({ text: poor ?? P2('P_POL_A', 'P_POL_B'), tone: 'polite' })
+    }
     if (out.length < 3) {
-      // нейтральная реплика знает время: ночь, вечер пятницы, поздние дни ожидания
       const period = this.period()
+      // отчаяние — своё намерение, чаще на дне; вежливый вариант выше остаётся при любом уровне
+      const cry = money && level && this.chance(level === 'bottom' ? 0.6 : 0.3) ? this.freshPlayer(`P_DESPERATE_${level}`, P_DESPERATE[level]) : null
+      const poor = !cry && money && this.chance(0.5) ? this.freshPlayer(`P_MONEY_${level}_NEU`, money.neutral) : null
+      if (cry) out.push({ text: cry, tone: 'neutral', act: 'desperate' })
+      else if (poor) out.push({ text: poor, tone: 'neutral' })
+      else {
+      // нейтральная реплика знает время: ночь, вечер пятницы, поздние дни ожидания
       const tail = period === 'night' && this.chance(0.5) ? this.freshPlayer('P_NIGHT', P_NIGHT)
         : period === 'friday' && this.chance(0.5) ? this.freshPlayer('P_FRIDAY', P_FRIDAY)
         : S.day >= 300 && this.chance(0.4) ? this.freshPlayer('P_NEU_B_LATE', P_NEU_B_LATE) : null
       out.push({ text: tail ? `${this.draw('P_NEU_A', D.P_NEU_A)} ${tail}` : P2('P_NEU_A', 'P_NEU_B'), tone: 'neutral' })
+      }
     }
     if (S.mem[memkeys.blocked]) out.push({ text: one('P_RUDE_BLOCKED', P_RUDE_BLOCKED), tone: 'rude' })
     else if (S.mem[memkeys.polite]) out.push({ text: one('P_RUDE_POLITE', P_RUDE_POLITE), tone: 'rude' })
