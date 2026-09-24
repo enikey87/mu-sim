@@ -162,6 +162,8 @@ function corpus(): Found[] {
       // подписи и экраны после события: ачивки, карточки персонажей, концовки
       if ([
         'achievements.ACH', 'arcs.CAST', 'finales.ENDINGS', 'finales.DEFAULT_FINALE', 'topics.TOPIC_NAME', 'world.WORLD', 'world.SPEAKS', 'world.MENTION_RE',
+        // реестры ключей фактов: не реплики
+        'world.EXTRAS', 'factkeys.CTX_KEYS', 'factkeys.HAS_KEYS', 'factkeys.FAMILIES',
         // правят или сверяют уже сказанное: автозамена, противоречия Дня выплаты (звено звучит, только если было событие)
         'life.AUTO', 'payday.MORNING_CONTRA', 'payday.CONTRADICTIONS',
       ].includes(at)) continue
