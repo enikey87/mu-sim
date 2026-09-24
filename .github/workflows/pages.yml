@@ -32,9 +32,8 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run typecheck
       - run: npm run lint
-      - run: npm test
+      - run: npm test             # в т.ч. 3 выборки покрытия + дрейф RARE
       - run: npm run test:rules   # движок правил — покрытие 100%
-      - run: npm run rules:stable # список RARE не протух
       - run: npm run build
       - run: npm run test:e2e
       - if: github.event_name != 'pull_request'
