@@ -206,7 +206,7 @@ describe('Game: начало и ход', () => {
       if (!(c.scene && c.text.length <= 8)) mine.push(c.text)
       game.S.offlineDays = 0
       await game.send(c)
-      if (game.ui.dead) await game.charge()
+      if (game.battery.dead) await game.battery.charge()
     }
     expect(new Set(mine).size).toBe(mine.length)
   })
@@ -264,14 +264,14 @@ describe('Game: батарея', () => {
     game.S.battery = 1
     game.S.stats.sent = 3
     await game.send('Алик, привет')
-    expect(game.ui.dead).toBe(true)
+    expect(game.battery.dead).toBe(true)
     expect(game.S.ach.dead).toBeDefined()
     expect(game.S.msgs.at(-1)).toMatchObject({ kind: 'sys', text: 'Не доставлено: у вас сел телефон.' })
     await game.send('ещё')
     expect(game.S.stats.sent).toBe(4)
     const n = game.S.msgs.length
-    await game.charge()
-    expect(game.ui.dead).toBe(false)
+    await game.battery.charge()
+    expect(game.battery.dead).toBe(false)
     expect(game.ui.busy).toBe(false)
     expect(game.S.battery).toBe(100)
     expect(game.S.msgs.slice(n).some((m) => m.kind === 'sys' && m.unread)).toBe(true)
@@ -282,7 +282,7 @@ describe('Game: батарея', () => {
   it('на 15% — уведомление о низком заряде', () => {
     const { game } = makeGame()
     game.S.battery = 16
-    game.drain(1)
+    game.battery.drain(1)
     expect(game.ui.notif?.text).toMatch(/Низкий заряд/)
   })
 })
@@ -374,11 +374,11 @@ describe('Game: сохранение', () => {
   it('перезагрузка продолжает игру и помнит показанные реплики', async () => {
     const storage = memStorage()
     const { game } = makeGame({ storage, seed: 8 })
-    for (let i = 0; i < 15; i++) { game.S.offlineDays = 0; await game.send(game.choices[0]) ; if (game.ui.dead) await game.charge() }
+    for (let i = 0; i < 15; i++) { game.S.offlineDays = 0; await game.send(game.choices[0]) ; if (game.battery.dead) await game.battery.charge() }
     const texts = alikTexts(game.S.msgs)
     const again = new Game({ storage, clock: manualClock(), rng: seededRng(8), noTimers: true, hour: 14 })
     expect(again.S.stats.sent).toBe(game.S.stats.sent)
-    for (let i = 0; i < 15; i++) { again.S.offlineDays = 0; await again.send(again.choices[0]); if (again.ui.dead) await again.charge() }
+    for (let i = 0; i < 15; i++) { again.S.offlineDays = 0; await again.send(again.choices[0]); if (again.battery.dead) await again.battery.charge() }
     const newTexts = alikTexts(again.S.msgs).slice(texts.length)
     for (const t of newTexts) if (!/^\*|\*$|автозамена|Телефон новый|^Не «/.test(t)) expect(texts).not.toContain(t)
   })
@@ -581,16 +581,16 @@ describe('Game: dispose отменяет async', () => {
   it('dispose во время зарядки останавливает последовательность', async () => {
     vi.useFakeTimers()
     const game = new Game({ storage: memStorage(), clock: realClock(), rng: seededRng(1), noTimers: true, hour: 14 })
-    game.die()
-    const charge = game.charge()
-    expect(game.ui.charging).toBe(1)
+    game.battery.die()
+    const charge = game.battery.charge()
+    expect(game.battery.charging).toBe(1)
     expect(vi.getTimerCount()).toBeGreaterThan(0)
     game.dispose()
     expect(game.pendingTimers()).toBe(0)
     expect(vi.getTimerCount()).toBe(0)
     await charge
-    expect(game.ui.charging).toBe(1)
-    expect(game.ui.dead).toBe(true)
+    expect(game.battery.charging).toBe(1)
+    expect(game.battery.dead).toBe(true)
   })
 
   it('гонка: callback начался → dispose → следующий await без эффектов', async () => {

@@ -465,7 +465,7 @@ describe('App', () => {
   it('телефон сел → зарядка', async () => {
     const { game } = makeGame()
     renderApp(game)
-    act(() => { game.S.battery = 1; game.drain(1) })
+    act(() => { game.S.battery = 1; game.battery.drain(1) })
     const dead = screen.getByRole('dialog', { name: 'Телефон сел' })
     expect(dead).toHaveAttribute('aria-modal', 'true')
     expect(document.querySelector('.phone-surface')).toHaveAttribute('inert')

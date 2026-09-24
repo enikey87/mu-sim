@@ -57,7 +57,7 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
   const notify = game.notify.bind(game)
   game.notify = (icon, app, text) => { asides.push({ at: game.S.msgs.length, text: `(уведомление телефона: ${icon} ${app} — ${text})` }); notify(icon, app, text) }
   const next = (): Act => {
-    if (game.ui.dead) return { kind: 'charge' }
+    if (game.battery.dead) return { kind: 'charge' }
     const job = game.S.msgs.find((m) => m.kind === 'job' && !m.answered)
     if (job) return { kind: 'job', yes: bot.random() < 0.5, at: game.S.msgs.length }
     if (game.S.stats.sent >= 5 && bot.random() < PROFILE[style].idle) return { kind: 'idle' }
@@ -71,7 +71,7 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
       if (now.join('\n') !== a.offered.join('\n')) throw new Error(`replay разошёлся на ходу ${k}: ${JSON.stringify(now)}`)
     }
     acts.push(a)
-    if (a.kind === 'charge') await game.charge()
+    if (a.kind === 'charge') await game.battery.charge()
     else if (a.kind === 'job') { const job = game.S.msgs.find((m) => m.kind === 'job' && !m.answered)!; await game.answerJob(job.id, a.yes) }
     else if (a.kind === 'idle') await game.onIdle()
     else {

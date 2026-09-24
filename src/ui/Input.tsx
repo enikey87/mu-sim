@@ -7,7 +7,7 @@ const MARKS = [3, 2, 4, 3, 2, 4]
 /** Варианты реплик: контекстные подсвечены, грубые — красным. Пока Алик отвечает — дёргающиеся «?», чтобы не раскрыть варианты. */
 export function Choices() {
   const game = useGame()
-  const locked = game.ui.busy || game.ui.dead
+  const locked = game.ui.busy || game.battery.dead
   return (
     <div className="choices" id="choices" aria-busy={locked}>
       {game.choices.map((o, i) =>
@@ -35,7 +35,7 @@ export function Choices() {
 export function Composer() {
   const game = useGame()
   const [text, setText] = useState('')
-  const locked = game.ui.busy || game.ui.dead
+  const locked = game.ui.busy || game.battery.dead
   const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const value = text.trim()

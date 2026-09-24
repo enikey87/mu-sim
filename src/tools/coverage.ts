@@ -71,7 +71,7 @@ export async function ruleCoverage(seeds: number[], turns: number, hours = [14, 
     for (let k = 0; k < turns; k++) {
       { const g = i >= seeds.length - grumpy; await botTurn(game, g ? 0.15 : 0.7, g ? 0.6 : 0.06, opts.freeText ?? 0) } // грубый бот почти не извиняется
       // события «игрок молчит» бот сам не вызывает — дёргаем их иногда
-      if (k % 7 === 0 && !game.ui.busy && !game.ui.dead) await game.fire('AlikIdle')
+      if (k % 7 === 0 && !game.ui.busy && !game.battery.dead) await game.fire('AlikIdle')
       total++
     }
     for (const id of Object.keys(game.S.rules.said)) said.add(id)

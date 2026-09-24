@@ -55,7 +55,7 @@ describe('начало игры и сериалы', () => {
     for (let seed = 1; seed <= 10; seed++) {
       const { game } = makeGame({ seed })
       for (let t = 0; t < 12 && !Object.keys(game.S.arcs).length; t++) {
-        if (game.ui.dead) await game.charge()
+        if (game.battery.dead) await game.battery.charge()
         game.S.choices = null
         await game.send(game.choices.find((c) => c.tone === 'polite')!)
         game.S.scene = null

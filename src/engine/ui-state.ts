@@ -16,8 +16,6 @@ export class UiState {
   notif: Notif | null = null
   moos: Moo[] = []
   busy = false
-  dead = false
-  charging: number | null = null
   unread = 0
   feel: SendFeel | null = null
   feelId = 0
