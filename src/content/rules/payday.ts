@@ -109,12 +109,14 @@ const outcome = (id: string, when: R['when'], extra: Partial<R> = {}): R => ({
     // «перевёл {sum}» — ровно то, что осталось «к выплате» после всех долей, а не 240 000 из воздуха
     if (o.sys) game.sys(o.sys.replace('{debt}', fmt(game.S.debt)).replace('{sum}', fmt(Number(game.S.mem[pd.sum] ?? game.S.debt))))
     for (const l of game.open(o.lines)) await game.say([typeof l === 'string' ? l : { w: l[0], t: l[1] }])
-    if (id === 'real' || id === 'coins') { game.S.money += game.S.debt; game.S.debt = 0 }
-    if (id === 'lavash') { game.S.debt = 0; game.S.items.push('Лаваш × 240 000') }
-    if (id === 'niva') { game.S.debt = Math.max(0, game.S.debt - 5000); game.S.items.push('«Нива» (выплата)') }
+    // долг меняем до печати выплаты: после paydayScene adjustDebt уже не пустит
+    if (id === 'real' || id === 'coins') { game.S.money += game.S.debt; game.adjustDebt(-game.S.debt) }
+    if (id === 'lavash') { game.adjustDebt(-game.S.debt); game.S.items.push('Лаваш × 240 000') }
+    if (id === 'niva') { game.adjustDebt(-Math.min(5000, game.S.debt)); game.S.items.push('«Нива» (выплата)') }
     if (id === 'notyou') game.S.items.push('Место на кране (40 м)')
-    if (id === 'default') { game.S.debt -= 50; game.S.money += 50 }
+    if (id === 'default') { if (game.adjustDebt(-50)) game.S.money += 50 }
     game.S.mem[paydayScene] = id
+    game.sealOpenJobs()
     game.S.mem[pd.sum] = undefined
     game.setLegend(null) // деньги «отданы» — легенда денег кончилась
     game.scheduleEvent(game.S.day + 1, 'PaydayButton', { outcome: id })
