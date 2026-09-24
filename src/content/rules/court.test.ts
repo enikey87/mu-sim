@@ -47,6 +47,19 @@ describe('линия суда', () => {
     for (const [, line] of COURT_LAWYER_AGAIN) expect(t).toContain(line)
     expect(t.join(' ')).not.toMatch(/Здравствуйте, это Арсен/)
   })
+  it('негативный контроль: без Court_Lawyer_Again при знакомстве с Арсеном побеждает Court_Step', async () => {
+    const { game } = makeGame()
+    await game.enterNode('nephew', 'start')
+    game.S.scene = null
+    game.S.mem.court = 1
+    const again = game.rules.all.find((x) => x.name === 'Court_Lawyer_Again')!
+    const when = again.when
+    again.when = [{ key: '__never__', op: '==', value: true }]
+    try {
+      // Court_Lawyer закрыт intro.arsen; без Again остаётся общая ступень
+      expect((await threat(game)).r).toBe('Court_Step')
+    } finally { again.when = when }
+  })
   it('в разгар ссоры угроза — встречный иск (один раз), линия суда не сбивается', async () => {
     const { game } = makeGame()
     game.S.mem['rude.heat'] = 3
@@ -101,5 +114,16 @@ describe('линия суда', () => {
     const { r, t } = await threat(game)
     expect(r).toBe('Court_Verdict_Lettered')
     expect(t.join(' ')).toMatch(/Страсбург|письм/i)
+  })
+  it('негативный контроль: без Court_Verdict_Lettered ступень 6+письмо — общая Court_Step', async () => {
+    const { game } = makeGame()
+    game.S.mem.court = 6
+    game.S.mem.payday = 'strasbourg'
+    const lettered = game.rules.all.find((x) => x.name === 'Court_Verdict_Lettered')!
+    const when = lettered.when
+    lettered.when = [{ key: '__never__', op: '==', value: true }]
+    try {
+      expect((await threat(game)).r).toBe('Court_Step')
+    } finally { lettered.when = when }
   })
 })
