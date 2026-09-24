@@ -1,46 +1,12 @@
-import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 import { makeGame } from '../test/helpers'
+import { fieldWrites, inMethod, sources } from '../test/field'
 
-// Долг пишет только Game.adjustDebt. Прямую запись `S.debt = …` не пропускает тип (readonly в GameState);
-// этот страж ловит то, что тип пропускает: запись через переменную без readonly, Object.assign, defineProperty, Reflect.set.
-const walk = (dir: string): string[] =>
-  readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]))
-const sources = walk('src').filter((f) => /\.tsx?$/.test(f) && !/\.test\./.test(f) && !f.startsWith(join('src', 'test')))
-
-/** Скобки и приведения не меняют, куда идёт запись: ((S as X).debt)++ — та же запись. */
-const bare = (n: ts.Node): ts.Node => (ts.isParenthesizedExpression(n) || ts.isNonNullExpression(n) || ts.isAsExpression(n) || ts.isSatisfiesExpression(n) || ts.isTypeAssertionExpression(n) ? bare(n.expression) : n)
-const isDebtKey = (n: ts.Node) => { const k = bare(n); return ts.isStringLiteralLike(k) && k.text === 'debt' }
-const isDebt = (x: ts.Node): boolean => {
-  const n = bare(x)
-  return (ts.isPropertyAccessExpression(n) && n.name.text === 'debt') || (ts.isElementAccessExpression(n) && isDebtKey(n.argumentExpression))
-}
-const hasDebtKey = (n: ts.Node | undefined): boolean =>
-  !!n && ((ts.isStringLiteralLike(n) && n.text === 'debt') ||
-    (ts.isObjectLiteralExpression(n) && n.properties.some((p) => (p.name && ts.isIdentifier(p.name) && p.name.text === 'debt') || (p.name && ts.isStringLiteralLike(p.name) && p.name.text === 'debt') || ts.isSpreadAssignment(p))))
-const WRITERS = new Set(['Object.assign', 'Object.defineProperty', 'Object.defineProperties', 'Reflect.set', 'Reflect.defineProperty'])
-
-/** Места записи долга в файле: «файл:строка». */
-function debtWrites(file: string, allowAdjust = true): string[] {
-  const src = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
-  const out: string[] = []
-  const at = (n: ts.Node) => out.push(`${file}:${src.getLineAndCharacterOfPosition(n.getStart()).line + 1}`)
-  const targets = (n: ts.Node): boolean => isDebt(n) || ((ts.isObjectLiteralExpression(n) || ts.isArrayLiteralExpression(n) || ts.isPropertyAssignment(n) || ts.isShorthandPropertyAssignment(n) || ts.isSpreadElement(n) || ts.isSpreadAssignment(n)) && (ts.forEachChild(n, (c) => targets(c) || undefined) ?? false))
-  const visit = (n: ts.Node, inAdjust: boolean): void => {
-    const here = inAdjust || (allowAdjust && ts.isMethodDeclaration(n) && n.name.getText(src) === 'adjustDebt' && file === join('src', 'engine', 'game.ts'))
-    if (!here) {
-      if (ts.isBinaryExpression(n) && n.operatorToken.kind >= ts.SyntaxKind.FirstAssignment && n.operatorToken.kind <= ts.SyntaxKind.LastAssignment && targets(n.left)) at(n)
-      if ((ts.isPrefixUnaryExpression(n) || ts.isPostfixUnaryExpression(n)) && [ts.SyntaxKind.PlusPlusToken, ts.SyntaxKind.MinusMinusToken].includes(n.operator) && isDebt(n.operand)) at(n)
-      if (ts.isDeleteExpression(n) && isDebt(n.expression)) at(n)
-      if (ts.isCallExpression(n) && WRITERS.has(n.expression.getText(src)) && n.arguments.slice(1).some(hasDebtKey)) at(n)
-    }
-    ts.forEachChild(n, (c) => visit(c, here))
-  }
-  visit(src, false)
-  return out
-}
+// Долг пишет только Game.adjustDebt: прямую запись `S.debt = …` не пропускает тип (readonly в GameState),
+// а разбор `test/field.ts` ловит то, что тип пропускает (переменную, Object.assign, defineProperty, Reflect.set).
+const game = join('src', 'engine', 'game.ts')
+const debtWrites = (file: string, allowAdjust = true) => fieldWrites(file, 'debt', allowAdjust ? inMethod(game, 'adjustDebt') : undefined)
 
 describe('долг: одна точка записи', () => {
   it('страж видит исходники и единственную законную запись', () => {

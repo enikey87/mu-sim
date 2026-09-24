@@ -1,7 +1,7 @@
 // Несостыковки из партии пользователя (docs/PLAYTEST_ISSUES.md): каждая — тестом, чтобы не вернулась.
 import { describe, it, expect } from 'vitest'
 import type { GameEvent } from './rules/events'
-import { makeGame } from '../test/helpers'
+import { makeGame , setMoney} from '../test/helpers'
 import { ARCS, GROUP } from './arcs'
 import { D } from './excuses'
 import { ENDGAME_RETURNERS } from './endgame'
@@ -101,17 +101,17 @@ describe('несостыковки из партии пользователя', 
   })
   it('микроволновка в FLOOR без sold.microwave не появляется', () => {
     const { game } = makeGame()
-    game.S.money = 1000
+    setMoney(game, 1000)
     const floor = () => { game.S.stats.sent += 20; return game.line('FLOOR', FLOOR) ?? '' }
     const got = Array.from({ length: 40 }, floor)
     expect(got.some((t) => /микроволновку/.test(t))).toBe(false)
   })
   it('займ 5000: деньги уходят с карты; нет 5000 на карте — Алик не просит', async () => {
     const { game } = makeGame()
-    game.S.money = 3000
+    setMoney(game, 3000)
     game.S.mood = 8
     for (let i = 0; i < 30; i++) expect((await game.fire('PickScene'))?.name).not.toBe('Scene_lend')
-    game.S.money = 9000
+    setMoney(game, 9000)
     await game.enterNode('lend', 'yes')
     expect(game.S.money).toBe(4000)
   })

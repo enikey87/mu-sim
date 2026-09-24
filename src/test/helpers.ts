@@ -34,3 +34,6 @@ export const alikTexts = (msgs: Msg[]): string[] =>
 export const FIX_RE = /^\*|\*$|автозамена|Телефон новый|^Не «/
 
 export { botTurn } from '../tools/bot'
+
+/** Деньги партии — только через adjustMoney: в тестах ставим их здесь, одной строкой и явно. */
+export const setMoney = (g: Game, n: number): void => { (g.S as { money: number }).money = n }

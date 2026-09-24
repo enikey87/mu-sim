@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { makeGame } from '../test/helpers'
+import { makeGame , setMoney} from '../test/helpers'
 import { BILLS, billUnpaid, lightOff, billDueAt } from './bills'
 import { dueIn } from '../engine/time'
 
@@ -22,7 +22,7 @@ describe('платежи по календарю', () => {
   })
   it('не хватает — СМС отказа, unpaid и последствие', () => {
     const { game } = makeGame()
-    game.S.money = 100
+    setMoney(game, 100)
     game.chargeBill('rent')
     expect(game.S.money).toBe(100)
     expect(game.S.mem[billUnpaid('rent')]).toBe(true)
@@ -65,7 +65,7 @@ describe('платежи по календарю', () => {
   })
   it('у каждого счёта одно списание за срок, даже когда сроки двух счетов совпали (#181)', async () => {
     const { game } = makeGame()
-    game.S.money = 1_000_000
+    setMoney(game, 1_000_000)
     const texts: string[] = []
     const notify = game.notify.bind(game)
     game.notify = (icon, app, text) => { texts.push(text); notify(icon, app, text) }
@@ -96,7 +96,7 @@ describe('платежи по календарю', () => {
   })
   it('два платежа в один день — каждое списание ровно одно за несколько сроков', async () => {
     const { game } = makeGame()
-    game.S.money = 10_000_000
+    setMoney(game, 10_000_000)
     const pending = (id: string) => game.rules.state.schedule.filter(
       (e) => e.kind === 'event' && e.event === 'BillDue' && (e as { facts?: { bill?: string } }).facts?.bill === id,
     )

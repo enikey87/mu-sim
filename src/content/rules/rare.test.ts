@@ -2,7 +2,7 @@
 // здесь каждое вызывается напрямую. Новое правило в списке = новая строка здесь; иначе гейт
 // молча перестаёт его проверять.
 import { describe, it, expect } from 'vitest'
-import { makeGame } from '../../test/helpers'
+import { makeGame, setMoney } from '../../test/helpers'
 import type { Game } from '../../engine/game'
 import type { Facts } from '../../engine/rules'
 import { RARE } from '../../tools/rare'
@@ -57,9 +57,9 @@ const CASES: Record<string, Case> = {
   Idle_PhoneWarn: { event: 'AlikIdle', setup: (g) => { g.S.mem['phone.warn'] = true } },
   Bill_Warn: { event: 'BillWarn', facts: { bill: 'phone' } },
   Bill_Due: { event: 'BillDue', facts: { bill: 'phone' } },
-  Credit_Due: { event: 'CreditDue', facts: { credit: 'consumer' }, setup: (g) => { g.S.mem['credit.consumer.taken'] = true; g.S.money = 50000 } },
-  Says_creditTake: { event: 'PlayerSays', facts: { intent: 'creditTake' }, setup: (g) => { g.S.mem['credit.offer'] = true; g.S.money = 1000 } },
-  Says_creditSell: { event: 'PlayerSays', facts: { intent: 'creditSell' }, setup: (g) => { g.S.mem['credit.offer'] = true; g.S.money = 1000 } },
+  Credit_Due: { event: 'CreditDue', facts: { credit: 'consumer' }, setup: (g) => { g.S.mem['credit.consumer.taken'] = true; setMoney(g, 50000) } },
+  Says_creditTake: { event: 'PlayerSays', facts: { intent: 'creditTake' }, setup: (g) => { g.S.mem['credit.offer'] = true; setMoney(g, 1000) } },
+  Says_creditSell: { event: 'PlayerSays', facts: { intent: 'creditSell' }, setup: (g) => { g.S.mem['credit.offer'] = true; setMoney(g, 1000) } },
   Payday_coins: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['payday.caught'] = true } },
   Ending_payday_coins: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'coins' } },
   Says_sorry_blocked_boris: { event: 'PlayerSays', facts: { intent: 'sorry' }, setup: (g) => { g.S.mem.blocked = true; g.S.arcs.boris = { i: 4, last: 0 } } },

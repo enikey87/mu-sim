@@ -1,7 +1,6 @@
 import { STARTS } from '../content/quests'
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { makeGame, memStorage, alikTexts, flush } from '../test/helpers'
+import { makeGame, memStorage, alikTexts, flush , setMoney} from '../test/helpers'
 import { ENDGAME_FORMALITIES, ENDGAME_JUBILEES } from '../content/endgame'
 import { silentAudio } from './audio'
 import { manualClock, realClock } from './clock'
@@ -913,7 +912,7 @@ describe('Game: деньги на карте', () => {
   })
   it('очередь уведомлений: кредит не затирает «критический», а идёт следом', () => {
     const { game } = makeGame()
-    game.S.money = 7000 // low → bottom: и предупреждение, и оффер
+    setMoney(game, 7000) // low → bottom: и предупреждение, и оффер
     game.adjustMoney(-6000, 'Гречка')
     expect(game.moneyLevel()).toBe('bottom')
     expect(game.ui.notif?.text).toMatch(/Списание/)
@@ -934,14 +933,6 @@ describe('Game: деньги на карте', () => {
     expect(game.adjustMoney(50, 'Перевод от Алика')).toBe(false)
     expect(game.S.money).toBe(m)
   })
-  it('S.money в прод-коде пишется только внутри adjustMoney', () => {
-    const write = /S\.money\s*(?:\+=|-=|=)/g
-    const src = readFileSync('src/engine/game.ts', 'utf8')
-    const body = src.replace(/adjustMoney\([\s\S]*?\n {2}\}/, 'adjustMoney() {}')
-    expect(body.match(write) ?? []).toEqual([])
-    const content = ['src/content/rules/payday.ts', 'src/content/misc.ts', 'src/content/excuses.ts']
-      .map((f) => readFileSync(f, 'utf8')).join('\n')
-    expect(content.match(write) ?? []).toEqual([])
-  })
+  // одна точка записи денег — страж engine/money.test.ts: тип (readonly) + разбор исходников
 })
 
