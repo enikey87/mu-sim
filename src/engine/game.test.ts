@@ -11,6 +11,9 @@ import { SAVE_KEY } from './state'
 import { fmtTime } from './time'
 import { ARCS } from '../content/arcs'
 import { CLAIMS } from '../content/lies'
+import { COLD_WAR } from '../content/rude'
+import { HEAT } from '../content/memkeys'
+import { valueOf } from './rules'
 import { MENTION_RE } from '../content/world'
 
 describe('Game: начало и ход', () => {
@@ -419,6 +422,57 @@ describe('Game: пачка непрочитанных подчиняется м�
       expect(msgs).toEqual([])
       expect(game.ui.unread).toBe(0)
     }
+  })
+  it('исход Дня выплаты определён, экран не закрыт: за ним тишина — ни пачки, ни простоя, ни обещаний, ни переводов', async () => {
+    const { game, clock } = makeGame()
+    // третий акт как в payday.test: партия с финалами, чтобы Beat_Payday и утро выплаты сложились
+    game.S.day = 340
+    Object.assign(game.S.mem, { 'finale.nune': 'default', 'finale.niva': 'chose', 'finale.boris': 'brigadir', 'met.samvel': true, 'met.karine': true, 'met.boris': true })
+    Object.assign(game.S.arcs, { nune: { i: 6, last: 0 }, niva: { i: 7, last: 0 }, boris: { i: 10, last: 0 } })
+    Object.assign(game.S.ach, { q_goat: 1, court: 1, q_hash: 1 })
+    const choose = async (go: string) => { game.S.choices = null; const c = game.choices.find((x) => x.go === go); expect(c, go).toBeDefined(); await game.send(c!) }
+    await game.enterNode('payday', 'announce')
+    await choose('witness'); await choose('share'); await choose('catch')
+    await game.fire('CheckEnding')
+    expect(game.S.ending).toBe('payday_coins')
+    expect(game.S.mem['endgame.active']).toBeUndefined()
+    const from = game.S.msgs.length
+    const [promises, debt, money] = [game.S.promises.length, game.S.debt, game.S.money]
+    await game.onVisibility(true)
+    clock.advance(40 * 60_000)
+    await game.onVisibility(false)
+    await game.onIdle()
+    game.recordPromise({ text: 'завтра', d: 1 })
+    game.nextDay(1)
+    await game.afterTurn()
+    expect(arrived(game, from)).toEqual([])
+    expect(game.ui.unread).toBe(0)
+    expect([game.S.promises.length, game.S.debt, game.S.money]).toEqual([promises + 1, debt, money])
+    expect(game.S.ending).toBe('payday_coins')
+    game.closeEnding()
+    expect(game.S.mem['endgame.active']).toBe(true)
+  })
+  it('обиженный Алик: в пачке максимум одна колкость холодной войны, остальное — тишина', async () => {
+    const pool = new Set(COLD_WAR.map(valueOf))
+    const offendedPack = async (seed: number, n: number) => {
+      const { game } = makeGame({ seed })
+      game.S.stats.sent = 6
+      game.S.mem[HEAT] = 1
+      game.S.ctx = { offended: true }
+      const from = game.S.msgs.length
+      await game.awayBurst(n, 1)
+      const body = arrived(game, from).filter((m) => m.kind !== 'sys')
+      expect(body.length).toBeLessThanOrEqual(1)
+      for (const m of body) expect(m.kind === 'text' && pool.has(m.text), JSON.stringify(m)).toBe(true)
+      return body.length
+    }
+    let jabs = 0
+    for (let seed = 1; seed <= 20; seed++) jabs += await offendedPack(seed, 4)
+    expect(jabs).toBeGreaterThan(0)
+    // шанс колкости 0,7 — на пачке из одного сообщения тишина тоже случается
+    let silent = 0
+    for (let seed = 1; seed <= 30; seed++) silent += (await offendedPack(seed, 1)) === 0 ? 1 : 0
+    expect(silent).toBeGreaterThan(0)
   })
   it('посреди сцены пачки нет — как и болтовни простоя; сцена продолжается', async () => {
     for (let seed = 1; seed <= 10; seed++) {
