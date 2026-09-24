@@ -29,7 +29,6 @@ npm run test:e2e   # Playwright: сценарии в desktop и mobile Chromium 
                    # (собирает dist и подаёт его через `vite preview` на :4173; dev — на :5173)
 npm run typecheck
 npm run lint       # ESLint (в CI)
-npm run format     # Prettier --write (опционально; стиль плотный, массовый прогон отдельно)
 npm run build      # сборка в dist/
 npm run rules:report  # покрытие: 3 выборки × 16 партий; достижимость — хотя бы в одной; отчёт по классам never
 npm run rules:stable  # то же пересечение: запись RARE, до которой выборки дошли, должна уйти (уже в npm test)
