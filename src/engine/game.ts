@@ -688,13 +688,14 @@ export class Game {
       deathCanAdvance: !!S.mem[memkeys.alikDead] && this.arcCanAdvance('alik_death', true),
       'ctx.type': c.type, 'ctx.amount': c.amount, 'ctx.s': c.s, 'ctx.shortTimey': c.s ? TIMEY.test(c.s) : false,
       'ctx.when': c.when, 'ctx.whenNever': c.whenNever,
-      // срок ещё впереди (или «когда-нибудь»): иначе «Запомнил: завтра» звучит уже после завтра
+      // срок ещё впереди (или «когда-нибудь»): иначе «Запомнил: завтра» звучит уже после завтра.
+      // нет дат — нельзя: потеря whenMade/whenDue не должна тихо разрешать кнопку
       'ctx.whenFresh': (() => {
         if (!c.when) return false
         if (c.whenNever) return true
         if (c.whenDue != null) return c.whenDue >= S.day
         if (c.whenMade != null) return c.whenMade >= S.day
-        return true
+        return false
       })(),
       'ctx.whenDate': c.when != null ? fmtDayMonth(c.whenMade ?? S.day) : undefined,
       'ctx.rel': c.rel?.n, 'ctx.relYou': c.rel?.you ?? c.rel?.n, 'ctx.sad': c.sad, 'ctx.festive': c.festive, 'ctx.revived': c.revived,
