@@ -9,6 +9,8 @@ export const pairKey = (a: string, b: string): string => [a, b].sort().join('|')
 export const HEAT = 'rude.heat'
 export const blocked = 'blocked'
 export const blockedHint = 'blocked.hint'
+/** В текущем блоке игроку уже сказали, что статус профиля скрыт: строка звучит один раз за блок. */
+export const statusHidden = 'status.hidden'
 export const polite = 'polite'
 export const alikDead = 'alik_dead'
 export const mourning = 'mourning'
@@ -114,7 +116,7 @@ export const EVENT_KEYS: ReadonlySet<string> = new Set([
 ])
 
 export const MEM_KEYS: ReadonlySet<string> = new Set([
-  HEAT, blocked, blockedHint, polite, bloodGiven, alikDead, mourning, evicted, vendetta, court, courtVerdict,
+  HEAT, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, evicted, vendetta, court, courtVerdict,
   ritualCount, ritualCut, caughtCount, cryptoHodl, bathAsked, mamaCalls, phoneKarine, alikDay, mooAt, sorryAt,
   rudeAt, thanksAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway,
   garikConcrete, garikCut, houseOnGarik, borisMarried, borisSmetaReady, taxFrozen, taxThawed,

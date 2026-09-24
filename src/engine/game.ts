@@ -12,7 +12,7 @@ import { ARCS, ARC_DONE, CAST, type Episode, GROUP, GROUP_OOPS, WRONG_TO, WRONG_
 import * as L from '../content/life'
 import { ACH } from '../content/achievements'
 import { SPEAKS, meet } from '../content/world'
-import { ALIK_STATUS, FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_WANDER, OATH_FORMS } from '../content/misc'
+import { ALIK_STATUS, FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_HIDDEN, STATUS_WANDER, OATH_FORMS } from '../content/misc'
 import { STARTS } from '../content/quests'
 import { BILLS, billDue, billDueAt, billStreak, billUnpaid, lightOff, netRation, phoneWarn, type BillId } from '../content/bills'
 import { allRules } from '../content/rules'
@@ -1106,8 +1106,16 @@ export class Game {
         this.unlock('ram')
       }
       // подпись профиля — после хода, а не правилом StoryBeat: серию она не вытесняет; одна за ход
-      const status = this.line('ALIK_STATUS', ALIK_STATUS)
-      if (status) this.sys(`Алик Воздухонесян изменил статус: «${status}»`)
+      if (S.mem[memkeys.blocked]) {
+        // в блоке статусов нет: об этом игрок узнаёт один раз за блок, факт сбрасывает Rude_Block
+        if (!S.mem[memkeys.statusHidden]) {
+          S.mem[memkeys.statusHidden] = true
+          this.sys(STATUS_HIDDEN)
+        }
+      } else {
+        const status = this.line('ALIK_STATUS', ALIK_STATUS)
+        if (status) this.sys(`Алик Воздухонесян изменил статус: «${status}»`)
+      }
       if (this.chance(0.12)) this.randomNotif()
       this.restStatus()
       this.ui.busy = false
