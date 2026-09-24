@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { makeGame } from '../test/helpers'
+import { makeGame , setMoney} from '../test/helpers'
 import { NOTIF } from './life'
 import {
   LOANS, THINGS, MOM_HELPS, creditOffer, creditStage, creditBroke, momDone,
@@ -9,7 +9,7 @@ import {
 describe('кредитная лестница', () => {
   it('на дне банк предлагает первую ступень', () => {
     const { game } = makeGame()
-    game.S.money = 6001
+    setMoney(game, 6001)
     expect(game.adjustMoney(-1, 'Гречка')).toBe(true)
     expect(game.S.mem[creditOffer]).toBe(true)
     // списание и «критический» идут первыми; оффер — в очереди (#211)
@@ -21,7 +21,7 @@ describe('кредитная лестница', () => {
 
   it('ступени не перепрыгнуть: без consumer нет refi', () => {
     const { game } = makeGame()
-    game.S.money = 1000
+    setMoney(game, 1000)
     game.S.mem[creditOffer] = true
     game.S.mem[creditStage] = 0
     game.takeCredit()
@@ -32,7 +32,7 @@ describe('кредитная лестница', () => {
 
   it('взять кредит — деньги через adjustMoney и срок платежа', () => {
     const { game } = makeGame()
-    game.S.money = 1000
+    setMoney(game, 1000)
     game.S.mem[creditOffer] = true
     const before = game.S.money
     game.takeCredit()
@@ -43,12 +43,12 @@ describe('кредитная лестница', () => {
 
   it('продать вещь — sold.* и деньги; выбор помнит порядок', () => {
     const { game } = makeGame()
-    game.S.money = 1000
+    setMoney(game, 1000)
     game.S.mem[creditOffer] = true
     game.sellThing()
     expect(game.S.mem[sold('microwave')]).toBe(true)
     expect(game.S.money).toBe(1000 + THINGS[0].amount)
-    game.S.money = 1000
+    setMoney(game, 1000)
     game.S.mem[creditOffer] = true
     game.sellThing()
     expect(game.S.mem[sold('guitar')]).toBe(true)
@@ -67,7 +67,7 @@ describe('кредитная лестница', () => {
     const { game } = makeGame()
     for (const t of THINGS) game.S.mem[sold(t.id)] = true
     expect(allSold(game.S.mem)).toBe(true)
-    game.S.money = 1000
+    setMoney(game, 1000)
     game.maybeCreditOffer()
     expect(game.S.mem[momHelp('pension')]).toBe(true)
     expect(game.S.money).toBe(1000 + MOM_HELPS[0].amount)
@@ -77,7 +77,7 @@ describe('кредитная лестница', () => {
     const { game } = makeGame()
     game.S.mem[loanTaken('micro')] = true
     game.S.mem[creditStage] = 3
-    game.S.money = 100
+    setMoney(game, 100)
     game.chargeCredit('micro')
     expect(game.S.mem[creditBroke]).toBe(true)
     expect(game.S.mem[creditStage]).toBe(4)
@@ -88,17 +88,17 @@ describe('кредитная лестница', () => {
   it('после broke мама выручает; после последней — mom.done', () => {
     const { game } = makeGame()
     game.S.mem[creditBroke] = true
-    game.S.money = 500
+    setMoney(game, 500)
     game.maybeCreditOffer()
     expect(game.S.mem[momHelp('pension')]).toBe(true)
-    game.S.money = 500
+    setMoney(game, 500)
     game.maybeCreditOffer()
     expect(game.S.mem[momHelp('pickles')]).toBe(true)
-    game.S.money = 500
+    setMoney(game, 500)
     game.maybeCreditOffer()
     expect(game.S.mem[momHelp('dacha')]).toBe(true)
     expect(game.S.mem[momDone]).toBe(true)
-    game.S.money = 500
+    setMoney(game, 500)
     game.maybeCreditOffer()
     expect(game.S.money).toBe(500)
   })
@@ -106,7 +106,7 @@ describe('кредитная лестница', () => {
   it('в эндгейме лестница молчит', () => {
     const { game } = makeGame()
     game.S.mem.payday = 'default'
-    game.S.money = 1000
+    setMoney(game, 1000)
     game.maybeCreditOffer()
     expect(game.S.mem[creditOffer]).toBeFalsy()
     game.S.mem[creditOffer] = true
@@ -117,7 +117,7 @@ describe('кредитная лестница', () => {
 
   it('Says_creditTake проводит зачисление', async () => {
     const { game } = makeGame()
-    game.S.money = 1000
+    setMoney(game, 1000)
     game.S.mem[creditOffer] = true
     await game.fire('PlayerSays', { intent: 'creditTake' })
     expect(game.S.mem[loanTaken('consumer')]).toBe(true)
@@ -127,7 +127,7 @@ describe('кредитная лестница', () => {
   it('CreditDue списывает платёж', async () => {
     const { game } = makeGame()
     game.S.mem[loanTaken('consumer')] = true
-    game.S.money = 50000
+    setMoney(game, 50000)
     game.scheduleCredits()
     const at = Number(game.S.mem[loanDueAt('consumer')])
     game.S.day = at
@@ -139,7 +139,7 @@ describe('кредитная лестница', () => {
   })
   it('у каждого займа одно событие платежа, когда дни перескакивают через сроки (#181)', async () => {
     const { game } = makeGame()
-    game.S.money = 10_000_000
+    setMoney(game, 10_000_000)
     const texts: string[] = []
     const notify = game.notify.bind(game)
     game.notify = (icon, app, text) => { texts.push(text); notify(icon, app, text) }
@@ -189,7 +189,7 @@ describe('кривая баланса до дна', () => {
 describe('негативные контроли', () => {
   it('без moneyBottom предложение не открывается', () => {
     const { game } = makeGame()
-    game.S.money = 10000
+    setMoney(game, 10000)
     game.maybeCreditOffer()
     expect(game.S.mem[creditOffer]).toBeFalsy()
   })

@@ -461,10 +461,11 @@ export class Game {
     if (delta === 0) return true
     if (delta < 0 && -delta > this.S.money) return false
     const before = this.moneyLevel()
-    this.S.money = Math.max(0, this.S.money + delta)
+    const w: { money: number } = this.S // единственная запись: S.money readonly
+    w.money = Math.max(0, w.money + delta)
     const after = this.moneyLevel()
     const amount = Math.abs(delta).toLocaleString('ru-RU')
-    const bal = this.S.money.toLocaleString('ru-RU')
+    const bal = w.money.toLocaleString('ru-RU')
     const kind = delta < 0 ? 'Списание' : 'Поступление'
     this.notify('🏦', 'Банк', `${kind} ${amount} ₽. ${reason}. Баланс: ${bal} ₽`)
     const rank = { normal: 2, low: 1, bottom: 0 }
