@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { makeGame } from '../test/helpers'
-import { isOpen, valueOf } from '../engine/rules'
-import { D } from './excuses'
+import { NOTIF } from './life'
 import {
   LOANS, THINGS, MOM_HELPS, creditOffer, creditStage, creditBroke, momDone,
   sold, momHelp, loanTaken, loanDueAt, allSold,
@@ -164,19 +163,18 @@ describe('негативные контроли', () => {
 
   it('реплика про микроволновку — только при sold.microwave', () => {
     const { game } = makeGame()
-    const entry = D.P_NEU_B.find((e: (typeof D.P_NEU_B)[number]) => String(valueOf(e)).includes('микроволновке'))
-    expect(entry).toBeDefined()
-    expect(isOpen(entry!, game.lineFacts())).toBe(false)
+    const open = () => game.lines.eligible('NOTIF', NOTIF, game.lineFacts()).some((p) => p.text.includes('Микроволновку'))
+    expect(open()).toBe(false)
     game.S.mem[sold('microwave')] = true
-    expect(isOpen(entry!, game.lineFacts())).toBe(true)
+    expect(open()).toBe(true)
   })
 
   it('сломанный gate sold — тест красный (NC)', () => {
     const { game } = makeGame()
+    const open = () => game.lines.eligible('NOTIF', NOTIF, game.lineFacts()).some((p) => p.text.includes('Микроволновку'))
     game.S.mem[sold('microwave')] = true
-    const entry = D.P_NEU_B.find((e: (typeof D.P_NEU_B)[number]) => String(valueOf(e)).includes('микроволновке'))!
-    expect(isOpen(entry, game.lineFacts())).toBe(true)
+    expect(open()).toBe(true)
     delete game.S.mem[sold('microwave')]
-    expect(isOpen(entry, game.lineFacts())).toBe(false)
+    expect(open()).toBe(false)
   })
 })

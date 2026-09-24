@@ -115,8 +115,6 @@ const CASES: Record<string, Case> = {
   Credit_Due: { event: 'CreditDue', facts: { credit: 'consumer' }, setup: (g) => { g.S.mem['credit.consumer.taken'] = true; g.S.money = 50000 } },
   Says_creditTake: { event: 'PlayerSays', facts: { intent: 'creditTake' }, setup: (g) => { g.S.mem['credit.offer'] = true; g.S.money = 1000 } },
   Says_creditSell: { event: 'PlayerSays', facts: { intent: 'creditSell' }, setup: (g) => { g.S.mem['credit.offer'] = true; g.S.money = 1000 } },
-  Opt_CreditTake: { event: 'BuildChoices', setup: (g) => { g.S.mem['credit.offer'] = true } },
-  Opt_CreditSell: { event: 'BuildChoices', setup: (g) => { g.S.mem['credit.offer'] = true } },
   Finale_beton_ledger: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem.caught = 2 } },
   Finale_nune_ledger: { event: 'ArcFinale', facts: { arc: 'nune' }, setup: (g) => { g.S.mem.caught = 2 } },
   Away_ColdWar: { event: 'AlikAway', setup: offended },

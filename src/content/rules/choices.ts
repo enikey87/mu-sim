@@ -14,7 +14,6 @@ import { TOPICS } from '../topics'
 import { WORLD, SPEAKS, needs } from '../world'
 import { fmtDayMonth } from '../../engine/time'
 import { HEAT, alikDead, blocked, court, lie, mourning } from '../memkeys'
-import { creditOffer, creditStage, nextLoan, nextThing } from '../credit'
 
 type R = Rule<Game, GameEvent, Offer>
 
@@ -111,21 +110,7 @@ export const choiceRules: R[] = [
 
   offer({ name: 'Doubt', when: [is('ctx.constr')], act: 'defend', tone: 'neutral', bonus: 1, text: (g) => fromD(g, 'P_DOUBT') }),
 
-  // кредитная лестница: взять следующую ступень или продать вещь (docs/design/money.md)
-  offer({
-    name: 'CreditTake', when: [is(creditOffer)], act: 'creditTake', tone: 'neutral', bonus: 9, slot: 'creditTake',
-    text: (g) => {
-      const loan = nextLoan(Number(g.S.mem[creditStage] ?? 0))
-      if (!loan) return ''
-      return loan.id === 'consumer' ? 'Взять кредит «Всё будет»'
-        : loan.id === 'refi' ? 'Взять кредит на погашение кредита'
-        : 'Взять микрозайм «Деньги-Ара»'
-    },
-  }),
-  offer({
-    name: 'CreditSell', when: [is(creditOffer)], act: 'creditSell', tone: 'neutral', bonus: 9, slot: 'creditSell',
-    text: (g) => nextThing(g.S.mem)?.choice ?? '',
-  }),
+  // кредитная лестница: кнопки собирает Game.buildChoices напрямую (не через top-2 collect)
 
   // напомнить о просроченном обещании из журнала
   offer({

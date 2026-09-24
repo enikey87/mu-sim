@@ -1062,7 +1062,20 @@ export class Game {
       const topic = facts['ctx.topic'] && this.chance(0.6) ? this.freshPlayer('PR_' + facts['ctx.topic'], TOPICS[String(facts['ctx.topic'])].r.filter((_, i) => TOPICS[String(facts['ctx.topic'])].rneed?.[i]?.test(this.topicText) ?? true)) : null
       out.push({ text: topic ?? P2('P_RUDE_A', 'P_RUDE_B'), tone: 'rude' })
     }
-    return out.slice(0, 4).map((c) => (c.text.includes('{') ? { ...c, text: this.fillMoney(c.text) } : c))
+    // кредитная лестница сверху — не через collect, чтобы не сдвигать колоды обычных реплик
+    const credit: Choice[] = []
+    if (S.mem[creditOffer] && !this.moneySealed()) {
+      const loan = nextLoan(Number(S.mem[creditStage] ?? 0))
+      if (loan) {
+        const text = loan.id === 'consumer' ? 'Взять кредит «Всё будет»'
+          : loan.id === 'refi' ? 'Взять кредит на погашение кредита'
+          : 'Взять микрозайм «Деньги-Ара»'
+        credit.push({ text, tone: 'neutral', act: 'creditTake' })
+      }
+      const thing = nextThing(S.mem)
+      if (thing) credit.push({ text: thing.choice, tone: 'neutral', act: 'creditSell' })
+    }
+    return [...credit, ...out].slice(0, 6).map((c) => (c.text.includes('{') ? { ...c, text: this.fillMoney(c.text) } : c))
   }
   get choices(): Choice[] {
     return (this.S.choices ??= this.buildChoices())
