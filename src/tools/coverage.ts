@@ -91,6 +91,13 @@ export function exemptionIssues(m: Measure, exempt: ReadonlySet<string>, names: 
     else if (zeroShare(v) < RARE_ZERO_SHARE.allowed) {
       // устаревший снимок после чужого PR тоже даёт z=0 — сначала перемерить, не «снять» (#208 / аудит #170)
       issues.push(`${n}: исключение, а стенд доходит всегда (${v.join('/')}) — снять или перемерить (npm run rules:stable)`)
+    } else if (
+      // полоса гистерезиса без нуля в пакетах CI: один ноль в пакете 5+ превращает всегда-достижимое в «исключение» (#230)
+      zeroShare(v) < RARE_ZERO_SHARE.required
+      && v.length >= COVERAGE_SAMPLES.length
+      && v.slice(0, COVERAGE_SAMPLES.length).every((x) => x > 0)
+    ) {
+      issues.push(`${n}: исключение в полосе гистерезиса без нуля в пакетах CI (${v.join('/')}) — снять или перемерить (npm run rules:stable)`)
     }
   }
   for (const [n, v] of Object.entries(m.rules)) if (known.has(n) && !exempt.has(n) && zeroShare(v) >= RARE_ZERO_SHARE.required) issues.push(`${n}: редкое (${v.join('/')}) и без исключения — гейт будет мигать; в RARE с прямым случаем`)
@@ -113,9 +120,9 @@ export function measurePackIssues(m: Measure): string[] {
 }
 
 /**
- * Подделка / устаревание снимка по колонкам CI: в JSON ноль, а живой гейт на тех же сидах правило видел.
- * Обратное (снимок >0, гейт молчит) не краснеет — редкие правила так и гуляют между прогонами.
- * PROVEN/RARE с нулями только в пакетах 3+ этой проверкой не ловятся; их сторожит exemptionIssues по z.
+ * Подделка / устаревание снимка по колонкам CI: в JSON ноль, а живой гейт на тех же сидах правило видел
+ * во **всех** выборках CI (не в одной — иначе правка текста, сдвигающая розыгрыш, даёт ложные «подделки», #230).
+ * Пакеты 3+ этой сверкой не ловятся: их нули для полосы гистерезиса режет `exemptionIssues` (нужен ноль в CI).
  */
 export function measureCiForgeIssues(
   m: Measure,
@@ -124,11 +131,12 @@ export function measureCiForgeIssues(
   const issues: string[] = []
   const nPacks = Math.min(COVERAGE_SAMPLES.length, live.length, m.packs.length)
   for (const [n, v] of Object.entries(m.rules)) {
+    const alwaysLive = live.length >= nPacks && live.slice(0, nPacks).every((s) => (s.fired[n] ?? 0) > 0)
+    if (!alwaysLive) continue
     for (let i = 0; i < nPacks; i++) {
       const snap = v[i] ?? 0
-      const got = live[i].fired[n] ?? 0
-      if (snap === 0 && got > 0) {
-        issues.push(`${n}: снимок пакета ${i} = 0, гейт видел ${got} — перемерить (npm run rules:stable)`)
+      if (snap === 0) {
+        issues.push(`${n}: снимок пакета ${i} = 0, гейт видел во всех выборках CI — перемерить (npm run rules:stable)`)
       }
     }
   }
