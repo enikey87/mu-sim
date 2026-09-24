@@ -79,6 +79,7 @@ const CASES: Record<string, Case> = {
   Ending_vendetta: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem.vendetta = true } },
   Ending_payday_real: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'real' } },
   Ending_payday_niva: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'niva' } },
+  Ending_payday_notyou: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'notyou' } },
   Payday_real: {
     event: 'PaydayOutcome',
     setup: (g) => {
@@ -87,6 +88,9 @@ const CASES: Record<string, Case> = {
     },
   },
   Payday_niva: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['finale.niva'] = 'chose' } },
+  Payday_notyou: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['finale.razmik'] = 'default'; g.S.mem['count.rude'] = 8 } },
+  Finale_razmik_swap: { event: 'ArcFinale', facts: { arc: 'razmik' }, setup: (g) => { g.S.mem['count.rude'] = 10; g.S.mem[HEAT] = 3 } },
+  Says_via_mama: { event: 'PlayerSays', facts: { intent: 'via', arg: 'mama' } },
   Endgame_Money: { event: 'PlayerSays', facts: { intent: 'endgameMoney' }, setup: endgame },
   Endgame_Mute: { event: 'PlayerSays', facts: { intent: 'endgameMute' }, setup: endgame },
   Endgame_Leave: { event: 'PlayerSays', facts: { intent: 'endgameLeave' }, setup: endgame },
