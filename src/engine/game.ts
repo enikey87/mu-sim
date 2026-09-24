@@ -654,13 +654,20 @@ export class Game {
   unfinishedArc(): string | undefined {
     return Object.keys(this.S.arcs).find((id) => this.arcCanAdvance(id, true))
   }
-  /** Квест можно запустить из разговора: он ещё не проходил и его условия выполнены (как у слота квестов). */
+  /** Квест можно запустить из разговора: ещё не брали и условия слота выполнены. Без побочных эффектов. */
   questAllowed(id: string): boolean {
     if (this.S.rules.once['Quest_' + id]) return false
     const facts = resolver(this.rules.hub, { event: 'line' }, this.facts())
-    if (!(QUEST_WHEN[id] ?? []).every((c) => test(c, facts))) return false
-    this.S.rules.once['Quest_' + id] = true // из разговора — тоже «один раз за игру»
-    return true
+    return (QUEST_WHEN[id] ?? []).every((c) => test(c, facts))
+  }
+  /**
+   * Отметить квест взятым тем же once, что у правила `Quest_*` (commit движка).
+   * Звать после успешного enterNode — срыв до отметки оставляет квест доступным.
+   */
+  takeQuest(id: string): void {
+    const r = this.rules.all.find((x) => x.name === 'Quest_' + id && x.event === 'PickQuest')
+    if (!r?.once) throw new Error(`takeQuest: no once PickQuest rule Quest_${id}`)
+    this.rules.commit(r, { event: 'PickQuest' })
   }
   /** Вопрос «Как там…?» к чему-то приведёт: сериал не закончен и сегодня по вопросу ещё не показывали серию. */
   arcCanAdvance(id: string, asked = false): boolean {

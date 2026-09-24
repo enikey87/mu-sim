@@ -9,6 +9,8 @@ import { TALK_REMEMBER } from '../talk'
 import type { Game } from '../../engine/game'
 import type { Msg } from '../../engine/state'
 import { valueOf, spec, lineId, type Entry } from '../../engine/rules'
+import { QUEST_WHEN, questRules } from './world'
+import { TOPICS } from '../topics'
 
 const pickScene = (game: Game) => game.rules.match({ event: 'PickScene' }, game.facts())?.name
 const texts = (msgs: Msg[]) => msgs.filter((m) => m.kind === 'text').map((m) => (m.kind === 'text' ? m.text : ''))
@@ -315,5 +317,20 @@ describe('приоритеты: посреди сцены Алик не болт
     const names = new Set<string>()
     for (let i = 0; i < 40; i++) names.add((await game.fire('AlikIdle'))!.name)
     expect([...names].some((n) => n !== 'Idle_Notif')).toBe(true)
+  })
+})
+
+describe('квесты: once через правило PickQuest', () => {
+  it('у каждого Quest_* once=true; темы с quest ссылаются на существующее правило', () => {
+    for (const r of questRules) {
+      expect(r.event).toBe('PickQuest')
+      expect(r.once).toBe(true)
+      expect(r.name.startsWith('Quest_')).toBe(true)
+    }
+    const names = new Set(questRules.map((r) => r.name))
+    for (const id of Object.keys(QUEST_WHEN)) expect(names.has('Quest_' + id), id).toBe(true)
+    for (const t of Object.values(TOPICS)) {
+      for (const id of Object.values(t.quest ?? {})) expect(names.has('Quest_' + id), id).toBe(true)
+    }
   })
 })
