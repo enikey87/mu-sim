@@ -204,7 +204,7 @@ function corpus(): Found[] {
         }
       else if (at === 'quests.QUESTS') for (const [id, x] of Object.entries(v as object)) strings(x, `${at}.${id}`, [...expand(atoms(QUEST_WHEN[id] ?? [])), ...ownSets(x)], out)
       // суд: ступень 1 вводит юриста Арсена (правило Court_Lawyer — remember до реплик)
-      else if (['quests.COURT', 'quests.COURT_LAWYER_AGAIN', 'quests.COURT_SCENE', 'quests.COURT_AFTER'].includes(at)) strings(v, at, [...atoms([WORLD.arsen]), ...ownSets(v)], out)
+      else if (['quests.COURT', 'quests.COURT_LAWYER_AGAIN', 'quests.COURT_VERDICT_AFTER_LETTER', 'quests.COURT_SCENE', 'quests.COURT_AFTER'].includes(at)) strings(v, at, [...atoms([WORLD.arsen]), ...ownSets(v)], out)
       // исход Дня выплаты звучит по своему правилу — его условия известны
       else if (at === 'payday.OUTCOME') for (const [id, x] of Object.entries(v as object)) strings(x, `${at}.${id}`, expand(atoms(paydayRules.find((r) => r.name === 'Payday_' + id)?.when ?? [])), out)
       // по своим правилам: посредники разблокировки, телефон у Карине (она забирает его, пока жена Алика)
