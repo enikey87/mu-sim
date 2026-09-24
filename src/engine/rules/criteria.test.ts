@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   eq, ne, gt, gte, lt, lte, between, exists, missing, matches, is, named, of,
-  set, add, mul, invert, during, test, describeCriterion, type Resolver,
+  set, add, mul, invert, during, test, describeCriterion, watchFactKeys, type Resolver,
 } from './criteria'
 import type { Facts } from './types'
 
@@ -72,5 +72,18 @@ describe('записи в память', () => {
     expect(invert('a')).toEqual({ key: 'a', op: '!' })
     expect(during('wedding', 5)).toEqual({ key: 'wedding', op: '=', value: true, forDays: 5, scope: undefined })
     expect(during('sick', 3, 'yes', 'target')).toMatchObject({ value: 'yes', scope: 'target', forDays: 3 })
+  })
+})
+
+describe('watchFactKeys', () => {
+  it('ловит ключи условий и записей; null снимает сторож', () => {
+    const seen: string[] = []
+    watchFactKeys((k) => seen.push(k))
+    is('sick')
+    set('heat', 1)
+    during('wedding', 2)
+    watchFactKeys(null)
+    is('ignored')
+    expect(seen).toEqual(['sick', 'heat', 'wedding'])
   })
 })
