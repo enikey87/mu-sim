@@ -393,7 +393,7 @@ describe('несостыковки из плейтеста ботами, рау�
     for (let i = 0; i < 600; i++) said.push(game.X.excuse({}).texts.join(' '))
     expect(said.filter((t) => own.test(t))).toEqual([])
     expect(said.some((t) => /Самвела|Гарика|Гоар|Мкртича|Гагика|Грачика/.test(t))).toBe(true)
-  })
+  }, 60_000) // 600 отмазок генератора: время растёт с корпусом
   it('пока в семье прощаются, застолья и смертного одра не бывает', async () => {
     const { game } = makeGame()
     game.S.day = 250
