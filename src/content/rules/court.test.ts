@@ -1,7 +1,7 @@
 // Линия суда: каждая угроза — следующая ступень, заседание — сцена с выбором, потом апелляция и Страсбург.
 import { describe, it, expect } from 'vitest'
 import { makeGame } from '../../test/helpers'
-import { COURT, COURT_AFTER, COURT_LAWYER_AGAIN } from '../quests'
+import { COURT, COURT_AFTER, COURT_LAWYER_AGAIN, COURT_VERDICT_AFTER_LETTER } from '../quests'
 import { valueOf } from '../../engine/rules'
 import { THREAT_AGAIN } from '../misc'
 import type { Game } from '../../engine/game'
@@ -47,7 +47,27 @@ describe('линия суда', () => {
     for (const [, line] of COURT_LAWYER_AGAIN) expect(t).toContain(line)
     expect(t.join(' ')).not.toMatch(/Здравствуйте, это Арсен/)
   })
-  it('негативный контроль: без Court_Lawyer_Again при знакомстве с Арсеном побеждает Court_Step', async () => {
+  it('перевод звучит и на ветках: Арсен уже писал и вердикт после письма Страсбурга', async () => {
+    // Court_Lawyer_Again: Арсен знаком, ступень 1
+    const { game } = makeGame()
+    await game.enterNode('nephew', 'start')
+    game.S.scene = null
+    game.S.mem.court = 1
+    game.S.mem['threat.claim'] = 'tax'
+    const again = await threat(game)
+    expect(again.r).toBe('Court_Lawyer_Again')
+    expect(again.t[0]).toBe(`Налоговая? Налоговая сказала — это в суд. ${COURT_LAWYER_AGAIN[0][1]}`)
+    // Court_Verdict_Lettered: ступень 6 и письмо Страсбурга в День выплаты
+    const { game: g2 } = makeGame()
+    g2.S.mem.court = 6
+    g2.S.mem.payday = 'strasbourg'
+    g2.S.mem['threat.claim'] = 'collectors'
+    const lettered = await threat(g2)
+    expect(lettered.r).toBe('Court_Verdict_Lettered')
+    expect(lettered.t[0]).toBe(`Коллекторы? Коллекторы сказали — это в суд. ${COURT_VERDICT_AFTER_LETTER[0][1]}`)
+  })
+
+  it('без Court_Lawyer_Again при знакомстве с Арсеном побеждает общая ступень', async () => {
     const { game } = makeGame()
     await game.enterNode('nephew', 'start')
     game.S.scene = null
@@ -115,7 +135,7 @@ describe('линия суда', () => {
     expect(r).toBe('Court_Verdict_Lettered')
     expect(t.join(' ')).toMatch(/Страсбург|письм/i)
   })
-  it('негативный контроль: без Court_Verdict_Lettered ступень 6+письмо — общая Court_Step', async () => {
+  it('без Court_Verdict_Lettered ступень 6 с письмом отвечает общая ступень', async () => {
     const { game } = makeGame()
     game.S.mem.court = 6
     game.S.mem.payday = 'strasbourg'
