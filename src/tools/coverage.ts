@@ -72,12 +72,13 @@ export interface Measure { packs: number[][]; rules: Record<string, number[]> }
 /** Доля пакетов, где правило не сработало ни разу. */
 export const zeroShare = (v: readonly number[]): number => v.filter((x) => x === 0).length / v.length
 /**
- * Граница исключений с гистерезисом (z — доля пакетов замера, где правило молчит). Исключение (RARE / PROVEN)
- * допустимо, только если стенд молчит хоть в одном пакете (z ≥ 0,1: «достигает не всегда»), и обязательно при
- * z ≥ 0,3: шанс, что правка текста обнулит такое правило во всех трёх выборках CI, ≈ z³ ≥ 2,7 %. Между ними —
- * решает автор: иначе правило на границе мигало бы от одного перемера к другому.
+ * Граница исключений с гистерезисом (z — доля пакетов замера, где правило молчит). Единственное место порога
+ * (#208): документ и тесты читают отсюда. Исключение (RARE / PROVEN) допустимо, только если стенд молчит хоть
+ * в одном пакете (z ≥ allowed: «достигает не всегда»), и обязательно при z ≥ required. Между ними — решает
+ * автор: иначе правило на границе мигало бы от одного перемера к другому. Правка текста без `rules:stable`
+ * списки не трогает — граница держится на закоммиченном снимке, а не на трёх выборках CI.
  */
-export const RARE_ZERO_SHARE = { allowed: 0.1, required: 0.3 }
+export const RARE_ZERO_SHARE = { allowed: 0.1, required: 0.3 } as const
 
 /** Расхождения исключений с замером: исключение, которое стенд достигает почти всегда; редкое правило без исключения; пропуски. */
 export function exemptionIssues(m: Measure, exempt: ReadonlySet<string>, names: readonly string[]): string[] {
@@ -87,10 +88,42 @@ export function exemptionIssues(m: Measure, exempt: ReadonlySet<string>, names: 
   for (const n of exempt) {
     const v = m.rules[n]
     if (!v) issues.push(`${n}: исключение без замера — перемерить (npm run rules:stable)`)
-    else if (zeroShare(v) < RARE_ZERO_SHARE.allowed) issues.push(`${n}: исключение, а стенд доходит всегда (${v.join('/')}) — снять`)
+    else if (zeroShare(v) < RARE_ZERO_SHARE.allowed) {
+      // устаревший снимок после чужого PR тоже даёт z=0 — сначала перемерить, не «снять» (#208 / аудит #170)
+      issues.push(`${n}: исключение, а стенд доходит всегда (${v.join('/')}) — снять или перемерить (npm run rules:stable)`)
+    }
   }
   for (const [n, v] of Object.entries(m.rules)) if (known.has(n) && !exempt.has(n) && zeroShare(v) >= RARE_ZERO_SHARE.required) issues.push(`${n}: редкое (${v.join('/')}) и без исключения — гейт будет мигать; в RARE с прямым случаем`)
   return issues
+}
+
+/** Первые пакеты снимка — те же сиды, что у гейта CI; иначе сверка с замером смотрит мимо прогона. */
+export function measurePackIssues(m: Measure): string[] {
+  const issues: string[] = []
+  if (m.packs.length < COVERAGE_SAMPLES.length) {
+    issues.push(`снимок: пакетов ${m.packs.length}, нужно ≥${COVERAGE_SAMPLES.length} — перемерить (npm run rules:stable)`)
+    return issues
+  }
+  for (let i = 0; i < COVERAGE_SAMPLES.length; i++) {
+    if (JSON.stringify(m.packs[i]) !== JSON.stringify(COVERAGE_SAMPLES[i])) {
+      issues.push(`снимок: пакет ${i} ≠ COVERAGE_SAMPLES — перемерить (npm run rules:stable)`)
+    }
+  }
+  return issues
+}
+
+/**
+ * Подделка снимка: запись в RARE + ручные нули в JSON, пока гейт в каждой выборке правило видит.
+ * PROVEN не сюда — бот до него может не доходить, хотя прямой случай есть.
+ */
+export function rareAlwaysReachedIssues(
+  rare: ReadonlySet<string>,
+  live: ReadonlyArray<{ fired: Record<string, number> }>,
+): string[] {
+  if (!live.length) return []
+  return [...rare]
+    .filter((n) => live.every((s) => (s.fired[n] ?? 0) > 0))
+    .map((n) => `${n}: в RARE, а гейт доходит в каждой выборке — снять или перемерить`)
 }
 
 /** grumpy — номера партий (с конца), где бот много грубит: иначе лестница грубости не проходится. */

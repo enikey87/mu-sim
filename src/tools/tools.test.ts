@@ -5,7 +5,8 @@ import { allRules } from '../content/rules'
 import { isFactKey } from '../content/factkeys'
 import { readFileSync } from 'node:fs'
 import {
-  multiSampleCoverage, formatCoverage, neverClass, neverInAllSamples, exemptionIssues, zeroShare, RARE_ZERO_SHARE, COVERAGE_SAMPLES, type Measure,
+  multiSampleCoverage, formatCoverage, neverClass, neverInAllSamples, exemptionIssues, zeroShare,
+  measurePackIssues, rareAlwaysReachedIssues, RARE_ZERO_SHARE, COVERAGE_SAMPLES, type Measure,
 } from './coverage'
 import { PROVEN } from './proven'
 import { RARE } from './rare'
@@ -40,6 +41,7 @@ describe('гистерезис покрытия', () => {
     expect(exemptionIssues(m, new Set(['Often', 'Gone']), ['Often', 'Rare', 'Gone', 'Edge'])).toEqual([
       expect.stringMatching(/^Often: исключение/), expect.stringMatching(/^Rare: редкое/),
     ])
+    expect(exemptionIssues(m, new Set(['Often', 'Gone']), ['Often', 'Rare', 'Gone', 'Edge'])[0]).toMatch(/перемерить/)
     // полоса гистерезиса (молчит в 2 пакетах из 10): и в исключениях, и под гейтом — законно
     expect(exemptionIssues(m, new Set(['Rare', 'Gone']), ['Often', 'Rare', 'Gone', 'Edge'])).toEqual([])
     expect(exemptionIssues(m, new Set(['Rare', 'Gone', 'Edge']), ['Often', 'Rare', 'Gone', 'Edge'])).toEqual([])
@@ -51,9 +53,22 @@ describe('гистерезис покрытия', () => {
   it('исключения гейта (RARE, PROVEN) совпадают с широким замером', () => {
     expect(measure.packs.length).toBeGreaterThanOrEqual(10)
     expect(Object.keys(measure.rules).length).toBeGreaterThan(200) // замер не пустой: пустой прошёл бы любую сверку
+    expect(measurePackIssues(measure)).toEqual([])
     const exempt = new Set([...RARE, ...Object.keys(PROVEN)])
     expect(exemptionIssues(measure, exempt, allRules.map((r) => r.name))).toEqual([])
-    expect(RARE_ZERO_SHARE.allowed).toBeGreaterThan(0)
+    expect(RARE_ZERO_SHARE.allowed).toBe(0.1)
+    expect(RARE_ZERO_SHARE.required).toBe(0.3)
+  })
+  it('подделка снимка: RARE + нули в JSON при живом гейте — красное', () => {
+    // Beat_FirstArc в RARE и два обнулённых пакета в JSON — прежний обход (#208); живой прогон его ловит
+    const live = [{ fired: { Beat_FirstArc: 3 } }, { fired: { Beat_FirstArc: 7 } }, { fired: { Beat_FirstArc: 4 } }]
+    expect(rareAlwaysReachedIssues(new Set(['Beat_FirstArc']), live)).toEqual([
+      expect.stringMatching(/^Beat_FirstArc: в RARE/),
+    ])
+    expect(rareAlwaysReachedIssues(new Set(['Tone_Cow']), live)).toEqual([])
+    expect(measurePackIssues({ packs: [[1], ...COVERAGE_SAMPLES.slice(1)], rules: {} })).toEqual([
+      expect.stringMatching(/пакет 0/),
+    ])
   })
   it('классы never — только rare / proven / unexplained; префикс не освобождает', () => {
     expect(neverClass('Tone_Cow')).toBe('rare')
@@ -61,10 +76,14 @@ describe('гистерезис покрытия', () => {
     expect(neverClass('Quiet_BrandNew')).toBe('unexplained')
     expect(neverClass('Finale_made_up')).toBe('unexplained')
   })
-  it('PROVEN ⊆ allRules, причины непустые, пересечения с RARE нет', () => {
+  it('PROVEN ⊆ allRules, причины уникальны и называют запись, пересечения с RARE нет', () => {
     const names = new Set(allRules.map((r) => r.name))
-    expect(Object.keys(PROVEN).filter((n) => !names.has(n))).toEqual([])
-    expect(Object.entries(PROVEN).filter(([, why]) => !why.trim()).map(([n]) => n)).toEqual([])
+    const entries = Object.entries(PROVEN)
+    expect(entries.filter(([n]) => !names.has(n)).map(([n]) => n)).toEqual([])
+    expect(entries.filter(([, why]) => !why.trim()).map(([n]) => n)).toEqual([])
+    // общая константа на всех (#130) — красная: причин меньше, чем записей
+    expect(new Set(entries.map(([, why]) => why)).size).toBe(entries.length)
+    expect(entries.filter(([n, why]) => !why.includes(n)).map(([n]) => n)).toEqual([])
     expect([...RARE].filter((n) => n in PROVEN)).toEqual([])
   })
 })
@@ -80,5 +99,7 @@ describe('покрытие правил', () => {
     }
     // Классы «не сработало» и их прямые тесты — в coverage.ts: необъяснённых быть не должно.
     expect(r.never.filter((n) => neverClass(n) === 'unexplained')).toEqual([])
+    // снимок нельзя подделать нулями, пока гейт в каждой выборке правило видит (#208)
+    expect(rareAlwaysReachedIssues(RARE, r.samples)).toEqual([])
   }, 900_000)
 })
