@@ -1285,6 +1285,17 @@ export class Game {
         const status = this.line('ALIK_STATUS', ALIK_STATUS)
         if (status) this.sys(`Алик Воздухонесян изменил статус: «${status}»`)
       }
+      // праздник в окне звучит хотя бы раз: отмазку вытесняют серия, сцена или легенда, а окно короткое.
+      // Поздравляет сам Алик: в блоке, при «смерти» и с телефоном у Карине он не пишет (как и статус)
+      const holiday = holidayOf(S.day)
+      const muted = S.mem[memkeys.blocked] || S.mem[memkeys.alikDead] || S.mem[memkeys.phoneKarine]
+      if (holiday && !muted && S.mem[memkeys.holidayGreeted] !== `${holiday}@${dateOf(S.day).getFullYear()}`) {
+        const festive = this.line('HOLIDAY', HOLIDAY_EXCUSES)
+        if (festive) {
+          await this.say([festive])
+          S.mem[memkeys.holidayGreeted] = `${holiday}@${dateOf(S.day).getFullYear()}`
+        }
+      }
       if (this.chance(0.12)) this.randomNotif()
       this.restStatus()
       this.ui.busy = false
