@@ -543,7 +543,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
           ],
         },
         yes: {
-          fx: { amnesty: true },
+          fx: { amnesty: true, mood: 1, ach: 'amnesty' },
           sys: (v: Vars) => `Амнистия объявлена. Просроченных обещаний обнулено: ${v.amnestied}.`,
           a: ['Вот это по-братски! Записывай новое:'],
           then: 'promise',

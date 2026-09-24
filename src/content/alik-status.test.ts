@@ -4,9 +4,14 @@ import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
 import { valueOf, type LineSpec } from '../engine/rules'
 import { ALIK_STATUS } from './misc'
+import { HEAT } from './memkeys'
 
 const statuses = (g: Game) => g.S.msgs.flatMap((m) => (m.kind === 'sys' && m.text.startsWith('Алик Воздухонесян изменил статус') ? [m.text] : []))
+const HIDDEN = 'Алик скрыл от вас статус'
+const hidden = (g: Game) => g.S.msgs.flatMap((m) => (m.kind === 'sys' && m.text === HIDDEN ? [m.text] : []))
 const turn = async (g: Game) => { g.S.offlineDays = 0; await g.send({ text: 'Алик, как дела?', tone: 'polite' }) }
+/** Крик доходит до блока (S3): ступень задаётся температурой ссоры, блок ставит правило Rude_Block. */
+const rage = async (g: Game) => { g.S.offlineDays = 0; g.S.mem[HEAT] = 3; await g.send({ text: 'Алик, ты вор!', tone: 'rude' }) }
 /** Серия за серией, пока настоящая серия не поставит состояние (или сериал не кончится). */
 async function playUntil(g: Game, arc: string, holds: (g: Game) => boolean): Promise<void> {
   for (let i = 0; i < 20 && !holds(g); i++) {
@@ -74,6 +79,31 @@ describe('статус Алика живёт миром', () => {
       await turn(game)
       expect(statuses(game), name).toEqual([])
     }
+  })
+  it('в блоке статус скрыт: строка один раз за блок, после разблокировки пул возвращается', async () => {
+    const { game } = makeGame()
+    await playUntil(game, 'niva', nivaAway) // есть что объявлять: состояние уже наступило
+    game.S.mem.blocked = true
+    await turn(game)
+    expect(hidden(game)).toEqual([HIDDEN])
+    expect(statuses(game)).toEqual([])
+    await turn(game)
+    expect(hidden(game)).toHaveLength(1) // один раз за блок, а не каждый ход
+    game.S.mem.blocked = false // разблокировка извинением через посредника
+    await turn(game)
+    expect(statuses(game)).toEqual(['Алик Воздухонесян изменил статус: «Ищу «Ниву». Видели — звоните»'])
+  })
+  it('блок ставит правило: строка приходит в его ходу, второй блок — снова', async () => {
+    const { game } = makeGame()
+    await rage(game)
+    expect(game.S.mem.blocked).toBe(true)
+    expect(hidden(game)).toEqual([HIDDEN])
+    game.nextDay(12) // блок кончился сам (4 дня) и прошёл перерыв Rude_Block
+    await game.afterTurn()
+    expect(game.S.mem.blocked).toBeUndefined()
+    await rage(game)
+    expect(game.S.mem.blocked).toBe(true)
+    expect(hidden(game)).toHaveLength(2)
   })
   it('статус не называет сроков и дат: такой текст — обещание без записи', () => {
     for (const l of ALIK_STATUS.map(valueOf)) expect((l as LineSpec).t).not.toMatch(/понедельник|вторник|сред|четверг|пятниц|суббот|воскрес|завтра|недел|месяц|\d/i)
