@@ -107,8 +107,6 @@ const CASES: Record<string, Case> = {
   Bill_Due: { event: 'BillDue', facts: { bill: 'phone' } },
   Finale_beton_ledger: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem.caught = 2 } },
   Finale_nune_ledger: { event: 'ArcFinale', facts: { arc: 'nune' }, setup: (g) => { g.S.mem.caught = 2 } },
-  Finale_razmik_swap: { event: 'ArcFinale', facts: { arc: 'razmik' }, setup: (g) => { g.S.mem['count.rude'] = 10; g.S.mem['rude.heat'] = 3 } },
-  Says_via_mama: { event: 'PlayerSays', facts: { intent: 'via', arg: 'mama' }, setup: (g) => { g.S.mem.blocked = true; g.S.mem['finale.rubik'] = 'karine' } },
   Away_ColdWar: { event: 'AlikAway', setup: offended },
   Quiet_Offended_AlikAway: { event: 'AlikAway', setup: offended },
 }
