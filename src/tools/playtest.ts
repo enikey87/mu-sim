@@ -103,9 +103,16 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
   const asides: Aside[] = []
   const world: WorldFrame[] = []
   const firedBuf: WorldFrame['fired'] = []
-  // сообщение принадлежит правилу, чей respond сейчас идёт (onRespond до/после); молчание снимает атрибуцию
+  // сообщение принадлежит правилу, чей respond сейчас идёт (onRespond до/после); молчание снимает атрибуцию.
+  // после выхода из fire атрибуция сбрасывается: пустой Quiet_* (respond → undefined) иначе оставляет
+  // своё имя на всё, что движок напишет следом (#229)
   let lastRule: string | null = null
   game.rules.onRespond = (r, ok) => { lastRule = ok ? r.name : null }
+  const fire = game.rules.fire.bind(game.rules)
+  game.rules.fire = (async (...args: Parameters<typeof fire>) => {
+    try { return await fire(...args) }
+    finally { lastRule = null }
+  }) as typeof game.rules.fire
   game.rules.tracer = (t) => {
     if (t.chosen.length) firedBuf.push({ event: t.event, chosen: [...t.chosen] })
   }

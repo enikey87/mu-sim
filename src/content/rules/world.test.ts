@@ -128,15 +128,15 @@ describe('обещания наступают', () => {
     expect(game.S.promises[0].met).toBeUndefined()
     expect(game.S.msgs).toHaveLength(before)
   })
-  it('негативный контроль: Condition_Met при смерти говорит — защита только в fulfillConditionalPromise', async () => {
+  it('Condition_Met при смерти молчит — гейт на alik_dead, не только обход в fulfillConditionalPromise', async () => {
     const { game } = makeGame()
     game.recordPromise({ text: 'как Грант заплатит — отдам', d: null, condition: 'grant.paid' })
     game.S.mem['grant.paid'] = true
     game.S.mem.alik_dead = true
     game.S.promises[0].met = game.S.day
     const before = game.S.msgs.length
-    await game.fire('PromiseConditionMet', { promise: 0 })
-    expect(game.S.msgs.length).toBeGreaterThan(before)
+    expect((await game.fire('PromiseConditionMet', { promise: 0 }))?.name).not.toBe('Condition_Met')
+    expect(game.S.msgs).toHaveLength(before)
   })
   it('событийное условие исполняет обещание ровно один раз', async () => {
     const { game } = makeGame()
