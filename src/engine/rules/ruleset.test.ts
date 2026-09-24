@@ -369,6 +369,25 @@ describe('RuleSet.fire', () => {
     expect(await rs.fire(game, { event: 'A' }, factsFor)).toBeNull()
     expect(game.log).toEqual(['Next'])
   })
+  it('вечно молчащее правило не заслоняет следующее подходящее', async () => {
+    const { rs, game, factsFor } = mk()
+    rs.add(
+      { name: 'AlwaysSilent', event: 'E', when: [], specificity: 99, respond: () => false },
+      { name: 'Speaks', event: 'E', when: [], respond: () => { game.log.push('Speaks') } },
+    )
+    const r = await rs.fire(game, { event: 'E' }, factsFor)
+    expect(r?.name).toBe('Speaks')
+    expect(game.log).toEqual(['Speaks'])
+  })
+  it('если промолчали все подходящие — null', async () => {
+    const { rs, game, factsFor } = mk()
+    rs.add(
+      { name: 'A', event: 'E', when: [], specificity: 2, respond: () => false },
+      { name: 'B', event: 'E', when: [], specificity: 1, respond: () => false },
+    )
+    expect(await rs.fire(game, { event: 'E' }, factsFor)).toBeNull()
+    expect(game.log).toEqual([])
+  })
   it('отложенный trigger попадает в расписание', async () => {
     const { rs, game, factsFor, state, clock } = mk()
     rs.add(say('Now', 'A', [], { trigger: [{ event: 'Later', delay: 4, facts: { x: 1 } }] }), say('Later', 'Later'))

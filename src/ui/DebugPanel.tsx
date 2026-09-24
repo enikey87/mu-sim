@@ -1,13 +1,13 @@
-import { useState } from 'react'
-import { useGame } from './useGame'
+import { useState, useSyncExternalStore } from 'react'
+import type { Game } from '../engine/game'
 import type { TraceEntry } from '../engine/ui-state'
 
 // Факты, которые почти всегда есть и только шумят
 const NOISY = /^(once\.|said\.|cb\.|caught\.)/
 
 /** Отладочная панель (?debug): какое правило выбрано на каждое событие и почему. */
-export function DebugPanel() {
-  const game = useGame()
+export function DebugPanel({ game }: { game: Game }) {
+  useSyncExternalStore(game.subscribe, game.getVersion)
   const [open, setOpen] = useState<number | null>(null)
   const [showMem, setShowMem] = useState(false)
   const mem = Object.entries(game.S.mem).filter(([k]) => showMem || !NOISY.test(k))
