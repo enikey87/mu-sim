@@ -150,6 +150,8 @@ export class Game {
   private dayMovedInTurn = false
   /** Списания дня для одного СМС («Списания: Связь …, Проездной …», #178). */
   private bankCharges: { day: number; parts: string[] } | null = null
+  /** Ключи банковских SMS за день — одно и то же не дважды (#251 / #178). */
+  private bankSmsDay: { day: number; keys: Set<string> } | null = null
 
   constructor(opts: GameOptions = {}) {
     this.storage = opts.storage === undefined ? (typeof localStorage !== 'undefined' ? localStorage : null) : opts.storage
@@ -513,7 +515,8 @@ export class Game {
       const at = this.S.day + dueIn(bill.due, this.S.day)
       this.S.mem[atKey] = at
       this.scheduleEvent(at, 'BillDue', { bill: bill.id, at })
-      if (at - 1 > this.S.day) this.scheduleEvent(at - 1, 'BillWarn', { bill: bill.id, at })
+      // предупреждение SMS — только коммуналка (#178/#251); иначе игрок кричит «списание завтра» без SMS
+      if (bill.id === 'rent' && at - 1 > this.S.day) this.scheduleEvent(at - 1, 'BillWarn', { bill: bill.id, at })
     }
   }
   /** Событие по сроку — текущий срок, а не устаревший дубль. Без `at` — событие из старого сохранения. */
@@ -870,6 +873,13 @@ export class Game {
 
   // ---------- уведомления, батарея ----------
   notify(icon: string, app: string, text: string): void {
+    // банк: одна и та же новость (числа не различают) — один раз за игровой день (#251)
+    if (app === 'Банк' || app === 'МФО') {
+      if (!this.bankSmsDay || this.bankSmsDay.day !== this.S.day) this.bankSmsDay = { day: this.S.day, keys: new Set() }
+      const key = text.replace(/\d[\d\s]*/g, '#')
+      if (this.bankSmsDay.keys.has(key)) return
+      this.bankSmsDay.keys.add(key)
+    }
     const n: Notif = { id: this.seq++, icon, app, text }
     if (this.ui.notif) { this.notifQueue.push(n); return }
     this.showNotif(n)
@@ -983,11 +993,12 @@ export class Game {
     return {
       day: S.day, tier: S.tier, mood: S.mood, sent: S.stats.sent, moo: S.stats.moo, patience: S.patience, money: S.money, debt: S.debt, fifty: S.stats.fifty,
       moneyNormal: moneyLv === 'normal', moneyLow: moneyLv === 'low', moneyBottom: moneyLv === 'bottom',
-      // завтра списывают платёж (счёт или кредит) — для отчаянных реплик про срок (#187)
+      // завтра списывают: только если банк уже предупредил (bill.due после BillWarn с SMS, #251)
       paymentDueTomorrow: (() => {
         const tom = S.day + 1
-        for (const b of BILLS) if (Number(S.mem[billDueAt(b.id)]) === tom) return true
-        for (const l of LOANS) if (Number(S.mem[loanDueAt(l.id)]) === tom) return true
+        for (const b of BILLS) {
+          if (Number(S.mem[billDueAt(b.id)]) === tom && S.mem[billDue(b.id)]) return true
+        }
         return false
       })(),
       dow: date.getDay(), month: date.getMonth() + 1, dom: date.getDate(),
@@ -1324,6 +1335,7 @@ export class Game {
       if (this.disposed) return
       this.advanceTurnDay()
       await this.rules.runDue(this, this.facts, { floor: this.floor() })
+      this.flushBankCharges()
       if (this.disposed) return
       // сюжетный ход: только вне сцены, если Алик не «пропал» и в этом ходу ещё не было сцены или серии
       if (!S.scene && !o.scene && !S.offlineDays && !this.battery.dead && this.arcAt !== S.stats.sent) await this.fire('StoryBeat')
