@@ -77,7 +77,7 @@ src/
 }
 ```
 
-Диз-док — [DESIGN.md](DESIGN.md), эндгейм — [ENDGAME.md](ENDGAME.md). Журналы и аудиты — в `docs/`:
+Диз-док — [DESIGN.md](DESIGN.md): что уже есть в игре. Документы отдельных механик и порядок, как обсуждают новое, — в [docs/design/](docs/design/README.md), например [эндгейм](docs/design/endgame.md). Журналы и аудиты — в `docs/`:
 
 - [PLAYTEST_ISSUES.md](docs/PLAYTEST_ISSUES.md) — огрехи плейтестов и раунды аудита;
 - [TECH_DEFECTS.md](docs/TECH_DEFECTS.md) — технические дефекты UI;
