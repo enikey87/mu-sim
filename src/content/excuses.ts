@@ -2,8 +2,9 @@
 import { type Rng, mathRng } from '../engine/rng'
 import type { Due } from '../engine/time'
 import { type Entry, gate, eq, gte, lt, lte, matches, missing, exists, is, of } from '../engine/rules'
+import type { LegalClaim } from '../engine/input'
 import { needs, WORLD } from './world'
-import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, count, evicted, grantPaid, met, nuneDekretOver, nuneKeyPassed, sick, taxThawed, tileCornerRemoved } from './memkeys'
+import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, count, evicted, grantPaid, met, nuneDekretOver, nuneKeyPassed, sick, taxThawed, threatClaim, tileCornerRemoved } from './memkeys'
 
 // draw(key, arr) выдаёт уместный сейчас элемент «из колоды» (без повторов до конца колоды); noRefill — после исчерпания null
 export type DrawFn = <T = unknown>(key: string, arr: readonly Entry<T>[], noRefill?: boolean) => T
@@ -235,13 +236,20 @@ D.WHEN1 = [{ t: 'после таможни', d: null }, { t: 'как санкц�
 D.WHEN2 = [{ t: 'когда Урарту восстановят', d: null }, { t: 'когда ковчег причалит', d: null }, { t: 'в следующем веке, в начале', d: 36500 }, { t: 'как только археологи закончат', d: 500 }, { t: 'после реставрации Гарни', d: 700 }];
 D.WHEN3 = [{ t: 'в следующей жизни', d: null }, { t: 'когда Меркурий выйдет из котлована', d: null }, { t: 'после конца света, в первый рабочий день', d: null }, { t: 'когда Вселенная сожмётся обратно', d: null }, { t: 'как только время на объекте догонит твоё', d: null }];
 
-// угрозы судом/полицией — гротескный ответ
+const claim = (id: LegalClaim) => gate(eq(threatClaim, id))
 D.THREAT_A = [
-  'Суд? Хорошо. Судья — мой кум.', 'Полиция? Участковый Вардан сейчас у меня на хаше.',
-  'Заявление? Бери сразу два, второе на себя, за клевету.', 'Прокурор? Он мне бетон должен.',
-  needs('samvel')('Адвокат? Мой адвокат — Самвел, он в суде тридцать лет. Подсудимым, но опыт есть.'), 'Суд — это хорошо, там бесплатный кофе.',
-  needs('boris', 'baran')('Иди, брат. Присяжные — бараны, Борис у них старший.'), 'Коллекторы? Приходили. Остались работать у меня на объекте.',
-  needs('arsen')('Юрист? Мой юрист — Арсен, ему девятнадцать, он смотрел сериал про юристов.'), 'Налоговая? Они мне сами должны, за нервы.',
+  claim('court')('Суд? Хорошо. Судья — мой кум.'), claim('police')('Полиция? Участковый Вардан сейчас у меня на хаше.'),
+  claim('statement')('Заявление? Бери сразу два, второе на себя, за клевету.'), claim('prosecutor')('Прокурор? Он мне бетон должен.'),
+  needs('samvel')(claim('lawyer')('Адвокат? Мой адвокат — Самвел, он в суде тридцать лет. Подсудимым, но опыт есть.')),
+  claim('court')('Суд — это хорошо, там бесплатный кофе.'),
+  needs('boris', 'baran')(claim('court')('Иди, брат. Присяжные — бараны, Борис у них старший.')),
+  claim('collectors')('Коллекторы? Приходили. Остались работать у меня на объекте.'),
+  needs('arsen')(claim('lawyer')('Юрист? Мой юрист — Арсен, ему девятнадцать, он смотрел сериал про юристов.')),
+  claim('tax')('Налоговая? Они мне сами должны, за нервы.'),
+  'Иди, брат. Я тебе там место займу.',
+  'Ого. А я думал, мы по-хорошему.',
+  'Хорошо. У меня всё записано. Правда, не то, что нужно.',
+  'Только не в обед, брат. В обед у нас святое.',
 ];
 D.THREAT_B = [
   'Приходи, чай будет.', 'Я даже рад — хоть увидимся.', 'Только в пятницу не приходи — застолье.',

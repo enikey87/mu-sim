@@ -1,7 +1,7 @@
 // Лестница грубости: тексты. Ступень — по «температуре» ссоры rude.heat (крик +1, остывает через 20 дней).
-import { type Line, type Entry, is, gate, missing, during } from '../engine/rules'
+import { type Line, type Entry, is, eq, gate, missing, during } from '../engine/rules'
 import { needs } from './world'
-import { bathAsked, met, phoneKarine } from './memkeys'
+import { bathAsked, met, phoneKarine, threatClaim } from './memkeys'
 // Реплика участника: [кто, текст]; кто — ключ CAST.
 export type Said = readonly [string, string]
 
@@ -161,7 +161,7 @@ export const APPEAL = [
   'Апелляция отклонена. Судья на свадьбе. Он же тамада.',
   'Мой адвокат подал встречный встречный иск. Ты теперь должен мне извинение с процентами.',
   'Суд опять? Кум сказал: третий раз — и он тебя усыновит. Будешь мне двоюродным. Тогда вообще не заплачу.',
-  'Участковый Вардан передаёт: он уже в пути. Три года в пути. Как мои деньги.',
+  gate(eq(threatClaim, 'police'))('Участковый Вардан передаёт: он уже в пути. Три года в пути. Как мои деньги.'),
   'Иск принят. Рассмотрение — после Вардавара. Какого года — судья не уточнил.',
 ]
 export const COUNTERSUIT: Said[] = [
