@@ -43,7 +43,7 @@ import { MENTION_RE, WORLD } from '../content/world'
 import { type Clock, type GameTimer, type WallTimer, realClock, isManualClock, wallClock } from './clock'
 import { type Audio, silentAudio } from './audio'
 import { typo } from './typo'
-import { UiState, type Moo, type SendFeel } from './ui-state'
+import { UiState, type Moo, type Notif, type SendFeel } from './ui-state'
 import { classifyUserInput, legalClaim, type ClassifiedInput } from './input'
 import { holidayOf, HOLIDAY_EXCUSES } from '../content/holidays'
 import { dueIn, dateOf, fmtDate, fmtDayMonth, fmtTime, nightHour, periodOf, tierOf, TIERS, type Due, type Period } from './time'
@@ -128,6 +128,8 @@ export class Game {
   /** UI-таймеры вне game-clock — иначе ?fast гасит тост за десятки мс. */
   private toastWall: WallTimer | null = null
   private notifWall: WallTimer | null = null
+  /** Пока на экране одно уведомление, следующие ждут — иначе кредит затирает «недостаточно средств». */
+  private notifQueue: Notif[] = []
   private idleCount = 0
   private seq = 1
   private resetting = false
@@ -281,6 +283,7 @@ export class Game {
     this.idleT = this.statusT = null
     if (this.toastWall !== null) { wallClock.clearTimeout(this.toastWall); this.toastWall = null }
     if (this.notifWall !== null) { wallClock.clearTimeout(this.notifWall); this.notifWall = null }
+    this.notifQueue = []
     const err = new GameDisposed()
     for (const finish of this.sleepWaiters) finish(err)
     this.sleepWaiters.clear()
@@ -807,12 +810,19 @@ export class Game {
 
   // ---------- уведомления, батарея ----------
   notify(icon: string, app: string, text: string): void {
-    this.ui.notif = { id: this.seq++, icon, app, text }
+    const n: Notif = { id: this.seq++, icon, app, text }
+    if (this.ui.notif) { this.notifQueue.push(n); return }
+    this.showNotif(n)
+  }
+  private showNotif(n: Notif): void {
+    this.ui.notif = n
     if (this.notifWall !== null) wallClock.clearTimeout(this.notifWall)
     this.notifWall = wallClock.setTimeout(() => {
       this.notifWall = null
       this.ui.notif = null
-      this.emit()
+      const next = this.notifQueue.shift()
+      if (next) this.showNotif(next)
+      else this.emit()
     }, 4200)
     this.audio.vibrate(30)
     this.emit()
@@ -820,7 +830,9 @@ export class Game {
   dismissNotif(): void {
     if (this.notifWall !== null) { wallClock.clearTimeout(this.notifWall); this.notifWall = null }
     this.ui.notif = null
-    this.emit()
+    const next = this.notifQueue.shift()
+    if (next) this.showNotif(next)
+    else this.emit()
   }
   randomNotif(): void {
     const p = this.linePicked('NOTIF', L.NOTIF)
