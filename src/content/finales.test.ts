@@ -268,12 +268,14 @@ describe('концовки игры', () => {
       expect(await check(game), id).toBe(id)
     }
   })
-  // Достижимость: каждая концовка — из фактов, которые ставит игрок (SETUP финалов, счётчики, ачивки квестов),
-  // через настоящих производителей: финал сериала (playArc), лестницу грубости (send), сцену выплаты (узлы).
-  // После Дня выплаты эндгейм концовок не даёт (Endgame_NoEnding), поэтому сюжетная концовка обязана
-  // сложиться, пока выплату ничто не вынудило: Beat_Payday_Late не должен быть уже открыт.
-  it('каждая концовка достижима путём игрока, а сюжетная — до Дня выплаты', async () => {
-    const finale = async (g: Game, key: string) => { const arc = key.split('.')[0]; SETUP[key](g); toLast(g, arc); await g.playArc(arc); expect(g.S.mem['finale.' + arc], key).toBe(key.split('.')[1]) }
+  // Достижимость. Входы — факты игрока, заданные напрямую (SETUP финалов, счётчики, ачивки квестов); дальше —
+  // настоящие производители: финал сериала (playArc), лестница грубости (send), сцена выплаты (узлы).
+  // После Дня выплаты эндгейм концовок не даёт (Endgame_NoEnding). Поэтому сюжетная концовка проверяется на
+  // самой выгодной траектории: с первого дня, который допускает её собственное условие, шаг за шагом — и
+  // перед каждым шагом, кроме последнего, ни одно правило, вынуждающее выплату (Beat_Payday*), не открыто.
+  // Последний шаг и концовка — один ход: CheckEnding идёт в том же ходу, что и сюжетный ход.
+  it('каждая концовка складывается из своих финалов и счётчиков, а сюжетная — раньше, чем выплату вынудит любое правило', async () => {
+    const finale = (key: string) => async (g: Game) => { const arc = key.split('.')[0]; SETUP[key](g); toLast(g, arc); await g.playArc(arc); expect(g.S.mem['finale.' + arc], key).toBe(key.split('.')[1]) }
     const choose = async (g: Game, go: string) => { g.S.choices = null; const c = g.choices.find((x) => x.go === go); expect(c, go).toBeDefined(); await g.send(c!) }
     const payday = (catches: boolean) => async (g: Game) => {
       await g.enterNode('payday', 'announce')
@@ -282,38 +284,47 @@ describe('концовки игры', () => {
       await choose(g, catches ? 'catch' : 'accept')
     }
     // противоречие утра и отмазки — есть что поймать (утром «Сейф открыли», в отмазке — сейф)
-    const contra = (g: Game) => { g.S.mem['finale.nune'] = 'default'; g.S.arcs.nune = { i: ARCS.nune.eps.length, last: 0 } }
+    const contra = async (g: Game) => { g.S.mem['finale.nune'] = 'default'; g.S.arcs.nune = { i: ARCS.nune.eps.length, last: 0 } }
     const threat = async (g: Game) => { g.S.offlineDays = 0; await g.send('Я подаю в суд. Серьёзно.') }
-    const SCENARIO: Record<string, (g: Game) => Promise<void>> = {
-      family: (g) => finale(g, 'samvel.groom'),
-      heir: (g) => finale(g, 'alik_death.will'),
-      ram: async (g) => { await finale(g, 'boris.toyou'); await finale(g, 'niva.chose') }, // второй трофей — «Нива»
-      alik: async (g) => { g.S.ach.fence = 190; await finale(g, 'garik.cutter') },
-      honest: async (g) => { g.S.mem['asked.niva'] = 5; await finale(g, 'boris.brigadir'); await finale(g, 'grant.ally'); toLast(g, 'niva'); await g.playArc('niva') },
-      vendetta: async (g) => { Object.assign(g.S.mem, { 'count.rude': 25, 'rude.heat': 5 }); await g.send({ text: 'АЛИК!!! ТЫ ВРЁШЬ!!!', tone: 'rude' }); expect(g.S.mem.vendetta).toBe(true) },
-      multiverse: async (g) => { g.S.day = 800; g.S.stats.sent = 300 },
-      payday_default: payday(false),
-      payday_coins: async (g) => { contra(g); await payday(true)(g) },
-      payday_lavash: async (g) => { contra(g); g.S.mem['crypto.hodl'] = true; await payday(true)(g) },
-      payday_niva: async (g) => { g.S.mem['asked.niva'] = 5; toLast(g, 'niva'); await g.playArc('niva'); await payday(false)(g) },
-      payday_strasbourg: async (g) => { g.S.mem.court = 5; await threat(g); expect(g.S.ach.strasbourg).toBeDefined(); await payday(false)(g) },
-      payday_notyou: async (g) => { toLast(g, 'razmik'); await g.playArc('razmik'); g.S.mem['count.rude'] = 8; await payday(false)(g) },
-      payday_real: async (g) => {
-        Object.assign(g.S.ach, { saint: 190, court: 200, q_hash: 1, q_mama: 1, q_goat: 1, q_parking: 1, q_photo: 1 })
-        g.S.mem.caught = 3
-        await payday(false)(g)
-      },
+    type Step = (g: Game) => Promise<void>
+    const SCENARIO: Record<string, Step[]> = {
+      family: [finale('samvel.groom')],
+      heir: [finale('alik_death.will')],
+      ram: [finale('boris.toyou'), finale('niva.chose')], // второй трофей — «Нива»
+      alik: [async (g) => { g.S.ach.fence = 190 }, finale('garik.cutter')],
+      honest: [finale('boris.brigadir'), finale('grant.ally'), async (g) => { g.S.mem['asked.niva'] = 5; toLast(g, 'niva'); await g.playArc('niva') }],
+      vendetta: [async (g) => { Object.assign(g.S.mem, { 'count.rude': 25, 'rude.heat': 5 }); await g.send({ text: 'АЛИК!!! ТЫ ВРЁШЬ!!!', tone: 'rude' }); expect(g.S.mem.vendetta).toBe(true) }],
+      multiverse: [],
+      payday_default: [payday(false)],
+      payday_coins: [contra, payday(true)],
+      payday_lavash: [contra, async (g) => { g.S.mem['crypto.hodl'] = true }, payday(true)],
+      payday_niva: [async (g) => { g.S.mem['asked.niva'] = 5; toLast(g, 'niva'); await g.playArc('niva') }, payday(false)],
+      payday_strasbourg: [async (g) => { g.S.mem.court = 5; await threat(g); expect(g.S.ach.strasbourg).toBeDefined() }, payday(false)],
+      payday_notyou: [async (g) => { toLast(g, 'razmik'); await g.playArc('razmik'); g.S.mem['count.rude'] = 8 }, payday(false)],
+      payday_real: [async (g) => { Object.assign(g.S.ach, { saint: 190, court: 200, q_hash: 1, q_mama: 1, q_goat: 1, q_parking: 1, q_photo: 1 }); g.S.mem.caught = 3 }, payday(false)],
     }
     // исключения — с причиной и issue; тест требует, чтобы причина всё ещё держалась
     const UNREACHABLE: Record<string, string> = { multiverse: '#92: 800-й день наступает только после вынужденного Дня выплаты' }
     expect(Object.keys(SCENARIO).sort()).toEqual(ENDINGS.map((e) => e.id).sort())
-    for (const [id, play] of Object.entries(SCENARIO)) {
+    /** Нижняя граница, которую ставит условие концовки: gte(key, n) → n. */
+    const floor = (e: (typeof ENDINGS)[number], key: string) => Math.max(0, ...e.when.filter((c) => c.key === key && c.op === '>=').map((c) => Number(c.value)))
+    const forcing = (g: Game) => g.rules.all.filter((r) => r.event === 'StoryBeat' && r.name.startsWith('Beat_Payday')).map((r) => r.name)
+    expect(forcing(makeGame().game)).toEqual(['Beat_Payday', 'Beat_Payday_Late']) // пустой список сторожил бы вакуум
+    for (const [id, steps] of Object.entries(SCENARIO)) {
+      const e = ENDINGS.find((x) => x.id === id)!
       const { game } = makeGame()
-      game.S.day = 320
-      await play(game)
-      const forced = game.rules.collect({ event: 'StoryBeat' }, game.facts()).some((r) => r.name === 'Beat_Payday_Late')
-      if (id in UNREACHABLE) { expect(forced, `${id}: ${UNREACHABLE[id]} — причина ушла, снять исключение`).toBe(true); continue }
-      if (!id.startsWith('payday_')) expect(forced, `${id}: выплата уже вынуждена — концовку заглушит эндгейм`).toBe(false)
+      game.S.day = floor(e, 'day')
+      game.S.stats.sent = floor(e, 'sent')
+      const story = !id.startsWith('payday_')
+      for (const [i, step] of steps.entries()) {
+        if (story) expect(game.rules.collect({ event: 'StoryBeat' }, game.facts()).filter((r) => forcing(game).includes(r.name)).map((r) => r.name), `${id}, шаг ${i + 1}: выплата вынуждена раньше концовки`).toEqual([])
+        await step(game)
+      }
+      if (id in UNREACHABLE) {
+        const forced = game.rules.collect({ event: 'StoryBeat' }, game.facts()).some((r) => forcing(game).includes(r.name))
+        expect(forced, `${id}: ${UNREACHABLE[id]} — причина ушла, снять исключение`).toBe(true)
+        continue
+      }
       if (game.S.ending !== id) await game.fire('CheckEnding')
       expect(game.S.ending, id).toBe(id)
     }
