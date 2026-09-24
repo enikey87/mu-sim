@@ -8,19 +8,17 @@ import { manualClock } from '../engine/clock'
 import { seededRng } from '../engine/rng'
 import { specificityOf, lineId, spec } from '../engine/rules'
 import { MEMORY } from '../content/memory'
-import { rudeRules, rudeSaysRules } from '../content/rules/rude'
-import { endgameRules } from '../content/rules/endgame'
 import { RARE, RARE_ALL } from './rare'
+import { PROVEN } from './proven'
 import { botTurn } from './bot'
 
-/** Почему правило не сработало в симуляции. У каждого класса, кроме последнего, есть прямой тест. */
-export type NeverClass = 'rare' | 'deterministic' | 'endgame' | 'unexplained'
-
-const DETERMINISTIC = new Set(
-  [...rudeRules, ...rudeSaysRules, ...endgameRules].map((r) => r.name)
-    .concat('Opt_Via_boris', 'Opt_Via_karine', 'Opt_Via_mama', 'Opt_Moo'),
-)
-const ENDGAME_ONLY = /^(Finale|Ending|Payday|Quiet)_/
+/**
+ * Почему правило не сработало в симуляции.
+ * `rare` — RARE / RARE_FLAKY (прямой случай в rare.test.ts).
+ * `proven` — явное доказательство вне статистики (прямой тест или структурная недостижимость).
+ * Больше нет освобождения по имени модуля или префиксу.
+ */
+export type NeverClass = 'rare' | 'proven' | 'unexplained'
 
 /** Три непересекающихся пакета сидов: по одной выборке не отличить покрытие от удачи траектории. */
 export const COVERAGE_SAMPLES: number[][] = [
@@ -30,13 +28,12 @@ export const COVERAGE_SAMPLES: number[][] = [
 ]
 
 export const neverClass = (name: string): NeverClass =>
-  RARE_ALL.has(name) ? 'rare' : DETERMINISTIC.has(name) ? 'deterministic' : ENDGAME_ONLY.test(name) ? 'endgame' : 'unexplained'
+  RARE_ALL.has(name) ? 'rare' : name in PROVEN ? 'proven' : 'unexplained'
 
 /** Где именно правило проверяется, если симуляция до него не доходит. */
 const NEVER_HINT: Record<NeverClass, string> = {
   rare: 'прямой тест: content/rules/rare.test.ts',
-  deterministic: 'прямой тест: rude / dialog / endgame',
-  endgame: 'прямой тест: finales / payday / endgame',
+  proven: 'доказательство: tools/proven.ts → указанный тест / structural',
   unexplained: 'НЕ ОБЪЯСНЕНО — гейт покрытия обязан падать',
 }
 
@@ -128,10 +125,10 @@ export function formatCoverage(r: CoverageReport): string {
   const lines = [`Ходов: ${r.turns}`, '', 'Событие                доля общих ответов   выборов']
   for (const [e, v] of Object.entries(r.events).sort((a, b) => b[1].total - a[1].total))
     lines.push(`${e.padEnd(22)} ${(r.weighted.includes(e) ? '— (по весам)' : Math.round((v.generic / v.total) * 100) + '%').padStart(12)}   ${String(v.total).padStart(8)}`)
-  const groups: Record<NeverClass, string[]> = { rare: [], deterministic: [], endgame: [], unexplained: [] }
+  const groups: Record<NeverClass, string[]> = { rare: [], proven: [], unexplained: [] }
   for (const n of r.never) groups[neverClass(n)].push(n)
-  lines.push('', `Ни разу не сработали (${r.never.length}): редкие ${groups.rare.length} · детерминированные ${groups.deterministic.length} · только в финалах ${groups.endgame.length} · необъяснённые ${groups.unexplained.length}`)
-  for (const cls of ['unexplained', 'rare', 'deterministic', 'endgame'] as NeverClass[]) {
+  lines.push('', `Ни разу не сработали (${r.never.length}): редкие ${groups.rare.length} · proven ${groups.proven.length} · необъяснённые ${groups.unexplained.length}`)
+  for (const cls of ['unexplained', 'rare', 'proven'] as NeverClass[]) {
     if (!groups[cls].length) continue
     lines.push(`  ${cls} — ${NEVER_HINT[cls]}:`, ...groups[cls].map((n) => '    ' + n))
   }
