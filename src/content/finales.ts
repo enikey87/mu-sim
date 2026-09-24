@@ -5,7 +5,7 @@
 import { type Criterion, type Entry, is, gte, lte, eq, set, gate, missing } from '../engine/rules'
 import type { Episode } from './arcs'
 import { needs, meet } from './world'
-import { HEAT, caughtCount, count, court, garikConcrete, houseOnGarik, intro, nivaAway, paydayScene, rubikFined, tileCornerRemoved, vendetta, wedding } from './memkeys'
+import { HEAT, caughtCount, count, court, garikConcrete, houseOnGarik, intro, nivaAway, paydayScene, rubikFined, tileCornerRemoved, vendetta, wedding, endgame } from './memkeys'
 
 export interface Finale extends Episode {
   id: string
@@ -184,6 +184,8 @@ export interface Ending {
   /** Текст на экране концовки. */
   text: string
   when: Criterion[]
+  /** Достижима в эндгейме: единственный выход из бесконечной группы (решение по #92); остальные там глушит Endgame_NoEnding. */
+  inEndgame?: boolean
 }
 
 // концовка — развязка, а не начало: не раньше конца второго акта (~300-й день)
@@ -221,9 +223,10 @@ export const ENDINGS: Ending[] = [
     text: 'Ты кричал так долго и ни разу не извинился, что стал кровным врагом рода. Долг теперь наследственный: висит на стене, как ковёр. Твои правнуки получат его вместе с «Мууу».',
   },
   {
-    id: 'multiverse', title: 'Параллельная вселенная', icon: '🌌', when: [gte('day', 800), gte('sent', 300)],
-    m: ['Брат, хорошая новость. В параллельной вселенной я тебе всё заплатил. Там ты богатый. Переезжай туда.'],
-    text: 'Прошло больше двух лет. Где-то в параллельной вселенной Алик всё заплатил. Ты решил переехать туда. Там тоже «Мууу».',
+    // 800-й день со сдачи объекта наступает только в группе после выплаты: выход из неё «через два года»
+    id: 'multiverse', title: 'Параллельная вселенная', icon: '🌌', when: [gte('day', 800), gte('sent', 300), is(endgame.active)], inEndgame: true,
+    m: ['Брат, хорошая новость. В параллельной вселенной я тебе всё заплатил. Там ты богатый. Переезжай туда. Группу можешь не покидать — там она тоже есть.'],
+    text: 'Прошло больше двух лет со сдачи объекта. Выплата закрыта, группа — нет. Где-то в параллельной вселенной Алик всё заплатил. Ты решил переехать туда. Там тоже «Мууу».',
   },
   // исходы Дня выплаты (третий акт): экран итогов после выплаты
   ...([

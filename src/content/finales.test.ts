@@ -256,7 +256,7 @@ describe('концовки игры', () => {
       ram: (g) => { g.S.mem['finale.boris'] = 'toyou'; g.S.items.push('баран Борис', '½ фундамента') },
       alik: (g) => { g.S.mem['finale.garik'] = 'cutter'; g.S.ach.fence = 190 },
       honest: (g) => Object.assign(g.S.mem, { 'finale.boris': 'brigadir', 'finale.grant': 'ally', 'finale.niva': 'chose' }),
-      multiverse: (g) => { g.S.day = 800; g.S.stats.sent = 300 },
+      multiverse: (g) => { g.S.day = 800; g.S.stats.sent = 300; g.S.mem['endgame.active'] = true },
       vendetta: (g) => { g.S.mem.vendetta = true },
     }
     // исходы Дня выплаты: концовка по факту payday = id
@@ -270,7 +270,7 @@ describe('концовки игры', () => {
   })
   // Достижимость. Входы — факты игрока, заданные напрямую (SETUP финалов, счётчики, ачивки квестов); дальше —
   // настоящие производители: финал сериала (playArc), лестница грубости (send), сцена выплаты (узлы).
-  // После Дня выплаты эндгейм концовок не даёт (Endgame_NoEnding). Поэтому сюжетная концовка проверяется на
+  // После Дня выплаты эндгейм концовок не даёт (Endgame_NoEnding), кроме «Параллельной вселенной». Поэтому сюжетная концовка проверяется на
   // самой выгодной траектории: с первого дня, который допускает её собственное условие, шаг за шагом — и
   // перед каждым шагом, кроме последнего, ни одно правило, вынуждающее выплату (Beat_Payday*), не открыто.
   // Последний шаг и концовка — один ход: CheckEnding идёт в том же ходу, что и сюжетный ход.
@@ -294,7 +294,8 @@ describe('концовки игры', () => {
       alik: [async (g) => { g.S.ach.fence = 190 }, finale('garik.cutter')],
       honest: [finale('boris.brigadir'), finale('grant.ally'), async (g) => { g.S.mem['asked.niva'] = 5; toLast(g, 'niva'); await g.playArc('niva') }],
       vendetta: [async (g) => { Object.assign(g.S.mem, { 'count.rude': 25, 'rude.heat': 5 }); await g.send({ text: 'АЛИК!!! ТЫ ВРЁШЬ!!!', tone: 'rude' }); expect(g.S.mem.vendetta).toBe(true) }],
-      multiverse: [],
+      // единственная концовка эндгейма: группа открылась выплатой и живёт до 800-го дня
+      multiverse: [async (g) => { await payday(false)(g); g.closeEnding(); expect(g.S.mem['endgame.active']).toBe(true) }],
       payday_default: [payday(false)],
       payday_coins: [contra, payday(true)],
       payday_lavash: [contra, async (g) => { g.S.mem['crypto.hodl'] = true }, payday(true)],
@@ -303,8 +304,6 @@ describe('концовки игры', () => {
       payday_notyou: [async (g) => { toLast(g, 'razmik'); await g.playArc('razmik'); g.S.mem['count.rude'] = 8 }, payday(false)],
       payday_real: [async (g) => { Object.assign(g.S.ach, { saint: 190, court: 200, q_hash: 1, q_mama: 1, q_goat: 1, q_parking: 1, q_photo: 1 }); g.S.mem.caught = 3 }, payday(false)],
     }
-    // исключения — с причиной и issue; тест требует, чтобы причина всё ещё держалась
-    const UNREACHABLE: Record<string, string> = { multiverse: '#92: 800-й день наступает только после вынужденного Дня выплаты' }
     expect(Object.keys(SCENARIO).sort()).toEqual(ENDINGS.map((e) => e.id).sort())
     /** Нижняя граница, которую ставит условие концовки: gte(key, n) → n. */
     const floor = (e: (typeof ENDINGS)[number], key: string) => Math.max(0, ...e.when.filter((c) => c.key === key && c.op === '>=').map((c) => Number(c.value)))
@@ -315,15 +314,11 @@ describe('концовки игры', () => {
       const { game } = makeGame()
       game.S.day = floor(e, 'day')
       game.S.stats.sent = floor(e, 'sent')
-      const story = !id.startsWith('payday_')
+      // концовка эндгейма рождается выплатой — требование «выплата не вынуждена раньше» к ней не относится
+      const story = !id.startsWith('payday_') && !e.inEndgame
       for (const [i, step] of steps.entries()) {
         if (story) expect(game.rules.collect({ event: 'StoryBeat' }, game.facts()).filter((r) => forcing(game).includes(r.name)).map((r) => r.name), `${id}, шаг ${i + 1}: выплата вынуждена раньше концовки`).toEqual([])
         await step(game)
-      }
-      if (id in UNREACHABLE) {
-        const forced = game.rules.collect({ event: 'StoryBeat' }, game.facts()).some((r) => forcing(game).includes(r.name))
-        expect(forced, `${id}: ${UNREACHABLE[id]} — причина ушла, снять исключение`).toBe(true)
-        continue
       }
       if (game.S.ending !== id) await game.fire('CheckEnding')
       expect(game.S.ending, id).toBe(id)
