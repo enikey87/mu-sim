@@ -223,6 +223,17 @@ describe('App', () => {
     expect(screen.getByText(/^изменено/)).toBeInTheDocument()
   })
 
+  it('ссылка в системной строке — настоящая: новая вкладка, игра остаётся открытой', () => {
+    const { game } = makeGame()
+    game.push({ kind: 'sys', text: 'Поддержать автора: https://www.donationalerts.com/r/enikey87' })
+    renderApp(game)
+    const link = screen.getByRole('link', { name: 'https://www.donationalerts.com/r/enikey87' })
+    expect(link).toHaveAttribute('href', 'https://www.donationalerts.com/r/enikey87')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener')
+    expect(screen.getByText(/Поддержать автора:/)).toBeInTheDocument()
+  })
+
   it('кнопки допработы отвечают и исчезают', async () => {
     const { game } = makeGame()
     await game.job()

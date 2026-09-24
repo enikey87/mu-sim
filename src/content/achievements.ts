@@ -1,8 +1,11 @@
-// Ачивки: ключ → [название, описание]
+// Ачивки: ключ → [название, описание]. Описание может быть функцией от партии, если зависит от ответа (lend50).
+import type { GameState } from '../engine/state'
 import { ARCS } from './arcs'
 import { FINALES, ENDINGS } from './finales'
+import { LEND50_DESC, LEND50_LOCKED } from './endgame'
+import { lend50 } from './memkeys'
 
-export const ACH: Record<string, readonly [string, string]> = {
+export const ACH: Record<string, readonly [string, string | ((s: GameState) => string)]> = {
   first: ['Первый шаг', 'Написал Алику'],
   brat: ['Брат джан', 'Алик назвал тебя «брат джан»'],
   night: ['Прочитано в 3:14', 'Алик прочитал и промолчал'],
@@ -26,6 +29,7 @@ export const ACH: Record<string, readonly [string, string]> = {
   customer: ['Прямой контакт', 'Позвонил заказчику'],
   nephew: ['Разоблачитель', 'Раскусил «племянника»'],
   lend: ['Инвестор', 'Занял Алику денег'],
+  lend50: ['🪙 Кредитор Алика', (s) => LEND50_DESC[String(s.mem[lend50.answer] ?? '')] ?? LEND50_LOCKED],
   redo: ['Проверка объекта', 'Съездил проверить плитку'],
   toast: ['Почётный армянин', 'Сказал тост «За маму!»'],
   newjob: ['Новый объект', 'Пошёл работать на ещё один объект'],
