@@ -855,18 +855,32 @@ describe('Game: пачка непрочитанных записывает в м
 describe('Game: деньги на карте', () => {
   it('adjustMoney пишет баланс, шлёт СМС и факты уровня', () => {
     const { game } = makeGame()
+    const drain = (re: RegExp) => {
+      for (let i = 0; i < 8 && game.ui.notif && !re.test(game.ui.notif.text); i++) game.dismissNotif()
+      expect(game.ui.notif?.text).toMatch(re)
+    }
     expect(game.moneyLevel()).toBe('normal')
     expect(game.facts().moneyNormal).toBe(true)
     expect(game.adjustMoney(-4000, 'Продукты')).toBe(true)
     expect(game.S.money).toBe(8400)
     expect(game.moneyLevel()).toBe('low')
-    expect(game.ui.notif?.text).toMatch(/Банк обеспокоен/)
+    drain(/Банк обеспокоен/)
     expect(game.adjustMoney(-3000, 'Гречка')).toBe(true)
     expect(game.moneyLevel()).toBe('bottom')
     expect(game.facts().moneyBottom).toBe(true)
-    // на дне сразу предложение кредита — последняя СМС может быть им, не предупреждением
     expect(game.S.mem['credit.offer']).toBe(true)
-    expect(game.ui.notif?.text).toMatch(/критический|Всё будет/)
+    drain(/критический/)
+  })
+  it('очередь уведомлений: кредит не затирает «критический», а идёт следом', () => {
+    const { game } = makeGame()
+    game.S.money = 7000 // low → bottom: и предупреждение, и оффер
+    game.adjustMoney(-6000, 'Гречка')
+    expect(game.moneyLevel()).toBe('bottom')
+    expect(game.ui.notif?.text).toMatch(/Списание/)
+    game.dismissNotif()
+    expect(game.ui.notif?.text).toMatch(/критический/)
+    game.dismissNotif()
+    expect(game.ui.notif?.text).toMatch(/Всё будет|одобрен/i)
   })
   it('после выплаты и в эндгейме деньги не меняются', () => {
     const { game } = makeGame()
