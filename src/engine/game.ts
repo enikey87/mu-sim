@@ -292,6 +292,13 @@ export class Game {
     this.storage?.removeItem(SAVE_KEY)
   }
 
+  /** Интро показано или пропущено: единственный факт, который интро ставит партии. */
+  introDone(): void {
+    if (this.S.introShown) return
+    this.S.introShown = true
+    this.save()
+  }
+
   // ---------- helpers ----------
   /** Следующий уместный сейчас элемент колоды (needs/gate). */
   draw = <T>(key: string, arr: readonly Entry<T>[]): T => {
