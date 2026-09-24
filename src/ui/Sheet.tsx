@@ -1,16 +1,13 @@
 import { useRef } from 'react'
 import { useGame } from './useGame'
-import { ACH } from '../content/achievements'
-import { ARCS } from '../content/arcs'
-import { ENDINGS } from '../content/finales'
 import { fmtDate } from '../engine/time'
 import { useModal } from './useModal'
+import { viewOf } from './view'
 
 /** Досье на Алика: обещания, сериалы, трофеи, ачивки, сброс. */
 export function Sheet({ onClose, onReset }: { onClose: () => void; onReset: () => void }) {
   const game = useGame()
-  const S = game.S
-  const got = Object.keys(S.ach).length
+  const v = viewOf(game)
   const dialogRef = useRef<HTMLDivElement>(null)
   useModal({
     active: true,
@@ -33,44 +30,40 @@ export function Sheet({ onClose, onReset }: { onClose: () => void; onReset: () =
 
         <h3>Журнал обещаний</h3>
         <ul id="promises" className="list">
-          {S.promises.length === 0 && <li className="locked">Пока пусто. Напиши Алику.</li>}
-          {S.promises.slice().reverse().map((p, i) => {
-            const late = p.due != null && p.due < S.day
-            return (
-              <li key={i}>
-                «{p.t}» <br />
-                <small>{late ? <span className="late">❌ просрочено</span> : '⏳'} срок: {p.due == null ? '∞ когда-нибудь' : fmtDate(p.due)}</small>
-              </li>
-            )
-          })}
+          {v.promises.length === 0 && <li className="locked">Пока пусто. Напиши Алику.</li>}
+          {v.promises.slice().reverse().map((p, i) => (
+            <li key={i}>
+              «{p.text}» <br />
+              <small>{p.late ? <span className="late">❌ просрочено</span> : '⏳'} срок: {p.due == null ? '∞ когда-нибудь' : fmtDate(p.due)}</small>
+            </li>
+          ))}
         </ul>
 
         <h3>Сериалы</h3>
         <ul id="arcs" className="list">
-          {Object.entries(ARCS).map(([id, a]) => {
-            const i = S.arcs[id]?.i ?? 0
-            return i
-              ? <li key={id}>{i >= a.eps.length ? '✅' : '📺'} <b>{a.title}</b> — {game.finaleTitle(id) ? `финал «${game.finaleTitle(id)}»` : `серия ${i}/${a.eps.length}`}</li>
-              : <li key={id} className="locked">🔒 ???</li>
-          })}
+          {v.arcs.map((a) => (
+            a.locked
+              ? <li key={a.id} className="locked">🔒 ???</li>
+              : <li key={a.id}>{a.done ? '✅' : '📺'} <b>{a.title}</b> — {a.state}</li>
+          ))}
         </ul>
 
-        <h3>Концовки <span id="endCount">{Object.keys(S.endings).length}/{ENDINGS.length}</span></h3>
+        <h3>Концовки <span id="endCount">{v.endingCount}/{v.endingTotal}</span></h3>
         <ul id="endings" className="list">
-          {ENDINGS.map((e) => (
-            <li key={e.id} className={S.endings[e.id] ? '' : 'locked'}>{S.endings[e.id] ? <>{e.icon} <b>{e.title}</b></> : '🔒 ???'}</li>
+          {v.endings.map((e) => (
+            <li key={e.id} className={e.got ? '' : 'locked'}>{e.got ? <>{e.icon} <b>{e.title}</b></> : '🔒 ???'}</li>
           ))}
         </ul>
 
         <h3>Трофеи</h3>
         <ul id="items" className="list">
-          {S.items.length ? S.items.map((it, i) => <li key={i}>📦 {it}</li>) : <li className="locked">Ничего. Даже барана.</li>}
+          {v.items.length ? v.items.map((it, i) => <li key={i}>📦 {it}</li>) : <li className="locked">Ничего. Даже барана.</li>}
         </ul>
 
-        <h3>Ачивки <span id="achCount">{got}/{Object.keys(ACH).length}</span></h3>
+        <h3>Ачивки <span id="achCount">{v.achGot}/{v.achTotal}</span></h3>
         <ul id="achList" className="list">
-          {Object.entries(ACH).map(([k, [title, desc]]) => (
-            <li key={k} className={S.ach[k] ? '' : 'locked'}>{S.ach[k] ? '🏆' : '🔒'} <b>{title}</b> — {desc}</li>
+          {v.ach.map((a) => (
+            <li key={a.id} className={a.got ? '' : 'locked'}>{a.got ? '🏆' : '🔒'} <b>{a.title}</b> — {a.desc}</li>
           ))}
         </ul>
         <button className="danger" id="resetBtn" onClick={onReset}>Начать заново</button>

@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState, useSyncExternalStore, memo, type ReactElement } from 'react'
 import { useGame, useGameApi } from './useGame'
 import { Message } from './Message'
+import { feedMsgs } from './view'
 import type { Msg } from '../engine/state'
 
 const BOTTOM_SLOP = 24
@@ -19,7 +20,7 @@ export const messageListRenderStats = { count: 0 }
 /** Создание узлов и сколько индексов затронул sync — только в test. */
 export const messageListBuildStats = { created: 0, touched: 0 }
 
-/** Сколько последних сообщений держим в DOM (S.msgs не режем). */
+/** Сколько последних сообщений держим в DOM (историю ленты не режем). */
 export const LIVE_RENDER_CAP = 1000
 
 type NodeCache = { len: number; nodes: ReactElement[]; windowStart: number }
@@ -79,7 +80,7 @@ const MessageList = memo(function MessageList() {
   if (import.meta.env.MODE === 'test') messageListRenderStats.count++
   const cache = useRef<NodeCache>({ len: 0, nodes: [], windowStart: 0 })
   const applied = useRef(-1)
-  const all = game.S.msgs
+  const all = feedMsgs(game)
   const windowStart = Math.max(0, all.length - LIVE_RENDER_CAP)
   const visible = windowStart > 0 ? all.slice(windowStart) : all
   if (applied.current !== epoch) {
@@ -101,9 +102,10 @@ export function Chat() {
   const game = useGame()
   const ref = useRef<HTMLElement>(null)
   const following = useRef(true)
-  const previousCount = useRef(game.S.msgs.length)
+  const feed = feedMsgs(game)
+  const previousCount = useRef(feed.length)
   const [unread, setUnread] = useState(0)
-  const count = game.S.msgs.length
+  const count = feed.length
   const version = game.getVersion()
 
   const scrollToBottom = () => {
@@ -119,7 +121,7 @@ export function Chat() {
   // коротких «???» на многострочные варианты, которая уменьшает высоту ленты уже после ответа.
   useLayoutEffect(() => {
     const previous = previousCount.current
-    const added = count >= previous ? game.S.msgs.slice(previous) : []
+    const added = count >= previous ? feed.slice(previous) : []
     previousCount.current = count
     if (added.some(isMine)) following.current = true // собственная реплика возвращает к текущему диалогу
 

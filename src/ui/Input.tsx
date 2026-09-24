@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useGame } from './useGame'
+import { viewOf } from './view'
 
 /** Сколько «?» на скрытой кнопке: 2–4, стабильно по индексу. */
 const MARKS = [3, 2, 4, 3, 2, 4]
@@ -54,7 +55,7 @@ export function Composer() {
         disabled={locked}
         enterKeyHint="send"
         onChange={(e) => setText(e.target.value)}
-        placeholder={game.S.scene ? 'Выберите ответ выше или напишите свой…' : 'Сообщение…'}
+        placeholder={viewOf(game).sceneId ? 'Выберите ответ выше или напишите свой…' : 'Сообщение…'}
         aria-label="Сообщение"
       />
       <button type="submit" id="sendBtn" disabled={locked || !text.trim()} aria-label="Отправить">➤</button>
