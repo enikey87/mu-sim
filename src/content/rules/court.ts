@@ -16,7 +16,7 @@ async function saySaid(game: Game, lines: ReadonlyArray<readonly [string, string
 }
 
 /** Перевод в суд для инстанции, которой грозил игрок: по факту threat.claim, а не по словам реплики. */
-const REFERRAL: Record<string, string> = {
+export const REFERRAL: Record<string, string> = {
   police: 'Полиция? Полиция сказала — это в суд.',
   prosecutor: 'Прокурор? Прокурор сказал — это в суд.',
   tax: 'Налоговая? Налоговая сказала — это в суд.',
