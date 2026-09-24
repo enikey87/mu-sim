@@ -8,8 +8,8 @@ import { CAST } from '../content/arcs'
 import { ENDINGS } from '../content/finales'
 import { NOTIF } from '../content/life'
 import { alikDead } from '../content/memkeys'
-import { type Criterion } from '../engine/rules'
-import type { Choice, Msg } from '../engine/state'
+import { type Criterion, type Rule } from '../engine/rules'
+import type { Choice, Msg, NewMsg } from '../engine/state'
 
 export type Style = 'curious' | 'polite' | 'hothead'
 export const STYLES: Style[] = ['curious', 'polite', 'hothead']
@@ -33,7 +33,8 @@ export interface WorldFrame {
   before: Record<string, unknown>
   mem: Record<string, unknown>
   fired: { event: string; chosen: string[] }[]
-  said: { w: string; k: string }[]
+  /** Кто говорил (w), чем (k) и какое правило это произнесло (r; null — вне правил) — оракул судит речь по правилу. */
+  said: { w: string; k: string; r: string | null }[]
   sys: string[]
   asides: string[]
   /** Пачка непрочитанных: приходит мимо движка правил, потому и отдельным полем. */
@@ -54,11 +55,13 @@ const worldFacts = (game: Game): Record<string, unknown> => {
   return mem
 }
 
-const namesKey = (c: Criterion, key: string): boolean =>
-  c.op === 'all' ? (c.all ?? []).some((x) => namesKey(x, key)) : c.key === key
+/** Условие требует факт (не «факта нет»): `missing(alik_dead)` — это правило живого Алика, а не гейт смерти. */
+const requiresKey = (c: Criterion, key: string): boolean =>
+  c.op === 'all' ? (c.all ?? []).some((x) => requiresKey(x, key)) : c.key === key && (c.op === 'exist' || (c.op === '==' && c.value === true))
 
-/** Правила с гейтом `alik_dead`: оракул судит о реплике по этому списку, а не по имени. */
-export const DEATH_GATED: readonly string[] = allRules.filter((r) => (r.when ?? []).some((c) => namesKey(c, alikDead))).map((r) => r.name).sort()
+/** Правила с гейтом `alik_dead`: оракул судит о реплике по этому списку, а не по имени. Считается по правилам партии — тест может снять гейт. */
+export const deathGated = (rules: readonly Rule<Game>[]): string[] => rules.filter((r) => (r.when ?? []).some((c) => requiresKey(c, alikDead))).map((r) => r.name).sort()
+export const DEATH_GATED: readonly string[] = deathGated(allRules)
 
 /** Ложные условия самой строки уведомления: `holds` — разбор выборщика, иначе именованные врут. */
 function notifFails(game: Game, app: string, text: string): string[] {
@@ -100,7 +103,15 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
   const asides: Aside[] = []
   const world: WorldFrame[] = []
   const firedBuf: WorldFrame['fired'] = []
-  game.rules.tracer = (t) => { if (t.chosen.length) firedBuf.push({ event: t.event, chosen: [...t.chosen] }) }
+  // сообщение принадлежит последнему выбранному правилу (match, не сбор кнопок): respond идёт сразу за выбором
+  let lastRule: string | null = null
+  game.rules.tracer = (t) => {
+    if (t.mode === 'match' && t.chosen.length) lastRule = t.chosen[0]
+    if (t.chosen.length) firedBuf.push({ event: t.event, chosen: [...t.chosen] })
+  }
+  const ruleOf = new Map<number, string | null>()
+  const push = game.push.bind(game)
+  game.push = ((m: NewMsg) => { const msg = push(m); ruleOf.set(msg.id, lastRule); return msg }) as typeof game.push
   const notifBuf: WorldFrame['notif'] = []
   const notify = game.notify.bind(game)
   game.notify = (icon, app, text) => {
@@ -118,7 +129,8 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
     // разделитель дня ставит сама пауза, а не Алик: в «пачке» его нет
     awayBuf.push(...game.S.msgs.slice(from).filter((m) => m.kind !== 'sep').map(line))
   }
-  let msgAt = 0
+  // завязка из конструктора — не ход: иначе первый кадр приписывает её речь «никакому правилу»
+  let msgAt = game.S.msgs.length
   let asideAt = 0
   // watch — после приборов: сценарий теста до первой партии иначе не попадает в дамп
   await watch?.(game)
@@ -128,7 +140,7 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
     const range = game.S.msgs.slice(msgAt)
     const said = range.flatMap((m, i) => {
       if (m.kind === 'sep' || m.kind === 'sys' || awayIdx.has(msgAt + i)) return []
-      return [{ w: m.from === 'me' ? 'me' : (('who' in m && m.who) || 'alik'), k: m.kind as string }]
+      return [{ w: m.from === 'me' ? 'me' : (('who' in m && m.who) || 'alik'), k: m.kind as string, r: ruleOf.get(m.id) ?? null }]
     })
     world.push({
       turn, at: game.S.msgs.length, day: game.S.day, before: memAt, mem,
@@ -149,6 +161,7 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
   }
   for (let k = 0; k < (replay?.length ?? turns); k++) {
     const a = replay ? replay[k] : next()
+    lastRule = null // речь до первого выбора правила в этом ходе — ничья
     if (a.kind === 'send' && replay) {
       const now = game.choices.map((c) => c.text)
       if (now.join('\n') !== a.offered.join('\n')) throw new Error(`replay разошёлся на ходу ${k}: ${JSON.stringify(now)}`)
@@ -183,7 +196,7 @@ export function worldDump(p: Played): object {
   const mutes = p.world.some((f) => Number(f.mem['endgame.mutes'] ?? 0) > 0)
   return {
     seed: p.seed,
-    rules: { deathGated: DEATH_GATED },
+    rules: { deathGated: deathGated(p.game.rules.all) },
     coverage: {
       dead_frames: dead,
       had_mute: mutes,
