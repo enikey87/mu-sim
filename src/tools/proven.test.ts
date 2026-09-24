@@ -19,6 +19,7 @@ const endgame = (g: Game) => {
 const phone = (g: Game) => { g.rules.applyOps([during('phone.karine', 1)], {}) }
 const dead = (g: Game) => { g.S.mem.alik_dead = true }
 const blocked = (g: Game) => { g.S.mem.blocked = true }
+const offended = (g: Game) => { g.S.mem[HEAT] = 1; g.S.ctx = { offended: true } }
 
 const CASES: Record<string, Case> = {
   Quiet_Dead_AlikIdle: { event: 'AlikIdle', setup: dead },
@@ -93,6 +94,10 @@ const CASES: Record<string, Case> = {
   Endgame_Away: { event: 'AlikAway', setup: endgame },
   Endgame_Formality: { event: 'StoryBeat', setup: endgame },
   Endgame_NoEnding: { event: 'CheckEnding', setup: endgame },
+  Finale_beton_ledger: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem.caught = 2 } },
+  Finale_grandpa_revoke: { event: 'ArcFinale', facts: { arc: 'grandpa' }, setup: (g) => { g.S.ach.heir = 1 } },
+  Away_ColdWar: { event: 'AlikAway', setup: offended },
+  Quiet_Offended_AlikAway: { event: 'AlikAway', setup: offended },
 }
 
 function fires(name: string, c: Case): boolean {

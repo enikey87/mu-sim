@@ -2,7 +2,7 @@
 // что сделать Алику — принимает система правил (engine/rules/, content/rules/*).
 import { make, D, low, cap, type ExcuseApi, type Promise3, type PromiseCondition, type Rel } from '../content/excuses'
 import { makeScenes, invKey, type Scene, type Line } from '../content/scenes'
-import { TRIBUNAL } from '../content/rude'
+import { COLD_WAR, TRIBUNAL } from '../content/rude'
 import { PAYDAY_HOOKS } from '../content/rules/payday'
 import { QUEST_WHEN } from '../content/rules/world'
 import { LEGENDS } from '../content/legends'
@@ -88,7 +88,7 @@ export const FESTIVE = /свадьб|крестин|юбилей|обручен|
 
 export type SayItem = string | { w: string; t: string }
 /** Что пришло, пока игрока не было: виды сообщений пачки непрочитанных. */
-export type AwayKind = 'text' | 'sticker' | 'fwd' | 'deleted' | 'voice' | 'transfer' | 'excuse' | 'formality'
+export type AwayKind = 'text' | 'sticker' | 'fwd' | 'deleted' | 'voice' | 'transfer' | 'excuse' | 'formality' | 'coldWar'
 
 export class Game {
   S: GameState
@@ -1687,8 +1687,9 @@ export class Game {
   /**
    * Сообщение пачки непрочитанных: пришло в момент `S.clock`, без «печатает…», часов и писка — они у пачки свои.
    * В мир записывает то же, что обычное сообщение Алика (noteAlik). Что именно пришло — решает правило AlikAway.
+   * false — пул исчерпан, правило промолчало.
    */
-  awayMsg(kind: AwayKind): void {
+  awayMsg(kind: AwayKind): boolean | void {
     const deliver = (m: NewMsg) => this.noteAlik(this.push({ from: 'alik', time: fmtTime(this.S.clock), ...m } as NewMsg))
     switch (kind) {
       case 'text': deliver({ kind: 'text', from: 'alik', text: this.addrLine('IDLE', L.IDLE) }); return
@@ -1709,6 +1710,12 @@ export class Game {
         deliver({ kind: 'transfer', from: 'alik', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE), amount: 50 })
         return
       case 'formality': for (const text of this.formalityLines()) deliver({ kind: 'text', from: 'alik', text }); return
+      case 'coldWar': {
+        const text = this.decks.pick('COLD_WAR', COLD_WAR, this.lineFacts(), { mode: 'sequential', noRepeat: true })
+        if (!text) return false
+        deliver({ kind: 'text', from: 'alik', text })
+        return
+      }
       case 'excuse': {
         const legend = this.legend()
         if (legend) {
