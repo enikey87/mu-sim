@@ -2,7 +2,7 @@
 // Анонс → утро (линии партии отдают деньги) → все в сборе → дележ (сумма тает) → великая отмазка из событий партии →
 // перевёртыш (деньги приходят в невозможной форме) → кнопка на следующий день.
 // Реплики — пулы с условиями и приоритетом (game.line): звучит то, что было в этой партии.
-import { type Line, type LineSpec, type Entry, is, eq, ne, exists, gte, lte, gate, missing } from '../engine/rules'
+import { type Line, type LineSpec, type Entry, is, eq, ne, exists, gte, lte, gate, missing } from './fact'
 import type { Scene } from './scenes'
 import { needs, WORLD } from './world'
 import { bathAsked, court, cryptoHodl, garikConcrete, met, payday, rubikFined, taxThawed } from './memkeys'

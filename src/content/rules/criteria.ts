@@ -1,5 +1,5 @@
 // Именованные условия (criterion() в kawaii-doom): переиспользуемые проверки с понятным именем.
-import { named, is, gte } from '../../engine/rules'
+import { named, is, gte } from '../fact'
 
 /** Алик «пропал» после грубости. */
 export const AlikOffline = named('AlikOffline', is('offline'))

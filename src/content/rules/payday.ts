@@ -1,6 +1,6 @@
 // День выплаты: шаги сцены (hook) собираются из событий партии; исход выбирают правила PaydayOutcome.
 import type { Game } from '../../engine/game'
-import { type Rule, eq, gte, is, exists, missing } from '../../engine/rules'
+import { type Rule, eq, gte, is, exists, missing } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { SOURCES, SOURCES_TOPUP, ROLL, CLAIMS, GRAND, GRAND_FALLBACK, SLOTS, CONTRADICTIONS, MORNING_CONTRA, OUTCOME, type Source, type Call, type Claim } from '../payday'
 import { alikDead, caughtCount, count, cryptoHodl, payday as pd, paydayScene } from '../memkeys'

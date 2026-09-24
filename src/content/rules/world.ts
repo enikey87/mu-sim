@@ -1,6 +1,6 @@
 // Правила новых возможностей: выбор сцен, наступившие обещания, хор персонажей, состояния мира.
 import type { Game } from '../../engine/game'
-import { type Rule, type Facts, type Entry, eq, ne, gte, lte, is, add, of, missing } from '../../engine/rules'
+import { type Rule, type Facts, type Entry, eq, ne, gte, lte, is, add, of, missing } from '../fact'
 
 import type { GameEvent, Offer } from './events'
 import { WORLD, SPEAKS } from '../world'
@@ -120,7 +120,7 @@ const noise = (key: string, arr: readonly Entry<string>[]) => async ({ game }: {
   await game.say([game.uniq(() => game.draw(key, arr))])
 }
 /** Факт у каждой свадьбы свой: два срока на одном ключе откатывали бы друг друга. */
-const weddingNoise = (who: string): R => ({
+const weddingNoise = (who: import('../ids').CastId): R => ({
   name: `Turn_Wedding_${who.charAt(0).toUpperCase()}${who.slice(1)}`, event: 'AlikTurn', when: [is(`wedding.${who}`)],
   specificity: 0, weight: 12, cooldown: { turns: 3 }, respond: noise('WEDDING', WEDDING_NOISE),
 })

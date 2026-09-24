@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 const ROOT = 'src/engine/rules'
 /** Все JS/TS-модули, которые могут импортировать код (не только то, что парсит tsc как .ts). */
-const PROD_EXT = /\.(?:[cm]?tsx?|m?js|cjs)$/
+const PROD_EXT = /\.(?:[cm]?[tj]sx?|m?js|cjs)$/
 const walk = (dir: string): string[] =>
   readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]))
 const listProd = (): string[] => walk(ROOT).filter((f) => PROD_EXT.test(f) && !/\.test\./.test(f))
@@ -57,7 +57,7 @@ const resolveTarget = (file: string, spec: string): string =>
 function allowed(file: string, spec: string): boolean {
   if (spec.startsWith('<не строка')) return false
   if (!spec.startsWith('.')) return false // голый пакет / абсолютный путь / types-имя
-  const t = resolveTarget(file, spec).replace(/\.(?:[cm]?tsx?|m?js|cjs)$/, '')
+  const t = resolveTarget(file, spec).replace(/\.(?:[cm]?[tj]sx?|m?js|cjs)$/, '')
   return t === 'src/engine/rng' || t === ROOT || t.startsWith(ROOT + '/')
 }
 
@@ -120,6 +120,17 @@ describe('изоляция engine/rules', () => {
     expect(listProd()).toContain(mts)
     for (const spec of specifiers(mts)) {
       expect(allowed(mts, spec), `mts: ${spec}`).toBe(false)
+    }
+  })
+
+  it('негативный контроль: .jsx с импортом контента — в списке и краснеет', () => {
+    const jsx = join(ROOT, '_nc_leak.jsx')
+    writeFileSync(jsx, `import { MEM_KEYS } from '../../content/memkeys.js'\nexport const k = MEM_KEYS\n`)
+    leftovers.push(jsx)
+    expect(PROD_EXT.test(jsx)).toBe(true)
+    expect(listProd()).toContain(jsx)
+    for (const spec of specifiers(jsx)) {
+      expect(allowed(jsx, spec), `jsx: ${spec}`).toBe(false)
     }
   })
 

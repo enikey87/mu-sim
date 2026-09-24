@@ -1,4 +1,4 @@
-import { type Entry, type LineSpec, gate, gte, lte, eq, ne, is, missing, set } from '../engine/rules'
+import { type Entry, type LineSpec, gate, gte, lte, eq, ne, is, missing, set } from './fact'
 import { needs, WORLD } from './world'
 import { bloodGiven, count, endgame, evicted, wedding } from './memkeys'
 import { sold, momHelp } from './credit'

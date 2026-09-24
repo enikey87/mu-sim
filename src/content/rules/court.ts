@@ -1,7 +1,7 @@
 // Линия суда: каждая угроза судом двигает дело на ступень (court = номер ступени).
 // 0 насмешка → 1 юрист Арсен → 2 досудебная претензия → 3 заседание (сцена) → 4 апелляция → 5 Страсбург → 6 решение; дальше — «опять суд?».
 import type { Game } from '../../engine/game'
-import { type Rule, eq, gte, lte, add, set, is, missing } from '../../engine/rules'
+import { type Rule, eq, gte, lte, add, set, is, missing } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { COURT, COURT_AFTER, COURT_LAWYER_AGAIN, COURT_VERDICT_AFTER_LETTER } from '../quests'
 import { THREAT_AGAIN } from '../misc'

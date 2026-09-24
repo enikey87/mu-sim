@@ -18,9 +18,9 @@ export const BILLS: readonly Bill[] = [
   { id: 'transit', label: 'Проездной', amount: 500, due: { week: true } },
 ]
 
-export const billDueAt = (id: BillId): string => `bills.${id}.dueAt`
-export const billDue = (id: BillId): string => `bills.${id}.due`
-export const billUnpaid = (id: BillId): string => `bills.${id}.unpaid`
-export const billStreak = (id: BillId): string => `bills.${id}.streak`
+export const billDueAt = <T extends BillId>(id: T): `bills.${T}.dueAt` => `bills.${id}.dueAt`
+export const billDue = <T extends BillId>(id: T): `bills.${T}.due` => `bills.${id}.due`
+export const billUnpaid = <T extends BillId>(id: T): `bills.${T}.unpaid` => `bills.${id}.unpaid`
+export const billStreak = <T extends BillId>(id: T): `bills.${T}.streak` => `bills.${id}.streak`
 
 export { lightOff, netRation, phoneWarn }

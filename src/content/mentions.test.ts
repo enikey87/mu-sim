@@ -1,7 +1,7 @@
 // Мир последователен: персонаж или предмет, который появляется по ходу истории, упоминается только под требованием
 // (needs / when / структура: серия сериала, финал, реплика персонажа). Регулярки — здесь, в проверке контента: игра текст не разбирает.
 import { describe, it, expect } from 'vitest'
-import { Gated, describeCriterion, valueOf, gate, is, type Criterion, type Entry, type FactOp } from '../engine/rules'
+import { Gated, describeCriterion, valueOf, gate, is, type Criterion, type Entry, type FactOp } from './fact'
 import { WORLD, SPEAKS, CHORUS, type WorldKey } from './world'
 import { ARCS, CAST, GROUP } from './arcs'
 import { RUDE_FAMILY } from './rude'

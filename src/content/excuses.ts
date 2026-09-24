@@ -1,7 +1,7 @@
 // Словари и генератор отмазок Алика Воздухонесяна.
 import { type Rng, mathRng } from '../engine/rng'
 import type { Due } from '../engine/time'
-import { type Entry, gate, eq, gte, lt, lte, matches, missing, exists, is, of } from '../engine/rules'
+import { type Entry, gate, eq, gte, lt, lte, matches, missing, exists, is, of } from './fact'
 import type { LegalClaim } from '../engine/input'
 import { needs, WORLD } from './world'
 import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, count, evicted, grantPaid, met, nuneDekretOver, nuneKeyPassed, sick, taxThawed, threatClaim, tileCornerRemoved } from './memkeys'

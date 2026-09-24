@@ -1,5 +1,5 @@
 import type { Choice } from '../engine/state'
-import { type Entry, type Line, exists, gate, is } from '../engine/rules'
+import { type Entry, type Line, exists, gate, is } from './fact'
 import { needs } from './world'
 import { lend50, met } from './memkeys'
 

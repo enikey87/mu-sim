@@ -2,7 +2,7 @@
 // Последнюю серию сериала выбирают правила события ArcFinale: обычный финал (последний эпизод из arcs.ts)
 // побеждает по умолчанию, частный — если игрок выполнил его условия (он специфичнее).
 // Выбранный финал пишется в память: finale.boris = 'brigadir' — его видят концовки и ответы «Как там Борис?».
-import { type Criterion, type Entry, is, gte, lte, eq, set, gate, missing } from '../engine/rules'
+import { type Criterion, type Entry, is, gte, lte, eq, set, gate, missing } from './fact'
 import type { Episode } from './arcs'
 import { needs, meet } from './world'
 import { HEAT, caughtCount, count, court, garikConcrete, houseOnGarik, intro, nivaAway, paydayScene, rubikFined, tileCornerRemoved, vendetta, wedding, endgame } from './memkeys'

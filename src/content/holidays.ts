@@ -1,6 +1,6 @@
 // Праздники по календарю переписки: окно шире одного дня — сообщение двигает календарь на 1–3 дня.
 import { dateOf } from '../engine/time'
-import { type Line, eq, gte, lte, missing } from '../engine/rules'
+import { type Line, eq, gte, lte, missing } from './fact'
 import { endgame } from './memkeys'
 
 export type Holiday = 'newYear' | 'march8'
