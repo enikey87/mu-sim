@@ -85,7 +85,7 @@ export const promiseRules: R[] = [
     },
   },
   {
-    name: 'Condition_Met', event: 'PromiseConditionMet', when: [live], priority: 'chatter',
+    name: 'Condition_Met', event: 'PromiseConditionMet', when: [live, missing(alikDead)], priority: 'chatter',
     respond: async ({ game, facts }) => { await game.say([dueLine(game, facts, 'MET', PROMISE_MET)]) },
   },
 ]
