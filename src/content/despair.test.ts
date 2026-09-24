@@ -93,11 +93,13 @@ describe('отчаяние от бедности', () => {
     setMoney(game, Game.MONEY_LOW)
     expect(game.facts().paymentDueTomorrow).toBe(false)
     expect(rebuilds(game, 80).flat().some((c) => c.text.includes(DUE_TOMORROW))).toBe(false)
-    game.S.mem[billDueAt('phone')] = game.S.day + 1
+    game.S.mem[billDueAt('rent')] = game.S.day + 1
+    game.S.mem['bills.rent.due'] = true
     expect(game.facts().paymentDueTomorrow).toBe(true)
     expect(rebuilds(game, 80).flat().some((c) => c.text.includes(DUE_TOMORROW))).toBe(true)
     // негативный контроль: снять факт — снова тишина
-    delete game.S.mem[billDueAt('phone')]
+    delete game.S.mem[billDueAt('rent')]
+    delete game.S.mem['bills.rent.due']
     game.S.choices = null
     expect(game.facts().paymentDueTomorrow).toBe(false)
     expect(rebuilds(game, 80).flat().some((c) => c.text.includes(DUE_TOMORROW))).toBe(false)

@@ -31,6 +31,8 @@ const CASES: Record<string, Case> = {
   Scene_lend: { event: 'PickScene', setup: (g) => { g.S.mood = 8 } },
   Quest_q_niva: { event: 'PickQuest', setup: (g) => { g.setLegend('niva_stuck', 'niva') } },
   Court_Lawyer: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem.court = 1 } },
+  Court_Lawyer_Again: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem.court = 1; g.S.mem['intro.arsen'] = true } },
+  Court_After: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem.court = 7 } },
   Court_Verdict_Lettered: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem.court = 6; g.S.mem.payday = 'strasbourg' } },
   Says_sorry_sorrySwing3: { event: 'PlayerSays', facts: { intent: 'sorry' }, setup: (g) => { g.S.stats.sent = 10; g.S.mem.sorryAt = '8,9,10' } },
   Turn_Wedding_Samvel: { event: 'AlikTurn', setup: (g) => { g.S.mem['wedding.samvel'] = true } },
@@ -46,6 +48,8 @@ const CASES: Record<string, Case> = {
   Finale_garik_cutter: { event: 'ArcFinale', facts: { arc: 'garik' }, setup: (g) => { g.S.ach.newjob = 1 } },
   Finale_alik_death_will: { event: 'ArcFinale', facts: { arc: 'alik_death' }, setup: (g) => { g.S.ach.forgive = 1; g.S.mem['asked.alik_death'] = 1 } },
   Finale_rubik_bribe: { event: 'ArcFinale', facts: { arc: 'rubik' }, setup: (g) => { g.S.ach.redo = 1 } },
+  Finale_tile_lost: { event: 'ArcFinale', facts: { arc: 'tile' }, setup: (g) => { g.S.mem.court = 6 } },
+  Finale_samvel_tamada: { event: 'ArcFinale', facts: { arc: 'samvel' }, setup: (g) => { g.S.ach.toast = 1 } },
   Ending_alik: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem['finale.garik'] = 'cutter'; g.S.ach.fence = 1 } },
   Ending_heir: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem['finale.alik_death'] = 'will' } },
   // встречный иск на горячую угрозу — один раз, дальше «опять угрожаешь»
@@ -65,6 +69,23 @@ const CASES: Record<string, Case> = {
       g.S.endings.payday_default = g.S.day
       g.recordPromise({ text: 'в пятницу', d: 1 })
       g.S.day += 1
+    },
+  },
+  Quiet_PaydayOpen_AlikIdle: {
+    event: 'AlikIdle',
+    setup: (g) => {
+      g.S.mem.payday = 'default'
+      g.S.ending = 'payday_default'
+      g.S.endings.payday_default = g.S.day
+    },
+  },
+  Quiet_PaydayOpen_Mentioned: {
+    event: 'Mentioned', target: 'garik',
+    setup: (g) => {
+      g.S.mem.payday = 'default'
+      g.S.ending = 'payday_default'
+      g.S.endings.payday_default = g.S.day
+      g.S.mem['intro.garik'] = true
     },
   },
   // бывшие PROVEN, до которых стенд доходит почти всегда (#133): под гейтом, случай — страховка

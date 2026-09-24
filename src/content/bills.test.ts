@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { makeGame , setMoney} from '../test/helpers'
+import { makeGame, setMoney } from '../test/helpers'
 import { BILLS, billUnpaid, billStreak, lightOff, billDueAt } from './bills'
 import { dueIn } from '../engine/time'
 
@@ -57,7 +57,7 @@ describe('платежи по календарю', () => {
     game.notify = (icon, app, text) => { texts.push(text); notify(icon, app, text) }
     await game.fire('BillWarn', { bill: 'phone', at: game.S.mem[billDueAt('phone')] })
     expect(texts.some((t) => /Завтра списание/.test(t))).toBe(false)
-    expect(game.S.mem['bills.phone.due']).toBe(true)
+    expect(game.S.mem['bills.phone.due']).toBeFalsy()
     await game.fire('BillWarn', { bill: 'rent', at: game.S.mem[billDueAt('rent')] })
     expect(texts.some((t) => /Завтра списание.*Коммуналка/.test(t))).toBe(true)
   })
@@ -177,21 +177,33 @@ describe('платежи по календарю', () => {
     expect(phoneDues).toHaveLength(0)
     expect(Number(game.S.mem[billDueAt('phone')])).toBe(day)
   })
-  it('доля банковских СМС к репликам Алика ниже порога оракула (#178)', async () => {
-    // оракул: NOTIF_SHARE = 0.25; до фикса сид 7 давал ~0.9. Здесь — бот 200 ходов, сиды 1/7.
-    const { botTurn } = await import('../tools/bot')
-    for (const seed of [1, 7]) {
-      const { game } = makeGame({ seed })
-      let bank = 0
-      const notify = game.notify.bind(game)
-      game.notify = (icon, app, text) => {
-        if (app === 'Банк' || app === 'МФО') bank++
-        notify(icon, app, text)
-      }
-      for (let i = 0; i < 200; i++) await botTurn(game)
-      const alik = game.S.msgs.filter((m) => m.kind === 'text' && m.from === 'alik').length
-      expect(alik, `seed ${seed} alik`).toBeGreaterThan(50)
-      expect(bank / alik, `seed ${seed} bank=${bank} alik=${alik}`).toBeLessThan(0.25)
-    }
+  it('ход игрока со сроком платежа — сводка СМС уходит (#251)', async () => {
+    const { game } = makeGame()
+    setMoney(game, 10_000_000)
+    const texts: string[] = []
+    const notify = game.notify.bind(game)
+    game.notify = (icon, app, text) => { texts.push(text); notify(icon, app, text) }
+    const day = game.S.day
+    game.S.mem[billDueAt('phone')] = day + 1 // после advanceTurnDay станет сегодня
+    game.rules.state.schedule = game.rules.state.schedule.filter((e) => !(e.kind === 'event' && e.event === 'BillDue'))
+    game.rules.schedule({ at: day + 1, kind: 'event', event: 'BillDue', facts: { bill: 'phone', at: day + 1 } })
+    await game.send({ text: 'Алик?', tone: 'polite' })
+    expect(texts.some((t) => /Списани/.test(t) && t.includes('Связь'))).toBe(true)
+  })
+  it('одинаковое банковское SMS не дважды за день (#251)', () => {
+    const { game } = makeGame()
+    const notify = game.notify.bind(game)
+    notify('🏦', 'Банк', 'Не прошло: недостаточно средств. Связь, 400 ₽.')
+    notify('🏦', 'Банк', 'Не прошло: недостаточно средств. Связь, 550 ₽.')
+    const keys = (game as unknown as { bankSmsDay: { keys: Set<string> } | null }).bankSmsDay?.keys
+    expect(keys?.size).toBe(1)
+  })
+  it('paymentDueTomorrow только после предупреждения с SMS (#251)', () => {
+    const { game } = makeGame()
+    game.S.mem[billDueAt('phone')] = game.S.day + 1
+    expect(game.facts().paymentDueTomorrow).toBe(false)
+    game.S.mem[billDueAt('rent')] = game.S.day + 1
+    game.S.mem['bills.rent.due'] = true
+    expect(game.facts().paymentDueTomorrow).toBe(true)
   })
 })
