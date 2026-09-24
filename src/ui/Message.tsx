@@ -37,6 +37,7 @@ function JobButtons({ id }: { id: number }) {
     <div className="job-btns">
       <button disabled={game.ui.busy || game.battery.dead} onClick={() => void game.answerJob(id, true)}>Ладно, сделаю</button>
       <button disabled={game.ui.busy || game.battery.dead} onClick={() => void game.answerJob(id, false)}>Нет, сначала деньги</button>
+      {game.canMirror() && <button disabled={game.ui.busy || game.battery.dead} onClick={() => void game.answerJob(id, 'mirror')}>Не могу, брат…</button>}
     </div>
   )
 }

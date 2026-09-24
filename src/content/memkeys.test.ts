@@ -16,6 +16,7 @@ import { ACTOR_KEYS, MEM_KEYS, caughtPair } from './memkeys'
 import { isFactKey } from './factkeys'
 import { allRules } from './rules'
 import { WORLD, SPEAKS } from './world'
+import { MIRROR, MIRROR_OPEN } from './mirror'
 
 const bad: string[] = []
 const see = (where: string, key: string) => { if (!isFactKey(key)) bad.push(`${where}: ${key}`) }
@@ -86,6 +87,8 @@ describe('реестр mem-ключей', () => {
     for (const r of allRules) { seeCrits(`rule.${r.name}`, r.when); seeOps(`rule.${r.name}.remember`, r.remember) }
     for (const [k, c] of Object.entries(WORLD)) seeCrits(`WORLD.${k}`, [c])
     for (const [k, c] of Object.entries(SPEAKS)) seeCrits(`SPEAKS.${k}`, [c])
+    MIRROR.forEach((e, i) => seeEntry(`mirror[${i}]`, e))
+    seeCrits('MIRROR_OPEN', [MIRROR_OPEN])
     expect(bad).toEqual([])
   })
 
