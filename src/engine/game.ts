@@ -56,7 +56,7 @@ const literalRe = (t: string): RegExp => {
   return re
 }
 
-/** Строгий режим молчания: правило промолчало, но изменило S. Ход её не глотает — иначе проверка слепа. */
+/** Строгий режим молчания: правило промолчало, но изменило S или видимый UI. Ход её не глотает — иначе проверка слепа. */
 export class SilenceBreach extends Error {}
 
 /** Отмена async после dispose — ловится на entry points, игроку не показывается. */
@@ -305,9 +305,15 @@ export class Game {
     if (x === null) throw new Error(`Колода ${key}: ни одного элемента, уместного сейчас`)
     return x
   }
-  /** Снимок S для строгого режима молчания: всё, кроме учёта выбора равных (groups) — его двигает сам match. */
+  /**
+   * Снимок видимого игроку состояния для строгого режима молчания: весь `S` (включая тексты ленты)
+   * и эфемерный UI, который игрок замечает (тост, уведомление, «Мууу»). RNG в снимок не входит.
+   */
   private silenceCheck(rule: string): () => void {
-    const stamp = () => { const { msgs, rules, ...rest } = this.S; return JSON.stringify([rest, msgs.length, msgs.at(-1)?.id, { ...rules, groups: null }]) }
+    const stamp = () => JSON.stringify({
+      S: this.S,
+      visible: { toast: this.ui.toast, notif: this.ui.notif, moos: this.ui.moos },
+    })
     const before = stamp()
     return () => { if (stamp() !== before) throw new SilenceBreach(`Правило ${rule} промолчало, но оставило след в S`) }
   }
@@ -467,14 +473,26 @@ export class Game {
     for (const bill of BILLS) {
       if (bill.skip?.(this.S.mem)) continue
       const atKey = billDueAt(bill.id)
-      const existing = Number(this.S.mem[atKey] ?? 0)
-      // уже стоит срок на сегодня или позже — не плодить второе BillDue в тот же день
-      if (existing >= this.S.day) continue
+      // срок стоит — его событие ещё впереди или ждёт в этой же пачке: второе расписание удвоит платёж
+      if (this.S.mem[atKey] != null) continue
       const at = this.S.day + dueIn(bill.due, this.S.day)
       this.S.mem[atKey] = at
-      this.scheduleEvent(at, 'BillDue', { bill: bill.id })
-      if (at - 1 > this.S.day) this.scheduleEvent(at - 1, 'BillWarn', { bill: bill.id })
+      this.scheduleEvent(at, 'BillDue', { bill: bill.id, at })
+      if (at - 1 > this.S.day) this.scheduleEvent(at - 1, 'BillWarn', { bill: bill.id, at })
     }
+  }
+  /** Событие по сроку — текущий срок, а не устаревший дубль. Без `at` — событие из старого сохранения. */
+  private dueLive(key: string, at: unknown, dayBefore = false): boolean {
+    const cur = this.S.mem[key]
+    if (cur == null) return false
+    if (at != null) return Number(at) === Number(cur)
+    return dayBefore ? Number(cur) === this.S.day + 1 : Number(cur) <= this.S.day
+  }
+  billEventLive(id: BillId, at: unknown, event: 'BillDue' | 'BillWarn'): boolean {
+    return this.dueLive(billDueAt(id), at, event === 'BillWarn')
+  }
+  creditEventLive(id: LoanId, at: unknown): boolean {
+    return this.dueLive(loanDueAt(id), at)
   }
   /** Списать платёж или записать неоплату и последствия. */
   chargeBill(id: BillId): void {
@@ -503,11 +521,10 @@ export class Game {
     for (const loan of LOANS) {
       if (!this.S.mem[loanTaken(loan.id)]) continue
       const atKey = loanDueAt(loan.id)
-      const existing = Number(this.S.mem[atKey] ?? 0)
-      if (existing >= this.S.day) continue
+      if (this.S.mem[atKey] != null) continue
       const at = this.S.day + dueIn(loan.due, this.S.day)
       this.S.mem[atKey] = at
-      this.scheduleEvent(at, 'CreditDue', { credit: loan.id })
+      this.scheduleEvent(at, 'CreditDue', { credit: loan.id, at })
     }
   }
   /** Списать платёж по займу; отказ по микрозайму → ступень «нечем платить». */
