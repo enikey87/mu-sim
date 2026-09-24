@@ -37,6 +37,7 @@ import { type Audio, silentAudio } from './audio'
 import { typo } from './typo'
 import { UiState, type Moo, type SendFeel } from './ui-state'
 import { classifyUserInput, legalClaim, type ClassifiedInput } from './input'
+import { holidayOf, HOLIDAY_EXCUSES } from '../content/holidays'
 import { dueIn, dateOf, fmtDate, fmtDayMonth, fmtTime, nightHour, periodOf, tierOf, TIERS, type Due, type Period } from './time'
 import { type GameState, type Msg, type NewMsg, type Choice, type Ctx, type Tone, type Storage, type InputCategory, freshState, loadState, saveState, SAVE_KEY, MAX_PATIENCE, isLate, type PromiseRec } from './state'
 
@@ -791,6 +792,7 @@ export class Game {
       day: S.day, tier: S.tier, mood: S.mood, sent: S.stats.sent, moo: S.stats.moo, patience: S.patience, money: S.money, debt: S.debt, fifty: S.stats.fifty,
       moneyNormal: moneyLv === 'normal', moneyLow: moneyLv === 'low', moneyBottom: moneyLv === 'bottom',
       dow: date.getDay(), month: date.getMonth() + 1, dom: date.getDate(),
+      holiday: holidayOf(S.day) ?? false,
       ...progress,
       items: S.items.length,
       latestItem: S.items.at(-1),
@@ -1209,6 +1211,8 @@ export class Game {
 
   async excuseTurn(): Promise<void> {
     if (this.legend()) return this.promiseLine(undefined, true)
+    const festive = this.line('HOLIDAY', HOLIDAY_EXCUSES)
+    if (festive) { await this.say([festive]); return }
     const ex = this.uniq(() => this.X.excuse({ preferLong: this.S.politeStreak >= 3 }))
     if (ex.legendary) this.unlock('legend')
     this.meetRel(ex.r)
@@ -1268,9 +1272,15 @@ export class Game {
     if (!fixed) this.S.ctx = { type: 'sticker' }
   }
 
+  /** Пересылки: базовый FWD + праздничные; отдельный ключ колоды в праздник — иначе Decks сдвигается. */
+  private fwdPool(): { key: string; pool: typeof L.FWD } {
+    if (this.facts().holiday) return { key: 'FWD_H', pool: [...L.FWD, ...L.FWD_HOLIDAY] }
+    return { key: 'FWD', pool: L.FWD }
+  }
   async forward(): Promise<void> {
     await this.typingFor(700)
-    const f = this.seen.pickFresh(() => this.draw('FWD', L.FWD), (x) => x)
+    const { key, pool } = this.fwdPool()
+    const f = this.seen.pickFresh(() => this.draw(key, pool), (x) => x)
     this.seen.mark(f.t)
     this.alikMsg({ kind: 'fwd', from: 'alik', f: f.f, text: f.t })
     this.unlock('fwd')
@@ -1751,7 +1761,8 @@ export class Game {
       case 'text': deliver({ kind: 'text', from: 'alik', text: this.addrLine('IDLE', L.IDLE) }); return
       case 'sticker': { const s = this.draw('STICKERS', L.STICKERS); deliver({ kind: 'sticker', from: 'alik', e: s.e, c: s.c }); return }
       case 'fwd': {
-        const f = this.seen.pickFresh(() => this.draw('FWD', L.FWD), (x) => x)
+        const { key, pool } = this.fwdPool()
+        const f = this.seen.pickFresh(() => this.draw(key, pool), (x) => x)
         this.seen.mark(f.t)
         deliver({ kind: 'fwd', from: 'alik', f: f.f, text: f.t })
         return
@@ -1780,6 +1791,8 @@ export class Game {
           deliver({ kind: 'text', from: 'alik', text: promise.text })
           return
         }
+        const festive = this.line('HOLIDAY', HOLIDAY_EXCUSES)
+        if (festive) { deliver({ kind: 'text', from: 'alik', text: festive }); return }
         const ex = this.uniq(() => this.X.excuse())
         this.meetRel(ex.r)
         this.recordPromise(ex.p)
