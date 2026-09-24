@@ -57,11 +57,14 @@ const realOf = (u: GameUi): Game => {
 
 export type PaydayView = { daysLeft: number | null; sum: number | null }
 /** Состояние записи журнала: что о сроке честно сказать в досье. */
-export type PromiseState = 'amnesty' | 'kept' | 'asked' | 'late' | 'someday' | 'wait'
-export type PromiseRow = { text: string; due: number | null; late: boolean; amnesty: number | null; state: PromiseState }
+export type PromiseState = 'amnesty' | 'kept' | 'asked' | 'late' | 'event' | 'eventMet' | 'someday' | 'wait'
+export type PromiseRow = { text: string; due: number | null; amnesty: number | null; state: PromiseState }
 
+/** Срок по событию (`condition`) не дата: до события ждём события, после — оно наступило (не «просрочено»:
+ *  в игре событийный срок не просрочен, docs/design/promise-amnesty.md). */
 const promiseState = (p: PromiseRec, day: number): PromiseState =>
-  p.amnesty !== undefined ? 'amnesty' : p.kept ? 'kept' : p.asked ? 'asked' : isLate(p, day) ? 'late' : p.due === null ? 'someday' : 'wait'
+  p.amnesty !== undefined ? 'amnesty' : p.kept ? 'kept' : p.asked ? 'asked' : isLate(p, day) ? 'late'
+    : p.condition ? (p.met === undefined ? 'event' : 'eventMet') : p.due === null ? 'someday' : 'wait'
 export type ArcRow = { id: string; title: string; state: string; done: boolean; locked: boolean }
 export type EndingRow = { id: string; title: string; icon: string; got: boolean }
 export type AchRow = { id: string; title: string; desc: string; got: boolean }
@@ -116,7 +119,7 @@ export const viewOf = (u: GameUi): View => {
     finales: Object.keys(ARCS)
       .filter((id) => g.finaleTitle(id))
       .map((id) => ({ id, title: ARCS[id].title, finale: g.finaleTitle(id)! })),
-    promises: S.promises.map((p) => ({ text: p.t, due: p.due, late: isLate(p, S.day), amnesty: p.amnesty ?? null, state: promiseState(p, S.day) })),
+    promises: S.promises.map((p) => ({ text: p.t, due: p.due, amnesty: p.amnesty ?? null, state: promiseState(p, S.day) })),
     arcs: Object.entries(ARCS).map(([id, a]) => {
       const i = S.arcs[id]?.i ?? 0
       const finale = g.finaleTitle(id)

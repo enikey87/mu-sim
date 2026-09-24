@@ -286,17 +286,23 @@ describe('App', () => {
       { t: 'сразу после свадьбы', made: day - 7, due: day - 3, asked: true, kept: true },
       { t: 'до конца недели', made: day - 8, due: day - 4, amnesty: day - 1 },
       { t: 'когда Арарат вернут', made: day, due: null },
+      { t: 'как Нуне из декрета выйдет', made: day, due: null, condition: 'nune.dekretOver' },
+      { t: 'как снег в горах сойдёт', made: day - 5, due: null, condition: 'tax.thawed', met: day - 1 },
     )
     renderApp(game)
     fireEvent.click(screen.getByTitle('Обещания и ачивки'))
     const dialog = screen.getByRole('dialog')
     const line = (re: RegExp) => within(dialog).getByText(re).textContent
-    expect(line(/⏳ ждём/)).toContain(fmtDate(day + 1)) // ждём — со своим сроком
+    expect(line(/⏳ ждём \d/)).toContain(fmtDate(day + 1)) // ждём — со своим сроком
     expect(line(/❌ просрочено/)).toContain(fmtDate(day - 1))
     expect(line(/❓ припомнили/)).toContain(fmtDate(day - 2))
     expect(line(/✅ сдержал — 50 ₽/)).toContain(fmtDate(day - 3))
     expect(line(/🕊 амнистия/)).toContain(fmtDate(day - 1))
-    expect(line(/∞ когда-нибудь/)).not.toMatch(/⏳|просрочено/) // «когда-нибудь» — не «ждём»
+    // «когда-нибудь» — ровно одна запись: сроки по событию им не прикидываются
+    expect(within(dialog).getAllByText(/∞ когда-нибудь/)).toHaveLength(1)
+    // срок по событию — свой значок до события и после: «когда-нибудь» ему не подходит
+    expect(line(/⏳ ждём события/)).toBeTruthy()
+    expect(line(/🎯 событие наступило/)).toBeTruthy()
   })
 
   it('Esc закрывает досье и возвращает фокус на кнопку досье', () => {
