@@ -128,3 +128,14 @@ export const idleRules: R[] = [
   { name: 'Idle_Voice', event: 'AlikIdle', when: [], specificity: 0, priority: 'chatter', weight: idleW.voice, respond: ({ game }) => game.voice() },
   { name: 'Idle_Period', event: 'AlikIdle', when: [], specificity: 0, priority: 'chatter', weight: (f) => (f.period === 'day' ? 0 : idleW.period), respond: ({ game }) => game.periodLine(game.period()) },
 ]
+
+// Событие AlikAway — одно сообщение пачки «пока тебя не было»; смерть, блок, телефон у Карине молчат правилами Quiet_* своих состояний
+const awayW = { text: 35, sticker: 15, fwd: 15, deleted: 10, voice: 10, transfer: 7, excuse: 8 }
+export const awayRules: R[] = [
+  // пропал — не пишет; уведомление телефона, как у Idle_Offline, в пачке ни к чему
+  { name: 'Away_Offline', event: 'AlikAway', when: [AlikOffline], respond: () => {} },
+  ...(Object.keys(awayW) as (keyof typeof awayW)[]).map((kind): R => ({
+    name: 'Away_' + kind.charAt(0).toUpperCase() + kind.slice(1), event: 'AlikAway', when: [], specificity: 0, weight: awayW[kind],
+    respond: ({ game }) => game.awayMsg(kind),
+  })),
+]

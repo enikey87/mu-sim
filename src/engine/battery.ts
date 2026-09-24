@@ -10,7 +10,7 @@ export interface BatteryHost {
   /** Заряд 0 %: гасим таймеры, открываем оверлей, сохраняемся. */
   dead(): void
   /** Анимация зарядки завершена: пачка непрочитанных «пока телефон заряжался», возобновляем жизнь. */
-  chargeDone(): void
+  chargeDone(): void | Promise<void>
   sleep(ms: number): Promise<void>
   emit(): void
   isDisposed(): boolean
@@ -67,7 +67,7 @@ export class Battery {
       this.S.battery = 100
       this.dead = false
       this.host.emit()
-      this.host.chargeDone()
+      await this.host.chargeDone()
     } catch (e) {
       if (!(e instanceof Error) || e.name !== 'GameDisposed') throw e
     }

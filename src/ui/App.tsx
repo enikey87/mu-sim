@@ -15,7 +15,7 @@ export function App({ game, onReset, debug = false }: { game: Game; onReset: () 
   // звук разрешается первым касанием; «вернулся к вкладке» — пачка непрочитанных
   useEffect(() => {
     const gesture = () => ui.gesture()
-    const vis = () => ui.onVisibility(document.hidden)
+    const vis = () => void ui.onVisibility(document.hidden)
     document.addEventListener('pointerdown', gesture)
     document.addEventListener('keydown', gesture)
     document.addEventListener('visibilitychange', vis)
