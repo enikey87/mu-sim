@@ -184,13 +184,24 @@ describe('несостыковки из партии пользователя', 
     game.S.choices = null
     expect(game.choices.some((c) => c.act === 'reactQ')).toBe(false)
   })
-  it('«толкни „Ниву“» — только внутри сериала «Нива», и из разговора квест не повторяется', () => {
+  it('«толкни „Ниву“» — только внутри сериала «Нива»; once ставит takeQuest, не questAllowed', async () => {
     const { game } = makeGame()
     expect(game.questAllowed('q_niva')).toBe(false)
     game.setLegend('niva_stuck', 'niva')
     expect(game.questAllowed('q_niva')).toBe(true)
-    expect(game.questAllowed('q_niva')).toBe(false) // уже был
+    expect(game.questAllowed('q_niva')).toBe(true) // проверка не списывает once
+    await game.enterNode('q_niva', game.scenes.q_niva.start)
+    game.takeQuest('q_niva')
+    expect(game.questAllowed('q_niva')).toBe(false)
     expect(game.questAllowed('q_hash')).toBe(true)
+  })
+  it('срыв до takeQuest — квест снова доступен', () => {
+    const { game } = makeGame()
+    game.setLegend('niva_stuck', 'niva')
+    expect(game.questAllowed('q_niva')).toBe(true)
+    // enterNode не вызвали / takeQuest не вызвали — once пуст
+    expect(game.S.rules.once['Quest_q_niva']).toBeUndefined()
+    expect(game.questAllowed('q_niva')).toBe(true)
   })
   it('«вернулся» без рода: подходит и тёще, и дедушке', () => {
     for (const t of CONDOLE_REVIVED) expect(t).not.toMatch(/\bон\b|\bона\b/)

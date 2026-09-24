@@ -200,7 +200,11 @@ export const replyRules: R[] = [
       // некоторые вопросы сразу превращаются в мини-квест («Приеду поесть» → хаш в 7 утра)
       const quest = TOPICS[k]?.quest?.[Number(i)]
       // квест из разговора — по тем же условиям, что и сам квест, и один раз за игру
-      if (quest && game.scenes[quest] && game.questAllowed(quest)) return game.enterNode(quest, game.scenes[quest].start)
+      if (quest && game.scenes[quest] && game.questAllowed(quest)) {
+        await game.enterNode(quest, game.scenes[quest].start)
+        game.takeQuest(quest)
+        return
+      }
       const a = TOPICS[k]?.a[Number(i)]
       // ответ Алика — тоже тема: разговор может продолжиться
       if (a && !game.seen.has(a)) { game.seen.mark(a); game.markTopical(await game.say([a])) } else await game.say([game.uniq(() => game.draw('TOPIC_FB', TOPIC_FALLBACK))])
