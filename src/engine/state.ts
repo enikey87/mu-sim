@@ -83,7 +83,8 @@ export interface PromiseRec {
 export interface GameState {
   day: number
   clock: number
-  debt: number
+  /** Только чтение: пишет один Game.adjustDebt (после Дня выплаты долг запечатан). Страж — engine/debt.test.ts. */
+  readonly debt: number
   patience: number
   politeStreak: number
   mood: number

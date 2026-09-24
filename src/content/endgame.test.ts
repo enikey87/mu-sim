@@ -20,7 +20,7 @@ function finishPayday(game: Game, outcome = 'default'): void {
 describe('бесконечная группа после Дня выплаты', () => {
   it('открывается один раз и сохраняет результат концовки', () => {
     const { game } = makeGame()
-    game.S.debt = 0
+    game.adjustDebt(-game.S.debt)
     game.S.money = 252400
 
     finishPayday(game, 'real')

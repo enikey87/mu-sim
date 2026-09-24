@@ -415,7 +415,8 @@ export class Game {
   /** Изменить долг. После выплаты — false, значение не тронуто. */
   adjustDebt(delta: number): boolean {
     if (this.debtSealed()) return false
-    this.S.debt += delta
+    const w: { debt: number } = this.S // единственная запись: S.debt readonly
+    w.debt += delta
     return true
   }
   // Дно ≤ 6000 (как старый FLOOR); «мало» ≤ 9000 — предупреждение до дна. Старт 12400.
@@ -1199,6 +1200,7 @@ export class Game {
   }
 
   async transfer(): Promise<void> {
+    if (this.debtSealed()) return // пузырь перевода без движения денег — ложь
     await this.typingFor(1200)
     const amount = Number(this.S.mem[memkeys.nextTransfer] ?? 50)
     delete this.S.mem[memkeys.nextTransfer]
@@ -1390,12 +1392,14 @@ export class Game {
     for (const x of m) this.seen.mark(typeof x === 'string' ? x : x.t)
     this.markTopical(await this.say(m))
     if (typeof ep.legend === 'string' && this.S.ctx) this.S.ctx.legend = ep.legend // новая легенда — есть что переспросить
-    if (ep.fx?.debt) this.adjustDebt(ep.fx.debt)
-    if (ep.fx?.pay && this.adjustDebt(-ep.fx.pay)) this.adjustMoney(ep.fx.pay, 'Выплата')
+    // серия, которая двигает долг, объявляет это в sys — объявление только о том, что случилось
+    const debtFx = !!(ep.fx?.debt || ep.fx?.pay)
+    let debtMoved = !!ep.fx?.debt && this.adjustDebt(ep.fx.debt)
+    if (ep.fx?.pay && this.adjustDebt(-ep.fx.pay)) { this.adjustMoney(ep.fx.pay, 'Выплата'); debtMoved = true }
     if (ep.item) this.S.items.push(ep.item)
     if (ep.state) this.rules.applyOps([{ key: ep.state.key, op: '=', value: true, forDays: ep.state.days, scope: ep.state.actor ? 'target' : 'world' }], { target: ep.state.actor })
     if (ep.fx?.days) this.nextDay(ep.fx.days)
-    if (ep.sys) { await this.sleep(500); this.sys(ep.sys) }
+    if (ep.sys && (!debtFx || debtMoved)) { await this.sleep(500); this.sys(ep.sys) }
     if (ep.fx?.ach) this.unlock(ep.fx.ach)
     if (ep.fx?.offline) this.goOffline(ep.fx.offline)
     if (ep.then === 'promise') await this.promiseLine(undefined, !!ep.legend)
@@ -1563,16 +1567,18 @@ export class Game {
 
     const fx = n.fx ?? {}
     if (fx.days) this.nextDay(fx.days)
-    if (fx.debt) this.adjustDebt(fx.debt)
+    const debtFx = !!(fx.debt || fx.barter || fx.invoice)
+    let debtMoved = !!fx.debt && this.adjustDebt(fx.debt)
     if (fx.money) this.adjustMoney(fx.money, 'По карте')
     if (fx.mood) this.mood(fx.mood)
-    if (fx.barter && this.adjustDebt(-v.v)) S.items.push(v.n)
+    if (fx.barter && this.adjustDebt(-v.v)) { S.items.push(v.n); debtMoved = true }
     const invoiced = !!fx.invoice && this.adjustDebt(-v.total)
+    debtMoved ||= invoiced
     if (fx.ach) this.unlock(fx.ach)
     if (fx.legend !== undefined) this.setLegend(fx.legend)
     if (fx.set) this.rules.applyOps(Object.entries(fx.set).map(([key, value]) => ({ key, op: '=' as const, value })), {})
     if (fx.during) this.rules.applyOps([{ key: fx.during.key, op: '=', value: true, forDays: fx.during.days }], {})
-    if (n.sys) { await this.sleep(700); this.sys(gen('sys', n.sys)()) }
+    if (n.sys && (!debtFx || debtMoved)) { await this.sleep(700); this.sys(gen('sys', n.sys)()) }
     // обращение «Брат мой, …» — манера Алика; реплики других персонажей (Борис: «Бее.») не украшаем
     if (n.a) await this.say([n.who ? gen('a', n.a)() : variant('a', n.a)], false, n.who)
     if (n.doc) {
@@ -1607,7 +1613,8 @@ export class Game {
       this.push({ kind: 'text', from: 'me', text: reply, time: fmtTime(this.S.clock) })
       if (yes) {
         const add = 5000 + this.rnd(16) * 1000
-        this.nextDay(2 + this.rnd(3))
+        // после Дня выплаты работа ничего не двигает — ни долг, ни календарь
+        if (!this.debtSealed()) this.nextDay(2 + this.rnd(3))
         if (this.adjustDebt(add)) {
           this.sys(`Вы сделали работу. Долг Алика вырос на ${add.toLocaleString('ru-RU')} ₽`)
           this.mood(2)
@@ -1703,10 +1710,9 @@ export class Game {
       case 'deleted': deliver({ kind: 'text', from: 'alik', text: '', deleted: true }); return
       case 'voice': deliver({ kind: 'voice', from: 'alik', len: 10 + this.rnd(50) }); return
       case 'transfer':
-        if (this.adjustDebt(-50)) {
-          this.adjustMoney(50, 'Перевод от Алика')
-          this.S.stats.fifty++
-        }
+        if (!this.adjustDebt(-50)) return // после выплаты перевода нет — и пузыря тоже
+        this.adjustMoney(50, 'Перевод от Алика')
+        this.S.stats.fifty++
         deliver({ kind: 'transfer', from: 'alik', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE), amount: 50 })
         return
       case 'formality': for (const text of this.formalityLines()) deliver({ kind: 'text', from: 'alik', text }); return
