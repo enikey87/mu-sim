@@ -958,6 +958,15 @@ export class Game {
       'arc.done': c.arc ? this.S.arcs[c.arc]?.i >= ARCS[c.arc].eps.length : false,
       'ctx.legend': c.legend, 'ctx.chorus': c.chorus, 'ctx.memory': c.memory,
       'ctx.group': c.group, 'ctx.wrong': c.wrong, 'ctx.deleted': c.deleted, 'ctx.offended': c.offended,
+      // слоты события: всегда в снимке (сверка EVENT_KEYS без ручной подстановки в тестах)
+      intent: extra.intent ?? false,
+      tone: extra.tone ?? false,
+      arg: extra.arg ?? false,
+      category: extra.category ?? false,
+      arc: extra.arc ?? false,
+      argArcDone: extra.argArcDone ?? false,
+      greet: extra.greet ?? false,
+      promise: extra.promise ?? false,
       ...extra,
     }
   }
