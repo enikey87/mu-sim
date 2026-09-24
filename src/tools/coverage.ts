@@ -10,7 +10,7 @@ import { specificityOf, lineId, spec } from '../engine/rules'
 import { MEMORY } from '../content/memory'
 import { rudeRules, rudeSaysRules } from '../content/rules/rude'
 import { endgameRules } from '../content/rules/endgame'
-import { RARE } from './rare'
+import { RARE, RARE_ALL } from './rare'
 import { botTurn } from './bot'
 
 /** Почему правило не сработало в симуляции. У каждого класса, кроме последнего, есть прямой тест. */
@@ -30,7 +30,7 @@ export const COVERAGE_SAMPLES: number[][] = [
 ]
 
 export const neverClass = (name: string): NeverClass =>
-  RARE.has(name) ? 'rare' : DETERMINISTIC.has(name) ? 'deterministic' : ENDGAME_ONLY.test(name) ? 'endgame' : 'unexplained'
+  RARE_ALL.has(name) ? 'rare' : DETERMINISTIC.has(name) ? 'deterministic' : ENDGAME_ONLY.test(name) ? 'endgame' : 'unexplained'
 
 /** Где именно правило проверяется, если симуляция до него не доходит. */
 const NEVER_HINT: Record<NeverClass, string> = {
@@ -57,8 +57,8 @@ export interface MultiCoverage {
   samples: CoverageReport[]
   /** Ни разу ни в одной выборке — настоящая недостижимость для гейта. */
   never: string[]
-  /** Записи RARE, сработавшие во всех выборках — исключение протухло. */
-  rareStale: string[]
+  /** Записи RARE, до которых стенд всё-таки дошёл: им место в RARE_FLAKY или под сторожем. */
+  rareReached: string[]
 }
 
 /** Пересечение «никогда»: имя есть в каждом списке never. */
@@ -68,9 +68,10 @@ export function neverInAllSamples(sampleNevers: string[][]): string[] {
   return sampleNevers[0].filter((name) => rest.every((s) => s.has(name)))
 }
 
-/** RARE-имена, которые сработали в каждой из `sampleCount` выборок. */
-export function staleRare(firedIn: Record<string, number>, sampleCount: number, rare: Iterable<string> = RARE): string[] {
-  return [...rare].filter((n) => (firedIn[n] ?? 0) === sampleCount)
+/** Записи RARE, которых нет в «ни разу ни в одной выборке»: стенд до правила дошёл. */
+export function rareReached(never: Iterable<string>, rare: Iterable<string> = RARE): string[] {
+  const neverSet = new Set(never)
+  return [...rare].filter((n) => !neverSet.has(n))
 }
 
 /** grumpy — номера партий (с конца), где бот много грубит: иначе лестница грубости не проходится. */
@@ -110,7 +111,7 @@ export async function ruleCoverage(seeds: number[], turns: number, hours = [14, 
   return { turns: total, weighted, fired, never: names.filter((n) => !fired[n]), events, unsaid }
 }
 
-/** Несколько выборок → достижимость по объединению, протухание RARE — по пересечению. */
+/** Несколько выборок → достижимость по объединению, RARE — по пересечению «никогда». */
 export async function multiSampleCoverage(
   samples = COVERAGE_SAMPLES,
   turns = 500,
@@ -118,20 +119,9 @@ export async function multiSampleCoverage(
   opts: { freeText?: number } = { freeText: 0.15 },
 ): Promise<MultiCoverage> {
   const reports: CoverageReport[] = []
-  const firedIn: Record<string, number> = {}
-  for (const seeds of samples) {
-    const r = await ruleCoverage(seeds, turns, undefined, grumpy, opts)
-    reports.push(r)
-    const never = new Set(r.never)
-    for (const name of [...Object.keys(r.fired), ...r.never]) {
-      if (!never.has(name)) firedIn[name] = (firedIn[name] ?? 0) + 1
-    }
-  }
-  return {
-    samples: reports,
-    never: neverInAllSamples(reports.map((r) => r.never)),
-    rareStale: staleRare(firedIn, samples.length),
-  }
+  for (const seeds of samples) reports.push(await ruleCoverage(seeds, turns, undefined, grumpy, opts))
+  const never = neverInAllSamples(reports.map((r) => r.never))
+  return { samples: reports, never, rareReached: rareReached(never) }
 }
 
 export function formatCoverage(r: CoverageReport): string {
