@@ -20,9 +20,12 @@ export const silentAudio: Audio = {
   unlock() {}, setMuted() {}, beep() {}, moo() {}, speak() {}, feast() {}, alikVoice() {}, vibrate() {}, dispose() {},
 }
 
+let everGestured = false
+
 export function browserAudio(): Audio {
   let ac: AudioContext | null = null
-  let gestured = false
+  // жест — свойство страницы, а не экземпляра: звук не должен молчать в интро после «Начать заново»
+  let gestured = everGestured
   let muted = false
   let disposed = false
   const pending = new Set<WallTimer>()
@@ -76,6 +79,7 @@ export function browserAudio(): Audio {
     unlock() {
       if (disposed || gestured) return
       gestured = true
+      everGestured = true
       try { ctx().resume() } catch { /* ignore */ }
     },
     setMuted(m) {
