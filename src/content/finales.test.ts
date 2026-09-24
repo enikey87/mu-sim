@@ -145,11 +145,11 @@ describe('финалы сериалов: выбор', () => {
   })
   it('финал с fx.pay увеличивает fifty — ответ на «спасибо» видит перевод', async () => {
     const { game } = makeGame()
-    SETUP['razmik.swap'](game)
+    SETUP['razmik.union'](game)
     toLast(game, 'razmik')
     const before = game.S.stats.fifty
     await game.playArc('razmik')
-    expect(game.S.mem['finale.razmik']).toBe('swap')
+    expect(game.S.mem['finale.razmik']).toBe('union')
     expect(game.S.stats.fifty).toBe(before + 1)
   })
   it('вопрос «Как там…?» считается и после финала отвечает репликами этого финала', async () => {
