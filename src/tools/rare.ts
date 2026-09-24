@@ -7,12 +7,14 @@ export const RARE = new Set([
   // ни в одной из трёх выборок (16 партий × 500 ходов каждая)
   'Tone_Cow', 'Says_catchLie_liekind_grandpa', 'Says_catchLie_liekind_customer', 'Says_catchLie_caught3',
   'Turn_WhileDead', 'Says_OtherArcWhileDead',
+  // пачка непрочитанных совпадает с «пропал» не в каждой выборке
+  'Away_Offline',
   // «Это корова?» ждёт фонового «Мууу»: симуляция покрытия не крутит таймеры, и за 16 партий
   // фоновое мычание случается 0–1 раз (playtest таймеры крутит и до правила доходит)
   'Opt_Cow',
   // в одной-двух выборках из трёх: состояние складывается не каждый раз
   'Says_catchLie_caught2',
   'Turn_Wedding_Samvel', 'Turn_Wedding_Razmik',
-  // сцена «жена» / квест «Нива»: сдвиг пула кнопок срока меняет траекторию бота (были в покрытии на main)
-  'Scene_wife', 'Quest_q_niva',
+  // квест «Нива»: сдвиг пула кнопок срока меняет траекторию бота (был в покрытии на main)
+  'Quest_q_niva',
 ])

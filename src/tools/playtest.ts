@@ -89,7 +89,7 @@ function pick(rng: Rng, style: Style, cs: Choice[]): number {
 }
 
 /** Сыграть партию ботом (или повторить записанные действия replay); watch — посмотреть на игру до первого хода. */
-export async function playtest(seed: number, turns: number, replay?: Act[], watch?: (game: Game) => void): Promise<Played> {
+export async function playtest(seed: number, turns: number, replay?: Act[], watch?: (game: Game) => void | Promise<void>): Promise<Played> {
   const style = STYLES[seed % STYLES.length]
   const hour = HOURS[seed % HOURS.length]
   const clock = manualClock(Date.parse('2026-09-14T12:00:00Z') + (seed % 7) * 864e5)
@@ -111,16 +111,17 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
   const awayBuf: WorldFrame['away'] = []
   const awayIdx = new Set<number>()
   const burst = game.awayBurst.bind(game)
-  game.awayBurst = (n, days, why) => {
+  game.awayBurst = async (n, days, why) => {
     const from = game.S.msgs.length
-    burst(n, days, why)
+    await burst(n, days, why)
     for (let i = from; i < game.S.msgs.length; i++) awayIdx.add(i)
-    awayBuf.push(...game.S.msgs.slice(from).map(line))
+    // разделитель дня ставит сама пауза, а не Алик: в «пачке» его нет
+    awayBuf.push(...game.S.msgs.slice(from).filter((m) => m.kind !== 'sep').map(line))
   }
   let msgAt = 0
   let asideAt = 0
   // watch — после приборов: сценарий теста до первой партии иначе не попадает в дамп
-  watch?.(game)
+  await watch?.(game)
   let memAt: Record<string, unknown> = worldFacts(game)
   const snap = (turn: number) => {
     const mem = worldFacts(game)
@@ -193,6 +194,8 @@ export function worldDump(p: Played): object {
       had_razmik_finale: p.world.some((f) => f.mem['finale.razmik'] !== undefined),
       notifications: p.world.reduce((n, f) => n + f.notif.length, 0),
       away_messages: p.world.reduce((n, f) => n + f.away.length, 0),
+      // пачка была, даже если мир велел молчать: событий AlikAway, а не сообщений
+      away_events: p.world.reduce((n, f) => n + f.fired.filter((h) => h.event === 'AlikAway').length, 0),
     },
     frames: p.world,
   }

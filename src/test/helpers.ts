@@ -24,6 +24,9 @@ export function makeGame(opts: Partial<GameOptions> & { seed?: number } = {}): T
   return { game, clock, storage }
 }
 
+/** Дождаться работы, начатой без await (пачка непрочитанных из конструктора): макрозадача — после всех микрозадач. */
+export const flush = (): Promise<void> => new Promise((r) => setTimeout(r, 0))
+
 export const alikTexts = (msgs: Msg[]): string[] =>
   msgs.filter((m): m is Extract<Msg, { kind: 'text' }> => m.kind === 'text' && m.from === 'alik' && !m.deleted).map((m) => m.text)
 

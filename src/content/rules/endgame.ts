@@ -32,6 +32,11 @@ export const endgameRules: R[] = [
     name: 'Endgame_Idle', event: 'AlikIdle', when: [active], specificity: 100, priority: 'system',
     respond: ({ game }) => game.endgameFormality(),
   },
+  // пока игрока не было, в группе копятся закрывающие акты — не переводы и не отмазки: долг после выплаты не меняется
+  {
+    name: 'Endgame_Away', event: 'AlikAway', when: [active], specificity: 100, priority: 'system',
+    respond: ({ game }) => game.awayMsg('formality'),
+  },
   {
     name: 'Endgame_Formality', event: 'StoryBeat', when: [active], specificity: 100, priority: 'cinematic',
     respond: ({ game }) => game.endgameFormality(),
