@@ -110,6 +110,43 @@ describe('варианты игрока (BuildChoices)', () => {
     const a = acts(choicesFor(game, game.S.ctx))
     expect(a.includes('promiseCheck') || a.includes('promiseOk')).toBe(true)
   })
+  it('без дат срока whenFresh — нельзя (потеря данных ≠ разрешение)', () => {
+    const { game } = makeGame()
+    game.S.ctx = { when: 'завтра' }
+    expect(game.facts()['ctx.whenFresh']).toBe(false)
+    expect(acts(choicesFor(game, game.S.ctx))).not.toContain('promiseOk')
+    expect(acts(choicesFor(game, game.S.ctx))).not.toContain('promiseCheck')
+  })
+  it('отмазка через ctxFromPromise: в день речи — кнопка с датой; после сдвига хода — нет', async () => {
+    const { game } = makeGame()
+    const p = { t: 'завтра', d: 1, text: 'завтра — рассчитаюсь', tomorrow: true as const }
+    const excuse = game.X.excuse
+    game.X.excuse = () => ({ texts: ['Брат, завтра — рассчитаюсь.'], p, legendary: false })
+    try {
+      await game.excuseTurn()
+    } finally {
+      game.X.excuse = excuse
+    }
+    // даты пишет ctxFromPromise, а не рука теста
+    expect(game.S.ctx?.when).toBe('завтра')
+    expect(game.S.ctx?.whenMade).toBe(game.S.day)
+    expect(game.S.ctx?.whenDue).toBe(game.S.day + 1)
+    expect(game.facts()['ctx.whenFresh']).toBe(true)
+    const onDue: string[] = []
+    for (let i = 0; i < 40; i++) {
+      game.S.choices = null
+      for (const c of game.buildChoices()) if (c.act === 'promiseOk' || c.act === 'promiseCheck') onDue.push(c.text)
+    }
+    expect(onDue.length).toBeGreaterThan(0)
+    expect(onDue.every((t) => t.includes('«') || /когда по-русски|это точно/.test(t))).toBe(true)
+    expect(onDue.some((t) => /Запомнил: завтра(?!\s*«)/.test(t))).toBe(false)
+    // как advanceTurnDay после ответа: +1…3, срок «завтра» уже позади
+    game.nextDay(2)
+    expect(game.facts()['ctx.whenFresh']).toBe(false)
+    game.S.choices = null
+    expect(acts(game.buildChoices())).not.toContain('promiseOk')
+    expect(acts(game.buildChoices())).not.toContain('promiseCheck')
+  })
 })
 
 describe('ответы Алика (PlayerSays)', () => {
@@ -210,11 +247,12 @@ describe('ответы Алика (PlayerSays)', () => {
   })
   it('на срок — либо вопрос, либо согласие; на согласие Алик не клянётся заново, а подтверждает', async () => {
     const { game } = makeGame()
+    const ctx = game.ctxFromPromise({ t: 'в среду утром', d: 2, text: 'в среду утром' })
     const acts = new Set<string>()
-    for (let i = 0; i < 40; i++) { game.S.ctx = { when: 'в среду утром' }; game.S.choices = null; for (const c of game.choices) if (c.act) acts.add(c.act) }
+    for (let i = 0; i < 40; i++) { game.S.ctx = ctx; game.S.choices = null; for (const c of game.choices) if (c.act) acts.add(c.act) }
     expect(acts).toContain('promiseCheck')
     expect(acts).toContain('promiseOk')
-    game.S.ctx = { when: 'в среду утром' }
+    game.S.ctx = ctx
     const t = await reply(game, { text: 'Запомнил: в среду утром. Не подведите.', tone: 'polite', act: 'promiseOk' })
     expect((D.PROMISE_OK as string[]).some((p) => t.join(' ').includes(p))).toBe(true)
   })

@@ -232,13 +232,13 @@ describe('несостыковки из плейтеста ботами', () => 
   it('«Алик умер»: ни простоя, ни сюжетных ходов, на слова — Карине или «с того света»', async () => {
     const { game } = makeGame()
     game.S.mem.alik_dead = true
-    for (const ev of ['AlikIdle', 'StoryBeat', 'PeriodLine', 'PromiseDue'] as GameEvent[]) expect((await game.fire(ev))?.name).toBe('Quiet_Dead_' + ev)
+    for (const ev of ['AlikIdle', 'AlikAway', 'StoryBeat', 'PeriodLine', 'PromiseDue'] as GameEvent[]) expect((await game.fire(ev))?.name).toBe('Quiet_Dead_' + ev)
     expect((await game.fire('PlayerSays', { intent: 'photo' }))?.name).toBe('Says_WhileDead')
   })
-  it('в чёрном списке — легенды и «обед — святое» не приходят', async () => {
+  it('в чёрном списке — легенды, «обед — святое» и пачка непрочитанных не приходят', async () => {
     const { game } = makeGame()
     game.S.mem.blocked = true
-    for (const ev of ['StoryBeat', 'PeriodLine', 'PromiseDue'] as GameEvent[]) expect((await game.fire(ev))?.name).toBe('Quiet_Blocked_' + ev)
+    for (const ev of ['AlikAway', 'StoryBeat', 'PeriodLine', 'PromiseDue'] as GameEvent[]) expect((await game.fire(ev))?.name).toBe('Quiet_Blocked_' + ev)
   })
   it('где деньги — меняется по сюжету: «Нива» полгода назад не ловится как ложь', () => {
     const { game } = makeGame()

@@ -71,7 +71,7 @@ function mutate(from: string, to: string, change: (d: { frames: Frame[]; rules: 
   return dir
 }
 
-interface Frame { before: Record<string, unknown>; mem: Record<string, unknown>; said: { w: string; k: string }[]; fired: { event: string; chosen: string[] }[] }
+interface Frame { before: Record<string, unknown>; mem: Record<string, unknown>; said: { w: string; k: string }[]; fired: { event: string; chosen: string[] }[]; away: string[] }
 
 describe('оракул: негативный контроль', () => {
   it('речь в окне смерти без гейта — находка; тот же кадр с гейтом — нет', () => {
@@ -96,14 +96,25 @@ describe('оракул: негативный контроль', () => {
     expect(oracle(join(FIXTURES, 'main')).verdict!.violations.dead_fact_lost).toBeUndefined()
   })
 
-  it('пачка непрочитанных при мёртвом Алике видна — сообщения идут мимо движка правил', async () => {
-    const dir = await dump(3, 2, (g) => {
+  it('пачка непрочитанных при мёртвом Алике молчит по правилу — событие в дампе есть, сообщений нет', async () => {
+    const dir = await dump(3, 2, async (g) => {
       g.S.mem['alik_dead'] = true
-      g.awayBurst(2, 1, 'Пока телефон заряжался')
+      await g.awayBurst(2, 1, 'Пока телефон заряжался')
     })
     const v = oracle(dir).verdict!
-    expect(v.violations.dead_away_loud).toBeGreaterThan(0)
-    expect(v.coverage.away_messages).toBeGreaterThan(0)
+    expect(v.violations.dead_away_loud).toBeUndefined()
+    expect(v.coverage.away_events).toBe(2) // окно не пусто: пачку пытались доставить дважды
+    expect(v.coverage.away_messages).toBe(0)
+    expect(v.coverage.away_unexercised).toBeUndefined()
+  })
+
+  it('сообщения пачки в кадре смерти — находка: проверка не зависит от того, каким путём они пришли', () => {
+    const dir = mutate('main', 'main', (d) => {
+      const f = d.frames.find((x) => x.before.alik_dead)!
+      expect(f, 'в фикстуре не нашлось кадра смерти — контролю нечего ломать').toBeDefined()
+      f.away = ['[12:00] Алик: Эээ, брат, ты спишь?']
+    })
+    expect(oracle(dir).verdict!.violations.dead_away_loud).toBe(1)
   })
 
   it('уведомление, показанное мимо выборщика, ловится по своему же условию', async () => {

@@ -2,7 +2,7 @@
 import type { Game } from '../../engine/game'
 import type { Rule } from '../../engine/rules'
 import type { GameEvent } from './events'
-import { toneRules, ignoreRules, periodRules, turnRules, idleRules, storyRules } from './turn'
+import { toneRules, ignoreRules, periodRules, turnRules, idleRules, awayRules, storyRules } from './turn'
 import { replyRules } from './replies'
 import { choiceRules } from './choices'
 import { worldRules } from './world'
@@ -12,4 +12,4 @@ import { courtRules } from './court'
 import { paydayRules } from './payday'
 import { endgameRules } from './endgame'
 
-export const allRules: Rule<Game, GameEvent>[] = [...toneRules, ...storyRules, ...ignoreRules, ...periodRules, ...turnRules, ...idleRules, ...replyRules, ...choiceRules, ...worldRules, ...finaleRules, ...endingRules, ...rudeRules, ...rudeSaysRules, ...courtRules, ...paydayRules, ...endgameRules]
+export const allRules: Rule<Game, GameEvent>[] = [...toneRules, ...storyRules, ...ignoreRules, ...periodRules, ...turnRules, ...idleRules, ...awayRules, ...replyRules, ...choiceRules, ...worldRules, ...finaleRules, ...endingRules, ...rudeRules, ...rudeSaysRules, ...courtRules, ...paydayRules, ...endgameRules]

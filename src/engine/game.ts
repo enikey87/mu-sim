@@ -42,6 +42,14 @@ import {
   type InputCategory, freshState, loadState, saveState, SAVE_KEY, MAX_PATIENCE,
 } from './state'
 
+/** Текст срока как буквальный шаблон без учёта регистра; кэш — topicOfLast зовётся из facts() на каждую реплику. */
+const LITERAL = new Map<string, RegExp>()
+const literalRe = (t: string): RegExp => {
+  let re = LITERAL.get(t)
+  if (!re) LITERAL.set(t, (re = new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')))
+  return re
+}
+
 /** Отмена async после dispose — ловится на entry points, игроку не показывается. */
 export class GameDisposed extends Error {
   override name = 'GameDisposed'
@@ -74,6 +82,8 @@ export const REVIVED = /встал|встаёт|воскрес|вернулас�
 export const FESTIVE = /свадьб|крестин|юбилей|обручен|день рождения|отмечаем|обмываем|празд|родился|поступил|выпускн|сватовств|помолвк|открыва|открыли|приехал|вернулся|урожа|отелилась|правнук|первое слово|дочку выдают/
 
 export type SayItem = string | { w: string; t: string }
+/** Что пришло, пока игрока не было: виды сообщений пачки непрочитанных. */
+export type AwayKind = 'text' | 'sticker' | 'fwd' | 'deleted' | 'voice' | 'transfer' | 'excuse' | 'formality'
 
 export class Game {
   S: GameState
@@ -158,7 +168,7 @@ export class Game {
     this.rawAudio.setMuted(this.S.muted)
 
     if (!this.S.msgs.length) this.seed()
-    this.checkAway(opts.away ?? null)
+    void this.checkAway(opts.away ?? null)
     if (!this.S.choices) this.S.choices = this.buildChoices()
     this.restStatus()
     if (this.battery.level === 0) this.battery.die()
@@ -612,9 +622,9 @@ export class Game {
     this.save()
     this.emit()
   }
-  private onPhoneCharged(): void {
+  private async onPhoneCharged(): Promise<void> {
     this.ui.busy = false
-    this.awayBurst(2 + this.rnd(3), 1 + this.rnd(2), 'Пока телефон заряжался')
+    await this.awayBurst(2 + this.rnd(3), 1 + this.rnd(2), 'Пока телефон заряжался')
     this.armIdle()
     this.armStatus()
   }
@@ -652,14 +662,17 @@ export class Game {
     const S = this.S
     const c = S.ctx ?? {}
     const pr = extra.promise !== undefined ? S.promises[Number(extra.promise)] : undefined
+    const date = dateOf(S.day)
+    // прогресс сериалов (arc.grandpa = номер серии), ачивки и трофеи — условия для финалов и концовок.
+    // Циклом, а не fromEntries со spread: facts() зовётся на каждую выборку реплики
+    const progress: Facts = {}
+    for (const id in S.arcs) progress['arc.' + id] = S.arcs[id].i
+    for (const k in S.ach) progress['ach.' + k] = true
+    for (const k in S.ach) progress['since.' + k] = S.day - S.ach[k]
     return {
       day: S.day, tier: S.tier, mood: S.mood, sent: S.stats.sent, moo: S.stats.moo, patience: S.patience, money: S.money, debt: S.debt, fifty: S.stats.fifty,
-      dow: dateOf(S.day).getDay(), month: dateOf(S.day).getMonth() + 1, dom: dateOf(S.day).getDate(),
-      // прогресс сериалов: arc.grandpa = номер серии
-      ...Object.fromEntries(Object.entries(S.arcs).map(([id, st]) => ['arc.' + id, st.i])),
-      // ачивки и трофеи — условия для финалов сериалов и концовок
-      ...Object.fromEntries(Object.keys(S.ach).map((k) => ['ach.' + k, true])),
-      ...Object.fromEntries(Object.entries(S.ach).map(([k, day]) => ['since.' + k, S.day - day])),
+      dow: date.getDay(), month: date.getMonth() + 1, dom: date.getDate(),
+      ...progress,
       items: S.items.length,
       latestItem: S.items.at(-1),
       legend: this.legend(),
@@ -688,13 +701,14 @@ export class Game {
       deathCanAdvance: !!S.mem[memkeys.alikDead] && this.arcCanAdvance('alik_death', true),
       'ctx.type': c.type, 'ctx.amount': c.amount, 'ctx.s': c.s, 'ctx.shortTimey': c.s ? TIMEY.test(c.s) : false,
       'ctx.when': c.when, 'ctx.whenNever': c.whenNever,
-      // срок ещё впереди (или «когда-нибудь»): иначе «Запомнил: завтра» звучит уже после завтра
+      // срок ещё впереди (или «когда-нибудь»): иначе «Запомнил: завтра» звучит уже после завтра.
+      // нет дат — нельзя: потеря whenMade/whenDue не должна тихо разрешать кнопку
       'ctx.whenFresh': (() => {
         if (!c.when) return false
         if (c.whenNever) return true
         if (c.whenDue != null) return c.whenDue >= S.day
         if (c.whenMade != null) return c.whenMade >= S.day
-        return true
+        return false
       })(),
       'ctx.whenDate': c.when != null ? fmtDayMonth(c.whenMade ?? S.day) : undefined,
       'ctx.rel': c.rel?.n, 'ctx.relYou': c.rel?.you ?? c.rel?.n, 'ctx.sad': c.sad, 'ctx.festive': c.festive, 'ctx.revived': c.revived,
@@ -722,7 +736,7 @@ export class Game {
       if ((D.OATH as Entry<string>[]).some((o) => m.text.startsWith(valueOf(o)))) continue
       let text = m.text
       // срок в сообщении — не тема: «После обеда…» иначе цепляет еду; регистр и точка в конце не мешают
-      for (const p of this.S.promises) text = text.replace(new RegExp(p.t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '')
+      for (const p of this.S.promises) text = text.replace(literalRe(p.t), '')
       text = text.replace(/^[.\s,;:!?…—–-]+|[.\s,;:!?…—–-]+$/g, '').trim()
       if (!text) continue
       const hit = Object.entries(TOPICS).find(([k, t]) => t.re.test(text) && !this.topicMuted(k))
@@ -1437,12 +1451,15 @@ export class Game {
     await this.say([this.draw('ENDGAME_LEAVE', ENDGAME_LEAVE)])
   }
 
-  async endgameFormality(): Promise<void> {
+  /** Очередной закрывающий акт (на круглом счёте — и юбилей); счёт актов растёт здесь. */
+  formalityLines(): string[] {
     const n = Number(this.S.mem[memkeys.endgame.forms] ?? 0) + 1
     this.S.mem[memkeys.endgame.forms] = n
-    await this.say([this.draw('ENDGAME_FORMALITIES', ENDGAME_FORMALITIES)])
     const jubilee = ENDGAME_JUBILEES[n]
-    if (jubilee) await this.say([jubilee])
+    return [this.draw('ENDGAME_FORMALITIES', ENDGAME_FORMALITIES), ...(jubilee ? [jubilee] : [])]
+  }
+  async endgameFormality(): Promise<void> {
+    for (const text of this.formalityLines()) await this.say([text])
     this.S.ctx = null
   }
 
@@ -1586,65 +1603,75 @@ export class Game {
     this.ui.unread = 0
     this.ui.title = 'Алик, где деньги?'
   }
-  private awayMsg(): void {
-    const r = this.rng.random()
+  /** Сообщение пачки непрочитанных: пришло в момент `S.clock`, без «печатает…». Что именно — решает правило AlikAway. */
+  awayMsg(kind: AwayKind): void {
     const base = { from: 'alik' as const, time: fmtTime(this.S.clock) }
-    if (r < 0.35) { this.push({ ...base, kind: 'text', text: this.addrLine('IDLE', L.IDLE) }); return }
-    if (r < 0.5) { const s = this.draw('STICKERS', L.STICKERS); this.push({ ...base, kind: 'sticker', e: s.e, c: s.c }); return }
-    if (r < 0.65) {
-      const f = this.seen.pickFresh(() => this.draw('FWD', L.FWD), (x) => x)
-      this.seen.mark(f.t)
-      this.push({ ...base, kind: 'fwd', f: f.f, text: f.t })
-      return
+    switch (kind) {
+      case 'text': this.push({ ...base, kind: 'text', text: this.addrLine('IDLE', L.IDLE) }); return
+      case 'sticker': { const s = this.draw('STICKERS', L.STICKERS); this.push({ ...base, kind: 'sticker', e: s.e, c: s.c }); return }
+      case 'fwd': {
+        const f = this.seen.pickFresh(() => this.draw('FWD', L.FWD), (x) => x)
+        this.seen.mark(f.t)
+        this.push({ ...base, kind: 'fwd', f: f.f, text: f.t })
+        return
+      }
+      case 'deleted': this.push({ ...base, kind: 'text', text: '', deleted: true }); return
+      case 'voice': this.push({ ...base, kind: 'voice', len: 10 + this.rnd(50) }); return
+      case 'transfer':
+        this.S.debt -= 50; this.S.money += 50; this.S.stats.fifty++
+        this.push({ ...base, kind: 'transfer', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE), amount: 50 })
+        return
+      case 'formality': for (const text of this.formalityLines()) this.push({ ...base, kind: 'text', text }); return
+      case 'excuse': {
+        const legend = this.legend()
+        if (legend) {
+          const spec = LEGENDS[legend]
+          const promise = this.alignPromise(this.X.promise(), spec.until, spec.condition)
+          this.recordPromise(promise)
+          this.push({ ...base, kind: 'text', text: promise.text })
+          return
+        }
+        const ex = this.uniq(() => this.X.excuse())
+        this.meetRel(ex.r)
+        this.recordPromise(ex.p)
+        this.push({ ...base, kind: 'text', text: ex.texts.join(' ') })
+      }
     }
-    if (r < 0.75) { this.push({ ...base, kind: 'text', text: '', deleted: true }); return }
-    if (r < 0.85) { this.push({ ...base, kind: 'voice', len: 10 + this.rnd(50) }); return }
-    if (r < 0.92) {
-      this.S.debt -= 50; this.S.money += 50; this.S.stats.fifty++
-      this.push({ ...base, kind: 'transfer', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE), amount: 50 })
-      return
-    }
-    const legend = this.legend()
-    if (legend) {
-      const spec = LEGENDS[legend]
-      const promise = this.alignPromise(this.X.promise(), spec.until, spec.condition)
-      this.recordPromise(promise)
-      this.push({ ...base, kind: 'text', text: promise.text })
-      return
-    }
-    const ex = this.uniq(() => this.X.excuse())
-    this.meetRel(ex.r)
-    this.recordPromise(ex.p)
-    this.push({ ...base, kind: 'text', text: ex.texts.join(' ') })
   }
-  awayBurst(n: number, days: number, why?: string): void {
+  /** Пачка «пока тебя не было»: n событий AlikAway. Мир решает, пишет ли Алик (смерть, блок, эндгейм) — заголовок и счётчик только по тому, что пришло. */
+  async awayBurst(n: number, days: number, why?: string): Promise<void> {
     this.nextDay(days)
-    this.push({ kind: 'sys', text: `${why ? why + ' — ' : ''}непрочитанные сообщения`, unread: true })
+    const at = this.S.msgs.length
     // пришли, пока игрока не было, — до «сейчас»: иначе часы переписки убегают вперёд настоящих
     const now = this.S.clock
     const times = Array.from({ length: n }, () => now - this.rnd(Math.min(now, 360) + 1)).sort((a, b) => a - b)
-    for (const t of times) { this.S.clock = t; this.awayMsg() }
+    for (const t of times) { this.S.clock = t; await this.fire('AlikAway') }
     this.S.clock = now
-    this.ui.unread = n
-    this.ui.title = `(${n}) Алик, где деньги?`
-    this.unlock('away')
-    this.notify('💬', 'Алик Воздухонесян', `${n} ${n < 5 ? 'новых сообщения' : 'новых сообщений'}`)
-    this.audio.beep()
-    this.S.ctx = { type: 'idle' }
+    const got = this.S.msgs.length - at
+    if (got) {
+      this.S.msgs.splice(at, 0, { kind: 'sys', text: `${why ? why + ' — ' : ''}непрочитанные сообщения`, unread: true, id: this.S.nextId++ })
+      this.touchMsgs(at)
+      this.ui.unread = got
+      this.ui.title = `(${got}) Алик, где деньги?`
+      this.unlock('away')
+      this.notify('💬', 'Алик Воздухонесян', `${got} ${got < 5 ? 'новых сообщения' : 'новых сообщений'}`)
+      this.audio.beep()
+      this.S.ctx = { type: 'idle' }
+    }
     this.S.choices = this.buildChoices()
     this.save()
     this.emit()
   }
-  checkAway(awayOverride: number | null): void {
+  async checkAway(awayOverride: number | null): Promise<void> {
     const gapMin = awayOverride ?? (this.S.lastSeen ? (this.clock.now() - this.S.lastSeen) / 60000 : 0)
     if (gapMin < 15 || !this.S.stats.sent) return
     if (gapMin > 120) this.battery.restore() // телефон заряжался
-    this.awayBurst(Math.min(5, 1 + Math.floor(gapMin / 30)), Math.min(10, 1 + Math.floor(gapMin / 120)))
+    await this.awayBurst(Math.min(5, 1 + Math.floor(gapMin / 30)), Math.min(10, 1 + Math.floor(gapMin / 120)))
   }
-  onVisibility(hidden: boolean): void {
+  async onVisibility(hidden: boolean): Promise<void> {
     if (hidden) { this.hiddenAt = this.clock.now(); this.save(); return }
     const gapMin = (this.clock.now() - this.hiddenAt) / 60000
-    if (this.hiddenAt && gapMin >= 3 && !this.ui.busy && !this.battery.dead && this.S.stats.sent) this.awayBurst(Math.min(4, 1 + Math.floor(gapMin / 10)), 1)
+    if (this.hiddenAt && gapMin >= 3 && !this.ui.busy && !this.battery.dead && this.S.stats.sent) await this.awayBurst(Math.min(4, 1 + Math.floor(gapMin / 10)), 1)
   }
 
   // ---------- начало ----------

@@ -1,6 +1,7 @@
 import { STARTS } from '../content/quests'
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { makeGame, memStorage, alikTexts } from '../test/helpers'
+import { makeGame, memStorage, alikTexts, flush } from '../test/helpers'
+import { ENDGAME_FORMALITIES, ENDGAME_JUBILEES } from '../content/endgame'
 import { silentAudio } from './audio'
 import { manualClock, realClock } from './clock'
 import { Game } from './game'
@@ -288,7 +289,7 @@ describe('Game: батарея', () => {
 })
 
 describe('Game: возвращение после паузы', () => {
-  it('долгое отсутствие — непрочитанные, счётчик в заголовке, телефон заряжен', () => {
+  it('долгое отсутствие — непрочитанные, счётчик в заголовке, телефон заряжен', async () => {
     const storage = memStorage()
     const clock = manualClock()
     const g1 = new Game({ storage, clock, rng: seededRng(1), noTimers: true, hour: 14 })
@@ -297,6 +298,7 @@ describe('Game: возвращение после паузы', () => {
     g1.save()
     clock.advance(3 * 3600_000)
     const g2 = new Game({ storage, clock, rng: seededRng(2), noTimers: true, hour: 14 })
+    await flush()
     expect(g2.ui.unread).toBeGreaterThan(0)
     expect(g2.ui.title).toMatch(/^\(\d\)/)
     expect(g2.S.battery).toBe(100)
@@ -313,9 +315,9 @@ describe('Game: возвращение после паузы', () => {
     await game.say(['{night}, брат…'])
     expect(game.S.msgs.slice(n2).map((m) => (m.kind === 'text' ? m.text : '')).join(' ')).toContain('три часа ночи')
   })
-  it('непрочитанные пришли до «сейчас»: время суток в репликах совпадает с часами переписки', () => {
+  it('непрочитанные пришли до «сейчас»: время суток в репликах совпадает с часами переписки', async () => {
     const { game } = makeGame({ hour: 2 })
-    game.awayBurst(5, 1)
+    await game.awayBurst(5, 1)
     const now = fmtTime(game.S.clock)
     expect(now.startsWith('02:')).toBe(true)
     expect(game.S.msgs.slice(-5).every((m) => m.time! <= now)).toBe(true)
@@ -327,13 +329,100 @@ describe('Game: возвращение после паузы', () => {
     const { game } = makeGame({ away: 5 })
     expect(game.ui.unread).toBe(0)
   })
-  it('скрытая вкладка 3+ минуты — пачка сообщений', () => {
+  it('скрытая вкладка 3+ минуты — пачка сообщений', async () => {
     const { game, clock } = makeGame()
     game.S.stats.sent = 2
-    game.onVisibility(true)
+    await game.onVisibility(true)
     clock.advance(5 * 60_000)
-    game.onVisibility(false)
+    await game.onVisibility(false)
     expect(game.ui.unread).toBeGreaterThan(0)
+  })
+})
+
+describe('Game: пачка непрочитанных подчиняется миру', () => {
+  /** То, что пришло: без разделителя дня и системных строк смены яруса — заголовок пачки и сообщения Алика. */
+  const arrived = (game: Game, from: number) => game.S.msgs.slice(from).filter((m) => (m.kind === 'sys' ? m.unread : m.kind !== 'sep'))
+  /** Тем же путём, что игрок: телефон сел, зарядили — пришла пачка. */
+  const charged = async (setup: (g: Game) => void, seed: number) => {
+    const { game } = makeGame({ seed })
+    game.S.stats.sent = 6
+    setup(game)
+    game.battery.die()
+    const from = game.S.msgs.length
+    const debt = game.S.debt
+    await game.battery.charge()
+    return { game, msgs: arrived(game, from), debt }
+  }
+  it('обычный день — как раньше: заголовок, счётчик по числу пришедших, привычные виды', async () => {
+    const kinds = new Set<string>()
+    for (let seed = 1; seed <= 20; seed++) {
+      const { game, msgs } = await charged(() => {}, seed)
+      expect(msgs[0]).toMatchObject({ kind: 'sys', unread: true, text: 'Пока телефон заряжался — непрочитанные сообщения' })
+      const body = msgs.slice(1)
+      expect(body.length).toBeGreaterThanOrEqual(2)
+      expect(game.ui.unread).toBe(body.length)
+      expect(game.ui.title).toBe(`(${body.length}) Алик, где деньги?`)
+      for (const m of body) kinds.add(m.kind)
+    }
+    expect([...kinds].sort()).toEqual(['fwd', 'sticker', 'text', 'transfer', 'voice'])
+  })
+  it('Алик умер — после зарядки от него ничего: ни заголовка, ни счётчика, долг прежний', async () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const { game, msgs, debt } = await charged((g) => { g.S.mem.alik_dead = true }, seed)
+      expect(msgs).toEqual([])
+      expect(game.ui.unread).toBe(0)
+      expect(game.S.debt).toBe(debt)
+    }
+  })
+  it('Алик умер — возвращение после паузы тоже молчит', async () => {
+    const storage = memStorage()
+    const clock = manualClock()
+    const g1 = new Game({ storage, clock, rng: seededRng(1), noTimers: true, hour: 14 })
+    g1.S.stats.sent = 5
+    g1.S.mem.alik_dead = true
+    g1.save()
+    clock.advance(3 * 3600_000)
+    const g2 = new Game({ storage, clock, rng: seededRng(2), noTimers: true, hour: 14 })
+    await flush()
+    expect(g2.ui.unread).toBe(0)
+    expect(g2.S.msgs.filter((m) => m.kind === 'sys' && m.unread)).toEqual([])
+    expect(g2.S.msgs.filter((m) => m.kind !== 'sep' && m.kind !== 'sys').length).toBe(g1.S.msgs.filter((m) => m.kind !== 'sep' && m.kind !== 'sys').length)
+  })
+  it('выплата закрыта — в пачке только закрывающие акты, долг не меняется', async () => {
+    const acts = new Set([...ENDGAME_FORMALITIES, ...Object.values(ENDGAME_JUBILEES)])
+    let seen = 0
+    for (let seed = 1; seed <= 30; seed++) {
+      const { game, msgs, debt } = await charged((g) => { g.S.mem['endgame.active'] = true }, seed)
+      const body = msgs.filter((m) => m.kind !== 'sys')
+      expect(body.length).toBeGreaterThan(0)
+      for (const m of body) expect(m.kind === 'text' && acts.has(m.text), JSON.stringify(m)).toBe(true)
+      expect(game.S.debt).toBe(debt)
+      expect(game.S.mem['endgame.forms']).toBe(body.length)
+      seen += body.length
+    }
+    expect(seen).toBeGreaterThan(60)
+  })
+  it.each([['заблокировал', 'blocked'], ['телефон у Карине', 'phone.karine']])('%s — пачки нет', async (_, key) => {
+    for (let seed = 1; seed <= 10; seed++) {
+      const { game, msgs, debt } = await charged((g) => { g.S.mem[key] = true }, seed)
+      expect(msgs).toEqual([])
+      expect(game.ui.unread).toBe(0)
+      expect(game.S.debt).toBe(debt)
+    }
+  })
+  it('пропал — пачки нет', async () => {
+    for (let seed = 1; seed <= 10; seed++) {
+      const { game, msgs } = await charged((g) => { g.S.offlineDays = 2 }, seed)
+      expect(msgs).toEqual([])
+      expect(game.ui.unread).toBe(0)
+    }
+  })
+  it('посреди сцены пачки нет — как и болтовни простоя; сцена продолжается', async () => {
+    for (let seed = 1; seed <= 10; seed++) {
+      const { game, msgs } = await charged((g) => { g.S.scene = { id: 'deathbed', node: 'ask', vars: {} } }, seed)
+      expect(msgs).toEqual([])
+      expect(game.S.scene?.id).toBe('deathbed')
+    }
   })
 })
 

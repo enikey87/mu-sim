@@ -7,13 +7,15 @@ import { Choices, Composer } from './Input'
 import { Sheet } from './Sheet'
 import { Toast, Notification, DeadScreen, EndingScreen } from './Overlays'
 import { DebugPanel } from './DebugPanel'
-import { viewOf } from './view'
+import { uiOf, viewOf } from './view'
 
+/** Корень: единственный компонент с Game в руках — отдаёт дереву фасад, а живую игру только DebugPanel. */
 export function App({ game, onReset, debug = false }: { game: Game; onReset: () => void; debug?: boolean }) {
+  const ui = uiOf(game)
   // звук разрешается первым касанием; «вернулся к вкладке» — пачка непрочитанных
   useEffect(() => {
-    const gesture = () => game.gesture()
-    const vis = () => game.onVisibility(document.hidden)
+    const gesture = () => ui.gesture()
+    const vis = () => void ui.onVisibility(document.hidden)
     document.addEventListener('pointerdown', gesture)
     document.addEventListener('keydown', gesture)
     document.addEventListener('visibilitychange', vis)
@@ -22,16 +24,16 @@ export function App({ game, onReset, debug = false }: { game: Game; onReset: () 
       document.removeEventListener('keydown', gesture)
       document.removeEventListener('visibilitychange', vis)
     }
-  }, [game])
+  }, [ui])
 
   // битое сохранение — самый вероятный виновник падения, поэтому стираем его до новой игры
-  const hardReset = () => { game.reset(); onReset() }
+  const hardReset = () => { ui.reset(); onReset() }
 
   return (
     <Crash onReset={hardReset}>
-      <GameContext.Provider value={game}>
+      <GameContext.Provider value={ui}>
         {debug ? (
-          <div className="debug-layout"><Phone onReset={onReset} /><DebugPanel /></div>
+          <div className="debug-layout"><Phone onReset={onReset} /><DebugPanel game={game} /></div>
         ) : (
           <Phone onReset={onReset} />
         )}

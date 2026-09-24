@@ -43,13 +43,13 @@ describe('регрессии первоначального аудита', () =>
     expect(text).toContain(LEGENDS.grant.until)
   })
 
-  it('непрочитанные отмазки тоже остаются внутри активной легенды', () => {
+  it('непрочитанные отмазки тоже остаются внутри активной легенды', async () => {
     let promiseSeen = false
     for (let seed = 1; seed <= 80; seed++) {
       const { game } = makeGame({ seed })
       game.setLegend('grant', 'grant')
       const promises = game.S.promises.length
-      game.awayBurst(1, 0)
+      await game.awayBurst(1, 0)
       if (game.S.promises.length === promises) continue
       const message = game.S.msgs.at(-1)
       expect(message).toMatchObject({ kind: 'text', text: expect.stringContaining(LEGENDS.grant.until) })
