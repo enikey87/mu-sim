@@ -99,6 +99,7 @@ const CASES: Record<string, Case> = {
   Finale_razmik_swap: { event: 'ArcFinale', facts: { arc: 'razmik' }, setup: (g) => { g.S.mem['count.rude'] = 10; g.S.mem[HEAT] = 3 } },
   Finale_razmik_union: { event: 'ArcFinale', facts: { arc: 'razmik' }, setup: (g) => { g.S.ach.customer = 1 } },
   Says_via_mama: { event: 'PlayerSays', facts: { intent: 'via', arg: 'mama' } },
+  Says_via_boris: { event: 'PlayerSays', facts: { intent: 'via', arg: 'boris' }, setup: (g) => { g.S.mem.blocked = true; g.S.mem['intro.boris'] = true } },
   Endgame_Money: { event: 'PlayerSays', facts: { intent: 'endgameMoney' }, setup: endgame },
   Endgame_Mute: { event: 'PlayerSays', facts: { intent: 'endgameMute' }, setup: endgame },
   Endgame_Leave: { event: 'PlayerSays', facts: { intent: 'endgameLeave' }, setup: endgame },
