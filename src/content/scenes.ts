@@ -19,6 +19,7 @@ export interface SceneFx {
   legend?: string | null
   /** Записать факты в память мира; during — факт = true на N дней. */
   set?: Record<string, number | boolean>; during?: { key: string; days: number }
+  amnesty?: boolean
 }
 export interface SceneNode {
   a?: Entry<Line>[]; a2?: Entry<Line>[]; who?: string; who2?: string
@@ -530,6 +531,27 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
       },
     },
 
+    // амнистия обещаний: журнал распух — Алик предлагает обнулить старые сроки (docs/design/promise-amnesty.md)
+    amnesty: {
+      start: 'offer',
+      nodes: {
+        offer: {
+          a: [() => `${A()}, давай объявим амнистию. Все старые обещания — обнуляем. Начнём с чистого листа, и я тебе сразу новое дам. Свежее.`],
+          opts: [
+            { t: 'Амнистия так амнистия', go: 'yes' },
+            { t: 'Нет. Выполняйте все. По порядку', go: 'no', tone: 'polite' },
+          ],
+        },
+        yes: {
+          fx: { amnesty: true },
+          sys: (v: Vars) => `Амнистия объявлена. Просроченных обещаний обнулено: ${v.amnestied}.`,
+          a: ['Вот это по-братски! Записывай новое:'],
+          then: 'promise',
+        },
+        // «первое по списку — «когда-нибудь»» — только если такое обещание в журнале есть
+        no: { a: [gate(gte('somedayCount', 1))('Хорошо. По порядку. Первое по списку — «когда-нибудь». Жди.'), 'Хорошо. По порядку. Жди.'] },
+      },
+    },
     invoice: {
       start: 'ask',
       init: (rng, open, day) => {
