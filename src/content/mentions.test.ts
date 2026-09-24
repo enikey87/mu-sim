@@ -1,7 +1,7 @@
 // Мир последователен: персонаж или предмет, который появляется по ходу истории, упоминается только под требованием
 // (needs / when / структура: серия сериала, финал, реплика персонажа). Регулярки — здесь, в проверке контента: игра текст не разбирает.
 import { describe, it, expect } from 'vitest'
-import { Gated, describeCriterion, valueOf, type Criterion, type Entry, type FactOp } from '../engine/rules'
+import { Gated, describeCriterion, valueOf, gate, is, type Criterion, type Entry, type FactOp } from '../engine/rules'
 import { WORLD, SPEAKS, CHORUS, type WorldKey } from './world'
 import { ARCS, CAST, GROUP } from './arcs'
 import { RUDE_FAMILY } from './rude'
@@ -16,6 +16,7 @@ import { sceneRules, QUEST_WHEN } from './rules/world'
 import { paydayRules } from './rules/payday'
 import { seededRng } from '../engine/rng'
 import { playtest } from '../tools/playtest'
+import { met } from './memkeys'
 import type { Game } from '../engine/game'
 import type { Msg } from '../engine/state'
 
@@ -82,6 +83,9 @@ function implied(c: Criterion, known: Criterion[]): boolean {
     // финал сериала идёт после всех его серий — значит, всё, что они записали, уже в мире
     || (k.key.startsWith('finale.') && (k.op === 'exist' || k.op === '==') && setBy(k.key.slice(7), ARCS[k.key.slice(7)]?.eps.length ?? 0).some((f) => describeCriterion(f) === describeCriterion(c)))
     || (c.op === '!=' && k.key === c.key && (k.op === '!exist' || (k.op === '==' && k.value !== c.value))))
+    // met.<кто> ставится только вместе с intro.<кто> (game.ts пишет оба на сообщении персонажа) — знакомство влечёт представленность
+    || ((c.op === 'exist' || (c.op === '==' && c.value === true)) && c.key.startsWith('intro.')
+      && known.some((k) => k.key === 'met.' + c.key.slice(6) && (k.op === 'exist' || (k.op === '==' && k.value === true))))
 }
 const holds = (key: WorldKey, known: Criterion[]) => atoms([WORLD[key]]).filter((a) => a.op !== 'all').every((a) => implied(a, known))
 
@@ -252,6 +256,10 @@ describe('упоминания в контенте', () => {
     expect(problems(strings('Размик слез с крана.', 'x', finale('razmik'), []))).toEqual([])
     expect(problems(strings('Близнец.', 'x', arcAt('grant', 3), []))).toHaveLength(1)
     expect(problems(strings('Близнец.', 'x', arcAt('grant', 4), []))).toEqual([])
+    // гейт записи возвращателя (met) покрывает имя в системной строке, но не подменяет факт сериала
+    expect(problems(strings([{ who: 'samvel', name: 'Самвел' }], 'x', [], []))).toHaveLength(1)
+    expect(problems(strings([gate(is(met('samvel')))({ who: 'samvel', name: 'Дядя Самвел' })], 'x', [], []))).toEqual([])
+    expect(problems(strings([gate(is(met('boris')))({ who: 'boris', name: 'Борис' })], 'x', [], []))).toHaveLength(1)
   })
   // Статическая проверка выше слепа именно к этому классу: known всегда содержит intro.<who>==true
   // для любой реплики этого персонажа (см. selfIntro), поэтому SPEAKS-критерий вида is(intro(x))

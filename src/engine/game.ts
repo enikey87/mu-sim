@@ -20,7 +20,7 @@ import { CLAIMS, claimByKey, conflicts, CALLBACK_OPEN, type Claim } from '../con
 import * as memkeys from '../content/memkeys'
 import {
   ENDGAME_CHOICES, ENDGAME_FALLBACK, ENDGAME_FORMALITIES, ENDGAME_GROUP, ENDGAME_INTRO, ENDGAME_JUBILEES,
-  ENDGAME_LEAVE, ENDGAME_MONEY, ENDGAME_MUTE, ENDGAME_OPEN, ENDGAME_RENAMES, ENDGAME_RETURNER_LINES, ENDGAME_RETURNERS, ENDGAME_VENDETTA,
+  ENDGAME_LEAVE, ENDGAME_MONEY, ENDGAME_MUTE, ENDGAME_OPEN, ENDGAME_RENAMES, ENDGAME_RETURNER_LINES, ENDGAME_RETURNERS, ENDGAME_VENDETTA, ENDGAME_ALIK_BACK,
 } from '../content/endgame'
 import { type Rng, mathRng, rndInt, shuffle, chance } from './rng'
 import { Decks } from './deck'
@@ -1435,11 +1435,15 @@ export class Game {
     S.mem[memkeys.endgame.exits] = Number(S.mem[memkeys.endgame.exits] ?? 0) + 1
     this.sys('Вы покинули группу')
     const back = this.decks.pick('ENDGAME_RETURNERS', ENDGAME_RETURNERS, this.lineFacts())
-    if (back) {
+    // noRefill: реплика возвращателя звучит один раз; исчерпав свой запас, он перестаёт возвращать
+    const line = back ? this.decks.tryDraw(`ENDGAME_RETURNER.${back.who}`, ENDGAME_RETURNER_LINES[back.who], true) : null
+    if (back && line) {
       this.sys(`${valueOf(back.name)} ${back.she ? 'добавила' : 'добавил'} вас обратно`)
-      await this.say([{ w: back.who, t: this.draw(`ENDGAME_RETURNER.${back.who}`, ENDGAME_RETURNER_LINES[back.who]) }])
+      await this.say([{ w: back.who, t: line }])
     } else {
       this.sys('Алик добавил вас обратно')
+      const quip = this.decks.tryDraw('ENDGAME_ALIK_BACK', ENDGAME_ALIK_BACK, true)
+      if (quip) await this.say([quip])
     }
     await this.say([this.draw('ENDGAME_LEAVE', ENDGAME_LEAVE)])
   }

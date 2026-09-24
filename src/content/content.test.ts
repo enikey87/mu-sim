@@ -143,7 +143,7 @@ describe('excuse generator', () => {
       }
       expect(seen.size / 3000, `tier ${tier}`).toBeGreaterThan(0.97)
     }
-  })
+  }, 60_000) // 12 000 отмазок: время растёт с корпусом, а не с числом проверок
   it('higher tiers use escalated excuses', () => {
     const X = api(5, 3)
     const esc = ([...D.ESC1, ...D.ESC2, ...D.ESC3] as Entry<string>[]).map(valueOf)

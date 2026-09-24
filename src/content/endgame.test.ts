@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { makeGame } from '../test/helpers'
 import {
-  ENDGAME_FORMALITIES, ENDGAME_LEAVE, ENDGAME_MONEY, ENDGAME_MUTE,
+  ENDGAME_ALIK_BACK, ENDGAME_FORMALITIES, ENDGAME_LEAVE, ENDGAME_MONEY, ENDGAME_MUTE,
   ENDGAME_RENAMES, ENDGAME_RETURNER_LINES, ENDGAME_RETURNERS,
 } from './endgame'
 import { valueOf } from '../engine/rules'
@@ -110,43 +110,61 @@ describe('бесконечная группа после Дня выплаты',
 
   it('одна шутка — один раз: ни одна пара строк не делит общий кусок ≥ 30 символов', () => {
     // общая подстрока такой длины — это та же шутка в новой обёртке («Коллеги, X» / «Итак, X»), а не новая шутка
-    const shared = (a: string, b: string): number => {
-      let best = 0
-      for (let i = 0; i < a.length; i++) for (let len = best + 1; i + len <= a.length && len <= b.length; len++) {
-        if (b.includes(a.slice(i, i + len))) best = len
-      }
-      return best
-    }
     const pools: Array<[string, readonly string[]]> = [
       ['money', ENDGAME_MONEY],
       ['mute', ENDGAME_MUTE],
       ['leave', ENDGAME_LEAVE],
       ['formalities', ENDGAME_FORMALITIES],
+      ['returners', Object.values(ENDGAME_RETURNER_LINES).flat()],
+      ['alik-back', ENDGAME_ALIK_BACK],
     ]
+    // куски по 30 символов вместо перебора всех подстрок каждой пары: общий кусок ≥ 30 — это общий
+    // ровно-30-символьный, поэтому проверка та же, а 17 700 пар находятся за один проход
+    const where = new Map<string, string[]>()
     for (const [name, pool] of pools) {
-      for (let i = 0; i < pool.length; i++) for (let j = i + 1; j < pool.length; j++) {
-        expect(shared(pool[i], pool[j]), `${name}: «${pool[i]}» / «${pool[j]}»`).toBeLessThan(30)
+      for (const line of pool) {
+        for (let i = 0; i + 30 <= line.length; i++) {
+          const piece = line.slice(i, i + 30)
+          where.set(piece, [...(where.get(piece) ?? []), `${name}: «${line}»`])
+        }
       }
     }
+    const shared = [...where].filter(([, lines]) => lines.length > 1)
+    expect(shared.map(([piece, lines]) => `«${piece}» — ${lines.join(' / ')}`).join('\n')).toBe('')
   })
 
-  it('у каждого возвращателя ≥3 реплики, гейт знакомства — на его записи', () => {
+  it('у каждого возвращателя ≥12 реплик, гейт знакомства — на его записи', () => {
     const whos = ENDGAME_RETURNERS.map((e) => valueOf(e).who)
     expect(whos).toHaveLength(6)
     for (const who of whos) {
       const lines = ENDGAME_RETURNER_LINES[who]
       expect(lines, who).toBeDefined()
-      expect(lines.length, who).toBeGreaterThanOrEqual(3)
+      expect(lines.length, who).toBeGreaterThanOrEqual(12)
       expect(new Set(lines).size, who).toBe(lines.length)
     }
   })
 
-  it('колода возвращателя выдаёт каждую реплику по разу до повтора', () => {
+  it('колода возвращателя выдаёт каждую реплику по разу и молчит, когда кончилась', () => {
     const { game } = makeGame()
     for (const [who, lines] of Object.entries(ENDGAME_RETURNER_LINES)) {
-      const drawn = lines.map(() => game.draw(`ENDGAME_RETURNER.${who}`, lines))
+      const drawn = lines.map(() => game.decks.tryDraw(`ENDGAME_RETURNER.${who}`, lines, true))
       expect(new Set(drawn).size, who).toBe(lines.length)
+      expect(game.decks.tryDraw(`ENDGAME_RETURNER.${who}`, lines, true), who).toBeNull()
     }
+  })
+
+  it('исчерпав запас, возвращатель перестаёт возвращать — дальше возвращает Алик', async () => {
+    const { game } = makeGame()
+    finishPayday(game)
+    game.S.mem['met.samvel'] = true // единственный допустимый возвращатель
+    const before = game.S.msgs.length
+    for (let i = 0; i <= ENDGAME_RETURNER_LINES.samvel.length; i++) await game.send(game.choices.find((c) => c.act === 'endgameLeave')!)
+    const spoken = game.S.msgs.slice(before).flatMap((m) => (m.kind === 'text' && m.who === 'samvel' ? [m.text] : []))
+    expect(spoken).toHaveLength(ENDGAME_RETURNER_LINES.samvel.length)
+    expect(new Set(spoken).size).toBe(spoken.length)
+    expect(messages(game, before).join(' ')).toMatch(/Алик добавил вас обратно/)
+    const quips = game.S.msgs.slice(before).flatMap((m) => (m.kind === 'text' && ENDGAME_ALIK_BACK.includes(m.text) ? [m.text] : []))
+    expect(quips.length).toBeGreaterThan(0)
   })
 
   it('тридцать формальностей подряд — без повторов: колода тянет длинную партию', async () => {
