@@ -1,5 +1,5 @@
 import { useGame } from './useGame'
-import { payday } from '../content/memkeys'
+import { viewOf } from './view'
 
 export function StatusBar() {
   const game = useGame()
@@ -15,9 +15,10 @@ export function StatusBar() {
 
 export function ChatHeader({ onInfo }: { onInfo: () => void }) {
   const game = useGame()
+  const v = viewOf(game)
   return (
     <header className="chat-head">
-      <div className={'avatar' + (game.S.ram ? ' ram' : '')} id="avatar">{game.S.ram ? '🐏' : 'А'}</div>
+      <div className={'avatar' + (v.ram ? ' ram' : '')} id="avatar">{v.ram ? '🐏' : 'А'}</div>
       <div className="who">
         <div className="name">Алик Воздухонесян</div>
         <div className={'status ' + game.ui.status.cls} id="status">{game.ui.status.text}</div>
@@ -26,10 +27,10 @@ export function ChatHeader({ onInfo }: { onInfo: () => void }) {
         className="icon-btn"
         id="muteBtn"
         title="Звук"
-        aria-label={game.S.muted ? 'Звук выключен' : 'Звук включён'}
-        aria-pressed={!game.S.muted}
+        aria-label={v.muted ? 'Звук выключен' : 'Звук включён'}
+        aria-pressed={!v.muted}
         onClick={() => game.toggleMute()}
-      >{game.S.muted ? '🔇' : '🔊'}</button>
+      >{v.muted ? '🔇' : '🔊'}</button>
       <button className="icon-btn" id="infoBtn" title="Обещания и ачивки" aria-label="Обещания и ачивки" onClick={onInfo}>📋</button>
     </header>
   )
@@ -37,14 +38,14 @@ export function ChatHeader({ onInfo }: { onInfo: () => void }) {
 
 export function StatsBar() {
   const game = useGame()
-  const S = game.S
+  const v = viewOf(game)
   return (
     <div className="stats">
-      <span>Долг: <b id="debt">{S.debt.toLocaleString('ru-RU')} ₽</b></span>
-      <span>Дней после сдачи: <b id="days">{S.day}</b></span>
+      <span>Долг: <b id="debt">{v.debt.toLocaleString('ru-RU')} ₽</b></span>
+      <span>Дней после сдачи: <b id="days">{v.day}</b></span>
       {/* День выплаты: отсчёт накануне и счётчик «к выплате», который тает на глазах */}
-      {S.scene?.id === 'payday' && Number(S.mem[payday.at]) > S.day && <span id="paydayAt">До выплаты: <b>1 день</b></span>}
-      {S.scene?.id === 'payday' && S.mem[payday.sum] !== undefined && <span id="paydaySum" className="payday-sum">К выплате: <b>{Number(S.mem[payday.sum]).toLocaleString('ru-RU')} ₽</b></span>}
+      {v.payday.daysLeft !== null && <span id="paydayAt">До выплаты: <b>{v.payday.daysLeft} день</b></span>}
+      {v.payday.sum !== null && <span id="paydaySum" className="payday-sum">К выплате: <b>{v.payday.sum.toLocaleString('ru-RU')} ₽</b></span>}
     </div>
   )
 }

@@ -7,6 +7,7 @@ import { Choices, Composer } from './Input'
 import { Sheet } from './Sheet'
 import { Toast, Notification, DeadScreen, EndingScreen } from './Overlays'
 import { DebugPanel } from './DebugPanel'
+import { viewOf } from './view'
 
 export function App({ game, onReset, debug = false }: { game: Game; onReset: () => void; debug?: boolean }) {
   // звук разрешается первым касанием; «вернулся к вкладке» — пачка непрочитанных
@@ -86,9 +87,10 @@ function Phone({ onReset }: { onReset: () => void }) {
     return () => { game.ui.sheetOpen = false }
   }, [sheet, game])
 
+  const endingId = viewOf(game).endingId
   useEffect(() => {
-    if (game.S.ending || game.battery.dead) setSheetOpen(false)
-  }, [game.S.ending, game.battery.dead, setSheetOpen])
+    if (endingId || game.battery.dead) setSheetOpen(false)
+  }, [endingId, game.battery.dead, setSheetOpen])
 
   const reset = () => {
     if (!confirm('Стереть всё и начать заново?')) return
@@ -96,7 +98,7 @@ function Phone({ onReset }: { onReset: () => void }) {
     onReset()
   }
 
-  const blocked = sheet || game.battery.dead || !!game.S.ending
+  const blocked = sheet || game.battery.dead || !!endingId
 
   return (
     <div className="phone" ref={phone}>
