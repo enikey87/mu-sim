@@ -24,7 +24,7 @@ import {
 } from '../content/endgame'
 import { type Rng, mathRng, rndInt, shuffle, chance } from './rng'
 import { Decks } from './deck'
-import { Battery, type BatteryHost } from './battery'
+import { Battery } from './battery'
 import { Seen, type Keyed } from './uniq'
 import {
   RuleSet, makeHub, Lines, resolver, test, isOpen, valueOf, set,
@@ -75,7 +75,7 @@ export const FESTIVE = /свадьб|крестин|юбилей|обручен|
 
 export type SayItem = string | { w: string; t: string }
 
-export class Game implements BatteryHost {
+export class Game {
   S: GameState
   readonly rng: Rng
   readonly clock: Clock
@@ -128,7 +128,16 @@ export class Game implements BatteryHost {
     this.noTimers = !!opts.noTimers
     this.typos = opts.typos ?? true
     this.S = loadState(this.storage) ?? freshState()
-    this.battery = new Battery(this.S, this)
+    // колбеки батареи — в узком хосте, а не в публичном интерфейсе Game: game.dead() путался бы со смертью Алика
+    this.battery = new Battery(this.S, {
+      low: (level) => this.notify('🪫', 'Система', `Низкий заряд батареи: ${level}%`),
+      dead: () => this.onPhoneDead(),
+      chargeDone: () => this.onPhoneCharged(),
+      sleep: (ms) => this.sleep(ms),
+      emit: () => this.emit(),
+      isDisposed: () => this.disposed,
+      rnd: (n) => this.rnd(n),
+    })
     this.decks = new Decks(this.S.bags, this.rng)
     this.seen = new Seen(this.S.seen)
     this.X = make(<T>(k: string, a: readonly Entry<T>[], nr?: boolean) => (nr ? this.decks.pick(k, a, this.lineFacts(), { noRepeat: true }) as T : this.draw(k, a)), () => this.S.tier, this.rng)
@@ -594,25 +603,19 @@ export class Game implements BatteryHost {
     }
     this.notify(n.icon, n.app, text)
   }
-  // ---------- колбеки Battery (BatteryHost) ----------
-  low(level: number): void {
-    this.notify('🪫', 'Система', `Низкий заряд батареи: ${level}%`)
-  }
-  dead(): void {
+  // ---------- телефон: что Game делает по событиям Battery ----------
+  private onPhoneDead(): void {
     this.clearSchedule(this.idleT)
     this.clearSchedule(this.statusT)
     this.unlock('dead')
     this.save()
     this.emit()
   }
-  chargeDone(): void {
+  private onPhoneCharged(): void {
     this.ui.busy = false
     this.awayBurst(2 + this.rnd(3), 1 + this.rnd(2), 'Пока телефон заряжался')
     this.armIdle()
     this.armStatus()
-  }
-  isDisposed(): boolean {
-    return this.disposed
   }
 
   // ---------- факты для правил ----------

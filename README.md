@@ -53,7 +53,7 @@ Vite + React + TypeScript. Решения «что ответить», «что 
 src/
   engine/   движок: rules/ (изолированный модуль, покрытие 100%), input.ts (классификация ручного ввода),
             game.ts (ход, сцены, сериалы, «живость», отклик на ввод, эндгейм), ui-state.ts (эфемерное
-            состояние интерфейса), state.ts, deck.ts + uniq.ts, rng.ts, time.ts, clock.ts, audio.ts, typo.ts
+            состояние интерфейса), battery.ts (заряд телефона), state.ts, deck.ts + uniq.ts, rng.ts, time.ts, clock.ts, audio.ts, typo.ts
   content/  тексты и данные: excuses.ts, scenes.ts, arcs.ts, finales.ts, legends.ts, lies.ts,
             memory.ts, quests.ts, payday.ts, endgame.ts, rude.ts, life.ts, talk.ts, topics.ts, misc.ts,
             achievements.ts; world.ts — труппа как факты (WORLD, SPEAKS); memkeys.ts — реестр ключей памяти;

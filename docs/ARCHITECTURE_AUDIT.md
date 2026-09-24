@@ -47,7 +47,8 @@ UI подписан двумя каналами: `getVersion` (всё) и `getMs
 | Память мира | `mem` (мир) + `actors` (доски персонажей) | внутри `S` | да |
 | Состояние движка правил | once, cooldowns, расписание, «сказано» | `S.rules` (`RuleState`) | да |
 | Анти-повторы | колоды (`S.bags`), хеши (`S.seen`), реплики (`S.rules.said`) | внутри `S` | да |
-| Эфемерное UI | status, typing, toast, notif, moos, busy, dead, charging, feel, trace | `UiState` (`engine/ui-state.ts`, `game.ui`; #50), не в `S` | нет |
+| Эфемерное UI | status, typing, toast, notif, moos, busy, feel, trace | `UiState` (`engine/ui-state.ts`, `game.ui`; #50), не в `S` | нет |
+| Телефон | заряд (`S.battery` — в сохранении), «сел» (`dead`), прогресс зарядки (`charging`) | `Battery` (`engine/battery.ts`, `game.battery`; #66) | заряд — да, флаги — нет |
 
 Сильное свойство: «без повторов» и паузы правил работают между сессиями, потому что состояние колод/правил — сериализуемое по замыслу (`GroupState`, `RuleState` — plain objects). Слабое: единый blob, shallow merge при загрузке, ручные латки (`rules.said ??= {}`) — см. TECH_AUDIT P3-2.
 

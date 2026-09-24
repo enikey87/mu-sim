@@ -15,7 +15,7 @@ async function fresh(page) {
 }
 
 async function waitIdle(page) {
-  await page.waitForFunction(() => window.__alik && !window.__alik.ui.busy && !window.__alik.ui.dead, null, { timeout: 20000 })
+  await page.waitForFunction(() => window.__alik && !window.__alik.ui.busy && !window.__alik.battery.dead, null, { timeout: 20000 })
 }
 
 async function run(label, device) {
@@ -91,7 +91,7 @@ async function run(label, device) {
 
     // dead focus
     await fresh(page)
-    await page.evaluate(() => window.__alik.die())
+    await page.evaluate(() => window.__alik.battery.die())
     await page.waitForSelector('#chargeBtn')
     if ((await page.evaluate(() => document.activeElement?.id)) !== 'chargeBtn') note('P2', `${label}/dead-focus`, '')
     if ((await page.locator('.phone-surface').getAttribute('inert')) === null) note('P1', `${label}/dead-inert`, '')
@@ -126,8 +126,8 @@ async function run(label, device) {
     // feel sticky cleared (animationend may not fire in headless for pseudo — check shake)
     await page.evaluate(() => {
       const g = window.__alik
-      g.feel = 'shake'
-      g.feelId++
+      g.ui.feel = 'shake'
+      g.ui.feelId++
       g.emit()
     })
     await page.waitForTimeout(50)
