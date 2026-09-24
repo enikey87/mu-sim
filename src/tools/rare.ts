@@ -19,15 +19,15 @@
 export const RARE = new Set([
   // 0 срабатываний за 48 партий во всех замерах: «Мууу» на слово игрока, ловля на лжи, смерть
   'Tone_Cow',
-  'Says_catchLie_liekind_grandpa', 'Says_catchLie_liekind_customer', 'Says_catchLie_caught3',
+  'Says_catchLie_liekind_customer', 'Says_catchLie_caught3',
   'Turn_WhileDead', 'Says_OtherArcWhileDead',
 ])
 
 export const RARE_FLAKY = new Set([
   // «Это корова?» и пачка непрочитанных: не в каждой выборке состояние складывается
   'Opt_Cow', 'Away_Offline',
-  // ловля на лжи: вторая ступень счётчика
-  'Says_catchLie_caught2',
+  // ловля на лжи: вторая ступень счётчика; ложь про дедушку — с тех пор как отмазки из пачки попадают в бухгалтерию (#101)
+  'Says_catchLie_caught2', 'Says_catchLie_liekind_grandpa',
   // окно состояния: свадьба Самвела и Размика, сцена «жена», квест «Нива», вердикт после письма
   'Turn_Wedding_Samvel', 'Turn_Wedding_Razmik', 'Scene_wife', 'Quest_q_niva', 'Court_Verdict_Lettered',
 ])
