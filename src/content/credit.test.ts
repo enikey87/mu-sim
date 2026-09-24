@@ -124,8 +124,37 @@ describe('кредитная лестница', () => {
     const { game } = makeGame()
     game.S.mem[loanTaken('consumer')] = true
     game.S.money = 50000
-    await game.fire('CreditDue', { credit: 'consumer' })
+    game.scheduleCredits()
+    const at = Number(game.S.mem[loanDueAt('consumer')])
+    game.S.day = at
+    await game.fire('CreditDue', { credit: 'consumer', at })
     expect(game.S.money).toBe(50000 - LOANS[0].payment)
+    await game.fire('CreditDue', { credit: 'consumer', at })
+    await game.fire('CreditDue', { credit: 'consumer' })
+    expect(game.S.money, 'устаревшее событие не списывает второй раз').toBe(50000 - LOANS[0].payment)
+  })
+  it('у каждого займа одно событие платежа, когда дни перескакивают через сроки (#181)', async () => {
+    const { game } = makeGame()
+    game.S.money = 10_000_000
+    const texts: string[] = []
+    const notify = game.notify.bind(game)
+    game.notify = (icon, app, text) => { texts.push(text); notify(icon, app, text) }
+    for (const l of LOANS) game.S.mem[loanTaken(l.id)] = true
+    game.scheduleCredits()
+    const pending = (id: string) => game.rules.state.schedule.filter((it) => it.kind === 'event' && it.event === 'CreditDue' && it.facts?.credit === id).length
+    const start = game.S.day
+    const jumps = [1, 2, 3]
+    for (let i = 0; game.S.day < start + 140; i++) {
+      game.nextDay(jumps[i % 3])
+      await game.afterTurn()
+      for (const l of LOANS) expect(pending(l.id), `${l.id} на день ${game.S.day}`).toBe(1)
+    }
+    const weeks = Math.ceil((game.S.day - start) / 7)
+    for (const l of LOANS) {
+      const n = texts.filter((t) => t.startsWith('Списание') && t.includes(l.label)).length
+      expect(n, l.id).toBeGreaterThanOrEqual(weeks - 1)
+      expect(n, l.id).toBeLessThanOrEqual(weeks)
+    }
   })
 })
 
