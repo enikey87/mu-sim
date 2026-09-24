@@ -1272,13 +1272,15 @@ export class Game {
         this.unlock('ram')
       }
       // подпись профиля — после хода, а не правилом StoryBeat: серию она не вытесняет; одна за ход
-      if (S.mem[memkeys.blocked]) {
+      // блок / смерть / телефон / эндгейм — без статуса; «скрыл» только в живом блоке (#192)
+      const quietStatus = S.mem[memkeys.blocked] || S.mem[memkeys.alikDead] || S.mem[memkeys.phoneKarine] || S.mem[memkeys.endgame.active]
+      if (S.mem[memkeys.blocked] && !S.mem[memkeys.endgame.active] && !S.mem[memkeys.alikDead] && !S.mem[memkeys.phoneKarine]) {
         // в блоке статусов нет: об этом игрок узнаёт один раз за блок, факт сбрасывает Rude_Block
         if (!S.mem[memkeys.statusHidden]) {
           S.mem[memkeys.statusHidden] = true
           this.sys(STATUS_HIDDEN)
         }
-      } else {
+      } else if (!quietStatus) {
         const status = this.line('ALIK_STATUS', ALIK_STATUS)
         if (status) this.sys(`Алик Воздухонесян изменил статус: «${status}»`)
       }

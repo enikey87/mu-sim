@@ -108,4 +108,27 @@ describe('статус Алика живёт миром', () => {
   it('статус не называет сроков и дат: такой текст — обещание без записи', () => {
     for (const l of ALIK_STATUS.map(valueOf)) expect((l as LineSpec).t).not.toMatch(/понедельник|вторник|сред|четверг|пятниц|суббот|воскрес|завтра|недел|месяц|\d/i)
   })
+  it('в блоке пул статуса сам молчит (ne blocked), не только точка вызова', async () => {
+    const { game } = makeGame()
+    await playUntil(game, 'niva', nivaAway)
+    game.S.mem.blocked = true
+    // без ne(blocked) line() вернул бы строку — вызов в обход sendTurn
+    expect(game.line('ALIK_STATUS', ALIK_STATUS)).toBeNull()
+  })
+  it('в эндгейме «скрыл статус» не звучит, даже если блок ещё висит', async () => {
+    const { game } = makeGame()
+    await playUntil(game, 'niva', nivaAway)
+    game.S.mem.blocked = true
+    game.S.mem['endgame.active'] = true
+    await turn(game)
+    expect(hidden(game)).toEqual([])
+    expect(statuses(game)).toEqual([])
+  })
+  it('строка блока не называет статус — об этом говорит STATUS_HIDDEN', async () => {
+    const { RUDE_BLOCK_SYS } = await import('./rude')
+    const { valueOf: v } = await import('../engine/rules')
+    for (const e of RUDE_BLOCK_SYS) {
+      expect(v(e)).not.toMatch(/[Сс]татус/)
+    }
+  })
 })
