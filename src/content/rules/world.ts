@@ -136,9 +136,9 @@ export const stateRules: R[] = [
   { name: 'Tone_WhileDead', event: 'PlayerMessage', when: [is(alikDead)], bonus: 10, respond: ({ game }) => deadTurn(game) },
   { name: 'Says_WhileDead', event: 'PlayerSays', when: [is(alikDead), ne('intent', 'arc')], bonus: 6, respond: ({ game }) => deadTurn(game) },
   { name: 'Says_OtherArcWhileDead', event: 'PlayerSays', when: [is(alikDead), eq('intent', 'arc'), ne('arg', 'alik_death')], bonus: 6, respond: ({ game }) => deadTurn(game) },
-  ...(['AlikIdle', 'StoryBeat', 'PeriodLine', 'PromiseDue', 'PromiseConditionMet'] as GameEvent[]).map((event): R => ({ name: 'Quiet_Dead_' + event, event, when: [is(alikDead)], bonus: 10, respond: () => {} })),
-  // заблокировал — значит, не пишет: ни легенд, ни «обед — святое» (пишет разве что через «Ниву» — это ход блокировки)
-  ...(['StoryBeat', 'PeriodLine', 'PromiseDue', 'PromiseConditionMet'] as GameEvent[]).map((event): R => ({ name: 'Quiet_Blocked_' + event, event, when: [is(blocked)], bonus: 10, respond: () => {} })),
+  ...(['AlikIdle', 'AlikAway', 'StoryBeat', 'PeriodLine', 'PromiseDue', 'PromiseConditionMet'] as GameEvent[]).map((event): R => ({ name: 'Quiet_Dead_' + event, event, when: [is(alikDead)], bonus: 10, respond: () => {} })),
+  // заблокировал — значит, не пишет: ни легенд, ни «обед — святое», ни пачки непрочитанных (пишет разве что через «Ниву» — это ход блокировки)
+  ...(['AlikAway', 'StoryBeat', 'PeriodLine', 'PromiseDue', 'PromiseConditionMet'] as GameEvent[]).map((event): R => ({ name: 'Quiet_Blocked_' + event, event, when: [is(blocked)], bonus: 10, respond: () => {} })),
 ]
 
 export const worldRules: R[] = [...sceneRules, ...questRules, ...promiseRules, ...chorusRules, ...stateRules]

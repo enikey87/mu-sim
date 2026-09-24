@@ -19,6 +19,7 @@ const CASES: Record<string, Case> = {
   Turn_BorisSick: { event: 'AlikTurn', setup: (g) => { g.S.arcs.boris = { i: 2, last: 0 }; g.S.actors.boris = { sick: true } } },
   Opt_Cow: { event: 'BuildChoices', setup: (g) => { g.S.mem.mooAt = g.S.stats.sent } },
   Idle_Offline: { event: 'AlikIdle', setup: (g) => { g.S.offlineDays = 2 } },
+  Away_Offline: { event: 'AlikAway', setup: (g) => { g.S.offlineDays = 2 } },
   Beat_FirstArc: { event: 'StoryBeat', setup: (g) => { g.S.stats.sent = 5 } },
   Says_WhileOffline: { event: 'PlayerSays', facts: { intent: 'photo' }, setup: (g) => { g.S.offlineDays = 2 } },
   Turn_WhileDead: { event: 'AlikTurn', setup: (g) => { g.S.mem.alik_dead = true } },

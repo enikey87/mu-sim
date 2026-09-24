@@ -258,6 +258,7 @@ def coverage(was, cov):
     cov['dead_frames'] += int(c.get('dead_frames') or 0)
     cov['notifications'] += int(c.get('notifications') or 0)
     cov['away_messages'] += int(c.get('away_messages') or 0)
+    cov['away_events'] += int(c.get('away_events') or 0)
     cov['games_with_dead'] += 1 if c.get('dead_frames') else 0
     cov['games_with_mute'] += 1 if c.get('had_mute') else 0
     cov['games_with_blood'] += 1 if c.get('had_blood') else 0
@@ -265,7 +266,8 @@ def coverage(was, cov):
     cov['games_with_arc'] += 1 if c.get('frames_with_arc') else 0
     if not c.get('notifications'):
         cov['notif_unexercised'] += 1
-    if not c.get('away_messages'):
+    # пачка при мёртвом Алике молчит по правилу: окно — события пачки, а не её сообщения (старый дамп — сообщения)
+    if not (c.get('away_events') or c.get('away_messages')):
         cov['away_unexercised'] += 1
     return cov
 
