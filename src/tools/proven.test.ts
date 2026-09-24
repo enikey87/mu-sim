@@ -79,6 +79,8 @@ const CASES: Record<string, Case> = {
   Ending_vendetta: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem.vendetta = true } },
   Ending_payday_real: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'real' } },
   Ending_payday_niva: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'niva' } },
+  Tone_Thanks: { event: 'PlayerMessage', facts: { tone: 'polite', category: 'gratitude' } },
+  Tone_Greeting: { event: 'PlayerMessage', facts: { tone: 'polite', category: 'greeting' } },
   Ending_payday_notyou: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'notyou' } },
   Ending_payday_lavash: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'lavash' } },
   Ending_payday_strasbourg: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'strasbourg' } },
@@ -114,6 +116,7 @@ const CASES: Record<string, Case> = {
   Finale_nune_ledger: { event: 'ArcFinale', facts: { arc: 'nune' }, setup: (g) => { g.S.mem.caught = 2 } },
   Away_ColdWar: { event: 'AlikAway', setup: offended },
   Quiet_Offended_AlikAway: { event: 'AlikAway', setup: offended },
+  Scene_amnesty: { event: 'PickScene', setup: (g) => { for (let i = 0; i < 8; i++) g.recordPromise({ text: `завтра №${i}`, d: 1 }); g.S.day += 5 } },
 }
 
 function fires(name: string, c: Case): boolean {

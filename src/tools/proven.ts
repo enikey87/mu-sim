@@ -12,6 +12,8 @@ export const PROVEN: Record<string, string> = Object.fromEntries([
   'Quiet_PhoneKarine_PeriodLine', 'Quiet_PhoneKarine_PromiseDue',
   'Phone_Karine_AlikTurn', 'Phone_Karine_PlayerMessage', 'Phone_Karine_PlayerSays',
   'Turn_Blocked', 'Turn_Vendetta', 'Rude_Vendetta',
+  // бот покрытия свободным текстом «спасибо»/«привет» не пишет (FREE в bot.ts); расширить FREE — сдвинуть все траектории
+  'Tone_Thanks', 'Tone_Greeting',
   'Says_sorry_blocked', 'Says_sorry_blocked_hinted', 'Says_via_mama',
   'Finale_boris_brigadir', 'Finale_boris_toyou', 'Finale_samvel_groom',
   'Finale_niva_chose', 'Finale_niva_chose_or', 'Finale_rubik_karine', 'Finale_alik_death_sulk', 'Finale_grandpa_revoke', 'Finale_razmik_swap', 'Finale_razmik_union',
@@ -24,4 +26,6 @@ export const PROVEN: Record<string, string> = Object.fromEntries([
   // финалы, до которых бот доходил только после выплаты — а там теперь тишина (#136); обиженный + пачка — редкое совпадение
   'Finale_beton_ledger', 'Finale_nune_ledger',
   'Away_ColdWar', 'Quiet_Offended_AlikAway',
+  // бот копит не больше 3 просрочек к Дню выплаты: 60 % обещаний — «когда-нибудь», датированные он припоминает кнопкой (#149)
+  'Scene_amnesty',
 ].map((name) => [name, reason]))

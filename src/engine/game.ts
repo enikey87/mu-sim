@@ -12,7 +12,7 @@ import { ARCS, ARC_DONE, CAST, type Episode, GROUP, GROUP_OOPS, WRONG_TO, WRONG_
 import * as L from '../content/life'
 import { ACH } from '../content/achievements'
 import { SPEAKS, meet } from '../content/world'
-import { FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_WANDER, OATH_FORMS } from '../content/misc'
+import { ALIK_STATUS, FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_WANDER, OATH_FORMS } from '../content/misc'
 import { STARTS } from '../content/quests'
 import { BILLS, billDue, billDueAt, billStreak, billUnpaid, lightOff, netRation, phoneWarn, type BillId } from '../content/bills'
 import { allRules } from '../content/rules'
@@ -39,10 +39,7 @@ import { UiState, type Moo, type SendFeel } from './ui-state'
 import { classifyUserInput, legalClaim, type ClassifiedInput } from './input'
 import { holidayOf, HOLIDAY_EXCUSES } from '../content/holidays'
 import { dueIn, dateOf, fmtDate, fmtDayMonth, fmtTime, nightHour, periodOf, tierOf, TIERS, type Due, type Period } from './time'
-import {
-  type GameState, type Msg, type NewMsg, type Choice, type Ctx, type Tone, type Storage,
-  type InputCategory, freshState, loadState, saveState, SAVE_KEY, MAX_PATIENCE,
-} from './state'
+import { type GameState, type Msg, type NewMsg, type Choice, type Ctx, type Tone, type Storage, type InputCategory, freshState, loadState, saveState, SAVE_KEY, MAX_PATIENCE, isLate, type PromiseRec } from './state'
 
 /** Текст срока как буквальный шаблон без учёта регистра; кэш — topicOfLast зовётся из facts() на каждую реплику. */
 const LITERAL = new Map<string, RegExp>()
@@ -765,8 +762,18 @@ export class Game {
     // по вопросу игрока — назавтра, сама — через три дня
     return !!st && st.i < ARCS[id].eps.length && this.S.day - st.last >= (asked ? 1 : 3)
   }
+  latePromises(): PromiseRec[] {
+    return this.S.promises.filter((p) => isLate(p, this.S.day))
+  }
   lateCount(): number {
-    return this.S.promises.filter((p) => p.due != null && p.due < this.S.day && !p.asked).length
+    return this.latePromises().length
+  }
+  /** Амнистия: просроченные записи помечаются днём амнистии; число — в переменные сцены для системной строки. */
+  amnesty(): number {
+    const late = this.latePromises()
+    for (const p of late) p.amnesty = this.S.day
+    if (this.S.scene) this.S.scene.vars.amnestied = late.length
+    return late.length
   }
 
   facts = (extra: Facts = {}): Facts => {
@@ -805,6 +812,7 @@ export class Game {
       period: this.period(), night: this.isNight(), offline: S.offlineDays > 0, scene: S.scene?.id,
       sinceAlik: S.day - Number(S.mem[memkeys.alikDay] ?? S.day),
       lateCount: this.lateCount(),
+      somedayCount: S.promises.filter((p) => p.due == null && !p.condition).length,
       // сама — не больше одной серии в день: три легенды денег за день — уже не сюжет, а шум
       arcAvailable: this.availableArcs().length > 0 && !Object.values(S.arcs).some((a) => a.last === S.day),
       arcsStarted: Object.keys(S.arcs).length,
@@ -1097,6 +1105,9 @@ export class Game {
         this.sys('Алик Воздухонесян сменил фото профиля. На фото — баран')
         this.unlock('ram')
       }
+      // подпись профиля — после хода, а не правилом StoryBeat: серию она не вытесняет; одна за ход
+      const status = this.line('ALIK_STATUS', ALIK_STATUS)
+      if (status) this.sys(`Алик Воздухонесян изменил статус: «${status}»`)
       if (this.chance(0.12)) this.randomNotif()
       this.restStatus()
       this.ui.busy = false
@@ -1622,6 +1633,7 @@ export class Game {
     const invoiced = !!fx.invoice && this.adjustDebt(-v.total)
     debtMoved ||= invoiced
     if (fx.ach) this.unlock(fx.ach)
+    if (fx.amnesty) this.amnesty()
     if (fx.legend !== undefined) this.setLegend(fx.legend)
     if (fx.set) this.rules.applyOps(Object.entries(fx.set).map(([key, value]) => ({ key, op: '=' as const, value })), {})
     if (fx.during) this.rules.applyOps([{ key: fx.during.key, op: '=', value: true, forDays: fx.during.days }], {})
