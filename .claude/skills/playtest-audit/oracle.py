@@ -47,10 +47,11 @@ ONCE_SCENES = [
     'Займи 5000 до пятницы', 'радостная новость! Я взял кредит', 'есть новый объект!',
     'если позвонят и спросят — ты у меня не работал', 'Теперь мы кровные братья',
 ]
-# Повторяемые уведомления: у них повтор — не находка.
+# Повторяемые уведомления: у них повтор — не находка. Банк/платежи — механика календаря (#229).
 REPEATABLE_NOTIF = [
-    'Списание', 'Сынок, ты поел', 'Когда за квартиру', 'Сынок, Алик заплатил',
-    'позвони маме', 'заплатил твой армянин', 'Система', 'новых сообщ',
+    'Банк —', 'Списание', 'Поступление', 'Не прошло', 'Завтра списание', 'Недостаточно',
+    'Сынок, ты поел', 'Когда за квартиру', 'Сынок, Алик заплатил',
+    'позвони маме', 'заплатил твой Алик', 'Система', 'новых сообщ',
 ]
 # Кто знакомится сам: подпись отправителя → фраза знакомства.
 MEETS = [('Нуне', 'nune_meet', 'nune'), ('Заказчик Грант', 'grant_meet', 'grant'), ('Крановщик Размик', 'razmik_meet', 'razmik')]
@@ -254,6 +255,45 @@ def check_transcript(path, frames):
     return v
 
 
+# Частоты. Слепой рецензент по своему промпту не судит однообразие, поэтому повтор и затопление
+# ленты видит только оракул (аудит 2026-09-24: 527 СМС банка на 574 сообщения Алика, сид 7).
+# Повтор внутри дня, который и есть механика: счётчик Дня выплаты растёт строка за строкой.
+SAME_DAY_OK = ['К выплате']
+# Уведомлений не больше этой доли от реплик персонажей: до платежей по календарю было 0,05–0,08.
+NOTIF_SHARE = float(os.environ.get('ORACLE_NOTIF_SHARE') or 0.25)
+
+
+def check_frequency(path):
+    """Одна и та же системная строка или уведомление дважды за игровой день; доля уведомлений в ленте.
+
+    Числа в тексте не различают строки: «Списание 550 ₽. Баланс: 9 700» и «…9 150» — одно событие дважды.
+    """
+    v = collections.Counter()
+    cov = collections.Counter()
+    day = collections.Counter()
+    for _, ln in msg_lines(path):
+        if ln.startswith('—— '):
+            day = collections.Counter()
+            continue
+        n = re.match(r'\(уведомление телефона: (.*)\)$', ln)
+        s = re.match(r'\[система\] (.*)', ln)
+        m = re.match(r'\[\d\d:\d\d\] (.+?): ', ln)
+        if n:
+            cov['notif_lines'] += 1
+        elif m and m.group(1) != 'Я':
+            cov['npc_lines'] += 1
+        text = n.group(1) if n else s.group(1) if s else None
+        if text is None or any(x in text for x in SAME_DAY_OK):
+            continue
+        key = ('n:' if n else 's:') + re.sub(r'\d[\d\s]*', '#', text)
+        day[key] += 1
+        if day[key] > 1:
+            v['same_day_repeat'] += 1
+    if cov['notif_lines'] > NOTIF_SHARE * cov['npc_lines']:
+        v['notif_flood'] += 1
+    return v, cov
+
+
 def check_text_mute(path):
     """Мьют без дампа фактов: остаётся счёт повторов текста «в первый раз»."""
     v = collections.Counter()
@@ -312,8 +352,15 @@ if __name__ == '__main__':
     cov = collections.Counter()
     affected = collections.defaultdict(set)
     n = world_n = 0
+    share = []
     for p in sorted(glob.glob(root + '/seed-*.txt')):
         n += 1
+        fv, fc = check_frequency(p)
+        cov.update(fc)
+        share.append(round(fc['notif_lines'] / max(fc['npc_lines'], 1), 2))
+        for k in fv:
+            affected[k].add(p)
+        tot.update(fv)
         wp = p.replace('.txt', '.world.json')
         if not os.path.isfile(wp):
             cov['games_without_world'] += 1
@@ -355,6 +402,8 @@ if __name__ == '__main__':
         'games_with_world': world_n,
         'games_affected': {k: len(affected[k]) for k in sorted(violations)},
         'coverage': {k: cov[k] for k in sorted(cov)},
+        # доля уведомлений от реплик персонажей по партиям: порог NOTIF_SHARE, находка — notif_flood
+        'notif_share': {'max': max(share), 'limit': NOTIF_SHARE},
         'violations': violations,
     }
     print(json.dumps(out, ensure_ascii=False, indent=2))

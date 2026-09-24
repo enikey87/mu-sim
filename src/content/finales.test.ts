@@ -132,7 +132,8 @@ describe('финалы сериалов: выбор', () => {
     toLast(game, 'samvel')
     await game.playArc('samvel')
     expect(game.S.mem['finale.samvel']).toBe('groom')
-    expect(game.S.mem['wedding.samvel']).toBe(true)
+    expect(game.S.mem['wedding.anush']).toBe(true)
+    expect(game.S.mem['wedding.samvel']).toBeUndefined()
   })
   it('грубил хоть раз — в женихи не берут', async () => {
     const { game } = makeGame()
@@ -142,12 +143,14 @@ describe('финалы сериалов: выбор', () => {
     await game.playArc('samvel')
     expect(game.S.mem['finale.samvel']).toBe('default')
   })
-  it('запасное условие: «Нива» выбирает того, кто о ней спрашивал', async () => {
+  it('финал с fx.pay увеличивает fifty — ответ на «спасибо» видит перевод', async () => {
     const { game } = makeGame()
-    game.S.mem['asked.niva'] = 5
-    toLast(game, 'niva')
-    await game.playArc('niva')
-    expect(game.S.mem['finale.niva']).toBe('chose')
+    SETUP['razmik.union'](game)
+    toLast(game, 'razmik')
+    const before = game.S.stats.fifty
+    await game.playArc('razmik')
+    expect(game.S.mem['finale.razmik']).toBe('union')
+    expect(game.S.stats.fifty).toBe(before + 1)
   })
   it('вопрос «Как там…?» считается и после финала отвечает репликами этого финала', async () => {
     const { game } = makeGame()
@@ -235,7 +238,7 @@ describe('концовки игры', () => {
     expect(await check(game)).toBe('family')
     expect(game.S.endings.family).toBe(game.S.day)
     expect(game.S.ach.end_family).toBeDefined()
-    game.closeEnding()
+    await game.closeEnding()
     expect(game.S.ending).toBeNull()
     expect(await check(game)).toBeNull()
   })

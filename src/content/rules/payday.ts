@@ -63,7 +63,7 @@ export const PAYDAY_HOOKS: Record<string, (game: Game) => Promise<void>> = {
       took.add((p.spec as Claim).who)
       await game.say([{ w: (p.spec as Claim).who, t: p.text }])
       sum = Math.max(50, sum - (p.spec as Claim).cut)
-      // отказал делиться — берут вдвое: «по рублю» армянским слухом
+      // отказал делиться — берут вдвое: родня слышит «по рублю»
       if (game.S.mem[pd.refused]) sum = Math.max(50, sum - Math.round((p.spec as Claim).cut / 2))
       await money(game, sum)
     }
@@ -145,6 +145,9 @@ export const paydayRules: R[] = [
   outcome('default', []),
   {
     name: 'Payday_Button', event: 'PaydayButton', when: [], priority: 'system',
-    respond: async ({ game, facts }) => { await game.say([game.open((OUTCOME[String(facts.outcome)] ?? OUTCOME.default).button)[0]]) },
+    respond: async ({ game, facts }) => {
+      const line = game.open((OUTCOME[String(facts.outcome)] ?? OUTCOME.default).button)[0]
+      if (line !== undefined) await game.say([line])
+    },
   },
 ]

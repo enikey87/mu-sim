@@ -13,9 +13,9 @@ export interface Bill {
 }
 
 export const BILLS: readonly Bill[] = [
-  { id: 'rent', label: 'Коммуналка', amount: 3500, due: { monthEnd: 0 }, skip: (m) => !!m[evicted] },
-  { id: 'phone', label: 'Связь', amount: 550, due: { weekday: 1 } },
-  { id: 'transit', label: 'Проездной', amount: 800, due: { week: true } },
+  { id: 'rent', label: 'Коммуналка', amount: 2500, due: { monthEnd: 0 }, skip: (m) => !!m[evicted] },
+  { id: 'phone', label: 'Связь', amount: 400, due: { weekday: 1 } },
+  { id: 'transit', label: 'Проездной', amount: 500, due: { week: true } },
 ]
 
 export const billDueAt = (id: BillId): string => `bills.${id}.dueAt`

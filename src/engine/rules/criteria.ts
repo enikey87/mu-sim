@@ -1,31 +1,39 @@
 // Условия правил: конструкторы, проверка, описание, именованные условия.
 import type { Criterion, Facts, Scope, Value, FactOp, WriteScope } from './types'
 
-export const eq = (key: string, value: Value, scope?: Scope): Criterion => ({ key, op: '==', value, scope })
-export const ne = (key: string, value: Value, scope?: Scope): Criterion => ({ key, op: '!=', value, scope })
-export const gt = (key: string, value: number, scope?: Scope): Criterion => ({ key, op: '>', value, scope })
-export const gte = (key: string, value: number, scope?: Scope): Criterion => ({ key, op: '>=', value, scope })
-export const lt = (key: string, value: number, scope?: Scope): Criterion => ({ key, op: '<', value, scope })
-export const lte = (key: string, value: number, scope?: Scope): Criterion => ({ key, op: '<=', value, scope })
+/** Сторож: зовётся из каждого конструктора условия/записи. Движок ключей не знает — проверку ставит контент. */
+let keySink: ((key: string) => void) | null = null
+export const watchFactKeys = (fn: ((key: string) => void) | null): void => { keySink = fn }
+const note = (key: string): void => { keySink?.(key) }
+
+export const eq = (key: string, value: Value, scope?: Scope): Criterion => { note(key); return { key, op: '==', value, scope } }
+export const ne = (key: string, value: Value, scope?: Scope): Criterion => { note(key); return { key, op: '!=', value, scope } }
+export const gt = (key: string, value: number, scope?: Scope): Criterion => { note(key); return { key, op: '>', value, scope } }
+export const gte = (key: string, value: number, scope?: Scope): Criterion => { note(key); return { key, op: '>=', value, scope } }
+export const lt = (key: string, value: number, scope?: Scope): Criterion => { note(key); return { key, op: '<', value, scope } }
+export const lte = (key: string, value: number, scope?: Scope): Criterion => { note(key); return { key, op: '<=', value, scope } }
 export const between = (key: string, min: number, max: number, scope?: Scope): Criterion[] => [gte(key, min, scope), lte(key, max, scope)]
-export const exists = (key: string, scope?: Scope): Criterion => ({ key, op: 'exist', scope })
-export const missing = (key: string, scope?: Scope): Criterion => ({ key, op: '!exist', scope })
-export const matches = (key: string, re: RegExp, scope?: Scope): Criterion => ({ key, op: 'match', value: re, scope })
+export const exists = (key: string, scope?: Scope): Criterion => { note(key); return { key, op: 'exist', scope } }
+export const missing = (key: string, scope?: Scope): Criterion => { note(key); return { key, op: '!exist', scope } }
+export const matches = (key: string, re: RegExp, scope?: Scope): Criterion => { note(key); return { key, op: 'match', value: re, scope } }
 export const is = (key: string, scope?: Scope): Criterion => eq(key, true, scope)
 
 /**
  * Именованное условие (criterion() в kawaii-doom): несколько проверок под одним именем.
  * Считается за одно условие при подсчёте специфичности — как в оригинале.
+ * Метка `name` — не ключ факта; ключи уже отметили вложенные конструкторы.
  */
 export const named = (name: string, ...all: Criterion[]): Criterion => ({ key: name, op: 'all', all })
 
-export const set = (key: string, value: number | string | boolean, extra: Partial<FactOp> = {}): FactOp => ({ key, op: '=', value, ...extra })
-export const add = (key: string, value = 1, extra: Partial<FactOp> = {}): FactOp => ({ key, op: '+', value, ...extra })
-export const mul = (key: string, value: number, extra: Partial<FactOp> = {}): FactOp => ({ key, op: '*', value, ...extra })
-export const invert = (key: string, extra: Partial<FactOp> = {}): FactOp => ({ key, op: '!', ...extra })
+export const set = (key: string, value: number | string | boolean, extra: Partial<FactOp> = {}): FactOp => { note(key); return { key, op: '=', value, ...extra } }
+export const add = (key: string, value = 1, extra: Partial<FactOp> = {}): FactOp => { note(key); return { key, op: '+', value, ...extra } }
+export const mul = (key: string, value: number, extra: Partial<FactOp> = {}): FactOp => { note(key); return { key, op: '*', value, ...extra } }
+export const invert = (key: string, extra: Partial<FactOp> = {}): FactOp => { note(key); return { key, op: '!', ...extra } }
 /** Временное состояние: факт = value на N дней, потом прежнее значение. */
-export const during = (key: string, days: number, value: number | string | boolean = true, scope?: WriteScope): FactOp =>
-  ({ key, op: '=', value, forDays: days, scope })
+export const during = (key: string, days: number, value: number | string | boolean = true, scope?: WriteScope): FactOp => {
+  note(key)
+  return { key, op: '=', value, forDays: days, scope }
+}
 
 export type Resolver = (key: string, scope?: Scope, actor?: string) => Value
 

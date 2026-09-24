@@ -65,19 +65,24 @@ describe('статус Алика живёт миром', () => {
     for (let i = 0; i < 3; i++) await turn(game)
     expect(statuses(game)).toEqual([])
   })
-  it('в блоке, при «смерти», с телефоном у Карине и в эндгейме — молчит', async () => {
-    const quiet: Record<string, (g: Game) => void> = {
-      блок: (g) => { g.S.mem.blocked = true },
-      смерть: (g) => { g.S.mem.alik_dead = true },
-      'телефон у Карине': (g) => { g.S.mem['phone.karine'] = true },
-      эндгейм: (g) => { g.S.mem['endgame.active'] = true },
+  it('в блоке, при «смерти», с телефоном у Карине и в эндгейме — молчит путём игрока; «скрыл» только в блоке', async () => {
+    const quiet: Record<string, { setup: (g: Game) => void; hidden: boolean }> = {
+      блок: { setup: (g) => { g.S.mem.blocked = true }, hidden: true },
+      смерть: { setup: (g) => { g.S.mem.alik_dead = true }, hidden: false },
+      'телефон у Карине': { setup: (g) => { g.S.mem['phone.karine'] = true }, hidden: false },
+      эндгейм: { setup: (g) => { g.S.mem['endgame.active'] = true }, hidden: false },
     }
-    for (const [name, setup] of Object.entries(quiet)) {
+    for (const [name, { setup, hidden: wantHidden }] of Object.entries(quiet)) {
       const { game } = makeGame()
       await playUntil(game, 'niva', nivaAway)
       setup(game)
       await turn(game)
       expect(statuses(game), name).toEqual([])
+      expect(hidden(game), name).toEqual(wantHidden ? [HIDDEN] : [])
+      if (name !== 'эндгейм') {
+        expect(game.ui.status?.text, name).toBe('не в сети')
+        expect(game.ui.status?.cls ?? '', name).not.toBe('online')
+      }
     }
   })
   it('в блоке статус скрыт: строка один раз за блок, после разблокировки пул возвращается', async () => {
@@ -87,6 +92,7 @@ describe('статус Алика живёт миром', () => {
     await turn(game)
     expect(hidden(game)).toEqual([HIDDEN])
     expect(statuses(game)).toEqual([])
+    expect(game.ui.status?.text).toBe('не в сети')
     await turn(game)
     expect(hidden(game)).toHaveLength(1) // один раз за блок, а не каждый ход
     game.S.mem.blocked = false // разблокировка извинением через посредника
@@ -107,5 +113,21 @@ describe('статус Алика живёт миром', () => {
   })
   it('статус не называет сроков и дат: такой текст — обещание без записи', () => {
     for (const l of ALIK_STATUS.map(valueOf)) expect((l as LineSpec).t).not.toMatch(/понедельник|вторник|сред|четверг|пятниц|суббот|воскрес|завтра|недел|месяц|\d/i)
+  })
+  it('в эндгейме «скрыл статус» не звучит, даже если блок ещё висит', async () => {
+    const { game } = makeGame()
+    await playUntil(game, 'niva', nivaAway)
+    game.S.mem.blocked = true
+    game.S.mem['endgame.active'] = true
+    await turn(game)
+    expect(hidden(game)).toEqual([])
+    expect(statuses(game)).toEqual([])
+  })
+  it('строка блока не называет статус — об этом говорит STATUS_HIDDEN', async () => {
+    const { RUDE_BLOCK_SYS } = await import('./rude')
+    const { valueOf: v } = await import('../engine/rules')
+    for (const e of RUDE_BLOCK_SYS) {
+      expect(v(e)).not.toMatch(/[Сс]татус/)
+    }
   })
 })

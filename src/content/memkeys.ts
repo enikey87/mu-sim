@@ -18,6 +18,8 @@ export const evicted = 'evicted'
 export const vendetta = 'vendetta'
 export const court = 'court'
 export const courtVerdict = 'court.verdict'
+/** Инстанции, которым ступень суда уже объяснила перевод («полиция сказала — это в суд») — список через запятую. */
+export const courtReferral = 'court.referral'
 export const ritualCount = 'ritual.count'
 export const ritualCut = 'ritual.cut'
 export const caughtCount = 'caught'
@@ -78,6 +80,12 @@ export const endgame = {
   exits: 'endgame.exits', mutes: 'endgame.mutes', renames: 'endgame.renames',
 } as const
 
+/** Праздник, который партия уже поздравила: «newYear@2027» — новый год тот же, но год другой. */
+export const holidayGreeted = 'holiday.greeted'
+
+/** «Займи 50» в эндгейме: просьба прозвучала и что игрок ответил (docs/design/lend-50.md). */
+export const lend50 = { asked: 'lend50.asked', answer: 'lend50.answer' } as const
+
 export const lie = { old: 'lie.old', new: 'lie.new', alikOld: 'lie.alikOld', kind: 'lie.kind' } as const
 
 export const said = (claim: string): string => `said.${claim}`
@@ -99,6 +107,11 @@ export const paydayScene = 'payday'
 export const lightOff = 'light.off'
 export const netRation = 'net.ration'
 export const phoneWarn = 'phone.warn'
+/** Кредитная лестница / мама-запаска — точные ключи; семейства sold./mom./credit.<loan>.* — в factkeys. */
+export const creditStage = 'credit.stage'
+export const creditOffer = 'credit.offer'
+export const creditBroke = 'credit.broke'
+export const momDone = 'mom.done'
 
 /** Ключи досок персонажей (S.actors), не мира. */
 export const sick = 'sick'
@@ -108,7 +121,7 @@ export const ACTOR_KEYS: ReadonlySet<string> = new Set([sick, interjections])
 /** Факты события (собираются в facts() на каждый fire) — не mem, но валидатор обязан их знать; сверка с facts() — factkeys.test.ts. */
 export const EVENT_KEYS: ReadonlySet<string> = new Set([
   'day', 'dow', 'month', 'dom', 'holiday', 'sent', 'moo', 'tier', 'mood', 'patience', 'money', 'debt', 'fifty',
-  'moneyNormal', 'moneyLow', 'moneyBottom',
+  'moneyNormal', 'moneyLow', 'moneyBottom', 'paymentDueTomorrow',
   'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sorrySwing', 'promiseLive',
   'period', 'night', 'offline', 'scene', 'sinceAlik', 'lateCount', 'arcAvailable',
   'arcsStarted', 'arcsDone', 'quests', 'callbackReady', 'arcUnfinished', 'deathCanAdvance',
@@ -117,10 +130,11 @@ export const EVENT_KEYS: ReadonlySet<string> = new Set([
 
 export const MEM_KEYS: ReadonlySet<string> = new Set([
   HEAT, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, evicted, vendetta, court, courtVerdict,
-  ritualCount, ritualCut, caughtCount, cryptoHodl, bathAsked, mamaCalls, phoneKarine, alikDay, mooAt, sorryAt,
+  ritualCount, ritualCut, caughtCount, cryptoHodl, bathAsked, mamaCalls, phoneKarine, alikDay, mooAt, sorryAt, courtReferral,
   rudeAt, thanksAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway,
   garikConcrete, garikCut, houseOnGarik, borisMarried, borisSmetaReady, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday,
-  lightOff, netRation, phoneWarn,
-  ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lie),
+  lightOff, netRation, phoneWarn, holidayGreeted,
+  creditStage, creditOffer, creditBroke, momDone,
+  ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lend50), ...Object.values(lie),
 ])

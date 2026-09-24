@@ -342,6 +342,30 @@ describe('промолчавшее правило не оставляет сле
     await expect(game.fire('PlayerMessage', { tone: 'polite' })).rejects.toThrow(/Leaky промолчало/)
     await expect(game.send({ text: 'АЛИК!!! Хватит врать!!!', tone: 'rude' })).rejects.toThrow(/Leaky промолчало/) // грубость всегда идёт в PlayerMessage
   })
+  it('тост промолчавшего — SilenceBreach', async () => {
+    const { game } = makeGame()
+    game.rules.add({ name: 'Flashy', event: 'PlayerMessage', when: [], specificity: 999, respond: ({ game }) => { game.flash('утечка'); return false } })
+    await expect(game.fire('PlayerMessage', { tone: 'polite' })).rejects.toThrow(/Flashy промолчало/)
+  })
+  it('уведомление промолчавшего — SilenceBreach', async () => {
+    const { game } = makeGame()
+    game.rules.add({ name: 'Noisy', event: 'PlayerMessage', when: [], specificity: 999, respond: ({ game }) => { game.notify('📺', 'Новости', 'утечка'); return false } })
+    await expect(game.fire('PlayerMessage', { tone: 'polite' })).rejects.toThrow(/Noisy промолчало/)
+  })
+  it('правка текста существующего сообщения — SilenceBreach', async () => {
+    const { game } = makeGame()
+    const first = game.S.msgs.find((m) => m.kind === 'text')
+    expect(first?.kind).toBe('text')
+    game.rules.add({
+      name: 'Editor', event: 'PlayerMessage', when: [], specificity: 999,
+      respond: ({ game }) => {
+        const m = game.S.msgs.find((x) => x.kind === 'text')
+        if (m?.kind === 'text') m.text = 'утечка'
+        return false
+      },
+    })
+    await expect(game.fire('PlayerMessage', { tone: 'polite' })).rejects.toThrow(/Editor промолчало/)
+  })
   it('ответ на несуществующую реплику молчит и не сбрасывает контекст', async () => {
     const { game } = makeGame()
     game.setCtx({ chorus: 'garik' })

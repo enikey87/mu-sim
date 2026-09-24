@@ -16,7 +16,8 @@ describe('ключи фактов', () => {
     const { game } = makeGame()
     for (const id of Object.keys(ARCS)) game.S.arcs[id] = { i: 1, last: 0 }
     for (const k of Object.keys(ACH)) game.S.ach[k] = game.S.day
-    const produced = Object.keys(game.facts({ intent: 'request', arg: 'boris', category: 'request', tone: 'polite', greet: true, argArcDone: false, promise: 0, arc: 'boris' }))
+    // без ручной подстановки intent/arg/… — facts() сам кладёт слоты события
+    const produced = Object.keys(game.facts())
     expect(produced.filter((k) => !isFactKey(k)), 'facts() порождает ключ, которого реестр не знает').toEqual([])
     const set = new Set(produced)
     expect([...EVENT_KEYS].filter((k) => !set.has(k)), 'реестр знает факт, которого facts() не порождает').toEqual([])

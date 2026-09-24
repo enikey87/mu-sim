@@ -6,13 +6,33 @@ import type { GameEvent, Offer } from './events'
 import { COURT, COURT_AFTER, COURT_LAWYER_AGAIN, COURT_VERDICT_AFTER_LETTER } from '../quests'
 import { THREAT_AGAIN } from '../misc'
 import { meet } from '../world'
-import { count, court, intro, paydayScene } from '../memkeys'
+import { count, court, courtReferral, intro, paydayScene, threatClaim } from '../memkeys'
 
 type R = Rule<Game, GameEvent, Offer>
 const threat = eq('tone', 'threat')
 
 async function saySaid(game: Game, lines: ReadonlyArray<readonly [string, string]>): Promise<void> {
   for (const [w, t] of lines) { await game.say([w === 'alik' ? t : { w, t }]); await game.sleep(400) }
+}
+
+/** Перевод в суд для инстанции, которой грозил игрок: по факту threat.claim, а не по словам реплики. */
+export const REFERRAL: Record<string, string> = {
+  police: 'Полиция? Полиция сказала — это в суд.',
+  prosecutor: 'Прокурор? Прокурор сказал — это в суд.',
+  tax: 'Налоговая? Налоговая сказала — это в суд.',
+  collectors: 'Коллекторы? Коллекторы сказали — это в суд.',
+  lawyer: 'Адвокат? Адвокат сказал — это в суд.',
+  statement: 'Заявление? Заявление приняли и отправили в суд.',
+}
+
+/** Префикс к реплике ступени, а не отдельное сообщение: реплик не больше, поток розыгрыша не сдвигается. */
+function referred(game: Game, lines: ReadonlyArray<readonly [string, string]>): ReadonlyArray<readonly [string, string]> {
+  const claim = String(game.S.mem[threatClaim] ?? '')
+  const said = String(game.S.mem[courtReferral] ?? '').split(',').filter(Boolean)
+  const i = lines.findIndex(([w]) => w === 'alik')
+  if (!REFERRAL[claim] || said.includes(claim) || i < 0) return lines
+  game.rules.applyOps([set(courtReferral, [...said, claim].join(','))], {})
+  return lines.map((l, j): readonly [string, string] => (j === i ? [l[0], `${REFERRAL[claim]} ${l[1]}`] : l))
 }
 
 export const courtRules: R[] = [
@@ -24,12 +44,12 @@ export const courtRules: R[] = [
   {
     name: 'Court_Lawyer', event: 'PlayerMessage', when: [threat, eq(court, 1), missing(intro('arsen'))], bonus: 1,
     remember: [add(count.threat), add(court), ...meet('arsen')],
-    respond: async ({ game }) => { game.unlock('memory'); await saySaid(game, COURT[1]) },
+    respond: async ({ game }) => { game.unlock('memory'); await saySaid(game, referred(game, COURT[1])) },
   },
   {
     name: 'Court_Lawyer_Again', event: 'PlayerMessage', when: [threat, eq(court, 1), is(intro('arsen'))], bonus: 1,
     remember: [add(count.threat), add(court)],
-    respond: async ({ game }) => { game.unlock('memory'); await saySaid(game, COURT_LAWYER_AGAIN) },
+    respond: async ({ game }) => { game.unlock('memory'); await saySaid(game, referred(game, COURT_LAWYER_AGAIN)) },
   },
   {
     // претензия, апелляция, Страсбург, решение — по ступеням
@@ -37,8 +57,8 @@ export const courtRules: R[] = [
     respond: async ({ game }) => {
       const stage = Number(game.S.mem[court]) - 1 // память уже сдвинута на следующую ступень
       game.unlock('memory')
-      if (stage === 3) return game.enterNode('court', game.scenes.court.start)
-      await saySaid(game, COURT[stage])
+      if (stage === 3) return game.enterNode('court', game.scenes.court.start) // заседание: суд уже идёт, переводить нечего
+      await saySaid(game, referred(game, COURT[stage]))
       if (stage === 5) game.unlock('strasbourg')
     },
   },
@@ -46,7 +66,7 @@ export const courtRules: R[] = [
     // ступень 6, когда письмо из Страсбурга уже пришло в День выплаты: решение не объявляется первым
     name: 'Court_Verdict_Lettered', event: 'PlayerMessage', when: [threat, eq(court, 6), eq(paydayScene, 'strasbourg')], bonus: 1,
     remember: [add(count.threat), add(court)],
-    respond: async ({ game }) => { game.unlock('memory'); await saySaid(game, COURT_VERDICT_AFTER_LETTER) },
+    respond: async ({ game }) => { game.unlock('memory'); await saySaid(game, referred(game, COURT_VERDICT_AFTER_LETTER)) },
   },
   {
     // дело прошло все инстанции

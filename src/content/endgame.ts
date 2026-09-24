@@ -1,7 +1,7 @@
 import type { Choice } from '../engine/state'
-import { type Entry, gate, is } from '../engine/rules'
+import { type Entry, type Line, exists, gate, is } from '../engine/rules'
 import { needs } from './world'
-import { met } from './memkeys'
+import { lend50, met } from './memkeys'
 
 export const ENDGAME_GROUP = 'ВЫПЛАТА ЗАКРЫТА ✅ (не выходить)'
 
@@ -545,6 +545,42 @@ export const ENDGAME_FORMALITIES = [
   'Прошу явиться за уведомлением об явке. Явка — обязательная, уведомление — заочное.',
   'Группа прошла сертификацию закрытости. Сертификат выдан, сертификация — закрытая.',
 ]
+
+// «Займи 50»: должник просит у кредитора те самые 50 ₽, и сразу за шуткой — честная просьба поддержать
+// автора (docs/design/lend-50.md). Подводка — три реплики, «Верну» всегда последняя, перед системной строкой.
+export const LEND50_ASK = [
+  'Брат. Слушай сюда. Только не смейся.',
+  'Займи 50 ₽.',
+  'Верну. Ты меня знаешь.',
+]
+/** Вторая партия на этом устройстве: та же просьба, но шутка не должна стать баннером. */
+export const LEND50_ASK_AGAIN = [
+  'Опять я. Опять 50. Это уже традиция, брат.',
+  'Верну. Ты меня знаешь.',
+]
+export const LEND50_CHOICES: Choice[] = [
+  { text: 'Перевёл. Расписку давай', tone: 'polite', act: 'lend50Yes' },
+  { text: 'Алик, ты серьёзно?', tone: 'neutral', act: 'lend50Serious' },
+  { text: 'Не дам', tone: 'neutral', act: 'lend50No' },
+]
+export const LEND50_YES = 'Получил. Уже потратил. Аванс на терпение — тебе же.'
+export const LEND50_NO = ['Понимаю. Я бы тоже себе не дал.', 'Правильно. Воспитал тебя на свою голову.']
+export const LEND50_SERIOUS = 'Серьёзнее, чем про пятницу.'
+/** Нуне — по знакомству: в группе она пишет, только если игрок её знает. */
+export const LEND50_NUNE = 'По ведомости это займ. По совести — подарок. По Алику — ничего.'
+export const LEND50_RENAME = 'ПЛИТОЧНИК — СПОНСОР'
+/** Перевод настоящий и по желанию: об этом говорит игра, а не Алик (docs/design/lend-50.md). */
+export const LEND50_SYS = 'Это настоящий перевод автору игры — через DonationAlerts, сумму выбираете сами. По желанию: в партии он ничего не меняет, и Алик его не вернёт — он же Алик.'
+export const LEND50_LINK = 'https://www.donationalerts.com/r/enikey87'
+/** Описание ачивки — по ответу; до ответа — нейтральное, ачивка ещё не получена. */
+export const LEND50_LOCKED = 'Просьба в группе, где выплата закрыта'
+export const LEND50_DESC: Record<string, string> = {
+  yes: 'Одолжил Алику 50 ₽. Теперь он должен 240 050. Поздравляем с ростом портфеля',
+  no: 'Отказал Алику в 50 ₽. Первый человек, у которого это получилось',
+  serious: 'Спросил Алика, серьёзно ли он. Он ответил. Серьёзно',
+}
+/** Воспоминание требует фактов: звучит в группе после ответа и один раз. */
+export const LEND50_MEMORY: Line[] = [{ t: 'Ты мне, кстати, 50 давал. Или я тебе. Запутался я.', when: [is(lend50.asked), exists(lend50.answer)] }]
 
 export const ENDGAME_JUBILEES: Record<number, string> = {
   10: 'Десять формальностей! Теперь это уже традиция.',

@@ -159,7 +159,7 @@ describe('День выплаты', () => {
     const n = game.S.msgs.length
     await choose(game, 'refuse')
     const out = texts(game, n).join('\n')
-    expect(out).toMatch(/они услышали «по рублю»/)
+    expect(out).toMatch(/родня услышала «по рублю»/)
     expect(out).toMatch(/К выплате: 180\s500 ₽/) // 239 000 − 39 000 − 19 500
   })
   it('доля и перекличка Самвела/Карине уместны только после знакомства', () => {

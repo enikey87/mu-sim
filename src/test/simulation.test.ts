@@ -11,26 +11,29 @@ interface Step { choice: Choice | null; ctxBefore: Ctx | null; mourning: boolean
 async function play(seed: number, turns: number) {
   const { game } = makeGame({ seed })
   const steps: Step[] = []
+  // эндгейм намеренно гоняет формальности по кругу (#190) — дубли после закрытия концовки не считаем
+  let beforeEndgame = Infinity
   for (let i = 0; i < turns; i++) {
     const ctxBefore = game.S.ctx ? { ...game.S.ctx } : null
     const mourning = game.holds(WORLD.mourning)
     const from = game.S.msgs.length
     const choice = await botTurn(game)
+    if (game.S.mem['endgame.active'] && beforeEndgame === Infinity) beforeEndgame = game.S.msgs.length
     steps.push({ choice, ctxBefore, mourning, replies: alikTexts(game.S.msgs.slice(from)) })
   }
-  return { game, steps }
+  return { game, steps, beforeEndgame }
 }
 
 describe.each([1, 2, 3])('симуляция, seed %i', (seed) => {
   it('300 ходов без ошибок, повторов и нелогичных ответов', async () => {
-    const { game, steps } = await play(seed, 300)
+    const { game, steps, beforeEndgame } = await play(seed, 300)
 
     // 1. нет мусора в текстах
     const all = JSON.stringify(game.S.msgs)
     expect(all).not.toMatch(/undefined|NaN|\[object|null,"t|г\.\./)
 
     // 2. реплики Алика не повторяются (исправления опечаток — естественно повторяются)
-    const texts = alikTexts(game.S.msgs).filter((t) => !FIX_RE.test(t))
+    const texts = alikTexts(game.S.msgs.slice(0, beforeEndgame)).filter((t) => !FIX_RE.test(t))
     const dups = texts.filter((t, i) => texts.indexOf(t) !== i)
     expect(dups).toEqual([])
 

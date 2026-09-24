@@ -8,13 +8,13 @@ import { manualClock } from '../engine/clock'
 import { seededRng } from '../engine/rng'
 import { specificityOf, lineId, spec } from '../engine/rules'
 import { MEMORY } from '../content/memory'
-import { RARE, RARE_ALL } from './rare'
+import { RARE } from './rare'
 import { PROVEN } from './proven'
 import { botTurn } from './bot'
 
 /**
  * Почему правило не сработало в симуляции.
- * `rare` — RARE / RARE_FLAKY (прямой случай в rare.test.ts).
+ * `rare` — RARE (прямой случай в rare.test.ts; членство — по широкому замеру).
  * `proven` — явное доказательство вне статистики (прямой тест или структурная недостижимость).
  * Больше нет освобождения по имени модуля или префиксу.
  */
@@ -28,7 +28,7 @@ export const COVERAGE_SAMPLES: number[][] = [
 ]
 
 export const neverClass = (name: string): NeverClass =>
-  RARE_ALL.has(name) ? 'rare' : name in PROVEN ? 'proven' : 'unexplained'
+  RARE.has(name) ? 'rare' : name in PROVEN ? 'proven' : 'unexplained'
 
 /** Где именно правило проверяется, если симуляция до него не доходит. */
 const NEVER_HINT: Record<NeverClass, string> = {
@@ -54,8 +54,6 @@ export interface MultiCoverage {
   samples: CoverageReport[]
   /** Ни разу ни в одной выборке — настоящая недостижимость для гейта. */
   never: string[]
-  /** Записи RARE, до которых стенд всё-таки дошёл: им место в RARE_FLAKY или под сторожем. */
-  rareReached: string[]
 }
 
 /** Пересечение «никогда»: имя есть в каждом списке never. */
@@ -65,10 +63,88 @@ export function neverInAllSamples(sampleNevers: string[][]): string[] {
   return sampleNevers[0].filter((name) => rest.every((s) => s.has(name)))
 }
 
-/** Записи RARE, которых нет в «ни разу ни в одной выборке»: стенд до правила дошёл. */
-export function rareReached(never: Iterable<string>, rare: Iterable<string> = RARE): string[] {
-  const neverSet = new Set(never)
-  return [...rare].filter((n) => !neverSet.has(n))
+/**
+ * Широкий замер (tools/coverage-measure.json, пишет `npm run rules:stable`): по правилу — срабатывания в каждом
+ * из пакетов по 16 партий. Решает, кому место в исключениях гейта, — вместо трёх выборок самого гейта, где
+ * граница «редкое / нет» мигала от любой правки текста.
+ */
+export interface Measure { packs: number[][]; rules: Record<string, number[]> }
+/** Доля пакетов, где правило не сработало ни разу. */
+export const zeroShare = (v: readonly number[]): number => v.filter((x) => x === 0).length / v.length
+/**
+ * Граница исключений с гистерезисом (z — доля пакетов замера, где правило молчит). Единственное место порога
+ * (#208): документ и тесты читают отсюда. Исключение (RARE / PROVEN) допустимо, только если стенд молчит хоть
+ * в одном пакете (z ≥ allowed: «достигает не всегда»), и обязательно при z ≥ required. Между ними — решает
+ * автор: иначе правило на границе мигало бы от одного перемера к другому. Правка текста без `rules:stable`
+ * списки не трогает — граница держится на закоммиченном снимке, а не на трёх выборках CI.
+ */
+export const RARE_ZERO_SHARE = { allowed: 0.1, required: 0.3 } as const
+
+/** Расхождения исключений с замером: исключение, которое стенд достигает почти всегда; редкое правило без исключения; пропуски. */
+export function exemptionIssues(m: Measure, exempt: ReadonlySet<string>, names: readonly string[]): string[] {
+  const issues: string[] = []
+  const known = new Set(names)
+  for (const n of Object.keys(m.rules)) if (!known.has(n)) issues.push(`${n}: в замере, но такого правила нет — перемерить (npm run rules:stable)`)
+  for (const n of exempt) {
+    const v = m.rules[n]
+    if (!v) issues.push(`${n}: исключение без замера — перемерить (npm run rules:stable)`)
+    else if (zeroShare(v) < RARE_ZERO_SHARE.allowed) {
+      // устаревший снимок после чужого PR тоже даёт z=0 — сначала перемерить, не «снять» (#208 / аудит #170)
+      issues.push(`${n}: исключение, а стенд доходит всегда (${v.join('/')}) — снять или перемерить (npm run rules:stable)`)
+    } else if (
+      // полоса гистерезиса без нуля в пакетах CI: один ноль в пакете 5+ превращает всегда-достижимое в «исключение» (#230)
+      zeroShare(v) < RARE_ZERO_SHARE.required
+      && v.length >= COVERAGE_SAMPLES.length
+      && v.slice(0, COVERAGE_SAMPLES.length).every((x) => x > 0)
+    ) {
+      issues.push(`${n}: исключение в полосе гистерезиса без нуля в пакетах CI (${v.join('/')}) — снять или перемерить (npm run rules:stable)`)
+    }
+  }
+  for (const [n, v] of Object.entries(m.rules)) if (known.has(n) && !exempt.has(n) && zeroShare(v) >= RARE_ZERO_SHARE.required) issues.push(`${n}: редкое (${v.join('/')}) и без исключения — гейт будет мигать; в RARE с прямым случаем`)
+  return issues
+}
+
+/** Первые пакеты снимка — те же сиды, что у гейта CI; иначе сверка с замером смотрит мимо прогона. */
+export function measurePackIssues(m: Measure): string[] {
+  const issues: string[] = []
+  if (m.packs.length < COVERAGE_SAMPLES.length) {
+    issues.push(`снимок: пакетов ${m.packs.length}, нужно ≥${COVERAGE_SAMPLES.length} — перемерить (npm run rules:stable)`)
+    return issues
+  }
+  for (let i = 0; i < COVERAGE_SAMPLES.length; i++) {
+    if (JSON.stringify(m.packs[i]) !== JSON.stringify(COVERAGE_SAMPLES[i])) {
+      issues.push(`снимок: пакет ${i} ≠ COVERAGE_SAMPLES — перемерить (npm run rules:stable)`)
+    }
+  }
+  return issues
+}
+
+/**
+ * Подделка / устаревание снимка по колонкам CI: в JSON ноль, а живой гейт на тех же сидах правило видел
+ * во **всех** выборках CI (не в одной — иначе правка текста, сдвигающая розыгрыш, даёт ложные «подделки», #230).
+ * Пакеты 3+ этой сверкой не ловятся: их нули для полосы гистерезиса режет `exemptionIssues` (нужен ноль в CI).
+ *
+ * Сторож **не** стоит на пути гейта CI (#208, #230): там сверка идёт со снимком, а живой дрейф редких правил
+ * между замерами не краснеет — иначе каждая правка текста требовала бы перемера. Вызов с живыми выборками —
+ * в unit-случае; кому этого мало, тот ставит его в `tools.test.ts` и платит перемерами (#198).
+ */
+export function measureCiForgeIssues(
+  m: Measure,
+  live: ReadonlyArray<{ fired: Record<string, number> }>,
+): string[] {
+  const issues: string[] = []
+  const nPacks = Math.min(COVERAGE_SAMPLES.length, live.length, m.packs.length)
+  for (const [n, v] of Object.entries(m.rules)) {
+    const alwaysLive = live.length >= nPacks && live.slice(0, nPacks).every((s) => (s.fired[n] ?? 0) > 0)
+    if (!alwaysLive) continue
+    for (let i = 0; i < nPacks; i++) {
+      const snap = v[i] ?? 0
+      if (snap === 0) {
+        issues.push(`${n}: снимок пакета ${i} = 0, гейт видел во всех выборках CI — перемерить (npm run rules:stable)`)
+      }
+    }
+  }
+  return issues
 }
 
 /** grumpy — номера партий (с конца), где бот много грубит: иначе лестница грубости не проходится. */
@@ -118,7 +194,7 @@ export async function multiSampleCoverage(
   const reports: CoverageReport[] = []
   for (const seeds of samples) reports.push(await ruleCoverage(seeds, turns, undefined, grumpy, opts))
   const never = neverInAllSamples(reports.map((r) => r.never))
-  return { samples: reports, never, rareReached: rareReached(never) }
+  return { samples: reports, never }
 }
 
 export function formatCoverage(r: CoverageReport): string {

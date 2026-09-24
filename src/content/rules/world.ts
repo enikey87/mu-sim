@@ -1,6 +1,7 @@
 // Правила новых возможностей: выбор сцен, наступившие обещания, хор персонажей, состояния мира.
 import type { Game } from '../../engine/game'
 import { type Rule, type Facts, type Entry, eq, ne, gte, lte, is, add, of, missing } from '../../engine/rules'
+
 import type { GameEvent, Offer } from './events'
 import { WORLD, SPEAKS } from '../world'
 import { CHORUS_LEGEND } from '../legends'
@@ -61,7 +62,7 @@ const dueLine = (game: Game, f: Facts, key: string, arr: readonly Entry<string>[
   return game.uniq(() => `${game.X.g('ADDR')}, ${game.X.fill(game.draw(key, arr), { t: p.t })}`)
 }
 // срок актуален: обещание есть и его не «переписали» в когда-нибудь
-const live = { key: 'promiseLive', op: '==' as const, value: true }
+const live = eq('promiseLive', true)
 export const promiseRules: R[] = [
   {
     // не через ход: наступивший срок — событие, а не фон
@@ -78,13 +79,13 @@ export const promiseRules: R[] = [
     respond: async ({ game, facts }) => {
       await game.say([dueLine(game, facts, 'DUE_KEPT', PROMISE_DUE_KEPT)])
       await game.transfer()
-      // сдержал (на 50 ₽) — в журнале больше не «просрочено», упрекать нечем
+      // сдержал (на 50 ₽) — в журнале больше не «просрочено», упрекать нечем; `kept` — чтобы досье не звало это «припомнил»
       const p = game.S.promises[Number(facts.promise)]
-      if (p) p.asked = true
+      if (p) { p.asked = true; p.kept = true }
     },
   },
   {
-    name: 'Condition_Met', event: 'PromiseConditionMet', when: [live], priority: 'chatter',
+    name: 'Condition_Met', event: 'PromiseConditionMet', when: [live, missing(alikDead)], priority: 'chatter',
     respond: async ({ game, facts }) => { await game.say([dueLine(game, facts, 'MET', PROMISE_MET)]) },
   },
 ]

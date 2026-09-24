@@ -1,36 +1,25 @@
-// RARE — два списка правил, которые статистический гейт покрытия сторожить не может. У обоих одна
-// страховка: прямой случай в src/content/rules/rare.test.ts, и он же — условие пребывания в списке
-// (машина сверяет, что случай есть и что он срабатывает).
+// RARE — правила, которые стенд покрытия (3 выборки × 16 партий в CI) достигает не каждый раз: гейт их
+// сторожить не может, их сторожит прямой случай в src/content/rules/rare.test.ts.
 //
-//   RARE       — стенд не дошёл НИ В ОДНОЙ выборке: 0 срабатываний за 48 партий, раз за разом.
-//   RARE_FLAKY — стенд доходит не в каждой выборке: состояние — окно (свадьба, сцена, квест) или
-//                таймер, за выборку 0–2 срабатывания, и в какой-то выборке их нет вовсе.
-//
-// Границы держит машина (tools.test.ts): запись из RARE, сработавшая хоть где-то, — красная
-// (стенд до неё дошёл: её место в RARE_FLAKY, если она редкая, или под сторожем, если нет);
-// правило вне обоих списков и вне классов, не сработавшее ни в одной выборке, — красная
-// (`unexplained`). Редкое правило называют здесь, а не пропускают молча.
-//
-// У FLAKY проверка слабее, и это осознанно: «стенд доходит через раз» неотличимо от «не дошёл
-// в этот раз» — по замерам 48 партий правила обоих списков срабатывают 0–3 раза за выборку, а
-// достижимые 4 и больше, поэтому порог по числу срабатываний встал бы на самой полосе и мигал бы
-// от сдвига розыгрыша. FLAKY сторожит не наблюдение, а прямой случай — то же, чем сторожатся
-// правила из PROVEN (tools/proven.ts).
+// Кому место в списке, решает не гейт CI, а широкий замер (tools/coverage-measure.json, `npm run rules:stable`):
+// граница — RARE_ZERO_SHARE в coverage.ts (allowed / required). Сверяет машина в обе стороны (tools.test.ts):
+// запись, до которой стенд доходит почти всегда, — красная; редкое правило вне списка — тоже. Правка текста
+// без перемера списки не двигает (#208): граница на снимке, не на трёх выборках CI.
 export const RARE = new Set([
-  // 0 срабатываний за 48 партий во всех замерах: «Мууу» на слово игрока, ловля на лжи, смерть
-  'Tone_Cow',
-  'Says_catchLie_liekind_customer', 'Says_catchLie_caught3',
-  'Turn_WhileDead', 'Says_OtherArcWhileDead',
+  // 0 срабатываний во всех пакетах: «Мууу» на слово игрока, ловля на лжи, смерть, пачка при пропаже, письмо Страсбурга
+  'Tone_Cow', 'Says_catchLie_liekind_customer', 'Says_catchLie_caught3', 'Turn_WhileDead', 'Says_OtherArcWhileDead',
+  'Away_Offline', 'Court_Verdict_Lettered',
+  // окно состояния или счётчик, который складывается не в каждой партии
+  'Opt_Cow', 'Says_catchLie_caught2', 'Says_catchLie_liekind_grandpa',
+  'Turn_Wedding_Samvel', 'Turn_Wedding_Razmik', 'Turn_Wedding_Boris', 'Turn_BorisSick', 'Quest_q_niva',
+  'Says_sorry_blocked_boris',
+  // частные финалы и концовки по стилю партии (z ≥ required; после #190 бот закрывает концовку)
+  'Finale_grant_ally', 'Finale_alik_death_will', 'Finale_beton_corner', 'Finale_beton_opened_or',
+  'Finale_garik_cutter', 'Finale_razmik_shift_or', 'Finale_rubik_bribe',
+  'Ending_alik', 'Ending_heir', 'Chorus_garik_FedUp',
+  // ответы/тона, которые бот редко складывает
+  'Says_condole_ctxrevived', 'Says_prev_ThickJournal', 'Says_sorry_blocked_karine', 'Says_sorry_sorrySwing3',
+  'Says_via_boris', 'Says_WhileOffline', 'Scene_lend', 'Tone_WhileBlocked',
+  // экран концовки выплаты открыт мгновение — PromiseDue успевает редко (#190)
+  'Quiet_PaydayOpen_PromiseDue',
 ])
-
-export const RARE_FLAKY = new Set([
-  // «Это корова?» и пачка непрочитанных: не в каждой выборке состояние складывается
-  'Opt_Cow', 'Away_Offline',
-  // ловля на лжи: вторая ступень счётчика; ложь про дедушку — с тех пор как отмазки из пачки попадают в бухгалтерию (#101)
-  'Says_catchLie_caught2', 'Says_catchLie_liekind_grandpa',
-  // окно состояния: свадьба Самвела / Размика / Бориса, сцена «жена», квест «Нива», вердикт после письма
-  'Turn_Wedding_Samvel', 'Turn_Wedding_Razmik', 'Turn_Wedding_Boris', 'Scene_wife', 'Quest_q_niva', 'Court_Verdict_Lettered',
-])
-
-/** Оба списка вместе: для классов «не сработало» — и для прямых случаев в rare.test.ts. */
-export const RARE_ALL: ReadonlySet<string> = new Set([...RARE, ...RARE_FLAKY])

@@ -6,12 +6,17 @@ import { PhotoSvg } from './PhotoSvg'
 /** Счётчик рендеров Message — только в test. */
 export const messageRenderStats = { count: 0 }
 
+/** Ссылка в системной строке — настоящая: вкладка открывается рядом, игра остаётся открытой. */
+const linkified = (text: string) => text.split(/(https?:\/\/\S+)/).map((part, i) => (i % 2
+  ? <a key={i} href={part} target="_blank" rel="noopener">{part}</a>
+  : part))
+
 /** Одно сообщение чата: разделитель даты, системное или пузырь (текст, перевод, голосовое, стикер…). */
 export const Message = memo(function Message({ m }: { m: Msg }) {
   if (import.meta.env.MODE === 'test') messageRenderStats.count++
   const game = useGameApi()
   if (m.kind === 'sep') return <div className="sep">{m.text}</div>
-  if (m.kind === 'sys') return <div className={'sys' + (m.unread ? ' unread' : '')}>{m.text}</div>
+  if (m.kind === 'sys') return <div className={'sys' + (m.unread ? ' unread' : '')}>{linkified(m.text)}</div>
 
   const cls = ['msg', m.from]
   if (m.kind === 'text' && m.legend) cls.push('legend')

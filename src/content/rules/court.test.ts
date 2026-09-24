@@ -1,7 +1,7 @@
 // Линия суда: каждая угроза — следующая ступень, заседание — сцена с выбором, потом апелляция и Страсбург.
 import { describe, it, expect } from 'vitest'
 import { makeGame } from '../../test/helpers'
-import { COURT, COURT_AFTER, COURT_LAWYER_AGAIN } from '../quests'
+import { COURT, COURT_AFTER, COURT_LAWYER_AGAIN, COURT_VERDICT_AFTER_LETTER } from '../quests'
 import { valueOf } from '../../engine/rules'
 import { THREAT_AGAIN } from '../misc'
 import type { Game } from '../../engine/game'
@@ -47,11 +47,85 @@ describe('линия суда', () => {
     for (const [, line] of COURT_LAWYER_AGAIN) expect(t).toContain(line)
     expect(t.join(' ')).not.toMatch(/Здравствуйте, это Арсен/)
   })
+  it('перевод звучит и на ветках: Арсен уже писал и вердикт после письма Страсбурга', async () => {
+    // Court_Lawyer_Again: Арсен знаком, ступень 1
+    const { game } = makeGame()
+    await game.enterNode('nephew', 'start')
+    game.S.scene = null
+    game.S.mem.court = 1
+    game.S.mem['threat.claim'] = 'tax'
+    const again = await threat(game)
+    expect(again.r).toBe('Court_Lawyer_Again')
+    expect(again.t[0]).toBe(`Налоговая? Налоговая сказала — это в суд. ${COURT_LAWYER_AGAIN[0][1]}`)
+    // Court_Verdict_Lettered: ступень 6 и письмо Страсбурга в День выплаты
+    const { game: g2 } = makeGame()
+    g2.S.mem.court = 6
+    g2.S.mem.payday = 'strasbourg'
+    g2.S.mem['threat.claim'] = 'collectors'
+    const lettered = await threat(g2)
+    expect(lettered.r).toBe('Court_Verdict_Lettered')
+    expect(lettered.t[0]).toBe(`Коллекторы? Коллекторы сказали — это в суд. ${COURT_VERDICT_AFTER_LETTER[0][1]}`)
+  })
+
+  it('без Court_Lawyer_Again при знакомстве с Арсеном побеждает общая ступень', async () => {
+    const { game } = makeGame()
+    await game.enterNode('nephew', 'start')
+    game.S.scene = null
+    game.S.mem.court = 1
+    const again = game.rules.all.find((x) => x.name === 'Court_Lawyer_Again')!
+    const when = again.when
+    again.when = [{ key: '__never__', op: '==', value: true }]
+    try {
+      // Court_Lawyer закрыт intro.arsen; без Again остаётся общая ступень
+      expect((await threat(game)).r).toBe('Court_Step')
+    } finally { again.when = when }
+  })
   it('в разгар ссоры угроза — встречный иск (один раз), линия суда не сбивается', async () => {
     const { game } = makeGame()
     game.S.mem['rude.heat'] = 3
     expect((await threat(game)).r).toBe('Tone_Threat_Hot')
     expect((await threat(game)).r).toBe('Court_Start')
+  })
+  it('не судебная инстанция переводится в суд её же словами — в той ступени, которую вызвала', async () => {
+    const { game } = makeGame()
+    game.S.mem.court = 1
+    game.S.mem['threat.claim'] = 'police'
+    const { r, t } = await threat(game)
+    expect(r).toBe('Court_Lawyer')
+    expect(t[0]).toBe(`Полиция? Полиция сказала — это в суд. ${COURT[1][0][1]}`)
+    expect(t).toContain(COURT[1][1][1]) // реплика Арсена не тронута
+    game.S.mem.court = 2
+    game.S.mem['threat.claim'] = 'tax'
+    const step = await threat(game)
+    expect(step.r).toBe('Court_Step')
+    expect(step.t[0]).toBe(COURT[2][0][1]) // первая реплика ступени — Арсена, перевод её не касается
+    expect(step.t[1]).toBe(`Налоговая? Налоговая сказала — это в суд. ${COURT[2][1][1]}`)
+  })
+  it('судебная угроза и угроза без инстанции ступеней не меняют', async () => {
+    for (const claim of ['court', undefined]) {
+      const { game } = makeGame()
+      game.S.mem.court = 1
+      if (claim) game.S.mem['threat.claim'] = claim
+      const { t } = await threat(game)
+      expect(t, String(claim)).toEqual(COURT[1].map(([, line]) => line))
+      expect(game.S.mem['court.referral']).toBeUndefined()
+    }
+  })
+  it('перевод звучит один раз на инстанцию: повтор молчит, другая инстанция — снова', async () => {
+    const { game } = makeGame()
+    game.S.mem.court = 1
+    game.S.mem['threat.claim'] = 'police'
+    expect((await threat(game)).t[0]).toMatch(/^Полиция\?/)
+    game.S.mem['threat.claim'] = 'police'
+    expect((await threat(game)).t).toEqual(COURT[2].map(([, line]) => line)) // вторая ступень — без повтора шутки
+    game.S.mem['threat.claim'] = 'collectors'
+    expect((await threat(game)).r).toBe('Court_Step') // ступень-заседание: сцена, перевода нет
+    expect(game.S.scene?.id).toBe('court')
+    expect(game.S.mem['court.referral']).toBe('police') // инстанция не зачтена — переведём её на следующей ступени
+    game.S.choices = null
+    await game.send(game.choices.find((c) => c.go === 'screens')!)
+    game.S.mem['threat.claim'] = 'collectors'
+    expect((await threat(game)).t[0]).toBe(`Коллекторы? Коллекторы сказали — это в суд. ${COURT[4][0][1]}`)
   })
   it('после письма Страсбурга в День выплаты — отдельный вердикт, не общая ступень', async () => {
     const { game } = makeGame()
@@ -60,5 +134,16 @@ describe('линия суда', () => {
     const { r, t } = await threat(game)
     expect(r).toBe('Court_Verdict_Lettered')
     expect(t.join(' ')).toMatch(/Страсбург|письм/i)
+  })
+  it('без Court_Verdict_Lettered ступень 6 с письмом отвечает общая ступень', async () => {
+    const { game } = makeGame()
+    game.S.mem.court = 6
+    game.S.mem.payday = 'strasbourg'
+    const lettered = game.rules.all.find((x) => x.name === 'Court_Verdict_Lettered')!
+    const when = lettered.when
+    lettered.when = [{ key: '__never__', op: '==', value: true }]
+    try {
+      expect((await threat(game)).r).toBe('Court_Step')
+    } finally { lettered.when = when }
   })
 })

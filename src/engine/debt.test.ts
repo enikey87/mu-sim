@@ -1,46 +1,14 @@
-import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
-import { makeGame } from '../test/helpers'
+import { makeGame, memStorage } from '../test/helpers'
+import { fieldWrites, inMethod, sources } from '../test/field'
+import type { Game } from './game'
+import { loadState, saveState, SAVE_KEY, type GameState, type Msg } from './state'
 
-// Долг пишет только Game.adjustDebt. Прямую запись `S.debt = …` не пропускает тип (readonly в GameState);
-// этот страж ловит то, что тип пропускает: запись через переменную без readonly, Object.assign, defineProperty, Reflect.set.
-const walk = (dir: string): string[] =>
-  readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]))
-const sources = walk('src').filter((f) => /\.tsx?$/.test(f) && !/\.test\./.test(f) && !f.startsWith(join('src', 'test')))
-
-/** Скобки и приведения не меняют, куда идёт запись: ((S as X).debt)++ — та же запись. */
-const bare = (n: ts.Node): ts.Node => (ts.isParenthesizedExpression(n) || ts.isNonNullExpression(n) || ts.isAsExpression(n) || ts.isSatisfiesExpression(n) || ts.isTypeAssertionExpression(n) ? bare(n.expression) : n)
-const isDebtKey = (n: ts.Node) => { const k = bare(n); return ts.isStringLiteralLike(k) && k.text === 'debt' }
-const isDebt = (x: ts.Node): boolean => {
-  const n = bare(x)
-  return (ts.isPropertyAccessExpression(n) && n.name.text === 'debt') || (ts.isElementAccessExpression(n) && isDebtKey(n.argumentExpression))
-}
-const hasDebtKey = (n: ts.Node | undefined): boolean =>
-  !!n && ((ts.isStringLiteralLike(n) && n.text === 'debt') ||
-    (ts.isObjectLiteralExpression(n) && n.properties.some((p) => (p.name && ts.isIdentifier(p.name) && p.name.text === 'debt') || (p.name && ts.isStringLiteralLike(p.name) && p.name.text === 'debt') || ts.isSpreadAssignment(p))))
-const WRITERS = new Set(['Object.assign', 'Object.defineProperty', 'Object.defineProperties', 'Reflect.set', 'Reflect.defineProperty'])
-
-/** Места записи долга в файле: «файл:строка». */
-function debtWrites(file: string, allowAdjust = true): string[] {
-  const src = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
-  const out: string[] = []
-  const at = (n: ts.Node) => out.push(`${file}:${src.getLineAndCharacterOfPosition(n.getStart()).line + 1}`)
-  const targets = (n: ts.Node): boolean => isDebt(n) || ((ts.isObjectLiteralExpression(n) || ts.isArrayLiteralExpression(n) || ts.isPropertyAssignment(n) || ts.isShorthandPropertyAssignment(n) || ts.isSpreadElement(n) || ts.isSpreadAssignment(n)) && (ts.forEachChild(n, (c) => targets(c) || undefined) ?? false))
-  const visit = (n: ts.Node, inAdjust: boolean): void => {
-    const here = inAdjust || (allowAdjust && ts.isMethodDeclaration(n) && n.name.getText(src) === 'adjustDebt' && file === join('src', 'engine', 'game.ts'))
-    if (!here) {
-      if (ts.isBinaryExpression(n) && n.operatorToken.kind >= ts.SyntaxKind.FirstAssignment && n.operatorToken.kind <= ts.SyntaxKind.LastAssignment && targets(n.left)) at(n)
-      if ((ts.isPrefixUnaryExpression(n) || ts.isPostfixUnaryExpression(n)) && [ts.SyntaxKind.PlusPlusToken, ts.SyntaxKind.MinusMinusToken].includes(n.operator) && isDebt(n.operand)) at(n)
-      if (ts.isDeleteExpression(n) && isDebt(n.expression)) at(n)
-      if (ts.isCallExpression(n) && WRITERS.has(n.expression.getText(src)) && n.arguments.slice(1).some(hasDebtKey)) at(n)
-    }
-    ts.forEachChild(n, (c) => visit(c, here))
-  }
-  visit(src, false)
-  return out
-}
+// Долг пишет только Game.adjustDebt: прямую запись `S.debt = …` не пропускает тип (readonly в GameState),
+// а разбор `test/field.ts` ловит то, что тип пропускает (переменную, Object.assign, defineProperty, Reflect.set).
+const game = join('src', 'engine', 'game.ts')
+const debtWrites = (file: string, allowAdjust = true) => fieldWrites(file, 'debt', allowAdjust ? inMethod(game, 'adjustDebt') : undefined)
 
 describe('долг: одна точка записи', () => {
   it('страж видит исходники и единственную законную запись', () => {
@@ -92,5 +60,117 @@ describe('долг: одна точка записи', () => {
     await game.enterNode('meet', 'cafe3')
     expect(game.S.debt).toBe(debt - 10000 + 1800)
     expect(game.S.msgs.some((m) => m.kind === 'sys' && /Долг Алика вырос на 1 800/.test(m.text))).toBe(true)
+  })
+})
+
+// Аудит #142, п. 2: флаг «долг сдвинулся» охранялся на двух видах эффекта из пяти. Каждый вид —
+// выплата серии, бартер, счёт — объявляет движение долга ровно тогда, когда оно случилось.
+describe('долг: объявление звучит ровно тогда, когда долг сдвинулся', () => {
+  const sys = (g: Game): string => g.S.msgs.filter((m) => m.kind === 'sys').map((m) => m.text).join(' ')
+  const sealed = (g: Game): Game => { g.S.mem.payday = 'default'; return g }
+
+  it('выплата серии: до выплаты — перевод и объявление, после — ни того, ни другого', async () => {
+    const { FINALES } = await import('../content/finales')
+    const pay = FINALES.boris.find((f) => f.fx?.pay === 500)!
+    const { game } = makeGame()
+    const debt = game.S.debt
+    await game.playEpisode(pay, 'boris')
+    expect(game.S.debt).toBe(debt - 500)
+    expect(sys(game)).toMatch(/перевёл 500/)
+
+    const { game: after } = makeGame()
+    const sealedDebt = sealed(after).S.debt
+    await after.playEpisode(pay, 'boris')
+    expect(after.S.debt).toBe(sealedDebt)
+    expect(sys(after)).not.toMatch(/перевёл/)
+  })
+
+  it('бартер: до выплаты объявляет зачтённую сумму, после — молчит и долг не двигает', async () => {
+    const { game } = makeGame()
+    const debt = game.S.debt
+    await game.enterNode('barter', 'take')
+    const moved = debt - game.S.debt
+    expect(moved).toBeGreaterThan(0)
+    // сообщение называет ту же сумму, что вычлась из долга: число закрывается числом
+    expect(sys(game)).toContain(`Долг уменьшился на ${moved.toLocaleString('ru-RU')} ₽`)
+
+    const { game: after } = makeGame()
+    const sealedDebt = sealed(after).S.debt
+    await after.enterNode('barter', 'take')
+    expect(after.S.debt).toBe(sealedDebt)
+    expect(sys(after)).not.toMatch(/Долг уменьшился/)
+  })
+
+  it('взаимозачёт: до выплаты списывает итог акта, после — нет', async () => {
+    const { game } = makeGame()
+    const debt = game.S.debt
+    await game.enterNode('invoice', 'ask')
+    const doc = game.S.msgs.find((m): m is Extract<Msg, { kind: 'doc' }> => m.kind === 'doc')
+    expect(doc?.total).toBeGreaterThan(0)
+    expect(debt - game.S.debt).toBe(doc!.total) // списали ровно то, что стоит в акте
+
+    const { game: after } = makeGame()
+    const sealedDebt = sealed(after).S.debt
+    await after.enterNode('invoice', 'ask')
+    expect(after.S.debt).toBe(sealedDebt)
+  })
+
+  it('отказ после выплаты не двигает и календарь (#189): неделя финала идёт только с долгом', async () => {
+    const { FINALES } = await import('../content/finales')
+    const cutter = FINALES.garik.find((f) => f.id === 'cutter')!
+    const { game } = makeGame()
+    const day = game.S.day
+    await game.playEpisode(cutter, 'garik')
+    expect(game.S.day).toBe(day + 7)
+    expect(sys(game)).toMatch(/Неделя на выковыривании/)
+
+    const { game: after } = makeGame()
+    const sealedDay = sealed(after).S.day
+    await after.playEpisode(cutter, 'garik')
+    expect(after.S.day).toBe(sealedDay)
+    expect(sys(after)).not.toMatch(/Неделя на выковыривании/)
+  })
+})
+
+// Обходы, которые аудит #142 нашёл у прежнего стража («все семь проходят и компилятор, и тест»).
+// Теперь у счёта геттер без сеттера (state.ts), а состояние игры — readonly: форма либо не компилируется,
+// либо бросает, не меняя долг. Контроль на каждую форму — этот блок.
+describe('долг: геттер без сеттера', () => {
+  it('шесть форм записи бросают и долг не меняют', () => {
+    const { game } = makeGame()
+    const debt = game.S.debt
+    const S = game.S as unknown as Record<string, unknown>
+    const patch = { debt: 0 }
+    const asg = Object.assign
+    const tries: Array<[string, () => void]> = [
+      ['Object.assign с патчем-переменной', () => { Object.assign(S, patch) }],
+      ['Object.assign с вычисляемым ключом', () => { Object.assign(S, { ['debt']: 0 }) }],
+      ['запись по ключу-переменной', () => { const k = 'debt'; (S as Record<string, number>)[k] = 0 }],
+      ['переименованный Object.assign', () => { asg(S, { debt: 0 }) }],
+      ['Object.entries/forEach по состоянию', () => { Object.entries(S).forEach(([k, v]) => { S[k] = v }) }],
+    ]
+    for (const [name, run] of tries) expect(run, name).toThrow(TypeError)
+    // Reflect.set не бросает — возвращает false и не пишет
+    expect(Reflect.set(S, 'debt', 0)).toBe(false)
+    expect(Reflect.set(S, 'de' + 'bt', 0)).toBe(false)
+    expect(game.S.debt).toBe(debt)
+  })
+
+  it('сохранение: счёт переживает запись и загрузку и остаётся только на чтение', () => {
+    const storage = memStorage()
+    const { game } = makeGame({ storage })
+    game.adjustDebt(-1000)
+    saveState(storage, game.S)
+    expect(storage.data[SAVE_KEY]).toContain('"debt"') // геттер enumerable: значение уезжает в сейв
+    const loaded = loadState(storage)!
+    expect(loaded.debt).toBe(game.S.debt)
+    expect(Object.getOwnPropertyDescriptor(loaded, 'debt')!.set).toBeUndefined()
+    expect(() => { (loaded as { debt: number }).debt = 0 }).toThrow(TypeError)
+  })
+
+  it('замена состояния на новое не компилируется', () => {
+    // @ts-expect-error S readonly: подменить состояние целиком — не выражение языка
+    const replace = (g: Game, s: GameState): void => { g.S = { ...s, debt: 0 } }
+    expect(replace).toBeTypeOf('function')
   })
 })

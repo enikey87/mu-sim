@@ -381,6 +381,17 @@ describe('RuleSet.fire', () => {
     expect((await rs.fire({ log: [] }, { event: 'E' }, (x) => ({ ...x })))?.name).toBe('Speaks')
     expect(seen).toEqual(['до Silent: {}', 'после Silent: {}', 'до Speaks: {}'])
   })
+  it('onRespond: true до ответа, false после молчания', async () => {
+    const { rs, game, factsFor } = mk()
+    const outcomes: Array<[string, boolean]> = []
+    rs.onRespond = (r, ok) => outcomes.push([r.name, ok])
+    rs.add(
+      { name: 'Silent', event: 'E', when: [], specificity: 2, respond: () => false },
+      { name: 'Speaks', event: 'E', when: [], respond: () => { game.log.push('ok') } },
+    )
+    await rs.fire(game, { event: 'E' }, factsFor)
+    expect(outcomes).toEqual([['Silent', true], ['Silent', false], ['Speaks', true]])
+  })
   it('во время ответа тот же факт переписали — откат чужую запись не трогает', async () => {
     const { rs, game, factsFor, world } = mk()
     rs.add({

@@ -1,7 +1,7 @@
 // Несостыковки из партии пользователя (docs/PLAYTEST_ISSUES.md): каждая — тестом, чтобы не вернулась.
 import { describe, it, expect } from 'vitest'
 import type { GameEvent } from './rules/events'
-import { makeGame } from '../test/helpers'
+import { makeGame , setMoney} from '../test/helpers'
 import { ARCS, GROUP } from './arcs'
 import { D } from './excuses'
 import { ENDGAME_RETURNERS } from './endgame'
@@ -49,7 +49,11 @@ describe('несостыковки из партии пользователя', 
     game.S.items.push('Место на кране (40 м)')
     game.S.stats.sent = 20
     const n = game.S.msgs.length
-    for (let i = 0; i < 12 && !texts(game, n).some((t) => /отдал тебе/.test(t)); i++) { game.S.rules.cooldown = {}; await game.fire('AlikTurn') }
+    for (let i = 0; i < 20 && !texts(game, n).some((t) => /отдал тебе/.test(t)); i++) {
+      game.S.rules.cooldown = {}
+      game.S.scene = null // квест/сцена иначе поднимает floor и глушит Turn_Memory
+      await game.fire('AlikTurn')
+    }
     const line = texts(game, n).find((t) => /отдал тебе/.test(t))!
     expect(line).toContain('«Место на кране»')
     expect(line).not.toContain('(40 м)')
@@ -85,9 +89,9 @@ describe('несостыковки из партии пользователя', 
     game.S.mem['alik.day'] = game.S.day - 1
     expect(excuses()).toMatch(/Кто это\?/)
   })
-  it('«терпение восстановлено»: событие вроде «продали микроволновку» — один раз, занятия — повторяются', () => {
+  it('«терпение восстановлено»: память о микроволновке — после продажи; занятия — повторяются', () => {
     const { game } = makeGame()
-    game.S.money = 1000 // нищета: только тогда в пуле есть «продали микроволновку»
+    game.S.mem['sold.microwave'] = true
     const floor = (turns: number) => { game.S.stats.sent += turns; return game.line('FLOOR', FLOOR) ?? 'Вы полежали на полу. Терпение восстановлено.' }
     const got = Array.from({ length: 40 }, () => floor(20))
     expect(got.filter((t) => /микроволновку/.test(t))).toHaveLength(1)
@@ -95,12 +99,19 @@ describe('несостыковки из партии пользователя', 
     const dry = Array.from({ length: 30 }, () => floor(0))
     expect(dry.every((t) => t.startsWith('Вы '))).toBe(true)
   })
+  it('микроволновка в FLOOR без sold.microwave не появляется', () => {
+    const { game } = makeGame()
+    setMoney(game, 1000)
+    const floor = () => { game.S.stats.sent += 20; return game.line('FLOOR', FLOOR) ?? '' }
+    const got = Array.from({ length: 40 }, floor)
+    expect(got.some((t) => /микроволновку/.test(t))).toBe(false)
+  })
   it('займ 5000: деньги уходят с карты; нет 5000 на карте — Алик не просит', async () => {
     const { game } = makeGame()
-    game.S.money = 3000
+    setMoney(game, 3000)
     game.S.mood = 8
     for (let i = 0; i < 30; i++) expect((await game.fire('PickScene'))?.name).not.toBe('Scene_lend')
-    game.S.money = 9000
+    setMoney(game, 9000)
     await game.enterNode('lend', 'yes')
     expect(game.S.money).toBe(4000)
   })

@@ -1,7 +1,6 @@
 import { STARTS } from '../content/quests'
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { makeGame, memStorage, alikTexts, flush } from '../test/helpers'
+import { makeGame, memStorage, alikTexts, flush , setMoney} from '../test/helpers'
 import { ENDGAME_FORMALITIES, ENDGAME_JUBILEES } from '../content/endgame'
 import { silentAudio } from './audio'
 import { manualClock, realClock } from './clock'
@@ -15,6 +14,7 @@ import { COLD_WAR } from '../content/rude'
 import { HEAT } from '../content/memkeys'
 import { valueOf } from './rules'
 import { MENTION_RE } from '../content/world'
+import { P_MONEY, P_DESPERATE } from '../content/topics'
 
 describe('Game: начало и ход', () => {
   it('новая игра: одна из завязок, 184-й день, 3–4 варианта реплик', () => {
@@ -206,11 +206,14 @@ describe('Game: начало и ход', () => {
   })
   it('реплики игрока не повторяются', async () => {
     const { game } = makeGame({ seed: 3 })
+    // пул бедности на дне исчерпывается за партию и дальше звучит редко по кругу (#184): повторы там
+    // разрешены осознанно, их темп сторожит тест «бедность не смолкает» ниже
+    const poor = new Set([...P_MONEY.low.polite, ...P_MONEY.low.neutral, ...P_MONEY.bottom.polite, ...P_MONEY.bottom.neutral, ...P_DESPERATE.low, ...P_DESPERATE.bottom].map(valueOf))
     const mine: string[] = []
     for (let i = 0; i < 80; i++) {
       const c = game.choices.find((x) => x.tone === 'polite' && !x.act) ?? game.choices[0]
       // короткие кнопки сцен («Сбер», «Алик…») по замыслу не перефразируются — их не считаем
-      if (!(c.scene && c.text.length <= 8)) mine.push(c.text)
+      if (!(c.scene && c.text.length <= 8) && !poor.has(c.text)) mine.push(c.text)
       game.S.offlineDays = 0
       await game.send(c)
       if (game.battery.dead) await game.battery.charge()
@@ -423,6 +426,25 @@ describe('Game: пачка непрочитанных подчиняется м�
       expect(game.ui.unread).toBe(0)
     }
   })
+  // issue #188: путь игрока — первая грубость ставит «был давно» и ctx.offended; Away_ColdWar не перебивает Away_Offline
+  it('после первой грубости пропавший Алик в пачке «пока тебя не было» молчит', async () => {
+    const pool = new Set(COLD_WAR.map(valueOf))
+    for (let seed = 1; seed <= 30; seed++) {
+      const { game, clock } = makeGame({ seed })
+      game.S.stats.sent = 6
+      await game.send({ text: 'Ты вор и мошенник!!!', tone: 'rude' })
+      expect(game.S.offlineDays).toBeGreaterThan(0)
+      expect(game.S.ctx?.offended).toBe(true)
+      const from = game.S.msgs.length
+      await game.onVisibility(true)
+      clock.advance(40 * 60_000)
+      await game.onVisibility(false)
+      const body = arrived(game, from)
+      expect(body, `seed ${seed}`).toEqual([])
+      expect(game.ui.unread).toBe(0)
+      expect(body.some((m) => m.kind === 'text' && pool.has(m.text))).toBe(false)
+    }
+  })
   it('исход Дня выплаты определён, экран не закрыт: за ним тишина — ни пачки, ни простоя, ни обещаний, ни переводов', async () => {
     const { game, clock } = makeGame()
     // третий акт как в payday.test: партия с финалами, чтобы Beat_Payday и утро выплаты сложились
@@ -449,16 +471,23 @@ describe('Game: пачка непрочитанных подчиняется м�
     expect(game.ui.unread).toBe(0)
     expect([game.S.promises.length, game.S.debt, game.S.money]).toEqual([promises + 1, debt, money])
     expect(game.S.ending).toBe('payday_coins')
-    game.closeEnding()
+    // каждое Quiet_PaydayOpen_* охраняет своё событие, пока экран концовки открыт
+    for (const event of ['AlikAway', 'AlikIdle', 'StoryBeat', 'PeriodLine', 'PromiseDue', 'Mentioned'] as const) {
+      const n = game.S.msgs.length
+      expect((await game.fire(event))?.name, event).toBe('Quiet_PaydayOpen_' + event)
+      expect(game.S.msgs.slice(n)).toEqual([])
+    }
+    await game.closeEnding()
     expect(game.S.mem['endgame.active']).toBe(true)
   })
-  it('обиженный Алик: в пачке максимум одна колкость холодной войны, остальное — тишина', async () => {
+  it('обиженный Алик на связи: в пачке максимум одна колкость холодной войны, остальное — тишина', async () => {
     const pool = new Set(COLD_WAR.map(valueOf))
     const offendedPack = async (seed: number, n: number) => {
       const { game } = makeGame({ seed })
       game.S.stats.sent = 6
       game.S.mem[HEAT] = 1
       game.S.ctx = { offended: true }
+      expect(game.S.offlineDays).toBe(0)
       const from = game.S.msgs.length
       await game.awayBurst(n, 1)
       const body = arrived(game, from).filter((m) => m.kind !== 'sys')
@@ -473,6 +502,20 @@ describe('Game: пачка непрочитанных подчиняется м�
     let silent = 0
     for (let seed = 1; seed <= 30; seed++) silent += (await offendedPack(seed, 1)) === 0 ? 1 : 0
     expect(silent).toBeGreaterThan(0)
+  })
+  // негативный контроль #188: без ne(offline) Away_ColdWar снова перебивает пропажу
+  it('Away_ColdWar не берёт AlikAway, пока Алик пропал', async () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const { game } = makeGame({ seed })
+      game.S.stats.sent = 6
+      game.S.mem[HEAT] = 1
+      game.S.ctx = { offended: true }
+      game.S.offlineDays = 2
+      expect(game.facts().offline).toBe(true)
+      const r = game.rules.match({ event: 'AlikAway', facts: {} }, game.facts())
+      expect(r?.name, `seed ${seed}`).not.toBe('Away_ColdWar')
+      expect(['Away_Offline', 'Quiet_Offended_AlikAway']).toContain(r?.name)
+    }
   })
   it('посреди сцены пачки нет — как и болтовни простоя; сцена продолжается', async () => {
     for (let seed = 1; seed <= 10; seed++) {
@@ -855,16 +898,45 @@ describe('Game: пачка непрочитанных записывает в м
 describe('Game: деньги на карте', () => {
   it('adjustMoney пишет баланс, шлёт СМС и факты уровня', () => {
     const { game } = makeGame()
+    setMoney(game, 12400) // уровень «мало»/«дно» проверяем от фиксированного баланса, а не от стартового
+    const drain = (re: RegExp) => {
+      for (let i = 0; i < 8 && game.ui.notif && !re.test(game.ui.notif.text); i++) game.dismissNotif()
+      expect(game.ui.notif?.text).toMatch(re)
+    }
     expect(game.moneyLevel()).toBe('normal')
     expect(game.facts().moneyNormal).toBe(true)
     expect(game.adjustMoney(-4000, 'Продукты')).toBe(true)
     expect(game.S.money).toBe(8400)
     expect(game.moneyLevel()).toBe('low')
-    expect(game.ui.notif?.text).toMatch(/Банк обеспокоен/)
+    drain(/Банк обеспокоен/)
     expect(game.adjustMoney(-3000, 'Гречка')).toBe(true)
     expect(game.moneyLevel()).toBe('bottom')
     expect(game.facts().moneyBottom).toBe(true)
+    expect(game.S.mem['credit.offer']).toBe(true)
+    drain(/критический/)
+  })
+  it('очередь уведомлений: кредит не затирает «критический», а идёт следом', () => {
+    const { game } = makeGame()
+    setMoney(game, 7000) // low → bottom: и предупреждение, и оффер
+    game.adjustMoney(-6000, 'Гречка')
+    expect(game.moneyLevel()).toBe('bottom')
+    expect(game.ui.notif?.text).toMatch(/Списание/)
+    game.dismissNotif()
     expect(game.ui.notif?.text).toMatch(/критический/)
+    game.dismissNotif()
+    expect(game.ui.notif?.text).toMatch(/Всё будет|одобрен/i)
+  })
+  it('бедность не смолкает: исчерпанный пул уровня звучит редко и по кругу (#184)', () => {
+    const { game } = makeGame()
+    setMoney(game, 1000)
+    const at = (day: number): string | null => { game.S.day = day; return game.poorLine('P_DESPERATE_bottom', P_DESPERATE.bottom) }
+    const fresh = [at(300), at(300), at(300), at(300)]
+    expect(new Set(fresh).size).toBe(4) // весь пул уровня — без повторов
+    const fallback = at(300)
+    expect(fallback).not.toBeNull() // исчерпанный пул не молчит
+    expect(at(301)).toBe(fallback) // внутри окна строка та же
+    expect(at(300 + 14)).not.toBe(fallback) // следующее окно — другая строка
+    expect(at(300 + 56)).toBe(fallback) // через полный круг — снова она: не чаще, чем раз в 14 дней
   })
   it('после выплаты и в эндгейме деньги не меняются', () => {
     const { game } = makeGame()
@@ -878,14 +950,44 @@ describe('Game: деньги на карте', () => {
     expect(game.adjustMoney(50, 'Перевод от Алика')).toBe(false)
     expect(game.S.money).toBe(m)
   })
-  it('S.money в прод-коде пишется только внутри adjustMoney', () => {
-    const write = /S\.money\s*(?:\+=|-=|=)/g
-    const src = readFileSync('src/engine/game.ts', 'utf8')
-    const body = src.replace(/adjustMoney\([\s\S]*?\n {2}\}/, 'adjustMoney() {}')
-    expect(body.match(write) ?? []).toEqual([])
-    const content = ['src/content/rules/payday.ts', 'src/content/misc.ts', 'src/content/excuses.ts']
-      .map((f) => readFileSync(f, 'utf8')).join('\n')
-    expect(content.match(write) ?? []).toEqual([])
+  // одна точка записи денег — страж engine/money.test.ts: тип (readonly) + разбор исходников
+
+  it('трата с карты без денег: банк отказывает вслух, а не молча (#185)', () => {
+    const { game } = makeGame()
+    setMoney(game, 50) // меньше самой мелкой траты (90) — отказ гарантирован
+    let refusals = 0
+    for (let i = 0; i < 200 && !refusals; i++) {
+      game.randomNotif()
+      if (game.ui.notif && /Не прошло/.test(game.ui.notif.text)) refusals++
+      else if (game.ui.notif) game.dismissNotif()
+    }
+    expect(refusals, 'пул NOTIF не выдал ни одной траты — проверка была бы пустой').toBeGreaterThan(0)
+    expect(game.S.money).toBe(50)
+  })
+
+  it('«займи 5000» без денег: долг не растёт, «Инвестор» не выдаётся, банк отказывает (#185)', async () => {
+    const { game } = makeGame()
+    const drain = (re: RegExp) => {
+      for (let i = 0; i < 8 && game.ui.notif && !re.test(game.ui.notif.text); i++) game.dismissNotif()
+      expect(game.ui.notif?.text).toMatch(re)
+    }
+    setMoney(game, 1000)
+    const debt = game.S.debt
+    await game.enterNode('lend', 'yes')
+    expect(game.S.debt).toBe(debt)
+    expect(game.S.ach.lend).toBeUndefined()
+    expect(game.S.msgs.some((m) => m.kind === 'sys' && /Вы перевели Алику/.test(m.text))).toBe(false)
+    drain(/Не прошло/)
+
+    // те же деньги есть — перевод идёт, и всё, что он обещает, случается
+    const { game: paid } = makeGame()
+    setMoney(paid, 20000)
+    const before = paid.S.debt
+    await paid.enterNode('lend', 'yes')
+    expect(paid.S.debt).toBe(before + 5000)
+    expect(paid.S.money).toBe(15000)
+    expect(paid.S.ach.lend).toBe(paid.S.day) // unlock пишет день, а не «выдано»
+    expect(paid.S.msgs.some((m) => m.kind === 'sys' && /Вы перевели Алику/.test(m.text))).toBe(true)
   })
 })
 

@@ -56,7 +56,7 @@ const worldFacts = (game: Game): Record<string, unknown> => {
 }
 
 /** Условие требует факт (не «факта нет»): `missing(alik_dead)` — это правило живого Алика, а не гейт смерти. */
-const requiresKey = (c: Criterion, key: string): boolean =>
+export const requiresKey = (c: Criterion, key: string): boolean =>
   c.op === 'all' ? (c.all ?? []).some((x) => requiresKey(x, key)) : c.key === key && (c.op === 'exist' || (c.op === '==' && c.value === true))
 
 /** Правила с гейтом `alik_dead`: оракул судит о реплике по этому списку, а не по имени. Считается по правилам партии — тест может снять гейт. */
@@ -103,10 +103,17 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
   const asides: Aside[] = []
   const world: WorldFrame[] = []
   const firedBuf: WorldFrame['fired'] = []
-  // сообщение принадлежит последнему выбранному правилу (match, не сбор кнопок): respond идёт сразу за выбором
+  // сообщение принадлежит правилу, чей respond сейчас идёт (onRespond до/после); молчание снимает атрибуцию.
+  // после выхода из fire атрибуция сбрасывается: пустой Quiet_* (respond → undefined) иначе оставляет
+  // своё имя на всё, что движок напишет следом (#229)
   let lastRule: string | null = null
+  game.rules.onRespond = (r, ok) => { lastRule = ok ? r.name : null }
+  const fire = game.rules.fire.bind(game.rules)
+  game.rules.fire = (async (...args: Parameters<typeof fire>) => {
+    try { return await fire(...args) }
+    finally { lastRule = null }
+  }) as typeof game.rules.fire
   game.rules.tracer = (t) => {
-    if (t.mode === 'match' && t.chosen.length) lastRule = t.chosen[0]
     if (t.chosen.length) firedBuf.push({ event: t.event, chosen: [...t.chosen] })
   }
   const ruleOf = new Map<number, string | null>()
@@ -180,7 +187,7 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
       ending = game.S.ending
       const e = ENDINGS.find((x) => x.id === ending)
       asides.push({ at: game.S.msgs.length, text: `(экран концовки: «${e?.title ?? ending}». Игрок закрыл экран)` })
-      game.closeEnding() // как игрок: закрыть экран итогов — после Дня выплаты это включает эндгейм
+      await game.closeEnding() // как игрок: закрыть экран итогов — после Дня выплаты это включает эндгейм
     }
     const moo = game.S.stats.moo
     clock.runTimers() // «Мууу» и прочее отложенное

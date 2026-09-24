@@ -1,16 +1,19 @@
 // «Спасибо» и «привет» свободным текстом (docs/design/greetings.md): свой ответ путём игрока.
 import { describe, expect, it } from 'vitest'
 import { alikTexts, makeGame } from '../test/helpers'
-import { specificityOf } from '../engine/rules'
+import { specificityOf, valueOf, type Entry } from '../engine/rules'
 import type { Game } from '../engine/game'
 import { GREET, GREET_MORNING, GREET_NIGHT, THANKS } from './misc'
 
 /** Реплика из пула: обращение в начале и подстановки ({night}) не мешают — ищем по самому длинному куску шаблона. */
-const fromPool = (pool: readonly string[], text: string) =>
-  pool.some((p) => text.includes(p.split(/\{\w+\}/).sort((a, b) => b.length - a.length)[0].replace(/^[,.\s]+|[.!?…]+$/g, '').slice(0, 30)))
+const fromPool = (pool: readonly Entry<string>[], text: string) =>
+  pool.some((p) => {
+    const raw = valueOf(p)
+    return text.includes(raw.split(/\{\w+\}/).sort((a, b) => b.length - a.length)[0].replace(/^[,.\s]+|[.!?…]+$/g, '').slice(0, 30))
+  })
 
 /** Сколько сидов из 12 ответили репликой пула (реакция без ответа — законный исход в ~30% вежливых ходов). */
-async function answered(text: string, pool: readonly string[], setup: (g: Game) => void = () => {}): Promise<number> {
+async function answered(text: string, pool: readonly Entry<string>[], setup: (g: Game) => void = () => {}): Promise<number> {
   let n = 0
   for (let seed = 1; seed <= 12; seed++) {
     const { game } = makeGame({ seed })
@@ -47,6 +50,22 @@ describe('«спасибо» и «привет»: у Алика свой отв�
     expect(mood()).toBe(6)
     await say(8) // ровно перерыв — можно
     expect(mood()).toBe(7)
+  })
+  it('после перевода «я ничего не перевёл» не звучит', async () => {
+    const lie = 'я же ничего не перевёл'
+    const heard = async (fifty: number) => {
+      let n = 0
+      for (let seed = 1; seed <= 40; seed++) {
+        const { game } = makeGame({ seed })
+        game.S.stats.fifty = fifty
+        const from = alikTexts(game.S.msgs).length
+        await game.send('Спасибо!')
+        if (alikTexts(game.S.msgs).slice(from).some((t) => t.includes(lie))) n++
+      }
+      return n
+    }
+    expect(await heard(0)).toBeGreaterThan(0)
+    expect(await heard(1)).toBe(0)
   })
   it('«спасибо» путём игрока: настроение растёт, приветствие его не трогает', async () => {
     const { game } = makeGame()

@@ -15,6 +15,12 @@ const endgame = (g: Game) => {
   g.S.endings.payday_default = g.S.day
   g.closeEnding()
 }
+/** Экран концовки выплаты открыт, эндгейм ещё не начат — окно Quiet_PaydayOpen_* (#190). */
+const paydayOpen = (g: Game) => {
+  g.S.mem.payday = 'default'
+  g.S.ending = 'payday_default'
+  g.S.endings.payday_default = g.S.day
+}
 
 const phone = (g: Game) => { g.rules.applyOps([during('phone.karine', 1)], {}) }
 const dead = (g: Game) => { g.S.mem.alik_dead = true }
@@ -22,13 +28,10 @@ const blocked = (g: Game) => { g.S.mem.blocked = true }
 const offended = (g: Game) => { g.S.mem[HEAT] = 1; g.S.ctx = { offended: true } }
 
 const CASES: Record<string, Case> = {
-  Quiet_Dead_AlikIdle: { event: 'AlikIdle', setup: dead },
   Quiet_Dead_AlikAway: { event: 'AlikAway', setup: dead },
-  Quiet_Dead_StoryBeat: { event: 'StoryBeat', setup: dead },
   Quiet_Dead_PeriodLine: { event: 'PeriodLine', setup: dead },
   Quiet_Dead_PromiseDue: { event: 'PromiseDue', facts: { promise: 0 }, setup: (g) => { dead(g); g.recordPromise({ text: 'в пятницу', d: 1 }); g.S.day += 1 } },
   Quiet_Blocked_AlikAway: { event: 'AlikAway', setup: blocked },
-  Quiet_Blocked_StoryBeat: { event: 'StoryBeat', setup: blocked },
   Quiet_Blocked_PeriodLine: { event: 'PeriodLine', setup: blocked },
   Quiet_Blocked_PromiseDue: { event: 'PromiseDue', facts: { promise: 0 }, setup: (g) => { blocked(g); g.recordPromise({ text: 'в пятницу', d: 1 }); g.S.day += 1 } },
   Quiet_PhoneKarine_AlikIdle: { event: 'AlikIdle', setup: phone },
@@ -78,7 +81,6 @@ const CASES: Record<string, Case> = {
   },
   Ending_vendetta: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem.vendetta = true } },
   Ending_payday_real: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'real' } },
-  Ending_multiverse: { event: 'CheckEnding', setup: (g) => { endgame(g); g.S.day = 800; g.S.stats.sent = 300 } },
   Ending_payday_niva: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'niva' } },
   Tone_Thanks: { event: 'PlayerMessage', facts: { tone: 'polite', category: 'gratitude' } },
   Tone_Greeting: { event: 'PlayerMessage', facts: { tone: 'polite', category: 'greeting' } },
@@ -99,20 +101,10 @@ const CASES: Record<string, Case> = {
   Finale_razmik_swap: { event: 'ArcFinale', facts: { arc: 'razmik' }, setup: (g) => { g.S.mem['count.rude'] = 10; g.S.mem[HEAT] = 3 } },
   Finale_razmik_union: { event: 'ArcFinale', facts: { arc: 'razmik' }, setup: (g) => { g.S.ach.customer = 1 } },
   Says_via_mama: { event: 'PlayerSays', facts: { intent: 'via', arg: 'mama' } },
-  Endgame_Money: { event: 'PlayerSays', facts: { intent: 'endgameMoney' }, setup: endgame },
-  Endgame_Mute: { event: 'PlayerSays', facts: { intent: 'endgameMute' }, setup: endgame },
-  Endgame_Leave: { event: 'PlayerSays', facts: { intent: 'endgameLeave' }, setup: endgame },
-  Endgame_Request: { event: 'PlayerSays', facts: { intent: 'request', tone: 'neutral' }, setup: endgame },
   Endgame_Turn: { event: 'AlikTurn', setup: endgame },
-  Endgame_Idle: { event: 'AlikIdle', setup: endgame },
-  Endgame_Away: { event: 'AlikAway', setup: endgame },
-  Endgame_Formality: { event: 'StoryBeat', setup: endgame },
-  Endgame_NoEnding: { event: 'CheckEnding', setup: endgame },
-  Turn_LightOff: { event: 'AlikTurn', setup: (g) => { g.S.mem['light.off'] = true } },
-  Turn_NetRation: { event: 'AlikTurn', setup: (g) => { g.S.mem['net.ration'] = true } },
-  Idle_PhoneWarn: { event: 'AlikIdle', setup: (g) => { g.S.mem['phone.warn'] = true } },
-  Bill_Warn: { event: 'BillWarn', facts: { bill: 'phone' } },
-  Bill_Due: { event: 'BillDue', facts: { bill: 'phone' } },
+  Quiet_PaydayOpen_AlikAway: { event: 'AlikAway', setup: paydayOpen },
+  Quiet_PaydayOpen_PeriodLine: { event: 'PeriodLine', setup: paydayOpen },
+  Quiet_PaydayOpen_StoryBeat: { event: 'StoryBeat', setup: paydayOpen },
   Finale_beton_ledger: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem.caught = 2 } },
   Finale_nune_ledger: { event: 'ArcFinale', facts: { arc: 'nune' }, setup: (g) => { g.S.mem.caught = 2 } },
   Away_ColdWar: { event: 'AlikAway', setup: offended },

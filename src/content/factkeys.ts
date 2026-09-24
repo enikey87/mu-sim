@@ -37,8 +37,12 @@ export const FAMILIES: Record<string, (rest: string) => boolean> = {
   'asked.': arcs, 'doneAsked.': arcs, 'finale.': arcs, 'legend.of.': arcs,
   'topic.': topics, 'topicMute.': topics,
   'inv.': items,
-  'wedding.': setOf(Object.keys(CAST)),
+  'wedding.': (r) => Object.hasOwn(CAST, r) || r === 'anush',
   'bills.': (r) => /^(rent|phone|transit)\.(dueAt|due|unpaid|streak)$/.test(r),
+  'sold.': (r) => /^(microwave|guitar|tile|tires)$/.test(r),
+  'mom.': (r) => /^(pension|pickles|dacha|done)$/.test(r),
+  // credit.stage / offer / broke — точные в MEM_KEYS; taken/dueAt — по займу
+  'credit.': (r) => /^(consumer|refi|micro)\.(taken|dueAt|failed)$/.test(r),
 }
 
 /** Известный ли ключ факта: точный — из реестра, семейный — до элемента. Точное совпадение — раньше семейств. */

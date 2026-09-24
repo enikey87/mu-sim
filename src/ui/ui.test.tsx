@@ -6,6 +6,7 @@ import { messageRenderStats } from './Message'
 import { messageListRenderStats, messageListBuildStats } from './Chat'
 import { makeGame } from '../test/helpers'
 import { SAVE_KEY } from '../engine/state'
+import { fmtDate } from '../engine/time'
 import type { Game } from '../engine/game'
 
 function renderApp(game: Game, onReset = vi.fn()) {
@@ -223,6 +224,17 @@ describe('App', () => {
     expect(screen.getByText(/^изменено/)).toBeInTheDocument()
   })
 
+  it('ссылка в системной строке — настоящая: новая вкладка, игра остаётся открытой', () => {
+    const { game } = makeGame()
+    game.push({ kind: 'sys', text: 'Поддержать автора: https://www.donationalerts.com/r/enikey87' })
+    renderApp(game)
+    const link = screen.getByRole('link', { name: 'https://www.donationalerts.com/r/enikey87' })
+    expect(link).toHaveAttribute('href', 'https://www.donationalerts.com/r/enikey87')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener')
+    expect(screen.getByText(/Поддержать автора:/)).toBeInTheDocument()
+  })
+
   it('кнопки допработы отвечают и исчезают', async () => {
     const { game } = makeGame()
     await game.job()
@@ -262,6 +274,35 @@ describe('App', () => {
     fireEvent.click(within(dialog).getByText('Начать заново'))
     expect(onReset).toHaveBeenCalled()
     fireEvent.click(screen.getByLabelText('Закрыть'))
+  })
+
+  it('досье: у каждого состояния журнала свой значок', () => {
+    const { game } = makeGame()
+    const day = game.S.day
+    game.S.promises.push(
+      { t: 'завтра', made: day, due: day + 1 },
+      { t: 'в пятницу', made: day - 5, due: day - 1 },
+      { t: 'на днях', made: day - 6, due: day - 2, asked: true },
+      { t: 'сразу после свадьбы', made: day - 7, due: day - 3, asked: true, kept: true },
+      { t: 'до конца недели', made: day - 8, due: day - 4, amnesty: day - 1 },
+      { t: 'когда Арарат вернут', made: day, due: null },
+      { t: 'как Нуне из декрета выйдет', made: day, due: null, condition: 'nune.dekretOver' },
+      { t: 'как снег в горах сойдёт', made: day - 5, due: null, condition: 'tax.thawed', met: day - 1 },
+    )
+    renderApp(game)
+    fireEvent.click(screen.getByTitle('Обещания и ачивки'))
+    const dialog = screen.getByRole('dialog')
+    const line = (re: RegExp) => within(dialog).getByText(re).textContent
+    expect(line(/⏳ ждём \d/)).toContain(fmtDate(day + 1)) // ждём — со своим сроком
+    expect(line(/❌ просрочено/)).toContain(fmtDate(day - 1))
+    expect(line(/❓ припомнили/)).toContain(fmtDate(day - 2))
+    expect(line(/✅ сдержал — 50 ₽/)).toContain(fmtDate(day - 3))
+    expect(line(/🕊 амнистия/)).toContain(fmtDate(day - 1))
+    // «когда-нибудь» — ровно одна запись: сроки по событию им не прикидываются
+    expect(within(dialog).getAllByText(/∞ когда-нибудь/)).toHaveLength(1)
+    // срок по событию — свой значок до события и после: «когда-нибудь» ему не подходит
+    expect(line(/⏳ ждём события/)).toBeTruthy()
+    expect(line(/🎯 событие наступило/)).toBeTruthy()
   })
 
   it('Esc закрывает досье и возвращает фокус на кнопку досье', () => {

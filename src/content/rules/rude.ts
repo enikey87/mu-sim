@@ -175,17 +175,17 @@ export const rudeRules: R[] = [
 
   // ветка: холодная война — игрок молчит после ссоры, Алик не выдерживает первым
   {
-    // Алик ещё обижен (после извинения «Ну и молчи» — невпопад)
-    name: 'Idle_ColdWar', event: 'AlikIdle', when: [gte(HEAT, 1), is('ctx.offended')], odds: 0.7, cooldown: { turns: 2 }, priority: 'chatter',
+    // Алик ещё обижен (после извинения «Ну и молчи» — невпопад); пропавший («был давно») молчит — см. Idle/Away_Offline
+    name: 'Idle_ColdWar', event: 'AlikIdle', when: [gte(HEAT, 1), is('ctx.offended'), ne('offline', true)], odds: 0.7, cooldown: { turns: 2 }, priority: 'chatter',
     respond: async ({ game }) => {
       const t = game.decks.pick('COLD_WAR', T.COLD_WAR, game.lineFacts(), { mode: 'sequential', noRepeat: true })
       if (!t) return false
       await game.say([t])
     },
   },
-  // обиженный и пачка «пока тебя не было»: максимум одна колкость холодной войны (перерыв тот же), остальное — тишина
+  // обиженный, но на связи: в пачке максимум одна колкость (перерыв тот же); пропавший — Away_Offline / Quiet_Offended
   {
-    name: 'Away_ColdWar', event: 'AlikAway', when: [gte(HEAT, 1), is('ctx.offended')], bonus: 1, odds: 0.7, cooldown: { turns: 2 },
+    name: 'Away_ColdWar', event: 'AlikAway', when: [gte(HEAT, 1), is('ctx.offended'), ne('offline', true)], bonus: 1, odds: 0.7, cooldown: { turns: 2 },
     respond: ({ game }) => game.awayMsg('coldWar'),
   },
   { name: 'Quiet_Offended_AlikAway', event: 'AlikAway', when: [gte(HEAT, 1), is('ctx.offended')], respond: () => {} },
