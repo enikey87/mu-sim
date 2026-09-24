@@ -1,6 +1,6 @@
 // Платежи по календарю: предупреждение за день, списание или неоплата с последствиями.
 import type { Game } from '../../engine/game'
-import { type Rule, is, set } from '../../engine/rules'
+import { type Rule, is, set } from '../fact'
 import type { GameEvent, Offer } from './events'
 import {
   BILLS, billDue, lightOff, netRation, phoneWarn, type BillId,

@@ -1,6 +1,6 @@
 // Зеркало: игрок отказывает в допработе отмазкой Алика (docs/design/mirror.md). Каждая отмазка правдива
 // в этой партии — элемент открыт только под фактом, о котором говорит, и ответ Алика — под тем же фактом.
-import { type Criterion, type Entry, gate, is, missing, named, of } from '../engine/rules'
+import { type Criterion, type Entry, gate, is, missing, named, of } from './fact'
 import { needs } from './world'
 import { alikDead, blocked, endgame, phoneKarine, sick, wedding } from './memkeys'
 

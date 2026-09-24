@@ -1,6 +1,6 @@
 // Кредитная лестница: предложение на дне, платёж по календарю, мама-запаска.
 import type { Game } from '../../engine/game'
-import { type Rule, eq, is } from '../../engine/rules'
+import { type Rule, eq, is } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { LOANS, creditOffer, type LoanId } from '../credit'
 

@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest'
 import { makeGame, setMoney } from '../test/helpers'
 import { Game } from '../engine/game'
-import { valueOf, test as holds, missing } from '../engine/rules'
+import { valueOf, test as holds, missing } from './fact'
 import type { Choice } from '../engine/state'
 import { P_MONEY, P_DESPERATE, DESPERATE_REPLY } from './topics'
 import { sold } from './credit'

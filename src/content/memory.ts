@@ -1,11 +1,11 @@
 // Память Алика: реплики с условиями на то, что было в этой партии (как в Hades — требования, приоритет, «уже сказано»).
 // Каждая звучит один раз. Приоритет 1 — конкретное событие партии, 0 — общая «статистика».
-import { type Line, is, eq, ne, gte, lte, exists } from '../engine/rules'
+import { type Line, is, eq, ne, gte, lte, exists, sincePast, sinceWithin } from './fact'
 import { needs } from './world'
 import { caughtCount, count, court, courtVerdict, garikConcrete, paydayScene, ritualCut, vendetta } from './memkeys'
 
 /** «Тогда» — о прошлом: событие было не сегодня. */
-const past = (ach: string) => gte('since.' + ach, 1)
+const past = sincePast
 
 export const MEMORY: Line[] = [
   // мини-квесты
@@ -66,7 +66,7 @@ export const MEMORY: Line[] = [
   // «сегодня» — значит, в эти дни, а не когда-нибудь потом
   { t: 'Брат, знаешь, что сегодня? Триста дней, как ты сдал объект. Отмечаем! Без денег, но с душой.', when: [gte('day', 300), lte('day', 303)] },
   { t: 'Год, брат! Год, как ты ждёшь. Я тебе торт заказал. Оплатишь при получении?', when: [gte('day', 365), lte('day', 368)], prio: 1 },
-  { t: 'Ты тогда пропал — телефон сел? Я чуть не заплатил от волнения. Хорошо, что вернулся.', when: [past('dead'), lte('since.dead', 3)] },
+  { t: 'Ты тогда пропал — телефон сел? Я чуть не заплатил от волнения. Хорошо, что вернулся.', when: sinceWithin('dead', 3) },
   needs('karineHome')(needs('karine')({ t: 'Ты мне ночью пишешь. Карине думает, у меня роман. Роман — с долгом.', when: [past('nightowl')] })),
   { t: 'Брат, у меня сегодня хорошее настроение. Давай не будем его портить разговорами про деньги.', when: [gte('mood', 8)] },
 ]

@@ -1,7 +1,7 @@
 // Финалы сериалов (ArcFinale { arc }) и концовки игры (CheckEnding после каждого хода).
 // Обычный финал — правило только с условием на сериал; частные финалы специфичнее и перекрывают его.
 import type { Game } from '../../engine/game'
-import { type Rule, eq } from '../../engine/rules'
+import { type Rule, eq } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { ARCS } from '../arcs'
 import { FINALES, ENDINGS, type Finale } from '../finales'

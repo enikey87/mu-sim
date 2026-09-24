@@ -1,7 +1,7 @@
 // Событие PlayerSays { intent, arg } — ответ Алика на контекстную реплику игрока.
 // Общее правило по intent + более специфичные для частных случаев (память, контекст).
 import type { Game } from '../../engine/game'
-import { type Rule, eq, ne, is, gte, add, valueOf } from '../../engine/rules'
+import { type Rule, eq, ne, is, gte, add, valueOf } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { AlikOffline, ThickJournal } from './criteria'
 import { cooldown } from './rude'

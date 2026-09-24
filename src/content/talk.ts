@@ -3,7 +3,7 @@
 import { LEGENDS } from './legends'
 import { ARCS } from './arcs'
 import type { GameState } from '../engine/state'
-import { type Entry, type FactOp, set } from '../engine/rules'
+import { type Entry, type FactOp, set } from './fact'
 import { needs } from './world'
 import { grantPaid } from './memkeys'
 

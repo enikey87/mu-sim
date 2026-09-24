@@ -1,6 +1,6 @@
 // Сквозные сюжеты, другие участники чата, групповой чат, «не тот чат».
 // Эпизод: m — сообщения (строка — от Алика, { w, t } — от участника), fx, sys, then: 'promise'.
-import { type Entry, type FactOp, set, gate, is, eq, missing, gte, lte } from '../engine/rules'
+import { type Entry, type FactOp, set, gate, is, eq, missing, gte, lte } from './fact'
 import { needs, meet, WORLD } from './world'
 import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, garikConcrete, garikCut, grandpaDying, grantPaid, houseOnGarik, intro, met, mourning, nivaAway, nuneDekretOver, nuneKeyPassed, sick, taxFrozen, wedding } from './memkeys'
 

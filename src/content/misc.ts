@@ -1,5 +1,5 @@
 // Мелкие тексты движка: «полежал на полу», застолье, платёжки, ответы на допработу и т.д.
-import { type Line, eq, gate, gte, is, of, set, type Entry } from '../engine/rules'
+import { type Line, eq, gate, gte, is, of, set, type Entry } from './fact'
 import { needs, WORLD } from './world'
 import { bloodGiven, court, polite, sick, threatClaim, wedding } from './memkeys'
 import { sold } from './credit'

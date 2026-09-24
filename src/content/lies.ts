@@ -1,10 +1,13 @@
 // Бухгалтерия лжи: что Алик «заявил», что чему противоречит, как он вспоминает и выкручивается.
 // Утверждения распознаются в тексте реплик — отдельно размечать сотни фраз не нужно.
-import { gate, is, type Entry } from '../engine/rules'
+import { gate, is, type Entry } from './fact'
+import type { ClaimKey } from './ids'
 import { needs } from './world'
 
+export type { ClaimKey }
+
 export interface Claim {
-  key: string
+  key: ClaimKey
   /** Как игрок перескажет это утверждение: «вы говорили: …» */
   say: string
   re: RegExp

@@ -1,11 +1,10 @@
 // Ачивки: ключ → [название, описание]. Описание может быть функцией от партии, если зависит от ответа (lend50).
-import type { GameState } from '../engine/state'
 import { ARCS } from './arcs'
 import { FINALES, ENDINGS } from './finales'
 import { LEND50_DESC, LEND50_LOCKED } from './endgame'
 import { lend50 } from './memkeys'
 
-export const ACH: Record<string, readonly [string, string | ((s: GameState) => string)]> = {
+export const ACH: Record<string, readonly [string, string | ((s: import("../engine/state").GameState) => string)]> = {
   first: ['Первый шаг', 'Написал Алику'],
   brat: ['Брат джан', 'Алик назвал тебя «брат джан»'],
   night: ['Прочитано в 3:14', 'Алик прочитал и промолчал'],

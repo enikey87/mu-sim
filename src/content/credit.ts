@@ -68,12 +68,12 @@ export const creditOffer = 'credit.offer'
 export const creditBroke = 'credit.broke'
 export const momDone = 'mom.done'
 
-export const sold = (id: ThingId): string => `sold.${id}`
-export const momHelp = (id: MomId): string => `mom.${id}`
-export const loanTaken = (id: LoanId): string => `credit.${id}.taken`
-export const loanDueAt = (id: LoanId): string => `credit.${id}.dueAt`
+export const sold = <T extends ThingId>(id: T): `sold.${T}` => `sold.${id}`
+export const momHelp = <T extends MomId>(id: T): `mom.${T}` => `mom.${id}`
+export const loanTaken = <T extends LoanId>(id: T): `credit.${T}.taken` => `credit.${id}.taken`
+export const loanDueAt = <T extends LoanId>(id: T): `credit.${T}.dueAt` => `credit.${id}.dueAt`
 /** Полоса неоплат по займу: банк говорит один раз за полосу, не каждую неделю (#184). */
-export const loanFailed = (id: LoanId): string => `credit.${id}.failed`
+export const loanFailed = <T extends LoanId>(id: T): `credit.${T}.failed` => `credit.${id}.failed`
 
 export const nextLoan = (stage: number): Loan | null =>
   LOANS.find((l) => l.stage === stage + 1) ?? null

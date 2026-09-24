@@ -1,5 +1,5 @@
 // Лестница грубости: тексты. Ступень — по «температуре» ссоры rude.heat (крик +1, остывает через 20 дней).
-import { type Line, type Entry, is, eq, gate, missing, during } from '../engine/rules'
+import { type Line, type Entry, is, eq, gate, missing, during } from './fact'
 import { needs } from './world'
 import { bathAsked, met, phoneKarine, threatClaim } from './memkeys'
 // Реплика участника: [кто, текст]; кто — ключ CAST.
