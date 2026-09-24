@@ -1,11 +1,9 @@
 // Правила, которые статистический бот покрытия не достигает, но у которых есть доказательство
-// вне симуляции: прямой случай в proven.test.ts. Имя → короткая причина.
-// Новое правило сюда — только с причиной и случаем в proven.test.ts; иначе гейт coverage
-// поставит unexplained. Модуль / префикс больше не освобождают (issue #102).
+// вне симуляции: прямой случай в proven.test.ts. Имя → причина, уникальная для записи
+// (имя теста/случая). Общая константа на всех — мёртвая метаданная (#130/#208): проверка
+// «причины непустые» не краснеет. Новое правило сюда — только с случаем в proven.test.ts.
 
-const reason = 'direct: tools/proven.test.ts'
-
-export const PROVEN: Record<string, string> = Object.fromEntries([
+const NAMES = [
   'Quiet_Dead_AlikAway', 'Quiet_Dead_PeriodLine', 'Quiet_Dead_PromiseDue',
   'Quiet_Blocked_AlikAway', 'Quiet_Blocked_PeriodLine', 'Quiet_Blocked_PromiseDue',
   'Quiet_PhoneKarine_AlikIdle', 'Quiet_PhoneKarine_AlikAway', 'Quiet_PhoneKarine_StoryBeat',
@@ -19,7 +17,7 @@ export const PROVEN: Record<string, string> = Object.fromEntries([
   'Finale_niva_chose', 'Finale_niva_chose_or', 'Finale_rubik_karine', 'Finale_alik_death_sulk', 'Finale_grandpa_revoke', 'Finale_razmik_swap', 'Finale_razmik_union',
   'Ending_family', 'Ending_ram', 'Ending_honest', 'Ending_vendetta',
   'Ending_payday_real', 'Ending_payday_niva', 'Ending_payday_notyou', 'Ending_payday_lavash', 'Ending_payday_strasbourg',
-  // бот покрытия экран концовки не закрывает — в эндгейм не входит, а «Параллельная вселенная» теперь только там (#172)
+  // бот покрытия экран концовки не закрывает — в эндгейм не входит, а «Параллельная вселенная» теперь только там (#172); #190 вернёт под гейт
   'Ending_multiverse',
   'Payday_real', 'Payday_niva', 'Payday_notyou', 'Payday_lavash', 'Payday_strasbourg',
   'Endgame_Money', 'Endgame_Mute', 'Endgame_Leave', 'Endgame_Request',
@@ -30,4 +28,8 @@ export const PROVEN: Record<string, string> = Object.fromEntries([
   'Away_ColdWar', 'Quiet_Offended_AlikAway',
   // бот копит не больше 3 просрочек к Дню выплаты: 60 % обещаний — «когда-нибудь», датированные он припоминает кнопкой (#149)
   'Scene_amnesty',
-].map((name) => [name, reason]))
+] as const
+
+export const PROVEN: Record<string, string> = Object.fromEntries(
+  NAMES.map((name) => [name, `proven.test.ts CASES.${name}`]),
+)
