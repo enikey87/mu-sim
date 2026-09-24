@@ -128,7 +128,7 @@ describe('реестр mem-ключей', () => {
     const { LEGENDS } = await import('./legends')
     const { MEMORY } = await import('./memory')
     const { NOTIF } = await import('./life')
-    const { MIRROR, MIRROR_OPEN } = await import('./mirror')
+    const { MIRROR, MIRROR_AGAIN, MIRROR_OPEN } = await import('./mirror')
     const { WORLD, SPEAKS } = await import('./world')
     const { allRules } = await import('./rules')
     for (const [aid, arc] of Object.entries(ARCS)) {
@@ -152,6 +152,7 @@ describe('реестр mem-ключей', () => {
     for (const [k, c] of Object.entries(WORLD)) seeCrits(`WORLD.${k}`, [c])
     for (const [k, c] of Object.entries(SPEAKS)) seeCrits(`SPEAKS.${k}`, [c])
     MIRROR.forEach((e, i) => seeEntry(`mirror[${i}]`, e))
+    MIRROR_AGAIN.forEach((e, i) => seeEntry(`mirrorAgain[${i}]`, e))
     seeCrits('MIRROR_OPEN', [MIRROR_OPEN])
     expect(bad).toEqual([])
   })

@@ -3,7 +3,7 @@
 import { make, D, low, cap, type ExcuseApi, type Promise3, type PromiseCondition, type Rel } from '../content/excuses'
 import { makeScenes, invKey, type Scene, type Line } from '../content/scenes'
 import { COLD_WAR, TRIBUNAL } from '../content/rude'
-import { MIRROR, MIRROR_OPEN, MIRROR_REPLY, type Mirror } from '../content/mirror'
+import { MIRROR, MIRROR_AGAIN, MIRROR_OPEN, MIRROR_REPLY, type Mirror } from '../content/mirror'
 import { PAYDAY_HOOKS } from '../content/rules/payday'
 import { QUEST_WHEN } from '../content/rules/world'
 import { LEGENDS } from '../content/legends'
@@ -1878,7 +1878,10 @@ export class Game {
       if (!m || m.kind !== 'job' || m.answered || this.ui.busy || this.battery.dead || this.disposed) return
       // бросок генератора — только для зеркала: иначе обычный ответ сдвигает розыгрыш всей партии
       const open = answer === 'mirror' ? this.mirrors() : []
-      const mirror = open.length ? open[this.rnd(open.length)] : undefined
+      const unseen = open.filter((m) => !this.seen.has(m.me))
+      const pickFrom = unseen.length ? unseen : open
+      const mirror = pickFrom.length ? pickFrom[this.rnd(pickFrom.length)] : undefined
+      const again = !!mirror && unseen.length === 0
       if (answer === 'mirror' && !mirror) return
       this.replaceMsg(m, { answered: true })
       this.ui.busy = true
@@ -1888,8 +1891,11 @@ export class Game {
       this.seen.mark(reply)
       this.push({ kind: 'text', from: 'me', text: reply, time: fmtTime(this.S.clock) })
       if (mirror) {
-        // зеркало — реплика, не событие: ни долга, ни календаря, ни настроения; ответ — про эту же отмазку или общий
-        await this.say([this.chance(0.5) ? mirror.alik : this.uniq(() => this.draw('MIRROR_REPLY', MIRROR_REPLY))])
+        // зеркало — реплика, не событие: ни долга, ни календаря, ни настроения; повтор — отдельный ответ (#191)
+        await this.say([this.uniq(() => {
+          if (again) return this.draw('MIRROR_AGAIN', MIRROR_AGAIN)
+          return this.chance(0.5) ? mirror.alik : this.draw('MIRROR_REPLY', MIRROR_REPLY)
+        })])
       } else if (yes) {
         const add = 5000 + this.rnd(16) * 1000
         // после Дня выплаты работа ничего не двигает — ни долг, ни календарь

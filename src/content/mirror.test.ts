@@ -78,4 +78,47 @@ describe('зеркало', () => {
     game.S.mem[key] = true
     expect(game.canMirror()).toBe(false)
   })
+
+  it('свадьба Самвела и Размик на кране — свои зеркала; чужая свадьба / «Нива у меня» — нет', () => {
+    const { game } = makeGame()
+    expect(game.mirrors()).toEqual([])
+    game.S.mem['intro.samvel'] = true
+    game.S.mem['wedding.samvel'] = true
+    expect(game.mirrors().map((m) => m.me)).toEqual([pool[2].me])
+    game.S.mem['wedding.samvel'] = false
+    game.S.mem['wedding.anush'] = true // финал «жених» — не свадьба Самвела
+    expect(game.mirrors()).toEqual([])
+    game.S.mem['intro.razmik'] = true
+    game.S.arcs.razmik = { i: 1, last: 0 }
+    expect(game.mirrors().map((m) => m.me)).toEqual([pool[3].me])
+    expect(pool[3].alik).not.toMatch(/весн/i)
+    expect(pool[1].me).not.toMatch(/Покрашу/)
+  })
+
+  it('финал «Нива выбрала тебя» снимает nivaAway — зеркало «уехала» закрыто', async () => {
+    const { game } = makeGame()
+    nivaAway(game)
+    expect(game.mirrors().some((m) => /Нива/.test(m.me))).toBe(true)
+    game.S.mem['niva.away'] = false // как remember финала chose
+    game.S.items.push('«Нива» (сама приехала)')
+    expect(game.mirrors().some((m) => /Нива/.test(m.me))).toBe(false)
+  })
+
+  it('повтор той же отмазки — ответ из MIRROR_AGAIN, не слово в слово', async () => {
+    const { MIRROR_AGAIN } = await import('./mirror')
+    const again = new Set(MIRROR_AGAIN.map(valueOf))
+    const { game } = makeGame({ seed: 3 })
+    borisSick(game)
+    const j1 = await job(game)
+    const from1 = game.S.msgs.length
+    await game.answerJob(j1.id, 'mirror')
+    const first = texts(game, from1, 'alik')[0]
+    const j2 = await job(game)
+    const from2 = game.S.msgs.length
+    await game.answerJob(j2.id, 'mirror')
+    const second = texts(game, from2, 'alik')[0]
+    expect(again.has(second) || second !== first).toBe(true)
+    // при одном открытом зеркале второй ответ обязан быть «опять»
+    expect(again.has(second)).toBe(true)
+  })
 })
