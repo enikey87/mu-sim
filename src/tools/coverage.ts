@@ -113,17 +113,26 @@ export function measurePackIssues(m: Measure): string[] {
 }
 
 /**
- * Подделка снимка: запись в RARE + ручные нули в JSON, пока гейт в каждой выборке правило видит.
- * PROVEN не сюда — бот до него может не доходить, хотя прямой случай есть.
+ * Подделка / устаревание снимка по колонкам CI: в JSON ноль, а живой гейт на тех же сидах правило видел.
+ * Обратное (снимок >0, гейт молчит) не краснеет — редкие правила так и гуляют между прогонами.
+ * PROVEN/RARE с нулями только в пакетах 3+ этой проверкой не ловятся; их сторожит exemptionIssues по z.
  */
-export function rareAlwaysReachedIssues(
-  rare: ReadonlySet<string>,
+export function measureCiForgeIssues(
+  m: Measure,
   live: ReadonlyArray<{ fired: Record<string, number> }>,
 ): string[] {
-  if (!live.length) return []
-  return [...rare]
-    .filter((n) => live.every((s) => (s.fired[n] ?? 0) > 0))
-    .map((n) => `${n}: в RARE, а гейт доходит в каждой выборке — снять или перемерить`)
+  const issues: string[] = []
+  const nPacks = Math.min(COVERAGE_SAMPLES.length, live.length, m.packs.length)
+  for (const [n, v] of Object.entries(m.rules)) {
+    for (let i = 0; i < nPacks; i++) {
+      const snap = v[i] ?? 0
+      const got = live[i].fired[n] ?? 0
+      if (snap === 0 && got > 0) {
+        issues.push(`${n}: снимок пакета ${i} = 0, гейт видел ${got} — перемерить (npm run rules:stable)`)
+      }
+    }
+  }
+  return issues
 }
 
 /** grumpy — номера партий (с конца), где бот много грубит: иначе лестница грубости не проходится. */
