@@ -10,6 +10,7 @@ import { RARE } from '../../tools/rare'
 type Case = { event: string; facts?: Facts; target?: string; setup?: (g: Game) => void }
 const CASES: Record<string, Case> = {
   Due_Cosmic: { event: 'PromiseDue', facts: { promise: 0 }, setup: (g) => { g.S.tier = 3; g.recordPromise({ text: 'в пятницу — закину', d: 5 }); g.S.day += 5 } },
+  Due_Kept: { event: 'PromiseDue', facts: { promise: 0 }, setup: (g) => { g.S.mood = 9; g.recordPromise({ text: 'в пятницу — закину', d: 5 }); g.S.day += 5 } },
   Tone_Cow: { event: 'PlayerMessage', facts: { tone: 'cow' } },
   Says_catchLie_liekind_grandpa: { event: 'PlayerSays', facts: { intent: 'catchLie' }, setup: (g) => { g.S.mem['lie.kind'] = 'grandpa' } },
   Says_catchLie_liekind_customer: { event: 'PlayerSays', facts: { intent: 'catchLie' }, setup: (g) => { g.S.mem['lie.kind'] = 'customer' } },
