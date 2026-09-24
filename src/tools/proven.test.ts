@@ -93,6 +93,11 @@ const CASES: Record<string, Case> = {
   Endgame_Away: { event: 'AlikAway', setup: endgame },
   Endgame_Formality: { event: 'StoryBeat', setup: endgame },
   Endgame_NoEnding: { event: 'CheckEnding', setup: endgame },
+  Turn_LightOff: { event: 'AlikTurn', setup: (g) => { g.S.mem['light.off'] = true } },
+  Turn_NetRation: { event: 'AlikTurn', setup: (g) => { g.S.mem['net.ration'] = true } },
+  Idle_PhoneWarn: { event: 'AlikIdle', setup: (g) => { g.S.mem['phone.warn'] = true } },
+  Bill_Warn: { event: 'BillWarn', facts: { bill: 'phone' } },
+  Bill_Due: { event: 'BillDue', facts: { bill: 'phone' } },
 }
 
 function fires(name: string, c: Case): boolean {

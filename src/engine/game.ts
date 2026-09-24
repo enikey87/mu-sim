@@ -14,6 +14,7 @@ import { ACH } from '../content/achievements'
 import { SPEAKS, meet } from '../content/world'
 import { FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_WANDER, OATH_FORMS } from '../content/misc'
 import { STARTS } from '../content/quests'
+import { BILLS, billDue, billDueAt, billStreak, billUnpaid, lightOff, netRation, phoneWarn, type BillId } from '../content/bills'
 import { allRules } from '../content/rules'
 import type { GameEvent } from '../content/rules/events'
 import { CLAIMS, claimByKey, conflicts, CALLBACK_OPEN, type Claim } from '../content/lies'
@@ -168,6 +169,7 @@ export class Game {
     this.rawAudio.setMuted(this.S.muted)
 
     if (!this.S.msgs.length) this.seed()
+    else this.scheduleBills()
     void this.checkAway(opts.away ?? null)
     if (!this.S.choices) this.S.choices = this.buildChoices()
     this.restStatus()
@@ -422,6 +424,7 @@ export class Game {
   adjustMoney(delta: number, reason: string): boolean {
     if (this.moneySealed()) return false
     if (delta === 0) return true
+    if (delta < 0 && -delta > this.S.money) return false
     const before = this.moneyLevel()
     this.S.money = Math.max(0, this.S.money + delta)
     const after = this.moneyLevel()
@@ -437,6 +440,40 @@ export class Game {
       this.notify('🏦', 'Банк', warn)
     }
     return true
+  }
+  /** Поставить в расписание ближайшие платежи (и предупреждение за день). */
+  scheduleBills(): void {
+    if (this.moneySealed()) return
+    for (const bill of BILLS) {
+      if (bill.skip?.(this.S.mem)) continue
+      const atKey = billDueAt(bill.id)
+      const existing = Number(this.S.mem[atKey] ?? 0)
+      if (existing > this.S.day) continue
+      const at = this.S.day + dueIn(bill.due, this.S.day)
+      this.S.mem[atKey] = at
+      this.scheduleEvent(at, 'BillDue', { bill: bill.id })
+      if (at - 1 > this.S.day) this.scheduleEvent(at - 1, 'BillWarn', { bill: bill.id })
+    }
+  }
+  /** Списать платёж или записать неоплату и последствия. */
+  chargeBill(id: BillId): void {
+    if (this.moneySealed()) return
+    const bill = BILLS.find((b) => b.id === id)
+    if (!bill || bill.skip?.(this.S.mem)) return
+    this.rules.applyOps([set(billDue(id), false)], {})
+    delete this.S.mem[billDueAt(id)]
+    if (this.adjustMoney(-bill.amount, bill.label)) {
+      this.rules.applyOps([set(billUnpaid(id), false), set(billStreak(id), 0)], {})
+    } else {
+      const streak = Number(this.S.mem[billStreak(id)] ?? 0) + 1
+      this.rules.applyOps([set(billUnpaid(id), true), set(billStreak(id), streak)], {})
+      this.notify('🏦', 'Банк', `Не прошло: недостаточно средств. ${bill.label}, ${bill.amount.toLocaleString('ru-RU')} ₽. Достоинство не принимается.`)
+      if (id === 'rent' && streak >= 1) this.rules.applyOps([set(lightOff, true)], {})
+      if (id === 'phone' && streak >= 1) this.rules.applyOps([set(phoneWarn, true)], {})
+      if (id === 'phone' && streak >= 2) this.rules.applyOps([set(netRation, true)], {})
+      if (id === 'transit' && streak >= 2) this.rules.applyOps([set(netRation, true)], {})
+    }
+    this.scheduleBills()
   }
   /** Закрыть кнопки допработ в ленте (после Дня выплаты). */
   sealOpenJobs(): void {
@@ -1758,6 +1795,7 @@ export class Game {
     this.push({ kind: 'sep', text: fmtDate(this.S.day) })
     this.S.clock = this.realMinutes()
     if (st.first) this.push({ kind: 'text', from: 'alik', time: fmtTime(this.S.clock), text: st.first })
+    this.scheduleBills()
   }
 
   // для отображения
