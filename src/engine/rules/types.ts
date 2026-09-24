@@ -98,15 +98,15 @@ export interface Rule<G, E extends string = string> {
   weight?: number | ((facts: Facts) => number)
   /** Шанс сработать при выполненных условиях (0..1). */
   odds?: number
-  /** Один раз за игру (matchOnce). */
+  /** Один раз за игру (matchOnce). Промолчавшее правило (respond → false) разовый шанс не тратит. */
   once?: boolean
-  /** Перерыв после срабатывания. */
+  /** Перерыв после срабатывания; промолчавшее правило на перерыв не встаёт. */
   cooldown?: Cooldown
   /** Приоритет речи; по умолчанию 'default'. */
   priority?: Priority
-  /** Записи в память перед ответом (applyFacts). */
+  /** Записи в память перед ответом (applyFacts): ответ видит их; при false откатываются. */
   remember?: FactOp[]
-  /** Ответ. Вернуть false — «ничего не сделал» (для trigger.ifResponded). */
+  /** Ответ. Вернуть false — «ничего не сделал»: правило остаётся как было, а fire отдаёт null. */
   respond?: (ctx: RuleCtx<G>) => void | boolean | Promise<void | boolean>
   /** Для событий-сборщиков: что правило предлагает. */
   offer?: (ctx: RuleCtx<G>) => unknown

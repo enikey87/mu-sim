@@ -3,12 +3,13 @@ import { describe, it, expect } from 'vitest'
 import { makeGame, alikTexts } from '../../test/helpers'
 import { ARCS } from '../arcs'
 import { CHORUS, CHORUS_FED_UP, WEDDING_NOISE, BORIS_SICK, DEAD_KARINE, DEAD_ALIK, PROMISE_DUE } from '../world'
+import { CHORUS_LEGEND } from '../legends'
 import { PROMISE_CONDITIONS } from '../excuses'
 import { LEGENDS } from '../legends'
 import { TALK_REMEMBER } from '../talk'
 import type { Game } from '../../engine/game'
 import type { Msg } from '../../engine/state'
-import { valueOf, type Entry } from '../../engine/rules'
+import { valueOf, spec, lineId, type Entry } from '../../engine/rules'
 
 const pickScene = (game: Game) => game.rules.match({ event: 'PickScene' }, game.facts())?.name
 const texts = (msgs: Msg[]) => msgs.filter((m) => m.kind === 'text').map((m) => (m.kind === 'text' ? m.text : ''))
@@ -173,6 +174,24 @@ describe('хор: упомянутый персонаж вклинивается
   })
   it('у каждого персонажа хора есть реплики', () => {
     for (const [who, arr] of Object.entries(CHORUS)) expect(arr.length, who).toBeGreaterThan(2)
+  })
+  it('реплики кончились: молчит, не копит «вклинивания» и не занимает ход другому упомянутому', async () => {
+    let spokeWhileExhausted = 0
+    for (let seed = 1; seed <= 30; seed++) {
+      const { game } = makeGame({ seed })
+      Object.assign(game.S.mem, { 'intro.garik': true, 'intro.karine': true })
+      for (const l of [...(CHORUS_LEGEND.garik ?? []), ...CHORUS.garik]) game.lines.mark(spec(l).id ?? lineId('CH_garik', spec(l).t))
+      game.alikMsg({ kind: 'text', from: 'alik', text: 'Гарик в горах, Карине у мамы.' })
+      const from = game.S.msgs.length
+      await game.afterTurn()
+      const who = game.S.msgs.slice(from).filter((m) => m.kind === 'text' && m.who).map((m) => (m.kind === 'text' ? m.who : ''))
+      expect(who).not.toContain('garik')
+      expect(game.S.actors.garik?.interjections).toBeUndefined()
+      expect(game.S.rules.cooldown.Chorus_garik).toBeUndefined()
+      if (who.length) spokeWhileExhausted++
+    }
+    // Гарик в очереди первым: раньше его молчание обрывало хор целиком — Карине не получала слова
+    expect(spokeWhileExhausted).toBeGreaterThan(5)
   })
 })
 
