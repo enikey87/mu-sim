@@ -59,8 +59,8 @@ describe('гистерезис покрытия', () => {
     expect(RARE_ZERO_SHARE.allowed).toBe(0.1)
     expect(RARE_ZERO_SHARE.required).toBe(0.3)
   })
-  it('подделка снимка: нули в колонках CI при живом гейте — красное', () => {
-    // Beat_FirstArc в RARE + обнулённые пакеты 0–1 в JSON (#208); живой прогон на тех же сидах ловит
+  it('подделка снимка: нули в колонках CI при живом гейте во всех выборках — красное', () => {
+    // Beat_FirstArc: обнулённые пакеты 0–1; живой прогон видит правило в каждой выборке CI (#208/#230)
     const m: Measure = {
       packs: COVERAGE_SAMPLES,
       rules: { Beat_FirstArc: [0, 0, 5, 4, 2, 1, 1, 3, 3, 3] },
@@ -70,6 +70,8 @@ describe('гистерезис покрытия', () => {
       expect.stringMatching(/^Beat_FirstArc: снимок пакета 0/),
       expect.stringMatching(/^Beat_FirstArc: снимок пакета 1/),
     ])
+    // шум одной выборки (правка текста) — не подделка
+    expect(measureCiForgeIssues(m, [{ fired: { Beat_FirstArc: 1 } }, { fired: {} }, { fired: { Beat_FirstArc: 5 } }])).toEqual([])
     // честный снимок (как у Turn_BorisSick: CI >0, нули только дальше) — зелёный
     expect(measureCiForgeIssues(
       { packs: COVERAGE_SAMPLES, rules: { Turn_BorisSick: [2, 1, 1, 3, 0, 1, 1, 0, 0, 0] } },
@@ -79,13 +81,30 @@ describe('гистерезис покрытия', () => {
       expect.stringMatching(/пакет 0/),
     ])
   })
+  it('подделка вне CI: ноль только в пакете 5 при полосе гистерезиса — красное', () => {
+    const names = ['Beat_FirstArc', 'Often']
+    // всегда-достижимое + один ноль в пакете 5 → z=0.1 без нуля в CI (#230 / аудит #214)
+    const forged: Measure = {
+      packs: [...COVERAGE_SAMPLES, [301], [401], [501], [601], [701], [801], [901]],
+      rules: { Beat_FirstArc: [1, 7, 5, 4, 2, 0, 1, 3, 3, 3] },
+    }
+    expect(exemptionIssues(forged, new Set(['Beat_FirstArc']), names)).toEqual([
+      expect.stringMatching(/^Beat_FirstArc: исключение в полосе гистерезиса без нуля в пакетах CI/),
+    ])
+    // z ≥ required за счёт нулей вне CI — законно (широкий замер)
+    const rareOk: Measure = {
+      packs: forged.packs,
+      rules: { Often: [2, 2, 2, 0, 0, 0, 1, 1, 1, 1] },
+    }
+    expect(exemptionIssues(rareOk, new Set(['Often']), names)).toEqual([])
+  })
   it('классы never — только rare / proven / unexplained; префикс не освобождает', () => {
     expect(neverClass('Tone_Cow')).toBe('rare')
     expect(neverClass('Endgame_Money')).toBe('proven')
     expect(neverClass('Quiet_BrandNew')).toBe('unexplained')
     expect(neverClass('Finale_made_up')).toBe('unexplained')
   })
-  it('PROVEN ⊆ allRules, причины уникальны и называют запись, пересечения с RARE нет', () => {
+  it('PROVEN ⊆ allRules, причины уникальны, содержательны и называют запись, пересечения с RARE нет', () => {
     const names = new Set(allRules.map((r) => r.name))
     const entries = Object.entries(PROVEN)
     expect(entries.filter(([n]) => !names.has(n)).map(([n]) => n)).toEqual([])
@@ -93,6 +112,9 @@ describe('гистерезис покрытия', () => {
     // общая константа на всех (#130) — красная: причин меньше, чем записей
     expect(new Set(entries.map(([, why]) => why)).size).toBe(entries.length)
     expect(entries.filter(([n, why]) => !why.includes(n)).map(([n]) => n)).toEqual([])
+    // шаблон «CASES.<name>» / пустой хвост — не причина (#230)
+    expect(entries.filter(([n, why]) => why === `proven.test.ts CASES.${n}` || why === `${n}:`).map(([n]) => n)).toEqual([])
+    expect(entries.filter(([n, why]) => !why.startsWith(`${n}: `) || why.length < n.length + 8).map(([n]) => n)).toEqual([])
     expect([...RARE].filter((n) => n in PROVEN)).toEqual([])
   })
 })
