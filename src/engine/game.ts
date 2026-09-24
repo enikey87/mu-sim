@@ -99,6 +99,8 @@ export type SayItem = string | { w: string; t: string }
 export type AwayKind = 'text' | 'sticker' | 'fwd' | 'deleted' | 'voice' | 'transfer' | 'excuse' | 'formality' | 'coldWar'
 
 const POOR_REPEAT_DAYS = 14
+/** Минимум сообщений игрока между клятвами легенды — одна защита на все пути (#179). */
+const LEGEND_VOW_GAP = 8
 
 export class Game {
   /** Только чтение: подмена состояния целиком (`this.S = …`) — один из обходов долга из аудита #142. */
@@ -1369,6 +1371,15 @@ export class Game {
     if (due !== null && due > this.S.day) this.scheduleEvent(due, 'PromiseDue', { promise: this.S.promises.length - 1 })
     if (this.S.promises.length >= 20) this.unlock('promises20')
   }
+  /** Пора снова назвать срок легенды: перерыв прошёл (#179). Серия, заведшая легенду, открывает гейт сама (setLegend). */
+  private legendDue(): boolean {
+    return this.S.stats.sent - Number(this.S.mem[memkeys.legendPromiseAt] ?? -99) >= LEGEND_VOW_GAP
+  }
+  /** Срок легенды второй раз в журнал не пишем — повтор не новость (#179). Ключ — условие срока: тексты клятвы разные. */
+  private recordPromiseOnce(p: Promise3): void {
+    if (p.condition && this.S.promises.some((x) => x.condition === p.condition)) return
+    this.recordPromise(p)
+  }
   private alignPromise(p: Promise3, until: string, condition?: PromiseCondition): Promise3 {
     p.text = p.text.replace(p.t, until)
     p.t = until
@@ -1385,9 +1396,8 @@ export class Game {
     // событие легенды уже случилось («свадьба Бориса прошла») — обещать «сразу после него» поздно
     const done = legendSpec?.condition ? this.S.mem[legendSpec.condition] === true : false
     const until = done ? undefined : legendSpec?.until
-    // срок из легенды — после серии обязательно, дальше изредка: одна и та же клятва «как „Нива“ заведётся» приедается
-    const recent = this.S.stats.sent - Number(this.S.mem[memkeys.legendPromiseAt] ?? -99) < 4
-    const fromLegend = !!until && (legend || (!recent && this.chance(0.4)))
+    // срок из легенды — не чаще, чем раз в LEGEND_VOW_GAP сообщений игрока: одна и та же клятва приедается (#179)
+    const fromLegend = !!until && this.legendDue() && (legend || this.chance(0.4))
     if (fromLegend) this.S.mem[memkeys.legendPromiseAt] = this.S.stats.sent
     const p = this.uniq(() => {
       const q = this.X.promise()
@@ -1397,7 +1407,8 @@ export class Game {
       const form = this.line('OATH_FORMS', OATH_FORMS) ?? '{o}, {p}.'
       return { text: form.replace('{o}', this.X.g('OATH')).replace('{P}', cap(q.text)).replace('{p}', q.text), q }
     })
-    this.recordPromise(p.q)
+    if (fromLegend) this.recordPromiseOnce(p.q)
+    else this.recordPromise(p.q)
     await this.say([p.text])
     this.S.ctx = { ...(this.S.ctx ?? {}), ...this.ctxFromPromise(p.q) }
   }
@@ -1444,7 +1455,7 @@ export class Game {
   }
 
   async excuseTurn(): Promise<void> {
-    if (this.legend()) return this.promiseLine(undefined, true)
+    if (this.legend() && this.legendDue()) return this.promiseLine(undefined, true)
     const festive = this.line('HOLIDAY', HOLIDAY_EXCUSES)
     if (festive) { await this.say([festive]); return }
     const ex = this.uniq(() => this.X.excuse({ preferLong: this.S.politeStreak >= 3 }))
@@ -1716,6 +1727,8 @@ export class Game {
     if (arc) m[memkeys.legendOf(arc)] = id
     m[memkeys.legendId] = id
     m[memkeys.legendDay] = this.S.day
+    // серия завела легенду — её срок звучит сразу (новость); дальше гейт закрыт на LEGEND_VOW_GAP сообщений (#179)
+    m[memkeys.legendPromiseAt] = this.S.stats.sent - LEGEND_VOW_GAP
     if (arc) m[memkeys.legendArc] = arc
   }
   /** Текущая легенда (если не устарела). */
@@ -2119,10 +2132,11 @@ export class Game {
       }
       case 'excuse': {
         const legend = this.legend()
-        if (legend) {
+        if (legend && this.legendDue()) {
           const spec = LEGENDS[legend]
           const promise = this.alignPromise(this.X.promise(), spec.until, spec.condition)
-          this.recordPromise(promise)
+          this.S.mem[memkeys.legendPromiseAt] = this.S.stats.sent
+          this.recordPromiseOnce(promise)
           deliver({ kind: 'text', from: 'alik', text: promise.text })
           return
         }
