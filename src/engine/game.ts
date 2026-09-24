@@ -395,6 +395,21 @@ export class Game {
   get ctx(): Ctx | null { return this.S.ctx }
   setCtx(c: Ctx | null): void { this.S.ctx = c }
 
+  /** День выплаты закрыт — долг больше не меняется (ENDGAME.md). */
+  debtSealed(): boolean {
+    return this.S.mem[memkeys.paydayScene] != null
+  }
+  /** Изменить долг. После выплаты — false, значение не тронуто. */
+  adjustDebt(delta: number): boolean {
+    if (this.debtSealed()) return false
+    this.S.debt += delta
+    return true
+  }
+  /** Закрыть кнопки допработ в ленте (после Дня выплаты). */
+  sealOpenJobs(): void {
+    for (const m of this.S.msgs) if (m.kind === 'job' && !m.answered) this.replaceMsg(m, { answered: true })
+  }
+
   // ---------- время ----------
   realHour(): number {
     return this.hour ?? new Date(this.clock.now()).getHours()
@@ -1132,11 +1147,12 @@ export class Game {
     await this.typingFor(1200)
     const amount = Number(this.S.mem[memkeys.nextTransfer] ?? 50)
     delete this.S.mem[memkeys.nextTransfer]
-    this.S.debt -= amount
-    this.S.money += amount
-    if (++this.S.stats.fifty >= 5) this.unlock('fifty5')
     this.alikMsg({ kind: 'transfer', from: 'alik', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE), amount })
     this.S.ctx = { type: 'transfer', amount }
+    if (this.adjustDebt(-amount)) {
+      this.S.money += amount
+      if (++this.S.stats.fifty >= 5) this.unlock('fifty5')
+    }
   }
 
   async sticker(fixed?: { e: string; c: string }): Promise<void> {
@@ -1319,8 +1335,8 @@ export class Game {
     for (const x of m) this.seen.mark(typeof x === 'string' ? x : x.t)
     this.markTopical(await this.say(m))
     if (typeof ep.legend === 'string' && this.S.ctx) this.S.ctx.legend = ep.legend // новая легенда — есть что переспросить
-    if (ep.fx?.debt) this.S.debt += ep.fx.debt
-    if (ep.fx?.pay) { this.S.debt -= ep.fx.pay; this.S.money += ep.fx.pay }
+    if (ep.fx?.debt) this.adjustDebt(ep.fx.debt)
+    if (ep.fx?.pay && this.adjustDebt(-ep.fx.pay)) this.S.money += ep.fx.pay
     if (ep.item) this.S.items.push(ep.item)
     if (ep.state) this.rules.applyOps([{ key: ep.state.key, op: '=', value: true, forDays: ep.state.days, scope: ep.state.actor ? 'target' : 'world' }], { target: ep.state.actor })
     if (ep.fx?.days) this.nextDay(ep.fx.days)
@@ -1492,11 +1508,11 @@ export class Game {
 
     const fx = n.fx ?? {}
     if (fx.days) this.nextDay(fx.days)
-    if (fx.debt) S.debt += fx.debt
+    if (fx.debt) this.adjustDebt(fx.debt)
     if (fx.money) S.money += fx.money
     if (fx.mood) this.mood(fx.mood)
-    if (fx.barter) { S.debt -= v.v; S.items.push(v.n) }
-    if (fx.invoice) S.debt -= v.total
+    if (fx.barter && this.adjustDebt(-v.v)) S.items.push(v.n)
+    const invoiced = !!fx.invoice && this.adjustDebt(-v.total)
     if (fx.ach) this.unlock(fx.ach)
     if (fx.legend !== undefined) this.setLegend(fx.legend)
     if (fx.set) this.rules.applyOps(Object.entries(fx.set).map(([key, value]) => ({ key, op: '=' as const, value })), {})
@@ -1510,7 +1526,7 @@ export class Game {
       // позиция вычтена — во втором акте её уже не будет
       this.rules.applyOps((v.rows as Array<[string, number]>).map(([t]) => set(invKey(t), true)), {})
       await this.sleep(600)
-      this.sys(`Алик вычел из долга ${v.total.toLocaleString('ru-RU')} ₽ по акту.`)
+      if (invoiced) this.sys(`Алик вычел из долга ${v.total.toLocaleString('ru-RU')} ₽ по акту.`)
     }
     if (n.a2) await this.say([n.who2 ? gen('a2', n.a2)() : variant('a2', n.a2)], false, n.who2)
     if (n.sys2) { await this.sleep(700); this.sys(gen('sys2', n.sys2)()) }
@@ -1537,11 +1553,16 @@ export class Game {
       if (yes) {
         const add = 5000 + this.rnd(16) * 1000
         this.nextDay(2 + this.rnd(3))
-        this.sys(`Вы сделали работу. Долг Алика вырос на ${add.toLocaleString('ru-RU')} ₽`)
-        this.S.debt += add
-        this.mood(2)
-        this.unlock('fence')
-        await this.say([this.uniq(this.X.jobYes)])
+        if (this.adjustDebt(add)) {
+          this.sys(`Вы сделали работу. Долг Алика вырос на ${add.toLocaleString('ru-RU')} ₽`)
+          this.mood(2)
+          this.unlock('fence')
+          await this.say([this.uniq(this.X.jobYes)])
+        } else {
+          // кнопка в ленте после Дня выплаты: мир уже закрыт, долг не трогаем
+          this.sys('Работа сделана. Долг уже закрыт Днём выплаты — ничего не выросло.')
+          await this.say([this.uniq(this.X.jobYes)])
+        }
       } else {
         this.mood(-1)
         await this.say([this.uniq(this.X.jobNo)])
@@ -1626,7 +1647,10 @@ export class Game {
       case 'deleted': deliver({ kind: 'text', from: 'alik', text: '', deleted: true }); return
       case 'voice': deliver({ kind: 'voice', from: 'alik', len: 10 + this.rnd(50) }); return
       case 'transfer':
-        this.S.debt -= 50; this.S.money += 50; this.S.stats.fifty++
+        if (this.adjustDebt(-50)) {
+          this.S.money += 50
+          this.S.stats.fifty++
+        }
         deliver({ kind: 'transfer', from: 'alik', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE), amount: 50 })
         return
       case 'formality': for (const text of this.formalityLines()) deliver({ kind: 'text', from: 'alik', text }); return
