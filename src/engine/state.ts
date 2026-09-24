@@ -91,7 +91,7 @@ export const isLate = (p: PromiseRec, day: number): boolean => p.due != null && 
 export interface GameState {
   day: number
   clock: number
-  /** Только чтение: пишет один Game.adjustDebt (после Дня выплаты долг запечатан). Страж — engine/debt.test.ts. */
+  /** Пишет один Game.adjustDebt (страж — engine/debt.test.ts). */
   readonly debt: number
   patience: number
   politeStreak: number
@@ -114,7 +114,7 @@ export interface GameState {
   arcs: Record<string, { i: number; last: number; byAsk?: boolean }>
   tier: number
   battery: number
-  /** Только чтение: пишет один Game.adjustMoney (в эндгейме деньги запечатаны). Страж — engine/money.test.ts. */
+  /** Пишет один Game.adjustMoney (страж — engine/money.test.ts). */
   readonly money: number
   lastSeen: number
   /** Память мира для системы правил: счётчики, факты, временные состояния. */
@@ -129,13 +129,37 @@ export interface GameState {
 }
 
 export function freshState(): GameState {
-  return {
+  return sealCounts({
     day: START_DAY, clock: 9 * 60 + 41, debt: DEBT0, patience: MAX_PATIENCE, politeStreak: 0, mood: 5,
     msgs: [], nextId: 1, ach: {}, promises: [], seen: [], bags: {}, items: [],
     stats: { moo: 0, fifty: 0, sent: 0 },
     offlineDays: 0, ram: false, muted: false, scene: null, ctx: null, choices: null, arcs: {}, tier: 0,
     battery: 100, money: 12400, lastSeen: 0, mem: {}, actors: {}, rules: freshRuleState(), endings: {}, ending: null,
+  })
+}
+
+/**
+ * Счёт партии (долг, деньги) — геттер без сеттера над приватной ячейкой: присваивание, `Object.assign`,
+ * `Reflect.set` и запись по ключу его не меняют (strict mode — TypeError, `Reflect.set` — false).
+ * Пишет только `setCount` из `Game.adjustDebt` / `Game.adjustMoney` (страж — `debt.test.ts`, `money.test.ts`).
+ */
+export type CountKey = 'debt' | 'money'
+const CELLS = new WeakMap<object, Record<CountKey, number>>()
+const cell = (s: GameState): Record<CountKey, number> => {
+  const c = CELLS.get(s)
+  if (!c) throw new Error('счёт без ячейки: состояние собрано не freshState/loadState')
+  return c
+}
+export const countOf = (s: GameState, key: CountKey): number => cell(s)[key]
+export const setCount = (s: GameState, key: CountKey, v: number): void => { cell(s)[key] = v }
+
+/** Значение — в ячейку, на объекте остаётся только чтение (enumerable — иначе `JSON.stringify` его не сохранит). */
+function sealCounts(s: GameState): GameState {
+  CELLS.set(s, { debt: s.debt, money: s.money })
+  for (const key of ['debt', 'money'] as CountKey[]) {
+    Object.defineProperty(s, key, { get: (): number => cell(s)[key], enumerable: true, configurable: false })
   }
+  return s
 }
 
 export interface Storage {
@@ -150,7 +174,7 @@ export function loadState(storage: Storage | null): GameState | null {
     const raw = storage.getItem(SAVE_KEY)
     if (!raw) return null
     const s = JSON.parse(raw)
-    return s && Array.isArray(s.msgs) ? { ...freshState(), ...s } : null
+    return s && Array.isArray(s.msgs) ? sealCounts({ ...freshState(), ...s }) : null
   } catch {
     return null
   }

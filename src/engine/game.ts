@@ -47,7 +47,7 @@ import { UiState, type Moo, type Notif, type SendFeel } from './ui-state'
 import { classifyUserInput, legalClaim, type ClassifiedInput } from './input'
 import { holidayOf, HOLIDAY_EXCUSES } from '../content/holidays'
 import { dueIn, dateOf, fmtDate, fmtDayMonth, fmtTime, nightHour, periodOf, tierOf, TIERS, type Due, type Period } from './time'
-import { type GameState, type Msg, type NewMsg, type Choice, type Ctx, type Tone, type Storage, type InputCategory, freshState, loadState, saveState, SAVE_KEY, LEND50_SEEN_KEY, MAX_PATIENCE, isLate, type PromiseRec } from './state'
+import { type GameState, type Msg, type NewMsg, type Choice, type Ctx, type Tone, type Storage, type InputCategory, freshState, loadState, saveState, SAVE_KEY, LEND50_SEEN_KEY, MAX_PATIENCE, isLate, countOf, setCount, type PromiseRec } from './state'
 
 /** Текст срока как буквальный шаблон без учёта регистра; кэш — topicOfLast зовётся из facts() на каждую реплику. */
 const LITERAL = new Map<string, RegExp>()
@@ -99,7 +99,8 @@ export type SayItem = string | { w: string; t: string }
 export type AwayKind = 'text' | 'sticker' | 'fwd' | 'deleted' | 'voice' | 'transfer' | 'excuse' | 'formality' | 'coldWar'
 
 export class Game {
-  S: GameState
+  /** Только чтение: подмена состояния целиком (`this.S = …`) — один из обходов долга из аудита #142. */
+  readonly S: GameState
   readonly rng: Rng
   readonly clock: Clock
   private readonly rawAudio: Audio
@@ -438,8 +439,7 @@ export class Game {
   /** Изменить долг. После выплаты — false, значение не тронуто. */
   adjustDebt(delta: number): boolean {
     if (this.debtSealed()) return false
-    const w: { debt: number } = this.S // единственная запись: S.debt readonly
-    w.debt += delta
+    setCount(this.S, 'debt', countOf(this.S, 'debt') + delta)
     return true
   }
   // Дно ≤ 6000 (как старый FLOOR); «мало» ≤ 9000 — предупреждение до дна. Старт 12400.
@@ -461,11 +461,10 @@ export class Game {
     if (delta === 0) return true
     if (delta < 0 && -delta > this.S.money) return false
     const before = this.moneyLevel()
-    const w: { money: number } = this.S // единственная запись: S.money readonly
-    w.money = Math.max(0, w.money + delta)
+    setCount(this.S, 'money', Math.max(0, countOf(this.S, 'money') + delta))
     const after = this.moneyLevel()
     const amount = Math.abs(delta).toLocaleString('ru-RU')
-    const bal = w.money.toLocaleString('ru-RU')
+    const bal = countOf(this.S, 'money').toLocaleString('ru-RU')
     const kind = delta < 0 ? 'Списание' : 'Поступление'
     this.notify('🏦', 'Банк', `${kind} ${amount} ₽. ${reason}. Баланс: ${bal} ₽`)
     const rank = { normal: 2, low: 1, bottom: 0 }
@@ -852,7 +851,9 @@ export class Game {
     const n = p.spec as L.Notif
     if (n.spend) {
       const spend = 90 + this.rnd(40) * 10
-      this.adjustMoney(-spend, this.draw('SPEND', L.SPEND))
+      const why = this.draw('SPEND', L.SPEND)
+      // отказ банка звучит: иначе трата исчезает молча (#185)
+      if (!this.adjustMoney(-spend, why)) this.notify('🏦', 'Банк', `Не прошло: недостаточно средств. ${why}, ${spend.toLocaleString('ru-RU')} ₽.`)
       return
     }
     this.notify(n.icon, n.app, p.text)
@@ -1660,6 +1661,8 @@ export class Game {
     if (typeof ep.legend === 'string' && this.S.ctx) this.S.ctx.legend = ep.legend // новая легенда — есть что переспросить
     // серия, которая двигает долг, объявляет это в sys — объявление только о том, что случилось
     const debtFx = !!(ep.fx?.debt || ep.fx?.pay)
+    // после выплаты долг запечатан: adjustDebt откажет в любой ветке — серия не двигает и календарь (#189)
+    const refused = debtFx && this.debtSealed()
     let debtMoved = !!ep.fx?.debt && this.adjustDebt(ep.fx.debt)
     if (ep.fx?.pay && this.adjustDebt(-ep.fx.pay)) {
       this.adjustMoney(ep.fx.pay, 'Выплата')
@@ -1669,7 +1672,7 @@ export class Game {
     }
     if (ep.item) this.S.items.push(ep.item)
     if (ep.state) this.rules.applyOps([{ key: ep.state.key, op: '=', value: true, forDays: ep.state.days, scope: ep.state.actor ? 'target' : 'world' }], { target: ep.state.actor })
-    if (ep.fx?.days) this.nextDay(ep.fx.days)
+    if (ep.fx?.days && !refused) this.nextDay(ep.fx.days)
     if (ep.sys && (!debtFx || debtMoved)) { await this.sleep(500); this.sys(ep.sys) }
     if (ep.fx?.ach) this.unlock(ep.fx.ach)
     if (ep.fx?.offline) this.goOffline(ep.fx.offline)
@@ -1901,15 +1904,21 @@ export class Game {
     const variant = (key: string, arr: Entry<Line>[]) => this.uniq(gen(key, arr))
 
     const fx = n.fx ?? {}
-    if (fx.days) this.nextDay(fx.days)
     const debtFx = !!(fx.debt || fx.barter || fx.invoice)
-    let debtMoved = !!fx.debt && this.adjustDebt(fx.debt)
-    if (fx.money) this.adjustMoney(fx.money, 'По карте')
+    // та же природа отказа, что и у серии: запечатанный долг — узел не двигает и календарь (#189)
+    const refused = debtFx && this.debtSealed()
+    if (fx.days && !refused) this.nextDay(fx.days)
+    // платёж с карты идёт первым: не прошёл — узел не брал денег и не берёт их следствий (#185)
+    const pays = (fx.money ?? 0) < 0
+    const paid = !pays || this.adjustMoney(fx.money!, 'По карте')
+    if (pays && !paid) this.notify('🏦', 'Банк', `Не прошло: недостаточно средств. Перевод ${Math.abs(fx.money!).toLocaleString('ru-RU')} ₽ не ушёл.`)
+    if (!pays && fx.money) this.adjustMoney(fx.money, 'По карте')
+    let debtMoved = !!fx.debt && paid && this.adjustDebt(fx.debt)
     if (fx.mood) this.mood(fx.mood)
     if (fx.barter && this.adjustDebt(-v.v)) { S.items.push(v.n); debtMoved = true }
     const invoiced = !!fx.invoice && this.adjustDebt(-v.total)
     debtMoved ||= invoiced
-    if (fx.ach) this.unlock(fx.ach)
+    if (fx.ach && paid) this.unlock(fx.ach)
     if (fx.amnesty) this.amnesty()
     if (fx.legend !== undefined) this.setLegend(fx.legend)
     if (fx.set) this.rules.applyOps(Object.entries(fx.set).map(([key, value]) => ({ key, op: '=' as const, value })), {})

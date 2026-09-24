@@ -934,5 +934,43 @@ describe('Game: деньги на карте', () => {
     expect(game.S.money).toBe(m)
   })
   // одна точка записи денег — страж engine/money.test.ts: тип (readonly) + разбор исходников
+
+  it('трата с карты без денег: банк отказывает вслух, а не молча (#185)', () => {
+    const { game } = makeGame()
+    setMoney(game, 50) // меньше самой мелкой траты (90) — отказ гарантирован
+    let refusals = 0
+    for (let i = 0; i < 200 && !refusals; i++) {
+      game.randomNotif()
+      if (game.ui.notif && /Не прошло/.test(game.ui.notif.text)) refusals++
+      else if (game.ui.notif) game.dismissNotif()
+    }
+    expect(refusals, 'пул NOTIF не выдал ни одной траты — проверка была бы пустой').toBeGreaterThan(0)
+    expect(game.S.money).toBe(50)
+  })
+
+  it('«займи 5000» без денег: долг не растёт, «Инвестор» не выдаётся, банк отказывает (#185)', async () => {
+    const { game } = makeGame()
+    const drain = (re: RegExp) => {
+      for (let i = 0; i < 8 && game.ui.notif && !re.test(game.ui.notif.text); i++) game.dismissNotif()
+      expect(game.ui.notif?.text).toMatch(re)
+    }
+    setMoney(game, 1000)
+    const debt = game.S.debt
+    await game.enterNode('lend', 'yes')
+    expect(game.S.debt).toBe(debt)
+    expect(game.S.ach.lend).toBeUndefined()
+    expect(game.S.msgs.some((m) => m.kind === 'sys' && /Вы перевели Алику/.test(m.text))).toBe(false)
+    drain(/Не прошло/)
+
+    // те же деньги есть — перевод идёт, и всё, что он обещает, случается
+    const { game: paid } = makeGame()
+    setMoney(paid, 20000)
+    const before = paid.S.debt
+    await paid.enterNode('lend', 'yes')
+    expect(paid.S.debt).toBe(before + 5000)
+    expect(paid.S.money).toBe(15000)
+    expect(paid.S.ach.lend).toBe(paid.S.day) // unlock пишет день, а не «выдано»
+    expect(paid.S.msgs.some((m) => m.kind === 'sys' && /Вы перевели Алику/.test(m.text))).toBe(true)
+  })
 })
 
