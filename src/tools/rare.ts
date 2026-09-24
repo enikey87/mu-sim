@@ -13,5 +13,6 @@ export const RARE = new Set([
   // в одной-двух выборках из трёх: состояние складывается не каждый раз
   'Says_catchLie_caught2',
   'Turn_Wedding_Samvel', 'Turn_Wedding_Razmik',
-  'Turn_BorisSick',
+  // сцена «жена» / квест «Нива»: сдвиг пула кнопок срока меняет траекторию бота (были в покрытии на main)
+  'Scene_wife', 'Quest_q_niva',
 ])

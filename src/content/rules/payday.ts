@@ -25,7 +25,9 @@ export const PAYDAY_HOOKS: Record<string, (game: Game) => Promise<void>> = {
   // утро: линии партии отдают деньги, счётчик растёт до долга (с допработами), а не до 240 000 из договора
   morning: async (game) => {
     await game.sleep(700)
-    game.nextDay(1)
+    // анонс ставит payday.at = day+1 («завтра»); away/зарядка могут сдвинуть календарь, пока сцена висит
+    const at = Number(game.S.mem[pd.at] ?? game.S.day + 1)
+    if (game.S.day < at) game.nextDay(at - game.S.day)
     game.sys('— День выплаты —')
     const owed = game.S.debt
     let sum = 0
