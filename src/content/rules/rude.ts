@@ -162,7 +162,7 @@ export const rudeRules: R[] = [
     name: 'Phone_Karine_' + event, event, when: [is(phoneKarine)], bonus: 9,
     respond: async ({ game }) => { const t = game.line('PHONE_KARINE', T.PHONE_KARINE); if (t) await game.say([{ w: 'karine', t }]) },
   })),
-  ...(['AlikIdle', 'StoryBeat', 'PeriodLine', 'PromiseDue'] as GameEvent[]).map((event): R => ({ name: 'Quiet_PhoneKarine_' + event, event, when: [is(phoneKarine)], bonus: 9, respond: () => {} })),
+  ...(['AlikIdle', 'AlikAway', 'StoryBeat', 'PeriodLine', 'PromiseDue'] as GameEvent[]).map((event): R => ({ name: 'Quiet_PhoneKarine_' + event, event, when: [is(phoneKarine)], bonus: 9, respond: () => {} })),
   // состояния: блок, вежливость, вендетта перекрывают обычный ход
   { name: 'Turn_Blocked', event: 'AlikTurn', when: [is(blocked)], respond: async ({ game }) => { if (!(await sayFresh(game, 'ALT', T.RUDE_ALT))) await game.excuseTurn() } },
   {

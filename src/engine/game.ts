@@ -74,6 +74,8 @@ export const REVIVED = /встал|встаёт|воскрес|вернулас�
 export const FESTIVE = /свадьб|крестин|юбилей|обручен|день рождения|отмечаем|обмываем|празд|родился|поступил|выпускн|сватовств|помолвк|открыва|открыли|приехал|вернулся|урожа|отелилась|правнук|первое слово|дочку выдают/
 
 export type SayItem = string | { w: string; t: string }
+/** Что пришло, пока игрока не было: виды сообщений пачки непрочитанных. */
+export type AwayKind = 'text' | 'sticker' | 'fwd' | 'deleted' | 'voice' | 'transfer' | 'excuse' | 'formality'
 
 export class Game {
   S: GameState
@@ -158,7 +160,7 @@ export class Game {
     this.rawAudio.setMuted(this.S.muted)
 
     if (!this.S.msgs.length) this.seed()
-    this.checkAway(opts.away ?? null)
+    void this.checkAway(opts.away ?? null)
     if (!this.S.choices) this.S.choices = this.buildChoices()
     this.restStatus()
     if (this.battery.level === 0) this.battery.die()
@@ -612,9 +614,9 @@ export class Game {
     this.save()
     this.emit()
   }
-  private onPhoneCharged(): void {
+  private async onPhoneCharged(): Promise<void> {
     this.ui.busy = false
-    this.awayBurst(2 + this.rnd(3), 1 + this.rnd(2), 'Пока телефон заряжался')
+    await this.awayBurst(2 + this.rnd(3), 1 + this.rnd(2), 'Пока телефон заряжался')
     this.armIdle()
     this.armStatus()
   }
@@ -1437,12 +1439,15 @@ export class Game {
     await this.say([this.draw('ENDGAME_LEAVE', ENDGAME_LEAVE)])
   }
 
-  async endgameFormality(): Promise<void> {
+  /** Очередной закрывающий акт (на круглом счёте — и юбилей); счёт актов растёт здесь. */
+  formalityLines(): string[] {
     const n = Number(this.S.mem[memkeys.endgame.forms] ?? 0) + 1
     this.S.mem[memkeys.endgame.forms] = n
-    await this.say([this.draw('ENDGAME_FORMALITIES', ENDGAME_FORMALITIES)])
     const jubilee = ENDGAME_JUBILEES[n]
-    if (jubilee) await this.say([jubilee])
+    return [this.draw('ENDGAME_FORMALITIES', ENDGAME_FORMALITIES), ...(jubilee ? [jubilee] : [])]
+  }
+  async endgameFormality(): Promise<void> {
+    for (const text of this.formalityLines()) await this.say([text])
     this.S.ctx = null
   }
 
@@ -1586,65 +1591,75 @@ export class Game {
     this.ui.unread = 0
     this.ui.title = 'Алик, где деньги?'
   }
-  private awayMsg(): void {
-    const r = this.rng.random()
+  /** Сообщение пачки непрочитанных: пришло в момент `S.clock`, без «печатает…». Что именно — решает правило AlikAway. */
+  awayMsg(kind: AwayKind): void {
     const base = { from: 'alik' as const, time: fmtTime(this.S.clock) }
-    if (r < 0.35) { this.push({ ...base, kind: 'text', text: this.addrLine('IDLE', L.IDLE) }); return }
-    if (r < 0.5) { const s = this.draw('STICKERS', L.STICKERS); this.push({ ...base, kind: 'sticker', e: s.e, c: s.c }); return }
-    if (r < 0.65) {
-      const f = this.seen.pickFresh(() => this.draw('FWD', L.FWD), (x) => x)
-      this.seen.mark(f.t)
-      this.push({ ...base, kind: 'fwd', f: f.f, text: f.t })
-      return
+    switch (kind) {
+      case 'text': this.push({ ...base, kind: 'text', text: this.addrLine('IDLE', L.IDLE) }); return
+      case 'sticker': { const s = this.draw('STICKERS', L.STICKERS); this.push({ ...base, kind: 'sticker', e: s.e, c: s.c }); return }
+      case 'fwd': {
+        const f = this.seen.pickFresh(() => this.draw('FWD', L.FWD), (x) => x)
+        this.seen.mark(f.t)
+        this.push({ ...base, kind: 'fwd', f: f.f, text: f.t })
+        return
+      }
+      case 'deleted': this.push({ ...base, kind: 'text', text: '', deleted: true }); return
+      case 'voice': this.push({ ...base, kind: 'voice', len: 10 + this.rnd(50) }); return
+      case 'transfer':
+        this.S.debt -= 50; this.S.money += 50; this.S.stats.fifty++
+        this.push({ ...base, kind: 'transfer', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE), amount: 50 })
+        return
+      case 'formality': for (const text of this.formalityLines()) this.push({ ...base, kind: 'text', text }); return
+      case 'excuse': {
+        const legend = this.legend()
+        if (legend) {
+          const spec = LEGENDS[legend]
+          const promise = this.alignPromise(this.X.promise(), spec.until, spec.condition)
+          this.recordPromise(promise)
+          this.push({ ...base, kind: 'text', text: promise.text })
+          return
+        }
+        const ex = this.uniq(() => this.X.excuse())
+        this.meetRel(ex.r)
+        this.recordPromise(ex.p)
+        this.push({ ...base, kind: 'text', text: ex.texts.join(' ') })
+      }
     }
-    if (r < 0.75) { this.push({ ...base, kind: 'text', text: '', deleted: true }); return }
-    if (r < 0.85) { this.push({ ...base, kind: 'voice', len: 10 + this.rnd(50) }); return }
-    if (r < 0.92) {
-      this.S.debt -= 50; this.S.money += 50; this.S.stats.fifty++
-      this.push({ ...base, kind: 'transfer', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE), amount: 50 })
-      return
-    }
-    const legend = this.legend()
-    if (legend) {
-      const spec = LEGENDS[legend]
-      const promise = this.alignPromise(this.X.promise(), spec.until, spec.condition)
-      this.recordPromise(promise)
-      this.push({ ...base, kind: 'text', text: promise.text })
-      return
-    }
-    const ex = this.uniq(() => this.X.excuse())
-    this.meetRel(ex.r)
-    this.recordPromise(ex.p)
-    this.push({ ...base, kind: 'text', text: ex.texts.join(' ') })
   }
-  awayBurst(n: number, days: number, why?: string): void {
+  /** Пачка «пока тебя не было»: n событий AlikAway. Мир решает, пишет ли Алик (смерть, блок, эндгейм) — заголовок и счётчик только по тому, что пришло. */
+  async awayBurst(n: number, days: number, why?: string): Promise<void> {
     this.nextDay(days)
-    this.push({ kind: 'sys', text: `${why ? why + ' — ' : ''}непрочитанные сообщения`, unread: true })
+    const at = this.S.msgs.length
     // пришли, пока игрока не было, — до «сейчас»: иначе часы переписки убегают вперёд настоящих
     const now = this.S.clock
     const times = Array.from({ length: n }, () => now - this.rnd(Math.min(now, 360) + 1)).sort((a, b) => a - b)
-    for (const t of times) { this.S.clock = t; this.awayMsg() }
+    for (const t of times) { this.S.clock = t; await this.fire('AlikAway') }
     this.S.clock = now
-    this.ui.unread = n
-    this.ui.title = `(${n}) Алик, где деньги?`
-    this.unlock('away')
-    this.notify('💬', 'Алик Воздухонесян', `${n} ${n < 5 ? 'новых сообщения' : 'новых сообщений'}`)
-    this.audio.beep()
-    this.S.ctx = { type: 'idle' }
+    const got = this.S.msgs.length - at
+    if (got) {
+      this.S.msgs.splice(at, 0, { kind: 'sys', text: `${why ? why + ' — ' : ''}непрочитанные сообщения`, unread: true, id: this.S.nextId++ })
+      this.touchMsgs(at)
+      this.ui.unread = got
+      this.ui.title = `(${got}) Алик, где деньги?`
+      this.unlock('away')
+      this.notify('💬', 'Алик Воздухонесян', `${got} ${got < 5 ? 'новых сообщения' : 'новых сообщений'}`)
+      this.audio.beep()
+      this.S.ctx = { type: 'idle' }
+    }
     this.S.choices = this.buildChoices()
     this.save()
     this.emit()
   }
-  checkAway(awayOverride: number | null): void {
+  async checkAway(awayOverride: number | null): Promise<void> {
     const gapMin = awayOverride ?? (this.S.lastSeen ? (this.clock.now() - this.S.lastSeen) / 60000 : 0)
     if (gapMin < 15 || !this.S.stats.sent) return
     if (gapMin > 120) this.battery.restore() // телефон заряжался
-    this.awayBurst(Math.min(5, 1 + Math.floor(gapMin / 30)), Math.min(10, 1 + Math.floor(gapMin / 120)))
+    await this.awayBurst(Math.min(5, 1 + Math.floor(gapMin / 30)), Math.min(10, 1 + Math.floor(gapMin / 120)))
   }
-  onVisibility(hidden: boolean): void {
+  async onVisibility(hidden: boolean): Promise<void> {
     if (hidden) { this.hiddenAt = this.clock.now(); this.save(); return }
     const gapMin = (this.clock.now() - this.hiddenAt) / 60000
-    if (this.hiddenAt && gapMin >= 3 && !this.ui.busy && !this.battery.dead && this.S.stats.sent) this.awayBurst(Math.min(4, 1 + Math.floor(gapMin / 10)), 1)
+    if (this.hiddenAt && gapMin >= 3 && !this.ui.busy && !this.battery.dead && this.S.stats.sent) await this.awayBurst(Math.min(4, 1 + Math.floor(gapMin / 10)), 1)
   }
 
   // ---------- начало ----------
