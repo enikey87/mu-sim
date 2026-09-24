@@ -104,6 +104,11 @@ export const paydayScene = 'payday'
 export const lightOff = 'light.off'
 export const netRation = 'net.ration'
 export const phoneWarn = 'phone.warn'
+/** Кредитная лестница / мама-запаска — точные ключи; семейства sold./mom./credit.<loan>.* — в factkeys. */
+export const creditStage = 'credit.stage'
+export const creditOffer = 'credit.offer'
+export const creditBroke = 'credit.broke'
+export const momDone = 'mom.done'
 
 /** Ключи досок персонажей (S.actors), не мира. */
 export const sick = 'sick'
@@ -127,5 +132,6 @@ export const MEM_KEYS: ReadonlySet<string> = new Set([
   garikConcrete, garikCut, houseOnGarik, borisMarried, borisSmetaReady, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday,
   lightOff, netRation, phoneWarn,
+  creditStage, creditOffer, creditBroke, momDone,
   ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lend50), ...Object.values(lie),
 ])

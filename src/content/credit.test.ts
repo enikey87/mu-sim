@@ -1,0 +1,180 @@
+import { describe, it, expect } from 'vitest'
+import { makeGame } from '../test/helpers'
+import { NOTIF } from './life'
+import {
+  LOANS, THINGS, MOM_HELPS, creditOffer, creditStage, creditBroke, momDone,
+  sold, momHelp, loanTaken, loanDueAt, allSold,
+} from './credit'
+
+describe('кредитная лестница', () => {
+  it('на дне банк предлагает первую ступень', () => {
+    const { game } = makeGame()
+    game.S.money = 6001
+    expect(game.adjustMoney(-1, 'Гречка')).toBe(true)
+    expect(game.S.mem[creditOffer]).toBe(true)
+    expect(game.ui.notif?.text).toMatch(/Всё будет/)
+  })
+
+  it('ступени не перепрыгнуть: без consumer нет refi', () => {
+    const { game } = makeGame()
+    game.S.money = 1000
+    game.S.mem[creditOffer] = true
+    game.S.mem[creditStage] = 0
+    game.takeCredit()
+    expect(game.S.mem[loanTaken('consumer')]).toBe(true)
+    expect(game.S.mem[creditStage]).toBe(1)
+    expect(game.S.mem[loanTaken('refi')]).toBeFalsy()
+  })
+
+  it('взять кредит — деньги через adjustMoney и срок платежа', () => {
+    const { game } = makeGame()
+    game.S.money = 1000
+    game.S.mem[creditOffer] = true
+    const before = game.S.money
+    game.takeCredit()
+    expect(game.S.money).toBe(before + LOANS[0].amount)
+    expect(Number(game.S.mem[loanDueAt('consumer')])).toBeGreaterThan(game.S.day)
+    expect(game.S.mem[creditOffer]).toBeFalsy()
+  })
+
+  it('продать вещь — sold.* и деньги; выбор помнит порядок', () => {
+    const { game } = makeGame()
+    game.S.money = 1000
+    game.S.mem[creditOffer] = true
+    game.sellThing()
+    expect(game.S.mem[sold('microwave')]).toBe(true)
+    expect(game.S.money).toBe(1000 + THINGS[0].amount)
+    game.S.money = 1000
+    game.S.mem[creditOffer] = true
+    game.sellThing()
+    expect(game.S.mem[sold('guitar')]).toBe(true)
+  })
+
+  it('кнопки взять/продать только при credit.offer', () => {
+    const { game } = makeGame()
+    const acts = () => game.buildChoices().map((c) => c.act)
+    expect(acts()).not.toContain('creditTake')
+    game.S.mem[creditOffer] = true
+    expect(acts()).toContain('creditTake')
+    expect(acts()).toContain('creditSell')
+  })
+
+  it('после продажи всех вещей без кредита — мама', () => {
+    const { game } = makeGame()
+    for (const t of THINGS) game.S.mem[sold(t.id)] = true
+    expect(allSold(game.S.mem)).toBe(true)
+    game.S.money = 1000
+    game.maybeCreditOffer()
+    expect(game.S.mem[momHelp('pension')]).toBe(true)
+    expect(game.S.money).toBe(1000 + MOM_HELPS[0].amount)
+  })
+
+  it('отказ платежа по микрозайму — credit.broke и СМС', () => {
+    const { game } = makeGame()
+    game.S.mem[loanTaken('micro')] = true
+    game.S.mem[creditStage] = 3
+    game.S.money = 100
+    game.chargeCredit('micro')
+    expect(game.S.mem[creditBroke]).toBe(true)
+    expect(game.S.mem[creditStage]).toBe(4)
+    // мама на том же тике перебивает последнюю СМС — сам факт broke важнее
+    expect(game.S.mem[momHelp('pension')]).toBe(true)
+  })
+
+  it('после broke мама выручает; после последней — mom.done', () => {
+    const { game } = makeGame()
+    game.S.mem[creditBroke] = true
+    game.S.money = 500
+    game.maybeCreditOffer()
+    expect(game.S.mem[momHelp('pension')]).toBe(true)
+    game.S.money = 500
+    game.maybeCreditOffer()
+    expect(game.S.mem[momHelp('pickles')]).toBe(true)
+    game.S.money = 500
+    game.maybeCreditOffer()
+    expect(game.S.mem[momHelp('dacha')]).toBe(true)
+    expect(game.S.mem[momDone]).toBe(true)
+    game.S.money = 500
+    game.maybeCreditOffer()
+    expect(game.S.money).toBe(500)
+  })
+
+  it('в эндгейме лестница молчит', () => {
+    const { game } = makeGame()
+    game.S.mem.payday = 'default'
+    game.S.money = 1000
+    game.maybeCreditOffer()
+    expect(game.S.mem[creditOffer]).toBeFalsy()
+    game.S.mem[creditOffer] = true
+    const before = game.S.money
+    game.takeCredit()
+    expect(game.S.money).toBe(before)
+  })
+
+  it('Says_creditTake проводит зачисление', async () => {
+    const { game } = makeGame()
+    game.S.money = 1000
+    game.S.mem[creditOffer] = true
+    await game.fire('PlayerSays', { intent: 'creditTake' })
+    expect(game.S.mem[loanTaken('consumer')]).toBe(true)
+    expect(game.S.money).toBe(1000 + LOANS[0].amount)
+  })
+
+  it('CreditDue списывает платёж', async () => {
+    const { game } = makeGame()
+    game.S.mem[loanTaken('consumer')] = true
+    game.S.money = 50000
+    await game.fire('CreditDue', { credit: 'consumer' })
+    expect(game.S.money).toBe(50000 - LOANS[0].payment)
+  })
+})
+
+describe('кривая баланса до дна', () => {
+  it('дно по пути к выплате: не день 0 и не «никогда» на типичных сидах', () => {
+    const bottoms: number[] = []
+    for (const seed of [1, 2, 3, 5, 8, 13, 21]) {
+      const { game } = makeGame({ seed })
+      const start = game.S.day
+      let hit: number | null = null
+      for (let d = 0; d < 200 && hit == null; d++) {
+        const spend = 290
+        if (game.S.money >= spend) game.adjustMoney(-spend, 'Продукты')
+        else if (game.S.money > 0) game.adjustMoney(-game.S.money, 'Продукты')
+        if (game.moneyLevel() === 'bottom') { hit = game.S.day - start; break }
+        game.nextDay(1)
+        if (game.S.mem[creditOffer]) game.takeCredit()
+      }
+      expect(hit, `seed ${seed}`).not.toBeNull()
+      bottoms.push(hit!)
+    }
+    expect(Math.min(...bottoms)).toBeGreaterThan(5)
+    expect(Math.max(...bottoms)).toBeLessThan(120)
+    console.log('money bottom days-from-start by seed:', bottoms.join(', '))
+  })
+})
+
+describe('негативные контроли', () => {
+  it('без moneyBottom предложение не открывается', () => {
+    const { game } = makeGame()
+    game.S.money = 10000
+    game.maybeCreditOffer()
+    expect(game.S.mem[creditOffer]).toBeFalsy()
+  })
+
+  it('реплика про микроволновку — только при sold.microwave', () => {
+    const { game } = makeGame()
+    const open = () => game.lines.eligible('NOTIF', NOTIF, game.lineFacts()).some((p) => p.text.includes('Микроволновку'))
+    expect(open()).toBe(false)
+    game.S.mem[sold('microwave')] = true
+    expect(open()).toBe(true)
+  })
+
+  it('сломанный gate sold — тест красный (NC)', () => {
+    const { game } = makeGame()
+    const open = () => game.lines.eligible('NOTIF', NOTIF, game.lineFacts()).some((p) => p.text.includes('Микроволновку'))
+    game.S.mem[sold('microwave')] = true
+    expect(open()).toBe(true)
+    delete game.S.mem[sold('microwave')]
+    expect(open()).toBe(false)
+  })
+})

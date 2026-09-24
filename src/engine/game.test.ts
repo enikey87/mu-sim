@@ -864,7 +864,9 @@ describe('Game: деньги на карте', () => {
     expect(game.adjustMoney(-3000, 'Гречка')).toBe(true)
     expect(game.moneyLevel()).toBe('bottom')
     expect(game.facts().moneyBottom).toBe(true)
-    expect(game.ui.notif?.text).toMatch(/критический/)
+    // на дне сразу предложение кредита — последняя СМС может быть им, не предупреждением
+    expect(game.S.mem['credit.offer']).toBe(true)
+    expect(game.ui.notif?.text).toMatch(/критический|Всё будет/)
   })
   it('после выплаты и в эндгейме деньги не меняются', () => {
     const { game } = makeGame()
