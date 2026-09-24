@@ -827,7 +827,7 @@ describe('Game: деньги на карте', () => {
   it('S.money в прод-коде пишется только внутри adjustMoney', () => {
     const write = /S\.money\s*(?:\+=|-=|=)/g
     const src = readFileSync('src/engine/game.ts', 'utf8')
-    const body = src.replace(/adjustMoney\([\s\S]*?\n  \}/, 'adjustMoney() {}')
+    const body = src.replace(/adjustMoney\([\s\S]*?\n {2}\}/, 'adjustMoney() {}')
     expect(body.match(write) ?? []).toEqual([])
     const content = ['src/content/rules/payday.ts', 'src/content/misc.ts', 'src/content/excuses.ts']
       .map((f) => readFileSync(f, 'utf8')).join('\n')
