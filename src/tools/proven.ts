@@ -14,7 +14,7 @@ export const PROVEN: Record<string, string> = Object.fromEntries([
   'Turn_Blocked', 'Turn_Vendetta', 'Rude_Vendetta',
   // бот покрытия свободным текстом «спасибо»/«привет» не пишет (FREE в bot.ts); расширить FREE — сдвинуть все траектории
   'Tone_Thanks', 'Tone_Greeting',
-  'Says_sorry_blocked', 'Says_sorry_blocked_hinted', 'Says_via_mama',
+  'Says_sorry_blocked', 'Says_sorry_blocked_hinted', 'Says_via_mama', 'Says_via_boris',
   'Finale_boris_brigadir', 'Finale_boris_toyou', 'Finale_samvel_groom',
   'Finale_niva_chose', 'Finale_niva_chose_or', 'Finale_rubik_karine', 'Finale_alik_death_sulk', 'Finale_grandpa_revoke', 'Finale_razmik_swap', 'Finale_razmik_union',
   'Ending_family', 'Ending_ram', 'Ending_honest', 'Ending_vendetta',

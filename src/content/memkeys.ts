@@ -18,6 +18,8 @@ export const evicted = 'evicted'
 export const vendetta = 'vendetta'
 export const court = 'court'
 export const courtVerdict = 'court.verdict'
+/** Инстанции, которым ступень суда уже объяснила перевод («полиция сказала — это в суд») — список через запятую. */
+export const courtReferral = 'court.referral'
 export const ritualCount = 'ritual.count'
 export const ritualCut = 'ritual.cut'
 export const caughtCount = 'caught'
@@ -99,6 +101,11 @@ export const paydayScene = 'payday'
 export const lightOff = 'light.off'
 export const netRation = 'net.ration'
 export const phoneWarn = 'phone.warn'
+/** Кредитная лестница / мама-запаска — точные ключи; семейства sold./mom./credit.<loan>.* — в factkeys. */
+export const creditStage = 'credit.stage'
+export const creditOffer = 'credit.offer'
+export const creditBroke = 'credit.broke'
+export const momDone = 'mom.done'
 
 /** Ключи досок персонажей (S.actors), не мира. */
 export const sick = 'sick'
@@ -117,10 +124,11 @@ export const EVENT_KEYS: ReadonlySet<string> = new Set([
 
 export const MEM_KEYS: ReadonlySet<string> = new Set([
   HEAT, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, evicted, vendetta, court, courtVerdict,
-  ritualCount, ritualCut, caughtCount, cryptoHodl, bathAsked, mamaCalls, phoneKarine, alikDay, mooAt, sorryAt,
+  ritualCount, ritualCut, caughtCount, cryptoHodl, bathAsked, mamaCalls, phoneKarine, alikDay, mooAt, sorryAt, courtReferral,
   rudeAt, thanksAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway,
   garikConcrete, garikCut, houseOnGarik, borisMarried, borisSmetaReady, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday,
   lightOff, netRation, phoneWarn,
+  creditStage, creditOffer, creditBroke, momDone,
   ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lie),
 ])

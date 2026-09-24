@@ -13,8 +13,8 @@ export const RARE = new Set([
   // окно состояния или счётчик, который складывается не в каждой партии
   'Opt_Cow', 'Says_catchLie_caught2', 'Says_catchLie_liekind_grandpa',
   'Turn_Wedding_Samvel', 'Turn_Wedding_Razmik', 'Turn_Wedding_Boris', 'Turn_BorisSick', 'Quest_q_niva', 'Scene_lend', 'Scene_wife', 'Chorus_garik_FedUp',
-  'Idle_Offline', 'Says_condole_ctxrevived', 'Says_sorry_blocked_karine', 'Says_sorry_blocked_boris', 'Says_via_boris',
+  'Idle_Offline', 'Says_condole_ctxrevived', 'Says_sorry_blocked_karine', 'Says_sorry_blocked_boris',
   // частные финалы и концовки по стилю партии
   'Finale_beton_opened', 'Finale_beton_opened_or', 'Finale_grant_ally', 'Finale_razmik_shift_or',
-  'Finale_garik_cutter', 'Ending_alik',
+  'Ending_alik', 'Payday_coins', 'Ending_payday_coins', 'Tone_Threat_Hot_Again',
 ])

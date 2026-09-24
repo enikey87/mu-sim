@@ -110,6 +110,8 @@ export const choiceRules: R[] = [
 
   offer({ name: 'Doubt', when: [is('ctx.constr')], act: 'defend', tone: 'neutral', bonus: 1, text: (g) => fromD(g, 'P_DOUBT') }),
 
+  // кредитная лестница: кнопки собирает Game.buildChoices напрямую (не через top-2 collect)
+
   // напомнить о просроченном обещании из журнала
   offer({
     name: 'Prev', when: [gt('lateCount', 0)], act: 'prev', tone: 'neutral', bonus: 1, odds: 0.35,
