@@ -1,7 +1,7 @@
 // Мелкие тексты движка: «полежал на полу», застолье, платёжки, ответы на допработу и т.д.
-import { type Line, eq, gate, gte, is, of, set } from '../engine/rules'
-import { needs } from './world'
-import { bloodGiven, court, sick, threatClaim } from './memkeys'
+import { type Line, eq, gate, gte, is, ne, of, set } from '../engine/rules'
+import { needs, WORLD } from './world'
+import { alikDead, blocked, bloodGiven, court, endgame, phoneKarine, polite, sick, threatClaim, wedding } from './memkeys'
 // повторяемые занятия — после перерыва; события («продали микроволновку») — один раз
 export const FLOOR: Line[] = [
   'Вы полежали на полу 15 минут. Терпение восстановлено.', 'Вы вышли на балкон и посчитали голубей. Терпение восстановлено.',
@@ -159,3 +159,16 @@ export const GREET_MORNING = [
   'С добрым утром! Ранняя пташка. Я тоже рано встаю — чтобы раньше начать отговариваться.',
   'Доброе утро! Ты первый, кто мне сегодня написал. Остальные кредиторы ещё спят.',
 ]
+
+// Подпись профиля Алика (docs/design/alik-status.md): состояние мира одной системной строкой в конце хода.
+// Каждая — под фактом своего состояния и один раз за партию; без сроков и дат (текст без записи — не обещание).
+// Скрыт от игрока в блоке; при «смерти», телефоне у Карине и в эндгейме не меняется
+const statusShown = [ne(blocked, true), ne(alikDead, true), ne(phoneKarine, true), ne(endgame.active, true)]
+export const ALIK_STATUS: Line[] = [
+  needs('samvel')({ t: 'Тамада. До последнего тоста не беспокоить 🥂', when: [is(wedding('samvel')), WORLD.tamada, ...statusShown], prio: 1 }),
+  needs('boris', 'baran')({ t: 'Сиделка барана. Звонить шёпотом', when: [of('boris', is(sick)), ...statusShown], prio: 1 }),
+  needs('niva')({ t: 'Ищу «Ниву». Видели — звоните', when: [WORLD.nivaAway, ...statusShown], prio: 1 }),
+  needs('razmik')({ t: 'Снимаю Размика с крана. Не отвлекать, высоко', when: [WORLD.razmikUp, ...statusShown], prio: 1 }),
+  { t: 'Уважаемые клиенты! Ваше обращение очень важно для нас', when: [is(polite), ...statusShown], prio: 1 },
+]
+

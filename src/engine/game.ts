@@ -12,7 +12,7 @@ import { ARCS, ARC_DONE, CAST, type Episode, GROUP, GROUP_OOPS, WRONG_TO, WRONG_
 import * as L from '../content/life'
 import { ACH } from '../content/achievements'
 import { SPEAKS, meet } from '../content/world'
-import { FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_WANDER, OATH_FORMS } from '../content/misc'
+import { ALIK_STATUS, FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_WANDER, OATH_FORMS } from '../content/misc'
 import { STARTS } from '../content/quests'
 import { BILLS, billDue, billDueAt, billStreak, billUnpaid, lightOff, netRation, phoneWarn, type BillId } from '../content/bills'
 import { allRules } from '../content/rules'
@@ -1103,6 +1103,9 @@ export class Game {
         this.sys('Алик Воздухонесян сменил фото профиля. На фото — баран')
         this.unlock('ram')
       }
+      // подпись профиля — после хода, а не правилом StoryBeat: серию она не вытесняет; одна за ход
+      const status = this.line('ALIK_STATUS', ALIK_STATUS)
+      if (status) this.sys(`Алик Воздухонесян изменил статус: «${status}»`)
       if (this.chance(0.12)) this.randomNotif()
       this.restStatus()
       this.ui.busy = false
