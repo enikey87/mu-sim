@@ -98,6 +98,8 @@ const CASES: Record<string, Case> = {
   Idle_PhoneWarn: { event: 'AlikIdle', setup: (g) => { g.S.mem['phone.warn'] = true } },
   Bill_Warn: { event: 'BillWarn', facts: { bill: 'phone' } },
   Bill_Due: { event: 'BillDue', facts: { bill: 'phone' } },
+  Finale_beton_ledger: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem.caught = 2 } },
+  Says_via_mama: { event: 'PlayerSays', facts: { intent: 'via', arg: 'mama' }, setup: (g) => { g.S.mem.blocked = true; g.S.mem['finale.rubik'] = 'karine' } },
 }
 
 function fires(name: string, c: Case): boolean {

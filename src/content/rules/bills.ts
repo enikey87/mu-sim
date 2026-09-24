@@ -35,19 +35,19 @@ export const billRules: R[] = [
   },
   // комедия: Алик замечает последствия, только если факт есть
   {
-    name: 'Turn_LightOff', event: 'AlikTurn', when: [is(lightOff)], specificity: 0, weight: 6, cooldown: { turns: 5 },
+    name: 'Turn_LightOff', event: 'AlikTurn', when: [is(lightOff)], once: true, priority: 'chatter',
     respond: async ({ game }) => {
       await game.say(['Свет отключили? Брат, это знак — экономь. Я тоже экономлю: не плачу.'])
     },
   },
   {
-    name: 'Turn_NetRation', event: 'AlikTurn', when: [is(netRation)], specificity: 0, weight: 5, cooldown: { turns: 5 },
+    name: 'Turn_NetRation', event: 'AlikTurn', when: [is(netRation)], once: true, priority: 'chatter',
     respond: async ({ game }) => {
       await game.say(['Интернет по талонам? Пиши короче. «Мууу» — один талон.'])
     },
   },
   {
-    name: 'Idle_PhoneWarn', event: 'AlikIdle', when: [is(phoneWarn)], odds: 0.4, cooldown: { turns: 8 }, priority: 'chatter',
+    name: 'Idle_PhoneWarn', event: 'AlikIdle', when: [is(phoneWarn)], once: true, priority: 'chatter',
     respond: async ({ game }) => {
       await game.say(['Оператор пишет, что ты ему должен. Знакомое чувство.'])
     },

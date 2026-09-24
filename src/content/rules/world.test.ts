@@ -72,7 +72,8 @@ describe('обещания наступают', () => {
     for (let seed = 1; seed <= 12; seed++) {
       const { game } = makeGame({ seed })
       game.recordPromise({ text: 'через три дня — всё отдам', d: 3 })
-      expect(game.S.rules.schedule.at(-1)).toMatchObject({ event: 'PromiseDue', at: game.S.day + 3 })
+      expect(game.S.rules.schedule.filter((s) => s.kind === 'event' && s.event === 'PromiseDue').at(-1))
+        .toMatchObject({ event: 'PromiseDue', at: game.S.day + 3 })
       game.S.day += 3
       const from = game.S.msgs.length
       await game.afterTurn()
@@ -84,7 +85,7 @@ describe('обещания наступают', () => {
   it('«когда-нибудь» не наступает никогда; «переписанное» обещание тоже', async () => {
     const { game } = makeGame()
     game.recordPromise({ text: 'когда Арарат вернут', d: null })
-    expect(game.S.rules.schedule).toEqual([])
+    expect(game.S.rules.schedule.filter((s) => s.kind === 'event' && s.event === 'PromiseDue')).toEqual([])
     game.recordPromise({ text: 'завтра', d: 1 })
     game.S.promises.at(-1)!.due = null // правка «изменено»
     game.S.day += 1
