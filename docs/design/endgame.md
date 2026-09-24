@@ -1,6 +1,6 @@
 # Бесконечный endgame: группа, из которой нельзя выйти
 
-> **Статус: реализовано (MVP) в PR #34: `src/content/endgame.ts`, `src/content/rules/endgame.ts`.**
+> **Статус:** реализовано (MVP) · PR #34 · код: `src/content/endgame.ts`, `src/content/rules/endgame.ts`.
 >
 > Документ — концепт; где MVP разошёлся с ним, это сказано в разделе «Реализация» в конце (сверено с кодом 2026-09-23).
 
