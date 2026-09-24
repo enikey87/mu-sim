@@ -172,4 +172,31 @@ describe('День выплаты', () => {
     game.S.mem['intro.samvel'] = true
     expect(whos(game.lines.eligible('PD_CLAIM', CLAIMS, game.lineFacts()))).toContain('samvel')
   })
+  it('после выплаты старая допработа и перевод не меняют долг; кнопка допработы закрыта', async () => {
+    const { game } = makeGame()
+    await game.job()
+    const job = game.S.msgs.find((m) => m.kind === 'job')!
+    expect(job.kind).toBe('job')
+    rich(game)
+    await game.enterNode('payday', 'announce')
+    await choose(game, 'bag')
+    await choose(game, 'refuse')
+    game.S.choices = null
+    await choose(game, 'accept')
+    expect(game.debtSealed()).toBe(true)
+    const sealed = game.S.debt
+    const money = game.S.money
+    // исход закрыл все незакрытые job
+    expect(game.S.msgs.find((m) => m.id === job.id && m.kind === 'job')!).toMatchObject({ answered: true })
+    // даже прямой вызов после печати — долг не растёт
+    await game.job()
+    const job2 = [...game.S.msgs].reverse().find((m) => m.kind === 'job' && !m.answered)
+    if (job2 && job2.kind === 'job') await game.answerJob(job2.id, true)
+    expect(game.S.debt).toBe(sealed)
+    await game.transfer()
+    expect(game.S.debt).toBe(sealed)
+    expect(game.S.money).toBe(money) // перевод тоже без эффекта
+    expect(game.adjustDebt(1000)).toBe(false)
+    expect(game.S.debt).toBe(sealed)
+  })
 })
