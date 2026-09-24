@@ -353,6 +353,33 @@ describe('RuleSet.fire', () => {
     expect(state.schedule).toEqual([])
     expect(state.cooldown.Silent).toBeUndefined()
   })
+  it('промолчавшее правило с истёкшим перерывом: откат возвращает прежнюю отметку, а не стирает её', async () => {
+    const { rs, game, factsFor, state, clock } = mk()
+    let talk = true
+    rs.add({ name: 'Cd', event: 'E', when: [], cooldown: { turns: 2 }, respond: () => (talk ? undefined : false) })
+    await rs.fire(game, { event: 'E' }, factsFor)
+    const first = state.cooldown.Cd
+    expect(first).toEqual({ turn: 0, day: 100 })
+    clock.turn = 5
+    talk = false
+    expect(await rs.fire(game, { event: 'E' }, factsFor)).toBeNull()
+    expect(state.cooldown.Cd).toEqual(first)
+  })
+  it('строгий режим: проверка снимается до commit и зовётся только у промолчавшего — после отката', async () => {
+    const clock: Clock = { turn: 0, day: 100 }
+    const world: Facts = {}
+    const seen: string[] = []
+    const rs = new RuleSet<G>({
+      rng: seededRng(1), hub: makeHub(world, {}), state: freshRuleState(), now: () => ({ ...clock }),
+      silence: (_, r) => { seen.push(`до ${r.name}: ${JSON.stringify(world)}`); return () => { seen.push(`после ${r.name}: ${JSON.stringify(world)}`) } },
+    })
+    rs.add(
+      { name: 'Silent', event: 'E', when: [], specificity: 2, remember: [set('x', 1)], respond: () => false },
+      { name: 'Speaks', event: 'E', when: [], remember: [set('y', 1)], respond: () => undefined },
+    )
+    expect((await rs.fire({ log: [] }, { event: 'E' }, (x) => ({ ...x })))?.name).toBe('Speaks')
+    expect(seen).toEqual(['до Silent: {}', 'после Silent: {}', 'до Speaks: {}'])
+  })
   it('во время ответа тот же факт переписали — откат чужую запись не трогает', async () => {
     const { rs, game, factsFor, world } = mk()
     rs.add({

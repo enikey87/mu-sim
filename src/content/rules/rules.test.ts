@@ -334,3 +334,28 @@ describe('ход Алика (AlikTurn): веса как в оригинале', 
     for (let i = 0; i < 1000; i++) expect(['Turn_Scene', 'Turn_Arc', 'Turn_Group', 'Turn_Wrong']).not.toContain(game.rules.match({ event: 'AlikTurn' }, f)!.name)
   })
 })
+
+describe('промолчавшее правило не оставляет следа (строгий режим, makeGame)', () => {
+  it('след в S — SilenceBreach, и ход игрока её не глотает', async () => {
+    const { game } = makeGame()
+    game.rules.add({ name: 'Leaky', event: 'PlayerMessage', when: [], specificity: 999, respond: ({ game }) => { game.S.mem.leak = Number(game.S.mem.leak ?? 0) + 1; return false } })
+    await expect(game.fire('PlayerMessage', { tone: 'polite' })).rejects.toThrow(/Leaky промолчало/)
+    await expect(game.send({ text: 'АЛИК!!! Хватит врать!!!', tone: 'rude' })).rejects.toThrow(/Leaky промолчало/) // грубость всегда идёт в PlayerMessage
+  })
+  it('ответ на несуществующую реплику молчит и не сбрасывает контекст', async () => {
+    const { game } = makeGame()
+    game.setCtx({ chorus: 'garik' })
+    expect(game.rules.match({ event: 'PlayerSays', facts: { intent: 'talk' } }, { ...game.facts(), intent: 'talk' })?.name).toBe('Says_talk')
+    await game.fire('PlayerSays', { intent: 'talk', arg: 'chorus|garik|999' })
+    expect(game.S.ctx).toEqual({ chorus: 'garik' })
+  })
+  it('свежих реплик нет — колода там же, где была', async () => {
+    const { sayFresh } = await import('./rude')
+    const { game } = makeGame()
+    const pool: Array<readonly [string, string]> = [['alik', 'Раз.'], ['alik', 'Два.']]
+    for (const [, t] of pool) game.seen.mark(t)
+    const bags = structuredClone(game.S.bags)
+    expect(await sayFresh(game, 'T_FRESH', pool)).toBe(false)
+    expect(game.S.bags).toEqual(bags)
+  })
+})

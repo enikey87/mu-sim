@@ -1,3 +1,5 @@
+import type { Choice } from '../../engine/state'
+
 /**
  * События игры — единственный список имён, по которому типизированы правила и `Game.fire`.
  * Опечатка в `event` иначе молчит с двух сторон: правило никогда не победит, вызов никого не найдёт.
@@ -8,3 +10,6 @@ export type GameEvent =
   | 'PaydayOutcome' | 'PaydayButton' | 'PromiseDue' | 'PromiseConditionMet'
   | 'BillDue' | 'BillWarn'
   | 'PeriodLine' | 'RudeCool' | 'Mentioned' | 'BuildChoices'
+
+/** Что предлагает правило-сборщик (BuildChoices): вариант ответа игрока или ничего. */
+export type Offer = Choice | null

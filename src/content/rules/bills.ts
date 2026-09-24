@@ -1,12 +1,12 @@
 // Платежи по календарю: предупреждение за день, списание или неоплата с последствиями.
 import type { Game } from '../../engine/game'
 import { type Rule, is, set } from '../../engine/rules'
-import type { GameEvent } from './events'
+import type { GameEvent, Offer } from './events'
 import {
   BILLS, billDue, lightOff, netRation, phoneWarn, type BillId,
 } from '../bills'
 
-type R = Rule<Game, GameEvent>
+type R = Rule<Game, GameEvent, Offer>
 
 const billOf = (facts: { bill?: unknown }): BillId | null => {
   const id = String(facts.bill ?? '')

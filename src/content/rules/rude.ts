@@ -4,13 +4,13 @@
 // сбоку — «Мууу»-дипломатия, встречный иск, ритуал примирения, холодная война, привыкание; финал — вендетта.
 import type { Game } from '../../engine/game'
 import { type Rule, type Line, type Entry, eq, ne, gte, lte, is, add, set, missing, mapEntry, valueOf } from '../../engine/rules'
-import type { GameEvent } from './events'
+import type { GameEvent, Offer } from './events'
 import { WORLD, SPEAKS } from '../world'
 import * as T from '../rude'
 import { RUDE_AGAIN } from '../misc'
 import { HEAT, blocked, blockedHint, count, mamaCalls, phoneKarine, polite, ritualCount, vendetta } from '../memkeys'
 
-type R = Rule<Game, GameEvent>
+type R = Rule<Game, GameEvent, Offer>
 const rude = eq('tone', 'rude')
 const cools = [add(count.rude), add(HEAT)]
 // остывание — отложенное событие, а не отложенное «−1»: после примирения (температура = 0) старые остывания не уводят её в минус
@@ -18,8 +18,10 @@ const cool: R['trigger'] = [{ event: 'RudeCool', delay: 20 }]
 
 /** Реплика участника без повторов: пул [кто, текст]. */
 export async function sayFresh(game: Game, key: string, pool: readonly Entry<T.Said>[]): Promise<boolean> {
+  const bag = structuredClone(game.S.bags[key])
   const t = game.seen.pickFresh(() => game.draw(key, pool.map((e) => mapEntry(e, ([, x]) => x))), (x) => x)
-  if (game.seen.has(t)) return false
+  // свежих нет — ничего не сказано, и колода остаётся там, где была
+  if (game.seen.has(t)) { if (bag) game.S.bags[key] = bag; else delete game.S.bags[key]; return false }
   game.seen.mark(t)
   const who = pool.map(valueOf).find(([, x]) => x === t)![0]
   await game.say([who === 'alik' ? t : { w: who, t }])
