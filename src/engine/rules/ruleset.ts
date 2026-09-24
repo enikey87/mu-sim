@@ -33,6 +33,8 @@ export interface FireOptions {
   floor?: Priority
   /** Имена правил, уже промолчавших в этом `fire` — match их не берёт (иначе вечная тишина заслоняет остальных). */
   skip?: ReadonlySet<string>
+  /** Броски шанса (odds) этого `fire`: повторный match берёт выпавшее, а не бросает заново. */
+  rolled?: Map<string, boolean>
 }
 
 export class RuleSet<G, O = unknown> {
@@ -72,19 +74,19 @@ export class RuleSet<G, O = unknown> {
   }
 
   // ---- проверка одного правила ----
-  private check(r: Rule<G, string, O>, q: Query, facts: Facts, floor: number): Candidate {
+  private check(r: Rule<G, string, O>, q: Query, facts: Facts, floor: number, rolled?: Map<string, boolean>): Candidate {
     const get = resolver(this.hub, q, facts)
     const failed = r.when.filter((c) => !test(c, get)).map(describeCriterion)
     if (r.sender && r.sender !== q.sender) failed.push(`sender == ${r.sender}`)
     if (r.target && r.target !== q.target) failed.push(`target == ${r.target}`)
     const cand: Candidate = { name: r.name, specificity: specificityOf(r), ok: false, failed }
-    const blocked = failed.length ? undefined : this.blocked(r, floor)
+    const blocked = failed.length ? undefined : this.blocked(r, floor, rolled)
     if (failed.length) return cand
     if (blocked) return { ...cand, blocked }
     return { ...cand, ok: true }
   }
 
-  private blocked(r: Rule<G, string, O>, floor: number): Blocked | undefined {
+  private blocked(r: Rule<G, string, O>, floor: number, rolled?: Map<string, boolean>): Blocked | undefined {
     if (PRIORITY[r.priority ?? 'default'] < floor) return 'priority'
     if (r.once && this.state.once[r.name]) return 'once'
     const cd = r.cooldown && this.state.cooldown[r.name]
@@ -92,7 +94,11 @@ export class RuleSet<G, O = unknown> {
       const now = this.now()
       if ((r.cooldown!.turns !== undefined && now.turn - cd.turn < r.cooldown!.turns) || (r.cooldown!.days !== undefined && now.day - cd.day < r.cooldown!.days)) return 'cooldown'
     }
-    if (r.odds !== undefined && this.rng.random() >= r.odds) return 'odds'
+    if (r.odds !== undefined) {
+      let pass = rolled?.get(r.name)
+      if (pass === undefined) { pass = this.rng.random() < r.odds; rolled?.set(r.name, pass) }
+      if (!pass) return 'odds'
+    }
     return undefined
   }
 
@@ -132,7 +138,7 @@ export class RuleSet<G, O = unknown> {
         trace.push({ name: r.name, specificity: s, ok: false, failed: ['проиграло по специфичности'] })
         continue
       }
-      const c = this.check(r, q, facts, floor)
+      const c = this.check(r, q, facts, floor, opts.rolled)
       trace?.push(c)
       if (!c.ok) continue
       if (best === -1) best = s
@@ -266,24 +272,23 @@ export class RuleSet<G, O = unknown> {
   async fire(game: G, q: Query, factsFor: (extra: Facts) => Facts, opts: FireOptions = {}, depth = 0): Promise<Rule<G, string, O> | null> {
     if (depth > 8) throw new Error(`Rule trigger chain too deep at ${q.event}`)
     const skip = new Set(opts.skip ?? [])
+    const rolled = new Map<string, boolean>()
     while (true) {
       const facts = factsFor(q.facts ?? {})
-      const r = this.match(q, facts, { ...opts, skip })
+      const r = this.match(q, facts, { ...opts, skip, rolled })
       if (!r) return null
       const check = this.silence?.(game, r)
       const undo = this.commit(r, q)
       const res = await r.respond?.(this.ctx(game, r, q, facts))
       const responded = res !== false
-      if (!responded) { undo(); check?.() }
+      if (!responded) { undo(); check?.(); skip.add(r.name); continue } // не случилось — и триггеров нет
       for (const t of r.trigger ?? []) {
-        if (t.ifResponded && !responded) continue
         if (t.probability !== undefined && this.rng.random() >= t.probability) continue
         const next: Query = { event: t.event, facts: t.facts, sender: t.sender ?? q.sender, target: t.target ?? q.target }
         if (t.delay) this.schedule({ at: this.now().day + t.delay, kind: 'event', ...next })
         else await this.fire(game, next, factsFor, opts, depth + 1)
       }
-      if (responded) return r
-      skip.add(r.name)
+      return r
     }
   }
 

@@ -317,15 +317,16 @@ describe('RuleSet.fire', () => {
     await rs.fire(game, { event: 'See', sender: 'blue', facts: { obj: 'barrel' } }, factsFor)
     expect(game.log).toEqual(['Blue', 'Red', 'ToRed'])
   })
-  it('ifResponded: ответ вернул false — цепочка не идёт; probability 0 — тоже', async () => {
-    const { rs, game, factsFor } = mk()
+  it('ответ вернул false — цепочка не идёт; probability 0 — тоже', async () => {
+    const { rs, game, factsFor, state } = mk()
     rs.add(
-      { name: 'Silent', event: 'A', when: [], respond: () => false, trigger: [{ event: 'Next', ifResponded: true }] },
-      { name: 'Talk', event: 'B', when: [], respond: () => {}, trigger: [{ event: 'Next', ifResponded: true }, { event: 'Next', probability: 0 }] },
+      { name: 'Silent', event: 'A', when: [], respond: () => false, trigger: [{ event: 'Next' }, { event: 'Later', delay: 3 }] },
+      { name: 'Talk', event: 'B', when: [], respond: () => {}, trigger: [{ event: 'Next' }, { event: 'Next', probability: 0 }] },
       say('Next', 'Next'),
     )
     await rs.fire(game, { event: 'A' }, factsFor)
     expect(game.log).toEqual([])
+    expect(state.schedule).toEqual([]) // отложенный триггер промолчавшего — тоже след
     await rs.fire(game, { event: 'B' }, factsFor)
     expect(game.log).toEqual(['Next'])
   })
@@ -390,11 +391,29 @@ describe('RuleSet.fire', () => {
     expect(world.x).toBe(99)
     expect('y' in world).toBe(false) // свою запись правило всё равно не оставляет
   })
-  it('промолчавшее правило всё равно шлёт свой trigger — ifResponded для этого и есть', async () => {
+  it('шанс — один бросок на событие: молчание соседа по ничьей не даёт правилу второй попытки', async () => {
+    const { rs, game, factsFor } = mk({ seed: 7 })
+    rs.add(
+      { name: 'Silent', event: 'E', when: [], specificity: 1, respond: () => false },
+      say('Lucky', 'E', [], { specificity: 1, odds: 0.5 }),
+      say('Fallback', 'E', [], { specificity: 0 }),
+    )
+    const N = 4000
+    for (let i = 0; i < N; i++) await rs.fire(game, { event: 'E' }, factsFor)
+    const lucky = game.log.filter((x) => x === 'Lucky').length / N
+    // перебрасывая шанс после молчания Silent, Lucky отвечал бы в 0.625 случаев
+    expect(lucky).toBeGreaterThan(0.46)
+    expect(lucky).toBeLessThan(0.54)
+  })
+  it('промолчавший и ответивший на одном событии: срабатывают триггеры только ответившего', async () => {
     const { rs, game, factsFor } = mk()
-    rs.add({ name: 'Silent', event: 'A', when: [], respond: () => false, trigger: [{ event: 'Next' }] }, say('Next', 'Next'))
-    expect(await rs.fire(game, { event: 'A' }, factsFor)).toBeNull()
-    expect(game.log).toEqual(['Next'])
+    rs.add(
+      { name: 'Silent', event: 'A', when: [], specificity: 2, respond: () => false, trigger: [{ event: 'FromSilent' }] },
+      say('Talk', 'A', [], { trigger: [{ event: 'FromTalk' }] }),
+      say('FromSilent', 'FromSilent'), say('FromTalk', 'FromTalk'),
+    )
+    expect((await rs.fire(game, { event: 'A' }, factsFor))?.name).toBe('Talk')
+    expect(game.log).toEqual(['Talk', 'FromTalk'])
   })
   it('вечно молчащее правило не заслоняет следующее подходящее', async () => {
     const { rs, game, factsFor } = mk()
