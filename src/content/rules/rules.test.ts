@@ -70,6 +70,46 @@ describe('варианты игрока (BuildChoices)', () => {
       expect(cs.some((c) => c.tone === 'rude')).toBe(true)
     }
   })
+  it('после сдвига дня не предлагает «Запомнил: завтра» / «через пять минут»', () => {
+    const { game } = makeGame()
+    const day = game.S.day
+    // как после отмазки: срок записан в день речи, календарь уже +1…3
+    game.S.ctx = { when: 'завтра', whenMade: day, whenDue: day + 1 }
+    game.S.day = day + 2
+    expect(acts(choicesFor(game, game.S.ctx))).not.toContain('promiseOk')
+    expect(acts(choicesFor(game, game.S.ctx))).not.toContain('promiseCheck')
+    game.S.ctx = { when: 'через пять минут', whenMade: day, whenDue: day }
+    game.S.day = day + 1
+    expect(acts(choicesFor(game, game.S.ctx)).some((a) => a === 'promiseOk' || a === 'promiseCheck')).toBe(false)
+  })
+  it('пока срок впереди — вариант с датой обещания, не голое «завтра»', () => {
+    const { game } = makeGame()
+    const day = game.S.day
+    game.S.ctx = { when: 'завтра', whenMade: day, whenDue: day + 1 }
+    game.S.day = day + 1 // «завтра» стало сегодня — текст всё ещё про цитату с датой
+    const whenActs = new Set<string>()
+    const texts: string[] = []
+    for (let i = 0; i < 40; i++) {
+      game.S.choices = null
+      for (const c of choicesFor(game, game.S.ctx!)) {
+        if (c.act === 'promiseOk' || c.act === 'promiseCheck') {
+          whenActs.add(c.act)
+          texts.push(c.text)
+        }
+      }
+    }
+    expect(whenActs.has('promiseOk') || whenActs.has('promiseCheck')).toBe(true)
+    expect(texts.some((t) => /Запомнил: завтра(?!\s*«)/.test(t) || /^Через пять минут\?/.test(t))).toBe(false)
+    expect(texts.every((t) => t.includes('«') || /когда по-русски|это точно/.test(t))).toBe(true)
+  })
+  it('«когда-нибудь» остаётся доступным после сдвига дня', () => {
+    const { game } = makeGame()
+    const day = game.S.day
+    game.S.ctx = { when: 'когда Арарат вернут', whenNever: true, whenMade: day, whenDue: null }
+    game.S.day = day + 5
+    const a = acts(choicesFor(game, game.S.ctx))
+    expect(a.includes('promiseCheck') || a.includes('promiseOk')).toBe(true)
+  })
 })
 
 describe('ответы Алика (PlayerSays)', () => {

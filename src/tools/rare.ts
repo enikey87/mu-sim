@@ -11,4 +11,6 @@ export const RARE = new Set([
   'Says_catchLie_caught2',
   'Turn_Wedding_Samvel', 'Turn_Wedding_Razmik', 'Turn_Wedding_Boris',
   'Turn_BorisSick',
+  // квест «толкни Ниву» — только при легенде niva_stuck; бот не каждый прогон доходит
+  'Quest_q_niva',
 ])

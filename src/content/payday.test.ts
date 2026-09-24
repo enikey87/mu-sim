@@ -52,6 +52,26 @@ describe('День выплаты', () => {
     await game.fire('CheckEnding')
     expect(game.S.ending).toBe('payday_coins')
   })
+  it('утро выплаты — день payday.at: без паузы и после сдвига календаря на анонсе', async () => {
+    const { game } = makeGame()
+    rich(game)
+    await game.enterNode('payday', 'announce')
+    const at = Number(game.S.mem['payday.at'])
+    expect(at).toBe(game.S.day + 1)
+    await choose(game, 'bag')
+    expect(game.S.day).toBe(at)
+
+    const { game: g2 } = makeGame()
+    rich(g2)
+    await g2.enterNode('payday', 'announce')
+    const at2 = Number(g2.S.mem['payday.at'])
+    g2.nextDay(3) // away/зарядка, сцена висит
+    const stuck = g2.S.day
+    expect(stuck).toBeGreaterThan(at2)
+    await choose(g2, 'bag')
+    expect(g2.S.day).toBe(stuck) // не прыгаем ещё на день от уже прошедшего «завтра»
+    expect(texts(g2).join(' ')).toMatch(/День выплаты/)
+  })
   it('без поимки — 50 ₽ «остатка», а на следующий день кнопка: «Повторим через год?»', async () => {
     const { game } = makeGame()
     game.S.day = 340

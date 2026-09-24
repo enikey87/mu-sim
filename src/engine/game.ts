@@ -36,7 +36,7 @@ import { type Audio, silentAudio } from './audio'
 import { typo } from './typo'
 import { UiState, type Moo, type SendFeel } from './ui-state'
 import { classifyUserInput, type ClassifiedInput } from './input'
-import { dueIn, dateOf, fmtDate, fmtTime, nightHour, periodOf, tierOf, TIERS, type Due, type Period } from './time'
+import { dueIn, dateOf, fmtDate, fmtDayMonth, fmtTime, nightHour, periodOf, tierOf, TIERS, type Due, type Period } from './time'
 import {
   type GameState, type Msg, type NewMsg, type Choice, type Ctx, type Tone, type Storage,
   type InputCategory, freshState, loadState, saveState, SAVE_KEY, MAX_PATIENCE,
@@ -686,7 +686,17 @@ export class Game {
       arcUnfinished: this.unfinishedArc(),
       deathCanAdvance: !!S.mem[memkeys.alikDead] && this.arcCanAdvance('alik_death', true),
       'ctx.type': c.type, 'ctx.amount': c.amount, 'ctx.s': c.s, 'ctx.shortTimey': c.s ? TIMEY.test(c.s) : false,
-      'ctx.when': c.when, 'ctx.whenNever': c.whenNever, 'ctx.rel': c.rel?.n, 'ctx.relYou': c.rel?.you ?? c.rel?.n, 'ctx.sad': c.sad, 'ctx.festive': c.festive, 'ctx.revived': c.revived,
+      'ctx.when': c.when, 'ctx.whenNever': c.whenNever,
+      // срок ещё впереди (или «когда-нибудь»): иначе «Запомнил: завтра» звучит уже после завтра
+      'ctx.whenFresh': (() => {
+        if (!c.when) return false
+        if (c.whenNever) return true
+        if (c.whenDue != null) return c.whenDue >= S.day
+        if (c.whenMade != null) return c.whenMade >= S.day
+        return true
+      })(),
+      'ctx.whenDate': c.when != null ? fmtDayMonth(c.whenMade ?? S.day) : undefined,
+      'ctx.rel': c.rel?.n, 'ctx.relYou': c.rel?.you ?? c.rel?.n, 'ctx.sad': c.sad, 'ctx.festive': c.festive, 'ctx.revived': c.revived,
       'ctx.constr': c.constr, 'ctx.legendary': c.legendary, 'ctx.arc': c.arc, 'ctx.quote': c.quote,
       // спросить про сериал есть смысл: будет новая серия, или сериал закончен и сегодня про финал ещё не спрашивали
       'ctx.arcCanAdvance': c.arc ? this.arcCanAdvance(c.arc, true) || (S.arcs[c.arc]?.i >= ARCS[c.arc].eps.length && S.mem[memkeys.doneAsked(c.arc)] !== S.day) : false,
@@ -1012,10 +1022,12 @@ export class Game {
     })
     this.recordPromise(p.q)
     await this.say([p.text])
-    this.S.ctx = { ...(this.S.ctx ?? {}), when: p.q.t, whenNever: p.q.d == null }
+    this.S.ctx = { ...(this.S.ctx ?? {}), ...this.ctxFromPromise(p.q) }
   }
   ctxFromPromise(p?: Promise3): Ctx {
-    return p ? { when: p.t, whenNever: p.d == null } : {}
+    if (!p) return {}
+    const due = p.d == null ? null : this.S.day + (p.due ? dueIn(p.due, this.S.day) : p.d)
+    return { when: p.t, whenNever: p.d == null, whenMade: this.S.day, whenDue: due }
   }
 
   // ---------- ход Алика ----------
@@ -1149,7 +1161,7 @@ export class Game {
       text = m.text.slice(0, at) + repl + m.text.slice(at + p.t.length)
       const rec = this.S.promises[this.S.promises.length - 1]
       if (rec && rec.t.includes(p.t)) { rec.t = rec.t.replace(p.t, w); rec.due = null }
-      this.S.ctx = { ...this.S.ctx, when: w, whenNever: true }
+      this.S.ctx = { ...this.S.ctx, when: w, whenNever: true, whenMade: this.S.day, whenDue: null }
     } else {
       text = m.text.replace(/[.!]?$/, this.draw('EDIT_SUFFIX', L.EDIT_SUFFIX) + '.')
     }
