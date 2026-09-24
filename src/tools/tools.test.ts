@@ -6,6 +6,8 @@ import { isMemKey } from '../content/memkeys'
 import {
   multiSampleCoverage, formatCoverage, neverClass, neverInAllSamples, rareReached, COVERAGE_SAMPLES,
 } from './coverage'
+import { PROVEN } from './proven'
+import { RARE_ALL } from './rare'
 
 describe('линтер правил', () => {
   it('в игре нет правил, которые никогда не могут победить, и правил без ответа', () => {
@@ -33,6 +35,18 @@ describe('гистерезис покрытия', () => {
     // «X» сработало хоть где-то — стенд дошёл, записи место в FLAKY; «Y» нет ни в одной — законная запись
     expect(rareReached(['Y'], ['X', 'Y'])).toEqual(['X'])
     expect(rareReached(['X', 'Y'], ['X', 'Y'])).toEqual([])
+  })
+  it('классы never — только rare / proven / unexplained; префикс не освобождает', () => {
+    expect(neverClass('Tone_Cow')).toBe('rare')
+    expect(neverClass('Endgame_Money')).toBe('proven')
+    expect(neverClass('Quiet_BrandNew')).toBe('unexplained')
+    expect(neverClass('Finale_made_up')).toBe('unexplained')
+  })
+  it('PROVEN ⊆ allRules, причины непустые, пересечения с RARE нет', () => {
+    const names = new Set(allRules.map((r) => r.name))
+    expect(Object.keys(PROVEN).filter((n) => !names.has(n))).toEqual([])
+    expect(Object.entries(PROVEN).filter(([, why]) => !why.trim()).map(([n]) => n)).toEqual([])
+    expect([...RARE_ALL].filter((n) => n in PROVEN)).toEqual([])
   })
 })
 
