@@ -56,7 +56,7 @@ const literalRe = (t: string): RegExp => {
   return re
 }
 
-/** Строгий режим молчания: правило промолчало, но изменило S. Ход её не глотает — иначе проверка слепа. */
+/** Строгий режим молчания: правило промолчало, но изменило S или видимый UI. Ход её не глотает — иначе проверка слепа. */
 export class SilenceBreach extends Error {}
 
 /** Отмена async после dispose — ловится на entry points, игроку не показывается. */
@@ -305,9 +305,15 @@ export class Game {
     if (x === null) throw new Error(`Колода ${key}: ни одного элемента, уместного сейчас`)
     return x
   }
-  /** Снимок S для строгого режима молчания: всё, кроме учёта выбора равных (groups) — его двигает сам match. */
+  /**
+   * Снимок видимого игроку состояния для строгого режима молчания: весь `S` (включая тексты ленты)
+   * и эфемерный UI, который игрок замечает (тост, уведомление, «Мууу»). RNG в снимок не входит.
+   */
   private silenceCheck(rule: string): () => void {
-    const stamp = () => { const { msgs, rules, ...rest } = this.S; return JSON.stringify([rest, msgs.length, msgs.at(-1)?.id, { ...rules, groups: null }]) }
+    const stamp = () => JSON.stringify({
+      S: this.S,
+      visible: { toast: this.ui.toast, notif: this.ui.notif, moos: this.ui.moos },
+    })
     const before = stamp()
     return () => { if (stamp() !== before) throw new SilenceBreach(`Правило ${rule} промолчало, но оставило след в S`) }
   }
