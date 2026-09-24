@@ -405,6 +405,39 @@ export class Game {
     this.S.debt += delta
     return true
   }
+  // Дно ≤ 6000 (как старый FLOOR); «мало» ≤ 9000 — предупреждение до дна. Старт 12400.
+  static readonly MONEY_LOW = 9000
+  static readonly MONEY_BOTTOM = 6000
+  moneyLevel(): 'normal' | 'low' | 'bottom' {
+    const m = this.S.money
+    if (m <= Game.MONEY_BOTTOM) return 'bottom'
+    if (m <= Game.MONEY_LOW) return 'low'
+    return 'normal'
+  }
+  /** После Дня выплаты механика денег выключена. */
+  moneySealed(): boolean {
+    return this.debtSealed() || !!this.S.mem[memkeys.endgame.active]
+  }
+  /** Единственная точка изменения S.money: СМС банка + смена уровня. */
+  adjustMoney(delta: number, reason: string): boolean {
+    if (this.moneySealed()) return false
+    if (delta === 0) return true
+    const before = this.moneyLevel()
+    this.S.money = Math.max(0, this.S.money + delta)
+    const after = this.moneyLevel()
+    const amount = Math.abs(delta).toLocaleString('ru-RU')
+    const bal = this.S.money.toLocaleString('ru-RU')
+    const kind = delta < 0 ? 'Списание' : 'Поступление'
+    this.notify('🏦', 'Банк', `${kind} ${amount} ₽. ${reason}. Баланс: ${bal} ₽`)
+    const rank = { normal: 2, low: 1, bottom: 0 }
+    if (rank[after] < rank[before]) {
+      const warn = after === 'bottom'
+        ? 'Банк: остаток критический. Гречка и достоинство — разные статьи расходов.'
+        : 'Банк обеспокоен остатком. Рекомендуем не ждать Алика.'
+      this.notify('🏦', 'Банк', warn)
+    }
+    return true
+  }
   /** Закрыть кнопки допработ в ленте (после Дня выплаты). */
   sealOpenJobs(): void {
     for (const m of this.S.msgs) if (m.kind === 'job' && !m.answered) this.replaceMsg(m, { answered: true })
@@ -626,13 +659,12 @@ export class Game {
     const p = this.linePicked('NOTIF', L.NOTIF)
     if (!p) return
     const n = p.spec as L.Notif
-    let text = p.text
     if (n.spend) {
       const spend = 90 + this.rnd(40) * 10
-      this.S.money = Math.max(0, this.S.money - spend)
-      text = this.X.fill(text, { spend: String(spend), what: this.draw('SPEND', L.SPEND), money: this.S.money.toLocaleString('ru-RU') })
+      this.adjustMoney(-spend, this.draw('SPEND', L.SPEND))
+      return
     }
-    this.notify(n.icon, n.app, text)
+    this.notify(n.icon, n.app, p.text)
   }
   // ---------- телефон: что Game делает по событиям Battery ----------
   private onPhoneDead(): void {
@@ -696,8 +728,10 @@ export class Game {
     for (const id in S.arcs) progress['arc.' + id] = S.arcs[id].i
     for (const k in S.ach) progress['ach.' + k] = true
     for (const k in S.ach) progress['since.' + k] = S.day - S.ach[k]
+    const moneyLv = this.moneyLevel()
     return {
       day: S.day, tier: S.tier, mood: S.mood, sent: S.stats.sent, moo: S.stats.moo, patience: S.patience, money: S.money, debt: S.debt, fifty: S.stats.fifty,
+      moneyNormal: moneyLv === 'normal', moneyLow: moneyLv === 'low', moneyBottom: moneyLv === 'bottom',
       dow: date.getDay(), month: date.getMonth() + 1, dom: date.getDate(),
       ...progress,
       items: S.items.length,
@@ -1157,7 +1191,7 @@ export class Game {
     this.alikMsg({ kind: 'transfer', from: 'alik', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE), amount })
     this.S.ctx = { type: 'transfer', amount }
     if (this.adjustDebt(-amount)) {
-      this.S.money += amount
+      this.adjustMoney(amount, 'Перевод от Алика')
       if (++this.S.stats.fifty >= 5) this.unlock('fifty5')
     }
   }
@@ -1343,7 +1377,7 @@ export class Game {
     this.markTopical(await this.say(m))
     if (typeof ep.legend === 'string' && this.S.ctx) this.S.ctx.legend = ep.legend // новая легенда — есть что переспросить
     if (ep.fx?.debt) this.adjustDebt(ep.fx.debt)
-    if (ep.fx?.pay && this.adjustDebt(-ep.fx.pay)) this.S.money += ep.fx.pay
+    if (ep.fx?.pay && this.adjustDebt(-ep.fx.pay)) this.adjustMoney(ep.fx.pay, 'Выплата')
     if (ep.item) this.S.items.push(ep.item)
     if (ep.state) this.rules.applyOps([{ key: ep.state.key, op: '=', value: true, forDays: ep.state.days, scope: ep.state.actor ? 'target' : 'world' }], { target: ep.state.actor })
     if (ep.fx?.days) this.nextDay(ep.fx.days)
@@ -1516,7 +1550,7 @@ export class Game {
     const fx = n.fx ?? {}
     if (fx.days) this.nextDay(fx.days)
     if (fx.debt) this.adjustDebt(fx.debt)
-    if (fx.money) S.money += fx.money
+    if (fx.money) this.adjustMoney(fx.money, 'По карте')
     if (fx.mood) this.mood(fx.mood)
     if (fx.barter && this.adjustDebt(-v.v)) S.items.push(v.n)
     const invoiced = !!fx.invoice && this.adjustDebt(-v.total)
@@ -1655,7 +1689,7 @@ export class Game {
       case 'voice': deliver({ kind: 'voice', from: 'alik', len: 10 + this.rnd(50) }); return
       case 'transfer':
         if (this.adjustDebt(-50)) {
-          this.S.money += 50
+          this.adjustMoney(50, 'Перевод от Алика')
           this.S.stats.fifty++
         }
         deliver({ kind: 'transfer', from: 'alik', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE), amount: 50 })
