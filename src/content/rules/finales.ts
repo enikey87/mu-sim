@@ -21,5 +21,7 @@ export const finaleRules: R[] = Object.keys(ARCS).flatMap((arc) => [
 // Концовка — один раз за игру; самая специфичная (редкое сочетание) побеждает.
 export const endingRules: R[] = ENDINGS.map((e) => ({
   name: `Ending_${e.id}`, event: 'CheckEnding', when: e.when, once: true, priority: 'system',
+  // концовка эндгейма обязана перекрыть Endgame_NoEnding (специфичность 100)
+  ...(e.inEndgame ? { specificity: 101 } : {}),
   respond: ({ game }) => game.reachEnding(e.id),
 }))
