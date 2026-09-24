@@ -1,0 +1,3158 @@
+{
+ "seed": 14,
+ "rules": {
+  "deathGated": [
+   "Beat_Payday",
+   "Beat_Payday_Late",
+   "Opt_Arc",
+   "Opt_ArcAny",
+   "Opt_ArcDeath",
+   "Quiet_Dead_AlikIdle",
+   "Quiet_Dead_PeriodLine",
+   "Quiet_Dead_PromiseConditionMet",
+   "Quiet_Dead_PromiseDue",
+   "Quiet_Dead_StoryBeat",
+   "Says_OtherArcWhileDead",
+   "Says_WhileDead",
+   "Tone_WhileDead",
+   "Turn_WhileDead"
+  ]
+ },
+ "coverage": {
+  "dead_frames": 4,
+  "had_mute": true,
+  "had_blood": false,
+  "had_friday": false,
+  "frames_with_arc": 160,
+  "had_razmik_finale": false,
+  "notifications": 42,
+  "away_messages": 10
+ },
+ "frames": [
+  {
+   "turn": 136,
+   "at": 0,
+   "day": 405,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.done": false
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.done": false
+   },
+   "fired": [
+    {
+     "event": "BuildChoices",
+     "chosen": [
+      "Opt_Group",
+      "Opt_Cow"
+     ]
+    },
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Says_group"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Beat_Memory"
+     ]
+    },
+    {
+     "event": "BuildChoices",
+     "chosen": [
+      "Opt_Talk_memory",
+      "Opt_ArcAny"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 137,
+   "at": 3,
+   "day": 407,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.done": false
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.done": false
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Says_talk"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 138,
+   "at": 6,
+   "day": 410,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.done": false
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.done": false
+   },
+   "fired": [
+    {
+     "event": "PlayerMessage",
+     "chosen": [
+      "Tone_Default"
+     ]
+    },
+    {
+     "event": "AlikTurn",
+     "chosen": [
+      "Turn_Job"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "job"
+    }
+   ],
+   "sys": [],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 139,
+   "at": 8,
+   "day": 410,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.done": false
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.done": false
+   },
+   "fired": [
+    {
+     "event": "BuildChoices",
+     "chosen": [
+      "Opt_ArcAny"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 140,
+   "at": 12,
+   "day": 413,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.done": false
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 1,
+    "arc.done": false,
+    "alik_dead": true,
+    "mourning": true
+   },
+   "fired": [
+    {
+     "event": "PlayerMessage",
+     "chosen": [
+      "Tone_Default"
+     ]
+    },
+    {
+     "event": "PeriodLine",
+     "chosen": [
+      "PeriodLine"
+     ]
+    },
+    {
+     "event": "AlikTurn",
+     "chosen": [
+      "Turn_Arc"
+     ]
+    },
+    {
+     "event": "BuildChoices",
+     "chosen": [
+      "Opt_ArcDeath",
+      "Opt_Mourn"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "karine",
+     "k": "text"
+    }
+   ],
+   "sys": [],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 141,
+   "at": 16,
+   "day": 414,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 1,
+    "arc.done": false,
+    "alik_dead": true,
+    "mourning": true
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 1,
+    "arc.done": false,
+    "alik_dead": true,
+    "mourning": true
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Says_WhileDead"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Quiet_Dead_StoryBeat"
+     ]
+    },
+    {
+     "event": "BuildChoices",
+     "chosen": [
+      "Opt_ArcDeath",
+      "Opt_Mourn"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Вы подрались с голубем за хлеб и победили. Терпение восстановлено."
+   ],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 142,
+   "at": 19,
+   "day": 417,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 1,
+    "arc.done": false,
+    "alik_dead": true,
+    "mourning": true
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 2,
+    "arc.done": false,
+    "alik_dead": true,
+    "mourning": true
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Says_arc"
+     ]
+    },
+    {
+     "event": "BuildChoices",
+     "chosen": [
+      "Opt_ArcDeath"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "karine",
+     "k": "text"
+    }
+   ],
+   "sys": [],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 143,
+   "at": 22,
+   "day": 420,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 2,
+    "arc.done": false,
+    "alik_dead": true,
+    "mourning": true
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 3,
+    "arc.done": false,
+    "alik_dead": true,
+    "mourning": true
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Says_arc"
+     ]
+    },
+    {
+     "event": "BuildChoices",
+     "chosen": [
+      "Opt_ArcDeath"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 144,
+   "at": 25,
+   "day": 422,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 3,
+    "arc.done": false,
+    "alik_dead": true,
+    "mourning": true
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Says_arc"
+     ]
+    },
+    {
+     "event": "BuildChoices",
+     "chosen": [
+      "Opt_Arc"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 145,
+   "at": 29,
+   "day": 423,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "fired": [
+    {
+     "event": "PlayerMessage",
+     "chosen": [
+      "Tone_Default"
+     ]
+    },
+    {
+     "event": "AlikTurn",
+     "chosen": [
+      "Turn_Excuse"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Beat_Memory"
+     ]
+    },
+    {
+     "event": "BuildChoices",
+     "chosen": [
+      "Opt_Talk_memory",
+      "Opt_WhenOk"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 146,
+   "at": 33,
+   "day": 425,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Says_promiseOk"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Вы открыли сайт вакансий и закрыли. Терпение восстановлено."
+   ],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 147,
+   "at": 36,
+   "day": 426,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "fired": [
+    {
+     "event": "PlayerMessage",
+     "chosen": [
+      "Tone_Rude_Again"
+     ]
+    },
+    {
+     "event": "BuildChoices",
+     "chosen": [
+      "Opt_Sorry"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 148,
+   "at": 39,
+   "day": 427,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "fired": [
+    {
+     "event": "PlayerMessage",
+     "chosen": [
+      "Tone_Default"
+     ]
+    },
+    {
+     "event": "AlikTurn",
+     "chosen": [
+      "Turn_Excuse"
+     ]
+    },
+    {
+     "event": "BuildChoices",
+     "chosen": [
+      "Opt_WhenOk",
+      "Opt_Doubt",
+      "Opt_Prev",
+      "Opt_Topic",
+      "Opt_WhyRel",
+      "Opt_ArcAny"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 149,
+   "at": 42,
+   "day": 430,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Says_defend"
+     ]
+    },
+    {
+     "event": "BuildChoices",
+     "chosen": [
+      "Opt_When"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 150,
+   "at": 45,
+   "day": 432,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Says_promiseCheck"
+     ]
+    },
+    {
+     "event": "BuildChoices",
+     "chosen": [
+      "Opt_ArcAny"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 151,
+   "at": 49,
+   "day": 433,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "fired": [
+    {
+     "event": "PlayerMessage",
+     "chosen": [
+      "Tone_Default"
+     ]
+    },
+    {
+     "event": "AlikTurn",
+     "chosen": [
+      "Turn_Quest"
+     ]
+    },
+    {
+     "event": "BuildChoices",
+     "chosen": [
+      "Opt_When",
+      "Opt_Prev"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Вы съели доширак без специй — специи на чёрный день. Терпение восстановлено."
+   ],
+   "asides": [
+    "(уведомление телефона: 🛒 Авито — Отзывы об «Алик Стройка под ключ» скрыты по жалобе владельца. Всех 48.)"
+   ],
+   "away": [],
+   "notif": [
+    {
+     "text": "Авито — Отзывы об «Алик Стройка под ключ» скрыты по жалобе владельца. Всех 48.",
+     "fails": []
+    }
+   ]
+  },
+  {
+   "turn": 152,
+   "at": 53,
+   "day": 435,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "fired": [
+    {
+     "event": "PlayerMessage",
+     "chosen": [
+      "Rude_Family_samvel"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Beat_Arc"
+     ]
+    },
+    {
+     "event": "BuildChoices",
+     "chosen": [
+      "Opt_Prev"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "samvel",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 153,
+   "at": 60,
+   "day": 436,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "fired": [
+    {
+     "event": "PlayerMessage",
+     "chosen": [
+      "Rude_Calls"
+     ]
+    },
+    {
+     "event": "Mentioned",
+     "chosen": [
+      "Chorus_grant"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Beat_Memory"
+     ]
+    },
+    {
+     "event": "BuildChoices",
+     "chosen": [
+      "Opt_Moo",
+      "Opt_Sorry",
+      "Opt_Talk_memory"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "mama",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "grant",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Пропущенных от мамы Алика: 11. Оставлено голосовое."
+   ],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 154,
+   "at": 63,
+   "day": 438,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Says_moo_peace"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 155,
+   "at": 66,
+   "day": 441,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "fired": [
+    {
+     "event": "PlayerMessage",
+     "chosen": [
+      "Rude_Family_arsen"
+     ]
+    },
+    {
+     "event": "BuildChoices",
+     "chosen": [
+      "Opt_Sorry",
+      "Opt_Prev"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "arsen",
+     "k": "text"
+    }
+   ],
+   "sys": [],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 156,
+   "at": 70,
+   "day": 442,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Says_sorry_countsorry2"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Вы полежали на полу. Терпение восстановлено."
+   ],
+   "asides": [
+    "(на фоне кто-то протяжно: «Мууууу»)"
+   ],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 157,
+   "at": 76,
+   "day": 443,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "fired": [
+    {
+     "event": "BuildChoices",
+     "chosen": [
+      "Opt_Cow"
+     ]
+    },
+    {
+     "event": "PlayerMessage",
+     "chosen": [
+      "Rude_Family_karine"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Beat_Payday_Late"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "karine",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Алик прислал фото: мешок из-под картошки, на нём маркером «ПЛИТОЧНИКУ»."
+   ],
+   "asides": [
+    "(на фоне кто-то протяжно: «Мууууу»)"
+   ],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 158,
+   "at": 96,
+   "day": 444,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "fired": [],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "mama",
+     "k": "text"
+    },
+    {
+     "w": "samvel",
+     "k": "text"
+    },
+    {
+     "w": "arsen",
+     "k": "text"
+    },
+    {
+     "w": "karine",
+     "k": "text"
+    },
+    {
+     "w": "samvel",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "— День выплаты —",
+    "К выплате: 10 000 ₽",
+    "К выплате: 13 000 ₽",
+    "К выплате: 73 000 ₽",
+    "К выплате: 74 500 ₽",
+    "К выплате: 275 800 ₽",
+    "Алик добавил вас в группу «ДЕНЬ ВЫПЛАТЫ 💰 (не выходить)»"
+   ],
+   "asides": [
+    "(на фоне кто-то протяжно: «Мууууу»)"
+   ],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 159,
+   "at": 109,
+   "day": 444,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "fired": [],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "karine",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "goar",
+     "k": "text"
+    },
+    {
+     "w": "mama",
+     "k": "text"
+    },
+    {
+     "w": "samvel",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "К выплате: 185 800 ₽",
+    "К выплате: 148 300 ₽",
+    "К выплате: 73 300 ₽",
+    "К выплате: 50 ₽"
+   ],
+   "asides": [
+    "(уведомление телефона: 🏦 Банк — Кредит одобрен! 94% годовых. Поздравляем!)"
+   ],
+   "away": [],
+   "notif": [
+    {
+     "text": "Банк — Кредит одобрен! 94% годовых. Поздравляем!",
+     "fails": []
+    }
+   ]
+  },
+  {
+   "turn": 160,
+   "at": 120,
+   "day": 447,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 0
+   },
+   "fired": [
+    {
+     "event": "PaydayOutcome",
+     "chosen": [
+      "Payday_default"
+     ]
+    },
+    {
+     "event": "RudeCool",
+     "chosen": [
+      "Rude_Cool"
+     ]
+    },
+    {
+     "event": "PaydayButton",
+     "chosen": [
+      "Payday_Button"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Ending_payday_default"
+     ]
+    },
+    {
+     "event": "BuildChoices",
+     "chosen": [
+      "Opt_Prev"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Алик Воздухонесян перевёл вам 50 ₽. Назначение: «Остаток».",
+    "Алик создал группу «ВЫПЛАТА ЗАКРЫТА ✅ (не выходить)»",
+    "Алик добавил вас"
+   ],
+   "asides": [
+    "(экран концовки: «День выплаты: Пятьдесят рублей». Игрок закрыл экран)",
+    "(на фоне кто-то протяжно: «Мууууу»)"
+   ],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 161,
+   "at": 128,
+   "day": 450,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 0
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 1
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Mute"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Вы отключили уведомления",
+    "Алик изменил название группы на «ОСТАВАЙСЯ 💛»",
+    "🌌 Отмазки Алика вышли на космический уровень",
+    "Вы посмотрели видео с котиками. Терпение восстановлено."
+   ],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 162,
+   "at": 132,
+   "day": 452,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 1
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 1
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Money"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [],
+   "asides": [
+    "(уведомление телефона: 🛒 Авито — Алик Воздухонесян оставил вам отзыв: «Хороший парень, терпеливый» ⭐⭐⭐⭐⭐)"
+   ],
+   "away": [],
+   "notif": [
+    {
+     "text": "Авито — Алик Воздухонесян оставил вам отзыв: «Хороший парень, терпеливый» ⭐⭐⭐⭐⭐",
+     "fails": []
+    }
+   ]
+  },
+  {
+   "turn": 163,
+   "at": 136,
+   "day": 454,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 1
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 1
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Money"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 164,
+   "at": 140,
+   "day": 456,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 1
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 1
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Money"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [],
+   "asides": [
+    "(на фоне кто-то протяжно: «Мууууу»)"
+   ],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 165,
+   "at": 146,
+   "day": 459,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 1
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 2
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Mute"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Уведомления снова включены. Кем — неизвестно. Вы отключили их ещё раз",
+    "Алик изменил название группы на «ФОРМАЛЬНОСТИ (НОМЕР НЕ ВАЖЕН)»"
+   ],
+   "asides": [
+    "(на фоне кто-то протяжно: «Мууууу»)"
+   ],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 166,
+   "at": 154,
+   "day": 460,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 2
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 3
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Mute"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Уведомления снова включены. Кем — неизвестно. Вы отключили их ещё раз",
+    "Алик изменил название группы на «НЕПРОЧИТАННОЕ ПРИБЫВАЕТ»",
+    "Вы полежали на полу 15 минут. Терпение восстановлено."
+   ],
+   "asides": [
+    "(на фоне кто-то протяжно: «Мууууу»)"
+   ],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 167,
+   "at": 161,
+   "day": 462,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 3
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 3
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Leave"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "karine",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Вы покинули группу",
+    "Карине добавила вас обратно"
+   ],
+   "asides": [
+    "(на фоне кто-то протяжно: «Мууууу»)"
+   ],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 168,
+   "at": 165,
+   "day": 464,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 3
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 3
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Money"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 169,
+   "at": 171,
+   "day": 465,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 3
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 4
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Mute"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Уведомления снова включены. Кем — неизвестно. Вы отключили их ещё раз",
+    "Алик изменил название группы на «АКТ О ЖДАНИИ»"
+   ],
+   "asides": [
+    "(уведомление телефона: 👩 Мама — Сынок, Алик заплатил?)"
+   ],
+   "away": [],
+   "notif": [
+    {
+     "text": "Мама — Сынок, Алик заплатил?",
+     "fails": []
+    }
+   ]
+  },
+  {
+   "turn": 170,
+   "at": 178,
+   "day": 468,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 4
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 5
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Mute"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Уведомления снова включены. Кем — неизвестно. Вы отключили их ещё раз",
+    "Алик изменил название группы на «ПЛИТОЧНИК, МЫ ВСЁ ВИДИМ»"
+   ],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 171,
+   "at": 185,
+   "day": 469,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 5
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 6
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Mute"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Уведомления снова включены. Кем — неизвестно. Вы отключили их ещё раз",
+    "Алик изменил название группы на «ГОЛОСОВАНИЕ ИДЁТ (ТЫ ЗА)»",
+    "Вы поорали в подушку. Терпение восстановлено."
+   ],
+   "asides": [
+    "(уведомление телефона: 🏥 Поликлиника — Анализы готовы: гречка в крови превышена в 4 раза.)",
+    "(на фоне кто-то протяжно: «Мууууу»)"
+   ],
+   "away": [],
+   "notif": [
+    {
+     "text": "Поликлиника — Анализы готовы: гречка в крови превышена в 4 раза.",
+     "fails": []
+    }
+   ]
+  },
+  {
+   "turn": 172,
+   "at": 191,
+   "day": 472,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 6
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 7
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Mute"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Уведомления снова включены. Кем — неизвестно. Вы отключили их ещё раз",
+    "Алик изменил название группы на «ФОРМАЛЬНОСТИ ИДУТ»"
+   ],
+   "asides": [
+    "(уведомление телефона: 👩 Мама — Сынок, ты поел?)"
+   ],
+   "away": [],
+   "notif": [
+    {
+     "text": "Мама — Сынок, ты поел?",
+     "fails": []
+    }
+   ]
+  },
+  {
+   "turn": 173,
+   "at": 197,
+   "day": 475,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 7
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 8
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Mute"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Уведомления снова включены. Кем — неизвестно. Вы отключили их ещё раз",
+    "Алик изменил название группы на «ВЫПЛАТА ЗАКРЫТА ✅ (ОТКРОЙ)»"
+   ],
+   "asides": [
+    "(на фоне кто-то протяжно: «Мууууу»)"
+   ],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 174,
+   "at": 201,
+   "day": 477,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 8
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 8
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Money"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [],
+   "asides": [
+    "(на фоне кто-то протяжно: «Мууууу»)"
+   ],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 175,
+   "at": 205,
+   "day": 478,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 8
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 8
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Money"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 176,
+   "at": 213,
+   "day": 479,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 8
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 8
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Leave"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "grant",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Вы покинули группу",
+    "Заказчик Грант добавил вас обратно",
+    "Вы позвонили маме. Мама спросила про Алика. Терпение восстановлено не полностью."
+   ],
+   "asides": [
+    "(на фоне кто-то протяжно: «Мууууу»)"
+   ],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 177,
+   "at": 217,
+   "day": 480,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 8
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 8
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Money"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 178,
+   "at": 224,
+   "day": 483,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 8
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 8
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Leave"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "samvel",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Вы покинули группу",
+    "Дядя Самвел добавил вас обратно"
+   ],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 179,
+   "at": 228,
+   "day": 486,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 8
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 8
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Money"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 180,
+   "at": 235,
+   "day": 489,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 8
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 8
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Leave"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "grant",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Вы покинули группу",
+    "Заказчик Грант добавил вас обратно"
+   ],
+   "asides": [],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 181,
+   "at": 240,
+   "day": 491,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 8
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 8
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Money"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Вы полежали на полу. Терпение восстановлено."
+   ],
+   "asides": [
+    "(на фоне кто-то протяжно: «Мууууу»)"
+   ],
+   "away": [],
+   "notif": []
+  },
+  {
+   "turn": 182,
+   "at": 247,
+   "day": 493,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 8
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 8
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Leave"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "karine",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [
+    "Вы покинули группу",
+    "Карине добавила вас обратно"
+   ],
+   "asides": [
+    "(уведомление телефона: 📺 Новости — В Ереване человек пережил собственные похороны и сказал на них тост.)"
+   ],
+   "away": [],
+   "notif": [
+    {
+     "text": "Новости — В Ереване человек пережил собственные похороны и сказал на них тост.",
+     "fails": []
+    }
+   ]
+  },
+  {
+   "turn": 183,
+   "at": 251,
+   "day": 495,
+   "before": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 8
+   },
+   "mem": {
+    "arc.samvel": 8,
+    "arc.beton": 7,
+    "arc.garik": 6,
+    "arc.alik_death": 4,
+    "arc.tile": 1,
+    "arc.done": false,
+    "alik_dead": false,
+    "mourning": false,
+    "endgame.mutes": 8
+   },
+   "fired": [
+    {
+     "event": "PlayerSays",
+     "chosen": [
+      "Endgame_Money"
+     ]
+    },
+    {
+     "event": "StoryBeat",
+     "chosen": [
+      "Endgame_Formality"
+     ]
+    },
+    {
+     "event": "CheckEnding",
+     "chosen": [
+      "Endgame_NoEnding"
+     ]
+    }
+   ],
+   "said": [
+    {
+     "w": "me",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    },
+    {
+     "w": "alik",
+     "k": "text"
+    }
+   ],
+   "sys": [],
+   "asides": [
+    "(уведомление телефона: 🌤 Погода — Ереван +32°. Идеальная погода, чтобы бетон застыл. Не застынет.)"
+   ],
+   "away": [],
+   "notif": [
+    {
+     "text": "Погода — Ереван +32°. Идеальная погода, чтобы бетон застыл. Не застынет.",
+     "fails": []
+    }
+   ]
+  }
+ ],
+ "fixture": "main: сид 14, окно смерти (ходы 136–183), обрезано из прогона PLAYTEST_SEEDS"
+}
