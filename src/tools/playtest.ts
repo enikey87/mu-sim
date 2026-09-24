@@ -20,7 +20,23 @@ export type Act =
 
 /** Что игрок видит и слышит вне чата («Мууу» на фоне, уведомления телефона): at — индекс сообщения, перед которым. */
 export interface Aside { at: number; text: string }
-export interface Played { seed: number; style: Style; hour: number; acts: Act[]; asides: Aside[]; game: Game }
+/** Снимок фактов после хода — для оракула; в расшифровку seed-*.txt не попадает. */
+export interface WorldFrame {
+  turn: number
+  at: number
+  day: number
+  mem: Record<string, unknown>
+  fired: { event: string; chosen: string[] }[]
+  sys: string[]
+  asides: string[]
+}
+export interface Played { seed: number; style: Style; hour: number; acts: Act[]; asides: Aside[]; world: WorldFrame[]; game: Game }
+
+/** Ключи, по которым оракул отличает состояния мира от шума текста. */
+const WORLD_KEYS = [
+  'alik_dead', 'mourning', 'blood.given', 'said.friday', 'grant.paid', 'finale.razmik', 'arc.razmik',
+  'boris.married', 'endgame.mutes', 'endgame.active', 'payday.at',
+] as const
 
 /** Характер бота: доля контекстных вариантов, доля грубости, шанс промолчать (Алик пишет сам). */
 const PROFILE: Record<Style, { ctx: number; rude: number; idle: number; polite: number }> = {
@@ -54,8 +70,28 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
   const acts: Act[] = []
   let ending: string | null = null
   const asides: Aside[] = []
+  const world: WorldFrame[] = []
+  const firedBuf: WorldFrame['fired'] = []
+  game.rules.tracer = (t) => { if (t.chosen.length) firedBuf.push({ event: t.event, chosen: [...t.chosen] }) }
   const notify = game.notify.bind(game)
   game.notify = (icon, app, text) => { asides.push({ at: game.S.msgs.length, text: `(уведомление телефона: ${icon} ${app} — ${text})` }); notify(icon, app, text) }
+  let msgAt = 0
+  let asideAt = 0
+  const snap = (turn: number) => {
+    const mem: Record<string, unknown> = {}
+    for (const k of WORLD_KEYS) if (game.S.mem[k] !== undefined) mem[k] = game.S.mem[k]
+    // finale.* / arc.* — любые линии, не только razmik
+    for (const k of Object.keys(game.S.mem)) {
+      if ((k.startsWith('finale.') || k.startsWith('arc.')) && !(k in mem)) mem[k] = game.S.mem[k]
+    }
+    const sys = game.S.msgs.slice(msgAt).filter((m) => m.kind === 'sys').map((m) => m.text)
+    world.push({
+      turn, at: game.S.msgs.length, day: game.S.day, mem,
+      fired: firedBuf.splice(0), sys, asides: asides.slice(asideAt).map((a) => a.text),
+    })
+    msgAt = game.S.msgs.length
+    asideAt = asides.length
+  }
   const next = (): Act => {
     if (game.battery.dead) return { kind: 'charge' }
     const job = game.S.msgs.find((m) => m.kind === 'job' && !m.answered)
@@ -89,8 +125,27 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
     const moo = game.S.stats.moo
     clock.runTimers() // «Мууу» и прочее отложенное
     if (game.S.stats.moo > moo) asides.push({ at: game.S.msgs.length, text: '(на фоне кто-то протяжно: «Мууууу»)' })
+    snap(k)
   }
-  return { seed, style, hour, acts, asides, game }
+  return { seed, style, hour, acts, asides, world, game }
+}
+
+/** Машиночитаемый лог фактов для оракула (рядом с seed-*.txt, не вместо). */
+export function worldDump(p: Played): object {
+  const dead = p.world.filter((f) => f.mem.alik_dead).length
+  const mutes = p.world.some((f) => Number(f.mem['endgame.mutes'] ?? 0) > 0)
+  const blood = p.world.some((f) => f.mem['blood.given'])
+  return {
+    seed: p.seed,
+    coverage: {
+      dead_frames: dead,
+      had_mute: mutes,
+      had_blood: blood,
+      had_friday: p.world.some((f) => f.mem['said.friday']),
+      had_razmik_finale: p.world.some((f) => f.mem['finale.razmik'] !== undefined),
+    },
+    frames: p.world,
+  }
 }
 
 function line(m: Msg): string {
