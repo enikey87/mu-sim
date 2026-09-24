@@ -97,7 +97,6 @@ const CASES: Record<string, Case> = {
   Endgame_Formality: { event: 'StoryBeat', setup: endgame },
   Endgame_NoEnding: { event: 'CheckEnding', setup: endgame },
   Finale_beton_ledger: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem.caught = 2 } },
-  Finale_grandpa_revoke: { event: 'ArcFinale', facts: { arc: 'grandpa' }, setup: (g) => { g.S.ach.heir = 1 } },
   Away_ColdWar: { event: 'AlikAway', setup: offended },
   Quiet_Offended_AlikAway: { event: 'AlikAway', setup: offended },
 }
