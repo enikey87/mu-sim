@@ -20,4 +20,6 @@ export const PROVEN: Record<string, string> = Object.fromEntries([
   'Payday_real', 'Payday_niva', 'Payday_notyou',
   'Endgame_Money', 'Endgame_Mute', 'Endgame_Leave', 'Endgame_Request',
   'Endgame_Turn', 'Endgame_Idle', 'Endgame_Away', 'Endgame_Formality', 'Endgame_NoEnding',
+  // финалы, до которых бот доходил только после выплаты — а там теперь тишина (#136); обиженный + пачка — редкое совпадение
+  'Finale_beton_ledger', 'Away_ColdWar', 'Quiet_Offended_AlikAway',
 ].map((name) => [name, reason]))

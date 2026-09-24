@@ -1,11 +1,13 @@
 import type { Game } from '../../engine/game'
-import { type Rule, eq, is } from '../../engine/rules'
+import { type Rule, eq, exists, is, missing, named } from '../../engine/rules'
 import type { GameEvent, Offer } from './events'
-import { endgame } from '../memkeys'
+import { endgame, paydayScene } from '../memkeys'
 
 type R = Rule<Game, GameEvent, Offer>
 
 const active = is(endgame.active)
+/** Исход выплаты определён, экран концовки ещё не закрыт: группы ещё нет, но «до выплаты» уже кончилось. */
+const paydayOpen = named('paydayOpen', exists(paydayScene), missing(endgame.active))
 
 export const endgameRules: R[] = [
   {
@@ -45,4 +47,8 @@ export const endgameRules: R[] = [
     name: 'Endgame_NoEnding', event: 'CheckEnding', when: [active], specificity: 100, priority: 'system',
     respond: () => undefined,
   },
+  // за экраном концовки мир молчит: ни пачки, ни простоя, ни сюжета, ни обещаний — иначе после выплаты приходят отмазки и «переводы»
+  ...(['AlikAway', 'AlikIdle', 'StoryBeat', 'PeriodLine', 'PromiseDue'] as GameEvent[]).map((event): R => ({
+    name: 'Quiet_PaydayOpen_' + event, event, when: [paydayOpen], specificity: 100, priority: 'system', respond: () => {},
+  })),
 ]
