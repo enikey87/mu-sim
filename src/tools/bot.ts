@@ -9,6 +9,8 @@ import type { Choice } from '../engine/state'
 const FREE = ['Верни деньги до пятницы', 'ВЕРНИ ДЕНЬГИ!!!', 'Я тебя убью', 'Я тебя найду', 'Муууу']
 
 export async function botTurn(game: Game, pickCtx = 0.7, rude = 0.06, freeText = 0): Promise<Choice | null> {
+  // как игрок: экран концовки закрывают, иначе эндгейм не начинается и гейт его не видит (#190)
+  if (game.S.ending) { await game.closeEnding(); return null }
   if (game.battery.dead) { await game.battery.charge(); return null }
   const job = game.S.msgs.find((m) => m.kind === 'job' && !m.answered)
   if (job) { await game.answerJob(job.id, game.chance(0.5)); return null }
@@ -17,6 +19,7 @@ export async function botTurn(game: Game, pickCtx = 0.7, rude = 0.06, freeText =
     return null
   }
   const cs = game.choices
+  if (!cs.length) return null
   const ctx = cs.filter((c) => c.act || c.scene)
   let c: Choice
   if (ctx.length && game.rng.random() < pickCtx) c = ctx[Math.floor(game.rng.random() * ctx.length)]

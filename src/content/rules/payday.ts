@@ -145,6 +145,9 @@ export const paydayRules: R[] = [
   outcome('default', []),
   {
     name: 'Payday_Button', event: 'PaydayButton', when: [], priority: 'system',
-    respond: async ({ game, facts }) => { await game.say([game.open((OUTCOME[String(facts.outcome)] ?? OUTCOME.default).button)[0]]) },
+    respond: async ({ game, facts }) => {
+      const line = game.open((OUTCOME[String(facts.outcome)] ?? OUTCOME.default).button)[0]
+      if (line !== undefined) await game.say([line])
+    },
   },
 ]

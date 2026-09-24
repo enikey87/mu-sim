@@ -40,14 +40,33 @@ const CASES: Record<string, Case> = {
   // частные финалы — условия как у игрока (finales.test.ts SETUP)
   Finale_beton_opened: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem['count.rude'] = 6; g.S.mem['rude.heat'] = 2 } },
   Finale_beton_opened_or: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem.court = 5 } },
+  Finale_beton_corner: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.ach.redo = 1 } },
   Finale_grant_ally: { event: 'ArcFinale', facts: { arc: 'grant' }, setup: (g) => { g.S.ach.customer = 1 } },
   Finale_razmik_shift_or: { event: 'ArcFinale', facts: { arc: 'razmik' }, setup: (g) => { g.S.ach.newjob = 1 } },
   Finale_garik_cutter: { event: 'ArcFinale', facts: { arc: 'garik' }, setup: (g) => { g.S.ach.newjob = 1 } },
+  Finale_alik_death_will: { event: 'ArcFinale', facts: { arc: 'alik_death' }, setup: (g) => { g.S.ach.forgive = 1; g.S.mem['asked.alik_death'] = 1 } },
+  Finale_rubik_bribe: { event: 'ArcFinale', facts: { arc: 'rubik' }, setup: (g) => { g.S.ach.redo = 1 } },
   Ending_alik: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem['finale.garik'] = 'cutter'; g.S.ach.fence = 1 } },
+  Ending_heir: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem['finale.alik_death'] = 'will' } },
   // встречный иск на горячую угрозу — один раз, дальше «опять угрожаешь»
   Tone_Threat_Hot_Again: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem['rude.heat'] = 2; g.S.rules.once.Tone_Threat_Hot = true } },
+  Tone_WhileBlocked: { event: 'PlayerMessage', facts: { tone: 'neutral' }, setup: (g) => { g.S.mem.blocked = true } },
   Says_sorry_blocked_karine: { event: 'PlayerSays', facts: { intent: 'sorry' }, setup: (g) => { g.S.mem.blocked = true } },
   Says_via_boris: { event: 'PlayerSays', facts: { intent: 'via', arg: 'boris' }, setup: (g) => { g.S.mem.blocked = true } },
+  Says_prev_ThickJournal: {
+    event: 'PlayerSays', facts: { intent: 'prev', arg: '0' },
+    setup: (g) => { for (let i = 0; i < 5; i++) g.recordPromise({ text: `завтра №${i}`, d: 1 }); g.S.day += 5 },
+  },
+  Quiet_PaydayOpen_PromiseDue: {
+    event: 'PromiseDue', facts: { promise: 0 },
+    setup: (g) => {
+      g.S.mem.payday = 'default'
+      g.S.ending = 'payday_default'
+      g.S.endings.payday_default = g.S.day
+      g.recordPromise({ text: 'в пятницу', d: 1 })
+      g.S.day += 1
+    },
+  },
   // бывшие PROVEN, до которых стенд доходит почти всегда (#133): под гейтом, случай — страховка
   Quiet_Dead_AlikIdle: { event: 'AlikIdle', setup: (g) => { g.S.mem.alik_dead = true } },
   Quiet_Dead_StoryBeat: { event: 'StoryBeat', setup: (g) => { g.S.mem.alik_dead = true } },
