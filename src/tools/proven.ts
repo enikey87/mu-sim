@@ -12,6 +12,8 @@ export const PROVEN: Record<string, string> = Object.fromEntries([
   'Quiet_PhoneKarine_PeriodLine', 'Quiet_PhoneKarine_PromiseDue',
   'Phone_Karine_AlikTurn', 'Phone_Karine_PlayerMessage', 'Phone_Karine_PlayerSays',
   'Turn_Blocked', 'Turn_Vendetta', 'Rude_Vendetta',
+  // бот покрытия свободным текстом «спасибо»/«привет» не пишет (FREE в bot.ts); расширить FREE — сдвинуть все траектории
+  'Tone_Thanks', 'Tone_Greeting',
   'Says_sorry_blocked', 'Says_sorry_blocked_hinted', 'Says_via_mama',
   'Finale_boris_brigadir', 'Finale_boris_toyou', 'Finale_samvel_groom',
   'Finale_niva_chose', 'Finale_niva_chose_or', 'Finale_rubik_karine', 'Finale_alik_death_sulk', 'Finale_grandpa_revoke', 'Finale_razmik_swap',

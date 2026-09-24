@@ -7,9 +7,13 @@ import { AlikOffline } from './criteria'
 import { IDLE } from '../life'
 import { MEMORY } from '../memory'
 import { LEGENDS } from '../legends'
-import { count, payday } from '../memkeys'
+import { count, endgame, payday, polite, vendetta } from '../memkeys'
+import { GREET, GREET_MORNING, GREET_NIGHT, THANKS } from '../misc'
 
 type R = Rule<Game, GameEvent, Offer>
+
+/** Тёплый ответ ломает режимы вежливости-убийцы, вендетты и эндгейма — там он молчит. */
+const warm = [ne(polite, true), ne(vendetta, true), ne(endgame.active, true)]
 
 // Событие PlayerMessage { tone } — как Алик реагирует на тон
 export const toneRules: R[] = [
@@ -17,6 +21,16 @@ export const toneRules: R[] = [
   // грубость — лестница эскалации в rude.ts
   // угрозы судом — линия суда (court.ts): каждая угроза двигает дело на ступень
   { name: 'Tone_Cow', event: 'PlayerMessage', when: [eq('tone', 'cow')], remember: [add(count.cow)], respond: async ({ game }) => { await game.say([game.uniq(game.X.cow)]) } },
+  // «спасибо» / «привет» свободным текстом: ответ на это слово. В S5, вендетте и эндгейме — прежний ход;
+  // блок, смерть, телефон у Карине и Tone_MissRude специфичнее и выигрывают сами
+  { name: 'Tone_Thanks', event: 'PlayerMessage', when: [eq('category', 'gratitude'), ...warm], respond: async ({ game }) => { await game.say([game.uniq(() => game.draw('THANKS', THANKS))]) } },
+  {
+    name: 'Tone_Greeting', event: 'PlayerMessage', when: [eq('category', 'greeting'), ...warm],
+    respond: async ({ game, facts }) => {
+      const [key, pool] = facts.period === 'night' ? ['GREET_NIGHT', GREET_NIGHT] : facts.period === 'morning' ? ['GREET_MORNING', GREET_MORNING] : ['GREET', GREET]
+      await game.say([game.uniq(() => game.fillMoney(game.draw(key, pool)))])
+    },
+  },
 ]
 
 // Событие StoryBeat — после хода игрока, даже если он спорил, кричал или отвечал на контекст:
