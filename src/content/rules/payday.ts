@@ -63,7 +63,7 @@ export const PAYDAY_HOOKS: Record<string, (game: Game) => Promise<void>> = {
       took.add((p.spec as Claim).who)
       await game.say([{ w: (p.spec as Claim).who, t: p.text }])
       sum = Math.max(50, sum - (p.spec as Claim).cut)
-      // отказал делиться — берут вдвое: «по рублю» армянским слухом
+      // отказал делиться — берут вдвое: родня слышит «по рублю»
       if (game.S.mem[pd.refused]) sum = Math.max(50, sum - Math.round((p.spec as Claim).cut / 2))
       await money(game, sum)
     }
