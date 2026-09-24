@@ -460,13 +460,20 @@ export class Game {
     for (const bill of BILLS) {
       if (bill.skip?.(this.S.mem)) continue
       const atKey = billDueAt(bill.id)
-      const existing = Number(this.S.mem[atKey] ?? 0)
-      if (existing > this.S.day) continue
+      // срок стоит — его событие ещё впереди или ждёт в этой же пачке: второе расписание удвоит платёж
+      if (this.S.mem[atKey] != null) continue
       const at = this.S.day + dueIn(bill.due, this.S.day)
       this.S.mem[atKey] = at
-      this.scheduleEvent(at, 'BillDue', { bill: bill.id })
-      if (at - 1 > this.S.day) this.scheduleEvent(at - 1, 'BillWarn', { bill: bill.id })
+      this.scheduleEvent(at, 'BillDue', { bill: bill.id, at })
+      if (at - 1 > this.S.day) this.scheduleEvent(at - 1, 'BillWarn', { bill: bill.id, at })
     }
+  }
+  /** Событие платежа — текущий срок счёта, а не устаревший дубль. Без `at` — событие из старого сохранения. */
+  billEventLive(id: BillId, at: unknown, event: 'BillDue' | 'BillWarn'): boolean {
+    const cur = this.S.mem[billDueAt(id)]
+    if (cur == null) return false
+    if (at != null) return Number(at) === Number(cur)
+    return event === 'BillDue' ? Number(cur) <= this.S.day : Number(cur) === this.S.day + 1
   }
   /** Списать платёж или записать неоплату и последствия. */
   chargeBill(id: BillId): void {
