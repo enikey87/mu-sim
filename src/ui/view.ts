@@ -4,7 +4,9 @@ import type { UiState } from '../engine/ui-state'
 import { ACH } from '../content/achievements'
 import { ARCS } from '../content/arcs'
 import { ENDINGS } from '../content/finales'
+import { NOTIF } from '../content/life'
 import { payday } from '../content/memkeys'
+import { fmtDate } from '../engine/time'
 
 /** Граница между движком и интерфейсом: единственный модуль UI, который знает устройство S и ключей памяти.
  *  Компоненты получают фасад GameUi и плоский снимок; контент и memkeys не импортируют (страж — view.test.ts). */
@@ -16,8 +18,8 @@ type BatteryView = Readonly<Pick<Game['battery'], 'level' | 'dead' | 'charging'>
  *  обход через каст получает undefined, а не память. */
 export type GameUi = Readonly<
   Pick<Game, 'subscribe' | 'getVersion' | 'getMsgsEpoch' | 'getMsgsDirtyFrom' | 'ackMsgsDirty' | 'choices' | 'clockText' | 'gameDate'
-    | 'send' | 'answerJob' | 'canMirror' | 'playVoice' | 'castOf' | 'flash' | 'closeEnding' | 'dismissNotif' | 'toggleMute' | 'gesture' | 'onVisibility' | 'reset'>
-  & { ui: UiView; battery: BatteryView }
+    | 'send' | 'answerJob' | 'canMirror' | 'playVoice' | 'castOf' | 'flash' | 'closeEnding' | 'dismissNotif' | 'toggleMute' | 'gesture' | 'onVisibility' | 'reset' | 'introDone'>
+  & { ui: UiView; battery: BatteryView; mooSound: () => void }
 >
 
 const REAL = new WeakMap<GameUi, Game>()
@@ -43,6 +45,8 @@ export function uiOf(g: Game): GameUi {
     send: (o) => g.send(o), answerJob: (id, answer) => g.answerJob(id, answer), canMirror: () => g.canMirror(), playVoice: (m) => g.playVoice(m), castOf: (who) => g.castOf(who),
     flash: (t, ms) => g.flash(t, ms), closeEnding: () => g.closeEnding(), dismissNotif: () => g.dismissNotif(),
     toggleMute: () => g.toggleMute(), gesture: () => g.gesture(), onVisibility: (h) => g.onVisibility(h), reset: () => g.reset(),
+    introDone: () => g.introDone(),
+    mooSound: () => { g.audio.moo() },
   }
   FACADE.set(g, u)
   REAL.set(u, g)
@@ -136,3 +140,32 @@ export const viewOf = (u: GameUi): View => {
 /** Лента — единственное, что не в снимке: инкрементальный канал MessageList читает сам массив
  *  (тот же объект, что и раньше; windowing и dirtyFrom считаются по нему в Chat). */
 export const feedMsgs = (u: GameUi): Msg[] => realOf(u).S.msgs
+
+export type IntroNote = { icon: string; app: string; text: string; me?: true }
+export type IntroView = {
+  /** Первое сообщение Алика в чате — обещание завязки; интро показывает именно его. */
+  intro: string
+  /** Ответ игрока в прологе чата. */
+  reply: string
+  /** Системная строка завязки («…прошло 184 дня…»). */
+  gap: string
+  /** Дней после сдачи — счётчик интро бежит до этого числа. */
+  day: number
+  /** Дата календаря для листания — той же функцией, что разделители чата. */
+  dateAt: (day: number) => string
+  /** Промежуточные уведомления: пул телефона, открытый в свежей партии (без незнакомых имён). */
+  notes: IntroNote[]
+}
+
+/** Интро новой партии: null, если уже показано. Пролог читается из ленты — интро совпадает с чатом по построению. */
+export const introOf = (u: GameUi): IntroView | null => {
+  const S = realOf(u).S
+  if (S.introShown) return null
+  const alik = S.msgs.find((m): m is Extract<Msg, { kind: 'text' }> => m.kind === 'text' && m.from === 'alik')
+  const me = S.msgs.find((m): m is Extract<Msg, { kind: 'text' }> => m.kind === 'text' && m.from === 'me')
+  const sys = S.msgs.find((m): m is Extract<Msg, { kind: 'sys' }> => m.kind === 'sys')
+  if (!alik || !me || !sys) return null
+  const pool = NOTIF.filter((n) => !n.when?.length && !n.spend)
+  const notes = [...pool].sort(() => Math.random() - 0.5).slice(0, 6).map((n) => ({ icon: n.icon, app: n.app, text: n.t }))
+  return { intro: alik.text, reply: me.text, gap: sys.text, day: S.day, dateAt: fmtDate, notes }
+}

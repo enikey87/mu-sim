@@ -8,9 +8,10 @@ const findings = []
 const note = (sev, id, detail) => findings.push({ sev, id, detail })
 
 async function fresh(page) {
-  await page.goto(`${BASE}/?fast`, { waitUntil: 'domcontentloaded' })
+  // ?nointro — интро новой партии ~12 с анимации, тех-обход не должен её ждать
+  await page.goto(`${BASE}/?fast&nointro`, { waitUntil: 'domcontentloaded' })
   await page.evaluate(() => localStorage.clear())
-  await page.goto(`${BASE}/?fast`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/?fast&nointro`, { waitUntil: 'domcontentloaded' })
   await page.waitForSelector('.chat-head .name')
 }
 

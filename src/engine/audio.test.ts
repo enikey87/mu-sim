@@ -63,3 +63,44 @@ describe('browserAudio.dispose', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 })
+
+describe('browserAudio.жест страницы', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('новый экземпляр после «Начать заново» играет звук: жест — свойство страницы, не экземпляра', () => {
+    const made: string[] = []
+    class FakeAC {
+      currentTime = 0
+      resume() { return Promise.resolve() }
+      createOscillator() {
+        made.push('osc')
+        return {
+          frequency: { value: 0, setValueAtTime() {}, linearRampToValueAtTime() {} },
+          type: 'sawtooth', connect() { return this }, start() {}, stop() {},
+        }
+      }
+      createGain() {
+        return { gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {}, linearRampToValueAtTime() {} }, connect() { return this } }
+      }
+      createBiquadFilter() {
+        return { type: 'bandpass', frequency: { value: 0 }, Q: { value: 0 }, connect() { return this } }
+      }
+      get destination() { return {} }
+    }
+    vi.stubGlobal('AudioContext', FakeAC)
+    vi.stubGlobal('speechSynthesis', { speak: vi.fn(), cancel: vi.fn() })
+    vi.stubGlobal('SpeechSynthesisUtterance', class {
+      lang = ''; pitch = 1; rate = 1; volume = 1
+      constructor(public text: string) {}
+    })
+
+    const first = browserAudio()
+    first.unlock() // касание на странице было (кнопка «Начать заново»)
+    const afterReset = browserAudio() // новая игра — новый экземпляр
+    afterReset.moo() // «Мууу» интро не должно срезаться гейтом жеста
+    expect(made.length).toBeGreaterThan(0)
+  })
+})
