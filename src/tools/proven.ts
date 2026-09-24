@@ -14,7 +14,7 @@ export const PROVEN: Record<string, string> = Object.fromEntries([
   'Turn_Blocked', 'Turn_Vendetta', 'Rude_Vendetta',
   'Says_sorry_blocked', 'Says_sorry_blocked_hinted',
   'Finale_boris_brigadir', 'Finale_boris_toyou', 'Finale_samvel_groom',
-  'Finale_niva_chose', 'Finale_niva_chose_or', 'Finale_rubik_karine', 'Finale_alik_death_sulk',
+  'Finale_niva_chose', 'Finale_niva_chose_or', 'Finale_rubik_karine', 'Finale_alik_death_sulk', 'Finale_grandpa_revoke',
   'Ending_family', 'Ending_ram', 'Ending_honest', 'Ending_vendetta',
   'Ending_payday_real', 'Ending_payday_niva',
   'Payday_real', 'Payday_niva',
