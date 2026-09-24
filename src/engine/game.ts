@@ -460,18 +460,23 @@ export class Game {
   alikMsg<M extends NewMsg>(m: M): Msg {
     // персонаж написал сам — он в истории (intro) и игрок его встречал (met, для переклички в День выплаты)
     if (m.kind === 'text' && m.who) { this.S.mem[memkeys.met(m.who)] = true; this.S.mem[memkeys.intro(m.who)] = true }
-    this.S.mem[memkeys.alikDay] = this.S.day
     this.tick(1 + this.rnd(3))
-    const msg = this.push({ from: 'alik', time: fmtTime(this.S.clock), ...m } as NewMsg)
+    const msg = this.noteAlik(this.push({ from: 'alik', time: fmtTime(this.S.clock), ...m } as NewMsg))
+    this.audio.beep()
+    this.audio.vibrate(40)
+    if (this.chance(this.mooChance())) this.schedule(() => this.moo(), 300 + this.rnd(900))
+    return msg
+  }
+
+  /** Что сообщение Алика записывает в мир, каким бы путём ни пришло: день речи, заявления, упоминания, «брат джан». */
+  private noteAlik(msg: Msg): Msg {
+    this.S.mem[memkeys.alikDay] = this.S.day
     if (msg.kind === 'text' && /брат джан/i.test(msg.text)) this.unlock('brat')
     if (msg.kind === 'text' || msg.kind === 'photo') this.noteClaims(msg.text, msg.kind === 'text' ? msg.who : undefined)
     // хор: Алик кого-то упомянул — тот, может быть, вклинится после его ответа
     if (msg.kind === 'text' && !msg.who) {
       for (const [who, re] of Object.entries(MENTION_RE)) if (re.test(msg.text)) this.pending.push({ event: 'Mentioned', target: who })
     }
-    this.audio.beep()
-    this.audio.vibrate(40)
-    if (this.chance(this.mooChance())) this.schedule(() => this.moo(), 300 + this.rnd(900))
     return msg
   }
 
@@ -1603,38 +1608,41 @@ export class Game {
     this.ui.unread = 0
     this.ui.title = 'Алик, где деньги?'
   }
-  /** Сообщение пачки непрочитанных: пришло в момент `S.clock`, без «печатает…». Что именно — решает правило AlikAway. */
+  /**
+   * Сообщение пачки непрочитанных: пришло в момент `S.clock`, без «печатает…», часов и писка — они у пачки свои.
+   * В мир записывает то же, что обычное сообщение Алика (noteAlik). Что именно пришло — решает правило AlikAway.
+   */
   awayMsg(kind: AwayKind): void {
-    const base = { from: 'alik' as const, time: fmtTime(this.S.clock) }
+    const deliver = (m: NewMsg) => this.noteAlik(this.push({ from: 'alik', time: fmtTime(this.S.clock), ...m } as NewMsg))
     switch (kind) {
-      case 'text': this.push({ ...base, kind: 'text', text: this.addrLine('IDLE', L.IDLE) }); return
-      case 'sticker': { const s = this.draw('STICKERS', L.STICKERS); this.push({ ...base, kind: 'sticker', e: s.e, c: s.c }); return }
+      case 'text': deliver({ kind: 'text', from: 'alik', text: this.addrLine('IDLE', L.IDLE) }); return
+      case 'sticker': { const s = this.draw('STICKERS', L.STICKERS); deliver({ kind: 'sticker', from: 'alik', e: s.e, c: s.c }); return }
       case 'fwd': {
         const f = this.seen.pickFresh(() => this.draw('FWD', L.FWD), (x) => x)
         this.seen.mark(f.t)
-        this.push({ ...base, kind: 'fwd', f: f.f, text: f.t })
+        deliver({ kind: 'fwd', from: 'alik', f: f.f, text: f.t })
         return
       }
-      case 'deleted': this.push({ ...base, kind: 'text', text: '', deleted: true }); return
-      case 'voice': this.push({ ...base, kind: 'voice', len: 10 + this.rnd(50) }); return
+      case 'deleted': deliver({ kind: 'text', from: 'alik', text: '', deleted: true }); return
+      case 'voice': deliver({ kind: 'voice', from: 'alik', len: 10 + this.rnd(50) }); return
       case 'transfer':
         this.S.debt -= 50; this.S.money += 50; this.S.stats.fifty++
-        this.push({ ...base, kind: 'transfer', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE), amount: 50 })
+        deliver({ kind: 'transfer', from: 'alik', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE), amount: 50 })
         return
-      case 'formality': for (const text of this.formalityLines()) this.push({ ...base, kind: 'text', text }); return
+      case 'formality': for (const text of this.formalityLines()) deliver({ kind: 'text', from: 'alik', text }); return
       case 'excuse': {
         const legend = this.legend()
         if (legend) {
           const spec = LEGENDS[legend]
           const promise = this.alignPromise(this.X.promise(), spec.until, spec.condition)
           this.recordPromise(promise)
-          this.push({ ...base, kind: 'text', text: promise.text })
+          deliver({ kind: 'text', from: 'alik', text: promise.text })
           return
         }
         const ex = this.uniq(() => this.X.excuse())
         this.meetRel(ex.r)
         this.recordPromise(ex.p)
-        this.push({ ...base, kind: 'text', text: ex.texts.join(' ') })
+        deliver({ kind: 'text', from: 'alik', text: ex.texts.join(' ') })
       }
     }
   }
