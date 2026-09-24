@@ -15,12 +15,17 @@ export interface Clock {
   day: number
 }
 
-export interface RuleSetOptions {
+export interface RuleSetOptions<G = unknown> {
   rng: Rng
   hub: Hub
   state: RuleState
   /** Текущий ход игрока и игровой день — для перерывов и расписания. */
   now: () => Clock
+  /**
+   * Строгий режим молчания: зовётся до commit правила, возвращает проверку, которую fire вызовет после отката
+   * промолчавшего правила. Проверка бросает, если ответ успел что-то записать в игру.
+   */
+  silence?: (game: G, rule: Rule<G>) => () => void
 }
 
 export interface FireOptions {
@@ -30,9 +35,9 @@ export interface FireOptions {
   skip?: ReadonlySet<string>
 }
 
-export class RuleSet<G> {
-  private byEvent = new Map<string, Rule<G>[]>()
-  readonly all: Rule<G>[] = []
+export class RuleSet<G, O = unknown> {
+  private byEvent = new Map<string, Rule<G, string, O>[]>()
+  readonly all: Rule<G, string, O>[] = []
   /** Если задан — получает трассировку каждого выбора. */
   tracer: ((t: Trace) => void) | null = null
   readonly hub: Hub
@@ -40,14 +45,17 @@ export class RuleSet<G> {
   private rng: Rng
   private now: () => Clock
 
-  constructor(o: RuleSetOptions) {
+  private silence: RuleSetOptions<G>['silence']
+
+  constructor(o: RuleSetOptions<G>) {
     this.rng = o.rng
+    this.silence = o.silence
     this.hub = o.hub
     this.state = o.state
     this.now = o.now
   }
 
-  add(...rules: Rule<G>[]): this {
+  add(...rules: Rule<G, string, O>[]): this {
     for (const r of rules) {
       if (this.all.some((x) => x.name === r.name)) throw new Error(`Duplicate rule name: ${r.name}`)
       this.all.push(r)
@@ -59,12 +67,12 @@ export class RuleSet<G> {
     return this
   }
 
-  rules(event: string): Rule<G>[] {
+  rules(event: string): Rule<G, string, O>[] {
     return this.byEvent.get(event) ?? []
   }
 
   // ---- проверка одного правила ----
-  private check(r: Rule<G>, q: Query, facts: Facts, floor: number): Candidate {
+  private check(r: Rule<G, string, O>, q: Query, facts: Facts, floor: number): Candidate {
     const get = resolver(this.hub, q, facts)
     const failed = r.when.filter((c) => !test(c, get)).map(describeCriterion)
     if (r.sender && r.sender !== q.sender) failed.push(`sender == ${r.sender}`)
@@ -76,7 +84,7 @@ export class RuleSet<G> {
     return { ...cand, ok: true }
   }
 
-  private blocked(r: Rule<G>, floor: number): Blocked | undefined {
+  private blocked(r: Rule<G, string, O>, floor: number): Blocked | undefined {
     if (PRIORITY[r.priority ?? 'default'] < floor) return 'priority'
     if (r.once && this.state.once[r.name]) return 'once'
     const cd = r.cooldown && this.state.cooldown[r.name]
@@ -88,10 +96,10 @@ export class RuleSet<G> {
     return undefined
   }
 
-  private weightedOrder(list: Rule<G>[], facts: Facts): Rule<G>[] {
-    const w = (r: Rule<G>): number => Math.max(0, typeof r.weight === 'function' ? r.weight(facts) : (r.weight ?? 1))
+  private weightedOrder(list: Rule<G, string, O>[], facts: Facts): Rule<G, string, O>[] {
+    const w = (r: Rule<G, string, O>): number => Math.max(0, typeof r.weight === 'function' ? r.weight(facts) : (r.weight ?? 1))
     const pool = list.slice()
-    const out: Rule<G>[] = []
+    const out: Rule<G, string, O>[] = []
     while (pool.length) {
       const total = pool.reduce((n, r) => n + w(r), 0)
       let x = this.rng.random() * total
@@ -106,12 +114,12 @@ export class RuleSet<G> {
   }
 
   /** Лучшее правило для запроса или null. */
-  match(q: Query, facts: Facts = q.facts ?? {}, opts: FireOptions = {}): Rule<G> | null {
+  match(q: Query, facts: Facts = q.facts ?? {}, opts: FireOptions = {}): Rule<G, string, O> | null {
     const floor = PRIORITY[opts.floor ?? 'idle']
     const skip = opts.skip
     const trace: Candidate[] | null = this.tracer ? [] : null
     let best = -1
-    const tied: Rule<G>[] = []
+    const tied: Rule<G, string, O>[] = []
     for (const r of this.rules(q.event)) {
       const s = specificityOf(r)
       if (skip?.has(r.name)) {
@@ -136,10 +144,10 @@ export class RuleSet<G> {
   }
 
   /** Все подходящие: по убыванию специфичности, равные — взвешенно перемешаны, по одному на слот. */
-  collect(q: Query, facts: Facts = q.facts ?? {}, opts: FireOptions = {}): Rule<G>[] {
+  collect(q: Query, facts: Facts = q.facts ?? {}, opts: FireOptions = {}): Rule<G, string, O>[] {
     const floor = PRIORITY[opts.floor ?? 'idle']
     const trace: Candidate[] | null = this.tracer ? [] : null
-    const groups = new Map<number, Rule<G>[]>()
+    const groups = new Map<number, Rule<G, string, O>[]>()
     for (const r of this.rules(q.event)) {
       const c = this.check(r, q, facts, floor)
       trace?.push(c)
@@ -159,7 +167,7 @@ export class RuleSet<G> {
   }
 
   /** Контекст ответа правила. */
-  ctx(game: G, r: Rule<G>, q: Query, facts: Facts): RuleCtx<G> {
+  ctx(game: G, r: Rule<G, string, O>, q: Query, facts: Facts): RuleCtx<G> {
     return { game, facts, rule: r, query: q, get: resolver(this.hub, q, facts) }
   }
 
@@ -196,11 +204,15 @@ export class RuleSet<G> {
    * Отметить срабатывание: once, перерыв, память. Возвращает откат — правило, которое промолчит
    * (respond вернул false), не тратит разовый шанс и не оставляет следов в мире.
    */
-  commit(r: Rule<G>, q: Query): () => void {
+  commit(r: Rule<G, string, O>, q: Query): () => void {
     const undo: Array<() => void> = []
-    // отмеченное правило до match не доходит (blocked), так что откат снимает отметку, а не возвращает прежнюю
+    // once до match не доходит (blocked) — откат снимает отметку; у перерыва прежняя отметка истекла, но была — её и вернуть
     if (r.once) { this.state.once[r.name] = true; undo.push(() => { delete this.state.once[r.name] }) }
-    if (r.cooldown) { this.state.cooldown[r.name] = { ...this.now() }; undo.push(() => { delete this.state.cooldown[r.name] }) }
+    if (r.cooldown) {
+      const was = this.state.cooldown[r.name]
+      this.state.cooldown[r.name] = { ...this.now() }
+      undo.push(() => { if (was) this.state.cooldown[r.name] = was; else delete this.state.cooldown[r.name] })
+    }
     this.applyOps(r.remember, q, undo)
     // в обратном порядке: две записи одного факта возвращаются к исходному значению
     return () => { for (let i = undo.length - 1; i >= 0; i--) undo[i]!() }
@@ -251,17 +263,18 @@ export class RuleSet<G> {
    * иначе правило, которое молчит всегда, заслоняло бы остальных на каждом ходе.
    * Если промолчали все — null, вызывающий отвечает сам.
    */
-  async fire(game: G, q: Query, factsFor: (extra: Facts) => Facts, opts: FireOptions = {}, depth = 0): Promise<Rule<G> | null> {
+  async fire(game: G, q: Query, factsFor: (extra: Facts) => Facts, opts: FireOptions = {}, depth = 0): Promise<Rule<G, string, O> | null> {
     if (depth > 8) throw new Error(`Rule trigger chain too deep at ${q.event}`)
     const skip = new Set(opts.skip ?? [])
     while (true) {
       const facts = factsFor(q.facts ?? {})
       const r = this.match(q, facts, { ...opts, skip })
       if (!r) return null
+      const check = this.silence?.(game, r)
       const undo = this.commit(r, q)
       const res = await r.respond?.(this.ctx(game, r, q, facts))
       const responded = res !== false
-      if (!responded) undo()
+      if (!responded) { undo(); check?.() }
       for (const t of r.trigger ?? []) {
         if (t.ifResponded && !responded) continue
         if (t.probability !== undefined && this.rng.random() >= t.probability) continue

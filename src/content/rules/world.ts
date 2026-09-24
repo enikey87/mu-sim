@@ -1,13 +1,13 @@
 // Правила новых возможностей: выбор сцен, наступившие обещания, хор персонажей, состояния мира.
 import type { Game } from '../../engine/game'
 import { type Rule, type Facts, type Entry, eq, ne, gte, lte, is, add, of, missing } from '../../engine/rules'
-import type { GameEvent } from './events'
+import type { GameEvent, Offer } from './events'
 import { WORLD, SPEAKS } from '../world'
 import { CHORUS_LEGEND } from '../legends'
 import { PROMISE_DUE, PROMISE_DUE_COSMIC, PROMISE_DUE_KEPT, PROMISE_MET, CHORUS, CHORUS_FED_UP, WEDDING_NOISE, BORIS_SICK, DEAD_KARINE, DEAD_ALIK } from '../world'
 import { alikDead, blocked, count, grantPaid, interjections, intro, met, mourning, sick } from '../memkeys'
 
-type R = Rule<Game, GameEvent>
+type R = Rule<Game, GameEvent, Offer>
 
 // ---- выбор сцены (PickScene): раньше — случайно из колоды, теперь — по сюжету ----
 // Специфичность у всех 0 (выбор по весам), условия — ворота; после показа — перерыв 25 дней.

@@ -2,7 +2,7 @@
 // Общее правило по intent + более специфичные для частных случаев (память, контекст).
 import type { Game } from '../../engine/game'
 import { type Rule, eq, ne, is, gte, add, valueOf } from '../../engine/rules'
-import type { GameEvent } from './events'
+import type { GameEvent, Offer } from './events'
 import { AlikOffline, ThickJournal } from './criteria'
 import { cooldown } from './rude'
 import { TOPICS, TOPIC_FALLBACK, TOPIC_NAME, TOPIC_OBSESSED } from '../topics'
@@ -15,7 +15,7 @@ import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER } from '../misc'
 import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_SENT, LIE_THIRD, LIE_NOCRED } from '../lies'
 import { HEAT, asked, caughtCount, count, doneAsked, finaleOf, lie, nextTransfer, topic, topicMute } from '../memkeys'
 
-type R = Rule<Game, GameEvent>
+type R = Rule<Game, GameEvent, Offer>
 const says = (intent: string, rest: Partial<R> & Pick<R, 'respond'>, extra: R['when'] = []): R => ({
   name: `Says_${intent}${extra.length ? '_' + extra.map((c) => (c.key + (typeof c.value === 'string' ? '_' + c.value : c.value === true || c.value === undefined ? '' : c.value)).replace(/[^\wа-я]/gi, '')).join('_') : ''}`,
   event: 'PlayerSays',
@@ -78,8 +78,8 @@ export const replyRules: R[] = [
       const [kind, sub, i] = String(facts.arg).split('|') as [TalkKind, string, string]
       const e = talkPairs(kind, sub)[Number(i)]
       const pair = e && valueOf(e)
+      if (!pair) return false // молчание не трогает ctx: следующее правило отвечает на тот же контекст
       game.setCtx(null)
-      if (!pair) return false
       const id = talkId(kind, sub, Number(i))
       game.lines.mark(id)
       game.rules.applyOps(TALK_REMEMBER[id] ?? [], {})

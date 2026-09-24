@@ -3,7 +3,7 @@
 import type { Game } from '../../engine/game'
 import type { Choice, Tone } from '../../engine/state'
 import { type Rule, type Facts, type Criterion, type Entry, eq, is, exists, missing, gt, gte, lte, isOpen, valueOf } from '../../engine/rules'
-import type { GameEvent } from './events'
+import type { GameEvent, Offer } from './events'
 import { D, cap } from '../excuses'
 import { talkPairs, talkId } from '../talk'
 import { ARCS, WRONG_Q } from '../arcs'
@@ -15,7 +15,7 @@ import { WORLD, SPEAKS, needs } from '../world'
 import { fmtDayMonth } from '../../engine/time'
 import { HEAT, alikDead, blocked, court, lie, mourning } from '../memkeys'
 
-type R = Rule<Game, GameEvent>
+type R = Rule<Game, GameEvent, Offer>
 
 interface OfferSpec {
   name: string
