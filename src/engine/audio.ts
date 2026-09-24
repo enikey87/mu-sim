@@ -54,26 +54,24 @@ export function browserAudio(): Audio {
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
     o.connect(g).connect(c.destination); o.start(t); o.stop(t + dur + 0.02)
   }
-  function cow(vol: number) {
-    const c = ctx(), t = c.currentTime, dur = 1.4 + Math.random() * 1.2
-    const out = c.createGain()
-    out.gain.setValueAtTime(0.0001, t)
-    out.gain.exponentialRampToValueAtTime(vol, t + 0.25)
-    out.gain.setValueAtTime(vol, t + dur - 0.4)
-    out.gain.exponentialRampToValueAtTime(0.0001, t + dur)
-    out.connect(c.destination)
-    const f0 = 95 + Math.random() * 30
-    for (const k of [1, 1.005]) {
-      const o = c.createOscillator(); o.type = 'sawtooth'
-      o.frequency.setValueAtTime(f0 * k, t)
-      o.frequency.linearRampToValueAtTime(f0 * 1.25 * k, t + dur * 0.35)
-      o.frequency.linearRampToValueAtTime(f0 * 0.8 * k, t + dur)
-      for (const [freq, q] of [[320, 4], [800, 6]]) {
-        const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = q
-        o.connect(f).connect(out)
-      }
-      o.start(t); o.stop(t + dur)
-    }
+  /**
+   * «Мууу»: один пилообразный осциллятор, частота вниз 120→95 Гц, lowpass 700 Гц — ориентир из макета интро (#161).
+   * Разброс длины и высоты — чтобы не звучало одинаково; выше прежнего не стало: было два осциллятора и синтез речи.
+   */
+  function mooVoice(vol: number) {
+    const c = ctx(), t = c.currentTime, dur = 1.6 + Math.random() * 0.4
+    const f0 = 114 + Math.random() * 12
+    const o = c.createOscillator(); o.type = 'sawtooth'
+    o.frequency.setValueAtTime(f0, t)
+    o.frequency.linearRampToValueAtTime(f0 * 95 / 120, t + dur)
+    const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 700
+    const g = c.createGain()
+    g.gain.setValueAtTime(0, t)
+    g.gain.linearRampToValueAtTime(vol, t + 0.25)
+    g.gain.linearRampToValueAtTime(vol * 0.8, t + dur - 0.4)
+    g.gain.linearRampToValueAtTime(0, t + dur)
+    o.connect(f).connect(g).connect(c.destination)
+    o.start(t); o.stop(t + dur + 0.02)
   }
   const api: Audio = {
     unlock() {
@@ -94,10 +92,8 @@ export function browserAudio(): Audio {
       try { speechSynthesis.cancel() } catch { /* ignore */ }
     },
     beep: () => safe(() => { tone(1320, 0.1, 0.15); tone(1320, 0.1, 0.15, 'sine', 0.12) }),
-    moo() {
-      safe(() => cow(0.25))
-      api.speak('М' + 'у'.repeat(5 + Math.floor(Math.random() * 6)), { pitch: 0.1, rate: 0.55, volume: 0.35 })
-    },
+    // синтеза речи поверх нет: голос браузера звучит по-разному на устройствах, а ориентир — без него (#161)
+    moo: () => safe(() => mooVoice(0.22)),
     speak(text, { pitch = 1, rate = 1, volume = 0.5 } = {}) {
       if (muted || disposed || !gestured) return
       try {
