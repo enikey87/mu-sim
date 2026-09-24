@@ -232,6 +232,21 @@ describe('App', () => {
     expect(game.S.ach.fence).toBeDefined()
   })
 
+  it('третья кнопка допработы — только при правдивой отмазке; нажатие отказывает зеркалом', async () => {
+    const { game } = makeGame()
+    await game.job()
+    renderApp(game)
+    expect(screen.queryByRole('button', { name: 'Не могу, брат…' })).not.toBeInTheDocument()
+    await act(async () => {
+      game.S.arcs.boris = { i: 2, last: 0 }
+      game.S.actors.boris = { sick: true }
+      game.emit()
+    })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Не могу, брат…' })) })
+    expect(screen.queryByRole('button', { name: 'Не могу, брат…' })).not.toBeInTheDocument()
+    expect(screen.getByText('Не могу, брат. Борис болеет, я с ним сижу.')).toBeInTheDocument()
+  })
+
   it('досье: обещания, сериалы, ачивки, сброс', async () => {
     const { game } = makeGame()
     game.recordPromise({ text: 'завтра — всё отдам', d: 1 })
