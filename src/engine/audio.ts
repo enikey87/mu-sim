@@ -1,6 +1,7 @@
 // Звук и вибрация. Браузер блокирует их до первого касания — поэтому unlock() вызывается по жесту.
 import { FEAST } from '../content/misc'
 import { VOICE } from '../content/life'
+import type { WallTimer } from './clock'
 
 export interface Audio {
   unlock(): void
@@ -24,7 +25,7 @@ export function browserAudio(): Audio {
   let gestured = false
   let muted = false
   let disposed = false
-  const pending = new Set<number>()
+  const pending = new Set<WallTimer>()
   const ctx = (): AudioContext => {
     if (!gestured) throw new Error('no gesture')
     return (ac ??= new AudioContext())
@@ -37,7 +38,7 @@ export function browserAudio(): Audio {
     const id = window.setTimeout(() => {
       pending.delete(id)
       if (!disposed) fn()
-    }, ms)
+    }, ms) as WallTimer
     pending.add(id)
   }
 
