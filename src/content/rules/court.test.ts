@@ -53,6 +53,47 @@ describe('линия суда', () => {
     expect((await threat(game)).r).toBe('Tone_Threat_Hot')
     expect((await threat(game)).r).toBe('Court_Start')
   })
+  it('не судебная инстанция переводится в суд её же словами — в той ступени, которую вызвала', async () => {
+    const { game } = makeGame()
+    game.S.mem.court = 1
+    game.S.mem['threat.claim'] = 'police'
+    const { r, t } = await threat(game)
+    expect(r).toBe('Court_Lawyer')
+    expect(t[0]).toBe(`Полиция? Полиция сказала — это в суд. ${COURT[1][0][1]}`)
+    expect(t).toContain(COURT[1][1][1]) // реплика Арсена не тронута
+    game.S.mem.court = 2
+    game.S.mem['threat.claim'] = 'tax'
+    const step = await threat(game)
+    expect(step.r).toBe('Court_Step')
+    expect(step.t[0]).toBe(COURT[2][0][1]) // первая реплика ступени — Арсена, перевод её не касается
+    expect(step.t[1]).toBe(`Налоговая? Налоговая сказала — это в суд. ${COURT[2][1][1]}`)
+  })
+  it('судебная угроза и угроза без инстанции ступеней не меняют', async () => {
+    for (const claim of ['court', undefined]) {
+      const { game } = makeGame()
+      game.S.mem.court = 1
+      if (claim) game.S.mem['threat.claim'] = claim
+      const { t } = await threat(game)
+      expect(t, String(claim)).toEqual(COURT[1].map(([, line]) => line))
+      expect(game.S.mem['court.referral']).toBeUndefined()
+    }
+  })
+  it('перевод звучит один раз на инстанцию: повтор молчит, другая инстанция — снова', async () => {
+    const { game } = makeGame()
+    game.S.mem.court = 1
+    game.S.mem['threat.claim'] = 'police'
+    expect((await threat(game)).t[0]).toMatch(/^Полиция\?/)
+    game.S.mem['threat.claim'] = 'police'
+    expect((await threat(game)).t).toEqual(COURT[2].map(([, line]) => line)) // вторая ступень — без повтора шутки
+    game.S.mem['threat.claim'] = 'collectors'
+    expect((await threat(game)).r).toBe('Court_Step') // ступень-заседание: сцена, перевода нет
+    expect(game.S.scene?.id).toBe('court')
+    expect(game.S.mem['court.referral']).toBe('police') // инстанция не зачтена — переведём её на следующей ступени
+    game.S.choices = null
+    await game.send(game.choices.find((c) => c.go === 'screens')!)
+    game.S.mem['threat.claim'] = 'collectors'
+    expect((await threat(game)).t[0]).toBe(`Коллекторы? Коллекторы сказали — это в суд. ${COURT[4][0][1]}`)
+  })
   it('после письма Страсбурга в День выплаты — отдельный вердикт, не общая ступень', async () => {
     const { game } = makeGame()
     game.S.mem.court = 6
