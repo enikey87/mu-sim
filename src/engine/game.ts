@@ -468,7 +468,8 @@ export class Game {
       if (bill.skip?.(this.S.mem)) continue
       const atKey = billDueAt(bill.id)
       const existing = Number(this.S.mem[atKey] ?? 0)
-      if (existing > this.S.day) continue
+      // уже стоит срок на сегодня или позже — не плодить второе BillDue в тот же день
+      if (existing >= this.S.day) continue
       const at = this.S.day + dueIn(bill.due, this.S.day)
       this.S.mem[atKey] = at
       this.scheduleEvent(at, 'BillDue', { bill: bill.id })
@@ -503,7 +504,7 @@ export class Game {
       if (!this.S.mem[loanTaken(loan.id)]) continue
       const atKey = loanDueAt(loan.id)
       const existing = Number(this.S.mem[atKey] ?? 0)
-      if (existing > this.S.day) continue
+      if (existing >= this.S.day) continue
       const at = this.S.day + dueIn(loan.due, this.S.day)
       this.S.mem[atKey] = at
       this.scheduleEvent(at, 'CreditDue', { credit: loan.id })
