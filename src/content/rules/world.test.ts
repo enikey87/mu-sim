@@ -57,12 +57,22 @@ describe('сцены выбираются по сюжету', () => {
     game.S.day += 25
     expect(pickScene(game)).toBeDefined()
   })
-  it('правило сцены промолчало — ход не потерян: следующее правило или отмазка', async () => {
+  it('правило сцены промолчало — ход не потерян: сцену берёт следующее правило', async () => {
     const { game } = makeGame()
     game.rules.add({ name: 'Scene_Silent', event: 'PickScene', when: [], specificity: 99, respond: () => false })
+    await game.startScene()
+    expect(game.S.scene).not.toBeNull()
+  })
+  it('промолчали все сцены — запасная отмазка: сцены нет, Алик отговаривается', async () => {
+    const { game } = makeGame()
+    game.rules.add({ name: 'Scene_Silent', event: 'PickScene', when: [], specificity: 99, respond: () => false })
+    const now = { turn: game.S.stats.sent, day: game.S.day }
+    const scenes = game.rules.all.filter((r) => r.event === 'PickScene' && r.name !== 'Scene_Silent')
+    expect(scenes.length).toBeGreaterThan(5)
+    for (const r of scenes) game.S.rules.cooldown[r.name] = now // все настоящие сцены — на перерыве
     const n = game.S.msgs.length
     await game.startScene()
-    // Silent выигрывает и молчит — fire берёт следующую сцену (или null → отмазка); пустого хода нет
+    expect(game.S.scene).toBeNull()
     expect(game.S.msgs.slice(n).some((m) => m.kind === 'text' && m.from === 'alik')).toBe(true)
   })
 })
