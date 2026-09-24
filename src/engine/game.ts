@@ -1043,8 +1043,8 @@ export class Game {
   recordPromise(p?: { text: string; d: number | null; due?: Due; condition?: PromiseCondition; tomorrow?: boolean } | null): void {
     if (!p) return
     if (p.condition && this.S.mem[p.condition] === true) return
-    if (p.tomorrow) this.rules.applyOps([set('said.tomorrow', true)], {})
-    if (p.due && 'weekday' in p.due && p.due.weekday === 5) this.rules.applyOps([set('said.friday', true)], {})
+    if (p.tomorrow) this.rules.applyOps([set(memkeys.saidTomorrow, true)], {})
+    if (p.due && 'weekday' in p.due && p.due.weekday === 5) this.rules.applyOps([set(memkeys.saidFriday, true)], {})
     const due = p.d == null ? null : this.S.day + (p.due ? dueIn(p.due, this.S.day) : p.d)
     this.S.promises.push({ t: p.text, made: this.S.day, due, condition: p.condition })
     if (due !== null && due > this.S.day) this.scheduleEvent(due, 'PromiseDue', { promise: this.S.promises.length - 1 })
