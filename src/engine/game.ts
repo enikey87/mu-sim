@@ -952,6 +952,13 @@ export class Game {
     return {
       day: S.day, tier: S.tier, mood: S.mood, sent: S.stats.sent, moo: S.stats.moo, patience: S.patience, money: S.money, debt: S.debt, fifty: S.stats.fifty,
       moneyNormal: moneyLv === 'normal', moneyLow: moneyLv === 'low', moneyBottom: moneyLv === 'bottom',
+      // завтра списывают платёж (счёт или кредит) — для отчаянных реплик про срок (#187)
+      paymentDueTomorrow: (() => {
+        const tom = S.day + 1
+        for (const b of BILLS) if (Number(S.mem[billDueAt(b.id)]) === tom) return true
+        for (const l of LOANS) if (Number(S.mem[loanDueAt(l.id)]) === tom) return true
+        return false
+      })(),
       dow: date.getDay(), month: date.getMonth() + 1, dom: date.getDate(),
       holiday: holidayOf(S.day) ?? false,
       ...progress,
