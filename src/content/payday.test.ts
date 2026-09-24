@@ -80,6 +80,18 @@ describe('День выплаты', () => {
     await choose(game, 'share')
     expect(String(game.S.mem['payday.chain']).length).toBeGreaterThan(80)
   })
+  it('День выплаты прошёл — правило уходит из пула, а не перехватывает StoryBeat молча', () => {
+    const late = (g: Game) => g.rules.collect({ event: 'StoryBeat' }, g.facts()).some((r) => r.name === 'Beat_Payday_Late')
+    const { game } = makeGame()
+    game.S.day = 430
+    game.S.stats.sent = 200
+    expect(late(game)).toBe(true)
+    game.S.mem['payday.at'] = 400
+    expect(late(game)).toBe(false)
+    delete game.S.mem['payday.at']
+    game.S.mem.payday = 'coins'
+    expect(late(game)).toBe(false)
+  })
   it('исходы по стилю партии: частный побеждает', async () => {
     const pick = async (setup: (g: Game) => void) => { const { game } = makeGame(); setup(game); return (await game.fire('PaydayOutcome'))?.name }
     expect(await pick(() => {})).toBe('Payday_default')
