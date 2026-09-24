@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { makeGame } from '../test/helpers'
+import { makeGame , setMoney} from '../test/helpers'
 import {
   ENDGAME_ALIK_BACK, ENDGAME_FORMALITIES, ENDGAME_LEAVE, ENDGAME_MONEY, ENDGAME_MUTE,
   ENDGAME_RENAMES, ENDGAME_RETURNER_LINES, ENDGAME_RETURNERS,
@@ -35,7 +35,7 @@ describe('бесконечная группа после Дня выплаты',
   it('открывается один раз и сохраняет результат концовки', async () => {
     const { game } = makeGame()
     game.adjustDebt(-game.S.debt)
-    game.S.money = 252400
+    setMoney(game, 252400)
 
     const day = game.S.day
     await finishPayday(game, 'real')

@@ -114,7 +114,8 @@ export interface GameState {
   arcs: Record<string, { i: number; last: number; byAsk?: boolean }>
   tier: number
   battery: number
-  money: number
+  /** Только чтение: пишет один Game.adjustMoney (в эндгейме деньги запечатаны). Страж — engine/money.test.ts. */
+  readonly money: number
   lastSeen: number
   /** Память мира для системы правил: счётчики, факты, временные состояния. */
   mem: Facts
