@@ -329,6 +329,46 @@ describe('RuleSet.fire', () => {
     await rs.fire(game, { event: 'B' }, factsFor)
     expect(game.log).toEqual(['Next'])
   })
+  it('промолчавшее правило: once не потрачен — молчит в первый раз, говорит во второй', async () => {
+    const { rs, game, factsFor, state } = mk()
+    let silent = true
+    rs.add({ name: 'Once', event: 'E', when: [], once: true, respond: () => { if (silent) return false; game.log.push('Once') } })
+    expect(await rs.fire(game, { event: 'E' }, factsFor)).toBeNull()
+    expect(state.once.Once).toBeUndefined()
+    silent = false
+    expect((await rs.fire(game, { event: 'E' }, factsFor))!.name).toBe('Once')
+    expect(game.log).toEqual(['Once'])
+  })
+  it('промолчавшее правило не оставляет ни памяти, ни перерыва, ни отложенных записей', async () => {
+    const { rs, game, factsFor, state, world, actors } = mk({ world: { x: 5 }, actors: { boris: { y: 1 } } })
+    rs.add({
+      name: 'Silent', event: 'E', when: [], once: true, cooldown: { turns: 3 }, target: 'boris',
+      remember: [add('x'), set('x', 7), set('y', 2, { forDays: 2 }), { key: 'z', op: '+', value: 1, delay: 5, scope: 'target' }, add('fresh')],
+      respond: () => false,
+    })
+    expect(await rs.fire(game, { event: 'E', target: 'boris' }, factsFor)).toBeNull()
+    expect(world.x).toBe(5)
+    expect('fresh' in world).toBe(false)
+    expect(actors.boris).toEqual({ y: 1 })
+    expect(state.schedule).toEqual([])
+    expect(state.cooldown.Silent).toBeUndefined()
+  })
+  it('во время ответа тот же факт переписали — откат чужую запись не трогает', async () => {
+    const { rs, game, factsFor, world } = mk()
+    rs.add({
+      name: 'Silent', event: 'E', when: [], remember: [set('x', 1), set('y', 1)],
+      respond: ({ query }) => { rs.applyOps([set('x', 99)], query); return false },
+    })
+    expect(await rs.fire(game, { event: 'E' }, factsFor)).toBeNull()
+    expect(world.x).toBe(99)
+    expect('y' in world).toBe(false) // свою запись правило всё равно не оставляет
+  })
+  it('промолчавшее правило всё равно шлёт свой trigger — ifResponded для этого и есть', async () => {
+    const { rs, game, factsFor } = mk()
+    rs.add({ name: 'Silent', event: 'A', when: [], respond: () => false, trigger: [{ event: 'Next' }] }, say('Next', 'Next'))
+    expect(await rs.fire(game, { event: 'A' }, factsFor)).toBeNull()
+    expect(game.log).toEqual(['Next'])
+  })
   it('отложенный trigger попадает в расписание', async () => {
     const { rs, game, factsFor, state, clock } = mk()
     rs.add(say('Now', 'A', [], { trigger: [{ event: 'Later', delay: 4, facts: { x: 1 } }] }), say('Later', 'Later'))

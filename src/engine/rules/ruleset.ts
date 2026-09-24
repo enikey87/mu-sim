@@ -157,28 +157,46 @@ export class RuleSet<G> {
   }
 
   // ---- память ----
-  /** Применить записи: сразу, с задержкой (delay) или на время (forDays). */
-  applyOps(ops: FactOp[] | undefined, q: Pick<Query, 'sender' | 'target'>): void {
+  /**
+   * Применить записи: сразу, с задержкой (delay) или на время (forDays).
+   * `undo` — журнал отката: правило, которое промолчит, не оставляет следов (см. commit).
+   */
+  applyOps(ops: FactOp[] | undefined, q: Pick<Query, 'sender' | 'target'>, undo?: Array<() => void>): void {
     const day = this.now().day
     for (const o of ops ?? []) {
       if (o.delay) {
-        this.schedule({ at: day + o.delay, kind: 'ops', ops: [{ ...o, delay: undefined }], sender: q.sender, target: q.target })
+        const item: Scheduled = { at: day + o.delay, kind: 'ops', ops: [{ ...o, delay: undefined }], sender: q.sender, target: q.target }
+        this.schedule(item)
+        undo?.push(() => { this.state.schedule = this.state.schedule.filter((x) => x !== item) })
         continue
       }
       const board = writeBoard(this.hub, q, o.scope)
       if (!board) continue
       if (o.forDays && o.op === '=') {
-        this.schedule({ at: day + o.forDays, kind: 'restore', key: o.key, scope: o.scope ?? 'world', actor: actorOf(q, o.scope), value: board[o.key] })
+        const item: Scheduled = { at: day + o.forDays, kind: 'restore', key: o.key, scope: o.scope ?? 'world', actor: actorOf(q, o.scope), value: board[o.key] }
+        this.schedule(item)
+        undo?.push(() => { this.state.schedule = this.state.schedule.filter((x) => x !== item) })
       }
+      const was = board[o.key]
       applyOp(board, o)
+      const wrote = board[o.key]
+      // откат — только своей записи: если во время ответа тот же факт переписали, чужая запись остаётся
+      undo?.push(() => { if (board[o.key] !== wrote) return; if (was === undefined) delete board[o.key]; else board[o.key] = was })
     }
   }
 
-  /** Отметить срабатывание: once, перерыв, память. */
-  commit(r: Rule<G>, q: Query): void {
-    if (r.once) this.state.once[r.name] = true
-    if (r.cooldown) this.state.cooldown[r.name] = { ...this.now() }
-    this.applyOps(r.remember, q)
+  /**
+   * Отметить срабатывание: once, перерыв, память. Возвращает откат — правило, которое промолчит
+   * (respond вернул false), не тратит разовый шанс и не оставляет следов в мире.
+   */
+  commit(r: Rule<G>, q: Query): () => void {
+    const undo: Array<() => void> = []
+    // отмеченное правило до match не доходит (blocked), так что откат снимает отметку, а не возвращает прежнюю
+    if (r.once) { this.state.once[r.name] = true; undo.push(() => { delete this.state.once[r.name] }) }
+    if (r.cooldown) { this.state.cooldown[r.name] = { ...this.now() }; undo.push(() => { delete this.state.cooldown[r.name] }) }
+    this.applyOps(r.remember, q, undo)
+    // в обратном порядке: две записи одного факта возвращаются к исходному значению
+    return () => { for (let i = undo.length - 1; i >= 0; i--) undo[i]!() }
   }
 
   // ---- расписание ----
@@ -222,15 +240,17 @@ export class RuleSet<G> {
   /**
    * Вызвать событие: лучшее правило → память → ответ → цепочка событий.
    * factsFor пересобирает факты на каждое событие цепочки (чтобы видеть свежую память).
+   * Промолчавшее правило (respond вернул false) откатывается и null — вызывающий отвечает сам.
    */
   async fire(game: G, q: Query, factsFor: (extra: Facts) => Facts, opts: FireOptions = {}, depth = 0): Promise<Rule<G> | null> {
     if (depth > 8) throw new Error(`Rule trigger chain too deep at ${q.event}`)
     const facts = factsFor(q.facts ?? {})
     const r = this.match(q, facts, opts)
     if (!r) return null
-    this.commit(r, q)
+    const undo = this.commit(r, q)
     const res = await r.respond?.(this.ctx(game, r, q, facts))
     const responded = res !== false
+    if (!responded) undo()
     for (const t of r.trigger ?? []) {
       if (t.ifResponded && !responded) continue
       if (t.probability !== undefined && this.rng.random() >= t.probability) continue
@@ -238,7 +258,7 @@ export class RuleSet<G> {
       if (t.delay) this.schedule({ at: this.now().day + t.delay, kind: 'event', ...next })
       else await this.fire(game, next, factsFor, opts, depth + 1)
     }
-    return r
+    return responded ? r : null
   }
 
   /** Вызвать все наступившие отложенные события. */

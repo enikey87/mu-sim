@@ -126,9 +126,11 @@ export const paydayRules: R[] = [
     name: 'Beat_Payday', event: 'StoryBeat', when: [gte('day', 330), gte('arcsDone', 3), missing(paydayScene), missing(pd.at), missing(alikDead)], bonus: 10, once: true, priority: 'cinematic',
     respond: ({ game }) => game.enterNode('payday', 'announce'),
   },
+  // условия Дня выплаты — в when, а не в respond: промолчавшее правило остаётся в пуле (разовый шанс
+  // не тратится) и после выплаты перехватывало бы каждый StoryBeat, ничего не говоря
   {
-    name: 'Beat_Payday_Late', event: 'StoryBeat', when: [gte('day', 420), gte('sent', 150), missing(alikDead)], bonus: 9, once: true, priority: 'cinematic',
-    respond: async ({ game }) => { if (game.S.mem[paydayScene] || game.S.mem[pd.at]) return false; await game.enterNode('payday', 'announce') },
+    name: 'Beat_Payday_Late', event: 'StoryBeat', when: [gte('day', 420), gte('sent', 150), missing(alikDead), missing(paydayScene), missing(pd.at)], bonus: 9, once: true, priority: 'cinematic',
+    respond: ({ game }) => game.enterNode('payday', 'announce'),
   },
   outcome('real', [is('ach.saint'), gte(caughtCount, 3), is('ach.court'), gte('quests', 5)]),
   // поймал великую отмазку — заслуга игрока: важнее исходов «по стилю партии» (одинаковая специфичность решалась бы случайно)
