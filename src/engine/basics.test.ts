@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { seededRng, shuffle, rndInt, chance, mathRng } from './rng'
 import { Decks, type Bags } from './deck'
 import { Seen, hash, keyOf } from './uniq'
-import { periodOf, tierOf, fmtTime, fmtDate, fmtDayMonth, dateOf, HANDOVER } from './time'
+import { periodOf, tierOf, fmtTime, fmtDate, fmtDayMonth, dateOf, dueIn, HANDOVER, type Due } from './time'
 import { manualClock, realClock } from './clock'
 import { freshState, loadState, saveState, SAVE_KEY } from './state'
 import { typo } from './typo'
@@ -105,6 +105,36 @@ describe('time', () => {
     expect(fmtDate(0)).toMatch(/18 марта 2026/)
     expect(fmtDayMonth(0)).toBe('18 марта')
     expect(fmtDayMonth(0)).not.toMatch(/г\./)
+  })
+  // Сидней и Окленд уходят с летнего времени в апреле, Нью-Йорк и Берлин переходят на него в марте/октябре.
+  // Эталон — тот же календарь в UTC: день игры → дата не зависит от пояса игрока
+  it('календарь одинаков в любом часовом поясе, в том числе через переход на летнее время', async () => {
+    const { makeGame } = await import('../test/helpers')
+    const DUES: Due[] = [{ weekday: 5 }, { weekday: 1, next: true, plus: 2 }, { monthEnd: 1 }, { newYear: true }, { quarter: true }, { week: true }]
+    const calendar = () => Array.from({ length: 1100 }, (_, d) => {
+      const x = dateOf(d)
+      return [d, x.getFullYear(), x.getMonth(), x.getDate(), x.getDay(), ...DUES.map((due) => dueIn(due, d))].join(' ')
+    })
+    const tz = process.env.TZ
+    try {
+      process.env.TZ = 'UTC'
+      const ref = calendar()
+      expect(ref[19]).toBe(`19 2026 3 6 1 ${DUES.map((due) => dueIn(due, 19)).join(' ')}`) // 6 апреля 2026 — понедельник
+      for (const zone of ['Australia/Sydney', 'Pacific/Auckland', 'America/Santiago', 'America/New_York', 'Europe/Berlin', 'Pacific/Kiritimati', 'Pacific/Pago_Pago']) {
+        process.env.TZ = zone
+        expect(new Date(2026, 3, 5, 12).getTimezoneOffset(), `${zone}: пояс не применился`).not.toBe(0)
+        const got = calendar()
+        for (let d = 0; d < ref.length; d++) expect(got[d], zone).toBe(ref[d])
+        // и в игре: день недели для правил и дата в строке состояния
+        const { game } = makeGame()
+        game.S.day = 19
+        expect(game.facts().dow, zone).toBe(1)
+        expect(game.gameDate, zone).toMatch(/^6 апр/)
+      }
+    } finally {
+      if (tz === undefined) delete process.env.TZ // присвоение undefined записало бы строку «undefined»
+      else process.env.TZ = tz
+    }
   })
 })
 
