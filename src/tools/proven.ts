@@ -21,5 +21,5 @@ export const PROVEN: Record<string, string> = Object.fromEntries([
   'Endgame_Money', 'Endgame_Mute', 'Endgame_Leave', 'Endgame_Request',
   'Endgame_Turn', 'Endgame_Idle', 'Endgame_Away', 'Endgame_Formality', 'Endgame_NoEnding',
   'Turn_LightOff', 'Turn_NetRation', 'Idle_PhoneWarn', 'Bill_Warn', 'Bill_Due',
-  'Finale_beton_ledger', 'Says_via_mama',
+  'Finale_beton_ledger', 'Finale_nune_ledger', 'Says_via_mama',
 ].map((name) => [name, reason]))
