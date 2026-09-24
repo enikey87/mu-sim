@@ -8,6 +8,7 @@ export type GameEvent =
   | 'PlayerSays' | 'PlayerMessage' | 'AlikTurn' | 'AlikIdle' | 'AlikAway' | 'AlikIgnores'
   | 'StoryBeat' | 'PickScene' | 'PickQuest' | 'ArcFinale' | 'CheckEnding'
   | 'PaydayOutcome' | 'PaydayButton' | 'PromiseDue' | 'PromiseConditionMet'
+  | 'BillDue' | 'BillWarn'
   | 'PeriodLine' | 'RudeCool' | 'Mentioned' | 'BuildChoices'
 
 /** Что предлагает правило-сборщик (BuildChoices): вариант ответа игрока или ничего. */
