@@ -27,6 +27,8 @@ export const alikDay = 'alik.day'
 export const mooAt = 'mooAt'
 export const sorryAt = 'sorryAt'
 export const rudeAt = 'rudeAt'
+/** Номер хода, на котором «спасибо» подняло настроение, — перерыв между бампами. */
+export const thanksAt = 'thanksAt'
 export const topicRun = 'topicRun'
 export const topicLast = 'topicLast'
 export const legendPromiseAt = 'legendPromiseAt'
@@ -114,7 +116,7 @@ export const EVENT_KEYS: ReadonlySet<string> = new Set([
 export const MEM_KEYS: ReadonlySet<string> = new Set([
   HEAT, blocked, blockedHint, polite, bloodGiven, alikDead, mourning, evicted, vendetta, court, courtVerdict,
   ritualCount, ritualCut, caughtCount, cryptoHodl, bathAsked, mamaCalls, phoneKarine, alikDay, mooAt, sorryAt,
-  rudeAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway,
+  rudeAt, thanksAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway,
   garikConcrete, garikCut, houseOnGarik, borisMarried, borisSmetaReady, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday,
   lightOff, netRation, phoneWarn,

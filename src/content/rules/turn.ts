@@ -1,19 +1,22 @@
 // Ход Алика в ответ на обычное сообщение игрока.
 import type { Game } from '../../engine/game'
-import { type Rule, eq, ne, gte, lte, is, exists, missing, add } from '../../engine/rules'
+import { type Rule, eq, ne, gte, lte, is, exists, missing, add, set } from '../../engine/rules'
 import type { GameEvent, Offer } from './events'
 import { meet } from '../world'
 import { AlikOffline } from './criteria'
 import { IDLE } from '../life'
 import { MEMORY } from '../memory'
 import { LEGENDS } from '../legends'
-import { count, endgame, payday, polite, vendetta } from '../memkeys'
+import { count, endgame, payday, polite, thanksAt, vendetta } from '../memkeys'
 import { GREET, GREET_MORNING, GREET_NIGHT, THANKS } from '../misc'
 
 type R = Rule<Game, GameEvent, Offer>
 
 /** Тёплый ответ ломает режимы вежливости-убийцы, вендетты и эндгейма — там он молчит. */
 const warm = [ne(polite, true), ne(vendetta, true), ne(endgame.active, true)]
+
+/** Перерыв между бампами настроения за «спасибо» — самый длинный ходовой перерыв в игре (docs/design/greetings.md). */
+const THANKS_MOOD_GAP = 8
 
 // Событие PlayerMessage { tone } — как Алик реагирует на тон
 export const toneRules: R[] = [
@@ -23,7 +26,17 @@ export const toneRules: R[] = [
   { name: 'Tone_Cow', event: 'PlayerMessage', when: [eq('tone', 'cow')], remember: [add(count.cow)], respond: async ({ game }) => { await game.say([game.uniq(game.X.cow)]) } },
   // «спасибо» / «привет» свободным текстом: ответ на это слово. В S5, вендетте и эндгейме — прежний ход;
   // блок, смерть, телефон у Карине и Tone_MissRude специфичнее и выигрывают сами
-  { name: 'Tone_Thanks', event: 'PlayerMessage', when: [eq('category', 'gratitude'), ...warm], respond: async ({ game }) => { await game.say([game.uniq(() => game.draw('THANKS', THANKS))]) } },
+  {
+    name: 'Tone_Thanks', event: 'PlayerMessage', when: [eq('category', 'gratitude'), ...warm],
+    respond: async ({ game }) => {
+      // «спасибо» — бесплатный текст, а настроение двигает переводы и сцены: бамп не чаще раза в THANKS_MOOD_GAP ходов
+      if (game.S.stats.sent - Number(game.S.mem[thanksAt] ?? -99) >= THANKS_MOOD_GAP) {
+        game.mood(1)
+        game.rules.applyOps([set(thanksAt, game.S.stats.sent)], {})
+      }
+      await game.say([game.uniq(() => game.draw('THANKS', THANKS))])
+    },
+  },
   {
     name: 'Tone_Greeting', event: 'PlayerMessage', when: [eq('category', 'greeting'), ...warm],
     respond: async ({ game, facts }) => {
