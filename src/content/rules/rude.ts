@@ -8,7 +8,7 @@ import type { GameEvent, Offer } from './events'
 import { WORLD, SPEAKS } from '../world'
 import * as T from '../rude'
 import { RUDE_AGAIN } from '../misc'
-import { HEAT, blocked, blockedHint, count, mamaCalls, phoneKarine, polite, ritualCount, vendetta } from '../memkeys'
+import { HEAT, blocked, blockedHint, count, mamaCalls, phoneKarine, polite, ritualCount, statusHidden, vendetta } from '../memkeys'
 
 type R = Rule<Game, GameEvent, Offer>
 const rude = eq('tone', 'rude')
@@ -96,7 +96,7 @@ export const rudeRules: R[] = [
   // S3 — блок на 4 дня; Алик всё равно отвечает — с телефона Бориса, «Нивы», домофона
   {
     name: 'Rude_Block', event: 'PlayerMessage', when: [rude, gte(HEAT, 3)], bonus: 3, cooldown: { days: 10 },
-    remember: [...cools, set(blocked, true, { forDays: 4 }), set(blockedHint, false)], trigger: cool,
+    remember: [...cools, set(blocked, true, { forDays: 4 }), set(blockedHint, false), set(statusHidden, false)], trigger: cool,
     respond: async ({ game }) => {
       game.mood(-2)
       game.sys(game.draw('RB_SYS', T.RUDE_BLOCK_SYS))

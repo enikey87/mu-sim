@@ -34,6 +34,28 @@ describe('«спасибо» и «привет»: у Алика свой отв�
     // ночью и утром дневной пул не звучит
     expect(await answered('Привет!', GREET, at(3))).toBe(0)
   })
+  it('«спасибо» поднимает настроение, но не чаще раза в 8 ходов', async () => {
+    const { game } = makeGame()
+    const say = async (sent: number) => { game.S.stats.sent = sent; await game.fire('PlayerMessage', { category: 'gratitude', tone: 'polite' }) }
+    const mood = () => game.S.mood
+    expect(mood()).toBe(5)
+    await say(0)
+    expect(mood()).toBe(6)
+    await say(3) // середина перерыва
+    expect(mood()).toBe(6)
+    await say(7) // ход до границы
+    expect(mood()).toBe(6)
+    await say(8) // ровно перерыв — можно
+    expect(mood()).toBe(7)
+  })
+  it('«спасибо» путём игрока: настроение растёт, приветствие его не трогает', async () => {
+    const { game } = makeGame()
+    await game.send('Спасибо!')
+    expect(game.S.mood).toBe(6)
+    const { game: g2 } = makeGame()
+    await g2.send('Привет, Алик!')
+    expect(g2.S.mood).toBe(5)
+  })
   it('«передай привет» и «вы добрый человек» — тоже приветствие', async () => {
     expect(await answered('Передай привет Борису!', GREET, at(14))).toBeGreaterThanOrEqual(6)
     expect(await answered('Вы добрый человек.', GREET, at(14))).toBeGreaterThanOrEqual(6)

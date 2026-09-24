@@ -60,7 +60,10 @@ describe('амнистия обещаний', () => {
     const from = game.S.msgs.length
     const count = game.S.promises.length
     const day = game.S.day // день амнистии — день выбора; ход потом сдвигает календарь
+    const mood = game.S.mood
     await choose(game, 'yes')
+    expect(game.S.ach.amnesty).toBeDefined() // согласие — ачивка и настроение (решение автора)
+    expect(game.S.mood).toBe(mood + 1)
     const dated = game.S.promises.slice(0, 9)
     expect(dated.map((p) => [p.amnesty, p.asked])).toEqual(dated.map(() => [day, undefined]))
     expect(game.S.promises[9].t).toBe('когда-нибудь')
@@ -85,8 +88,11 @@ describe('амнистия обещаний', () => {
     await game.fire('PickScene')
     const before = JSON.stringify(game.S.promises)
     const from = game.S.msgs.length
+    const mood = game.S.mood
     await choose(game, 'no')
     expect(JSON.stringify(game.S.promises)).toBe(before)
+    expect(game.S.ach.amnesty).toBeUndefined() // отказ: ни ачивки, ни настроения (решение автора)
+    expect(game.S.mood).toBe(mood)
     expect(game.lateCount()).toBe(9)
     expect(alik(game, from).join(' ')).toMatch(/По порядку/)
     expect(offersPrev(game)).toBe(true)
