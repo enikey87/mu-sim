@@ -1,8 +1,20 @@
-import { useRef } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { useGame } from './useGame'
 import { fmtDate } from '../engine/time'
 import { useModal } from './useModal'
-import { viewOf } from './view'
+import { viewOf, type PromiseRow } from './view'
+
+/** Значок записи журнала: свой у каждого состояния (docs/design/promise-amnesty.md). */
+const due = (p: PromiseRow) => (p.due === null ? '' : ` ${fmtDate(p.due)}`)
+const MARK: Record<PromiseRow['state'], (p: PromiseRow) => ReactNode> = {
+  amnesty: (p) => <span className="amnesty">🕊 амнистия {fmtDate(p.amnesty!)}</span>,
+  kept: (p) => <span className="kept">✅ сдержал — 50 ₽{due(p)}</span>,
+  asked: (p) => <span className="asked">❓ припомнили{due(p)}</span>,
+  late: (p) => <span className="late">❌ просрочено{due(p)}</span>,
+  someday: () => '∞ когда-нибудь',
+  wait: (p) => <>⏳ ждём{due(p)}</>,
+}
+const mark = (p: PromiseRow) => MARK[p.state](p)
 
 /** Досье на Алика: обещания, сериалы, трофеи, ачивки, сброс. */
 export function Sheet({ onClose, onReset }: { onClose: () => void; onReset: () => void }) {
@@ -34,7 +46,7 @@ export function Sheet({ onClose, onReset }: { onClose: () => void; onReset: () =
           {v.promises.slice().reverse().map((p, i) => (
             <li key={i}>
               «{p.text}» <br />
-              <small>{p.amnesty != null ? <span className="amnesty">🕊 амнистия {fmtDate(p.amnesty)}</span> : p.late ? <span className="late">❌ просрочено</span> : '⏳'} срок: {p.due == null ? '∞ когда-нибудь' : fmtDate(p.due)}</small>
+              <small>{mark(p)}</small>
             </li>
           ))}
         </ul>

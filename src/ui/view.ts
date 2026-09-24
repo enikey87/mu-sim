@@ -1,5 +1,5 @@
 import type { Game } from '../engine/game'
-import { isLate, type Msg } from '../engine/state'
+import { isLate, type Msg, type PromiseRec } from '../engine/state'
 import type { UiState } from '../engine/ui-state'
 import { ACH } from '../content/achievements'
 import { ARCS } from '../content/arcs'
@@ -56,7 +56,12 @@ const realOf = (u: GameUi): Game => {
 }
 
 export type PaydayView = { daysLeft: number | null; sum: number | null }
-export type PromiseRow = { text: string; due: number | null; late: boolean; amnesty: number | null }
+/** Состояние записи журнала: что о сроке честно сказать в досье. */
+export type PromiseState = 'amnesty' | 'kept' | 'asked' | 'late' | 'someday' | 'wait'
+export type PromiseRow = { text: string; due: number | null; late: boolean; amnesty: number | null; state: PromiseState }
+
+const promiseState = (p: PromiseRec, day: number): PromiseState =>
+  p.amnesty !== undefined ? 'amnesty' : p.kept ? 'kept' : p.asked ? 'asked' : isLate(p, day) ? 'late' : p.due === null ? 'someday' : 'wait'
 export type ArcRow = { id: string; title: string; state: string; done: boolean; locked: boolean }
 export type EndingRow = { id: string; title: string; icon: string; got: boolean }
 export type AchRow = { id: string; title: string; desc: string; got: boolean }
@@ -111,7 +116,7 @@ export const viewOf = (u: GameUi): View => {
     finales: Object.keys(ARCS)
       .filter((id) => g.finaleTitle(id))
       .map((id) => ({ id, title: ARCS[id].title, finale: g.finaleTitle(id)! })),
-    promises: S.promises.map((p) => ({ text: p.t, due: p.due, late: isLate(p, S.day), amnesty: p.amnesty ?? null })),
+    promises: S.promises.map((p) => ({ text: p.t, due: p.due, late: isLate(p, S.day), amnesty: p.amnesty ?? null, state: promiseState(p, S.day) })),
     arcs: Object.entries(ARCS).map(([id, a]) => {
       const i = S.arcs[id]?.i ?? 0
       const finale = g.finaleTitle(id)

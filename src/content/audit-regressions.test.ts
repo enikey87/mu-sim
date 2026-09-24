@@ -201,6 +201,8 @@ describe('регрессии раунда 16', () => {
     const before = game.S.msgs.length
     await rule.respond!(game.rules.ctx(game, rule, { event: 'PromiseDue', facts }, facts))
     expect(game.S.msgs.slice(before).some((m) => m.kind === 'text' && m.text.includes('«как штукатурка высохнет»'))).toBe(true)
+    // досье зовёт это «сдержал», а не «припомнили»: `asked` у записи закрывает срок, `kept` называет причину
+    expect([game.S.promises[0].asked, game.S.promises[0].kept]).toEqual([true, true])
   })
 
   it('«вы обещали в пятницу» — только если Алик обещал пятницу', () => {

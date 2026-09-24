@@ -78,9 +78,9 @@ export const promiseRules: R[] = [
     respond: async ({ game, facts }) => {
       await game.say([dueLine(game, facts, 'DUE_KEPT', PROMISE_DUE_KEPT)])
       await game.transfer()
-      // сдержал (на 50 ₽) — в журнале больше не «просрочено», упрекать нечем
+      // сдержал (на 50 ₽) — в журнале больше не «просрочено», упрекать нечем; `kept` — чтобы досье не звало это «припомнил»
       const p = game.S.promises[Number(facts.promise)]
-      if (p) p.asked = true
+      if (p) { p.asked = true; p.kept = true }
     },
   },
   {
