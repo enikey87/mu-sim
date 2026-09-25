@@ -5,6 +5,7 @@ import { SAD, TIMEY } from '../engine/game'
 import type { Choice, Ctx } from '../engine/state'
 import { D } from '../content/excuses'
 import { WORLD } from '../content/world'
+import { ENDGAME_ALIK_BACK, ENDGAME_FORMALITIES, ENDGAME_RETURNER_LINES } from '../content/endgame'
 
 interface Step { choice: Choice | null; ctxBefore: Ctx | null; mourning: boolean; replies: string[] }
 
@@ -29,6 +30,31 @@ async function play(seed: number, turns: number) {
 const alikLines = (msgs: Parameters<typeof alikTexts>[0]) => alikTexts(msgs).filter((t) => !FIX_RE.test(t))
 const consecutive = (texts: string[]) => texts.filter((t, i) => i > 0 && t === texts[i - 1])
 
+const FORMALITIES = new Set<string>(ENDGAME_FORMALITIES)
+const NEVER_AGAIN = new Set<string>([...Object.values(ENDGAME_RETURNER_LINES).flat(), ...ENDGAME_ALIK_BACK])
+/**
+ * Повторы эндгейма по docs/design/endgame.md: формальность — из колоды, повтор только после полного круга;
+ * реплики возвращающих и «Алик добавил обратно» — никогда. Круг считается по самим показам, не по соседству.
+ */
+function endgameRepeats(texts: readonly string[]): string[] {
+  const out: string[] = []
+  let round = new Set<string>()
+  const once = new Set<string>()
+  for (const t of texts) {
+    if (FORMALITIES.has(t)) {
+      if (round.has(t)) {
+        if (round.size < FORMALITIES.size) out.push(`формальность до конца колоды (${round.size}/${FORMALITIES.size}): ${t}`)
+        round = new Set()
+      }
+      round.add(t)
+    } else if (NEVER_AGAIN.has(t)) {
+      if (once.has(t)) out.push(`повтор возвращения: ${t}`)
+      once.add(t)
+    }
+  }
+  return out
+}
+
 describe.each([1, 2, 3])('симуляция, seed %i', (seed) => {
   it('300 ходов без ошибок, повторов и нелогичных ответов', async () => {
     const { game, steps, beforeEndgame } = await play(seed, 300)
@@ -40,7 +66,11 @@ describe.each([1, 2, 3])('симуляция, seed %i', (seed) => {
     // 2. до эндгейма — без повторов вовсе; в эндгейме — без подряд (колода формальностей по кругу)
     const pre = alikLines(game.S.msgs.slice(0, beforeEndgame))
     expect(pre.filter((t, i) => pre.indexOf(t) !== i)).toEqual([])
-    expect(consecutive(alikLines(game.S.msgs.slice(beforeEndgame)))).toEqual([])
+    const endgame = alikLines(game.S.msgs.slice(beforeEndgame))
+    expect(consecutive(endgame)).toEqual([])
+    // колода, а не только «не подряд»: срез эндгейма не пустой, формальности в нём есть
+    expect(endgame.filter((t) => FORMALITIES.has(t)).length, 'формальностей в эндгейме нет — проверка пуста').toBeGreaterThan(20)
+    expect(endgameRepeats(endgame)).toEqual([])
 
     // 3. логика пар «вариант → контекст»
     for (const s of steps) {
@@ -65,15 +95,11 @@ describe.each([1, 2, 3])('симуляция, seed %i', (seed) => {
   }, 60_000)
 })
 
-describe('повторы в эндгейме (#267)', () => {
-  it('повтор реплики подряд в эндгейме ловит consecutive — вырезание эндгейма прячет', () => {
-    const pre = ['утро', 'день']
-    const end = ['формальность', 'формальность', 'другая']
-    const whole = [...pre, ...end]
-    // старый тест смотрел только pre — подряд в эндгейме не видел
-    expect(pre.filter((t, i) => pre.indexOf(t) !== i)).toEqual([])
-    expect(consecutive(end)).toEqual(['формальность'])
-    expect(consecutive(whole.slice(pre.length))).toEqual(['формальность'])
+describe('повторы в эндгейме (#267, #304)', () => {
+  it('круг колоды: повтор после полного круга законен, раньше — нет', () => {
+    const all = [...FORMALITIES]
+    expect(endgameRepeats([...all, all[0], all[1]])).toEqual([])
+    expect(endgameRepeats([all[0], all[1], all[0]])).toEqual([expect.stringMatching(/^формальность до конца колоды \(2\//)])
   })
 })
 
