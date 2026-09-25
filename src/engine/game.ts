@@ -1059,6 +1059,8 @@ export class Game {
   /** false — отброшено дедупом; true — показано, в очереди или карточкой в ленте. */
   notify(icon: string, app: string, text: string, card: Partial<Card> & { event: PhoneEvent }): boolean {
     if (this.disposed) return false
+    // после выплаты банк/МФО молчат везде, не только в очереди сцены (#323/#366)
+    if ((app === 'Банк' || app === 'МФО') && this.moneySealed()) return false
     // банк: одно и то же событие (не баланс) — один раз за игровой день (#251/#265)
     if (app === 'Банк' || app === 'МФО') {
       if (!this.bankSmsDay || this.bankSmsDay.day !== this.S.day) this.bankSmsDay = { day: this.S.day, keys: new Set() }
@@ -1068,8 +1070,6 @@ export class Game {
     }
     // событие денег не перебивает сцену — карточки после её конца (#300)
     if (!Game.isBanner(app) && this.S.scene) {
-      // после выплаты банк/МФО в очередь не кладём — иначе flush отменит #316 (#323)
-      if ((app === 'Банк' || app === 'МФО') && this.moneySealed()) return false
       this.S.pendingCards.push({ icon, app, text, ...card })
       return true
     }
