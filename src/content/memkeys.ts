@@ -81,6 +81,8 @@ export const payday = {
 export const count = {
   rude: 'count.rude', cow: 'count.cow', threat: 'count.threat',
   violence: 'count.violence', intimidation: 'count.intimidation', sorry: 'count.sorry',
+  /** Сколько раз за партию сработало тёплое «спасибо» (Tone_Thanks*) — третье даёт once-реплику (#354). */
+  thanks: 'count.thanks',
 } as const
 
 export const endgame = {
