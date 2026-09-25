@@ -17,6 +17,7 @@ export const Message = memo(function Message({ m }: { m: Msg }) {
   const game = useGameApi()
   if (m.kind === 'sep') return <div className="sep">{m.text}</div>
   if (m.kind === 'sys') return <div className={'sys' + (m.unread ? ' unread' : '')}>{linkified(m.text)}</div>
+  if (m.kind === 'card') return <PhoneCard m={m} />
 
   const cls = ['msg', m.from]
   if (m.kind === 'text' && m.legend) cls.push('legend')
@@ -35,6 +36,28 @@ export const Message = memo(function Message({ m }: { m: Msg }) {
     </div>
   )
 })
+
+/** Банк, мама, Авито — компактная карточка посреди ленты: не реплика Алика и не игрока, нажимать не нужно (#287). */
+function PhoneCard({ m }: { m: Extract<Msg, { kind: 'card' }> }) {
+  const game = useGame()
+  const off = game.ui.busy || game.battery.dead
+  const o = m.offer
+  return (
+    <div className="card" data-testid="card">
+      <div className="card-head"><span>{m.icon} {m.app}</span><span>{m.time}</span></div>
+      <div>{m.text}</div>
+      {m.lines?.map((l) => <div className="card-line" key={l}>{l}</div>)}
+      {o && !m.answered && (
+        <div className="job-btns card-btns">
+          {o.take && <button disabled={off} onClick={() => game.answerCard(m.id, 'take')}>{o.take}</button>}
+          {o.sell && <button disabled={off} onClick={() => game.answerCard(m.id, 'sell')}>{o.sell}</button>}
+          <button disabled={off} onClick={() => game.answerCard(m.id, 'later')}>Не сейчас</button>
+        </div>
+      )}
+      {m.result && <div className="card-line card-result">{m.result}</div>}
+    </div>
+  )
+}
 
 function JobButtons({ id }: { id: number }) {
   const game = useGame()

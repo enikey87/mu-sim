@@ -1,6 +1,6 @@
 import { STARTS } from '../content/quests'
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { makeGame, memStorage, alikTexts, flush , setMoney} from '../test/helpers'
+import { makeGame, memStorage, alikTexts, flush, setMoney, cards } from '../test/helpers'
 import { ENDGAME_FORMALITIES, ENDGAME_JUBILEES } from '../content/endgame'
 import { silentAudio } from './audio'
 import { manualClock, realClock } from './clock'
@@ -15,7 +15,6 @@ import { HEAT } from '../content/memkeys'
 import { valueOf } from './rules'
 import { MENTION_RE } from '../content/world'
 import { P_MONEY, P_DESPERATE } from '../content/topics'
-import { LOANS } from '../content/credit'
 
 describe('Game: начало и ход', () => {
   it('новая игра: одна из завязок, 184-й день, 3–4 варианта реплик', () => {
@@ -919,59 +918,54 @@ describe('Game: пачка непрочитанных записывает в м
 })
 
 describe('Game: деньги на карте', () => {
-  it('adjustMoney пишет баланс, шлёт СМС и факты уровня', () => {
+  it('adjustMoney: строка сводки, карточки уровня и факты; баннера нет (#287)', () => {
     const { game } = makeGame()
     setMoney(game, 12400) // уровень «мало»/«дно» проверяем от фиксированного баланса, а не от стартового
-    const drain = (re: RegExp) => {
-      for (let i = 0; i < 8 && game.ui.notif && !re.test(game.ui.notif.text); i++) game.dismissNotif()
-      expect(game.ui.notif?.text).toMatch(re)
-    }
     expect(game.moneyLevel()).toBe('normal')
     expect(game.facts().moneyNormal).toBe(true)
     expect(game.adjustMoney(-4000, 'Продукты')).toBe(true)
     expect(game.S.money).toBe(8400)
     expect(game.moneyLevel()).toBe('low')
-    drain(/Банк обеспокоен/)
+    expect(game.S.bank?.lines['-Продукты']).toEqual({ sum: 4000, n: 1 })
+    expect(cards(game, 'Банк').map((c) => c.text)).toEqual([`Банк обеспокоен остатком: ${(8400).toLocaleString('ru-RU')} ₽. Рекомендуем не ждать Алика.`])
     expect(game.adjustMoney(-3000, 'Гречка')).toBe(true)
     expect(game.moneyLevel()).toBe('bottom')
     expect(game.facts().moneyBottom).toBe(true)
     expect(game.S.mem['credit.offer']).toBe(true)
-    drain(/критический/)
+    // «критический» и предложение — одна карточка: причина рядом с кредитом
+    expect(cards(game, 'Банк').at(-1)?.text).toMatch(/^Остаток критический: 5\s400 ₽ после «Гречка»\. Вам одобрен/)
+    expect(cards(game, 'Банк')).toHaveLength(2)
+    expect(game.ui.notif).toBeNull()
   })
-  it('очередь уведомлений: кредит не затирает «критический», а идёт следом', () => {
+  it('дно без ступени лестницы: «критический» отдельной карточкой, дальше мама', () => {
     const { game } = makeGame()
-    setMoney(game, 7000) // low → bottom: и предупреждение, и оффер
+    game.S.mem['credit.broke'] = true
+    setMoney(game, 7000)
     game.adjustMoney(-6000, 'Гречка')
-    expect(game.moneyLevel()).toBe('bottom')
-    expect(game.ui.notif?.text).toMatch(/Списание/)
-    game.dismissNotif()
-    expect(game.ui.notif?.text).toMatch(/критический/)
-    game.dismissNotif()
-    expect(game.ui.notif?.text).toBe(LOANS[0].offer)
+    expect(cards(game).map((c) => c.app)).toEqual(['Банк', 'Мама'])
+    expect(cards(game, 'Банк')[0].text).toMatch(/^Остаток критический/)
   })
-  it('очередь уведомлений: батарея и непрочитанные — впереди банка, но не впереди показанного (#272)', () => {
+  it('баннер — только батарея и непрочитанные; банк, мама, Авито — карточки в ленте (#287)', () => {
     const { game } = makeGame()
-    game.notify('🏦', 'Банк', 'Списание один')
-    game.notify('🏦', 'Банк', 'Списание два')
-    game.notify('🏦', 'Банк', 'Списание три')
+    for (const [icon, app] of [['🏦', 'Банк'], ['🏦', 'МФО'], ['👩', 'Мама'], ['🛒', 'Авито']]) game.notify(icon, app, `${app}: текст`)
+    expect(game.ui.notif).toBeNull()
+    expect(cards(game).map((c) => c.app)).toEqual(['Банк', 'МФО', 'Мама', 'Авито'])
     game.S.battery = 16
     game.battery.drain(1)
     game.notify('💬', 'Алик Воздухонесян', '3 новых сообщения')
     const shown: string[] = []
     while (game.ui.notif) { shown.push(game.ui.notif.text); game.dismissNotif() }
-    expect(shown).toEqual(['Списание один', 'Низкий заряд батареи: 15%', '3 новых сообщения', 'Списание два', 'Списание три'])
+    expect(shown).toEqual(['Низкий заряд батареи: 15%', '3 новых сообщения'])
+    expect(cards(game)).toHaveLength(4)
   })
-  it('очередь уведомлений: предел — старое из фона уходит, срочное остаётся (#272)', () => {
+  it('очередь баннеров: предел — самое старое уходит (#272)', () => {
     const { game } = makeGame()
     const texts = ['раз', 'два', 'три', 'четыре', 'пять', 'шесть', 'семь']
-    for (const t of texts) game.notify('🏦', 'Банк', `Списание ${t}`)
-    game.S.battery = 16
-    game.battery.drain(1)
-    game.notify('🏦', 'Банк', 'Списание восемь')
+    for (const t of texts) game.notify('💬', 'Алик Воздухонесян', t)
     const shown: string[] = []
     while (game.ui.notif) { shown.push(game.ui.notif.text); game.dismissNotif() }
     expect(shown).toHaveLength(1 + Game.NOTIF_QUEUE_MAX)
-    expect(shown).toEqual(['Списание раз', 'Низкий заряд батареи: 15%', 'Списание шесть', 'Списание семь', 'Списание восемь'])
+    expect(shown).toEqual(['раз', 'четыре', 'пять', 'шесть', 'семь'])
   })
   it('бедность не смолкает: исчерпанный пул уровня звучит редко и по кругу (#184)', () => {
     const { game } = makeGame()
@@ -999,32 +993,27 @@ describe('Game: деньги на карте', () => {
   })
   // одна точка записи денег — страж engine/money.test.ts: тип (readonly) + разбор исходников
 
-  it('трата с карты без денег: банк отказывает вслух, а не молча (#185)', () => {
+  it('трата с карты без денег: отказ не молчит — строка «Не прошло» в сводке недели (#185/#287)', () => {
     const { game } = makeGame()
     setMoney(game, 50) // меньше самой мелкой траты (90) — отказ гарантирован
-    let refusals = 0
-    for (let i = 0; i < 200 && !refusals; i++) {
-      game.randomNotif()
-      if (game.ui.notif && /Не прошло/.test(game.ui.notif.text)) refusals++
-      else if (game.ui.notif) game.dismissNotif()
-    }
-    expect(refusals, 'пул NOTIF не выдал ни одной траты — проверка была бы пустой').toBeGreaterThan(0)
+    const refusals = (): number => game.S.bank?.lines['!По мелочи']?.n ?? 0
+    for (let i = 0; i < 200 && !refusals(); i++) game.randomNotif()
+    expect(refusals(), 'пул NOTIF не выдал ни одной траты — проверка была бы пустой').toBeGreaterThan(0)
     expect(game.S.money).toBe(50)
+    game.nextDay(7)
+    game.flushBankWeek()
+    expect(cards(game, 'Банк').at(-1)?.lines).toContainEqual(expect.stringMatching(/^Не прошло: По мелочи \d+ ₽/))
   })
 
   it('«займи 5000» без денег: долг не растёт, «Инвестор» не выдаётся, банк отказывает (#185)', async () => {
     const { game } = makeGame()
-    const drain = (re: RegExp) => {
-      for (let i = 0; i < 8 && game.ui.notif && !re.test(game.ui.notif.text); i++) game.dismissNotif()
-      expect(game.ui.notif?.text).toMatch(re)
-    }
     setMoney(game, 1000)
     const debt = game.S.debt
     await game.enterNode('lend', 'yes')
     expect(game.S.debt).toBe(debt)
     expect(game.S.ach.lend).toBeUndefined()
     expect(game.S.msgs.some((m) => m.kind === 'sys' && /Вы перевели Алику/.test(m.text))).toBe(false)
-    drain(/Не прошло/)
+    expect(cards(game, 'Банк').at(-1)?.text).toMatch(/^Не прошло/)
 
     // те же деньги есть — перевод идёт, и всё, что он обещает, случается
     const { game: paid } = makeGame()

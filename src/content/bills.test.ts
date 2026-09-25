@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { makeGame, setMoney } from '../test/helpers'
+import { makeGame, setMoney, cards, moneyLog } from '../test/helpers'
 import { BILLS, billUnpaid, billStreak, lightOff, billDueAt } from './bills'
-import { dueIn } from '../engine/time'
+import { dueIn, weekOf } from '../engine/time'
 
 describe('платежи по календарю', () => {
   it('на старте стоят сроки трёх платежей', () => {
@@ -17,17 +17,20 @@ describe('платежи по календарю', () => {
     const before = game.S.money
     const phone = BILLS.find((b) => b.id === 'phone')!
     game.chargeBill('phone')
-    game.flushBankCharges()
+    game.flushBankWeek()
     expect(game.S.money).toBe(before - phone.amount)
     expect(game.S.mem[billUnpaid('phone')]).toBe(false)
-    expect(game.ui.notif?.text).toMatch(/Списание/)
+    // списание — строка недельной сводки, не карточка (#287)
+    expect(cards(game)).toHaveLength(0)
+    expect(game.S.bank?.lines['-Связь']).toEqual({ sum: phone.amount, n: 1 })
   })
   it('неоплата не эхо: банк говорит один раз за полосу, а не каждый срок (#184)', () => {
     const { game } = makeGame()
     const said: string[] = []
     const orig = game.notify.bind(game)
     game.notify = (icon: string, app: string, text: string): boolean => { said.push(text); return orig(icon, app, text) }
-    const refusals = (): number => said.filter((t) => /недостаточно средств/i.test(t)).length
+    // на дне отказ приходит вместе с предложением кредита — одной карточкой с причиной (#287)
+    const refusals = (): number => said.filter((t) => /^Не прошло: Связь/.test(t)).length
     setMoney(game, 100)
     game.chargeBill('phone')
     expect(refusals()).toBe(1)
@@ -48,7 +51,16 @@ describe('платежи по календарю', () => {
     expect(game.S.money).toBe(100)
     expect(game.S.mem[billUnpaid('rent')]).toBe(true)
     expect(game.S.mem[lightOff]).toBe(true)
-    expect(game.ui.notif?.text).toMatch(/недостаточно средств/i)
+    expect(cards(game, 'Банк').at(-1)?.text).toMatch(/^Не прошло: Коммуналка, 2\s500 ₽\./)
+    expect(game.ui.notif).toBeNull()
+  })
+  it('не хватило денег, а кредит уже не дают — отдельная карточка отказа (#287)', () => {
+    const { game } = makeGame()
+    game.S.mem['credit.stage'] = 3
+    setMoney(game, 100)
+    game.chargeBill('phone')
+    expect(cards(game, 'Банк').map((c) => c.text)).toEqual([`Не прошло: Связь, 400 ₽. Недостаточно средств. Достоинство не принимается.`])
+    expect(cards(game, 'Банк')[0].offer).toBeUndefined()
   })
   it('«Завтра списание» — только коммуналка; связь молчит (#178)', async () => {
     const { game } = makeGame()
@@ -79,9 +91,10 @@ describe('платежи по календарю', () => {
     setMoney(skip, 1_000_000)
     await walkTo(skip, 2)
     const skipped = listen(skip)
+    const charged = moneyLog(skip)
     skip.nextDay(2) // через канун — предупреждение и списание в одной пачке
     await skip.afterTurn()
-    expect(skipped.some((t) => /Коммуналка/.test(t) && /Списани/.test(t))).toBe(true)
+    expect(charged).toContain('-Коммуналка')
     expect(skipped.some((t) => /Завтра списание/.test(t))).toBe(false)
 
     const { game: eve } = makeGame()
@@ -93,22 +106,28 @@ describe('платежи по календарю', () => {
     expect(heard.some((t) => /Завтра списание.*Коммуналка/.test(t))).toBe(true)
     expect(eve.facts().paymentDueTomorrow).toBe(true)
   })
-  it('два списания в один день — одно СМС-дайджест (#178)', async () => {
+  it('неделя списаний — одна сводка: что списано и баланс; прочих карточек банка без нехватки нет (#287)', async () => {
     const { game } = makeGame()
     setMoney(game, 10_000_000)
-    const texts: string[] = []
-    const notify = game.notify.bind(game)
-    game.notify = (icon, app, text) => { texts.push(text); return notify(icon, app, text) }
-    const day = game.S.day
-    game.S.mem[billDueAt('rent')] = day
-    game.S.mem[billDueAt('transit')] = day
-    game.rules.state.schedule = game.rules.state.schedule.filter((e) => !(e.kind === 'event' && e.event === 'BillDue'))
-    game.rules.schedule({ at: day, kind: 'event', event: 'BillDue', facts: { bill: 'rent' } })
-    game.rules.schedule({ at: day, kind: 'event', event: 'BillDue', facts: { bill: 'transit' } })
-    await game.afterTurn()
-    const digests = texts.filter((t) => t.startsWith('Списания:') || (t.startsWith('Списание') && t.includes('Коммуналка')))
-    expect(digests.some((t) => t.includes('Коммуналка') && t.includes('Проездной'))).toBe(true)
-    expect(texts.filter((t) => t.startsWith('Списание ') || t.startsWith('Списания:'))).toHaveLength(1)
+    const weeks = new Set<number>()
+    for (let d = 0; d < 28; d++) {
+      game.nextDay(1)
+      await game.afterTurn()
+      weeks.add(weekOf(game.S.day))
+    }
+    const all = cards(game, 'Банк')
+    const bank = all.filter((c) => c.text.startsWith('Сводка'))
+    // денег хватает: кроме сводок — только «завтра коммуналка» раз в месяц
+    expect(all.filter((c) => !bank.includes(c)).map((c) => c.text.split(':')[0])).toEqual(['Завтра списание'])
+    // последняя неделя ещё идёт — её сводка впереди
+    expect(bank).toHaveLength(weeks.size - 1)
+    for (const [i, c] of bank.entries()) {
+      expect(c.text).toMatch(/^Сводка за неделю \d+ \S+ – \d+ \S+: баланс [\d\s]+ ₽$/)
+      // первая неделя партии неполная: понедельник связи мог пройти до старта
+      if (i > 0) expect(c.lines?.[0]).toMatch(/^Списано: (?=.*Связь 400 ₽)(?=.*Проездной 500 ₽)/)
+    }
+    expect(new Set(bank.map((c) => c.text.split('.')[0])).size, 'одна сводка на неделю').toBe(bank.length)
+    expect(game.ui.notif, 'банк не приходит баннером').toBeNull()
   })
   it('после выселения коммуналка не списывается', () => {
     const { game } = makeGame()
@@ -143,14 +162,12 @@ describe('платежи по календарю', () => {
     game.S.day = Number(game.S.mem[billDueAt('rent')]) - 1
     await game.fire('BillWarn', { bill: 'rent', at: game.S.mem[billDueAt('rent')] })
     expect(game.S.mem['bills.rent.due']).toBe(true)
-    expect(game.ui.notif?.text).toMatch(/Завтра списание/)
+    expect(cards(game, 'Банк').at(-1)?.text).toMatch(/Завтра списание/)
   })
   it('у каждого счёта одно списание за срок, даже когда сроки двух счетов совпали (#181)', async () => {
     const { game } = makeGame()
     setMoney(game, 1_000_000)
-    const texts: string[] = []
-    const notify = game.notify.bind(game)
-    game.notify = (icon, app, text) => { texts.push(text); return notify(icon, app, text) }
+    const charged = moneyLog(game)
     const pending = (id: string) => game.rules.state.schedule.filter((it) => it.kind === 'event' && it.event === 'BillDue' && it.facts?.bill === id).length
     const start = game.S.day
     const jumps = [1, 2, 3]
@@ -161,7 +178,7 @@ describe('платежи по календарю', () => {
     }
     const weeks = Math.ceil((game.S.day - start) / 7)
     for (const label of ['Связь', 'Проездной']) {
-      const n = texts.filter((t) => /Списани/.test(t) && t.includes(label)).length
+      const n = charged.filter((t) => t === `-${label}`).length
       expect(n, label).toBeGreaterThanOrEqual(weeks - 1)
       expect(n, label).toBeLessThanOrEqual(weeks)
     }
@@ -179,12 +196,7 @@ describe('платежи по календарю', () => {
   it('два счёта с одним сроком: игрок перескакивает дни, каждый срок списан ровно один раз (#272)', async () => {
     const { game } = makeGame()
     setMoney(game, 10_000_000)
-    const charges: Record<string, number> = { Коммуналка: 0, Проездной: 0 }
-    const notify = game.notify.bind(game)
-    game.notify = (icon, app, text) => {
-      if (/Списани/.test(text)) for (const label of Object.keys(charges)) if (text.includes(label)) charges[label]++
-      return notify(icon, app, text)
-    }
+    const charged = moneyLog(game)
     // сроки коммуналки и проездного совпали (#183) — дальше только путь игрока: +1…3 дня за ход
     const same = Number(game.S.mem[billDueAt('rent')])
     game.S.mem[billDueAt('transit')] = same
@@ -200,9 +212,10 @@ describe('платежи по календарю', () => {
     // каждый срок, который остался позади, списан один раз — не ноль и не дважды
     const behind = (id: 'rent' | 'transit') => [...passed[id]].filter((at) => at <= game.S.day).length
     expect(behind('transit')).toBeGreaterThanOrEqual(8)
-    expect(charges.Проездной).toBe(behind('transit'))
+    const n = (label: string) => charged.filter((t) => t === `-${label}`).length
+    expect(n('Проездной')).toBe(behind('transit'))
     expect(behind('rent')).toBeGreaterThanOrEqual(2)
-    expect(charges.Коммуналка).toBe(behind('rent'))
+    expect(n('Коммуналка')).toBe(behind('rent'))
   })
   it('срок стоит, а события в сохранении нет — при загрузке событие возвращается и платёж списывается (#272)', async () => {
     const { game, storage } = makeGame()
@@ -219,25 +232,23 @@ describe('платежи по календарю', () => {
     expect(due('CreditDue', 'credit', 'consumer').map((e) => e.at)).toEqual([loanAt])
     // событие, которое есть, второй раз не ставится: у остальных счетов по одному
     for (const id of ['rent', 'transit']) expect(due('BillDue', 'bill', id), id).toHaveLength(1)
-    const texts: string[] = []
-    const notify = loaded.notify.bind(loaded)
-    loaded.notify = (icon, app, text) => { texts.push(text); return notify(icon, app, text) }
+    const charged = moneyLog(loaded)
     while (loaded.S.day < Math.max(at, loanAt)) { loaded.nextDay(1); await loaded.afterTurn() }
-    expect(texts.filter((t) => /Списани/.test(t) && t.includes('Связь'))).toHaveLength(1)
-    expect(texts.filter((t) => /Списани/.test(t) && t.includes('Всё будет'))).toHaveLength(1)
+    expect(charged.filter((t) => t === '-Связь')).toHaveLength(1)
+    expect(charged.filter((t) => t.startsWith('-') && t.includes('Всё будет'))).toHaveLength(1)
   })
-  it('ход игрока со сроком платежа — сводка СМС уходит (#251)', async () => {
+  it('ход игрока со сроком платежа — платёж списан и попал в сводку недели (#251/#287)', async () => {
     const { game } = makeGame()
     setMoney(game, 10_000_000)
-    const texts: string[] = []
-    const notify = game.notify.bind(game)
-    game.notify = (icon, app, text) => { texts.push(text); return notify(icon, app, text) }
+    const charged = moneyLog(game)
     const day = game.S.day
     game.S.mem[billDueAt('phone')] = day + 1 // после advanceTurnDay станет сегодня
     game.rules.state.schedule = game.rules.state.schedule.filter((e) => !(e.kind === 'event' && e.event === 'BillDue'))
     game.rules.schedule({ at: day + 1, kind: 'event', event: 'BillDue', facts: { bill: 'phone', at: day + 1 } })
     await game.send({ text: 'Алик?', tone: 'polite' })
-    expect(texts.some((t) => /Списани/.test(t) && t.includes('Связь'))).toBe(true)
+    expect(charged).toContain('-Связь')
+    const week = [...cards(game, 'Банк').flatMap((c) => c.lines ?? []), ...Object.keys(game.S.bank?.lines ?? {})].join(' ')
+    expect(week).toContain('Связь')
   })
   it('одинаковое банковское SMS не дважды за день; разные суммы — разные события (#251/#265)', () => {
     const { game } = makeGame()

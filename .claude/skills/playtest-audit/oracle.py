@@ -51,10 +51,15 @@ ONCE_SCENES = [
 # Не «Банк —»: префикс приложения прятал разовые события (предложение кредита, #268).
 REPEATABLE_NOTIF = [
     'Списание', 'Поступление', 'Не прошло', 'Завтра списание', 'Недостаточно',
-    'остаток критический', 'Банк обеспокоен',
+    'остаток критический', 'Остаток критический', 'Банк обеспокоен', 'Сводка за неделю',
     'Сынок, ты поел', 'Когда за квартиру', 'Сынок, Алик заплатил',
     'позвони маме', 'заплатил твой Алик', 'Система', 'новых сообщ',
 ]
+# Телефон вне переписки: баннер сверху (батарея, непрочитанные) или карточка в ленте (банк, мама, Авито, #287).
+PHONE_RE = r'\((?:уведомление телефона|карточка в ленте): (.*)\)$'
+# Недельная сводка банка: у каждой недели — одна (#287). Неделя — по датам в самом тексте.
+SUMMARY_RE = r'Сводка за неделю (.+?): баланс'
+
 # Кто знакомится сам: подпись отправителя → фраза знакомства.
 MEETS = [('Нуне', 'nune_meet', 'nune'), ('Заказчик Грант', 'grant_meet', 'grant'), ('Крановщик Размик', 'razmik_meet', 'razmik')]
 
@@ -63,8 +68,8 @@ def msg_lines(path):
     """Строки расшифровки, каждая из которых — одно сообщение, с его номером в партии.
 
     Разделитель дня приходит в расшифровку с ведущим переводом строки, варианты и ответ на
-    допработу — с отступом: это не сообщения. Асайды (со скобки: уведомления телефона, экран
-    концовки) отдаются с номером соседнего сообщения, но сами не нумеруются — по ним судят
+    допработу — с отступом: это не сообщения. Асайды (со скобки: баннер телефона, экран
+    концовки; кроме карточки в ленте — она сообщение) отдаются с номером соседнего сообщения, но сами не нумеруются — по ним судят
     уведомления и хозяина квартиры.
     """
     out = []
@@ -75,7 +80,8 @@ def msg_lines(path):
         if ln.startswith('Партия '):  # заголовок расшифровки
             continue
         out.append((i, ln))
-        if not ln.startswith('('):
+        # карточка в ленте — сообщение S.msgs (#287), в отличие от асайдов
+        if not ln.startswith('(') or ln.startswith('(карточка в ленте:'):
             i += 1
     return out
 
@@ -195,6 +201,7 @@ def check_transcript(path, frames):
     lines = msg_lines(path)
     last_me = None
     notifs = collections.Counter()
+    weeks = collections.Counter()
     meets = {k: False for k in ('boris', 'arsen', 'nune', 'grant', 'razmik')}
     boris_msgs = 0
     seen_once = collections.Counter()
@@ -239,8 +246,13 @@ def check_transcript(path, frames):
         r = re.match(MARKERS['read_before_send'], ln)
         if r and last_me is not None and int(r.group(1)) * 60 + int(r.group(2)) < last_me:
             v['read_before_send'] += 1
-        n = re.match(r'\(уведомление телефона: (.*)\)$', ln)
+        n = re.match(PHONE_RE, ln)
         if n:
+            w = re.search(SUMMARY_RE, n.group(1))
+            if w:
+                weeks[w.group(1)] += 1
+                if weeks[w.group(1)] > 1:
+                    v['bank_week_repeat'] += 1
             txt = re.sub(r'\d[\d\s]*', '#', n.group(1))
             if not any(x in txt for x in REPEATABLE_NOTIF):
                 notifs[txt] += 1
@@ -277,7 +289,7 @@ def check_frequency(path):
         if ln.startswith('—— '):
             day = collections.Counter()
             continue
-        n = re.match(r'\(уведомление телефона: (.*)\)$', ln)
+        n = re.match(PHONE_RE, ln)
         s = re.match(r'\[система\] (.*)', ln)
         m = re.match(r'\[\d\d:\d\d\] (.+?): ', ln)
         if n:

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { makeGame , setMoney} from '../test/helpers'
+import { makeGame, setMoney, cards, moneyLog } from '../test/helpers'
 import { NOTIF } from './life'
 import {
   LOANS, THINGS, MOM_HELPS, creditOffer, creditStage, creditBroke, momDone,
@@ -12,11 +12,12 @@ describe('кредитная лестница', () => {
     setMoney(game, 6001)
     expect(game.adjustMoney(-1, 'Гречка')).toBe(true)
     expect(game.S.mem[creditOffer]).toBe(true)
-    // списание и «критический» идут первыми; оффер — в очереди (#211), и это оффер именно первой ступени (#272)
-    for (let i = 0; i < 8 && game.ui.notif && game.ui.notif.text !== LOANS[0].offer; i++) {
-      game.dismissNotif()
-    }
-    expect(game.ui.notif?.text).toBe(LOANS[0].offer)
+    // одна карточка: причина рядом с офером первой ступени (#272/#287), баннера нет
+    const [card] = cards(game, 'Банк')
+    expect(card.text).toBe(`Остаток критический: ${(6000).toLocaleString('ru-RU')} ₽ после «Гречка». ${LOANS[0].offer}`)
+    expect(card.offer).toEqual({ take: 'Взять кредит «Всё будет»', sell: THINGS[0].choice })
+    expect(cards(game)).toHaveLength(1)
+    expect(game.ui.notif).toBeNull()
   })
 
   it('каждая ступень предлагает свой текст; после микрозайма — ничего (#272)', () => {
@@ -28,7 +29,7 @@ describe('кредитная лестница', () => {
       game.S.mem[creditStage] = stage
       setMoney(game, 1000)
       game.maybeCreditOffer()
-      const offers = said.filter((t) => LOANS.some((l) => l.offer === t))
+      const offers = said.flatMap((t) => LOANS.filter((l) => t.endsWith(`. ${l.offer}`)).map((l) => l.offer))
       expect(offers, `ступень ${stage}`).toEqual(stage < 3 ? [LOANS[stage].offer] : [])
       expect(!!game.S.mem[creditOffer], `ступень ${stage}`).toBe(stage < 3)
     }
@@ -69,13 +70,12 @@ describe('кредитная лестница', () => {
     expect(game.S.mem[sold('guitar')]).toBe(true)
   })
 
-  it('кнопки взять/продать только при credit.offer', () => {
+  it('кредит больше не вытесняет ответы Алику: вариантов кредита нет (#287)', () => {
     const { game } = makeGame()
-    const acts = () => game.buildChoices().map((c) => c.act)
-    expect(acts()).not.toContain('creditTake')
+    setMoney(game, 1000)
     game.S.mem[creditOffer] = true
-    expect(acts()).toContain('creditTake')
-    expect(acts()).toContain('creditSell')
+    const texts = game.buildChoices().map((c) => c.text)
+    expect(texts.some((t) => /кредит|микрозайм|Продать/i.test(t))).toBe(false)
   })
 
   it('после продажи всех вещей без кредита — мама', () => {
@@ -105,7 +105,7 @@ describe('кредитная лестница', () => {
     const said: string[] = []
     const orig = game.notify.bind(game)
     game.notify = (icon: string, app: string, text: string): boolean => { said.push(text); return orig(icon, app, text) }
-    const refusals = (): number => said.filter((t) => /недостаточно средств/i.test(t)).length
+    const refusals = (): number => said.filter((t) => /^Не прошло: Платёж по кредиту «Всё будет»/.test(t)).length
     game.S.mem[loanTaken('consumer')] = true
     setMoney(game, 100)
     game.chargeCredit('consumer')
@@ -149,15 +149,6 @@ describe('кредитная лестница', () => {
     expect(game.S.money).toBe(before)
   })
 
-  it('Says_creditTake проводит зачисление', async () => {
-    const { game } = makeGame()
-    setMoney(game, 1000)
-    game.S.mem[creditOffer] = true
-    await game.fire('PlayerSays', { intent: 'creditTake' })
-    expect(game.S.mem[loanTaken('consumer')]).toBe(true)
-    expect(game.S.money).toBe(1000 + LOANS[0].amount)
-  })
-
   it('CreditDue списывает платёж', async () => {
     const { game } = makeGame()
     game.S.mem[loanTaken('consumer')] = true
@@ -166,7 +157,7 @@ describe('кредитная лестница', () => {
     const at = Number(game.S.mem[loanDueAt('consumer')])
     game.S.day = at
     await game.fire('CreditDue', { credit: 'consumer', at })
-    game.flushBankCharges()
+    game.flushBankWeek()
     expect(game.S.money).toBe(50000 - LOANS[0].payment)
     await game.fire('CreditDue', { credit: 'consumer', at })
     await game.fire('CreditDue', { credit: 'consumer' })
@@ -175,9 +166,7 @@ describe('кредитная лестница', () => {
   it('у каждого займа одно событие платежа, когда дни перескакивают через сроки (#181)', async () => {
     const { game } = makeGame()
     setMoney(game, 10_000_000)
-    const texts: string[] = []
-    const notify = game.notify.bind(game)
-    game.notify = (icon, app, text) => { texts.push(text); return notify(icon, app, text) }
+    const charged = moneyLog(game)
     for (const l of LOANS) game.S.mem[loanTaken(l.id)] = true
     game.scheduleCredits()
     const pending = (id: string) => game.rules.state.schedule.filter((it) => it.kind === 'event' && it.event === 'CreditDue' && it.facts?.credit === id).length
@@ -190,10 +179,88 @@ describe('кредитная лестница', () => {
     }
     const weeks = Math.ceil((game.S.day - start) / 7)
     for (const l of LOANS) {
-      const n = texts.filter((t) => t.includes(l.label) && /Списани/.test(t)).length
+      const n = charged.filter((t) => t === `-${l.label}`).length
       expect(n, l.id).toBeGreaterThanOrEqual(weeks - 1)
       expect(n, l.id).toBeLessThanOrEqual(weeks)
     }
+  })
+})
+
+describe('карточка банка с кнопками (#287)', () => {
+  const bottom = () => {
+    const { game } = makeGame()
+    setMoney(game, 100)
+    game.chargeBill('rent') // не прошло → на дне отказ и предложение одной карточкой
+    const card = cards(game, 'Банк').at(-1)!
+    return { game, card }
+  }
+  const mine = (g: ReturnType<typeof makeGame>['game']) => g.S.msgs.filter((m) => m.kind === 'text' && m.from === 'me').length
+
+  it('причина рядом с предложением', () => {
+    const { card } = bottom()
+    expect(card.text).toMatch(/^Не прошло: Коммуналка, 2\s500 ₽\. Вам одобрен кредит «Всё будет»/)
+    expect(card.offer?.take).toBe('Взять кредит «Всё будет»')
+  })
+
+  it('«Взять кредит» даёт кредит и не пишет Алику', () => {
+    const { game, card } = bottom()
+    const msgs = game.S.msgs.length
+    const me = mine(game)
+    game.answerCard(card.id, 'take')
+    expect(game.S.mem[loanTaken('consumer')]).toBe(true)
+    expect(game.S.money).toBe(100 + LOANS[0].amount)
+    expect(mine(game), 'реплики игрока нет').toBe(me)
+    expect(game.S.msgs.length, 'в ленту ничего не добавилось — изменилась сама карточка').toBe(msgs)
+    const after = cards(game, 'Банк').at(-1)!
+    expect(after.answered).toBe(true)
+    expect(after.result).toMatch(/^Кредит взят: \+30\s000 ₽\. Баланс: 30\s100 ₽$/)
+    game.answerCard(card.id, 'take') // второе нажатие — ничего
+    expect(game.S.mem[creditStage]).toBe(1)
+  })
+
+  it('«Продать» пишет sold и деньги; мало — банк предлагает снова, ниже, с причиной', () => {
+    const { game, card } = bottom()
+    game.answerCard(card.id, 'sell')
+    expect(game.S.mem[sold('microwave')]).toBe(true)
+    expect(game.S.money).toBe(100 + THINGS[0].amount)
+    const bank = cards(game, 'Банк')
+    expect(bank.find((c) => c.id === card.id)?.result).toMatch(/^Микроволновку забрали/)
+    const again = bank.at(-1)!
+    expect(again.id).not.toBe(card.id)
+    expect(again.text).toMatch(/^Продано, а остаток 4\s600 ₽\. Вам одобрен/)
+    expect(again.offer?.sell).toBe(THINGS[1].choice)
+  })
+
+  it('«Не сейчас»: без новой причины банк молчит, отказ платежа — новая карточка, старая закрыта', () => {
+    const { game, card } = bottom()
+    game.answerCard(card.id, 'later')
+    expect(game.S.mem[creditOffer]).toBe(false)
+    const n = cards(game).length
+    game.chargeBill('transit') // отказ другого платежа — новая причина
+    expect(cards(game).length).toBe(n + 1)
+    const fresh = cards(game).at(-1)!
+    expect(fresh.text).toMatch(/^Не прошло: Проездной/)
+    expect(fresh.offer).toBeDefined()
+    game.maybeCreditOffer() // без причины — после «не сейчас» не повторяет
+    expect(cards(game).length).toBe(n + 1)
+  })
+
+  it('переписка без выбора предложение не снимает: открытая карточка остаётся (новый отказ переносит её ниже)', async () => {
+    const { game } = bottom()
+    for (let i = 0; i < 3; i++) await game.send({ text: 'Алик, где деньги?', tone: 'polite' })
+    const open = cards(game, 'Банк').filter((c) => c.offer && !c.answered)
+    expect(open).toHaveLength(1)
+    expect(game.S.mem[creditOffer]).toBe(true)
+    game.answerCard(open[0].id, 'take')
+    expect(game.S.mem[loanTaken('consumer')]).toBe(true)
+  })
+
+  it('после Дня выплаты кнопка ничего не меняет и закрывается', () => {
+    const { game, card } = bottom()
+    game.S.mem.payday = 'default'
+    game.answerCard(card.id, 'take')
+    expect(game.S.mem[loanTaken('consumer')]).toBeFalsy()
+    expect(cards(game, 'Банк').find((c) => c.id === card.id)?.answered).toBe(true)
   })
 })
 

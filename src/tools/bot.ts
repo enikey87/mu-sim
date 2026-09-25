@@ -14,6 +14,9 @@ export async function botTurn(game: Game, pickCtx = 0.7, rude = 0.06, freeText =
   if (game.battery.dead) { await game.battery.charge(); return null }
   const job = game.S.msgs.find((m) => m.kind === 'job' && !m.answered)
   if (job) { await game.answerJob(job.id, game.chance(0.5)); return null }
+  // карточка банка: кредит или продажа кнопкой в ленте, а не репликой Алику (#287)
+  const offer = game.S.msgs.find((m) => m.kind === 'card' && m.offer && !m.answered)
+  if (offer && game.rng.random() < 0.7) { game.answerCard(offer.id, game.rng.random() < 0.5 ? 'take' : 'sell'); return null }
   if (freeText > 0 && game.rng.random() < freeText) {
     await game.send(FREE[Math.floor(game.rng.random() * FREE.length)])
     return null

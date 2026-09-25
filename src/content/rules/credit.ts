@@ -1,8 +1,8 @@
-// Кредитная лестница: предложение на дне, платёж по календарю, мама-запаска.
+// Кредитная лестница: платёж по календарю; предложение и выбор — карточка банка в ленте (Game.answerCard, #287).
 import type { Game } from '../../engine/game'
-import { type Rule, eq, is } from '../fact'
+import { type Rule } from '../fact'
 import type { GameEvent, Offer } from './events'
-import { LOANS, creditOffer, type LoanId } from '../credit'
+import { LOANS, type LoanId } from '../credit'
 
 type R = Rule<Game, GameEvent, Offer>
 
@@ -19,13 +19,5 @@ export const creditRules: R[] = [
       if (!id || game.moneySealed() || !game.creditEventLive(id, facts.at)) return
       game.chargeCredit(id)
     },
-  },
-  {
-    name: 'Says_creditTake', event: 'PlayerSays', when: [eq('intent', 'creditTake'), is(creditOffer)], bonus: 8,
-    respond: ({ game }) => { game.takeCredit(); game.setCtx(null) },
-  },
-  {
-    name: 'Says_creditSell', event: 'PlayerSays', when: [eq('intent', 'creditSell'), is(creditOffer)], bonus: 8,
-    respond: ({ game }) => { game.sellThing(); game.setCtx(null) },
   },
 ]

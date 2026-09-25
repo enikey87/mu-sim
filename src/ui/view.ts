@@ -18,7 +18,7 @@ type BatteryView = Readonly<Pick<Game['battery'], 'level' | 'dead' | 'charging'>
  *  обход через каст получает undefined, а не память. */
 export type GameUi = Readonly<
   Pick<Game, 'subscribe' | 'getVersion' | 'getMsgsEpoch' | 'getMsgsDirtyFrom' | 'ackMsgsDirty' | 'choices' | 'clockText' | 'gameDate'
-    | 'send' | 'answerJob' | 'canMirror' | 'playVoice' | 'castOf' | 'flash' | 'closeEnding' | 'dismissNotif' | 'toggleMute' | 'gesture' | 'onVisibility' | 'reset' | 'introDone'>
+    | 'send' | 'answerJob' | 'answerCard' | 'canMirror' | 'playVoice' | 'castOf' | 'flash' | 'closeEnding' | 'dismissNotif' | 'toggleMute' | 'gesture' | 'onVisibility' | 'reset' | 'introDone'>
   & { ui: UiView; battery: BatteryView; mooSound: () => void }
 >
 
@@ -42,7 +42,7 @@ export function uiOf(g: Game): GameUi {
     ui, battery,
     subscribe: g.subscribe, getVersion: g.getVersion, getMsgsEpoch: g.getMsgsEpoch, getMsgsDirtyFrom: g.getMsgsDirtyFrom, ackMsgsDirty: g.ackMsgsDirty,
     get choices() { return g.choices }, get clockText() { return g.clockText }, get gameDate() { return g.gameDate },
-    send: (o) => g.send(o), answerJob: (id, answer) => g.answerJob(id, answer), canMirror: () => g.canMirror(), playVoice: (m) => g.playVoice(m), castOf: (who) => g.castOf(who),
+    send: (o) => g.send(o), answerJob: (id, answer) => g.answerJob(id, answer), answerCard: (id, pick) => g.answerCard(id, pick), canMirror: () => g.canMirror(), playVoice: (m) => g.playVoice(m), castOf: (who) => g.castOf(who),
     flash: (t, ms) => g.flash(t, ms), closeEnding: () => g.closeEnding(), dismissNotif: () => g.dismissNotif(),
     toggleMute: () => g.toggleMute(), gesture: () => g.gesture(), onVisibility: (h) => g.onVisibility(h), reset: () => g.reset(),
     introDone: () => g.introDone(),
