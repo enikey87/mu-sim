@@ -29,7 +29,7 @@ describe('кредитная лестница', () => {
       const { game } = makeGame()
       const said: string[] = []
       const orig = game.notify.bind(game)
-      game.notify = (icon, app, text) => { said.push(text); return orig(icon, app, text) }
+      game.notify = (icon, app, text, card) => { said.push(text); return orig(icon, app, text, card) }
       game.S.mem[creditStage] = stage
       setMoney(game, 1000)
       game.maybeCreditOffer()
@@ -108,7 +108,7 @@ describe('кредитная лестница', () => {
     const { game } = makeGame()
     const said: string[] = []
     const orig = game.notify.bind(game)
-    game.notify = (icon: string, app: string, text: string): boolean => { said.push(text); return orig(icon, app, text) }
+    game.notify = (icon, app, text, card) => { said.push(text); return orig(icon, app, text, card) }
     const refusals = (): number => said.filter((t) => /^Не прошло: Платёж по кредиту «Всё будет»/.test(t)).length
     game.S.mem[loanTaken('consumer')] = true
     setMoney(game, 100)

@@ -30,7 +30,7 @@ describe('платежи по календарю', () => {
     const { game } = makeGame()
     const said: string[] = []
     const orig = game.notify.bind(game)
-    game.notify = (icon: string, app: string, text: string): boolean => { said.push(text); return orig(icon, app, text) }
+    game.notify = (icon, app, text, card) => { said.push(text); return orig(icon, app, text, card) }
     // на дне отказ приходит вместе с предложением кредита — одной карточкой с причиной (#287)
     const refusals = (): number => said.filter((t) => /^Не прошло: Связь/.test(t)).length
     setMoney(game, 100)
@@ -68,7 +68,7 @@ describe('платежи по календарю', () => {
     const { game } = makeGame()
     const texts: string[] = []
     const notify = game.notify.bind(game)
-    game.notify = (icon, app, text) => { texts.push(text); return notify(icon, app, text) }
+    game.notify = (icon, app, text, card) => { texts.push(text); return notify(icon, app, text, card) }
     game.S.day = Number(game.S.mem[billDueAt('phone')]) - 1
     await game.fire('BillWarn', { bill: 'phone', at: game.S.mem[billDueAt('phone')] })
     expect(texts.some((t) => /Завтра списание/.test(t))).toBe(false)
@@ -86,7 +86,7 @@ describe('платежи по календарю', () => {
     const listen = (g: ReturnType<typeof makeGame>['game']) => {
       const texts: string[] = []
       const notify = g.notify.bind(g)
-      g.notify = (icon, app, text) => { texts.push(text); return notify(icon, app, text) }
+      g.notify = (icon, app, text, card) => { texts.push(text); return notify(icon, app, text, card) }
       return texts
     }
     const { game: skip } = makeGame()
@@ -275,25 +275,25 @@ describe('платежи по календарю', () => {
     const { game } = makeGame()
     const shown: string[] = []
     const notify = game.notify.bind(game)
-    game.notify = (icon, app, text) => {
-      const ok = notify(icon, app, text)
+    game.notify = (icon, app, text, card) => {
+      const ok = notify(icon, app, text, card)
       if (ok) shown.push(text)
       return ok
     }
-    game.notify('🏦', 'Банк', 'Не прошло: недостаточно средств. Связь, 400 ₽.')
-    game.notify('🏦', 'Банк', 'Не прошло: недостаточно средств. Связь, 550 ₽.')
+    game.notify('🏦', 'Банк', 'Не прошло: недостаточно средств. Связь, 400 ₽.', { event: 'bank.refusal' })
+    game.notify('🏦', 'Банк', 'Не прошло: недостаточно средств. Связь, 550 ₽.', { event: 'bank.refusal' })
     expect(shown).toHaveLength(2) // суммы разные — два события
-    game.notify('🏦', 'Банк', 'Не прошло: недостаточно средств. Связь, 550 ₽.')
+    game.notify('🏦', 'Банк', 'Не прошло: недостаточно средств. Связь, 550 ₽.', { event: 'bank.refusal' })
     expect(shown).toHaveLength(2) // повтор той же суммы — дедуп
     // поступления с разным балансом, одна сумма и причина — одно событие
     shown.length = 0
     const { game: g2 } = makeGame()
     const n2 = g2.notify.bind(g2)
-    g2.notify = (icon, app, text) => { const ok = n2(icon, app, text); if (ok) shown.push(text); return ok }
-    g2.notify('🏦', 'Банк', 'Поступление 50 ₽. Перевод от Алика. Баланс: 12 450 ₽')
-    g2.notify('🏦', 'Банк', 'Поступление 50 ₽. Перевод от Алика. Баланс: 12 500 ₽')
+    g2.notify = (icon, app, text, card) => { const ok = n2(icon, app, text, card); if (ok) shown.push(text); return ok }
+    g2.notify('🏦', 'Банк', 'Поступление 50 ₽. Перевод от Алика. Баланс: 12 450 ₽', { event: 'bank.summary' })
+    g2.notify('🏦', 'Банк', 'Поступление 50 ₽. Перевод от Алика. Баланс: 12 500 ₽', { event: 'bank.summary' })
     expect(shown).toHaveLength(1)
-    g2.notify('🏦', 'Банк', 'Поступление 500 ₽. Выплата. Баланс: 13 000 ₽')
+    g2.notify('🏦', 'Банк', 'Поступление 500 ₽. Выплата. Баланс: 13 000 ₽', { event: 'bank.summary' })
     expect(shown).toHaveLength(2)
   })
   it('доля банковских уведомлений к репликам Алика до Дня выплаты (#301/#323)', async () => {
@@ -406,7 +406,7 @@ describe('платежи по календарю', () => {
     const { game } = makeGame()
     game.S.scene = { id: 'meet', node: game.scenes.meet.start, vars: {} }
     const n = game.S.msgs.length
-    game.notify('🏦', 'Банк', 'Сводка за неделю тест: баланс 1 ₽', { lines: ['Списано: Связь 400 ₽'] })
+    game.notify('🏦', 'Банк', 'Сводка за неделю тест: баланс 1 ₽', { lines: ['Списано: Связь 400 ₽'], event: 'bank.summary' })
     expect(game.S.msgs.slice(n).filter((m) => m.kind === 'card')).toEqual([])
     expect(game.S.pendingCards.length).toBe(1)
     await game.enterNode('meet', null)
@@ -417,9 +417,9 @@ describe('платежи по календарю', () => {
   it('после выплаты отложенные банк/МФО из сцены не выходят (#323)', async () => {
     const { game } = makeGame()
     game.S.scene = { id: 'meet', node: game.scenes.meet.start, vars: {} }
-    game.notify('🏦', 'Банк', 'Кредит одобрен! после сцены', { offer: { take: 'Взять' } })
-    game.notify('🏦', 'МФО', 'Мы записываем после сцены')
-    game.notify('👩', 'Мама', 'Сынок, держись')
+    game.notify('🏦', 'Банк', 'Кредит одобрен! после сцены', { offer: { take: 'Взять' }, event: 'bank.offer' })
+    game.notify('🏦', 'МФО', 'Мы записываем после сцены', { event: 'bank.refusal' })
+    game.notify('👩', 'Мама', 'Сынок, держись', { event: 'mom' })
     expect(game.S.pendingCards.length).toBe(3)
     game.S.mem.payday = 'default'
     expect(game.moneySealed()).toBe(true)
@@ -432,7 +432,7 @@ describe('платежи по календарю', () => {
   it('NC: без moneySealed отложенный банк выходит после сцены (#323)', async () => {
     const { game } = makeGame()
     game.S.scene = { id: 'meet', node: game.scenes.meet.start, vars: {} }
-    game.notify('🏦', 'Банк', 'Кредит без печати')
+    game.notify('🏦', 'Банк', 'Кредит без печати', { event: 'bank.offer' })
     expect(game.S.pendingCards.length).toBe(1)
     await game.enterNode('meet', null)
     expect(game.S.msgs.some((m) => m.kind === 'card' && m.app === 'Банк' && /Кредит без печати/.test(m.text))).toBe(true)
@@ -441,7 +441,7 @@ describe('платежи по календарю', () => {
     const storage = memStorage()
     const { game } = makeGame({ storage })
     game.S.scene = { id: 'meet', node: game.scenes.meet.start, vars: {} }
-    game.notify('🏦', 'Банк', 'Сводка в очереди: баланс 7 ₽')
+    game.notify('🏦', 'Банк', 'Сводка в очереди: баланс 7 ₽', { event: 'bank.summary' })
     game.save()
     const { game: loaded } = makeGame({ storage, seed: 2 })
     expect(loaded.S.scene?.id).toBe('meet')
