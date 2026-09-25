@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
+import { Game } from '../engine/game'
 import { makeGame, setMoney, cards, moneyLog } from '../test/helpers'
 import { NOTIF } from './life'
+import { moneyPoor } from './memkeys'
 import {
   LOANS, THINGS, MOM_HELPS, creditOffer, creditStage, creditBroke, momDone,
   sold, momHelp, loanTaken, loanDueAt, allSold,
@@ -286,6 +288,52 @@ describe('кривая баланса до дна', () => {
     expect(Math.max(...bottoms)).toBeLessThan(120)
     console.log('money bottom days-from-start by seed:', bottoms.join(', '))
   })
+})
+
+describe('после первого дна бедность до выплаты (#279)', () => {
+  it('кредит не возвращает в норму, пока money.poor', () => {
+    const { game } = makeGame()
+    setMoney(game, Game.MONEY_BOTTOM + 100)
+    expect(game.adjustMoney(-200, 'Продукты')).toBe(true)
+    expect(game.S.mem[moneyPoor]).toBe(true)
+    expect(game.moneyLevel()).toBe('bottom')
+    setMoney(game, 50_000)
+    expect(game.moneyLevel()).toBe('low')
+    expect(game.facts().moneyNormal).toBe(false)
+    expect(game.facts().moneyLow).toBe(true)
+  })
+
+  it('без money.poor большой баланс — норма (NC)', () => {
+    const { game } = makeGame()
+    setMoney(game, 50_000)
+    expect(game.S.mem[moneyPoor]).toBeFalsy()
+    expect(game.moneyLevel()).toBe('normal')
+  })
+
+  it('кривая: после первого дна доля дней в «норме» = 0 до выплаты', async () => {
+    const { botTurn } = await import('../tools/bot')
+    const shares: number[] = []
+    for (const seed of [1, 2, 3, 5, 8, 13]) {
+      const { game } = makeGame({ seed })
+      let firstBottom: number | null = null
+      let normalAfter = 0
+      let daysAfter = 0
+      for (let i = 0; i < 200; i++) {
+        await botTurn(game)
+        if (game.S.mem[moneyPoor] && firstBottom == null) firstBottom = game.S.day
+        if (firstBottom != null && !game.S.mem['payday.chain'] && !game.S.mem['endgame.active']) {
+          daysAfter++
+          if (game.moneyLevel() === 'normal') normalAfter++
+        }
+        if (game.S.mem['payday.chain'] || game.S.mem['endgame.active']) break
+      }
+      expect(firstBottom, `seed ${seed} never bottom`).not.toBeNull()
+      const share = daysAfter ? normalAfter / daysAfter : 0
+      shares.push(share)
+      expect(share, `seed ${seed} normal share ${share} days=${daysAfter}`).toBe(0)
+    }
+    console.log('normal-after-bottom shares:', shares.map((s) => s.toFixed(2)).join(', '))
+  }, 180_000)
 })
 
 describe('негативные контроли', () => {

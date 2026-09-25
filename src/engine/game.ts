@@ -466,11 +466,13 @@ export class Game {
     return true
   }
   // Дно ≤ 6000 (как старый FLOOR); «мало» ≤ 9000 — предупреждение до дна. Старт — START_MONEY.
+  // После первого дна (`money.poor`) до выплаты уровень не возвращается в «норму» (#279).
   static readonly MONEY_LOW = 9000
   static readonly MONEY_BOTTOM = 6000
   moneyLevel(): 'normal' | 'low' | 'bottom' {
     const m = this.S.money
     if (m <= Game.MONEY_BOTTOM) return 'bottom'
+    if (this.S.mem[memkeys.moneyPoor] && !this.moneySealed()) return 'low'
     if (m <= Game.MONEY_LOW) return 'low'
     return 'normal'
   }
@@ -485,6 +487,7 @@ export class Game {
     if (delta < 0 && -delta > this.S.money) return false
     const before = this.moneyLevel()
     setCount(this.S, 'money', Math.max(0, countOf(this.S, 'money') + delta))
+    if (this.S.money <= Game.MONEY_BOTTOM) this.S.mem[memkeys.moneyPoor] = true
     const after = this.moneyLevel()
     this.bankLine(opts?.group ?? reason, delta)
     const rank = { normal: 2, low: 1, bottom: 0 }
