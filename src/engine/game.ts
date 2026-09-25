@@ -145,6 +145,7 @@ export class Game {
   private noTimers: boolean
   private typos: boolean
   private hiddenAt = 0
+  private sceneCards: { icon: string; app: string; text: string; card?: Partial<Card> }[] = []
   /** Ход игрока: nextDay уже был (offline / fx.days) — обычный +1…3 в конце не дублируем. */
   private inPlayerTurn = false
   private dayMovedInTurn = false
@@ -191,7 +192,7 @@ export class Game {
     this.rawAudio.setMuted(this.S.muted)
 
     if (!this.S.msgs.length) this.seed()
-    else { this.restoreDueEvents(); this.scheduleBills(); this.scheduleCredits() }
+    else { this.restoreDueEvents(); this.scheduleBills(); this.scheduleCredits(); this.migrateCreditSave() }
     void this.checkAway(opts.away ?? null)
     // перезагрузка посреди «займи 50»: доиграть просьбу+пометку, иначе лента врёт (#219)
     if (this.S.mem[memkeys.endgame.active] && !this.S.mem[memkeys.lend50.asked]) {
@@ -284,7 +285,7 @@ export class Game {
   /** Кнопки после падения: сломанная сцена собирается снова при каждой отрисовке, а пустой список — всё ещё игра, свой текст пишется. */
   private choicesAfterCrash(): Choice[] {
     try { return this.buildChoices() } catch (e) { console.error('[alik] сцена не собирается — выходим из неё', e) }
-    this.S.scene = null
+    this.clearScene()
     try { return this.buildChoices() } catch (e) { console.error('[alik] кнопки не собираются', e); return [] }
   }
 
@@ -480,8 +481,8 @@ export class Game {
   moneySealed(): boolean {
     return this.debtSealed() || !!this.S.mem[memkeys.endgame.active]
   }
-  /** Единственная точка изменения S.money: строка недельной сводки + смена уровня (#287). `group` — строка сводки вместо `reason`. */
-  adjustMoney(delta: number, reason: string, opts?: { group?: string }): boolean {
+  /** Единственная точка изменения S.money: строка недельной сводки + смена уровня (#287). `group` — строка сводки вместо `reason`; `onDay` — неделя срока, не день обработки (#300). */
+  adjustMoney(delta: number, reason: string, opts?: { group?: string; onDay?: number }): boolean {
     if (this.moneySealed()) return false
     if (delta === 0) return true
     if (delta < 0 && -delta > this.S.money) return false
@@ -489,7 +490,7 @@ export class Game {
     setCount(this.S, 'money', Math.max(0, countOf(this.S, 'money') + delta))
     if (this.S.money <= Game.MONEY_BOTTOM) this.S.mem[memkeys.moneyPoor] = true
     const after = this.moneyLevel()
-    this.bankLine(opts?.group ?? reason, delta)
+    this.bankLine(opts?.group ?? reason, delta, false, opts?.onDay)
     const rank = { normal: 2, low: 1, bottom: 0 }
     if (rank[after] < rank[before]) {
       const bal = this.rub(this.S.money)
@@ -504,10 +505,10 @@ export class Game {
   }
   private rub(n: number): string { return `${n.toLocaleString('ru-RU')} ₽` }
   private bankCard(text: string, extra?: Partial<Card>): void { this.notify('🏦', 'Банк', text, extra) }
-  /** Строка недельной сводки; `refused` — трата не прошла (мелочь — строка, а не карточка). */
-  private bankLine(label: string, delta: number, refused = false): void {
+  /** Строка недельной сводки; `refused` — трата не прошла; `onDay` — день срока платежа (#300). */
+  private bankLine(label: string, delta: number, refused = false, onDay = this.S.day): void {
     if (this.moneySealed()) return
-    const week = weekOf(this.S.day)
+    const week = weekOf(onDay)
     if (this.S.bank && this.S.bank.week !== week) this.flushBankWeek()
     const b = (this.S.bank ??= { week, lines: {}, bal: this.S.money })
     const key = `${refused ? '!' : delta < 0 ? '-' : '+'}${label}`
@@ -519,7 +520,8 @@ export class Game {
   /** Сводка прошедшей недели — одна карточка, когда календарь перешёл в новую (#287). */
   flushBankWeek(): void {
     const b = this.S.bank
-    if (!b || b.week === weekOf(this.S.day)) return
+    // только прошедшие недели: буфер будущей недели (если появится) не сбрасываем
+    if (!b || b.week >= weekOf(this.S.day)) return
     this.S.bank = null
     if (this.moneySealed()) return
     const part = (sign: string, head: string): string[] => {
@@ -589,9 +591,13 @@ export class Game {
     if (this.moneySealed()) return
     const bill = BILLS.find((b) => b.id === id)
     if (!bill || bill.skip?.(this.S.mem)) return
+    const dueAt = this.S.mem[billDueAt(id)]
+    const dueDay = dueAt != null ? Number(dueAt) : this.S.day
+    // неделя срока, но не будущего буфера: досрочное списание в тесте остаётся в текущей неделе
+    const onDay = Math.min(dueDay, this.S.day)
     this.rules.applyOps([set(billDue(id), false)], {})
     delete this.S.mem[billDueAt(id)]
-    if (this.adjustMoney(-bill.amount, bill.label)) {
+    if (this.adjustMoney(-bill.amount, bill.label, { onDay })) {
       this.rules.applyOps([set(billUnpaid(id), false), set(billStreak(id), 0)], {})
       this.scheduleBills()
       if (this.moneyLevel() === 'bottom') this.maybeCreditOffer()
@@ -630,8 +636,11 @@ export class Game {
     if (this.moneySealed()) return
     const loan = LOANS.find((l) => l.id === id)
     if (!loan || !this.S.mem[loanTaken(id)]) return
+    const dueAt = this.S.mem[loanDueAt(id)]
+    const dueDay = dueAt != null ? Number(dueAt) : this.S.day
+    const onDay = Math.min(dueDay, this.S.day)
     delete this.S.mem[loanDueAt(id)]
-    if (this.adjustMoney(-loan.payment, loan.label)) {
+    if (this.adjustMoney(-loan.payment, loan.label, { onDay })) {
       this.rules.applyOps([set(loanFailed(id), false)], {}) // платёж прошёл — полоса неоплат закрыта
       this.scheduleCredits()
       return
@@ -684,6 +693,28 @@ export class Game {
   }
   private closeOffers(): void {
     for (const m of this.S.msgs) if (m.kind === 'card' && m.offer && !m.answered) this.replaceMsg(m, { answered: true })
+  }
+  /** Старое сохранение до #287: кнопки кредита в S.choices и credit.offer без карточки (#300). */
+  private migrateCreditSave(): void {
+    this.S.choices = null
+    if (!this.S.mem[creditOffer]) return
+    if (this.S.msgs.some((m) => m.kind === 'card' && m.offer && !m.answered)) return
+    delete this.S.mem[creditOffer]
+    delete this.S.mem[creditDeclined]
+    this.maybeCreditOffer('Предложение банка ещё открыто')
+  }
+  private clearScene(alsoCtx = false): void {
+    this.S.scene = null
+    if (alsoCtx) this.S.ctx = null
+    this.flushSceneCards()
+  }
+  private flushSceneCards(): void {
+    const q = this.sceneCards.splice(0)
+    for (const c of q) {
+      // уже прошли дедуп при откладывании — повторный notify снова отбросил бы банк (#300)
+      this.push({ kind: 'card', time: fmtTime(this.S.clock), icon: c.icon, app: c.app, text: c.text, ...c.card })
+      this.audio.vibrate(30)
+    }
   }
   takeCredit(): void {
     if (this.moneySealed() || !this.S.mem[creditOffer]) return
@@ -977,6 +1008,11 @@ export class Game {
       const key = this.bankSmsKey(text)
       if (this.bankSmsDay.keys.has(key)) return false
       this.bankSmsDay.keys.add(key)
+    }
+    // событие денег не перебивает сцену — карточки после её конца (#300)
+    if (!Game.isBanner(app) && this.S.scene) {
+      this.sceneCards.push({ icon, app, text, card })
+      return true
     }
     if (!Game.isBanner(app)) {
       this.push({ kind: 'card', time: fmtTime(this.S.clock), icon, app, text, ...card })
@@ -1417,10 +1453,10 @@ export class Game {
       } else if (o.scene) {
         await this.enterNode(o.scene, o.go ?? null)
       } else if (o.act) {
-        S.scene = null // контекстная реплика посреди сцены (например, «Поймать на лжи») прерывает её
+        this.clearScene() // контекстная реплика посреди сцены (например, «Поймать на лжи») прерывает её
         await this.fire('PlayerSays', this.saysFacts(o))
       } else if (S.scene) {
-        S.scene = null // свой текст посреди сцены — сцена прерывается
+        this.clearScene() // свой текст посреди сцены — сцена прерывается
         await this.alikTurn(tone, o.category)
       } else {
         await this.alikTurn(tone, o.category)
@@ -1938,8 +1974,7 @@ export class Game {
       S.mem[memkeys.endgame.exits] = 0
       S.mem[memkeys.endgame.mutes] = 0
       S.mem[memkeys.endgame.renames] = 0
-      S.scene = null
-      S.ctx = null
+      this.clearScene(true)
       S.offlineDays = 0
       S.rules.schedule = S.rules.schedule.filter((item) => item.kind !== 'event')
       this.sys(`Алик создал группу «${ENDGAME_GROUP}»`)
@@ -2060,7 +2095,7 @@ export class Game {
   }
   async enterNode(sid: string, nid: string | null): Promise<void> {
     const S = this.S
-    if (nid === null) { S.scene = null; S.ctx = null; await this.say([this.uniq(this.X.short)]); return }
+    if (nid === null) { this.clearScene(true); await this.say([this.uniq(this.X.short)]); return }
     if (nid.includes(':')) [sid, nid] = nid.split(':')
     const sc = this.scenes[sid]
     // новая сцена — старый контекст («что вы удалили?», «при чём тут тётя?») больше не к месту
@@ -2113,7 +2148,7 @@ export class Game {
     if (n.then === 'moo') { await this.sleep(400); this.moo() }
     if (n.then === 'transfer') await this.transfer()
     if (n.then === 'promise') await this.promiseLine()
-    if (!n.opts) { S.scene = null; if (n.then !== 'promise') S.ctx = null }
+    if (!n.opts) this.clearScene(n.then !== 'promise')
     this.emit()
   }
 

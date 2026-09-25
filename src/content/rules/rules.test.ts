@@ -293,13 +293,14 @@ describe('тон сообщения (PlayerMessage)', () => {
 })
 
 describe('Алик пишет сам (AlikIdle)', () => {
-  it('посреди сцены не перебивает — только карточка телефона (#287)', async () => {
+  it('посреди сцены не перебивает ленту — карточка телефона ждёт конца сцены (#287/#300)', async () => {
     const { game } = makeGame()
     game.S.scene = { id: 'deathbed', node: 'ask', vars: {} }
     const n = game.S.msgs.length
     await game.fire('AlikIdle')
-    const added = game.S.msgs.slice(n)
-    expect(added.map((m) => m.kind)).toEqual(['card'])
+    expect(game.S.msgs.slice(n)).toEqual([])
+    await game.enterNode('deathbed', null)
+    expect(game.S.msgs.slice(n).some((m) => m.kind === 'card')).toBe(true)
   })
   it('в обычном режиме пишет сам', async () => {
     let wrote = 0

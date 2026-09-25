@@ -1,12 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import { Game } from '../engine/game'
-import { makeGame, setMoney, cards, moneyLog } from '../test/helpers'
+import { makeGame, setMoney, cards, moneyLog, memStorage } from '../test/helpers'
 import { NOTIF } from './life'
 import { moneyPoor } from './memkeys'
 import {
   LOANS, THINGS, MOM_HELPS, creditOffer, creditStage, creditBroke, momDone,
   sold, momHelp, loanTaken, loanDueAt, allSold,
 } from './credit'
+import { SAVE_KEY, freshState, setCount } from '../engine/state'
 
 describe('кредитная лестница', () => {
   it('на дне банк предлагает первую ступень', () => {
@@ -342,6 +343,23 @@ describe('негативные контроли', () => {
     setMoney(game, 10000)
     game.maybeCreditOffer()
     expect(game.S.mem[creditOffer]).toBeFalsy()
+  })
+
+  it('старое сохранение с credit.offer без карточки — снова карточка, не кнопка Алику (#300)', () => {
+    const storage = memStorage()
+    const s = freshState()
+    setCount(s, 'money', 100)
+    s.mem[creditOffer] = true
+    s.mem[creditStage] = 0
+    s.choices = [{ text: 'Взять кредит «Всё будет»', tone: 'polite', act: 'creditTake' }]
+    s.msgs = [{ id: 1, kind: 'text', from: 'alik', text: 'Брат', time: '14:00' }]
+    s.nextId = 2
+    storage.setItem(SAVE_KEY, JSON.stringify(s))
+    const { game } = makeGame({ storage, seed: 2 })
+    expect(game.choices.some((c) => /Взять кредит/.test(c.text) || c.act === 'creditTake')).toBe(false)
+    const offer = game.S.msgs.find((m) => m.kind === 'card' && m.offer && !m.answered)
+    expect(offer?.kind === 'card' && offer.offer?.take).toMatch(/Взять кредит/)
+    expect(game.S.mem[creditOffer]).toBe(true)
   })
 
   it('реплика про микроволновку — только при sold.microwave', () => {
