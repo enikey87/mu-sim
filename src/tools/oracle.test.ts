@@ -137,6 +137,28 @@ describe('оракул: негативный контроль', () => {
     }
   }, 120_000)
 
+  // #308: путь ответа на кнопку (PlayerSays) — бот сам в окне смерти кнопку с act почти не видит, даём её всегда
+  it('снятый гейт смерти у ответа на кнопку (Says_WhileDead) — оракул краснеет на реальной партии', async () => {
+    const { allRules } = await import('../content/rules')
+    const says = allRules.find((r) => r.name === 'Says_WhileDead')!
+    const deadWithButton = (g: Game) => {
+      g.S.mem.alik_dead = true
+      const build = g.buildChoices.bind(g)
+      g.buildChoices = () => [{ text: 'Алик, это на фото ты?', tone: 'neutral', act: 'photo' }, ...build()]
+      g.S.choices = null
+    }
+    const clean = oracle(await dump(9, 40, deadWithButton)).verdict!
+    expect(clean.coverage.games_with_dead).toBe(1)
+    expect(clean.violations.dead_speech).toBeUndefined()
+    const when = says.when
+    says.when = when.filter((c: Criterion) => c.key !== 'alik_dead')
+    try {
+      const v = oracle(await dump(9, 40, deadWithButton)).verdict!
+      expect(v.coverage.games_with_dead).toBe(1)
+      expect(v.violations.dead_speech).toBeGreaterThan(0)
+    } finally { says.when = when }
+  }, 120_000)
+
   it('дамп без атрибуции речи (старый формат) не судит и говорит об этом', () => {
     const dir = mutate('main', 'main', (d) => { for (const f of d.frames) for (const s of f.said) delete (s as Partial<Said>).r })
     const v = oracle(dir).verdict!
