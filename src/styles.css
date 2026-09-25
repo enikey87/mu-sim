@@ -150,6 +150,16 @@ body {
 .photo svg { display: block; width: 220px; height: auto; border-radius: 10px; }
 .photo .cap { font-size: 12px; color: var(--muted); margin-top: 3px; }
 .job-btns { display: flex; gap: 6px; margin-top: 6px; }
+.card {
+  align-self: center; width: min(90%, 320px); z-index: 1; margin: 4px 0;
+  padding: 6px 10px; border-radius: 10px; font-size: 12px;
+  background: rgba(127, 127, 127, .14); color: var(--text); border-left: 3px solid var(--muted);
+}
+.card-head { display: flex; justify-content: space-between; color: var(--muted); font-weight: 600; margin-bottom: 2px; }
+.card-line { color: var(--muted); margin-top: 2px; }
+.card-result { color: var(--text); font-weight: 600; }
+.card-btns { flex-wrap: wrap; }
+.card-btns button { font-size: 12px; padding: 5px 8px; }
 .job-btns button, .choices button {
   border: 0; border-radius: 10px; padding: 7px 10px; cursor: pointer;
   background: rgba(127, 127, 127, .15); color: var(--text); font: inherit; text-align: left;

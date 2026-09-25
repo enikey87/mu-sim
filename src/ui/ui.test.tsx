@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { App } from './App'
 import { messageRenderStats } from './Message'
 import { messageListRenderStats, messageListBuildStats } from './Chat'
-import { makeGame } from '../test/helpers'
+import { makeGame, setMoney } from '../test/helpers'
 import { SAVE_KEY } from '../engine/state'
 import { fmtDate } from '../engine/time'
 import type { Game } from '../engine/game'
@@ -534,11 +534,35 @@ describe('App', () => {
   it('уведомление телефона и тост ачивки', () => {
     const { game } = makeGame()
     renderApp(game)
-    act(() => { game.notify('👩', 'Мама', 'Сынок, ты поел?'); game.unlock('cow') })
-    expect(screen.getByText('Сынок, ты поел?')).toBeInTheDocument()
+    act(() => { game.notify('💬', 'Алик Воздухонесян', '3 новых сообщения'); game.unlock('cow') })
+    expect(screen.getByText('3 новых сообщения')).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('Это корова?')
-    act(() => { fireEvent.click(screen.getByText('Сынок, ты поел?')) })
-    expect(screen.queryByText('Сынок, ты поел?')).not.toBeInTheDocument()
+    act(() => { fireEvent.click(screen.getByText('3 новых сообщения')) })
+    expect(screen.queryByText('3 новых сообщения')).not.toBeInTheDocument()
+  })
+
+  it('мама и банк — карточки в ленте, а не баннер (#287)', () => {
+    const { game } = makeGame()
+    renderApp(game)
+    act(() => { game.notify('👩', 'Мама', 'Сынок, ты поел?'); game.notify('🏦', 'Банк', 'Банк обеспокоен') })
+    expect(document.getElementById('notif')).not.toHaveTextContent(/Сынок|Банк/)
+    const shown = screen.getAllByTestId('card')
+    expect(shown.map((c) => c.textContent)).toEqual([expect.stringContaining('Сынок, ты поел?'), expect.stringContaining('Банк обеспокоен')])
+  })
+
+  it('карточка банка: «Взять кредит» берёт кредит, реплики Алику нет (#287)', () => {
+    const { game } = makeGame()
+    renderApp(game)
+    setMoney(game, 100)
+    act(() => { game.chargeBill('rent') })
+    const me = game.S.msgs.filter((m) => m.kind === 'text' && m.from === 'me').length
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Взять кредит «Всё будет»' })) })
+    expect(game.S.mem['credit.consumer.taken']).toBe(true)
+    expect(game.S.msgs.filter((m) => m.kind === 'text' && m.from === 'me').length).toBe(me)
+    expect(screen.queryByRole('button', { name: 'Не сейчас' })).not.toBeInTheDocument()
+    expect(screen.getAllByTestId('card').at(-1)).toHaveTextContent(/Кредит взят: \+30\s000 ₽/)
+    // в вариантах ответа Алику кредита нет
+    expect(screen.queryByRole('button', { name: /Продать/ })).not.toBeInTheDocument()
   })
 
   it('звук переключается', () => {
