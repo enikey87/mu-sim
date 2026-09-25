@@ -193,12 +193,12 @@ export class Game {
 
     if (!this.S.msgs.length) this.seed()
     else { this.restoreDueEvents(); this.scheduleBills(); this.scheduleCredits(); this.migrateCreditSave() }
-    void this.checkAway(opts.away ?? null)
-    // перезагрузка посреди «займи 50»: доиграть просьбу+пометку, иначе лента врёт (#219)
+    // незаконченная просьба — до пачки непрочитанных: иначе «Займи 50» рвётся away-burst (#248)
     if (this.S.mem[memkeys.endgame.active] && !this.S.mem[memkeys.lend50.asked]) {
       this.ui.busy = true
       try { this.deliverLend50Ask() } finally { this.ui.busy = false }
     }
+    void this.checkAway(opts.away ?? null)
     if (!this.S.choices) this.S.choices = this.buildChoices()
     this.restStatus()
     if (this.battery.level === 0) this.battery.die()
@@ -2020,7 +2020,8 @@ export class Game {
 
   /**
    * Просьба «займи 50» и системная пометка — одним куском: либо обе в ленте, либо ни одной (#219).
-   * Без опечаток: «Верну» не должна ломаться автозаменой. Звать только при endgame.active и !asked.
+   * Без опечаток и без «печатает…»: три реплики — пакет, чтобы загрузка/away не рвали его (#248).
+   * Звать только при endgame.active и !asked.
    */
   private deliverLend50Ask(): void {
     const S = this.S
@@ -2049,18 +2050,24 @@ export class Game {
     }
   }
 
-  /** Ответ на «займи 50»: реплики и ачивка — без движения денег и долга (docs/design/lend-50.md). */
+  /** Ответ на «займи 50»: реплики и ачивка — без движения денег и долга; без опечаток (#248). */
   async endgameLend50(answer: string): Promise<void> {
     const S = this.S
     S.ctx = null
     S.mem[memkeys.lend50.answer] = answer
-    if (answer === 'yes') {
-      await this.say([LEND50_YES])
-      S.mem[memkeys.endgame.renames] = Number(S.mem[memkeys.endgame.renames] ?? 0) + 1
-      this.sys(`Алик изменил название группы на «${LEND50_RENAME}»`)
-      if (this.canSpeak('nune')) await this.say([{ w: 'nune', t: LEND50_NUNE }])
-    } else if (answer === 'no') await this.say([this.draw('LEND50_NO', LEND50_NO)])
-    else await this.say([LEND50_SERIOUS])
+    const typos = this.typos
+    this.typos = false
+    try {
+      if (answer === 'yes') {
+        await this.say([LEND50_YES])
+        S.mem[memkeys.endgame.renames] = Number(S.mem[memkeys.endgame.renames] ?? 0) + 1
+        this.sys(`Алик изменил название группы на «${LEND50_RENAME}»`)
+        if (this.canSpeak('nune')) await this.say([{ w: 'nune', t: LEND50_NUNE }])
+      } else if (answer === 'no') await this.say([this.draw('LEND50_NO', LEND50_NO)])
+      else await this.say([LEND50_SERIOUS])
+    } finally {
+      this.typos = typos
+    }
     this.unlock('lend50')
   }
 
