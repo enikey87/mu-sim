@@ -26,6 +26,36 @@ export function holidayGreetKey(day: number): string | undefined {
   return `march8@${d.getFullYear()}`
 }
 
+/** Праздники и сезоны, на которые Алик ссылается сроком (docs/design/deadline-replies.md) — горизонт по календарю. */
+export type HolidayRef = 'navasard' | 'vardavar' | 'easter' | 'winter'
+
+// Пасха — григорианский компут (армянская церковь приняла его в 1924-м), Вардавар — через 98 дней после неё.
+// Проверено: 2026 → 5 апреля, 2027 → 28 марта.
+const easterOf = (year: number): Date => {
+  const a = year % 19, b = Math.floor(year / 100), c = year % 100
+  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3)
+  const h = (19 * a + b - d - g + 15) % 30
+  const i = Math.floor(c / 4), k = c % 4
+  const l = (32 + 2 * e + 2 * i - h - k) % 7
+  const m = Math.floor((a + 11 * h + 22 * l) / 451)
+  return new Date(year, Math.floor((h + l - 7 * m + 114) / 31) - 1, ((h + l - 7 * m + 114) % 31) + 1)
+}
+const FIXED: Record<'navasard' | 'winter', [number, number]> = { navasard: [8, 11], winter: [12, 1] }
+
+/** Сколько дней от day до ближайшего наступления праздника (0 — сегодня; сказанный в разные дни — разная даль). */
+export function holidayDays(ref: HolidayRef, day: number): number {
+  const from = dateOf(day)
+  const diff = (to: Date) => Math.round((Date.UTC(to.getFullYear(), to.getMonth(), to.getDate()) - Date.UTC(from.getFullYear(), from.getMonth(), from.getDate())) / 864e5)
+  if (ref === 'easter' || ref === 'vardavar') {
+    const move = (y: number) => { const d = easterOf(y); if (ref === 'vardavar') d.setDate(d.getDate() + 98); return d }
+    const cur = diff(move(from.getFullYear()))
+    return cur >= 0 ? cur : diff(move(from.getFullYear() + 1))
+  }
+  const [m, dom] = FIXED[ref]
+  const cur = diff(new Date(from.getFullYear(), m - 1, dom))
+  return cur >= 0 ? cur : diff(new Date(from.getFullYear() + 1, m - 1, dom))
+}
+
 const ny = [eq('holiday', 'newYear'), missing(endgame.active)] as const
 const m8 = [eq('holiday', 'march8'), missing(endgame.active)] as const
 

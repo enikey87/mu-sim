@@ -12,7 +12,7 @@ describe('легенда денег', () => {
   it('каждая легенда из серий существует, у каждой есть срок и реплики', () => {
     for (const [id, a] of Object.entries(ARCS)) for (const ep of a.eps) if (ep.legend) expect(LEGENDS[ep.legend], `${id}: ${ep.legend}`).toBeDefined()
     for (const [id, l] of Object.entries(LEGENDS)) {
-      expect(l.until.length, id).toBeGreaterThan(5)
+      expect(l.until.t.length, id).toBeGreaterThan(5)
       expect(l.lines.length, id).toBeGreaterThan(0)
       expect(lintLines('LEG_' + id, l.lines)).toEqual([])
     }
