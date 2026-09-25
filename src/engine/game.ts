@@ -1566,9 +1566,12 @@ export class Game {
   private legendDue(): boolean {
     return this.S.stats.sent - Number(this.S.mem[memkeys.legendPromiseAt] ?? -99) >= LEGEND_VOW_GAP
   }
-  /** Срок легенды второй раз в журнал не пишем — повтор не новость (#179). Ключ — условие срока: тексты клятвы разные. */
+  /** Срок легенды второй раз в журнал не пишем — повтор не новость (#179). Условие — если есть; иначе фраза срока внутри текста записи (у 23 легенд condition нет, #246). */
   private recordPromiseOnce(p: { text: string; d: number | null; due?: Due; condition?: PromiseCondition; tomorrow?: boolean; stake?: 'moustache' }): void {
-    if (p.condition && this.S.promises.some((x) => x.condition === p.condition)) return
+    const seen = p.condition
+      ? this.S.promises.some((x) => x.condition === p.condition)
+      : !!p.t && this.S.promises.some((x) => x.t.includes(p.t))
+    if (seen) return
     this.recordPromise(p)
   }
   private alignPromise(p: Promise3, until: string, condition?: PromiseCondition): Promise3 {
@@ -1917,11 +1920,12 @@ export class Game {
       if (!arc || m[memkeys.legendArc] === arc) { delete m[memkeys.legendId]; delete m[memkeys.legendArc] }
       return
     }
+    const prev = m[memkeys.legendId]
     if (arc) m[memkeys.legendOf(arc)] = id
     m[memkeys.legendId] = id
     m[memkeys.legendDay] = this.S.day
-    // серия завела легенду — её срок звучит сразу (новость); дальше гейт закрыт на LEGEND_VOW_GAP сообщений (#179)
-    m[memkeys.legendPromiseAt] = this.S.stats.sent - LEGEND_VOW_GAP
+    // гейт клятвы — только при новой или сменившейся легенде; проходная серия ту же не открывает (#246)
+    if (prev !== id) m[memkeys.legendPromiseAt] = this.S.stats.sent - LEGEND_VOW_GAP
     if (arc) m[memkeys.legendArc] = arc
   }
   /** Текущая легенда (если не устарела). */
