@@ -4,7 +4,7 @@ import { makeGame } from '../test/helpers'
 import { spec } from './fact'
 import { OATH_FORMS } from './misc'
 import { WORLD, meet } from './world'
-import { alikShaved } from './memkeys'
+import { alikShaved, endgame, nuneKeyPassed } from './memkeys'
 import { D } from './excuses'
 import type { Entry } from './fact'
 
@@ -16,6 +16,7 @@ const oathOpen = (g: ReturnType<typeof makeGame>['game']) =>
   g.lines.eligible('OATH_FORMS', OATH_FORMS, g.lineFacts()).some((p) => p.id === 'oath_stake_moustache')
 const oathUsamiOpen = (g: ReturnType<typeof makeGame>['game']) =>
   g.lines.eligible('OATH', D.OATH as Entry<string>[], g.lineFacts()).some((p) => /своими усами/.test(p.text))
+const stakeForm = () => OATH_FORMS.map(spec).find((s) => s.id === 'oath_stake_moustache')!
 
 describe('ставка «усы»', () => {
   it('сорванный срок: фото без усов, alik.shaved, ачивка; клятвы усами молчат', async () => {
@@ -29,6 +30,7 @@ describe('ставка «усы»', () => {
     expect((await game.fire('PromiseDue', { promise: 0 }))?.name).toBe('Due_StakeShave')
     expect(sys(game, from)).toContain('Алик Воздухонесян сменил фото профиля. На фото — Алик без усов.')
     expect(alik(game, from).join(' ').toLowerCase()).toContain('ус')
+    expect(alik(game, from).some((t) => /, С[А-Я]/.test(t))).toBe(false)
     expect(game.S.mem[alikShaved]).toBe(true)
     expect(game.S.ach.shaved).toBeDefined()
     expect(game.holds(WORLD.moustache)).toBe(false)
@@ -84,21 +86,83 @@ describe('ставка «усы»', () => {
   it('форма клятвы пишет stake и молчит без усов / в эндгейме', () => {
     const { game } = makeGame()
     game.rules.applyOps(meet('karine'), {})
-    const form = OATH_FORMS.map(spec).find((s) => s.id === 'oath_stake_moustache')!
-    expect(form.t).toMatch(/сбрею усы/)
+    expect(stakeForm().t).toMatch(/сбрею усы/)
     expect(oathOpen(game)).toBe(true)
     game.S.mem[alikShaved] = true
     expect(oathOpen(game)).toBe(false)
     delete game.S.mem[alikShaved]
-    game.S.mem['endgame.active'] = true
+    game.S.mem[endgame.active] = true
     expect(oathOpen(game)).toBe(false)
   })
 
-  it('негатив: без гейта moustache форма осталась бы открыта после бритья', () => {
+  it('легенда + форма ставки пишет stake (#307)', async () => {
     const { game } = makeGame()
     game.rules.applyOps(meet('karine'), {})
+    game.setLegend('safe_baby', 'nune')
+    const pick = game.linePicked.bind(game)
+    game.linePicked = (key, pool, o) => {
+      if (key === 'OATH_FORMS') {
+        const s = stakeForm()
+        return { text: s.t, spec: s, id: s.id ?? 'oath_stake_moustache' }
+      }
+      return pick(key, pool, o)
+    }
+    await game.promiseLine(undefined, true)
+    const last = game.S.promises.at(-1)!
+    expect(last.stake).toBe('moustache')
+    expect(last.condition).toBe(nuneKeyPassed)
+    expect(last.t).toMatch(/как ключ выйдет/)
+  })
+
+  it('срок «сегодня» планирует PromiseDue (#307)', () => {
+    const { game } = makeGame()
+    const day = game.S.day
+    game.recordPromise({ text: 'сегодня вечером', d: 0, stake: 'moustache' })
+    expect(game.S.promises[0].due).toBe(day)
+    expect(game.S.rules.schedule.some((s) => s.kind === 'event' && s.event === 'PromiseDue' && s.at === day)).toBe(true)
+  })
+
+  it('событийный срок: условие без денег брит усы (#307)', async () => {
+    const { game } = makeGame()
+    game.rules.applyOps(meet('karine'), {})
+    game.S.mood = 3
+    game.recordPromise({ text: 'как ключ выйдет', d: null, condition: nuneKeyPassed, stake: 'moustache' })
+    game.S.mem[nuneKeyPassed] = true
+    game.S.promises[0].met = game.S.day
+    const from = game.S.msgs.length
+    expect((await game.fire('PromiseConditionMet', { promise: 0 }))?.name).toBe('Condition_StakeShave')
+    expect(sys(game, from)).toContain('Алик Воздухонесян сменил фото профиля. На фото — Алик без усов.')
+    expect(game.S.mem[alikShaved]).toBe(true)
+  })
+
+  it('уже сбритые усы: StakeKept/Shave молчат (#307)', async () => {
+    const { game } = makeGame()
+    game.S.mood = 3
     game.S.mem[alikShaved] = true
-    expect(oathOpen(game)).toBe(false)
+    game.recordPromise({ text: 'завтра', d: 1, stake: 'moustache' })
+    game.S.day += 1
+    const from = game.S.msgs.length
+    expect((await game.fire('PromiseDue', { promise: 0 }))?.name).not.toBe('Due_StakeShave')
+    expect(sys(game, from)).toEqual([])
+  })
+
+  it('в эндгейме ставка не исполняется (#307)', async () => {
+    const { game } = makeGame()
+    game.S.mood = 3
+    game.recordPromise({ text: 'завтра', d: 1, stake: 'moustache' })
+    game.S.day += 1
+    game.S.mem[endgame.active] = true
+    expect((await game.fire('PromiseDue', { promise: 0 }))?.name).not.toBe('Due_StakeShave')
+    expect(game.S.mem[alikShaved]).toBeUndefined()
+  })
+
+  it('NC: клятвы усами закрыты без WORLD.moustache', () => {
+    const { game } = makeGame()
+    game.rules.applyOps(meet('karine'), {})
+    expect(oathUsamiOpen(game)).toBe(true)
+    game.S.mem[alikShaved] = true
     expect(game.holds(WORLD.moustache)).toBe(false)
+    expect(oathUsamiOpen(game)).toBe(false)
+    expect(oathOpen(game)).toBe(false)
   })
 })

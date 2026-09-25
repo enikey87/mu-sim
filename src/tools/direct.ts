@@ -4,7 +4,7 @@
 import type { Game } from '../engine/game'
 import type { Facts } from '../engine/rules'
 import { during } from '../engine/rules'
-import { HEAT } from '../content/memkeys'
+import { HEAT, nuneKeyPassed } from '../content/memkeys'
 
 export type DirectCase = { event: string; facts?: Facts; target?: string; setup?: (g: Game) => void }
 
@@ -206,5 +206,23 @@ export const DIRECT: Record<string, DirectCase> = {
   Due_StakeKept: {
     event: 'PromiseDue', facts: { promise: 0 },
     setup: (g) => { g.S.mood = 9; g.recordPromise({ text: 'завтра — всё', d: 1, stake: 'moustache' }); g.S.day += 1 },
+  },
+  Condition_StakeShave: {
+    event: 'PromiseConditionMet', facts: { promise: 0 },
+    setup: (g) => {
+      g.S.mood = 3
+      g.recordPromise({ text: 'как ключ выйдет', d: null, condition: nuneKeyPassed, stake: 'moustache' })
+      g.S.mem[nuneKeyPassed] = true
+      g.S.promises[0].met = g.S.day
+    },
+  },
+  Condition_StakeKept: {
+    event: 'PromiseConditionMet', facts: { promise: 0 },
+    setup: (g) => {
+      g.S.mood = 9
+      g.recordPromise({ text: 'как ключ выйдет', d: null, condition: nuneKeyPassed, stake: 'moustache' })
+      g.S.mem[nuneKeyPassed] = true
+      g.S.promises[0].met = g.S.day
+    },
   },
 }
