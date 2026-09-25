@@ -1246,7 +1246,7 @@ export class Game {
       // начатая линия коллекторов идёт своим битом, но той же нормой: не больше серии в день (#324)
       collectorsCanAdvance: this.arcCanAdvance('collectors') && !Object.values(S.arcs).some((a) => a.last === S.day),
       arcsStarted: Object.keys(S.arcs).length,
-      arcsDone: Object.entries(S.arcs).filter(([id, a]) => a.i >= ARCS[id].eps.length).length,
+      arcsDone: Object.entries(S.arcs).filter(([id, a]) => !ARCS[id].mechanic && a.i >= ARCS[id].eps.length).length,
       quests: Object.keys(S.ach).filter((k) => k.startsWith('q_')).length,
       callbackReady: !!this.callbackCandidate(),
       arcUnfinished: this.unfinishedArc(),
