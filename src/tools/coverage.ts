@@ -1,24 +1,22 @@
 // Отчёт покрытия правил: симуляция N партий → какие правила срабатывают, какие никогда,
 // и в каких событиях чаще всего побеждает общий ответ (там не хватает частного контента).
 //
-// Гейт покрытия смотрит на объединение нескольких непересекающихся выборок: правило достижимо,
-// если сработало хотя бы в одной. Одна выборка путает недостижимость с невезением розыгрыша.
+// Гейт покрытия (#278): правило достижимо, если сработало хотя бы раз в объединении больших выборок; правило
+// основной игры — хотя бы раз в выборках «до концовки». Не срабатывает — прямой случай в direct.ts или удалить.
+// Верхней полосы, снимка и списков «почти всегда» нет: правка текста не делает правило «слишком частым».
 import { Game } from '../engine/game'
 import { manualClock } from '../engine/clock'
 import { seededRng } from '../engine/rng'
 import { specificityOf, lineId, spec } from '../engine/rules'
 import { MEMORY } from '../content/memory'
-import { RARE } from './rare'
-import { PROVEN } from './proven'
+import type { Rule } from '../engine/rules'
+import { endgame } from '../content/memkeys'
+import { DIRECT } from './direct'
 import { botTurn } from './bot'
+import { requiresKey } from './playtest'
 
-/**
- * Почему правило не сработало в симуляции.
- * `rare` — RARE: стенд доходит не каждый раз, прямой случай в rare.test.ts.
- * `proven` — PROVEN: стенд не доходит никогда, прямой случай в proven.test.ts.
- * Больше нет освобождения по имени модуля или префиксу.
- */
-export type NeverClass = 'rare' | 'proven' | 'unexplained'
+/** Почему правило не сработало в симуляции: `direct` — у него прямой случай (direct.ts), иначе гейт падает. */
+export type NeverClass = 'direct' | 'unexplained'
 
 /**
  * Выборка гейта: `full` — партия до конца (после выплаты бот живёт в эндгейме), `main` — до экрана концовки,
@@ -39,13 +37,11 @@ export const COVERAGE_SAMPLES: SampleSpec[] = [
   { kind: 'main', seeds: seeds(1201, 24), turns: 500, grumpy: 3 },
 ]
 
-export const neverClass = (name: string): NeverClass =>
-  RARE.has(name) ? 'rare' : PROVEN.has(name) ? 'proven' : 'unexplained'
+export const neverClass = (name: string): NeverClass => (name in DIRECT ? 'direct' : 'unexplained')
 
 /** Где именно правило проверяется, если симуляция до него не доходит. */
 const NEVER_HINT: Record<NeverClass, string> = {
-  rare: 'прямой тест: content/rules/rare.test.ts',
-  proven: 'прямой тест: tools/proven.test.ts',
+  direct: 'прямой тест: tools/direct.test.ts',
   unexplained: 'НЕ ОБЪЯСНЕНО — гейт покрытия обязан падать',
 }
 
@@ -79,43 +75,24 @@ export function neverInAllSamples(sampleNevers: string[][]): string[] {
   return sampleNevers[0].filter((name) => rest.every((s) => s.has(name)))
 }
 
+/** Правило эндгейма: его условие требует `endgame.active` — до экрана концовки оно не может сработать. */
+export const endgameOnly = (r: Pick<Rule<unknown>, 'when'>): boolean => (r.when ?? []).some((c) => requiresKey(c, endgame.active))
+
 /**
- * Полоса исключений — по живым выборкам CI, снимка нет (#269: правимый руками снимок подделывался, перемер двигал
- * границу). Мера — партии, где правило сработало: одна партия даёт пачку срабатываний, и сумма гуляет от правки
- * текста в разы, число партий — нет. Исключение красное от COMMON_GAMES партий из 120 (каждая шестая); ниже — полоса,
- * где список не мигает, снимать оттуда решает автор (`rules:stable` — второе мнение).
+ * Нарушения гейта: правило без прямого случая, которое ни разу не сработало — в выборках «до концовки», если это
+ * правило основной игры (эндгейм не прячет его пропажу), или во всех выборках, если это правило эндгейма.
  */
-export const COMMON_GAMES = 20
-
-const gamesOf = (samples: ReadonlyArray<Pick<SampleReport, 'games'>>, name: string): number =>
-  samples.reduce((n, s) => n + (s.games[name] ?? 0), 0)
-
-const counts = (samples: ReadonlyArray<Pick<SampleReport, 'kind' | 'games'>>, name: string): string =>
-  (['full', 'main'] as const)
-    .map((k) => `${k} ${samples.filter((s) => s.kind === k).map((s) => s.games[name] ?? 0).join('/')}`)
-    .join(' · ')
-
-export function exemptionIssues(
-  samples: ReadonlyArray<Pick<SampleReport, 'kind' | 'games'>>,
-  rare: ReadonlySet<string>,
-  proven: ReadonlySet<string>,
-  names: readonly string[],
+export function gateIssues(
+  samples: ReadonlyArray<Pick<SampleReport, 'kind' | 'fired'>>,
+  rules: ReadonlyArray<Pick<Rule<unknown>, 'name' | 'when'>>,
+  direct: Readonly<Record<string, unknown>> = DIRECT,
 ): string[] {
-  const issues: string[] = []
-  const known = new Set(names)
-  for (const [list, set] of [['RARE', rare], ['PROVEN', proven]] as const) {
-    for (const n of set) {
-      if (!known.has(n)) { issues.push(`${n}: в ${list}, а такого правила нет`); continue }
-      const g = gamesOf(samples, n)
-      if (g >= COMMON_GAMES) issues.push(`${n}: в ${list}, а стенд доходит в ${g} партиях (${counts(samples, n)}) — снять`)
-    }
-  }
-  return issues
-}
-
-/** Правила под гейтом, которые держатся на одной партии: не красное, но повод для RARE до того, как гейт мигнёт. */
-export function fragile(samples: ReadonlyArray<Pick<SampleReport, 'games'>>, names: readonly string[]): string[] {
-  return names.filter((n) => !RARE.has(n) && !PROVEN.has(n) && gamesOf(samples, n) === 1)
+  const hit = (name: string, kinds: readonly SampleKind[]) => samples.some((s) => kinds.includes(s.kind) && (s.fired[name] ?? 0) > 0)
+  return rules.filter((r) => !(r.name in direct)).flatMap((r) => {
+    const late = endgameOnly(r)
+    if (hit(r.name, late ? ['full', 'main'] : ['main'])) return []
+    return [`${r.name}: ${late ? 'правило эндгейма ни разу не сработало' : 'ни разу до экрана концовки'} — прямой случай в direct.ts или удалить`]
+  })
 }
 
 /**
@@ -184,10 +161,10 @@ export function formatCoverage(r: CoverageReport): string {
   const lines = [`Ходов: ${r.turns}`, '', 'Событие                доля общих ответов   выборов']
   for (const [e, v] of Object.entries(r.events).sort((a, b) => b[1].total - a[1].total))
     lines.push(`${e.padEnd(22)} ${(r.weighted.includes(e) ? '— (по весам)' : Math.round((v.generic / v.total) * 100) + '%').padStart(12)}   ${String(v.total).padStart(8)}`)
-  const groups: Record<NeverClass, string[]> = { rare: [], proven: [], unexplained: [] }
+  const groups: Record<NeverClass, string[]> = { direct: [], unexplained: [] }
   for (const n of r.never) groups[neverClass(n)].push(n)
-  lines.push('', `Ни разу не сработали (${r.never.length}): редкие ${groups.rare.length} · proven ${groups.proven.length} · необъяснённые ${groups.unexplained.length}`)
-  for (const cls of ['unexplained', 'rare', 'proven'] as NeverClass[]) {
+  lines.push('', `Ни разу не сработали (${r.never.length}): с прямым случаем ${groups.direct.length} · необъяснённые ${groups.unexplained.length}`)
+  for (const cls of ['unexplained', 'direct'] as NeverClass[]) {
     if (!groups[cls].length) continue
     lines.push(`  ${cls} — ${NEVER_HINT[cls]}:`, ...groups[cls].map((n) => '    ' + n))
   }
