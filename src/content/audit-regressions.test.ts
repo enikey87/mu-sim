@@ -40,7 +40,7 @@ describe('регрессии первоначального аудита', () =>
     const before = game.S.msgs.length
     await game.excuseTurn()
     const text = game.S.msgs.slice(before).flatMap((m) => m.kind === 'text' ? [m.text] : []).join(' ')
-    expect(text).toContain(LEGENDS.grant.until)
+    expect(text).toContain(LEGENDS.grant.until.t)
   })
 
   it('непрочитанные отмазки тоже остаются внутри активной легенды', async () => {
@@ -52,7 +52,7 @@ describe('регрессии первоначального аудита', () =>
       await game.awayBurst(1, 0)
       if (game.S.promises.length === promises) continue
       const message = game.S.msgs.at(-1)
-      expect(message).toMatchObject({ kind: 'text', text: expect.stringContaining(LEGENDS.grant.until) })
+      expect(message).toMatchObject({ kind: 'text', text: expect.stringContaining(LEGENDS.grant.until.t) })
       promiseSeen = true
     }
     expect(promiseSeen).toBe(true)

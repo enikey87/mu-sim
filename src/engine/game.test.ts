@@ -720,7 +720,7 @@ describe('Game: мелочи', () => {
     const { game } = makeGame()
     const m = game.push({ kind: 'text', from: 'alik', text: 'В среду утром — всё отдам.' })
     game.recordPromise({ text: 'в среду утром — всё отдам', d: 3 })
-    await game.editLast(m, { text: 'в среду утром — всё отдам', t: 'в среду утром', d: 3 })
+    await game.editLast(m, { text: 'в среду утром — всё отдам', t: 'в среду утром', d: 3, kind: 'clear' })
     const edited = game.S.msgs.find((x) => x.id === m.id)
     expect(edited?.kind === 'text' && edited.edited).toBe(true)
     expect(edited?.kind === 'text' && edited.text).not.toMatch(/среду утром/)

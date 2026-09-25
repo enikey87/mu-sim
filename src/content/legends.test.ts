@@ -13,7 +13,7 @@ describe('легенда денег', () => {
   it('каждая легенда из серий существует, у каждой есть срок и реплики', () => {
     for (const [id, a] of Object.entries(ARCS)) for (const ep of a.eps) if (ep.legend) expect(LEGENDS[ep.legend], `${id}: ${ep.legend}`).toBeDefined()
     for (const [id, l] of Object.entries(LEGENDS)) {
-      expect(l.until.length, id).toBeGreaterThan(5)
+      expect(l.until.t.length, id).toBeGreaterThan(5)
       expect(l.lines.length, id).toBeGreaterThan(0)
       expect(lintLines('LEG_' + id, l.lines)).toEqual([])
     }
@@ -50,7 +50,7 @@ describe('легенда денег', () => {
   it('срок легенды звучит не чаще, чем раз в 8 сообщений игрока (#179)', async () => {
     const { game } = makeGame({ seed: 5 })
     game.setLegend('safe_baby', 'nune')
-    const until = LEGENDS.safe_baby.until
+    const until = LEGENDS.safe_baby.until.t
     const at: number[] = []
     for (let i = 0; i < 120; i++) {
       game.S.stats.sent += 1
@@ -69,10 +69,10 @@ describe('легенда денег', () => {
     game.S.day += 3 // легенда не сегодняшняя: обязательной клятвы нет
     let n = game.S.msgs.length
     await game.excuseTurn()
-    expect(vows(game, LEGENDS.safe_baby.until)).toBe(1) // перерыв прошёл — клятва
+    expect(vows(game, LEGENDS.safe_baby.until.t)).toBe(1) // перерыв прошёл — клятва
     n = game.S.msgs.length
     await game.excuseTurn()
-    expect(vows(game, LEGENDS.safe_baby.until)).toBe(1) // пауза: второй клятвы нет
+    expect(vows(game, LEGENDS.safe_baby.until.t)).toBe(1) // пауза: второй клятвы нет
     expect(texts(game, n).length).toBeGreaterThan(0) // но отмазка жива
   })
 
@@ -92,7 +92,7 @@ describe('легенда денег', () => {
       if (!said.some((t) => LEGENDS.safe_baby.lines.map((l) => spec(l).t).includes(t))) { game.S.scene = null; continue }
       lines++
       // сразу после строки легенды клятвы быть не должно: пауза не прошла
-      expect(said.filter((t) => t.includes(LEGENDS.safe_baby.until))).toEqual([])
+      expect(said.filter((t) => t.includes(LEGENDS.safe_baby.until.t))).toEqual([])
       game.S.scene = null
     }
     expect(lines).toBeGreaterThan(1)
@@ -105,14 +105,14 @@ describe('легенда денег', () => {
     await game.excuseTurn() // клятва — дальше пауза
     const n = game.S.msgs.length
     await game.awayMsg('excuse')
-    expect(game.S.msgs.slice(n).filter((m) => m.kind === 'text' && m.text.includes(LEGENDS.safe_baby.until))).toEqual([])
+    expect(game.S.msgs.slice(n).filter((m) => m.kind === 'text' && m.text.includes(LEGENDS.safe_baby.until.t))).toEqual([])
     expect(game.S.msgs.length).toBeGreaterThan(n) // пачка не молчит
   })
 
   it('повторный срок легенды звучит, но в журнал второй раз не пишется (#179)', async () => {
     const { game } = makeGame()
     game.setLegend('safe_baby', 'nune')
-    const until = LEGENDS.safe_baby.until
+    const until = LEGENDS.safe_baby.until.t
     const inJournal = () => game.S.promises.filter((p) => p.t.includes(until)).length
     game.S.stats.sent += 100
     await game.excuseTurn()
@@ -126,7 +126,7 @@ describe('легенда денег', () => {
   it('проходная серия ту же легенду гейт клятвы не открывает (#246)', async () => {
     const { game } = makeGame()
     await game.playArc('samvel') // ep0: wedding + обязательная клятва
-    const until = LEGENDS.wedding.until
+    const until = LEGENDS.wedding.until.t
     expect(vows(game, until)).toBe(1)
     const at = game.S.mem.legendPromiseAt
     await game.playArc('samvel') // ep1: без своей легенды — возвращает wedding
@@ -153,9 +153,9 @@ describe('легенда денег', () => {
     for (const [id, spec] of Object.entries(LEGENDS)) {
       const { game } = makeGame({ seed: 1 })
       game.setLegend(id, 'nune')
-      const until = spec.until
+      const until = spec.until.t
       const inJournal = () => game.S.promises.filter((p) =>
-        spec.condition ? p.condition === spec.condition : p.t.includes(until)).length
+        spec.until.condition ? p.condition === spec.until.condition : p.t.includes(until)).length
       game.S.stats.sent += 100
       await game.excuseTurn()
       expect(inJournal(), id).toBe(1)
@@ -223,7 +223,7 @@ describe('легенда денег', () => {
   it('у каждой легенды срок — факт или дни, либо она названа «никогда» с причиной (#327)', () => {
     for (const id of Object.keys(NEVER)) expect(LEGENDS[id], `NEVER: нет легенды ${id}`).toBeDefined()
     for (const [id, l] of Object.entries(LEGENDS)) {
-      const term = l.condition !== undefined || l.days !== undefined
+      const term = l.until.condition !== undefined || l.until.d !== null
       expect(term, `${id}: нет ни condition, ни days, и в NEVER её нет`).toBe(!(id in NEVER))
       if (id in NEVER) expect(NEVER[id].length, id).toBeGreaterThan(10)
     }
@@ -264,15 +264,15 @@ describe('легенда денег', () => {
   ])('срок легенды %s наступает, когда сериал %s доигран (#327)', async (id, arc) => {
     const { game } = makeGame()
     const l = LEGENDS[id]
-    expect(l.condition, id).toBeDefined()
-    game.recordPromise({ text: l.until, d: null, condition: l.condition })
+    expect(l.until.condition, id).toBeDefined()
+    game.recordPromise({ text: l.until.t, d: null, condition: l.until.condition })
     expect(game.S.promises[0].met).toBeUndefined()
     for (let i = 0; i < ARCS[arc].eps.length; i++) {
       game.nextDay(40) // отложенные факты (свадьба — через дни) успевают наступить
       await game.playArc(arc)
     }
     game.nextDay(40)
-    expect(game.S.mem[l.condition!], `${id}: ${l.condition} после серий ${arc}`).toBeTruthy()
+    expect(game.S.mem[l.until.condition!], `${id}: ${l.until.condition} после серий ${arc}`).toBeTruthy()
     await game.afterTurn()
     expect(game.S.promises[0].met, `${id}: событие срока`).toBeDefined()
   })
@@ -284,7 +284,7 @@ describe('легенда денег', () => {
   ])('проходная серия при чередовании сериалов гейт клятвы не открывает: %s (#327)', async (_name, between) => {
     const { game } = makeGame()
     await game.playArc('samvel') // ep0: wedding + обязательная клятва
-    const until = LEGENDS.wedding.until
+    const until = LEGENDS.wedding.until.t
     expect(vows(game, until)).toBe(1)
     game.S.stats.sent += 1
     await between(game)
