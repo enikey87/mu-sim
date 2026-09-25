@@ -862,6 +862,7 @@ export class Game {
     if (this.disposed) throw new GameDisposed()
     const msg = { ...m, id: this.S.nextId++ } as Msg
     if ((msg.kind === 'text' || msg.kind === 'sys') && msg.text.includes('{')) msg.text = this.fillMoney(msg.text)
+    this.quietHeader()
     this.S.msgs.push(msg)
     this.touchMsgs(this.S.msgs.length - 1)
     this.emit()
@@ -903,7 +904,7 @@ export class Game {
   async typingFor(ms: number, label = 'печатает…'): Promise<void> {
     ms = Math.min(5000, Math.max(800, ms)) * (this.isNight() ? 1.5 : 1)
     // в блоке / «смерти» / у Карине шапка не врёт «печатает…» → «в сети» (#257)
-    if (this.alikSilent()) { await this.sleep(ms); return }
+    if (this.alikSilent()) { this.quietHeader(); this.emit(); await this.sleep(ms); return }
     const show = () => { this.ui.typing = label; this.ui.status = { text: label, cls: 'typing' }; this.emit() }
     const hide = () => { this.ui.typing = null; this.ui.status = { text: 'в сети', cls: 'online' }; this.emit() }
     show()
@@ -957,6 +958,13 @@ export class Game {
   alikSilent(): boolean {
     const m = this.S.mem
     return !!(m[memkeys.blocked] || m[memkeys.alikDead] || m[memkeys.phoneKarine] || this.S.offlineDays > 0)
+  }
+  /** Молчание могло начаться посреди хода (блок, «смерть»): шапка не остаётся «прочитано»/«в сети» до его конца (#308). */
+  private quietHeader(): void {
+    if (!this.alikSilent()) return
+    const text = this.S.offlineDays > 0 ? 'был давно' : 'не в сети'
+    this.ui.typing = null
+    if (this.ui.status.text !== text) this.ui.status = { text, cls: '' }
   }
   restStatus(): void {
     if (this.S.offlineDays > 0) {

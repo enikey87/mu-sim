@@ -160,3 +160,80 @@ describe('статус Алика живёт миром', () => {
     }
   })
 })
+
+// #308: шапка честна с первого хода молчания и в простое по таймеру
+const ONLINE = new Set(['в сети', 'печатает…', 'прочитано', 'был недавно'])
+/** Шапка, с которой игрок видит каждое сообщение Алика или родни, пришедшее, когда Алик уже не на связи. */
+function watchLies(g: Game): string[] {
+  const lies: string[] = []
+  const push = g.push.bind(g)
+  g.push = ((m: Parameters<Game['push']>[0]) => {
+    const msg = push(m)
+    const text = g.ui.status?.text ?? ''
+    if ('from' in m && m.from === 'alik' && g.alikSilent() && ONLINE.has(text)) lies.push(`${text}: ${'text' in m ? m.text : m.kind}`)
+    return msg
+  }) as Game['push']
+  return lies
+}
+
+describe('шапка с первого хода молчания (#308)', () => {
+  it('блок посреди хода: сообщения после блока — под «не в сети», а не «прочитано»', async () => {
+    let blocked = 0
+    for (let seed = 1; seed <= 10; seed++) {
+      const { game } = makeGame({ seed })
+      const lies = watchLies(game)
+      await rage(game)
+      if (game.S.mem.blocked) blocked++
+      expect(lies, `seed ${seed}`).toEqual([])
+    }
+    expect(blocked, 'блок ни разу не наступил — проверка пуста').toBeGreaterThan(5)
+  })
+  it('«смерть» серией: сообщения после неё — под «не в сети»', async () => {
+    let died = 0
+    for (let seed = 1; seed <= 10; seed++) {
+      const { game } = makeGame({ seed })
+      const lies = watchLies(game)
+      for (let i = 0; i < 12 && !game.S.mem.alik_dead; i++) await game.playArc('alik_death')
+      if (game.S.mem.alik_dead) died++
+      for (let i = 0; i < 3; i++) await turn(game)
+      expect(lies, `seed ${seed}`).toEqual([])
+    }
+    expect(died, '«смерть» ни разу не наступила — проверка пуста').toBeGreaterThan(5)
+  })
+  it('сообщение мимо «печатает…» (стикер) после блока — тоже под «не в сети»', () => {
+    const { game } = makeGame()
+    game.setStatus('прочитано')
+    game.S.mem.blocked = true
+    const lies = watchLies(game)
+    game.alikMsg({ kind: 'sticker', from: 'alik', e: '🐏', c: 'бее' })
+    expect(lies).toEqual([])
+    expect(game.ui.status?.text).toBe('не в сети')
+  })
+  it('пауза «печати» после блока: шапка «не в сети» уже в паузе, а не с приходом сообщения', async () => {
+    const { game } = makeGame()
+    game.setStatus('прочитано')
+    game.S.mem.blocked = true
+    const pause = game.typingFor(1000)
+    expect(game.ui.status?.text).toBe('не в сети')
+    await pause
+  })
+  it('простой по таймеру в молчании: шапка не оживает (armStatus)', async () => {
+    const { flush } = await import('../test/helpers')
+    const run = async (setup: (g: Game) => void) => {
+      const { game, clock } = makeGame({ noTimers: false })
+      setup(game)
+      const seen: string[] = []
+      const emit = game.emit.bind(game)
+      game.emit = () => { emit(); seen.push(game.ui.status?.text ?? '') }
+      for (let i = 0; i < 40; i++) { clock.runTimers(); await flush() }
+      return seen
+    }
+    // без молчания таймер правда двигает шапку — иначе проверка ниже пуста
+    expect((await run(() => {})).some((t) => ONLINE.has(t))).toBe(true)
+    for (const key of ['blocked', 'alik_dead', 'phone.karine'] as const) {
+      const seen = await run((g) => { g.S.mem[key] = true })
+      expect(seen.length, key).toBeGreaterThan(0)
+      expect(seen.filter((t) => ONLINE.has(t)), key).toEqual([])
+    }
+  })
+})
