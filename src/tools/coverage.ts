@@ -14,26 +14,38 @@ import { botTurn } from './bot'
 
 /**
  * Почему правило не сработало в симуляции.
- * `rare` — RARE (прямой случай в rare.test.ts; членство — по широкому замеру).
- * `proven` — явное доказательство вне статистики (прямой тест или структурная недостижимость).
+ * `rare` — RARE: стенд доходит не каждый раз, прямой случай в rare.test.ts.
+ * `proven` — PROVEN: стенд не доходит никогда, прямой случай в proven.test.ts.
  * Больше нет освобождения по имени модуля или префиксу.
  */
 export type NeverClass = 'rare' | 'proven' | 'unexplained'
 
-/** Три непересекающихся пакета сидов: по одной выборке не отличить покрытие от удачи траектории. */
-export const COVERAGE_SAMPLES: number[][] = [
-  Array.from({ length: 16 }, (_, i) => i + 1),
-  Array.from({ length: 16 }, (_, i) => i + 101),
-  Array.from({ length: 16 }, (_, i) => i + 201),
+/**
+ * Выборка гейта: `full` — партия до конца (после выплаты бот живёт в эндгейме), `main` — до экрана концовки,
+ * иначе правилам основной игры не хватает ходов (#269). Сиды родов не пересекаются: партия до выплаты та же.
+ */
+export interface SampleSpec { kind: 'full' | 'main'; seeds: number[]; turns: number; grumpy: number }
+export type SampleKind = SampleSpec['kind']
+
+const seeds = (from: number, n: number): number[] => Array.from({ length: n }, (_, i) => from + i)
+
+/** Три полные и три «до концовки» выборки: по одной не отличить покрытие от удачи траектории. */
+export const COVERAGE_SAMPLES: SampleSpec[] = [
+  { kind: 'full', seeds: seeds(1, 16), turns: 500, grumpy: 2 },
+  { kind: 'full', seeds: seeds(101, 16), turns: 500, grumpy: 2 },
+  { kind: 'full', seeds: seeds(201, 16), turns: 500, grumpy: 2 },
+  { kind: 'main', seeds: seeds(1001, 24), turns: 500, grumpy: 3 },
+  { kind: 'main', seeds: seeds(1101, 24), turns: 500, grumpy: 3 },
+  { kind: 'main', seeds: seeds(1201, 24), turns: 500, grumpy: 3 },
 ]
 
 export const neverClass = (name: string): NeverClass =>
-  RARE.has(name) ? 'rare' : name in PROVEN ? 'proven' : 'unexplained'
+  RARE.has(name) ? 'rare' : PROVEN.has(name) ? 'proven' : 'unexplained'
 
 /** Где именно правило проверяется, если симуляция до него не доходит. */
 const NEVER_HINT: Record<NeverClass, string> = {
   rare: 'прямой тест: content/rules/rare.test.ts',
-  proven: 'доказательство: tools/proven.ts → указанный тест / structural',
+  proven: 'прямой тест: tools/proven.test.ts',
   unexplained: 'НЕ ОБЪЯСНЕНО — гейт покрытия обязан падать',
 }
 
@@ -43,6 +55,8 @@ export interface CoverageReport {
   weighted: string[]
   /** Сколько раз правило было выбрано (match) или попало в выбранные (collect). */
   fired: Record<string, number>
+  /** В скольких партиях правило сработало хоть раз: одна партия даёт пачку срабатываний, партии — нет. */
+  games: Record<string, number>
   never: string[]
   /** Реплики памяти, которые ни разу не прозвучали (условие не наступило или пул не дошёл). */
   unsaid: string[]
@@ -50,8 +64,10 @@ export interface CoverageReport {
   events: Record<string, { total: number; generic: number }>
 }
 
+export interface SampleReport extends CoverageReport { kind: SampleKind }
+
 export interface MultiCoverage {
-  samples: CoverageReport[]
+  samples: SampleReport[]
   /** Ни разу ни в одной выборке — настоящая недостижимость для гейта. */
   never: string[]
 }
@@ -64,92 +80,54 @@ export function neverInAllSamples(sampleNevers: string[][]): string[] {
 }
 
 /**
- * Широкий замер (tools/coverage-measure.json, пишет `npm run rules:stable`): по правилу — срабатывания в каждом
- * из пакетов по 16 партий. Решает, кому место в исключениях гейта, — вместо трёх выборок самого гейта, где
- * граница «редкое / нет» мигала от любой правки текста.
+ * Полоса исключений — по живым выборкам CI, снимка нет (#269: правимый руками снимок подделывался, перемер двигал
+ * границу). Мера — партии, где правило сработало: одна партия даёт пачку срабатываний, и сумма гуляет от правки
+ * текста в разы, число партий — нет. Исключение красное от COMMON_GAMES партий из 120 (каждая шестая); ниже — полоса,
+ * где список не мигает, снимать оттуда решает автор (`rules:stable` — второе мнение).
  */
-export interface Measure { packs: number[][]; rules: Record<string, number[]> }
-/** Доля пакетов, где правило не сработало ни разу. */
-export const zeroShare = (v: readonly number[]): number => v.filter((x) => x === 0).length / v.length
-/**
- * Граница исключений с гистерезисом (z — доля пакетов замера, где правило молчит). Единственное место порога
- * (#208): документ и тесты читают отсюда. Исключение (RARE / PROVEN) допустимо, только если стенд молчит хоть
- * в одном пакете (z ≥ allowed: «достигает не всегда»), и обязательно при z ≥ required. Между ними — решает
- * автор: иначе правило на границе мигало бы от одного перемера к другому. Правка текста без `rules:stable`
- * списки не трогает — граница держится на закоммиченном снимке, а не на трёх выборках CI.
- */
-export const RARE_ZERO_SHARE = { allowed: 0.1, required: 0.3 } as const
+export const COMMON_GAMES = 20
 
-/** Расхождения исключений с замером: исключение, которое стенд достигает почти всегда; редкое правило без исключения; пропуски. */
-export function exemptionIssues(m: Measure, exempt: ReadonlySet<string>, names: readonly string[]): string[] {
-  const issues: string[] = []
-  const known = new Set(names)
-  for (const n of Object.keys(m.rules)) if (!known.has(n)) issues.push(`${n}: в замере, но такого правила нет — перемерить (npm run rules:stable)`)
-  for (const n of exempt) {
-    const v = m.rules[n]
-    if (!v) issues.push(`${n}: исключение без замера — перемерить (npm run rules:stable)`)
-    else if (zeroShare(v) < RARE_ZERO_SHARE.allowed) {
-      // устаревший снимок после чужого PR тоже даёт z=0 — сначала перемерить, не «снять» (#208 / аудит #170)
-      issues.push(`${n}: исключение, а стенд доходит всегда (${v.join('/')}) — снять или перемерить (npm run rules:stable)`)
-    } else if (
-      // полоса гистерезиса без нуля в пакетах CI: один ноль в пакете 5+ превращает всегда-достижимое в «исключение» (#230)
-      zeroShare(v) < RARE_ZERO_SHARE.required
-      && v.length >= COVERAGE_SAMPLES.length
-      && v.slice(0, COVERAGE_SAMPLES.length).every((x) => x > 0)
-    ) {
-      issues.push(`${n}: исключение в полосе гистерезиса без нуля в пакетах CI (${v.join('/')}) — снять или перемерить (npm run rules:stable)`)
-    }
-  }
-  for (const [n, v] of Object.entries(m.rules)) if (known.has(n) && !exempt.has(n) && zeroShare(v) >= RARE_ZERO_SHARE.required) issues.push(`${n}: редкое (${v.join('/')}) и без исключения — гейт будет мигать; в RARE с прямым случаем`)
-  return issues
-}
+const gamesOf = (samples: ReadonlyArray<Pick<SampleReport, 'games'>>, name: string): number =>
+  samples.reduce((n, s) => n + (s.games[name] ?? 0), 0)
 
-/** Первые пакеты снимка — те же сиды, что у гейта CI; иначе сверка с замером смотрит мимо прогона. */
-export function measurePackIssues(m: Measure): string[] {
-  const issues: string[] = []
-  if (m.packs.length < COVERAGE_SAMPLES.length) {
-    issues.push(`снимок: пакетов ${m.packs.length}, нужно ≥${COVERAGE_SAMPLES.length} — перемерить (npm run rules:stable)`)
-    return issues
-  }
-  for (let i = 0; i < COVERAGE_SAMPLES.length; i++) {
-    if (JSON.stringify(m.packs[i]) !== JSON.stringify(COVERAGE_SAMPLES[i])) {
-      issues.push(`снимок: пакет ${i} ≠ COVERAGE_SAMPLES — перемерить (npm run rules:stable)`)
-    }
-  }
-  return issues
-}
+const counts = (samples: ReadonlyArray<Pick<SampleReport, 'kind' | 'games'>>, name: string): string =>
+  (['full', 'main'] as const)
+    .map((k) => `${k} ${samples.filter((s) => s.kind === k).map((s) => s.games[name] ?? 0).join('/')}`)
+    .join(' · ')
 
-/**
- * Подделка / устаревание снимка по колонкам CI: в JSON ноль, а живой гейт на тех же сидах правило видел
- * во **всех** выборках CI (не в одной — иначе правка текста, сдвигающая розыгрыш, даёт ложные «подделки», #230).
- * Пакеты 3+ этой сверкой не ловятся: их нули для полосы гистерезиса режет `exemptionIssues` (нужен ноль в CI).
- *
- * Сторож **не** стоит на пути гейта CI (#208, #230): там сверка идёт со снимком, а живой дрейф редких правил
- * между замерами не краснеет — иначе каждая правка текста требовала бы перемера. Вызов с живыми выборками —
- * в unit-случае; кому этого мало, тот ставит его в `tools.test.ts` и платит перемерами (#198).
- */
-export function measureCiForgeIssues(
-  m: Measure,
-  live: ReadonlyArray<{ fired: Record<string, number> }>,
+export function exemptionIssues(
+  samples: ReadonlyArray<Pick<SampleReport, 'kind' | 'games'>>,
+  rare: ReadonlySet<string>,
+  proven: ReadonlySet<string>,
+  names: readonly string[],
 ): string[] {
   const issues: string[] = []
-  const nPacks = Math.min(COVERAGE_SAMPLES.length, live.length, m.packs.length)
-  for (const [n, v] of Object.entries(m.rules)) {
-    const alwaysLive = live.length >= nPacks && live.slice(0, nPacks).every((s) => (s.fired[n] ?? 0) > 0)
-    if (!alwaysLive) continue
-    for (let i = 0; i < nPacks; i++) {
-      const snap = v[i] ?? 0
-      if (snap === 0) {
-        issues.push(`${n}: снимок пакета ${i} = 0, гейт видел во всех выборках CI — перемерить (npm run rules:stable)`)
-      }
+  const known = new Set(names)
+  for (const [list, set] of [['RARE', rare], ['PROVEN', proven]] as const) {
+    for (const n of set) {
+      if (!known.has(n)) { issues.push(`${n}: в ${list}, а такого правила нет`); continue }
+      const g = gamesOf(samples, n)
+      if (g >= COMMON_GAMES) issues.push(`${n}: в ${list}, а стенд доходит в ${g} партиях (${counts(samples, n)}) — снять`)
     }
   }
   return issues
 }
 
-/** grumpy — номера партий (с конца), где бот много грубит: иначе лестница грубости не проходится. */
-export async function ruleCoverage(seeds: number[], turns: number, hours = [14, 3, 20, 8, 20, 13, 9], grumpy = 0, opts: { freeText?: number } = {}): Promise<CoverageReport> {
+/** Правила под гейтом, которые держатся на одной партии: не красное, но повод для RARE до того, как гейт мигнёт. */
+export function fragile(samples: ReadonlyArray<Pick<SampleReport, 'games'>>, names: readonly string[]): string[] {
+  return names.filter((n) => !RARE.has(n) && !PROVEN.has(n) && gamesOf(samples, n) === 1)
+}
+
+/**
+ * grumpy — номера партий (с конца), где бот много грубит: иначе лестница грубости не проходится.
+ * untilEnding — партия кончается на первом экране концовки (выборка `main`).
+ */
+export async function ruleCoverage(
+  seeds: number[], turns: number, hours = [14, 3, 20, 8, 20, 13, 9], grumpy = 0,
+  opts: { freeText?: number; untilEnding?: boolean } = {},
+): Promise<CoverageReport> {
   const fired: Record<string, number> = {}
+  const games: Record<string, number> = {}
   const events: CoverageReport['events'] = {}
   let total = 0
   let names: string[] = []
@@ -164,10 +142,12 @@ export async function ruleCoverage(seeds: number[], turns: number, hours = [14, 
     const minSpec: Record<string, number> = {}
     for (const r of game.rules.all) minSpec[r.event] = Math.min(minSpec[r.event] ?? Infinity, specificityOf(r))
     const specOf = Object.fromEntries(game.rules.all.map((r) => [r.name, specificityOf(r)]))
+    const seen = new Set<string>()
     game.rules.tracer = (t) => {
       const e = (events[t.event] ??= { total: 0, generic: 0 })
       for (const n of t.chosen) {
         fired[n] = (fired[n] ?? 0) + 1
+        seen.add(n)
         e.total++
         if (specOf[n] === minSpec[t.event]) e.generic++
       }
@@ -177,22 +157,25 @@ export async function ruleCoverage(seeds: number[], turns: number, hours = [14, 
       // события «игрок молчит» бот сам не вызывает — дёргаем их иногда
       if (k % 7 === 0 && !game.ui.busy && !game.battery.dead) await game.fire('AlikIdle')
       total++
+      if (opts.untilEnding && game.S.ending) break
     }
     for (const id of Object.keys(game.S.rules.said)) said.add(id)
+    for (const n of seen) games[n] = (games[n] ?? 0) + 1
   }
   const unsaid = MEMORY.map(spec).filter((l) => !said.has(l.id ?? lineId('MEMORY', l.t))).map((l) => l.t)
-  return { turns: total, weighted, fired, never: names.filter((n) => !fired[n]), events, unsaid }
+  return { turns: total, weighted, fired, games, never: names.filter((n) => !fired[n]), events, unsaid }
 }
 
-/** Несколько выборок → достижимость по объединению, RARE — по пересечению «никогда». */
+/** Несколько выборок → достижимость по объединению. */
 export async function multiSampleCoverage(
   samples = COVERAGE_SAMPLES,
-  turns = 500,
-  grumpy = 2,
   opts: { freeText?: number } = { freeText: 0.15 },
 ): Promise<MultiCoverage> {
-  const reports: CoverageReport[] = []
-  for (const seeds of samples) reports.push(await ruleCoverage(seeds, turns, undefined, grumpy, opts))
+  const reports: SampleReport[] = []
+  for (const s of samples) {
+    const r = await ruleCoverage(s.seeds, s.turns, undefined, s.grumpy, { ...opts, untilEnding: s.kind === 'main' })
+    reports.push({ ...r, kind: s.kind })
+  }
   const never = neverInAllSamples(reports.map((r) => r.never))
   return { samples: reports, never }
 }
