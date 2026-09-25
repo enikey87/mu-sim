@@ -216,4 +216,13 @@ export const DIRECT: Record<string, DirectCase> = {
       g.S.promises[0].met = g.S.day
     },
   },
+  Condition_StakeKept: {
+    event: 'PromiseConditionMet', facts: { promise: 0 },
+    setup: (g) => {
+      g.S.mood = 9
+      g.recordPromise({ text: 'как ключ выйдет', d: null, condition: nuneKeyPassed, stake: 'moustache' })
+      g.S.mem[nuneKeyPassed] = true
+      g.S.promises[0].met = g.S.day
+    },
+  },
 }
