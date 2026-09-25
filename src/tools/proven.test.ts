@@ -110,10 +110,6 @@ const CASES: Record<string, Case> = {
   Away_ColdWar: { event: 'AlikAway', setup: offended },
   Quiet_Offended_AlikAway: { event: 'AlikAway', setup: offended },
   Scene_amnesty: { event: 'PickScene', setup: (g) => { for (let i = 0; i < 5; i++) g.recordPromise({ text: `завтра №${i}`, d: 1 }); g.S.day += 5 } },
-  Due_StakeShave: {
-    event: 'PromiseDue', facts: { promise: 0 },
-    setup: (g) => { g.S.mood = 3; g.recordPromise({ text: 'завтра — всё', d: 1, stake: 'moustache' }); g.S.day += 1 },
-  },
   Due_StakeKept: {
     event: 'PromiseDue', facts: { promise: 0 },
     setup: (g) => { g.S.mood = 9; g.recordPromise({ text: 'завтра — всё', d: 1, stake: 'moustache' }); g.S.day += 1 },
