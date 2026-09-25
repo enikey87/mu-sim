@@ -7,7 +7,8 @@ import { AlikOffline } from './criteria'
 import { IDLE } from '../life'
 import { MEMORY } from '../memory'
 import { LEGENDS } from '../legends'
-import { count, endgame, payday, polite, thanksAt, vendetta } from '../memkeys'
+import { count, creditBroke, endgame, payday, polite, thanksAt, vendetta } from '../memkeys'
+
 import { GREET, GREET_MORNING, GREET_NIGHT, THANKS } from '../misc'
 
 type R = Rule<Game, GameEvent, Offer>
@@ -49,6 +50,16 @@ export const toneRules: R[] = [
 // Событие StoryBeat — после хода игрока, даже если он спорил, кричал или отвечал на контекст:
 // сюжет не ждёт «обычного» хода. Первый сериал — в первые ходы; изредка — мини-квест.
 export const storyRules: R[] = [
+  // «нечем платить» → коллекторы; не ждём случайного nextArc (#128)
+  {
+    name: 'Beat_Collectors', event: 'StoryBeat',
+    when: [is(creditBroke), missing(endgame.active)],
+    once: true, bonus: 10, priority: 'cinematic',
+    respond: async ({ game }) => {
+      if (game.S.arcs.collectors) return false
+      await game.playArc('collectors')
+    },
+  },
   { name: 'Beat_FirstArc', event: 'StoryBeat', when: [gte('sent', 3), lte('arcsStarted', 0), is('arcAvailable')], odds: 0.5, priority: 'chatter', respond: async ({ game }) => { const id = game.nextArc(); if (id) await game.playArc(id) } },
   // идущие сериалы продолжаются и между «обычными» ходами — не реже серии в ~8 ходов
   { name: 'Beat_Arc', event: 'StoryBeat', when: [gte('arcsStarted', 1), is('arcAvailable')], specificity: 0, odds: 0.14, cooldown: { turns: 4 }, priority: 'chatter', respond: async ({ game }) => { const id = game.nextArc(); if (id) await game.playArc(id) } },

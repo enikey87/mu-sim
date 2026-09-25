@@ -119,6 +119,8 @@ export const momDone = 'mom.done'
 export const creditDeclined = 'credit.declined'
 /** Первое дно: до Дня выплаты уровень не возвращается в «норму» (#279 / docs/design/money.md). */
 export const moneyPoor = 'money.poor'
+/** Коллекторы остались на объекте Алика — микрозайм с игрока больше не требуют (#128). */
+export const collectorsRecruited = 'collectors.recruited'
 
 /** Ключи досок персонажей (S.actors), не мира. */
 export const sick = 'sick'
@@ -147,6 +149,6 @@ export const MEM_KEYS: ReadonlySet<string> = new Set([
   garikConcrete, garikCut, houseOnGarik, borisMarried, borisSmetaReady, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday,
   lightOff, netRation, phoneWarn, holidayGreeted,
-  creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor,
+  creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited,
   ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lend50), ...Object.values(lie),
 ])

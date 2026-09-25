@@ -1,7 +1,7 @@
 // Тексты для новых возможностей системы правил: обещания, которые наступают, хор персонажей,
 // состояния мира со сроком (свадьба, болезнь Бориса, «Алик умер»).
 import { type Criterion, type Entry, named, exists, is, eq, gte, ne, missing, set, gate } from './fact'
-import { cryptoHodl, garikConcrete, garikCut, grandpaDying, grantPaid, intro, met, mourning, nivaAway, nivaPlayer, nuneDekretOver, payday, saidFriday, saidTomorrow, alikShaved, wedding } from './memkeys'
+import { cryptoHodl, garikConcrete, garikCut, grandpaDying, grantPaid, intro, met, mourning, nivaAway, nivaPlayer, nuneDekretOver, payday, saidFriday, saidTomorrow, alikShaved, wedding, collectorsRecruited } from './memkeys'
 import type { WhoId } from './ids'
 
 // Мир последователен: кто и что есть в истории и в каком оно положении — факты, их ставит серия (remember), ступень суда
@@ -77,6 +77,10 @@ export const WORLD = {
   nivaPlayer: named('nivaPlayer', is(nivaPlayer)),
   /** Игрок оставил деньги в «Лаваш-коине», и его ещё не продали в День выплаты. */
   lavashHeld: named('lavashHeld', is(cryptoHodl), missing(payday.chain)),
+  /** Коллекторы вошли в историю (написали сами). */
+  collectors: named('collectors', is(intro('collectors'))),
+  /** Алик перевербовал коллекторов — микрозайм с игрока не требуют (#128). */
+  collectorsRecruited: named('collectorsRecruited', is(collectorsRecruited)),
 }
 export type WorldKey = keyof typeof WORLD
 export const needs = (...keys: WorldKey[]) => gate(...keys.map((k) => WORLD[k]))
@@ -87,6 +91,7 @@ export const SPEAKS: Record<string, Criterion> = {
   boris: WORLD.borisWrites, arsen: WORLD.arsen, razmik: WORLD.razmik, rubik: WORLD.rubik,
   karine: WORLD.karineSpeaks, garik: WORLD.garikKnown,
   samvel: WORLD.samvel, nune: WORLD.nune, mkrtich: WORLD.mkrtich, grant: WORLD.grant,
+  collectors: WORLD.collectors,
 }
 
 // --- обещание наступило: Алик пишет сам, до игрока ({t} — текст обещания)
@@ -140,6 +145,7 @@ export const MENTION_RE: Record<string, RegExp> = {
   grant: /Грант|заказчик/i,
   razmik: /Размик/,
   rubik: /Рубик/,
+  collectors: /Коллектор/i,
 }
 export const CHORUS: Record<string, Entry<string>[]> = {
   garik: [needs('garikFree')('Я вообще-то рядом стою. Алик, скажи ему правду.'), 'Алик, опять ты про меня? Я даже не знаю, о чём речь.', needs('garikFree')('Привет. Я ничего не брал. Если что — я на свадьбе.'), 'Брат, не верь ему про меня. Верь про других.'],
@@ -151,6 +157,11 @@ export const CHORUS: Record<string, Entry<string>[]> = {
   grant: [gate(is(grantPaid))('Алик, опять вы про меня? Я вам всё заплатил.'), 'Молодой человек, не верьте ему, я плачу исправно.', gate(is(grantPaid))('Меня нет. Это автоответчик. Всё оплачено.')],
   razmik: ['Брат, не верь ему. Я ему тоже верил. Сорок метров верил.', 'Кто меня звал? Если про деньги — я первый в очереди. По высоте.', 'Плиточник, держись. Кто на кране не сидел — тот Алика не знает.'],
   rubik: ['Молодой человек, я всё записываю. Вы теперь тоже в протоколе.', 'Инспекция не спит. Инспекция в ванной, но не спит.', 'Слишком ровно пишете, молодой человек. Подозрительно.'],
+  collectors: [
+    needs('collectorsRecruited')('Мы теперь у Алика. Раствор — наш процент.'),
+    needs('collectorsRecruited')('Не верьте «Деньги-Ара». Верьте вертикали. Мы на объекте.'),
+    needs('collectorsRecruited')('Плиточник? Мы свои. Долги месим вместе с раствором.'),
+  ],
 }
 // упомянули много раз — персонажу надоело (по порядку, как нарастание)
 export const CHORUS_FED_UP: Record<string, string[]> = {
