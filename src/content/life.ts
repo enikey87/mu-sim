@@ -2,6 +2,7 @@ import { type Entry, type LineSpec, gate, gte, lte, eq, ne, is, missing, set } f
 import { needs, WORLD } from './world'
 import { bloodGiven, count, endgame, evicted, wedding } from './memkeys'
 import { sold, momHelp } from './credit'
+import { billStreak } from './bills'
 
 const newYear = gate(eq('holiday', 'newYear'), missing(endgame.active))
 // 8 Марта: поздравление в сам день (08–09.03), а 06–07.03 — про подготовку: «С 8 Марта» накануне неправда
@@ -26,7 +27,7 @@ export const PERIOD: Record<string, Entry<string>[]> = {
   morning: ['я ещё кофе не пил.', 'только проснулся.', 'еду на объект, пробки.', 'утро, я добрый, но бедный.', 'умываюсь, одной рукой пишу.'],
   lunch: ['я на обеде, коротко.', 'ем хаш, руки жирные, пишу носом.', 'обед — святое, но тебе отвечу.', needs('garikFree')(needs('garik')('в шашлычной у Гарика, шумно.'))],
   friday: ['ара, тут застолье, плохо слышу…', 'пятница, брат! Тост за тебя!', needs('samvel')(needs('samvel')('мы тут сидим, Самвел поёт.')), 'пятница, не пиши про деньги, грех.', 'застолье не отпускает.'],
-  evening: [gate(missing(wedding('samvel')))('я дома, с семьёй.'), gate(missing(wedding('samvel')))('смотрю футбол, в перерыве отвечаю.'), needs('gagik')('нарды с Гагиком, мой ход.'), 'вечер, устал, ноги гудят.'],
+  evening: [gate(missing(wedding('samvel')), missing(wedding('anush')))('я дома, с семьёй.'), gate(missing(wedding('samvel')), missing(wedding('anush')))('смотрю футбол, в перерыве отвечаю.'), needs('gagik')('нарды с Гагиком, мой ход.'), 'вечер, устал, ноги гудят.'],
 };
 
 // автозамена: [правильное, как написалось]
@@ -134,7 +135,8 @@ export const NOTIF: Notif[] = [
   { icon: '🏦', app: 'Банк', t: 'Кредит одобрен! 94% годовых. Поздравляем!', when: [gte('credit.stage', 1)] },
   { icon: '📞', app: 'Коллекторы', t: 'Мы знаем, где живёт ваш Алик. Он нам тоже должен. Давайте дружить.' },
   { icon: '👩', app: 'Мама', t: 'Сынок, я продала дачу, чтобы ты дождался Алика.', when: [is(momHelp('dacha'))] },
-  { icon: '🏠', app: 'Хозяин квартиры', t: 'Выселяю. Можешь пожить у Алика, он же тебе как отец.', when: [gte('day', 250)], remember: [set(evicted, true)] },
+  // три неоплаты коммуналки подряд — хозяин выселяет; оплата сбрасывает полосу (#301)
+  { icon: '🏠', app: 'Хозяин квартиры', t: 'Выселяю. Можешь пожить у Алика, он же тебе как отец.', when: [missing(evicted), gte(billStreak('rent'), 3)], remember: [set(evicted, true)] },
   { icon: '🩸', app: 'Донорский центр', t: 'Спасибо, что пришли сдать кровь! Вы наш герой. Приходите ещё.', when: [is(bloodGiven)] },
   // память о проданном: иначе две несвязанные микроволновки
   { icon: '🍽', app: 'Соседка', t: 'Микроволновку вашу грею. Спасибо, что продали.', when: [is(sold('microwave'))] },

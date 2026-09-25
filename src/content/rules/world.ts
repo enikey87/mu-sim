@@ -141,7 +141,7 @@ const noise = (key: string, arr: readonly Entry<string>[]) => async ({ game }: {
   await game.say([game.uniq(() => game.draw(key, arr))])
 }
 /** Факт у каждой свадьбы свой: два срока на одном ключе откатывали бы друг друга. */
-const weddingNoise = (who: import('../ids').CastId): R => ({
+const weddingNoise = (who: import('../factkeys').WeddingId): R => ({
   name: `Turn_Wedding_${who.charAt(0).toUpperCase()}${who.slice(1)}`, event: 'AlikTurn', when: [is(`wedding.${who}`)],
   specificity: 0, weight: 12, cooldown: { turns: 3 }, respond: noise('WEDDING', WEDDING_NOISE),
 })
@@ -152,7 +152,7 @@ async function deadTurn(game: Game): Promise<void> {
   else await game.say([game.uniq(() => game.draw('DEAD_A', DEAD_ALIK))])
 }
 export const stateRules: R[] = [
-  weddingNoise('boris'), weddingNoise('samvel'), weddingNoise('razmik'),
+  weddingNoise('boris'), weddingNoise('samvel'), weddingNoise('razmik'), weddingNoise('anush'),
   { name: 'Turn_BorisSick', event: 'AlikTurn', when: [of('boris', is(sick))], specificity: 0, weight: 10, cooldown: { turns: 3 }, respond: noise('BORIS_SICK', BORIS_SICK) },
   // «умер» — значит, умер: ни болтовни простоя, ни сюжетных ходов, ни «доброе утро»; на слова игрока — Карине / «с того света»
   // ход Алика по другим путям (после сцены, после пропажи) — тоже «умер»

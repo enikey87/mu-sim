@@ -56,6 +56,7 @@ export const DIRECT: Record<string, DirectCase> = {
   Turn_Wedding_Samvel: { event: 'AlikTurn', setup: (g) => { g.S.mem['wedding.samvel'] = true } },
   Turn_Wedding_Razmik: { event: 'AlikTurn', setup: (g) => { g.S.mem['wedding.razmik'] = true } },
   Turn_Wedding_Boris: { event: 'AlikTurn', setup: (g) => { g.S.mem['wedding.boris'] = true } },
+  Turn_Wedding_Anush: { event: 'AlikTurn', setup: (g) => { g.S.mem['wedding.anush'] = true } },
   Chorus_garik_FedUp: { event: 'Mentioned', target: 'garik', setup: (g) => { g.S.mem['intro.garik'] = true; g.S.actors.garik = { interjections: 3 } } },
   // частные финалы — условия как у игрока (finales.test.ts SETUP)
   Finale_beton_opened: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem['count.rude'] = 6; g.S.mem['rude.heat'] = 2 } },

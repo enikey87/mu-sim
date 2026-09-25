@@ -8,7 +8,7 @@ const texts = (g: Game, n = 0) => g.S.msgs.slice(n).flatMap((m) => (m.kind === '
 const choose = async (g: Game, go: string) => { g.S.choices = null; const c = g.choices.find((x) => x.go === go); expect(c, go).toBeDefined(); await g.send(c!) }
 const rich = (g: Game) => {
   g.S.day = 340
-  Object.assign(g.S.mem, { 'finale.nune': 'default', 'finale.niva': 'chose', 'finale.boris': 'brigadir', 'met.samvel': true, 'met.karine': true, 'met.boris': true })
+  Object.assign(g.S.mem, { 'finale.nune': 'default', 'finale.niva': 'chose', 'finale.boris': 'brigadir', 'met.samvel': true, 'met.karine': true, 'met.boris': true, 'intro.niva': true, 'niva.player': true })
   Object.assign(g.S.arcs, { nune: { i: 6, last: 0 }, niva: { i: 7, last: 0 }, boris: { i: 10, last: 0 } })
   Object.assign(g.S.ach, { q_goat: 1, court: 1, q_hash: 1 })
 }

@@ -100,6 +100,7 @@ describe('зеркало', () => {
     nivaAway(game)
     expect(game.mirrors().some((m) => /Нива/.test(m.me))).toBe(true)
     game.S.mem['niva.away'] = false // как remember финала chose
+    game.S.mem['niva.player'] = true
     game.S.items.push('«Нива» (сама приехала)')
     expect(game.mirrors().some((m) => /Нива/.test(m.me))).toBe(false)
   })
