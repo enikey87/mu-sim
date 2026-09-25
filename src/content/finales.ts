@@ -22,7 +22,7 @@ export interface Finale extends Episode {
 export const DEFAULT_FINALE: Record<string, string> = {
   boris: 'Налоговая', beton: 'Неотделимое улучшение', samvel: 'Снова женится', niva: 'Не ищи', nune: 'Второй декрет',
   grant: 'Близнец', alik_death: 'Жив, к сожалению', garik: 'Не хочет вылезать', tile: 'Квиты', grandpa: 'Шаурмичная',
-  rubik: 'Он из налоговой', razmik: 'Ты первый',
+  rubik: 'Он из налоговой', razmik: 'Ты первый', collectors: 'На объекте',
 }
 
 export const FINALES: Record<string, Finale[]> = {
