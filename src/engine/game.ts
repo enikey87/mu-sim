@@ -486,6 +486,12 @@ export class Game {
     if (this.moneySealed()) return false
     if (delta === 0) return true
     if (delta < 0 && -delta > this.S.money) return false
+    // после первого дна до выплаты приход не поднимает выше «мало»: кредит/продажа — передышка, не богатство (#299)
+    if (delta > 0 && this.S.mem[memkeys.moneyPoor]) {
+      const room = Math.max(0, Game.MONEY_LOW - this.S.money)
+      if (room === 0) return true
+      delta = Math.min(delta, room)
+    }
     const before = this.moneyLevel()
     setCount(this.S, 'money', Math.max(0, countOf(this.S, 'money') + delta))
     if (this.S.money <= Game.MONEY_BOTTOM) this.S.mem[memkeys.moneyPoor] = true
