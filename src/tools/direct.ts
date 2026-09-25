@@ -1,16 +1,32 @@
-// Правила из списка RARE (tools/rare.ts) статистический гейт сторожить не может —
-// здесь каждое вызывается напрямую. Новое правило в списке = новая строка здесь; иначе гейт
-// молча перестаёт его проверять.
-import { describe, it, expect } from 'vitest'
-import { makeGame, setMoney } from '../../test/helpers'
-import type { Game } from '../../engine/game'
-import type { Facts } from '../../engine/rules'
-import { during } from '../../engine/rules'
-import { RARE } from '../../tools/rare'
-import { HEAT } from '../memkeys'
+// Прямые случаи гейта покрытия (#278): правило, до которого бот в выборках не доходит или доходит не всегда,
+// запускается здесь напрямую — direct.test.ts краснеет, если его сломать. Гейт (tools.test.ts) освобождает только
+// правила из этого списка; убрал случай — правило снова под гейтом, и недостижимое краснеет.
+import type { Game } from '../engine/game'
+import type { Facts } from '../engine/rules'
+import { during } from '../engine/rules'
+import { HEAT } from '../content/memkeys'
 
-type Case = { event: string; facts?: Facts; target?: string; setup?: (g: Game) => void }
-const CASES: Record<string, Case> = {
+export type DirectCase = { event: string; facts?: Facts; target?: string; setup?: (g: Game) => void }
+
+const endgame = (g: Game) => {
+  g.S.mem.payday = 'default'
+  g.S.ending = 'payday_default'
+  g.S.endings.payday_default = g.S.day
+  g.closeEnding()
+}
+/** Экран концовки выплаты открыт, эндгейм ещё не начат — окно Quiet_PaydayOpen_* (#190). */
+const paydayOpen = (g: Game) => {
+  g.S.mem.payday = 'default'
+  g.S.ending = 'payday_default'
+  g.S.endings.payday_default = g.S.day
+}
+
+const phone = (g: Game) => { g.rules.applyOps([during('phone.karine', 1)], {}) }
+const dead = (g: Game) => { g.S.mem.alik_dead = true }
+const blocked = (g: Game) => { g.S.mem.blocked = true }
+const offended = (g: Game) => { g.S.mem[HEAT] = 1; g.S.ctx = { offended: true } }
+
+export const DIRECT: Record<string, DirectCase> = {
   Due_Cosmic: { event: 'PromiseDue', facts: { promise: 0 }, setup: (g) => { g.S.tier = 3; g.recordPromise({ text: 'в пятницу — закину', d: 5 }); g.S.day += 5 } },
   Due_Kept: { event: 'PromiseDue', facts: { promise: 0 }, setup: (g) => { g.S.mood = 9; g.recordPromise({ text: 'в пятницу — закину', d: 5 }); g.S.day += 5 } },
   Tone_Cow: { event: 'PlayerMessage', facts: { tone: 'cow' } },
@@ -91,7 +107,7 @@ const CASES: Record<string, Case> = {
       g.S.mem['intro.garik'] = true
     },
   },
-  // бывшие PROVEN, до которых стенд доходит почти всегда (#133): под гейтом, случай — страховка
+  // стенд доходит почти всегда (#133), но случай освобождает от гейта: его it держит правило сам
   Quiet_Dead_AlikIdle: { event: 'AlikIdle', setup: (g) => { g.S.mem.alik_dead = true } },
   Quiet_Dead_StoryBeat: { event: 'StoryBeat', setup: (g) => { g.S.mem.alik_dead = true } },
   Quiet_Blocked_StoryBeat: { event: 'StoryBeat', setup: (g) => { g.S.mem.blocked = true } },
@@ -100,10 +116,10 @@ const CASES: Record<string, Case> = {
   Idle_PhoneWarn: { event: 'AlikIdle', setup: (g) => { g.S.mem['phone.warn'] = true } },
   Bill_Warn: { event: 'BillWarn', facts: { bill: 'phone' } },
   Bill_Due: { event: 'BillDue', facts: { bill: 'phone' } },
-  Credit_Due: { event: 'CreditDue', facts: { credit: 'consumer' }, setup: (g) => { g.S.mem['credit.consumer.taken'] = true; setMoney(g, 50000) } },
+  Credit_Due: { event: 'CreditDue', facts: { credit: 'consumer' }, setup: (g) => { g.S.mem['credit.consumer.taken'] = true; g.adjustMoney(50000, 'Случай гейта') } },
   Payday_coins: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['payday.caught'] = true } },
   Ending_payday_coins: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'coins' } },
-  // бывшие PROVEN (#269): стенд доходит не в каждой выборке; наследство деда уходит Борису — он уже в партии
+  // стенд доходит не в каждой выборке (#269); наследство деда уходит Борису — он уже в партии
   Ending_payday_notyou: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'notyou' } },
   Ending_payday_strasbourg: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'strasbourg' } },
   Finale_beton_ledger: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem.caught = 2 } },
@@ -136,30 +152,59 @@ const CASES: Record<string, Case> = {
   Quiet_PhoneKarine_AlikIdle: { event: 'AlikIdle', setup: (g) => { g.rules.applyOps([during('phone.karine', 1)], {}) } },
   Quiet_PhoneKarine_StoryBeat: { event: 'StoryBeat', setup: (g) => { g.rules.applyOps([during('phone.karine', 1)], {}) } },
   Says_sorry_blocked_boris: { event: 'PlayerSays', facts: { intent: 'sorry' }, setup: (g) => { g.S.mem.blocked = true; g.S.arcs.boris = { i: 4, last: 0 } } },
+  // стенд не доходит никогда: окна, которые бот не открывает сам (свободный «спасибо», вендетта, телефон Карине…)
+  Quiet_Dead_PeriodLine: { event: 'PeriodLine', setup: dead },
+  Quiet_Blocked_PeriodLine: { event: 'PeriodLine', setup: blocked },
+  Quiet_PhoneKarine_AlikAway: { event: 'AlikAway', setup: phone },
+  Quiet_PhoneKarine_PeriodLine: { event: 'PeriodLine', setup: phone },
+  Quiet_PhoneKarine_PromiseDue: { event: 'PromiseDue', facts: { promise: 0 }, setup: (g) => { phone(g); g.recordPromise({ text: 'в пятницу', d: 1 }); g.S.day += 1 } },
+  Phone_Karine_AlikTurn: { event: 'AlikTurn', setup: phone },
+  Phone_Karine_PlayerSays: { event: 'PlayerSays', facts: { intent: 'photo' }, setup: phone },
+  Turn_Blocked: { event: 'AlikTurn', setup: blocked },
+  Turn_Vendetta: { event: 'AlikTurn', setup: (g) => { g.S.mem.vendetta = true } },
+  Rude_Vendetta: {
+    event: 'PlayerMessage', facts: { tone: 'rude' },
+    setup: (g) => { g.S.mem[HEAT] = 5; g.S.mem['count.rude'] = 25; g.S.mem['count.sorry'] = 0 },
+  },
+  Says_sorry_blocked: {
+    event: 'PlayerSays', facts: { intent: 'sorry' },
+    setup: (g) => { blocked(g); g.S.mem['finale.rubik'] = 'karine' },
+  },
+  Finale_boris_brigadir: { event: 'ArcFinale', facts: { arc: 'boris' }, setup: (g) => { g.S.mem['asked.boris'] = 6 } },
+  Finale_samvel_groom: { event: 'ArcFinale', facts: { arc: 'samvel' }, setup: (g) => { g.S.ach.saint = 1 } },
+  Finale_niva_chose_or: { event: 'ArcFinale', facts: { arc: 'niva' }, setup: (g) => { g.S.mem['asked.niva'] = 5 } },
+  Finale_alik_death_sulk: { event: 'ArcFinale', facts: { arc: 'alik_death' }, setup: () => {} },
+  Ending_family: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem['finale.samvel'] = 'groom' } },
+  Ending_honest: {
+    event: 'CheckEnding',
+    setup: (g) => {
+      g.S.day = 300
+      g.S.mem['finale.boris'] = 'brigadir'
+      g.S.mem['finale.grant'] = 'ally'
+      g.S.mem['finale.niva'] = 'chose'
+    },
+  },
+  Ending_vendetta: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem.vendetta = true } },
+  Ending_payday_real: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'real' } },
+  Ending_payday_niva: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'niva' } },
+  Tone_Thanks: { event: 'PlayerMessage', facts: { tone: 'polite', category: 'gratitude' } },
+  Tone_Greeting: { event: 'PlayerMessage', facts: { tone: 'polite', category: 'greeting' } },
+  Payday_real: {
+    event: 'PaydayOutcome',
+    setup: (g) => {
+      Object.assign(g.S.ach, { saint: 1, court: 1, q_hash: 1, q_goat: 1, q_niva: 1, q_mama: 1, q_photo: 1 })
+      g.S.mem.caught = 3
+    },
+  },
+  Payday_niva: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['finale.niva'] = 'chose' } },
+  Endgame_Turn: { event: 'AlikTurn', setup: endgame },
+  Quiet_PaydayOpen_AlikAway: { event: 'AlikAway', setup: paydayOpen },
+  Quiet_PaydayOpen_PeriodLine: { event: 'PeriodLine', setup: paydayOpen },
+  Quiet_PaydayOpen_StoryBeat: { event: 'StoryBeat', setup: paydayOpen },
+  Away_ColdWar: { event: 'AlikAway', setup: offended },
+  Quiet_Offended_AlikAway: { event: 'AlikAway', setup: offended },
+  Due_StakeKept: {
+    event: 'PromiseDue', facts: { promise: 0 },
+    setup: (g) => { g.S.mood = 9; g.recordPromise({ text: 'завтра — всё', d: 1, stake: 'moustache' }); g.S.day += 1 },
+  },
 }
-
-/** Срабатывает ли правило (у многих есть шанс — пробуем на разных сидах). */
-function fires(name: string, c: Case): boolean {
-  for (let seed = 1; seed <= 40; seed++) {
-    const { game } = makeGame({ seed })
-    c.setup?.(game)
-    if (c.event === 'BuildChoices') {
-      if (game.rules.collect({ event: c.event }, game.facts()).some((r) => r.name === name)) return true
-      continue
-    }
-    const r = game.rules.match({ event: c.event, target: c.target, facts: c.facts ?? {} }, game.facts(c.facts ?? {}))
-    if (r?.name === name) return true
-  }
-  return false
-}
-
-describe('редкие правила — детерминированно', () => {
-  it('каждый случай срабатывает', () => {
-    for (const [name, c] of Object.entries(CASES)) expect(fires(name, c), name).toBe(true)
-  })
-  // Кейсы и списки не связаны: правило, которое симуляция уверенно покрывает, уходит из списка,
-  // но прямой случай остаётся страховкой, пока его кто-то не удалит осознанно.
-  it('у каждой записи RARE есть случай', () => {
-    expect([...RARE].filter((name) => !CASES[name])).toEqual([])
-  })
-})

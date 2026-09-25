@@ -3,11 +3,10 @@ import { describe, it, expect } from 'vitest'
 import { lintRules, type Rule } from '../engine/rules'
 import { allRules } from '../content/rules'
 import { isFactKey } from '../content/factkeys'
-import {
-  multiSampleCoverage, formatCoverage, neverClass, neverInAllSamples, exemptionIssues, fragile, COMMON_GAMES, COVERAGE_SAMPLES,
-} from './coverage'
-import { PROVEN } from './proven'
-import { RARE } from './rare'
+import { multiSampleCoverage, formatCoverage, neverClass, neverInAllSamples, gateIssues, endgameOnly, COVERAGE_SAMPLES } from './coverage'
+import { DIRECT } from './direct'
+import { is } from '../content/fact'
+import { endgame } from '../content/memkeys'
 
 describe('линтер правил', () => {
   it('в игре нет правил, которые никогда не могут победить, и правил без ответа', () => {
@@ -25,39 +24,33 @@ describe('линтер правил', () => {
   })
 })
 
-describe('полоса исключений — по живым выборкам', () => {
-  it('недостижимость — только пересечение never по выборкам', () => {
-    // правило выпало из одной выборки (шум) — гейт молчит; из всех — падает
+describe('гейт покрытия: сработало хоть раз (#278)', () => {
+  it('недостижимость в отчёте — пересечение never по выборкам', () => {
     expect(neverInAllSamples([['A', 'B'], ['B', 'C'], ['B']])).toEqual(['B'])
     expect(neverInAllSamples([['A'], ['B'], ['C']])).toEqual([])
   })
-  const live = (full: Record<string, number>[], main: Record<string, number>[]) => [
-    ...full.map((games) => ({ kind: 'full' as const, games })), ...main.map((games) => ({ kind: 'main' as const, games })),
-  ]
-  const names = ['Often', 'Rare', 'Gone', 'MainOnly']
-  // партии, в которых правило сработало: Often — 22 из 120, MainOnly — 20 (только main), Rare — 4, Gone — 0
-  const samples = live(
-    [{ Often: 5, Rare: 1 }, { Often: 3, Rare: 0 }, { Often: 4, Rare: 2 }],
-    [{ Often: 4, MainOnly: 7 }, { Often: 3, Rare: 1, MainOnly: 6 }, { Often: 3, MainOnly: 7 }],
-  )
-  it('исключение красное от COMMON_GAMES партий, а не от суммы срабатываний', () => {
-    expect(COMMON_GAMES).toBe(20)
-    expect(exemptionIssues(samples, new Set(['Often', 'Rare', 'Gone']), new Set(['MainOnly']), names)).toEqual([
-      expect.stringMatching(/^Often: в RARE, а стенд доходит в 22 партиях \(full 5\/3\/4 · main 4\/3\/3\)/),
-      expect.stringMatching(/^MainOnly: в PROVEN, а стенд доходит в 20 партиях/),
-    ])
-    // на одну партию ниже порога — полоса: список не мигает от одной партии
-    expect(exemptionIssues(live([{ X: 7 }, { X: 6 }, { X: 6 }], [{}, {}, {}]), new Set(['X']), new Set(), ['X'])).toEqual([])
-    // пачка срабатываний в одной партии — всё ещё одна партия
-    expect(exemptionIssues(live([{ X: 1 }], []), new Set(['X']), new Set(), ['X'])).toEqual([])
+  const sample = (kind: 'full' | 'main', fired: Record<string, number>) => ({ kind, fired })
+  const rule = (name: string, late = false) => ({ name, when: late ? [is(endgame.active)] : [] })
+  it('одно срабатывание в одной выборке — достижимо; частота не красит', () => {
+    const s = [sample('main', { Once: 1, Often: 900 }), sample('main', {}), sample('full', { Often: 900 })]
+    expect(gateIssues(s, [rule('Once'), rule('Often')], {})).toEqual([])
   })
-  it('запись без правила — красное в обоих списках', () => {
-    expect(exemptionIssues(samples, new Set(['Ghost']), new Set(['Phantom']), names)).toEqual([
-      expect.stringMatching(/^Ghost: в RARE, а такого правила нет/), expect.stringMatching(/^Phantom: в PROVEN, а такого правила нет/),
-    ])
+  it('недостижимое правило без прямого случая — красное; со случаем — нет', () => {
+    const s = [sample('main', {}), sample('full', {})]
+    expect(gateIssues(s, [rule('Dead')], {})).toEqual([expect.stringMatching(/^Dead: ни разу до экрана концовки/)])
+    expect(gateIssues(s, [rule('Dead')], { Dead: {} })).toEqual([])
   })
-  it('на грани — правило под гейтом, которое держится на одной партии', () => {
-    expect(fragile(live([{ A: 1 }, {}, {}], [{}, { B: 1 }, { B: 2 }]), ['A', 'B', 'C'])).toEqual(['A'])
+  it('правило основной игры обязано сработать до концовки: полная выборка его не спасает', () => {
+    const s = [sample('main', {}), sample('full', { Late: 5 })]
+    expect(gateIssues(s, [rule('Late')], {})).toEqual([expect.stringMatching(/^Late: ни разу до экрана концовки/)])
+    // правило эндгейма (условие требует endgame.active) — по всем выборкам
+    expect(gateIssues(s, [rule('Late', true)], {})).toEqual([])
+    expect(gateIssues([sample('main', {}), sample('full', {})], [rule('Late', true)], {})).toEqual([expect.stringMatching(/^Late: правило эндгейма/)])
+  })
+  it('правило эндгейма — по условию, а не по имени', () => {
+    expect(allRules.filter(endgameOnly).map((r) => r.name)).toContain('Endgame_Idle')
+    expect(allRules.filter(endgameOnly).map((r) => r.name)).toContain('Lend50_yes')
+    expect(endgameOnly({ when: [] })).toBe(false)
   })
   it('выборки гейта: два рода, сиды не пересекаются, main — до экрана концовки', () => {
     expect(COVERAGE_SAMPLES.filter((s) => s.kind === 'full')).toHaveLength(3)
@@ -65,34 +58,24 @@ describe('полоса исключений — по живым выборкам
     const all = COVERAGE_SAMPLES.flatMap((s) => s.seeds)
     expect(new Set(all).size).toBe(all.length)
   })
-  it('классы never — только rare / proven / unexplained; префикс не освобождает', () => {
-    expect(neverClass('Tone_Cow')).toBe('rare')
-    expect(neverClass('Quiet_PhoneKarine_AlikAway')).toBe('proven')
+  it('классы never — только direct / unexplained; префикс не освобождает', () => {
+    expect(neverClass('Tone_Cow')).toBe('direct')
+    expect(neverClass('Quiet_PhoneKarine_AlikAway')).toBe('direct')
     expect(neverClass('Quiet_BrandNew')).toBe('unexplained')
-    expect(neverClass('Finale_made_up')).toBe('unexplained')
-  })
-  it('RARE и PROVEN ⊆ allRules, пересечения нет', () => {
-    const names = new Set(allRules.map((r) => r.name))
-    expect([...RARE].filter((n) => !names.has(n))).toEqual([])
-    expect([...PROVEN].filter((n) => !names.has(n))).toEqual([])
-    expect([...RARE].filter((n) => PROVEN.has(n))).toEqual([])
+    expect(Object.keys(DIRECT).length).toBeGreaterThan(0)
   })
 })
 
 // Редкие правила: срабатывают только при особых сочетаниях, которые бот за разумное время не собирает
 
 describe('покрытие правил', () => {
-  it(`за ${COVERAGE_SAMPLES.length} непересекающихся выборок (${COVERAGE_SAMPLES.filter((s) => s.kind === 'main').length} — до концовки) срабатывают все правила, кроме исключений, а исключения — по полосе`, async () => {
+  it(`за ${COVERAGE_SAMPLES.length} непересекающихся выборок (${COVERAGE_SAMPLES.filter((s) => s.kind === 'main').length} — до концовки) срабатывают все правила без прямого случая`, async () => {
     const r = await multiSampleCoverage()
-    const names = allRules.map((x) => x.name)
     if (process.env.RULES_REPORT) {
       for (const [i, s] of r.samples.entries()) process.stdout.write(`\n# sample ${i} (${s.kind})\n` + formatCoverage(s) + '\n')
       process.stdout.write(`\nunion never: ${r.never.join(', ') || '(none)'}\n`)
-      process.stdout.write(`на грани (одна выборка): ${fragile(r.samples, names).join(', ') || '(none)'}\n`)
     }
-    // Классы «не сработало» и их прямые тесты — в coverage.ts: необъяснённых быть не должно.
-    expect(r.never.filter((n) => neverClass(n) === 'unexplained')).toEqual([])
-    // списки — по тем же выборкам: RARE, до которого стенд доходит всегда, и PROVEN, до которого дошёл, — красные
-    expect(exemptionIssues(r.samples, RARE, PROVEN, names)).toEqual([])
+    // правило без прямого случая обязано сработать хоть раз; основной игры — до концовки
+    expect(gateIssues(r.samples, allRules)).toEqual([])
   }, 900_000)
 })
