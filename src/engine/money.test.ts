@@ -35,7 +35,37 @@ describe('деньги: одна точка записи', () => {
     expect(found("setCount(g.S, 'money', 10)")).toHaveLength(1)
     // переменная без readonly не спасает: исключение — только сам adjustMoney
     expect(found('const w: { money: number } = g.S; w.money = 0')).toHaveLength(1)
+    // ключ и патч через имя: в месте записи поля не видно, значение имени разбор достаёт (#253)
+    expect(found("const k = 'money'\ng.S[k] = 0")).toHaveLength(1)
+    expect(found("let k = 'money'\ng.S[k] = 0")).toHaveLength(1)
+    expect(found("g.S['mo' + 'ney'] = 0")).toHaveLength(1)
+    expect(found("Reflect.set(g.S, 'mo' + 'ney', 10)")).toHaveLength(1)
+    expect(found("const k = 'money'\nsetCount(g.S, k, 10)")).toHaveLength(1)
+    expect(found('const patch = { money: 0 }\nObject.assign(g.S, patch)')).toHaveLength(1)
+    // …а чужой ключ и чужой патч записью не считаются: иначе страж ловил бы любое обращение по имени
+    expect(found("const k = 'other'\ng.S[k] = 0")).toEqual([])
+    expect(found('const p = { other: 1 }\nObject.assign(g.S, p)')).toEqual([])
     expect(found('g.S.moneyLevel()')).toEqual([])
+  })
+
+  it('обходы readonly бросают и денег не меняют: те же формы, что у долга (#253)', () => {
+    const { game } = makeGame()
+    const money = game.S.money
+    const S = game.S as unknown as Record<string, unknown>
+    const patch = { money: 0 }
+    const asg = Object.assign
+    const tries: Array<[string, () => void]> = [
+      ['Object.assign с патчем-переменной', () => { Object.assign(S, patch) }],
+      ['Object.assign с вычисляемым ключом', () => { Object.assign(S, { ['money']: 0 }) }],
+      ['запись по ключу-переменной', () => { const k = 'money'; (S as Record<string, number>)[k] = 0 }],
+      ['переименованный Object.assign', () => { asg(S, { money: 0 }) }],
+      ['Object.entries/forEach по состоянию', () => { Object.entries(S).forEach(([k, v]) => { S[k] = v }) }],
+    ]
+    for (const [name, run] of tries) expect(run, name).toThrow(TypeError)
+    // Reflect.set не бросает — возвращает false и не пишет
+    expect(Reflect.set(S, 'money', 0)).toBe(false)
+    expect(Reflect.set(S, 'mo' + 'ney', 0)).toBe(false)
+    expect(game.S.money).toBe(money)
   })
 
   it('тип и геттер: прямая запись денег не компилируется и не проходит', () => {
