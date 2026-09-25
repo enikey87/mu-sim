@@ -12,7 +12,8 @@ import { ARCS } from '../content/arcs'
 import { CLAIMS } from '../content/lies'
 import { COLD_WAR } from '../content/rude'
 import { HEAT, bloodGiven } from '../content/memkeys'
-import { valueOf, spec } from './rules'
+import { valueOf, spec, type Facts } from './rules'
+import type { GameEvent } from '../content/rules/events'
 import { MENTION_RE } from '../content/world'
 import { P_MONEY, P_DESPERATE } from '../content/topics'
 import { BLOOD_PAY, FLOOR } from '../content/misc'
@@ -503,11 +504,20 @@ describe('Game: пачка непрочитанных подчиняется м�
     game.S.mem[HEAT] = 1
     game.S.ctx = { offended: true }
     game.S.offlineDays = 0
-    // каждое Quiet_PaydayOpen_* глушит своё событие, пока экран концовки открыт (#259)
-    for (const event of ['AlikAway', 'AlikIdle', 'StoryBeat', 'PeriodLine', 'PromiseDue', 'Mentioned'] as const) {
+    // каждое Quiet_PaydayOpen_* глушит своё событие, пока экран концовки открыт (#259);
+    // событие зовётся тем же вызовом, что в игре: у PromiseDue — номер срока, у Mentioned — цель (#266)
+    const dueIdx = game.S.promises.findIndex((_, i) => game.facts({ promise: i }).promiseLive)
+    expect(dueIdx, 'срок на сегодня — иначе PromiseDue глушит тишину пустого пула').toBeGreaterThanOrEqual(0)
+    const quiet: Array<{ event: GameEvent; facts?: Facts; target?: string }> = [
+      { event: 'AlikAway' }, { event: 'AlikIdle' }, { event: 'StoryBeat' }, { event: 'PeriodLine' },
+      { event: 'PromiseDue', facts: { promise: dueIdx } },
+      { event: 'Mentioned', target: 'boris' },
+    ]
+    for (const c of quiet) {
       const n = game.S.msgs.length
-      expect((await game.fire(event))?.name, event).toBe('Quiet_PaydayOpen_' + event)
-      expect(game.S.msgs.slice(n), event).toEqual([])
+      const r = await game.fire(c.event, c.facts ?? {}, c.target ? { target: c.target } : {})
+      expect(r?.name, c.event).toBe('Quiet_PaydayOpen_' + c.event)
+      expect(game.S.msgs.slice(n), c.event).toEqual([])
     }
     await game.closeEnding()
     expect(game.S.mem['endgame.active']).toBe(true)
