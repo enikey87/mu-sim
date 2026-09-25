@@ -1567,10 +1567,10 @@ export class Game {
     return this.S.stats.sent - Number(this.S.mem[memkeys.legendPromiseAt] ?? -99) >= LEGEND_VOW_GAP
   }
   /** Срок легенды второй раз в журнал не пишем — повтор не новость (#179). Условие — если есть; иначе фраза срока внутри текста записи (у 23 легенд condition нет, #246). */
-  private recordPromiseOnce(p: { text: string; d: number | null; due?: Due; condition?: PromiseCondition; tomorrow?: boolean; stake?: 'moustache' }): void {
+  private recordPromiseOnce(p: { text: string; t?: string; d: number | null; due?: Due; condition?: PromiseCondition; tomorrow?: boolean; stake?: 'moustache' }): void {
     const seen = p.condition
       ? this.S.promises.some((x) => x.condition === p.condition)
-      : !!p.t && this.S.promises.some((x) => x.t.includes(p.t))
+      : !!p.t && this.S.promises.some((x) => x.t.includes(p.t!))
     if (seen) return
     this.recordPromise(p)
   }
