@@ -1,7 +1,7 @@
 // Сценарии правил: именно те места, где в оригинале были нелогичные ответы.
 import { describe, it, expect } from 'vitest'
 import { makeGame, alikTexts } from '../../test/helpers'
-import { spec, valueOf } from '../../engine/rules'
+import { type Entry, spec, valueOf } from '../../engine/rules'
 import type { Game } from '../../engine/game'
 import type { Choice, Ctx } from '../../engine/state'
 import { D } from '../excuses'
@@ -277,7 +277,7 @@ describe('тон сообщения (PlayerMessage)', () => {
   it('угроза судом — насмешка, дальше линия суда: юрист, претензия', async () => {
     const { game } = makeGame()
     const t1 = await reply(game, { text: 'Я иду в суд!', tone: 'rude' })
-    expect(oneOf(D.THREAT_A, t1.join(' '))).toBe(true)
+    expect(oneOf((D.THREAT_A as Entry<string>[]).map(valueOf), t1.join(' '))).toBe(true) // строки пула с гейтом — Gated, не строки
     expect(game.S.ach.threat).toBeDefined()
     game.S.offlineDays = 0
     const t2 = game.S.msgs.length

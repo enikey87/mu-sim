@@ -1201,6 +1201,8 @@ export class Game {
       somedayCount: S.promises.filter((p) => p.due == null && !p.condition).length,
       // сама — не больше одной серии в день: три легенды денег за день — уже не сюжет, а шум
       arcAvailable: this.availableArcs().length > 0 && !Object.values(S.arcs).some((a) => a.last === S.day),
+      // начатая линия коллекторов идёт своим битом, но той же нормой: не больше серии в день (#324)
+      collectorsCanAdvance: this.arcCanAdvance('collectors') && !Object.values(S.arcs).some((a) => a.last === S.day),
       arcsStarted: Object.keys(S.arcs).length,
       arcsDone: Object.entries(S.arcs).filter(([id, a]) => a.i >= ARCS[id].eps.length).length,
       quests: Object.keys(S.ach).filter((k) => k.startsWith('q_')).length,
