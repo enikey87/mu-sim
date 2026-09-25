@@ -78,6 +78,10 @@ const CASES: Record<string, Case> = {
   Quiet_PaydayOpen_StoryBeat: { event: 'StoryBeat', setup: paydayOpen },
   Away_ColdWar: { event: 'AlikAway', setup: offended },
   Quiet_Offended_AlikAway: { event: 'AlikAway', setup: offended },
+  Due_StakeKept: {
+    event: 'PromiseDue', facts: { promise: 0 },
+    setup: (g) => { g.S.mood = 9; g.recordPromise({ text: 'завтра — всё', d: 1, stake: 'moustache' }); g.S.day += 1 },
+  },
 }
 
 function fires(name: string, c: Case): boolean {
