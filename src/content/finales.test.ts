@@ -148,6 +148,32 @@ describe('финалы сериалов: выбор', () => {
     }
     expect(noise).toBeGreaterThan(3)
   })
+  it('жених: wedding.anush навсегда — через 8 дней свадебный ход жив (#328)', async () => {
+    const { game } = makeGame()
+    SETUP['samvel.groom'](game)
+    toLast(game, 'samvel')
+    await game.playArc('samvel')
+    expect(game.S.mem['wedding.anush']).toBe(true)
+    expect(game.S.rules.schedule.some((it) => it.kind === 'restore' && it.key === 'wedding.anush')).toBe(false)
+    game.S.day += 9
+    game.rules.settle()
+    expect(game.S.mem['wedding.anush']).toBe(true)
+    game.S.arcs.beton = { i: 1, last: 0 }
+    let noise = 0
+    for (let i = 0; i < 150; i++) {
+      game.S.stats.sent += 4
+      if (game.rules.match({ event: 'AlikTurn' }, game.facts())?.name === 'Turn_Wedding_Anush') noise++
+    }
+    expect(noise).toBeGreaterThan(3)
+  })
+  it('NC: forDays:8 снимает wedding.anush через 8 дней (#328)', () => {
+    const { game } = makeGame()
+    game.rules.applyOps([{ key: 'wedding.anush', op: '=', value: true, forDays: 8 }], {})
+    expect(game.S.mem['wedding.anush']).toBe(true)
+    game.S.day += 8
+    game.rules.settle()
+    expect(game.S.mem['wedding.anush']).toBeUndefined()
+  })
   it('грубил хоть раз — в женихи не берут', async () => {
     const { game } = makeGame()
     SETUP['samvel.groom'](game)

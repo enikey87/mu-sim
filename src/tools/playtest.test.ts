@@ -76,6 +76,20 @@ describe('плейтест', () => {
     expect(deathGated(liveOnly)).toEqual([])
     expect(deathGated(deadGate)).toEqual(['Dead'])
   })
+  it('иногда отвечает на допработу зеркалом, когда оно открыто (#328)', async () => {
+    let mirrored = 0
+    for (let seed = 1; seed <= 80; seed++) {
+      const p = await playtest(seed, 1, undefined, async (g) => {
+        g.S.arcs.boris = { i: 2, last: 0 }
+        g.S.actors.boris = { sick: true }
+        await g.job()
+        expect(g.canMirror()).toBe(true)
+      })
+      if (p.acts.some((a) => a.kind === 'job' && a.yes === 'mirror')) mirrored++
+    }
+    expect(mirrored).toBeGreaterThan(5)
+    expect(mirrored).toBeLessThan(60)
+  }, 60_000)
 })
 
 const seeds = (s: string): number[] => s.split(',').flatMap((p) => {
