@@ -1,6 +1,7 @@
 // Событие PlayerSays { intent, arg } — ответ Алика на контекстную реплику игрока.
 // Общее правило по intent + более специфичные для частных случаев (память, контекст).
 import type { Game } from '../../engine/game'
+import { fmtDays } from '../../engine/time'
 import { type Rule, eq, ne, is, gte, add, valueOf } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { AlikOffline, ThickJournal } from './criteria'
@@ -11,7 +12,7 @@ import { GREET_A, WHEN_COND, SWING } from '../misc'
 import { type TalkKind, talkPairs, talkId, TALK_REMEMBER } from '../talk'
 import { ARCS, NO_NEWS_A, NO_NEWS_B, GROUP_SEEN_A, GROUP_SEEN_B, WRONG_A, WRONG_B } from '../arcs'
 import * as L from '../life'
-import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER } from '../misc'
+import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, PROMISE_PENCIL, PROMISE_FAR } from '../misc'
 import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_SENT, LIE_THIRD, LIE_NOCRED } from '../lies'
 import { HEAT, asked, caughtCount, count, doneAsked, finaleOf, lie, nextTransfer, topic, topicMute } from '../memkeys'
 
@@ -104,16 +105,23 @@ export const replyRules: R[] = [
 
   says('promiseCheck', { respond: async ({ game, facts }) => { await game.say([game.uniq(() => game.X.promiseCheck(String(facts.arg ?? '')))]); game.setCtx(null) } }),
   says('promiseOk', { respond: async ({ game }) => { await game.say([game.uniq(() => game.draw('PROMISE_OK', D.PROMISE_OK))]); game.setCtx(null) } }),
-  // срок «когда-нибудь» — переспрашивать бессмысленно, и Алик это честно признаёт
+  // «Точно «как ключ выйдет»?» — событие не дата, отвечаем про само событие
   says('promiseCheck', {
     respond: async ({ game, facts }) => {
-      // общие «философские» ответы — по разу; дальше — про само условие, с его текстом (не повторяется)
       const t = String(facts['ctx.when'] ?? '')
-      const cond = () => game.draw('WHEN_COND', WHEN_COND).replace('{t}', t).replace('{T}', cap(t))
-      await game.say([game.line('PROMISE_NEVER', PROMISE_NEVER, { fallback: cond })!])
+      await game.say([game.uniq(() => game.draw('WHEN_COND', WHEN_COND).replace('{t}', t).replace('{T}', cap(t)))])
       game.setCtx(null)
     },
-  }, [is('ctx.whenNever')]),
+  }, [eq('ctx.whenKind', 'event')]),
+  // карандаш, горизонт и ирония на «никогда» — у каждой кнопки свой акт и свой пул
+  ...([['promisePencil', 'PROMISE_PENCIL', PROMISE_PENCIL], ['promiseFar', 'PROMISE_FAR', PROMISE_FAR], ['promiseNever', 'PROMISE_NEVER', PROMISE_NEVER]] as const).map(([act, key, pool]) => says(act, {
+    respond: async ({ game, facts }) => {
+      const t = String(facts['ctx.when'] ?? '')
+      const days = fmtDays(Number(facts['ctx.whenDays'] ?? 0))
+      await game.say([game.uniq(() => game.X.fill(game.draw(key, pool), { t, T: cap(t), days }))])
+      game.setCtx(null)
+    },
+  })),
 
   says('condole', { respond: async ({ game }) => { game.mood(1); await game.say([game.pair('CONDOLE_A', D.CONDOLE_A, 'CONDOLE_B', D.CONDOLE_B)]); game.setCtx(null) } }),
   // соболезнуешь, а покойник уже встал и говорит тост
