@@ -1537,14 +1537,9 @@ export class Game {
       }
       // праздник в окне звучит хотя бы раз: отмазку вытесняют серия, сцена или легенда, а окно короткое.
       // Поздравляет сам Алик: молчит там же, где шапка (alikSilent — блок/смерть/Карине/пропал)
-      const holiday = holidayOf(S.day)
-      const greetKey = holidayGreetKey(S.day)
-      if (holiday && greetKey && !this.alikSilent() && !startedOffline && S.mem[memkeys.holidayGreeted] !== greetKey) {
-        const festive = this.line('HOLIDAY', HOLIDAY_EXCUSES)
-        if (festive) {
-          await this.say([festive])
-          S.mem[memkeys.holidayGreeted] = greetKey
-        }
+      if (!startedOffline) {
+        const festive = this.holidayGreetLine()
+        if (festive) await this.say([festive])
       }
       if (this.chance(0.12)) this.randomNotif()
       this.restStatus()
@@ -1664,7 +1659,7 @@ export class Game {
 
   async excuseTurn(): Promise<void> {
     if (this.legend() && this.legendDue()) return this.promiseLine(undefined, true)
-    const festive = this.line('HOLIDAY', HOLIDAY_EXCUSES)
+    const festive = this.holidayGreetLine()
     if (festive) { await this.say([festive]); return }
     const ex = this.uniq(() => this.X.excuse({ preferLong: this.S.politeStreak >= 3 }))
     if (ex.legendary) this.unlock('legend')
@@ -1677,6 +1672,16 @@ export class Game {
       sad: SAD.test(ex.ev ?? ''), revived: REVIVED.test(ex.ev ?? ''), festive: !SAD.test(ex.ev ?? '') && FESTIVE.test(ex.ev ?? ''),
     }
     if (this.chance(0.09)) await this.editLast(msgs[msgs.length - 1], ex.p)
+  }
+
+  /** Праздник один раз за окно: тот же факт, что пишет тайл хода (#328). */
+  private holidayGreetLine(): string | null {
+    const key = holidayGreetKey(this.S.day)
+    if (!key || this.alikSilent() || this.S.mem[memkeys.holidayGreeted] === key) return null
+    const festive = this.line('HOLIDAY', HOLIDAY_EXCUSES)
+    if (!festive) return null
+    this.S.mem[memkeys.holidayGreeted] = key
+    return festive
   }
 
   async shortReply(): Promise<void> {
@@ -2358,7 +2363,7 @@ export class Game {
           deliver({ kind: 'text', from: 'alik', text: promise.text })
           return
         }
-        const festive = this.line('HOLIDAY', HOLIDAY_EXCUSES)
+        const festive = this.holidayGreetLine()
         if (festive) { deliver({ kind: 'text', from: 'alik', text: festive }); return }
         const ex = this.uniq(() => this.X.excuse())
         this.meetRel(ex.r)

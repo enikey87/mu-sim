@@ -453,4 +453,30 @@ describe('несостыковки из плейтеста ботами, рау�
     expect(low('Гарика достали?')).toBe('Гарика достали?')
     expect(low('Как там с оплатой?')).toBe('как там с оплатой?')
   })
+  it('«Интерпол ищет Ниву» — только в бегах; «отдал тебе Ниву» — только у игрока (#328)', async () => {
+    const { game } = makeGame({ seed: 2 })
+    const { D } = await import('./excuses')
+    const { valueOf } = await import('../engine/rules')
+    const interpol = D.ESC1.find((e: unknown) => String(valueOf(e)).includes('Интерпол'))!
+    game.S.mem['intro.niva'] = true
+    expect(game.open([interpol])).toEqual([]) // знакомы, но не в бегах
+    game.S.mem['niva.away'] = true
+    expect(game.open([interpol]).map((x) => (typeof x === 'string' ? x : x.t))).toEqual(['Интерпол ищет мою «Ниву», все счета проверяют'])
+    // NC: без nivaAway в гейте строка открыта и без бегов
+    const ungated = { t: 'Интерпол ищет мою «Ниву», все счета проверяют', when: [WORLD.niva] }
+    delete game.S.mem['niva.away']
+    expect(game.open([ungated]).length).toBe(1)
+
+    const mem = game.rules.all.find((r) => r.name === 'Turn_Memory')!
+    const ask = async () => {
+      const from = game.S.msgs.length
+      await mem.respond!({ game, facts: game.facts() } as Parameters<NonNullable<typeof mem.respond>>[0])
+      return game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : []))
+    }
+    game.S.items.push('«Нива» 1987 года')
+    game.S.stats.sent = 20
+    expect((await ask()).join(' ')).not.toMatch(/отдал тебе «Ниву»/)
+    game.S.mem['niva.player'] = true
+    expect((await ask()).join(' ')).toMatch(/отдал тебе «Ниву»/)
+  })
 })
