@@ -26,6 +26,22 @@ describe('прямые случаи гейта покрытия', () => {
     const names = new Set(allRules.map((r) => r.name))
     expect(Object.keys(DIRECT).filter((n) => !names.has(n))).toEqual([])
   })
+  // Глушилка молчит не всегда одинаково: у события должен быть и говорящий, иначе пустой пул (#266).
+  // Шансы у правил-альтернатив — потому 40 сидов, как у fires.
+  it('у глушилки за экраном концовки есть кого глушить', () => {
+    const empty: string[] = []
+    for (const [name, c] of Object.entries(DIRECT)) {
+      if (!name.startsWith('Quiet_PaydayOpen_')) continue
+      let spoke = false
+      for (let seed = 1; seed <= 40 && !spoke; seed++) {
+        const { game } = makeGame({ seed })
+        c.setup?.(game)
+        spoke = game.rules.collect({ event: c.event, target: c.target, facts: c.facts ?? {} }, game.facts(c.facts ?? {})).some((r) => r.name !== name)
+      }
+      if (!spoke) empty.push(name)
+    }
+    expect(empty).toEqual([])
+  })
   // issue #102: Quiet_*_PromiseConditionMet были недостижимы — удалены, а не «освобождены»
   it('Quiet_*_PromiseConditionMet нет в правилах', () => {
     expect(allRules.filter((r) => /^Quiet_.*_PromiseConditionMet$/.test(r.name)).map((r) => r.name)).toEqual([])
