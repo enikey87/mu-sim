@@ -346,6 +346,33 @@ describe('платежи по календарю', () => {
     expect((line.when ?? []).every((c) => test(c, { day: 500, 'bills.rent.streak': 0 }))).toBe(false)
     expect((line.when ?? []).every((c) => test(c, { 'bills.rent.streak': 3 }))).toBe(true)
   })
+  it('платёж после перескока срока идёт в сводку недели срока, не обработки (#300)', async () => {
+    const { game } = makeGame()
+    setMoney(game, 10_000_000)
+    const due = Number(game.S.mem[billDueAt('transit')])
+    expect(dateOf(due).getDay(), 'проездной — воскресенье').toBe(0)
+    game.S.day = due + 1 // понедельник следующей недели
+    await game.fire('BillDue', { bill: 'transit', at: due })
+    expect(game.S.bank?.week).toBe(weekOf(due))
+    expect(weekOf(due)).not.toBe(weekOf(game.S.day))
+    game.S.day = due + 8
+    game.flushBankWeek()
+    const summary = cards(game, 'Банк').filter((c) => c.text.startsWith('Сводка')).at(-1)!
+    expect(summary.lines?.join(' ')).toMatch(/Проездной 500 ₽/)
+    expect(summary.lines?.join(' ')).not.toMatch(/2 раза/)
+    const { fmtShortDate } = await import('../engine/time')
+    expect(summary.text).toMatch(new RegExp(`Сводка за неделю ${fmtShortDate(weekOf(due))}`))
+  })
+  it('карточка банка во время сцены ждёт её конца (#300)', async () => {
+    const { game } = makeGame()
+    game.S.scene = { id: 'meet', node: game.scenes.meet.start, vars: {} }
+    const n = game.S.msgs.length
+    game.notify('🏦', 'Банк', 'Сводка за неделю тест: баланс 1 ₽', { lines: ['Списано: Связь 400 ₽'] })
+    expect(game.S.msgs.slice(n).filter((m) => m.kind === 'card')).toEqual([])
+    await game.enterNode('meet', null)
+    expect(game.S.scene).toBeNull()
+    expect(game.S.msgs.some((m) => m.kind === 'card' && m.app === 'Банк' && /Сводка за неделю тест/.test(m.text))).toBe(true)
+  })
   it('paymentDueTomorrow только после предупреждения с SMS (#251)', () => {
     const { game } = makeGame()
     game.S.mem[billDueAt('phone')] = game.S.day + 1
