@@ -21,7 +21,7 @@ type BatteryView = Readonly<Pick<Game['battery'], 'level' | 'dead' | 'charging'>
 export type GameUi = Readonly<
   Pick<Game, 'subscribe' | 'getVersion' | 'getMsgsEpoch' | 'getMsgsDirtyFrom' | 'ackMsgsDirty' | 'choices' | 'clockText' | 'gameDate'
     | 'send' | 'answerJob' | 'answerCard' | 'canMirror' | 'playVoice' | 'castOf' | 'flash' | 'closeEnding' | 'dismissNotif' | 'toggleMute' | 'gesture' | 'onVisibility' | 'reset' | 'introDone'>
-  & { ui: UiView; battery: BatteryView; mooSound: () => void }
+  & { ui: UiView; battery: BatteryView; mooSound: () => void; vibrate: (p: number | number[]) => void }
 >
 
 const REAL = new WeakMap<GameUi, Game>()
@@ -49,6 +49,7 @@ export function uiOf(g: Game): GameUi {
     toggleMute: () => g.toggleMute(), gesture: () => g.gesture(), onVisibility: (h) => g.onVisibility(h), reset: () => g.reset(),
     introDone: () => g.introDone(),
     mooSound: () => { g.audio.moo() },
+    vibrate: (p) => { g.audio.vibrate(p) },
   }
   FACADE.set(g, u)
   REAL.set(u, g)

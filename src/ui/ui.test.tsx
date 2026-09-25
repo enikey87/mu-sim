@@ -9,6 +9,7 @@ import { SAVE_KEY, loadState, START_MONEY } from '../engine/state'
 import { fmtDate } from '../engine/time'
 import type { Game } from '../engine/game'
 import { introOf, uiOf } from './view'
+import { browserAudio } from '../engine/audio'
 
 function renderApp(game: Game, onReset = vi.fn()) {
   const utils = render(<App game={game} onReset={onReset} />)
@@ -869,5 +870,47 @@ describe('интро новой партии', () => {
     expect(intro.className).toMatch(/phase-gap/)
     expect(intro.className).not.toMatch(/phase-title/)
     expect(within(intro as HTMLElement).getByText(p.gap)).toBeInTheDocument()
+  })
+})
+
+describe('интро: вибрация на уведомлениях (#351)', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  const vibrateGame = (muted = false) => {
+    const vibrate = vi.fn()
+    vi.stubGlobal('navigator', { vibrate })
+    const audio = browserAudio()
+    const { game } = makeGame({ audio })
+    game.gesture() // касание страницы было — иначе гейт жеста audio срежет вибрацию
+    if (muted) game.toggleMute()
+    return { game, vibrate }
+  }
+
+  it('на каждое уведомление — встряска: обещание, ответ и 6 из пула', () => {
+    vi.useFakeTimers()
+    const { game, vibrate } = vibrateGame()
+    render(<App game={game} onReset={vi.fn()} intro />)
+    act(() => { vi.advanceTimersByTime(7000) })
+    expect(vibrate).toHaveBeenCalledTimes(8)
+  })
+
+  it('выключенный звук — без вибраций: гейт живёт в audio, интро его не обходит', () => {
+    vi.useFakeTimers()
+    const { game, vibrate } = vibrateGame(true)
+    render(<App game={game} onReset={vi.fn()} intro />)
+    act(() => { vi.advanceTimersByTime(7000) })
+    expect(vibrate).not.toHaveBeenCalled()
+  })
+
+  it('prefers-reduced-motion — статика без вибраций', () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('matchMedia', () => ({ matches: true }))
+    const { game, vibrate } = vibrateGame()
+    render(<App game={game} onReset={vi.fn()} intro />)
+    act(() => { vi.advanceTimersByTime(6000) })
+    expect(vibrate).not.toHaveBeenCalled()
   })
 })
