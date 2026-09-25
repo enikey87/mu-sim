@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { makeGame, setMoney, cards, moneyLog } from '../test/helpers'
 import { BILLS, billUnpaid, billStreak, lightOff, billDueAt } from './bills'
-import { dueIn, weekOf } from '../engine/time'
+import { dateOf, dueIn, weekOf } from '../engine/time'
 
 describe('платежи по календарю', () => {
   it('на старте стоят сроки трёх платежей', () => {
@@ -128,6 +128,25 @@ describe('платежи по календарю', () => {
     }
     expect(new Set(bank.map((c) => c.text.split('.')[0])).size, 'одна сводка на неделю').toBe(bank.length)
     expect(game.ui.notif, 'банк не приходит баннером').toBeNull()
+  })
+  it('коммуналка — один срок на месяц: партия днями по 1–3 через концы месяцев (#292)', async () => {
+    const { game } = makeGame()
+    setMoney(game, 10_000_000)
+    const charged = moneyLog(game)
+    const dues = new Set<number>()
+    const start = game.S.day
+    const jumps = [1, 2, 3, 1, 1]
+    for (let i = 0; game.S.day < start + 200; i++) {
+      dues.add(Number(game.S.mem[billDueAt('rent')]))
+      game.nextDay(jumps[i % jumps.length])
+      await game.afterTurn()
+    }
+    const passed = [...dues].filter((at) => at <= game.S.day).sort((a, b) => a - b)
+    expect(passed.length).toBeGreaterThanOrEqual(6)
+    for (const at of passed) expect(dateOf(at + 1).getDate(), `срок ${at} — последний день месяца`).toBe(1)
+    const months = passed.map((at) => dateOf(at).getFullYear() * 12 + dateOf(at).getMonth())
+    expect(new Set(months).size, 'два срока в одном месяце').toBe(months.length)
+    expect(charged.filter((t) => t === '-Коммуналка')).toHaveLength(passed.length)
   })
   it('после выселения коммуналка не списывается', () => {
     const { game } = makeGame()
