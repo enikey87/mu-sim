@@ -143,14 +143,27 @@ describe('финалы сериалов: выбор', () => {
     await game.playArc('samvel')
     expect(game.S.mem['finale.samvel']).toBe('default')
   })
-  it('финал с fx.pay увеличивает fifty — ответ на «спасибо» видит перевод', async () => {
+  it('финал с fx.pay: paid растёт, fifty — только при 50 ₽', async () => {
     const { game } = makeGame()
     SETUP['razmik.union'](game)
     toLast(game, 'razmik')
-    const before = game.S.stats.fifty
+    const beforeFifty = game.S.stats.fifty
+    const beforePaid = game.S.stats.paid
     await game.playArc('razmik')
     expect(game.S.mem['finale.razmik']).toBe('union')
-    expect(game.S.stats.fifty).toBe(before + 1)
+    expect(game.S.stats.paid).toBe(beforePaid + 1) // 500 ₽ — «спасибо» видит перевод
+    expect(game.S.stats.fifty).toBe(beforeFifty) // не 50 ₽ — ачивка не считает
+  })
+  it('финал с fx.pay 50 ₽ увеличивает и paid, и fifty', async () => {
+    const { game } = makeGame()
+    SETUP['beton.opened'](game)
+    toLast(game, 'beton')
+    const beforeFifty = game.S.stats.fifty
+    const beforePaid = game.S.stats.paid
+    await game.playArc('beton')
+    expect(game.S.mem['finale.beton']).toBe('opened')
+    expect(game.S.stats.paid).toBe(beforePaid + 1)
+    expect(game.S.stats.fifty).toBe(beforeFifty + 1)
   })
   it('вопрос «Как там…?» считается и после финала отвечает репликами этого финала', async () => {
     const { game } = makeGame()
