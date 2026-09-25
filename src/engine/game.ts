@@ -2214,8 +2214,8 @@ export class Game {
     if (fx.set) this.rules.applyOps(Object.entries(fx.set).map(([key, value]) => ({ key, op: '=' as const, value })), {})
     if (fx.during) this.rules.applyOps([{ key: fx.during.key, op: '=', value: true, forDays: fx.during.days }], {})
     if (n.sys && (!debtFx || debtMoved)) { await this.sleep(700); this.sys(gen('sys', n.sys)()) }
-    // перевод не прошёл — Алик не благодарит за то, чего не было (#252)
-    if (n.a && (!pays || paid)) await this.say([n.who ? gen('a', n.a)() : variant('a', n.a)], false, n.who)
+    // перевод не прошёл или долг запечатан — Алик не объявляет счёт, которого не было (#252, #266)
+    if (n.a && (!pays || paid) && (!debtFx || debtMoved)) await this.say([n.who ? gen('a', n.a)() : variant('a', n.a)], false, n.who)
     if (n.doc) {
       await this.typingFor(2000, 'отправляет документ…')
       this.alikMsg({ kind: 'doc', from: 'alik', title: `АКТ ВЗАИМОЗАЧЁТА № ${100 + this.rnd(900)}`, rows: v.rows, total: v.total })
