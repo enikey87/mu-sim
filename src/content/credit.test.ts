@@ -17,7 +17,8 @@ describe('кредитная лестница', () => {
     expect(game.S.mem[creditOffer]).toBe(true)
     // одна карточка: причина рядом с офером первой ступени (#272/#287), баннера нет
     const [card] = cards(game, 'Банк')
-    expect(card.text).toBe(`Остаток критический: ${(6000).toLocaleString('ru-RU')} ₽ после «Гречка». ${LOANS[0].offer}`)
+    // на дне 6 000: банк обещает ровно то, что даст, — до порога «мало» (#337)
+    expect(card.text).toBe(`Остаток критический после «Гречка». ${LOANS[0].offer.replace('{sum}', `${(3000).toLocaleString('ru-RU')} ₽`)}`)
     expect(card.offer).toEqual({ take: 'Взять кредит «Всё будет»', sell: THINGS[0].choice })
     expect(cards(game)).toHaveLength(1)
     expect(game.ui.notif).toBeNull()
@@ -32,7 +33,7 @@ describe('кредитная лестница', () => {
       game.S.mem[creditStage] = stage
       setMoney(game, 1000)
       game.maybeCreditOffer()
-      const offers = said.flatMap((t) => LOANS.filter((l) => t.endsWith(`. ${l.offer}`)).map((l) => l.offer))
+      const offers = said.flatMap((t) => LOANS.filter((l) => t.endsWith(`. ${l.offer.replace('{sum}', `${l.amount.toLocaleString('ru-RU')} ₽`)}`)).map((l) => l.offer))
       expect(offers, `ступень ${stage}`).toEqual(stage < 3 ? [LOANS[stage].offer] : [])
       expect(!!game.S.mem[creditOffer], `ступень ${stage}`).toBe(stage < 3)
     }
@@ -230,7 +231,7 @@ describe('карточка банка с кнопками (#287)', () => {
     expect(bank.find((c) => c.id === card.id)?.result).toMatch(/^Микроволновку забрали/)
     const again = bank.at(-1)!
     expect(again.id).not.toBe(card.id)
-    expect(again.text).toMatch(/^Продано, а остаток 4\s600 ₽\. Вам одобрен/)
+    expect(again.text).toMatch(/^Продано, а остаток всё ещё критический\. Вам одобрен/) // без числа: карточку жмут позже (#337)
     expect(again.offer?.sell).toBe(THINGS[1].choice)
   })
 
@@ -239,13 +240,18 @@ describe('карточка банка с кнопками (#287)', () => {
     game.answerCard(card.id, 'later')
     expect(game.S.mem[creditOffer]).toBe(false)
     const n = cards(game).length
-    game.chargeBill('transit') // отказ другого платежа — новая причина
+    game.chargeBill('transit') // отказ в тот же день — не новое падение: «не прошло» без кнопок (#337)
     expect(cards(game).length).toBe(n + 1)
+    expect(cards(game).at(-1)!.text).toMatch(/^Не прошло: Проездной/)
+    expect(cards(game).at(-1)!.offer).toBeUndefined()
+    game.S.day += 14
+    game.chargeBill('phone') // через перерыв — новая причина и кнопки
     const fresh = cards(game).at(-1)!
-    expect(fresh.text).toMatch(/^Не прошло: Проездной/)
+    expect(fresh.text).toMatch(/^Не прошло: Связь/)
     expect(fresh.offer).toBeDefined()
-    game.maybeCreditOffer() // без причины — после «не сейчас» не повторяет
-    expect(cards(game).length).toBe(n + 1)
+    const m = cards(game).length
+    game.maybeCreditOffer() // без причины — при открытом предложении не повторяет
+    expect(cards(game).length).toBe(m)
   })
 
   it('переписка без выбора предложение не снимает: открытая карточка остаётся (новый отказ переносит её ниже)', async () => {
@@ -320,13 +326,13 @@ describe('после первого дна бедность до выплаты 
       let firstBottom: number | null = null
       let peak = 0
       let daysAfter = 0
-      let alik = 0 // переводы, серии, сцены — приходят целиком, их потолок не касается
+      let whole = 0 // приходит целиком, потолок не касается: деньги Алика и кровь за деньги (#339)
       const adjust = game.adjustMoney.bind(game)
       game.adjustMoney = (delta, reason, opts) => {
         const ok = adjust(delta, reason, opts)
         if (ok && delta > 0 && game.S.mem[moneyPoor]) {
-          expect(/^(Кредит: |Авито$|Мама$|Перевод от Алика$|Выплата$|По карте$|День выплаты$)/.test(reason), `seed ${seed}: неизвестный приход «${reason}»`).toBe(true)
-          if (/Алика|Выплата|По карте/.test(reason)) alik += delta
+          expect(/^(Кредит: |Авито$|Мама$|Перевод от Алика$|Выплата$|По карте$|День выплаты$|Донорский центр$)/.test(reason), `seed ${seed}: неизвестный приход «${reason}»`).toBe(true)
+          if (/Алика|Выплата|По карте|Донорский/.test(reason)) whole += delta
         }
         return ok
       }
@@ -336,7 +342,7 @@ describe('после первого дна бедность до выплаты 
         if (firstBottom != null && !game.S.mem['payday.chain'] && !game.S.mem['endgame.active']) {
           daysAfter++
           peak = Math.max(peak, game.S.money)
-          expect(game.S.money, `seed ${seed} day ${game.S.day}`).toBeLessThanOrEqual(Game.MONEY_LOW + alik)
+          expect(game.S.money, `seed ${seed} day ${game.S.day}`).toBeLessThanOrEqual(Game.MONEY_LOW + whole)
         }
         if (game.S.mem['payday.chain'] || game.S.mem['endgame.active']) break
       }

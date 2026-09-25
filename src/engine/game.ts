@@ -494,13 +494,24 @@ export class Game {
     if (rank[after] < rank[before]) {
       const bal = this.rub(this.S.money)
       if (after === 'low') this.bankCard(`Банк обеспокоен остатком: ${bal}. Рекомендуем не ждать Алика.`)
-      else if (this.loanOffer()) this.maybeCreditOffer(`Остаток критический: ${bal} после «${reason}»`)
+      // шапка предложения — без остатка: карточку жмут позже, а число в ней стареет (#337)
+      else if (!this.newFall()) { /* дно не новость */ }
+      else if (this.loanOffer()) this.maybeCreditOffer(`Остаток критический после «${reason}»`)
       else {
-        this.bankCard(`Остаток критический: ${bal}. Гречка и достоинство — разные статьи расходов.`)
+        this.criticalCard(`Остаток критический: ${bal}. Гречка и достоинство — разные статьи расходов.`)
         this.maybeCreditOffer()
       }
     }
     return true
+  }
+  /** «Новое падение»: после первого дна баланс живёт у дна, и каждая неделя счетов — не новость. Банк объявляет остаток критическим (и предлагает ступень) не чаще раза в POOR_REPEAT_DAYS (#337). */
+  private newFall(): boolean {
+    const at = this.S.mem[memkeys.criticalAt]
+    return at == null || this.S.day - Number(at) >= POOR_REPEAT_DAYS
+  }
+  private criticalCard(text: string, extra?: Partial<Card>): void {
+    this.S.mem[memkeys.criticalAt] = this.S.day
+    this.bankCard(text, extra)
   }
   private rub(n: number): string { return `${n.toLocaleString('ru-RU')} ₽` }
   private bankCard(text: string, extra?: Partial<Card>): void { this.notify('🏦', 'Банк', text, extra) }
@@ -599,7 +610,7 @@ export class Game {
     if (this.adjustMoney(-bill.amount, bill.label, { onDay })) {
       this.rules.applyOps([set(billUnpaid(id), false), set(billStreak(id), 0)], {})
       this.scheduleBills()
-      if (this.moneyLevel() === 'bottom') this.maybeCreditOffer()
+      if (this.moneyLevel() === 'bottom' && this.newFall()) this.maybeCreditOffer()
       return
     }
     const streak = Number(this.S.mem[billStreak(id)] ?? 0) + 1
@@ -614,9 +625,9 @@ export class Game {
   }
   /** Отказ платежа: карточка с причиной — или сразу предложение кредита с ней же (#287). */
   private refused(why: string, tail: string, say: boolean): void {
-    if (say && this.loanOffer()) { this.maybeCreditOffer(why); return }
+    if (say && this.loanOffer() && this.newFall()) { this.maybeCreditOffer(why); return }
     if (say) this.bankCard(`${why}. ${tail}`)
-    if (this.moneyLevel() === 'bottom') this.maybeCreditOffer()
+    if (this.moneyLevel() === 'bottom' && this.newFall()) this.maybeCreditOffer()
   }
   /** Расписание платежей по взятым кредитам. */
   scheduleCredits(): void {
@@ -659,7 +670,7 @@ export class Game {
     if (id === 'micro' && !this.S.mem[creditBroke]) {
       this.rules.applyOps([set(creditBroke, true), set(creditStage, 4)], {})
       this.notify('🏦', 'МФО', `${why}. Мы не злимся. Мы записываем`)
-      if (this.moneyLevel() === 'bottom') this.maybeCreditOffer()
+      if (this.moneyLevel() === 'bottom' && this.newFall()) this.maybeCreditOffer()
       return
     }
     this.refused(why, 'Недостаточно средств.', first)
@@ -688,13 +699,15 @@ export class Game {
     const loan = this.loanOffer()
     if (!loan) return false
     if (!why && (this.S.mem[creditOffer] || this.S.mem[creditDeclined])) return false
+    // сумма фиксируется здесь и даётся ровно она: обещанное и зачисленное — одно число (#337)
+    const sum = this.relief(loan.amount)
     this.closeOffers()
-    this.rules.applyOps([set(creditOffer, true), set(creditDeclined, false)], {})
+    this.rules.applyOps([set(creditOffer, true), set(creditDeclined, false), set(memkeys.creditOfferSum, sum)], {})
     const thing = nextThing(this.S.mem)
     const take = loan.id === 'consumer' ? 'Взять кредит «Всё будет»'
       : loan.id === 'refi' ? 'Взять кредит на погашение кредита'
       : 'Взять микрозайм «Деньги-Ара»'
-    this.bankCard(`${why ?? `Остаток: ${this.rub(this.S.money)}`}. ${loan.offer}`, { offer: { take, sell: thing?.choice } })
+    this.criticalCard(`${why ?? 'Остаток критический'}. ${loan.offer.replace('{sum}', this.rub(sum))}`, { offer: { take, sell: thing?.choice } })
     return true
   }
   private closeOffers(): void {
@@ -738,8 +751,10 @@ export class Game {
     const stage = Number(this.S.mem[creditStage] ?? 0)
     const loan = nextLoan(stage)
     if (!loan) return
-    const amount = this.relief(loan.amount)
+    const offered = this.S.mem[memkeys.creditOfferSum]
+    const amount = offered != null ? Number(offered) : this.relief(loan.amount)
     if (amount === 0) return
+    delete this.S.mem[memkeys.creditOfferSum]
     const payment = amount === loan.amount ? loan.payment : Math.max(1, Math.round(loan.payment * amount / loan.amount))
     this.rules.applyOps([
       set(creditOffer, false),
@@ -757,9 +772,10 @@ export class Game {
     const got = this.relief(thing.amount)
     if (got === 0) return
     this.rules.applyOps([set(creditOffer, false), set(sold(thing.id), true)], {})
+    delete this.S.mem[memkeys.creditOfferSum]
     this.adjustMoney(got, 'Авито')
-    // продажа могла не вытащить со дна — снова предложить, с этой причиной
-    if (this.moneyLevel() === 'bottom') this.maybeCreditOffer(`Продано, а остаток ${this.rub(this.S.money)}`)
+    // продажа могла не вытащить со дна — снова предложить, с этой причиной (ход игрока, не падение — без перерыва)
+    if (this.moneyLevel() === 'bottom') this.maybeCreditOffer('Продано, а остаток всё ещё критический')
   }
   /** Кнопка карточки банка: выбор пишется в мир, Алику не уходит (#287). */
   answerCard(id: number, pick: 'take' | 'sell' | 'later'): void {
@@ -783,6 +799,7 @@ export class Game {
         result = `${thing.done}. +${this.rub(this.S.money - before)}. Баланс: ${this.rub(this.S.money)}`
       } else if (pick === 'later') {
         this.rules.applyOps([set(creditOffer, false), set(creditDeclined, true)], {})
+        delete this.S.mem[memkeys.creditOfferSum]
         result = 'Не сейчас'
       } else return
       const cur = this.S.msgs.find((x) => x.id === id)
