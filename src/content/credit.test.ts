@@ -12,11 +12,26 @@ describe('кредитная лестница', () => {
     setMoney(game, 6001)
     expect(game.adjustMoney(-1, 'Гречка')).toBe(true)
     expect(game.S.mem[creditOffer]).toBe(true)
-    // списание и «критический» идут первыми; оффер — в очереди (#211)
-    for (let i = 0; i < 8 && game.ui.notif && !/Всё будет|одобрен/i.test(game.ui.notif.text); i++) {
+    // списание и «критический» идут первыми; оффер — в очереди (#211), и это оффер именно первой ступени (#272)
+    for (let i = 0; i < 8 && game.ui.notif && game.ui.notif.text !== LOANS[0].offer; i++) {
       game.dismissNotif()
     }
-    expect(game.ui.notif?.text).toMatch(/Всё будет|одобрен/i)
+    expect(game.ui.notif?.text).toBe(LOANS[0].offer)
+  })
+
+  it('каждая ступень предлагает свой текст; после микрозайма — ничего (#272)', () => {
+    for (const stage of [0, 1, 2, 3]) {
+      const { game } = makeGame()
+      const said: string[] = []
+      const orig = game.notify.bind(game)
+      game.notify = (icon, app, text) => { said.push(text); return orig(icon, app, text) }
+      game.S.mem[creditStage] = stage
+      setMoney(game, 1000)
+      game.maybeCreditOffer()
+      const offers = said.filter((t) => LOANS.some((l) => l.offer === t))
+      expect(offers, `ступень ${stage}`).toEqual(stage < 3 ? [LOANS[stage].offer] : [])
+      expect(!!game.S.mem[creditOffer], `ступень ${stage}`).toBe(stage < 3)
+    }
   })
 
   it('ступени не перепрыгнуть: без consumer нет refi', () => {

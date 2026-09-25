@@ -15,6 +15,7 @@ import { HEAT } from '../content/memkeys'
 import { valueOf } from './rules'
 import { MENTION_RE } from '../content/world'
 import { P_MONEY, P_DESPERATE } from '../content/topics'
+import { LOANS } from '../content/credit'
 
 describe('Game: начало и ход', () => {
   it('новая игра: одна из завязок, 184-й день, 3–4 варианта реплик', () => {
@@ -946,7 +947,31 @@ describe('Game: деньги на карте', () => {
     game.dismissNotif()
     expect(game.ui.notif?.text).toMatch(/критический/)
     game.dismissNotif()
-    expect(game.ui.notif?.text).toMatch(/Всё будет|одобрен/i)
+    expect(game.ui.notif?.text).toBe(LOANS[0].offer)
+  })
+  it('очередь уведомлений: батарея и непрочитанные — впереди банка, но не впереди показанного (#272)', () => {
+    const { game } = makeGame()
+    game.notify('🏦', 'Банк', 'Списание один')
+    game.notify('🏦', 'Банк', 'Списание два')
+    game.notify('🏦', 'Банк', 'Списание три')
+    game.S.battery = 16
+    game.battery.drain(1)
+    game.notify('💬', 'Алик Воздухонесян', '3 новых сообщения')
+    const shown: string[] = []
+    while (game.ui.notif) { shown.push(game.ui.notif.text); game.dismissNotif() }
+    expect(shown).toEqual(['Списание один', 'Низкий заряд батареи: 15%', '3 новых сообщения', 'Списание два', 'Списание три'])
+  })
+  it('очередь уведомлений: предел — старое из фона уходит, срочное остаётся (#272)', () => {
+    const { game } = makeGame()
+    const texts = ['раз', 'два', 'три', 'четыре', 'пять', 'шесть', 'семь']
+    for (const t of texts) game.notify('🏦', 'Банк', `Списание ${t}`)
+    game.S.battery = 16
+    game.battery.drain(1)
+    game.notify('🏦', 'Банк', 'Списание восемь')
+    const shown: string[] = []
+    while (game.ui.notif) { shown.push(game.ui.notif.text); game.dismissNotif() }
+    expect(shown).toHaveLength(1 + Game.NOTIF_QUEUE_MAX)
+    expect(shown).toEqual(['Списание раз', 'Низкий заряд батареи: 15%', 'Списание шесть', 'Списание семь', 'Списание восемь'])
   })
   it('бедность не смолкает: исчерпанный пул уровня звучит редко и по кругу (#184)', () => {
     const { game } = makeGame()
