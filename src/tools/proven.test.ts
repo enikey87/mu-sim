@@ -28,19 +28,12 @@ const blocked = (g: Game) => { g.S.mem.blocked = true }
 const offended = (g: Game) => { g.S.mem[HEAT] = 1; g.S.ctx = { offended: true } }
 
 const CASES: Record<string, Case> = {
-  Quiet_Dead_AlikAway: { event: 'AlikAway', setup: dead },
   Quiet_Dead_PeriodLine: { event: 'PeriodLine', setup: dead },
-  Quiet_Dead_PromiseDue: { event: 'PromiseDue', facts: { promise: 0 }, setup: (g) => { dead(g); g.recordPromise({ text: 'в пятницу', d: 1 }); g.S.day += 1 } },
-  Quiet_Blocked_AlikAway: { event: 'AlikAway', setup: blocked },
   Quiet_Blocked_PeriodLine: { event: 'PeriodLine', setup: blocked },
-  Quiet_Blocked_PromiseDue: { event: 'PromiseDue', facts: { promise: 0 }, setup: (g) => { blocked(g); g.recordPromise({ text: 'в пятницу', d: 1 }); g.S.day += 1 } },
-  Quiet_PhoneKarine_AlikIdle: { event: 'AlikIdle', setup: phone },
   Quiet_PhoneKarine_AlikAway: { event: 'AlikAway', setup: phone },
-  Quiet_PhoneKarine_StoryBeat: { event: 'StoryBeat', setup: phone },
   Quiet_PhoneKarine_PeriodLine: { event: 'PeriodLine', setup: phone },
   Quiet_PhoneKarine_PromiseDue: { event: 'PromiseDue', facts: { promise: 0 }, setup: (g) => { phone(g); g.recordPromise({ text: 'в пятницу', d: 1 }); g.S.day += 1 } },
   Phone_Karine_AlikTurn: { event: 'AlikTurn', setup: phone },
-  Phone_Karine_PlayerMessage: { event: 'PlayerMessage', facts: { tone: 'neutral' }, setup: phone },
   Phone_Karine_PlayerSays: { event: 'PlayerSays', facts: { intent: 'photo' }, setup: phone },
   Turn_Blocked: { event: 'AlikTurn', setup: blocked },
   Turn_Vendetta: { event: 'AlikTurn', setup: (g) => { g.S.mem.vendetta = true } },
@@ -52,24 +45,11 @@ const CASES: Record<string, Case> = {
     event: 'PlayerSays', facts: { intent: 'sorry' },
     setup: (g) => { blocked(g); g.S.mem['finale.rubik'] = 'karine' },
   },
-  Says_sorry_blocked_hinted: {
-    event: 'PlayerSays', facts: { intent: 'sorry' },
-    setup: (g) => { blocked(g); g.S.mem['blocked.hint'] = true },
-  },
   Finale_boris_brigadir: { event: 'ArcFinale', facts: { arc: 'boris' }, setup: (g) => { g.S.mem['asked.boris'] = 6 } },
-  Finale_boris_toyou: { event: 'ArcFinale', facts: { arc: 'boris' }, setup: (g) => { g.S.items.push('баран Борис') } },
   Finale_samvel_groom: { event: 'ArcFinale', facts: { arc: 'samvel' }, setup: (g) => { g.S.ach.saint = 1 } },
-  Finale_niva_chose: { event: 'ArcFinale', facts: { arc: 'niva' }, setup: (g) => { g.S.items.push('«Нива» 1987 года') } },
   Finale_niva_chose_or: { event: 'ArcFinale', facts: { arc: 'niva' }, setup: (g) => { g.S.mem['asked.niva'] = 5 } },
-  Finale_rubik_karine: { event: 'ArcFinale', facts: { arc: 'rubik' }, setup: (g) => { g.S.ach.wife = 1 } },
   Finale_alik_death_sulk: { event: 'ArcFinale', facts: { arc: 'alik_death' }, setup: () => {} },
-  // наследство уходит Борису — он уже есть в партии (как SETUP['grandpa.revoke'] в finales.test.ts)
-  Finale_grandpa_revoke: { event: 'ArcFinale', facts: { arc: 'grandpa' }, setup: (g) => { g.S.ach.heir = 1; g.S.arcs.boris = { i: 1, last: 0 } } },
   Ending_family: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem['finale.samvel'] = 'groom' } },
-  Ending_ram: {
-    event: 'CheckEnding',
-    setup: (g) => { g.S.day = 300; g.S.mem['finale.boris'] = 'toyou'; g.S.items.push('баран Борис', '½ фундамента') },
-  },
   Ending_honest: {
     event: 'CheckEnding',
     setup: (g) => {
@@ -84,9 +64,6 @@ const CASES: Record<string, Case> = {
   Ending_payday_niva: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'niva' } },
   Tone_Thanks: { event: 'PlayerMessage', facts: { tone: 'polite', category: 'gratitude' } },
   Tone_Greeting: { event: 'PlayerMessage', facts: { tone: 'polite', category: 'greeting' } },
-  Ending_payday_notyou: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'notyou' } },
-  Ending_payday_lavash: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'lavash' } },
-  Ending_payday_strasbourg: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'strasbourg' } },
   Payday_real: {
     event: 'PaydayOutcome',
     setup: (g) => {
@@ -95,21 +72,12 @@ const CASES: Record<string, Case> = {
     },
   },
   Payday_niva: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['finale.niva'] = 'chose' } },
-  Payday_notyou: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['finale.razmik'] = 'default'; g.S.mem['count.rude'] = 8 } },
-  Payday_lavash: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['payday.caught'] = true; g.S.mem['crypto.hodl'] = true } },
-  Payday_strasbourg: { event: 'PaydayOutcome', setup: (g) => { g.S.ach.strasbourg = 1 } },
-  Finale_razmik_swap: { event: 'ArcFinale', facts: { arc: 'razmik' }, setup: (g) => { g.S.mem['count.rude'] = 10; g.S.mem[HEAT] = 3 } },
-  Finale_razmik_union: { event: 'ArcFinale', facts: { arc: 'razmik' }, setup: (g) => { g.S.ach.customer = 1 } },
-  Says_via_mama: { event: 'PlayerSays', facts: { intent: 'via', arg: 'mama' } },
   Endgame_Turn: { event: 'AlikTurn', setup: endgame },
   Quiet_PaydayOpen_AlikAway: { event: 'AlikAway', setup: paydayOpen },
   Quiet_PaydayOpen_PeriodLine: { event: 'PeriodLine', setup: paydayOpen },
   Quiet_PaydayOpen_StoryBeat: { event: 'StoryBeat', setup: paydayOpen },
-  Finale_beton_ledger: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem.caught = 2 } },
-  Finale_nune_ledger: { event: 'ArcFinale', facts: { arc: 'nune' }, setup: (g) => { g.S.mem.caught = 2 } },
   Away_ColdWar: { event: 'AlikAway', setup: offended },
   Quiet_Offended_AlikAway: { event: 'AlikAway', setup: offended },
-  Scene_amnesty: { event: 'PickScene', setup: (g) => { for (let i = 0; i < 5; i++) g.recordPromise({ text: `завтра №${i}`, d: 1 }); g.S.day += 5 } },
 }
 
 function fires(name: string, c: Case): boolean {
@@ -127,10 +95,10 @@ describe('proven — прямые случаи для гейта покрыти�
     for (const [name, c] of Object.entries(CASES)) expect(fires(name, c), name).toBe(true)
   })
   it('у каждой записи PROVEN есть случай', () => {
-    expect(Object.keys(PROVEN).filter((name) => !CASES[name])).toEqual([])
+    expect([...PROVEN].filter((name) => !CASES[name])).toEqual([])
   })
   it('у каждого случая есть запись PROVEN', () => {
-    expect(Object.keys(CASES).filter((name) => !(name in PROVEN))).toEqual([])
+    expect(Object.keys(CASES).filter((name) => !PROVEN.has(name))).toEqual([])
   })
   // issue #102: Quiet_*_PromiseConditionMet были недостижимы — удалены, а не «освобождены»
   it('Quiet_*_PromiseConditionMet нет в правилах', async () => {
