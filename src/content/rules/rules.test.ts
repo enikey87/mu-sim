@@ -109,7 +109,7 @@ describe('варианты игрока (BuildChoices)', () => {
     game.S.ctx = game.ctxFromPromise({ t: 'когда Арарат вернут', d: null, kind: 'never', text: 'когда Арарат вернут' })
     game.S.day = day + 5
     const a = acts(choicesFor(game, game.S.ctx))
-    expect(a.includes('promiseCheck') || a.includes('promiseOk')).toBe(true)
+    expect(a).toContain('promiseNever')
   })
   it('без дат срока whenFresh — нельзя (потеря данных ≠ разрешение)', () => {
     const { game } = makeGame()
@@ -234,10 +234,10 @@ describe('ответы Алика (PlayerSays)', () => {
     expect(oneOf(PREV_MANY.map(frag), t.join(' '))).toBe(true)
     expect(game.S.promises[0].asked).toBe(true)
   })
-  it('переспросить срок «когда-нибудь» — честный ответ', async () => {
+  it('ирония на срок «никогда» — честный ответ в образе', async () => {
     const { game } = makeGame()
-    game.S.ctx = { when: 'когда Арарат вернут', whenNever: true }
-    const t = await reply(game, { text: 'Точно?', tone: 'neutral', act: 'promiseCheck', arg: 'когда Арарат вернут' })
+    game.S.ctx = game.ctxFromPromise({ t: 'когда Арарат вернут', d: null, kind: 'never', text: 'когда Арарат вернут' })
+    const t = await reply(game, { text: 'По-русски это «никогда», Алик.', tone: 'neutral', act: 'promiseNever', arg: 'когда Арарат вернут' })
     expect(oneOf(PROMISE_NEVER.map(valueOf).map(frag), t.join(' '))).toBe(true)
   })
   it('переспросить обычный срок — клятва и тот же срок', async () => {
