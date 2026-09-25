@@ -12,7 +12,7 @@ import { GROUP_Q } from '../misc'
 import { P_LIE } from '../lies'
 import { TOPICS } from '../topics'
 import { WORLD, SPEAKS, needs } from '../world'
-import { fmtDayMonth } from '../../engine/time'
+import { fmtDayMonth, fmtDays } from '../../engine/time'
 import { HEAT, alikDead, blocked, court, lie, mourning } from '../memkeys'
 
 type R = Rule<Game, GameEvent, Offer>
@@ -88,15 +88,21 @@ export const choiceRules: R[] = [
   offer({ name: 'Wrong', when: [is('ctx.wrong')], act: 'wrong', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'WQ', WRONG_Q) }),
   offer({ name: 'Legend', when: [is('ctx.legendary')], act: 'legendQ', tone: 'polite', bonus: 2, text: (g) => fromD(g, 'P_LEGEND') }),
 
-  // срок обещания: только пока он ещё впереди относительно даты над перепиской (после +1…3 дня «завтра» уже вчера)
-  offer({
-    name: 'When', slot: 'when', weight: 0.6, when: [exists('ctx.when'), is('ctx.whenFresh')], act: 'promiseCheck', tone: 'neutral', bonus: 1,
-    text: (g, f) => fromD(g, 'P_WHEN', { t: String(f['ctx.when']), T: cap(String(f['ctx.when'])), date: String(f['ctx.whenDate'] ?? '') }), arg: (_g, f) => String(f['ctx.when']),
-  }),
-  offer({
-    name: 'WhenOk', slot: 'when', weight: 0.4, when: [exists('ctx.when'), is('ctx.whenFresh')], act: 'promiseOk', tone: 'polite', bonus: 1,
-    text: (g, f) => fromD(g, 'P_WHEN_OK', { t: String(f['ctx.when']), T: cap(String(f['ctx.when'])), date: String(f['ctx.whenDate'] ?? '') }),
-  }),
+  // срок обещания: только пока он ещё впереди относительно даты над перепиской (после +1…3 дня «завтра» уже вчера).
+  // Кнопка — по горизонту и роду (docs/design/deadline-replies.md); специфичность прежняя, слот `when` вытесняет других как раньше
+  ...(() => {
+    const term = [exists('ctx.when'), is('ctx.whenFresh')]
+    const args = (f: Facts) => ({ t: String(f['ctx.when']), T: cap(String(f['ctx.when'])), date: String(f['ctx.whenDate'] ?? ''), days: fmtDays(Number(f['ctx.whenDays'] ?? 0)) })
+    const when = (o: Pick<OfferSpec, 'name' | 'when' | 'act' | 'tone' | 'weight' | 'arg' | 'text'>) => offer({ slot: 'when', specificity: 3, bonus: 1, ...o })
+    const near = [...term, eq('ctx.whenHorizon', 'near')]
+    return [
+      when({ name: 'WhenOk', when: near, weight: 0.4, act: 'promiseOk', tone: 'polite', text: (g, f) => fromD(g, f['ctx.whenDate'] ? 'P_WHEN_OK' : 'P_WHEN_OK_EVENT', args(f)) }),
+      when({ name: 'WhenCheck', when: near, weight: 0.6, act: 'promiseCheck', tone: 'neutral', text: (g, f) => fromD(g, 'P_WHEN', args(f)), arg: (_g, f) => String(f['ctx.when']) }),
+      when({ name: 'WhenPencil', when: [...term, eq('ctx.whenHorizon', 'far')], act: 'promiseOk', tone: 'neutral', text: (g, f) => fromD(g, 'P_WHEN_PENCIL', args(f)) }),
+      when({ name: 'WhenFar', when: [...term, eq('ctx.whenHorizon', 'veryFar')], act: 'promiseCheck', tone: 'neutral', text: (g, f) => fromD(g, 'P_WHEN_FAR', args(f)), arg: (_g, f) => String(f['ctx.when']) }),
+      ...(['never', 'absurd'] as const).map((kind) => when({ name: `When_${kind}`, when: [...term, eq('ctx.whenKind', kind)], act: 'promiseCheck', tone: 'neutral', text: (g, f) => fromD(g, 'P_WHEN_NEVER', args(f)), arg: (_g, f) => String(f['ctx.when']) })),
+    ]
+  })(),
 
   // родственник: спросить «при чём тут он» / поздравить / посочувствовать — одна кнопка на слот
   offer({

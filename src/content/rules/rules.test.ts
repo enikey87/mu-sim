@@ -74,18 +74,19 @@ describe('варианты игрока (BuildChoices)', () => {
     const { game } = makeGame()
     const day = game.S.day
     // как после отмазки: срок записан в день речи, календарь уже +1…3
-    game.S.ctx = { when: 'завтра', whenMade: day, whenDue: day + 1 }
+    game.S.ctx = game.ctxFromPromise({ t: 'завтра', d: 1, kind: 'clear', text: 'завтра' })
     game.S.day = day + 2
     expect(acts(choicesFor(game, game.S.ctx))).not.toContain('promiseOk')
     expect(acts(choicesFor(game, game.S.ctx))).not.toContain('promiseCheck')
-    game.S.ctx = { when: 'через пять минут', whenMade: day, whenDue: day }
+    game.S.day = day
+    game.S.ctx = game.ctxFromPromise({ t: 'через пять минут', d: 0, kind: 'clear', text: 'через пять минут' })
     game.S.day = day + 1
     expect(acts(choicesFor(game, game.S.ctx)).some((a) => a === 'promiseOk' || a === 'promiseCheck')).toBe(false)
   })
-  it('пока срок впереди — вариант с датой обещания, не голое «завтра»', () => {
+  it('пока срок впереди — вариант с датой срока, не голое «завтра»', () => {
     const { game } = makeGame()
     const day = game.S.day
-    game.S.ctx = { when: 'завтра', whenMade: day, whenDue: day + 1 }
+    game.S.ctx = game.ctxFromPromise({ t: 'завтра', d: 1, kind: 'clear', text: 'завтра' })
     game.S.day = day + 1 // «завтра» стало сегодня — текст всё ещё про цитату с датой
     const whenActs = new Set<string>()
     const texts: string[] = []
@@ -100,12 +101,12 @@ describe('варианты игрока (BuildChoices)', () => {
     }
     expect(whenActs.has('promiseOk') || whenActs.has('promiseCheck')).toBe(true)
     expect(texts.some((t) => /Запомнил: завтра(?!\s*«)/.test(t) || /^Через пять минут\?/.test(t))).toBe(false)
-    expect(texts.every((t) => t.includes('«') || /когда по-русски|это точно/.test(t))).toBe(true)
+    expect(texts.every((t) => t.includes('«'))).toBe(true)
   })
   it('«когда-нибудь» остаётся доступным после сдвига дня', () => {
     const { game } = makeGame()
     const day = game.S.day
-    game.S.ctx = { when: 'когда Арарат вернут', whenNever: true, whenMade: day, whenDue: null }
+    game.S.ctx = game.ctxFromPromise({ t: 'когда Арарат вернут', d: null, kind: 'never', text: 'когда Арарат вернут' })
     game.S.day = day + 5
     const a = acts(choicesFor(game, game.S.ctx))
     expect(a.includes('promiseCheck') || a.includes('promiseOk')).toBe(true)
@@ -138,7 +139,7 @@ describe('варианты игрока (BuildChoices)', () => {
       for (const c of game.buildChoices()) if (c.act === 'promiseOk' || c.act === 'promiseCheck') onDue.push(c.text)
     }
     expect(onDue.length).toBeGreaterThan(0)
-    expect(onDue.every((t) => t.includes('«') || /когда по-русски|это точно/.test(t))).toBe(true)
+    expect(onDue.every((t) => t.includes('«'))).toBe(true)
     expect(onDue.some((t) => /Запомнил: завтра(?!\s*«)/.test(t))).toBe(false)
     // как advanceTurnDay после ответа: +1…3, срок «завтра» уже позади
     game.nextDay(2)

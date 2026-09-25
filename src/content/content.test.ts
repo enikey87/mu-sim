@@ -121,7 +121,7 @@ describe('dictionaries', () => {
   })
   it('player templates only use known placeholders', () => {
     for (const k of Object.keys(D).filter((k) => k.startsWith('P_'))) {
-      for (const s of (D[k] as Entry<string>[]).map(valueOf)) for (const m of s.matchAll(/\{(\w+)\}/g)) expect(['t', 'T', 'n', 's', 'date', 'amount'], `${k}: ${s}`).toContain(m[1])
+      for (const s of (D[k] as Entry<string>[]).map(valueOf)) for (const m of s.matchAll(/\{(\w+)\}/g)) expect(['t', 'T', 'n', 's', 'date', 'days', 'amount'], `${k}: ${s}`).toContain(m[1])
     }
   })
 })

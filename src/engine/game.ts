@@ -1263,7 +1263,8 @@ export class Game {
         if (c.whenMade != null) return c.whenMade >= S.day
         return false
       })(),
-      'ctx.whenDate': c.when != null ? fmtDayMonth(c.whenMade ?? S.day) : undefined,
+      // дата в кнопке — срок, и только у ясного срока и увёртки; у остальных родов даты нет
+      'ctx.whenDate': c.whenAt !== undefined && (c.whenKind === 'clear' || c.whenKind === 'dodge') ? fmtDayMonth(c.whenAt) : undefined,
       'ctx.whenKind': c.whenKind, 'ctx.whenDays': whenDays,
       'ctx.whenHorizon': whenDays === undefined ? undefined : whenDays <= 7 ? 'near' : whenDays <= 30 ? 'far' : 'veryFar',
       'ctx.rel': c.rel?.n, 'ctx.relYou': c.rel?.you ?? c.rel?.n, 'ctx.sad': c.sad, 'ctx.festive': c.festive, 'ctx.revived': c.revived,
