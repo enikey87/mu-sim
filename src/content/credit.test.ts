@@ -89,7 +89,7 @@ describe('кредитная лестница', () => {
     const { game } = makeGame()
     const said: string[] = []
     const orig = game.notify.bind(game)
-    game.notify = (icon: string, app: string, text: string): void => { said.push(text); orig(icon, app, text) }
+    game.notify = (icon: string, app: string, text: string): boolean => { said.push(text); return orig(icon, app, text) }
     const refusals = (): number => said.filter((t) => /недостаточно средств/i.test(t)).length
     game.S.mem[loanTaken('consumer')] = true
     setMoney(game, 100)
@@ -162,7 +162,7 @@ describe('кредитная лестница', () => {
     setMoney(game, 10_000_000)
     const texts: string[] = []
     const notify = game.notify.bind(game)
-    game.notify = (icon, app, text) => { texts.push(text); notify(icon, app, text) }
+    game.notify = (icon, app, text) => { texts.push(text); return notify(icon, app, text) }
     for (const l of LOANS) game.S.mem[loanTaken(l.id)] = true
     game.scheduleCredits()
     const pending = (id: string) => game.rules.state.schedule.filter((it) => it.kind === 'event' && it.event === 'CreditDue' && it.facts?.credit === id).length

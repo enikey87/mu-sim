@@ -883,17 +883,23 @@ export class Game {
   }
 
   // ---------- уведомления, батарея ----------
-  notify(icon: string, app: string, text: string): void {
-    // банк: одна и та же новость (числа не различают) — один раз за игровой день (#251)
+  /** Ключ банковского SMS: событие без баланса; суммы различают события (#265). */
+  private bankSmsKey(text: string): string {
+    return text.replace(/\s*Баланс:\s*[\d\s\u00a0]*₽\.?/gi, '').trim()
+  }
+  /** false — отброшено дедупом; true — показано или в очереди. */
+  notify(icon: string, app: string, text: string): boolean {
+    // банк: одно и то же событие (не баланс) — один раз за игровой день (#251/#265)
     if (app === 'Банк' || app === 'МФО') {
       if (!this.bankSmsDay || this.bankSmsDay.day !== this.S.day) this.bankSmsDay = { day: this.S.day, keys: new Set() }
-      const key = text.replace(/\d[\d\s]*/g, '#')
-      if (this.bankSmsDay.keys.has(key)) return
+      const key = this.bankSmsKey(text)
+      if (this.bankSmsDay.keys.has(key)) return false
       this.bankSmsDay.keys.add(key)
     }
     const n: Notif = { id: this.seq++, icon, app, text }
-    if (this.ui.notif) { this.notifQueue.push(n); return }
+    if (this.ui.notif) { this.notifQueue.push(n); return true }
     this.showNotif(n)
+    return true
   }
   private showNotif(n: Notif): void {
     this.ui.notif = n

@@ -131,9 +131,11 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
   const notifBuf: WorldFrame['notif'] = []
   const notify = game.notify.bind(game)
   game.notify = (icon, app, text) => {
+    // только показанное: дедуп банка иначе попадает в расшифровку (#265)
+    if (!notify(icon, app, text)) return false
     asides.push({ at: game.S.msgs.length, text: `(уведомление телефона: ${icon} ${app} — ${text})` })
     notifBuf.push({ text: `${app} — ${text}`, fails: notifFails(game, app, text) })
-    notify(icon, app, text)
+    return true
   }
   const awayBuf: WorldFrame['away'] = []
   const awayIdx = new Set<number>()
