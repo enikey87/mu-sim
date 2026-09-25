@@ -4,7 +4,7 @@ import type { Due } from '../engine/time'
 import { type Entry, gate, eq, gte, lt, lte, matches, missing, exists, is, of } from './fact'
 import type { LegalClaim } from '../engine/input'
 import { needs, WORLD } from './world'
-import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, count, evicted, grantPaid, met, nuneDekretOver, nuneKeyPassed, sick, taxThawed, threatClaim, tileCornerRemoved } from './memkeys'
+import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, collectorsRecruited, count, evicted, grantPaid, met, nuneDekretOver, nuneKeyPassed, sick, taxThawed, threatClaim, tileCornerRemoved } from './memkeys'
 
 // draw(key, arr) выдаёт уместный сейчас элемент «из колоды» (без повторов до конца колоды); noRefill — после исчерпания null
 export type DrawFn = <T = unknown>(key: string, arr: readonly Entry<T>[], noRefill?: boolean) => T
@@ -243,7 +243,8 @@ D.THREAT_A = [
   needs('samvel')(claim('lawyer')('Адвокат? Мой адвокат — Самвел, он в суде тридцать лет. Подсудимым, но опыт есть.')),
   claim('court')('Суд — это хорошо, там бесплатный кофе.'),
   needs('boris', 'baran')(claim('court')('Иди, брат. Присяжные — бараны, Борис у них старший.')),
-  claim('collectors')('Коллекторы? Приходили. Остались работать у меня на объекте.'),
+  claim('collectors')(needs('collectorsRecruited')('Коллекторы? Приходили. Остались работать у меня на объекте.')),
+  claim('collectors')(gate(missing(collectorsRecruited))('Коллекторы? Пусть сначала найдут меня. Я их тоже ищу — для дружбы.')),
   needs('arsen')(claim('lawyer')('Юрист? Мой юрист — Арсен, ему девятнадцать, он смотрел сериал про юристов.')),
   claim('tax')('Налоговая? Они мне сами должны, за нервы.'),
   // без предмета — без «там»: строка открыта любой инстанции, и коллекторам, и заявлению

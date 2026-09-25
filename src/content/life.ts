@@ -1,6 +1,6 @@
 import { type Entry, type LineSpec, gate, gte, lte, eq, ne, is, missing, set } from './fact'
 import { needs, WORLD } from './world'
-import { bloodGiven, count, endgame, evicted, wedding } from './memkeys'
+import { bloodGiven, collectorsRecruited, count, creditBroke, endgame, evicted, wedding } from './memkeys'
 import { sold, momHelp } from './credit'
 import { billStreak } from './bills'
 
@@ -133,7 +133,7 @@ export const NOTIF: Notif[] = [
   // «сдал объект» — новость финала Бориса, не серии о назначении
   { icon: '📺', app: 'Новости', t: 'Баран-прораб из Абовяна дал первое интервью. На вопрос «как платить людям» ответил «бее».', when: [WORLD.baran, gte('arc.boris', 8)] },
   { icon: '🏦', app: 'Банк', t: 'Кредит одобрен! 94% годовых. Поздравляем!', when: [gte('credit.stage', 1)] },
-  { icon: '📞', app: 'Коллекторы', t: 'Мы знаем, где живёт ваш Алик. Он нам тоже должен. Давайте дружить.' },
+  { icon: '📞', app: 'Коллекторы', t: 'Мы знаем, где живёт ваш Алик. Он нам тоже должен. Давайте дружить.', when: [is(creditBroke), missing(collectorsRecruited)] },
   { icon: '👩', app: 'Мама', t: 'Сынок, я продала дачу, чтобы ты дождался Алика.', when: [is(momHelp('dacha'))] },
   // три неоплаты коммуналки подряд — хозяин выселяет; оплата сбрасывает полосу (#301)
   { icon: '🏠', app: 'Хозяин квартиры', t: 'Выселяю. Можешь пожить у Алика, он же тебе как отец.', when: [missing(evicted), gte(billStreak('rent'), 3)], remember: [set(evicted, true)] },

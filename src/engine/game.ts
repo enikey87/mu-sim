@@ -628,6 +628,8 @@ export class Game {
     if (this.moneySealed()) return
     for (const loan of LOANS) {
       if (!this.S.mem[loanTaken(loan.id)]) continue
+      // после перевербовки микрозайм с игрока не требуют (#128)
+      if (loan.id === 'micro' && this.S.mem[memkeys.collectorsRecruited]) continue
       const atKey = loanDueAt(loan.id)
       if (this.S.mem[atKey] != null) continue
       const at = this.S.day + dueIn(loan.due, this.S.day)
@@ -640,6 +642,10 @@ export class Game {
     if (this.moneySealed()) return
     const loan = LOANS.find((l) => l.id === id)
     if (!loan || !this.S.mem[loanTaken(id)]) return
+    if (id === 'micro' && this.S.mem[memkeys.collectorsRecruited]) {
+      delete this.S.mem[loanDueAt(id)]
+      return
+    }
     const payment = Number(this.S.mem[loanPayment(id)] ?? loan.payment)
     const dueAt = this.S.mem[loanDueAt(id)]
     const dueDay = dueAt != null ? Number(dueAt) : this.S.day
@@ -1097,9 +1103,15 @@ export class Game {
 
   // ---------- факты для правил ----------
   availableArcs(): string[] {
+    // when проверяем по mem+day, не через facts(): там arcAvailable → availableArcs
+    const slim = { ...this.S.mem, day: this.S.day }
     return Object.keys(ARCS).filter((id) => {
+      const a = ARCS[id]
       const st = this.S.arcs[id]
-      return st ? st.i < ARCS[id].eps.length && this.S.day - st.last >= 3 : this.S.day >= (ARCS[id].minDay ?? 0)
+      if (st) return st.i < a.eps.length && this.S.day - st.last >= 3
+      if (this.S.day < (a.minDay ?? 0)) return false
+      if (a.when?.length && !a.when.every((c) => test(c, slim))) return false
+      return true
     })
   }
   unfinishedArc(): string | undefined {
