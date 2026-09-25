@@ -1,6 +1,6 @@
 // Игра: состояние, сообщения, ход Алика, «живость». Решения — что ответить, что предложить игроку,
 // что сделать Алику — принимает система правил (engine/rules/, content/rules/*).
-import { make, D, low, cap, type ExcuseApi, type Promise3, type PromiseCondition, type Rel } from '../content/excuses'
+import { make, D, low, cap, type ExcuseApi, type Promise3, type PromiseCondition, type Rel, type When } from '../content/excuses'
 import { makeScenes, invKey, type Scene, type Line } from '../content/scenes'
 import { COLD_WAR, TRIBUNAL } from '../content/rude'
 import { MIRROR, MIRROR_AGAIN, MIRROR_OPEN, MIRROR_REPLY, type Mirror } from '../content/mirror'
@@ -13,7 +13,7 @@ import { ARCS, ARC_DONE, CAST, type Episode, GROUP, GROUP_OOPS, WRONG_TO, WRONG_
 import * as L from '../content/life'
 import { ACH } from '../content/achievements'
 import { SPEAKS, meet } from '../content/world'
-import { ALIK_STATUS, FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_HIDDEN, STATUS_WANDER, OATH_FORMS, OATH_STAKE_MOUSTACHE } from '../content/misc'
+import { ALIK_STATUS, BLOOD_PAY, FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_HIDDEN, STATUS_WANDER, OATH_FORMS, OATH_STAKE_MOUSTACHE } from '../content/misc'
 import { STARTS } from '../content/quests'
 import { BILLS, billDue, billDueAt, billStreak, billUnpaid, lightOff, netRation, phoneWarn, type BillId } from '../content/bills'
 import {
@@ -45,9 +45,9 @@ import { type Audio, silentAudio } from './audio'
 import { typo } from './typo'
 import { UiState, type Moo, type Notif, type SendFeel } from './ui-state'
 import { classifyUserInput, legalClaim, type ClassifiedInput } from './input'
-import { holidayOf, holidayGreetKey, HOLIDAY_EXCUSES } from '../content/holidays'
+import { holidayOf, holidayGreetKey, holidayDays, HOLIDAY_EXCUSES } from '../content/holidays'
 import { dueIn, dateOf, fmtDate, fmtDayMonth, fmtShortDate, fmtTime, weekOf, nightHour, periodOf, tierOf, TIERS, type Due, type Period } from './time'
-import { type GameState, type Msg, type NewMsg, type Card, type Choice, type Ctx, type Tone, type Storage, type InputCategory, freshState, loadState, saveState, SAVE_KEY, LEND50_SEEN_KEY, MAX_PATIENCE, isLate, countOf, setCount, type PromiseRec } from './state'
+import { type GameState, type Msg, type NewMsg, type Card, type PhoneEvent, type Choice, type Ctx, type Tone, type Storage, type InputCategory, freshState, loadState, saveState, SAVE_KEY, LEND50_SEEN_KEY, MAX_PATIENCE, isLate, countOf, setCount, type PromiseRec } from './state'
 
 /** Текст срока как буквальный шаблон без учёта регистра; кэш — topicOfLast зовётся из facts() на каждую реплику. */
 const LITERAL = new Map<string, RegExp>()
@@ -162,7 +162,7 @@ export class Game {
     this.S = loadState(this.storage) ?? freshState()
     // колбеки батареи — в узком хосте, а не в публичном интерфейсе Game: game.dead() путался бы со смертью Алика
     this.battery = new Battery(this.S, {
-      low: (level) => this.notify('🪫', 'Система', `Низкий заряд батареи: ${level}%`),
+      low: (level) => this.notify('🪫', 'Система', `Низкий заряд батареи: ${level}%`, { event: 'battery' }),
       dead: () => this.onPhoneDead(),
       chargeDone: () => this.onPhoneCharged(),
       sleep: (ms) => this.sleep(ms),
@@ -493,17 +493,28 @@ export class Game {
     const rank = { normal: 2, low: 1, bottom: 0 }
     if (rank[after] < rank[before]) {
       const bal = this.rub(this.S.money)
-      if (after === 'low') this.bankCard(`Банк обеспокоен остатком: ${bal}. Рекомендуем не ждать Алика.`)
-      else if (this.loanOffer()) this.maybeCreditOffer(`Остаток критический: ${bal} после «${reason}»`)
+      if (after === 'low') this.bankCard(`Банк обеспокоен остатком: ${bal}. Рекомендуем не ждать Алика.`, { event: 'bank.level' })
+      // шапка предложения — без остатка: карточку жмут позже, а число в ней стареет (#337)
+      else if (!this.newFall()) { /* дно не новость */ }
+      else if (this.loanOffer()) this.maybeCreditOffer(`Остаток критический после «${reason}»`)
       else {
-        this.bankCard(`Остаток критический: ${bal}. Гречка и достоинство — разные статьи расходов.`)
+        this.criticalCard(`Остаток критический: ${bal}. Гречка и достоинство — разные статьи расходов.`, { event: 'bank.level' })
         this.maybeCreditOffer()
       }
     }
     return true
   }
+  /** «Новое падение»: после первого дна баланс живёт у дна, и каждая неделя счетов — не новость. Банк объявляет остаток критическим (и предлагает ступень) не чаще раза в POOR_REPEAT_DAYS (#337). */
+  private newFall(): boolean {
+    const at = this.S.mem[memkeys.criticalAt]
+    return at == null || this.S.day - Number(at) >= POOR_REPEAT_DAYS
+  }
+  private criticalCard(text: string, extra: Partial<Card> & { event: PhoneEvent }): void {
+    this.S.mem[memkeys.criticalAt] = this.S.day
+    this.bankCard(text, extra)
+  }
   private rub(n: number): string { return `${n.toLocaleString('ru-RU')} ₽` }
-  private bankCard(text: string, extra?: Partial<Card>): void { this.notify('🏦', 'Банк', text, extra) }
+  private bankCard(text: string, extra: Partial<Card> & { event: PhoneEvent }): void { this.notify('🏦', 'Банк', text, extra) }
   /** Строка недельной сводки; `refused` — трата не прошла; `onDay` — день срока платежа (#300). */
   private bankLine(label: string, delta: number, refused = false, onDay = this.S.day): void {
     if (this.moneySealed()) return
@@ -529,7 +540,7 @@ export class Game {
     }
     const lines = [...part('-', 'Списано'), ...part('+', 'Поступило'), ...part('!', 'Не прошло')]
     if (!lines.length) return
-    this.bankCard(`Сводка за неделю ${fmtShortDate(b.week)} – ${fmtShortDate(b.week + 6)}: баланс ${this.rub(b.bal)}`, { lines })
+    this.bankCard(`Сводка за неделю ${fmtShortDate(b.week)} – ${fmtShortDate(b.week + 6)}: баланс ${this.rub(b.bal)}`, { lines, event: 'bank.summary' })
   }
   /** Перевод от Алика: paid — любой; fifty — только ровно 50 ₽ (ачивка «пять раз»). */
   noteAlikPay(amount: number): void {
@@ -599,7 +610,7 @@ export class Game {
     if (this.adjustMoney(-bill.amount, bill.label, { onDay })) {
       this.rules.applyOps([set(billUnpaid(id), false), set(billStreak(id), 0)], {})
       this.scheduleBills()
-      if (this.moneyLevel() === 'bottom') this.maybeCreditOffer()
+      if (this.moneyLevel() === 'bottom' && this.newFall()) this.maybeCreditOffer()
       return
     }
     const streak = Number(this.S.mem[billStreak(id)] ?? 0) + 1
@@ -614,9 +625,9 @@ export class Game {
   }
   /** Отказ платежа: карточка с причиной — или сразу предложение кредита с ней же (#287). */
   private refused(why: string, tail: string, say: boolean): void {
-    if (say && this.loanOffer()) { this.maybeCreditOffer(why); return }
-    if (say) this.bankCard(`${why}. ${tail}`)
-    if (this.moneyLevel() === 'bottom') this.maybeCreditOffer()
+    if (say && this.loanOffer() && this.newFall()) { this.maybeCreditOffer(why); return }
+    if (say) this.bankCard(`${why}. ${tail}`, { event: 'bank.refusal' })
+    if (this.moneyLevel() === 'bottom' && this.newFall()) this.maybeCreditOffer()
   }
   /** Расписание платежей по взятым кредитам. */
   scheduleCredits(): void {
@@ -658,8 +669,8 @@ export class Game {
     const why = `Не прошло: ${loan.label}, ${this.rub(payment)}`
     if (id === 'micro' && !this.S.mem[creditBroke]) {
       this.rules.applyOps([set(creditBroke, true), set(creditStage, 4)], {})
-      this.notify('🏦', 'МФО', `${why}. Мы не злимся. Мы записываем`)
-      if (this.moneyLevel() === 'bottom') this.maybeCreditOffer()
+      this.notify('🏦', 'МФО', `${why}. Мы не злимся. Мы записываем`, { event: 'bank.refusal' })
+      if (this.moneyLevel() === 'bottom' && this.newFall()) this.maybeCreditOffer()
       return
     }
     this.refused(why, 'Недостаточно средств.', first)
@@ -688,13 +699,15 @@ export class Game {
     const loan = this.loanOffer()
     if (!loan) return false
     if (!why && (this.S.mem[creditOffer] || this.S.mem[creditDeclined])) return false
+    // сумма фиксируется здесь и даётся ровно она: обещанное и зачисленное — одно число (#337)
+    const sum = this.relief(loan.amount)
     this.closeOffers()
-    this.rules.applyOps([set(creditOffer, true), set(creditDeclined, false)], {})
+    this.rules.applyOps([set(creditOffer, true), set(creditDeclined, false), set(memkeys.creditOfferSum, sum)], {})
     const thing = nextThing(this.S.mem)
     const take = loan.id === 'consumer' ? 'Взять кредит «Всё будет»'
       : loan.id === 'refi' ? 'Взять кредит на погашение кредита'
       : 'Взять микрозайм «Деньги-Ара»'
-    this.bankCard(`${why ?? `Остаток: ${this.rub(this.S.money)}`}. ${loan.offer}`, { offer: { take, sell: thing?.choice } })
+    this.criticalCard(`${why ?? 'Остаток критический'}. ${loan.offer.replace('{sum}', this.rub(sum))}`, { offer: { take, sell: thing?.choice }, event: 'bank.offer' })
     return true
   }
   private closeOffers(): void {
@@ -738,8 +751,10 @@ export class Game {
     const stage = Number(this.S.mem[creditStage] ?? 0)
     const loan = nextLoan(stage)
     if (!loan) return
-    const amount = this.relief(loan.amount)
+    const offered = this.S.mem[memkeys.creditOfferSum]
+    const amount = offered != null ? Number(offered) : this.relief(loan.amount)
     if (amount === 0) return
+    delete this.S.mem[memkeys.creditOfferSum]
     const payment = amount === loan.amount ? loan.payment : Math.max(1, Math.round(loan.payment * amount / loan.amount))
     this.rules.applyOps([
       set(creditOffer, false),
@@ -757,9 +772,10 @@ export class Game {
     const got = this.relief(thing.amount)
     if (got === 0) return
     this.rules.applyOps([set(creditOffer, false), set(sold(thing.id), true)], {})
+    delete this.S.mem[memkeys.creditOfferSum]
     this.adjustMoney(got, 'Авито')
-    // продажа могла не вытащить со дна — снова предложить, с этой причиной
-    if (this.moneyLevel() === 'bottom') this.maybeCreditOffer(`Продано, а остаток ${this.rub(this.S.money)}`)
+    // продажа могла не вытащить со дна — снова предложить, с этой причиной (ход игрока, не падение — без перерыва)
+    if (this.moneyLevel() === 'bottom') this.maybeCreditOffer('Продано, а остаток всё ещё критический')
   }
   /** Кнопка карточки банка: выбор пишется в мир, Алику не уходит (#287). */
   answerCard(id: number, pick: 'take' | 'sell' | 'later'): void {
@@ -783,6 +799,7 @@ export class Game {
         result = `${thing.done}. +${this.rub(this.S.money - before)}. Баланс: ${this.rub(this.S.money)}`
       } else if (pick === 'later') {
         this.rules.applyOps([set(creditOffer, false), set(creditDeclined, true)], {})
+        delete this.S.mem[memkeys.creditOfferSum]
         result = 'Не сейчас'
       } else return
       const cur = this.S.msgs.find((x) => x.id === id)
@@ -798,7 +815,7 @@ export class Game {
     const help = nextMom(this.S.mem)
     if (!help) {
       this.rules.applyOps([set(momDone, true)], {})
-      this.notify('👩', 'Мама', MOM_DONE_TEXT)
+      this.notify('👩', 'Мама', MOM_DONE_TEXT, { event: 'mom' })
       return
     }
     const got = this.relief(help.amount)
@@ -807,7 +824,7 @@ export class Game {
     this.adjustMoney(got, 'Мама')
     const done = !nextMom(this.S.mem)
     if (done) this.rules.applyOps([set(momDone, true)], {})
-    this.notify('👩', 'Мама', help.text.replace('{sum}', this.rub(got)), done ? { lines: [MOM_DONE_TEXT] } : undefined)
+    this.notify('👩', 'Мама', help.text.replace('{sum}', this.rub(got)), { event: 'mom', ...(done ? { lines: [MOM_DONE_TEXT] } : {}) })
   }
   /** Закрыть кнопки допработ в ленте (после Дня выплаты). */
   sealOpenJobs(): void {
@@ -862,6 +879,7 @@ export class Game {
     if (this.disposed) throw new GameDisposed()
     const msg = { ...m, id: this.S.nextId++ } as Msg
     if ((msg.kind === 'text' || msg.kind === 'sys') && msg.text.includes('{')) msg.text = this.fillMoney(msg.text)
+    this.quietHeader()
     this.S.msgs.push(msg)
     this.touchMsgs(this.S.msgs.length - 1)
     this.emit()
@@ -903,7 +921,7 @@ export class Game {
   async typingFor(ms: number, label = 'печатает…'): Promise<void> {
     ms = Math.min(5000, Math.max(800, ms)) * (this.isNight() ? 1.5 : 1)
     // в блоке / «смерти» / у Карине шапка не врёт «печатает…» → «в сети» (#257)
-    if (this.alikSilent()) { await this.sleep(ms); return }
+    if (this.alikSilent()) { this.quietHeader(); this.emit(); await this.sleep(ms); return }
     const show = () => { this.ui.typing = label; this.ui.status = { text: label, cls: 'typing' }; this.emit() }
     const hide = () => { this.ui.typing = null; this.ui.status = { text: 'в сети', cls: 'online' }; this.emit() }
     show()
@@ -957,6 +975,13 @@ export class Game {
   alikSilent(): boolean {
     const m = this.S.mem
     return !!(m[memkeys.blocked] || m[memkeys.alikDead] || m[memkeys.phoneKarine] || this.S.offlineDays > 0)
+  }
+  /** Молчание могло начаться посреди хода (блок, «смерть»): шапка не остаётся «прочитано»/«в сети» до его конца (#308). */
+  private quietHeader(): void {
+    if (!this.alikSilent()) return
+    const text = this.S.offlineDays > 0 ? 'был давно' : 'не в сети'
+    this.ui.typing = null
+    if (this.ui.status.text !== text) this.ui.status = { text, cls: '' }
   }
   restStatus(): void {
     if (this.S.offlineDays > 0) {
@@ -1032,7 +1057,7 @@ export class Game {
   /** Баннер сверху — только батарея и непрочитанные; остальное телефона — карточка в ленте, без нажатий (#287). */
   static isBanner(app: string): boolean { return app === 'Система' || app === 'Алик Воздухонесян' }
   /** false — отброшено дедупом; true — показано, в очереди или карточкой в ленте. */
-  notify(icon: string, app: string, text: string, card?: Partial<Card>): boolean {
+  notify(icon: string, app: string, text: string, card: Partial<Card> & { event: PhoneEvent }): boolean {
     if (this.disposed) return false
     // банк: одно и то же событие (не баланс) — один раз за игровой день (#251/#265)
     if (app === 'Банк' || app === 'МФО') {
@@ -1083,18 +1108,23 @@ export class Game {
     else this.emit()
   }
   randomNotif(): void {
-    const p = this.linePicked('NOTIF', L.NOTIF)
+    // remember после notify: плейтест судит when до факта строки (#339)
+    const p = this.lines.pick('NOTIF', L.NOTIF, this.lineFacts())
     if (!p) return
+    this.lines.mark(p.id)
+    this.seen.mark(p.text)
     const n = p.spec as L.Notif
     if (n.spend) {
-      if (this.moneySealed()) return // после выплаты мелочь не шумит «недостаточно» (#252)
-      const spend = 90 + this.rnd(40) * 10
-      const why = this.draw('SPEND', L.SPEND)
-      // отказ не молчит (#185), но мелочь — строка сводки, а не карточка (#287)
-      if (!this.adjustMoney(-spend, why, { group: 'По мелочи' })) this.bankLine('По мелочи', -spend, true)
-      return
+      if (!this.moneySealed()) { // после выплаты мелочь не шумит «недостаточно» (#252)
+        const spend = 90 + this.rnd(40) * 10
+        const why = this.draw('SPEND', L.SPEND)
+        // отказ не молчит (#185), но мелочь — строка сводки, а не карточка (#287)
+        if (!this.adjustMoney(-spend, why, { group: 'По мелочи' })) this.bankLine('По мелочи', -spend, true)
+      }
+    } else {
+      this.notify(n.icon, n.app, p.text, { event: 'life' })
     }
-    this.notify(n.icon, n.app, p.text)
+    if (p.spec.remember) this.rules.applyOps(p.spec.remember, {})
   }
   // ---------- телефон: что Game делает по событиям Battery ----------
   private onPhoneDead(): void {
@@ -1175,6 +1205,7 @@ export class Game {
     for (const k in S.ach) progress['ach.' + k] = true
     for (const k in S.ach) progress['since.' + k] = S.day - S.ach[k]
     const moneyLv = this.moneyLevel()
+    const whenDays = c.whenAt === undefined ? undefined : Math.max(0, c.whenAt - S.day)
     return {
       day: S.day, tier: S.tier, mood: S.mood, sent: S.stats.sent, moo: S.stats.moo, patience: S.patience, money: S.money, debt: S.debt, fifty: S.stats.fifty, paid: S.stats.paid,
       moneyNormal: moneyLv === 'normal', moneyLow: moneyLv === 'low', moneyBottom: moneyLv === 'bottom',
@@ -1216,7 +1247,7 @@ export class Game {
       // начатая линия коллекторов идёт своим битом, но той же нормой: не больше серии в день (#324)
       collectorsCanAdvance: this.arcCanAdvance('collectors') && !Object.values(S.arcs).some((a) => a.last === S.day),
       arcsStarted: Object.keys(S.arcs).length,
-      arcsDone: Object.entries(S.arcs).filter(([id, a]) => a.i >= ARCS[id].eps.length).length,
+      arcsDone: Object.entries(S.arcs).filter(([id, a]) => !ARCS[id].mechanic && a.i >= ARCS[id].eps.length).length,
       quests: Object.keys(S.ach).filter((k) => k.startsWith('q_')).length,
       callbackReady: !!this.callbackCandidate(),
       arcUnfinished: this.unfinishedArc(),
@@ -1232,7 +1263,10 @@ export class Game {
         if (c.whenMade != null) return c.whenMade >= S.day
         return false
       })(),
-      'ctx.whenDate': c.when != null ? fmtDayMonth(c.whenMade ?? S.day) : undefined,
+      // дата в кнопке — срок, и только у ясного срока и увёртки; у остальных родов даты нет
+      'ctx.whenDate': c.whenAt !== undefined && (c.whenKind === 'clear' || c.whenKind === 'dodge') ? fmtDayMonth(c.whenAt) : undefined,
+      'ctx.whenKind': c.whenKind, 'ctx.whenDays': whenDays,
+      'ctx.whenHorizon': whenDays === undefined ? undefined : whenDays <= 7 ? 'near' : whenDays <= 30 ? 'far' : 'veryFar',
       'ctx.rel': c.rel?.n, 'ctx.relYou': c.rel?.you ?? c.rel?.n, 'ctx.sad': c.sad, 'ctx.festive': c.festive, 'ctx.revived': c.revived,
       'ctx.constr': c.constr, 'ctx.legendary': c.legendary, 'ctx.arc': c.arc, 'ctx.quote': c.quote,
       // спросить про сериал есть смысл: будет новая серия, или сериал закончен и сегодня про финал ещё не спрашивали
@@ -1316,7 +1350,7 @@ export class Game {
       if (candidate.condition === record.condition && candidate.met === undefined) candidate.met = this.S.day
     }
     const legend = this.legend()
-    if (legend && LEGENDS[legend]?.condition === record.condition) {
+    if (legend && LEGENDS[legend]?.until.condition === record.condition) {
       const arc = this.S.mem[memkeys.legendArc]
       this.setLegend(null, typeof arc === 'string' ? arc : undefined)
     }
@@ -1538,7 +1572,12 @@ export class Game {
         await this.sleep(600)
         if (this.disposed) return
         // без fallback: он проходит через украшение реплик Алика и получает обращение («Сынок, слушай, вы полежали…»)
-        this.sys(this.line('FLOOR', FLOOR) ?? 'Вы полежали на полу. Терпение восстановлено.')
+        const floor = this.linePicked('FLOOR', FLOOR)
+        // «за деньги» — поступление; adjustMoney без потолка бедности (как Алик), сумма под дном (#339/#279)
+        if (floor?.spec.remember?.some((o) => o.key === memkeys.bloodGiven && o.op === '=' && o.value === true)) {
+          this.adjustMoney(BLOOD_PAY, 'Донорский центр')
+        }
+        this.sys(floor?.text ?? 'Вы полежали на полу. Терпение восстановлено.')
         S.patience = MAX_PATIENCE
         this.unlock('floor')
       }
@@ -1611,28 +1650,25 @@ export class Game {
     const pending = seen.condition ? seen.met === undefined : seen.due != null && seen.due >= day
     if (p.stake && pending) seen.stake ??= p.stake
   }
-  private alignPromise(p: Promise3, until: string, condition?: PromiseCondition, days?: number): Promise3 {
-    p.text = p.text.replace(p.t, until)
-    p.t = until
-    p.d = days ?? null
-    p.due = undefined
-    p.condition = condition
-    p.tomorrow = undefined // срок из легенды — не «завтра»: иначе said.tomorrow без слова «завтра»
-    return p
+  private alignPromise(p: Promise3, until: When): Promise3 {
+    p.text = p.text.replace(p.t, until.t)
+    const { t, d, due, condition, kind, est, state, holiday } = until
+    // срок из легенды — не «завтра»: иначе said.tomorrow без слова «завтра»
+    return Object.assign(p, { t, d, due, condition, kind, est, state, holiday, tomorrow: undefined })
   }
   /** «Клянусь мамой, завтра — всё отдам» + запись в журнал. */
   /** Обещание. Пока жива легенда денег — срок чаще вытекает из неё («как ключ выйдет»); legend = true — всегда из неё. */
   async promiseLine(prefix?: string, legend?: boolean): Promise<void> {
     const legendSpec = this.legend() ? LEGENDS[this.legend()!] : undefined
     // событие легенды уже случилось («свадьба Бориса прошла») — обещать «сразу после него» поздно
-    const done = legendSpec?.condition ? this.conditionHolds(legendSpec.condition) : false
+    const done = legendSpec?.until.condition ? this.conditionHolds(legendSpec.until.condition) : false
     const until = done ? undefined : legendSpec?.until
     // срок из легенды — не чаще, чем раз в LEGEND_VOW_GAP сообщений игрока: одна и та же клятва приедается (#179)
     const fromLegend = !!until && this.legendDue() && (legend || this.chance(0.4))
     if (fromLegend) this.S.mem[memkeys.legendPromiseAt] = this.S.stats.sent
     const p = this.uniq(() => {
       const q = this.X.promise()
-      if (fromLegend) this.alignPromise(q, until!, legendSpec?.condition, legendSpec?.days)
+      if (fromLegend) this.alignPromise(q, until!)
       if (prefix) return { text: `${prefix} ${low(q.text)}.`, q, stake: undefined as undefined | 'moustache' }
       // форма клятвы — из пула (одна формула в каждом втором сообщении приедается); ставка — только на срок, который может наступить
       const form = this.linePicked('OATH_FORMS', OATH_FORMS, { filter: (s) => s.id !== OATH_STAKE_MOUSTACHE || q.d != null || !!q.condition })
@@ -1648,7 +1684,29 @@ export class Game {
   ctxFromPromise(p?: Promise3): Ctx {
     if (!p) return {}
     const due = p.d == null ? null : this.S.day + (p.due ? dueIn(p.due, this.S.day) : p.d)
-    return { when: p.t, whenNever: p.d == null, whenMade: this.S.day, whenDue: due }
+    return { when: p.t, whenNever: p.d == null, whenMade: this.S.day, whenDue: due, whenKind: p.kind, whenAt: this.horizonAt(p, due) }
+  }
+  /** Абсолютный день горизонта: срок по дате (у увёртки — поздняя из двух), событие — остаток идущего состояния или оценка, праздник — календарь; «никогда» и абсурд — нет. */
+  private horizonAt(p: Promise3, due: number | null): number | undefined {
+    const day = this.S.day
+    switch (p.kind) {
+      case 'clear': return due ?? undefined
+      case 'dodge': return p.est === undefined ? due ?? undefined : Math.max(due ?? day, day + p.est)
+      case 'event': return (p.state && this.stateEnd(p.state)) ?? (p.est === undefined ? undefined : day + p.est)
+      case 'holiday': return p.holiday === undefined ? undefined : day + holidayDays(p.holiday, day)
+      default: return undefined
+    }
+  }
+  /** День, когда идущее состояние мира со сроком (свадьба, болезнь) кончится: запись `restore` в расписании правил. */
+  private stateEnd(state: NonNullable<When['state']>): number | undefined {
+    let end: number | undefined
+    for (const x of this.S.rules.schedule) {
+      if (x.kind !== 'restore' || x.at <= this.S.day) continue
+      if (state.key !== undefined ? x.key !== state.key : !x.key.startsWith(state.prefix ?? '')) continue
+      if (state.actor !== undefined && x.actor !== state.actor) continue
+      if (end === undefined || x.at < end) end = x.at
+    }
+    return end
   }
 
   // ---------- ход Алика ----------
@@ -1802,7 +1860,7 @@ export class Game {
       text = m.text.slice(0, at) + repl + m.text.slice(at + p.t.length)
       const rec = this.S.promises[this.S.promises.length - 1]
       if (rec && rec.t.includes(p.t)) { rec.t = rec.t.replace(p.t, w); rec.due = null }
-      this.S.ctx = { ...this.S.ctx, when: w, whenNever: true, whenMade: this.S.day, whenDue: null }
+      this.S.ctx = { ...this.S.ctx, when: w, whenNever: true, whenKind: 'never', whenAt: undefined, whenMade: this.S.day, whenDue: null }
     } else {
       text = m.text.replace(/[.!]?$/, this.draw('EDIT_SUFFIX', L.EDIT_SUFFIX) + '.')
     }
@@ -2200,7 +2258,7 @@ export class Game {
     const paid = !pays || this.adjustMoney(fx.money!, 'По карте')
     // запечатано — тишина; мало денег — «недостаточно» (#252)
     if (pays && !paid && !this.moneySealed()) {
-      this.notify('🏦', 'Банк', `Не прошло: недостаточно средств. Перевод ${Math.abs(fx.money!).toLocaleString('ru-RU')} ₽ не ушёл.`)
+      this.notify('🏦', 'Банк', `Не прошло: недостаточно средств. Перевод ${Math.abs(fx.money!).toLocaleString('ru-RU')} ₽ не ушёл.`, { event: 'bank.refusal' })
     }
     if (!pays && fx.money) this.adjustMoney(fx.money, 'По карте')
     let debtMoved = !!fx.debt && paid && this.adjustDebt(fx.debt)
@@ -2386,7 +2444,7 @@ export class Game {
         const legend = this.legend()
         if (legend && this.legendDue()) {
           const spec = LEGENDS[legend]
-          const promise = this.alignPromise(this.X.promise(), spec.until, spec.condition, spec.days)
+          const promise = this.alignPromise(this.X.promise(), spec.until)
           this.S.mem[memkeys.legendPromiseAt] = this.S.stats.sent
           this.recordPromiseOnce(promise)
           deliver({ kind: 'text', from: 'alik', text: promise.text })
@@ -2417,7 +2475,7 @@ export class Game {
       this.ui.unread = got
       this.ui.title = `(${got}) Алик, где деньги?`
       this.unlock('away')
-      this.notify('💬', 'Алик Воздухонесян', `${got} ${got < 5 ? 'новых сообщения' : 'новых сообщений'}`)
+      this.notify('💬', 'Алик Воздухонесян', `${got} ${got < 5 ? 'новых сообщения' : 'новых сообщений'}`, { event: 'unread' })
       this.audio.beep()
       this.S.ctx = { type: 'idle' }
     }

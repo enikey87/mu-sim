@@ -21,13 +21,14 @@ import {
   actSigned, grantPaid, rubikFined, threatClaim, nuneKeyPassed, nuneDekretOver, grandpaDying,
   betonSet, cardSent, saidTomorrow, saidFriday, payday, count, endgame, holidayGreeted, lend50,
   lie, paydayScene, lightOff, netRation, phoneWarn, creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited,
+  criticalAt, creditOfferSum,
 } from './memkeys'
 import type { LoanId, MomId, ThingId } from './credit'
 import { valueOf } from '../engine/rules'
 
 /** Факты контекста последней реплики — facts() кладёт их все на каждый fire; сверка — factkeys.test.ts. */
 export const CTX_KEYS = [
-  'topic', 'type', 'amount', 's', 'shortTimey', 'when', 'whenNever', 'whenFresh', 'whenDate', 'rel', 'relYou',
+  'topic', 'type', 'amount', 's', 'shortTimey', 'when', 'whenNever', 'whenFresh', 'whenDate', 'whenKind', 'whenDays', 'whenHorizon', 'rel', 'relYou',
   'sad', 'festive', 'revived', 'constr', 'legendary', 'arc', 'quote', 'arcCanAdvance', 'legend', 'chorus', 'memory',
   'group', 'wrong', 'deleted', 'offended',
 ] as const
@@ -55,6 +56,7 @@ export type MemExactKey =
   | typeof betonSet | typeof cardSent | typeof saidTomorrow | typeof saidFriday | typeof paydayScene
   | typeof lightOff | typeof netRation | typeof phoneWarn | typeof holidayGreeted
   | typeof creditStage | typeof creditOffer | typeof creditBroke | typeof momDone | typeof creditDeclined | typeof moneyPoor | typeof collectorsRecruited
+  | typeof criticalAt | typeof creditOfferSum
   | typeof payday[keyof typeof payday] | typeof count[keyof typeof count]
   | typeof endgame[keyof typeof endgame] | typeof lend50[keyof typeof lend50] | typeof lie[keyof typeof lie]
 

@@ -137,6 +137,28 @@ describe('оракул: негативный контроль', () => {
     }
   }, 120_000)
 
+  // #308: путь ответа на кнопку (PlayerSays) — бот сам в окне смерти кнопку с act почти не видит, даём её всегда
+  it('снятый гейт смерти у ответа на кнопку (Says_WhileDead) — оракул краснеет на реальной партии', async () => {
+    const { allRules } = await import('../content/rules')
+    const says = allRules.find((r) => r.name === 'Says_WhileDead')!
+    const deadWithButton = (g: Game) => {
+      g.S.mem.alik_dead = true
+      const build = g.buildChoices.bind(g)
+      g.buildChoices = () => [{ text: 'Алик, это на фото ты?', tone: 'neutral', act: 'photo' }, ...build()]
+      g.S.choices = null
+    }
+    const clean = oracle(await dump(9, 40, deadWithButton)).verdict!
+    expect(clean.coverage.games_with_dead).toBe(1)
+    expect(clean.violations.dead_speech).toBeUndefined()
+    const when = says.when
+    says.when = when.filter((c: Criterion) => c.key !== 'alik_dead')
+    try {
+      const v = oracle(await dump(9, 40, deadWithButton)).verdict!
+      expect(v.coverage.games_with_dead).toBe(1)
+      expect(v.violations.dead_speech).toBeGreaterThan(0)
+    } finally { says.when = when }
+  }, 120_000)
+
   it('дамп без атрибуции речи (старый формат) не судит и говорит об этом', () => {
     const dir = mutate('main', 'main', (d) => { for (const f of d.frames) for (const s of f.said) delete (s as Partial<Said>).r })
     const v = oracle(dir).verdict!
@@ -177,7 +199,7 @@ describe('оракул: негативный контроль', () => {
 
   it('уведомление, показанное мимо выборщика, ловится по своему же условию', async () => {
     const text = 'Спасибо, что пришли сдать кровь! Вы наш герой. Приходите ещё.'
-    const dir = await dump(5, 2, (g) => { g.notify('🩸', 'Донорский центр', text) })
+    const dir = await dump(5, 2, (g) => { g.notify('🩸', 'Донорский центр', text, { event: 'life' }) })
     const v = oracle(dir).verdict!
     expect(v.violations.notif_gate_false).toBe(1)
     // та же партия без обхода гейта — чисто: проверка различает показанное и объявленное
@@ -202,6 +224,14 @@ const muteFrame = (before: number, after: number, sys: string[]) => ({
   frames: [{ at: 0, before: { 'endgame.mutes': before }, mem: { 'endgame.mutes': after }, said: [], fired: [], sys, away: [], notif: [] }],
   rules: { deathGated: [] }, coverage: { had_mute: true },
 })
+/** Кадр с уведомлениями телефона, как их выгружает плейтест: текст, событие, повторяемость строки пула (#304). */
+type Phone = { text: string; event: string; repeat?: boolean }
+const phone = (...notif: Phone[]) => ({
+  frames: [{ at: 0, before: {}, mem: {}, said: [], fired: [], notif: notif.map((n) => ({ fails: [], repeat: false, ...n })) }],
+  rules: { deathGated: [] }, coverage: {},
+})
+const MOM = { text: 'Мама — перевела с пенсии 1 500 ₽. Не говори папе', event: 'mom' }
+const week = (dates: string, bal: string) => ({ text: `Банк — Сводка за неделю ${dates}: баланс ${bal} ₽`, event: 'bank.summary' })
 const CASES: Record<string, { lines: string[]; world?: object; clean?: { lines?: string[]; world?: object } }> = {
   greet_off_hours: { lines: ['[10:00] Я: Добрый вечер, Алик'], clean: { lines: ['[19:00] Я: Добрый вечер, Алик'] } },
   boris_before_meet: { lines: ['[10:00] Алик: Борис передаёт привет'], clean: { lines: ['[10:00] Алик: Смотри, новый баран. Борис зовут', '[10:01] Алик: Борис передаёт привет'] } },
@@ -210,7 +240,7 @@ const CASES: Record<string, { lines: string[]; world?: object; clean?: { lines?:
   boris_writes_again: { lines: ['[10:00] Борис 🐏: Бее', '[10:01] Борис 🐏: Это Борис тебе написал. Сам!'], clean: { lines: ['[10:00] Борис 🐏: Это Борис тебе написал. Сам!', '[10:01] Борис 🐏: Бее'] } },
   once_scene_repeat: { lines: ['[10:00] Алик: Займи 5000 до пятницы', '[10:01] Алик: Займи 5000 до пятницы'], clean: { lines: ['[10:00] Алик: Займи 5000 до пятницы'] } },
   read_before_send: { lines: ['[10:30] Я: Алик, где деньги?', '[система] Прочитано в 09:03'], clean: { lines: ['[10:30] Я: Алик, где деньги?', '', '—— 2 марта 2027 г. ——', '[система] Прочитано в 09:03'] } },
-  notif_event_repeat: { lines: ['(уведомление телефона: 🏷 Авито — Микроволновку забрали. Разогревать больше нечего)', '(уведомление телефона: 🏷 Авито — Микроволновку забрали. Разогревать больше нечего)'], clean: { lines: ['(уведомление телефона: 🏷 Авито — Микроволновку забрали. Разогревать больше нечего)'] } },
+  notif_event_repeat: { lines: [], world: phone(MOM, MOM), clean: { world: phone(MOM) } },
   same_day_repeat: {
     lines: ['(уведомление телефона: 🏦 Банк — Списание 550 ₽. Связь. Баланс: 9 700 ₽)', '(уведомление телефона: 🏦 Банк — Списание 550 ₽. Связь. Баланс: 9 150 ₽)'],
     clean: { lines: ['(уведомление телефона: 🏦 Банк — Списание 550 ₽. Связь. Баланс: 9 700 ₽)', '', '—— 2 марта 2027 г. ——', '(уведомление телефона: 🏦 Банк — Списание 550 ₽. Связь. Баланс: 9 150 ₽)'] },
@@ -220,8 +250,8 @@ const CASES: Record<string, { lines: string[]; world?: object; clean?: { lines?:
     clean: { lines: ['[10:00] Алик: Завтра', '[10:01] Алик: Честно', '[10:02] Борис 🐏: Бее', '[10:03] Алик: Мамой клянусь', '(уведомление телефона: 🏦 Банк — Списание 550 ₽. Связь. Баланс: 9 700 ₽)'] },
   },
   bank_week_repeat: {
-    lines: ['(карточка в ленте: 🏦 Банк — Сводка за неделю 2 мар. – 8 мар.: баланс 9 700 ₽ · Списано: Связь 400 ₽)', '(карточка в ленте: 🏦 Банк — Сводка за неделю 2 мар. – 8 мар.: баланс 9 300 ₽ · Списано: Проездной 500 ₽)'],
-    clean: { lines: ['(карточка в ленте: 🏦 Банк — Сводка за неделю 2 мар. – 8 мар.: баланс 9 700 ₽ · Списано: Связь 400 ₽)', '(карточка в ленте: 🏦 Банк — Сводка за неделю 9 мар. – 15 мар.: баланс 9 300 ₽ · Списано: Проездной 500 ₽)'] },
+    lines: [], world: phone(week('2 мар. – 8 мар.', '9 700'), week('2 мар. – 8 мар.', '9 300')),
+    clean: { world: phone(week('2 мар. – 8 мар.', '9 700'), week('9 мар. – 15 мар.', '9 300')) },
   },
   landlord_after_evict: { lines: ['[10:00] Алик: Выселяю тебя, брат', '(уведомление телефона: 🏠 Хозяин — Жду до пятницы)'], clean: { lines: ['(уведомление телефона: 🏠 Хозяин — Жду до пятницы)'] } },
   friday_without_fact: {
@@ -247,23 +277,24 @@ describe('оракул: сторож у каждой проверки', () => {
     expect(oracle(synthetic(payday)).verdict!.violations.same_day_repeat).toBeUndefined()
     expect(oracle(synthetic(['[система] Алик скрыл от вас статус', '[система] Алик скрыл от вас статус'])).verdict!.violations.same_day_repeat).toBe(1)
   })
-  it('Поступление — повторяемое; два перевода подряд не notif_event_repeat', () => {
-    const lines = [
-      '(уведомление телефона: 🏦 Банк — Поступление 50 ₽. Перевод от Алика. Баланс: 12 450 ₽)',
-      '(уведомление телефона: 🏦 Банк — Поступление 50 ₽. Перевод от Алика. Баланс: 12 500 ₽)',
-    ]
-    expect(oracle(synthetic(lines)).verdict!.violations.notif_event_repeat).toBeUndefined()
-  })
-  it('банковские «Завтра списание» и «Не прошло» — повторяемые (#229)', () => {
-    for (const t of ['Завтра списание: Интернет, 550 ₽', 'Не прошло: недостаточно средств. Интернет, 550 ₽']) {
-      const lines = [`(уведомление телефона: 🏦 Банк — ${t})`, `(уведомление телефона: 🏦 Банк — ${t})`]
-      expect(oracle(synthetic(lines)).verdict!.violations.notif_event_repeat, t).toBeUndefined()
+  it('повторяемое — по событию: сводка, отказ, уровень, «завтра списание», батарея, непрочитанные, строка пула с repeat (#229, #304)', () => {
+    for (const event of ['bank.summary', 'bank.refusal', 'bank.level', 'bank.warn', 'battery', 'unread']) {
+      const n = { text: 'Банк — Не прошло: Связь, 400 ₽. Баланс: 9 700 ₽', event }
+      expect(oracle(synthetic([], phone(n, n))).verdict!.violations.notif_event_repeat, event).toBeUndefined()
     }
+    const often = { text: 'Мама — Сынок, ты поел?', event: 'life', repeat: true }
+    expect(oracle(synthetic([], phone(often, often))).verdict!.violations.notif_event_repeat).toBeUndefined()
+    const once = { text: 'Авито — Отзывы скрыты по жалобе владельца', event: 'life' }
+    expect(oracle(synthetic([], phone(once, once))).verdict!.violations.notif_event_repeat).toBe(1)
   })
-  it('карточка в ленте — тот же телефон: повтор разового события и затопление видны (#287)', () => {
-    const avito = '(карточка в ленте: 🏷 Авито — Микроволновку забрали. Разогревать больше нечего)'
-    expect(oracle(synthetic([avito, avito])).verdict!.violations.notif_event_repeat).toBe(1)
-    expect(oracle(synthetic(['[10:00] Алик: Завтра', avito])).verdict!.violations.notif_flood).toBe(1)
+  it('затопление ленты видит и карточки в ленте (#287)', () => {
+    expect(oracle(synthetic(['[10:00] Алик: Завтра', '(карточка в ленте: 👩 Мама — Сынок, ты поел?)'])).verdict!.violations.notif_flood).toBe(1)
+  })
+  it('выгрузка без событий (старый формат) повторы не судит и говорит об этом', () => {
+    const old = { frames: [{ at: 0, before: {}, mem: {}, said: [], fired: [], notif: [{ text: MOM.text, fails: [] }, { text: MOM.text, fails: [] }] }], rules: { deathGated: [] }, coverage: {} }
+    const v = oracle(synthetic([], old)).verdict!
+    expect(v.violations.notif_event_repeat).toBeUndefined()
+    expect(v.coverage.notif_without_event).toBe(2)
   })
   it('карточка в ленте — сообщение: нумерация для фактов на момент реплики её считает (#287)', () => {
     const f = (at: number, before: Record<string, unknown>) => ({ at, before, mem: {}, said: [], fired: [] })
@@ -271,10 +302,18 @@ describe('оракул: сторож у каждой проверки', () => {
     const card = '(карточка в ленте: 👩 Мама — Сынок, ты поел?)'
     expect(oracle(synthetic([card, card, '[10:00] Алик: Вы же обещали в пятницу'], world)).verdict!.violations.friday_without_fact).toBeUndefined()
   })
-  it('повтор предложения кредита — находка; префикс «Банк —» его не прячет (#268)', () => {
-    const offer = 'Вам одобрен кредит «Всё будет» — 30 000 ₽ под 39,9%. Всё будет. Проценты — точно'
-    const lines = [`(уведомление телефона: 🏦 Банк — ${offer})`, `(уведомление телефона: 🏦 Банк — ${offer})`]
-    expect(oracle(synthetic(lines)).verdict!.violations.notif_event_repeat).toBe(1)
+  it('то же предложение кредита с причиной, пока прежнее открыто, — находка; причина в тексте повтор не прячет (#268, #304)', () => {
+    const offer = { text: 'Банк — Остаток критический после «Гречка». Вам одобрен кредит «Всё будет» — 30 000 ₽ под 39,9%', event: 'bank.offer' }
+    expect(oracle(synthetic([], phone(offer, offer))).verdict!.violations.notif_event_repeat).toBe(1)
+    // прежнее предложение закрыто (продажа, «не сейчас») — новое падение законно предлагает ту же ступень (#287)
+    const frame = (open: boolean) => ({ at: 0, before: { 'credit.offer': open }, mem: {}, said: [], fired: [], notif: [{ ...offer, fails: [], repeat: false }] })
+    const answered = { frames: [frame(false), frame(false)], rules: { deathGated: [] }, coverage: {} }
+    expect(oracle(synthetic([], answered)).verdict!.violations.notif_event_repeat).toBeUndefined()
+    const stillOpen = { frames: [frame(false), frame(true)], rules: { deathGated: [] }, coverage: {} }
+    expect(oracle(synthetic([], stillOpen)).verdict!.violations.notif_event_repeat).toBe(1)
+    // тот же текст, но другое событие (отказ банка) — повторяемое: решает событие, не подстрока
+    const refusal = { ...offer, event: 'bank.refusal' }
+    expect(oracle(synthetic([], phone(refusal, refusal))).verdict!.violations.notif_event_repeat).toBeUndefined()
   })
   it('факты на момент сообщения: после последнего кадра — его «после», а не пустота', () => {
     const late = (mem: Record<string, unknown>) => ({ frames: [{ at: 0, before: {}, mem, said: [], fired: [] }], rules: { deathGated: [] }, coverage: {} })

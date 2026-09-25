@@ -11,11 +11,12 @@ import { fmtTime } from './time'
 import { ARCS } from '../content/arcs'
 import { CLAIMS } from '../content/lies'
 import { COLD_WAR } from '../content/rude'
-import { HEAT } from '../content/memkeys'
-import { valueOf, type Facts } from './rules'
+import { HEAT, bloodGiven } from '../content/memkeys'
+import { valueOf, spec, type Facts } from './rules'
 import type { GameEvent } from '../content/rules/events'
 import { MENTION_RE } from '../content/world'
 import { P_MONEY, P_DESPERATE } from '../content/topics'
+import { BLOOD_PAY, FLOOR } from '../content/misc'
 
 describe('Game: начало и ход', () => {
   it('новая игра: одна из завязок, 184-й день, 3–4 варианта реплик', () => {
@@ -241,6 +242,33 @@ describe('Game: начало и ход', () => {
     await game.send('Алик, привет')
     expect(game.S.patience).toBe(5)
     expect(game.S.ach.floor).toBeDefined()
+  })
+  it('сдача крови на полу — +BLOOD_PAY через adjustMoney (#339)', async () => {
+    const { game } = makeGame()
+    setMoney(game, 500)
+    const blood = FLOOR.map(spec).find((s) => /сдали кровь/.test(s.t))!
+    const pick = game.lines.pick.bind(game.lines)
+    game.lines.pick = (key, pool, facts, opts) => {
+      if (key === 'FLOOR') return { id: 'blood-floor', text: blood.t, spec: blood }
+      return pick(key, pool, facts, opts)
+    }
+    const adjust = game.adjustMoney.bind(game)
+    let donorPay = 0
+    game.adjustMoney = (delta, reason, opts) => {
+      if (reason === 'Донорский центр') {
+        donorPay = delta
+        const before = game.S.money
+        const ok = adjust(delta, reason, opts)
+        expect(game.S.money).toBe(before + BLOOD_PAY)
+        return ok
+      }
+      return adjust(delta, reason, opts)
+    }
+    game.S.patience = 1
+    await game.send('Алик, привет')
+    expect(donorPay).toBe(BLOOD_PAY)
+    expect(game.S.mem[bloodGiven]).toBe(true)
+    expect(game.S.msgs.some((m) => m.kind === 'sys' && /сдали кровь за деньги/.test(m.text))).toBe(true)
   })
   it('после 25 сообщений у Алика аватарка-баран', async () => {
     const { game } = makeGame()
@@ -702,7 +730,7 @@ describe('Game: мелочи', () => {
     const { game } = makeGame()
     const m = game.push({ kind: 'text', from: 'alik', text: 'В среду утром — всё отдам.' })
     game.recordPromise({ text: 'в среду утром — всё отдам', d: 3 })
-    await game.editLast(m, { text: 'в среду утром — всё отдам', t: 'в среду утром', d: 3 })
+    await game.editLast(m, { text: 'в среду утром — всё отдам', t: 'в среду утром', d: 3, kind: 'clear' })
     const edited = game.S.msgs.find((x) => x.id === m.id)
     expect(edited?.kind === 'text' && edited.edited).toBe(true)
     expect(edited?.kind === 'text' && edited.text).not.toMatch(/среду утром/)
@@ -943,7 +971,7 @@ describe('Game: деньги на карте', () => {
     expect(game.facts().moneyBottom).toBe(true)
     expect(game.S.mem['credit.offer']).toBe(true)
     // «критический» и предложение — одна карточка: причина рядом с кредитом
-    expect(cards(game, 'Банк').at(-1)?.text).toMatch(/^Остаток критический: 5\s400 ₽ после «Гречка»\. Вам одобрен/)
+    expect(cards(game, 'Банк').at(-1)?.text).toMatch(/^Остаток критический после «Гречка»\. Вам одобрен кредит «Всё будет» — 3\s600 ₽/) // без остатка в шапке, сумма — та, что даст (#337)
     expect(cards(game, 'Банк')).toHaveLength(2)
     expect(game.ui.notif).toBeNull()
   })
@@ -957,12 +985,12 @@ describe('Game: деньги на карте', () => {
   })
   it('баннер — только батарея и непрочитанные; банк, мама, Авито — карточки в ленте (#287)', () => {
     const { game } = makeGame()
-    for (const [icon, app] of [['🏦', 'Банк'], ['🏦', 'МФО'], ['👩', 'Мама'], ['🛒', 'Авито']]) game.notify(icon, app, `${app}: текст`)
+    for (const [icon, app] of [['🏦', 'Банк'], ['🏦', 'МФО'], ['👩', 'Мама'], ['🛒', 'Авито']]) game.notify(icon, app, `${app}: текст`, { event: 'life' })
     expect(game.ui.notif).toBeNull()
     expect(cards(game).map((c) => c.app)).toEqual(['Банк', 'МФО', 'Мама', 'Авито'])
     game.S.battery = 16
     game.battery.drain(1)
-    game.notify('💬', 'Алик Воздухонесян', '3 новых сообщения')
+    game.notify('💬', 'Алик Воздухонесян', '3 новых сообщения', { event: 'unread' })
     const shown: string[] = []
     while (game.ui.notif) { shown.push(game.ui.notif.text); game.dismissNotif() }
     expect(shown).toEqual(['Низкий заряд батареи: 15%', '3 новых сообщения'])
@@ -971,7 +999,7 @@ describe('Game: деньги на карте', () => {
   it('очередь баннеров: предел — самое старое уходит (#272)', () => {
     const { game } = makeGame()
     const texts = ['раз', 'два', 'три', 'четыре', 'пять', 'шесть', 'семь']
-    for (const t of texts) game.notify('💬', 'Алик Воздухонесян', t)
+    for (const t of texts) game.notify('💬', 'Алик Воздухонесян', t, { event: 'unread' })
     const shown: string[] = []
     while (game.ui.notif) { shown.push(game.ui.notif.text); game.dismissNotif() }
     expect(shown).toHaveLength(1 + Game.NOTIF_QUEUE_MAX)

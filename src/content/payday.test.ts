@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest'
 import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
 import { CLAIMS, ROLL } from './payday'
+import { ARCS } from './arcs'
 
 const texts = (g: Game, n = 0) => g.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' || m.kind === 'sys' ? [m.text] : []))
 const choose = async (g: Game, go: string) => { g.S.choices = null; const c = g.choices.find((x) => x.go === go); expect(c, go).toBeDefined(); await g.send(c!) }
@@ -23,6 +24,18 @@ describe('День выплаты', () => {
     expect((await game.fire('StoryBeat'))?.name).toBe('Beat_Payday')
     expect(game.S.scene?.id).toBe('payday')
     expect(game.S.ach.payday).toBeDefined()
+  })
+  it('законченная линия коллекторов не приближает День выплаты: считаются сюжетные сериалы (#338)', () => {
+    const { game } = makeGame()
+    game.S.day = 340
+    const done = (id: string) => ({ i: ARCS[id].eps.length, last: 0 })
+    Object.assign(game.S.arcs, { nune: done('nune'), boris: done('boris'), collectors: done('collectors') })
+    const payday = () => game.rules.collect({ event: 'StoryBeat' }, game.facts()).some((r) => r.name === 'Beat_Payday')
+    expect(game.facts().arcsDone).toBe(2)
+    expect(payday()).toBe(false)
+    game.S.arcs.grant = done('grant')
+    expect(game.facts().arcsDone).toBe(3)
+    expect(payday()).toBe(true) // не пустая проверка: третий сюжетный сериал выплату открывает
   })
   it('полный проход: утро из событий партии → 240 000 → дележ → 50 ₽ → великая отмазка → поймал → мешок мелочи', async () => {
     const { game } = makeGame()

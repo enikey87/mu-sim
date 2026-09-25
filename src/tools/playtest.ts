@@ -9,7 +9,7 @@ import { ENDINGS } from '../content/finales'
 import { NOTIF } from '../content/life'
 import { alikDead } from '../content/memkeys'
 import { type Criterion, type Rule } from '../engine/rules'
-import type { Choice, Msg, NewMsg } from '../engine/state'
+import type { Choice, Msg, NewMsg, PhoneEvent } from '../engine/state'
 
 export type Style = 'curious' | 'polite' | 'hothead'
 export const STYLES: Style[] = ['curious', 'polite', 'hothead']
@@ -40,12 +40,13 @@ export interface WorldFrame {
   asides: string[]
   /** Пачка непрочитанных: приходит мимо движка правил, потому и отдельным полем. */
   away: string[]
-  notif: { text: string; fails: string[] }[]
+  /** event — что за событие (сводка, отказ, предложение…); repeat — строка пула объявлена повторяемой: по ним оракул судит повтор (#304). */
+  notif: { text: string; fails: string[]; event: PhoneEvent; repeat: boolean }[]
 }
 export interface Played { seed: number; style: Style; hour: number; acts: Act[]; asides: Aside[]; world: WorldFrame[]; game: Game }
 
 /** Ключи мира для оракула; сериалы — из `facts()`, они живут в `S.arcs`, а не в `S.mem`. */
-const WORLD_KEYS = ['alik_dead', 'mourning', 'blood.given', 'said.friday', 'endgame.mutes'] as const
+const WORLD_KEYS = ['alik_dead', 'mourning', 'blood.given', 'said.friday', 'endgame.mutes', 'credit.offer'] as const
 const WORLD_PREFIXES = ['arc.', 'finale.'] as const
 
 const worldFacts = (game: Game): Record<string, unknown> => {
@@ -65,7 +66,7 @@ export const deathGated = (rules: readonly Rule<Game>[]): string[] => rules.filt
 export const DEATH_GATED: readonly string[] = deathGated(allRules)
 
 /** Ложные условия самой строки уведомления: `holds` — разбор выборщика, иначе именованные врут. */
-function notifFails(game: Game, app: string, text: string): string[] {
+export function notifFails(game: Game, app: string, text: string): string[] {
   const entry = NOTIF.find((n) => n.app === app && n.t === text)
   if (!entry) return []
   return (entry.when ?? []).filter((c) => !game.holds(c)).map((c) => c.key)
@@ -96,7 +97,6 @@ function pick(rng: Rng, style: Style, cs: Choice[]): number {
 export const openOffer = (game: Game): Extract<Msg, { kind: 'card' }> | undefined =>
   game.S.msgs.find((m): m is Extract<Msg, { kind: 'card' }> => m.kind === 'card' && !!m.offer && !m.answered)
 
-/** Сыграть партию ботом (или повторить записанные действия replay); watch — посмотреть на игру до первого хода. */
 /** Атрибуция речи для оракула: сообщение → правило, чей respond сейчас идёт (#229/#268).
  *  Вложенный `fire` сохраняет и возвращает прежнюю атрибуцию — иначе `Turn_Quest` → `PickQuest`
  *  обнуляет имя и `excuseTurn()` пишется как ничья. */
@@ -118,6 +118,7 @@ export function attachSpeechAttribution(game: Game): {
   return { ruleOf, clearRule: () => { lastRule = null } }
 }
 
+/** Сыграть партию ботом (или повторить записанные действия replay); watch — посмотреть на игру до первого хода. */
 export async function playtest(seed: number, turns: number, replay?: Act[], watch?: (game: Game) => void | Promise<void>): Promise<Played> {
   const style = STYLES[seed % STYLES.length]
   const hour = HOURS[seed % HOURS.length]
@@ -139,7 +140,8 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
     // только показанное: дедуп банка иначе попадает в расшифровку (#265); карточка в ленте — сообщение, не асайд (#287)
     if (!notify(icon, app, text, card)) return false
     if (Game.isBanner(app)) asides.push({ at: game.S.msgs.length, text: `(уведомление телефона: ${icon} ${app} — ${text})` })
-    notifBuf.push({ text: `${app} — ${text}`, fails: notifFails(game, app, text) })
+    const entry = NOTIF.find((n) => n.app === app && n.t === text)
+    notifBuf.push({ text: `${app} — ${text}`, fails: notifFails(game, app, text), event: card.event, repeat: !!entry?.repeat })
     return true
   }
   const awayBuf: WorldFrame['away'] = []

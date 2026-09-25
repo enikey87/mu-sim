@@ -1,7 +1,7 @@
 // Состояние игры (сохраняется целиком) и сообщения чата.
 import type { Bags } from './deck'
 import { type Facts, type RuleState, freshRuleState } from './rules'
-import type { PromiseCondition, Rel } from '../content/excuses'
+import type { PromiseCondition, Rel, WhenKind } from '../content/excuses'
 import type { Vars } from '../content/scenes'
 
 export const SAVE_KEY = 'alik-save-v4'
@@ -33,6 +33,9 @@ export type Msg =
   | (MsgBase & { kind: 'job'; from: 'alik'; text: string; answered?: boolean })
   | (MsgBase & { kind: 'card' } & Card)
 
+/** Что за событие телефона: по нему оракул отличает законный повтор (сводка, отказ, уровень) от настоящего (#304). */
+export type PhoneEvent = 'bank.summary' | 'bank.offer' | 'bank.refusal' | 'bank.level' | 'bank.warn' | 'mom' | 'life' | 'battery' | 'unread'
+
 /** Карточка телефона в ленте (банк, МФО, мама, Авито): не реплика и не требует нажатия; `offer` — кнопки кредита (#287). */
 export interface Card {
   icon: string
@@ -40,6 +43,7 @@ export interface Card {
   text: string
   lines?: string[]
   offer?: { take?: string; sell?: string }
+  event?: PhoneEvent
   /** Кнопки закрыты; `result` — чем кончилось. */
   answered?: boolean
   result?: string
@@ -56,6 +60,9 @@ export interface Ctx {
   s?: string
   when?: string
   whenNever?: boolean
+  whenKind?: WhenKind
+  /** Абсолютный день горизонта срока (у «никогда» и абсурда нет); дни до него от сегодня — `ctx.whenDays`. */
+  whenAt?: number
   /** Игровой день, в который Алик назвал срок — варианты игрока сверяются с календарём. */
   whenMade?: number
   /** Абсолютный день срока (`null` — «когда-нибудь»). */

@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { is, missing } from '../engine/rules'
-import { playtest, transcript, worldDump, deathGated, requiresKey, attachSpeechAttribution } from './playtest'
+import { playtest, transcript, worldDump, deathGated, requiresKey, attachSpeechAttribution, notifFails } from './playtest'
 import { alikDead } from '../content/memkeys'
 import type { Game } from '../engine/game'
 import type { Rule } from '../engine/rules'
@@ -68,6 +68,29 @@ describe('плейтест', () => {
     const mine = [...ruleOf.entries()].map(([, r]) => r).filter((r) => r === 'Nest_Parent')
     expect(mine.length).toBeGreaterThan(0)
   })
+  // #304: не функция, а сама партия — playtest() обязан вешать ту же атрибуцию (раньше тест видел только обёртку)
+  it('playtest(): речь после вложенного fire атрибутирована родителю в кадрах партии', async () => {
+    const p = await playtest(5, 12, undefined, (g) => {
+      g.rules.add({ name: 'Nest_Child', event: 'NestProbe', when: [], specificity: 10_000, respond: () => false })
+      g.rules.add({
+        name: 'Nest_Parent', event: 'AlikTurn', when: [], specificity: 10_000,
+        respond: async ({ game: gg }) => {
+          const nested = await gg.rules.fire(gg, { event: 'NestProbe' }, gg.facts, { floor: gg.floor() })
+          if (!nested) await gg.say(['речь родителя после вложенного fire'])
+        },
+      })
+    })
+    const said = p.world.flatMap((f) => f.said)
+    expect(p.game.S.msgs.some((m) => m.kind === 'text' && m.text === 'речь родителя после вложенного fire'), 'родитель ни разу не говорил — проверка пуста').toBe(true)
+    expect(said.filter((s) => s.r === 'Nest_Parent').length).toBeGreaterThan(0)
+  }, 60_000)
+  it('каждое уведомление партии выгружено с событием — оракул судит повтор по нему (#304)', async () => {
+    const p = await playtest(80001, 200)
+    const notif = p.world.flatMap((f) => f.notif)
+    expect(notif.length, 'уведомлений нет — проверка пуста').toBeGreaterThan(20)
+    expect(notif.filter((n) => !n.event)).toEqual([])
+    expect(new Set(notif.map((n) => n.event)).size).toBeGreaterThan(2)
+  }, 60_000)
   it('requiresKey: missing(alik_dead) — не гейт смерти; is(alik_dead) — гейт', () => {
     expect(requiresKey(missing(alikDead), alikDead)).toBe(false)
     expect(requiresKey(is(alikDead), alikDead)).toBe(true)
@@ -75,6 +98,48 @@ describe('плейтест', () => {
     const deadGate = [{ name: 'Dead', event: 'X', when: [is(alikDead)] }] as Rule<Game>[]
     expect(deathGated(liveOnly)).toEqual([])
     expect(deathGated(deadGate)).toEqual(['Dead'])
+  })
+  it('notifFails: выселение через randomNotif чисто; донор без крови — fails; remember до notify — ложь (#339)', async () => {
+    const { makeGame, setMoney } = await import('../test/helpers')
+    const { NOTIF } = await import('../content/life')
+    const eviction = NOTIF.find((n) => /Выселяю/.test(n.t))!
+    const donor = NOTIF.find((n) => n.app === 'Донорский центр')!
+
+    // настоящее нарушение
+    const cold = makeGame().game
+    expect(notifFails(cold, donor.app, donor.t)).toEqual(['blood.given'])
+    cold.S.mem['blood.given'] = true
+    expect(notifFails(cold, donor.app, donor.t)).toEqual([])
+
+    // выселение: remember после notify — fails пуст
+    const { game } = makeGame()
+    setMoney(game, 0)
+    game.chargeBill('rent')
+    game.chargeBill('rent')
+    game.chargeBill('rent')
+    const pick = game.lines.pick.bind(game.lines)
+    game.lines.pick = (key, pool, facts, opts) =>
+      key === 'NOTIF' ? pick(key, [eviction], facts, opts) : pick(key, pool, facts, opts)
+    let seen: string[] | null = null
+    const notify = game.notify.bind(game)
+    game.notify = (icon, app, text, card) => {
+      const ok = notify(icon, app, text, card)
+      if (ok && app === eviction.app) seen = notifFails(game, app, text)
+      return ok
+    }
+    game.randomNotif()
+    expect(seen).toEqual([])
+    expect(game.S.mem.evicted).toBe(true)
+
+    // NC: remember до notify (как linePicked) → ложное нарушение
+    const early = makeGame().game
+    setMoney(early, 0)
+    early.chargeBill('rent')
+    early.chargeBill('rent')
+    early.chargeBill('rent')
+    const hit = early.linePicked('NOTIF_EVICT_NC', [eviction])
+    expect(hit?.text).toMatch(/Выселяю/)
+    expect(notifFails(early, eviction.app, hit!.text)).toContain('evicted')
   })
   it('иногда отвечает на допработу зеркалом, когда оно открыто (#328)', async () => {
     let mirrored = 0

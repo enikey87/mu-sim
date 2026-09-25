@@ -18,6 +18,9 @@ export const fmtDayMonth = byDay({ day: 'numeric', month: 'long' })
 export const fmtShortDate = byDay({ day: 'numeric', month: 'short' })
 /** Понедельник недели дня `day` (номер дня) — ключ недельной сводки банка. */
 export const weekOf = (day: number): number => day - (dateOf(day).getDay() + 6) % 7
+/** «1 день», «3 дня», «97 дней». */
+export const fmtDays = (n: number): string =>
+  `${n} ${n % 10 === 1 && n % 100 !== 11 ? 'день' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? 'дня' : 'дней'}`
 export const fmtTime = (m: number): string =>
   `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
 
