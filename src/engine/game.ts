@@ -2010,8 +2010,7 @@ export class Game {
   async closeEnding(): Promise<void> {
     const id = this.S.ending
     this.S.ending = null
-    // вход в эндгейм: вступление и формальности, потом просьба — последовательность ждёт пауз,
-    // а факты и выборы ставит синхронно (тесты и прямые случаи гейта покрытия зовут closeEnding без await)
+    // вход в эндгейм: вступление, потом просьба «займи 50»; формальности — AlikAway/Idle при висящей просьбе (#321)
     if (id?.startsWith('payday_') && !this.S.mem[memkeys.endgame.active]) {
       try { await this.startEndgame(id.slice(7)) } catch (e) { this.swallowDisposed(e) }
     }
