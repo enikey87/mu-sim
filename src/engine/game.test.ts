@@ -1013,6 +1013,7 @@ describe('Game: деньги на карте', () => {
     expect(game.S.debt).toBe(debt)
     expect(game.S.ach.lend).toBeUndefined()
     expect(game.S.msgs.some((m) => m.kind === 'sys' && /Вы перевели Алику/.test(m.text))).toBe(false)
+    expect(game.S.msgs.some((m) => m.kind === 'text' && m.from === 'alik' && /святой|Вот это брат/i.test(m.text))).toBe(false)
     expect(cards(game, 'Банк').at(-1)?.text).toMatch(/^Не прошло/)
 
     // те же деньги есть — перевод идёт, и всё, что он обещает, случается
@@ -1024,6 +1025,26 @@ describe('Game: деньги на карте', () => {
     expect(paid.S.money).toBe(15000)
     expect(paid.S.ach.lend).toBe(paid.S.day) // unlock пишет день, а не «выдано»
     expect(paid.S.msgs.some((m) => m.kind === 'sys' && /Вы перевели Алику/.test(m.text))).toBe(true)
+    expect(paid.S.msgs.some((m) => m.kind === 'text' && m.from === 'alik' && /святой|Вот это брат/i.test(m.text))).toBe(true)
+  })
+
+  it('после выплаты отказ в списании молчит: ни «недостаточно», ни мелочь (#252)', async () => {
+    const { game } = makeGame()
+    setMoney(game, 50_000)
+    game.S.mem.payday = 'default'
+    expect(game.moneySealed()).toBe(true)
+    await game.enterNode('lend', 'yes')
+    expect(cards(game, 'Банк')).toEqual([])
+    expect(game.S.msgs.some((m) => m.kind === 'text' && m.from === 'alik' && /святой/i.test(m.text))).toBe(false)
+    for (let i = 0; i < 100; i++) game.randomNotif()
+    expect(game.S.bank?.lines['!По мелочи']).toBeUndefined()
+  })
+
+  it('NC: без seal «займи» без денег пишет недостаточно (#252)', async () => {
+    const { game } = makeGame()
+    setMoney(game, 100)
+    await game.enterNode('lend', 'yes')
+    expect(cards(game, 'Банк').at(-1)?.text).toMatch(/недостаточно средств/)
   })
 })
 
