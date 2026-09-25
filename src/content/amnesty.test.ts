@@ -44,21 +44,32 @@ describe('амнистия обещаний', () => {
     for (let i = 0; i < 30; i++) expect(pick(game)).not.toBe('Scene_amnesty')
   })
 
-  it('порог 5 достижим у бота: lateCount ≥ 5 хотя бы в части партий (#281)', async () => {
-    const { botTurn } = await import('../tools/bot')
+  // Амнистия — для игрока, который не припоминает сроки: бот покрытия жмёт «вы обещали» и гасит просрочки,
+  // поэтому у него порог — 2 партии из 24, и счёт по одному сиду падал от любого сдвига партии (#305).
+  // Здесь игрок не припоминает и не грубит; замер: пик ≥ 5 в 18 из 24, сцена в 12 — пороги вдвое ниже.
+  it('игрок, который не припоминает сроки, доходит до амнистии в заметной доле партий (#281, #305)', async () => {
+    const forgetful = async (g: Game) => {
+      if (g.S.ending) { await g.closeEnding(); return }
+      if (g.battery.dead) { await g.battery.charge(); return }
+      const job = g.S.msgs.find((m) => m.kind === 'job' && !m.answered)
+      if (job) { await g.answerJob(job.id, false); return }
+      const cs = g.choices.filter((c) => c.act !== 'prev' && c.tone !== 'rude')
+      await g.send(cs[Math.floor(g.rng.random() * cs.length)] ?? g.choices[0])
+    }
     const peaks: number[] = []
-    for (const seed of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]) {
+    let scenes = 0
+    for (let seed = 1; seed <= 24; seed++) {
       const { game } = makeGame({ seed })
       let peak = 0
-      for (let i = 0; i < 300; i++) {
-        await botTurn(game)
+      for (let i = 0; i < 300 && !game.S.mem['payday.chain'] && !game.S.mem['endgame.active']; i++) {
+        await forgetful(game)
         peak = Math.max(peak, game.lateCount())
-        if (game.S.mem['payday.chain'] || game.S.mem['endgame.active']) break
       }
       peaks.push(peak)
+      if (game.S.rules.once.Scene_amnesty) scenes++
     }
-    // при пороге 8 пик был ≤3; при 5 — ≥5 в части партий (сцена всё ещё редка: бот жмёт «вы обещали»)
-    expect(peaks.filter((p) => p >= 5).length, `peaks=${peaks.join(',')}`).toBeGreaterThan(0)
+    expect(peaks.filter((p) => p >= 5).length, `peaks=${peaks.join(',')}`).toBeGreaterThanOrEqual(12)
+    expect(scenes, `сцена амнистии в ${scenes} из 24`).toBeGreaterThanOrEqual(6)
   }, 300_000)
 
   it('после начала Дня выплаты не предлагается: журнал уже ни на что не влияет', () => {
