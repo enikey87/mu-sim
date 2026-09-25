@@ -292,7 +292,7 @@ describe('App', () => {
     renderApp(game)
     fireEvent.click(screen.getByTitle('Обещания и ачивки'))
     const dialog = screen.getByRole('dialog')
-    const line = (re: RegExp) => within(dialog).getByText(re).textContent
+    const line = (re: RegExp) => within(dialog).getByText(re).closest('li')!.textContent!
     expect(line(/⏳ ждём \d/)).toContain(fmtDate(day + 1)) // ждём — со своим сроком
     expect(line(/❌ просрочено/)).toContain(fmtDate(day - 1))
     expect(line(/❓ припомнили/)).toContain(fmtDate(day - 2))
@@ -301,8 +301,8 @@ describe('App', () => {
     // «когда-нибудь» — ровно одна запись: сроки по событию им не прикидываются
     expect(within(dialog).getAllByText(/∞ когда-нибудь/)).toHaveLength(1)
     // срок по событию — свой значок до события и после: «когда-нибудь» ему не подходит
-    expect(line(/⏳ ждём события/)).toBeTruthy()
-    expect(line(/🎯 событие наступило/)).toBeTruthy()
+    expect(line(/⏳ ждём события/)).toContain('Нуне из декрета')
+    expect(line(/🎯 событие наступило/)).toContain('снег в горах')
   })
 
   it('Esc закрывает досье и возвращает фокус на кнопку досье', () => {

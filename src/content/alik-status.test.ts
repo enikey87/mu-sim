@@ -85,6 +85,32 @@ describe('статус Алика живёт миром', () => {
       }
     }
   })
+  it('в блоке шапка не показывает «прочитано»/«печатает…»/«в сети» ни в какой момент хода', async () => {
+    const { game } = makeGame()
+    game.S.mem.blocked = true
+    const seen: string[] = []
+    const emit = game.emit.bind(game)
+    game.emit = () => {
+      const t = game.ui.status?.text
+      if (t) seen.push(t)
+      emit()
+    }
+    await turn(game)
+    expect(seen.filter((t) => t === 'прочитано' || t === 'печатает…' || t === 'в сети')).toEqual([])
+    expect(game.ui.status?.text).toBe('не в сети')
+    expect(game.alikSilent()).toBe(true)
+  })
+  it('alikSilent — одно место: блок, смерть, телефон у Карине; эндгейм сам по себе не глушит шапку', () => {
+    const { game } = makeGame()
+    expect(game.alikSilent()).toBe(false)
+    game.S.mem['endgame.active'] = true
+    expect(game.alikSilent()).toBe(false)
+    for (const key of ['blocked', 'alik_dead', 'phone.karine'] as const) {
+      const { game: g } = makeGame()
+      g.S.mem[key] = true
+      expect(g.alikSilent(), key).toBe(true)
+    }
+  })
   it('в блоке статус скрыт: строка один раз за блок, после разблокировки пул возвращается', async () => {
     const { game } = makeGame()
     await playUntil(game, 'niva', nivaAway) // есть что объявлять: состояние уже наступило

@@ -504,6 +504,11 @@ export class Game {
     }
     return true
   }
+  /** Перевод от Алика: paid — любой; fifty — только ровно 50 ₽ (ачивка «пять раз»). */
+  noteAlikPay(amount: number): void {
+    this.S.stats.paid++
+    if (amount === 50 && ++this.S.stats.fifty >= 5) this.unlock('fifty5')
+  }
   /** Поставить в расписание ближайшие платежи (и предупреждение за день). */
   scheduleBills(): void {
     if (this.moneySealed()) return
@@ -758,6 +763,8 @@ export class Game {
 
   async typingFor(ms: number, label = 'печатает…'): Promise<void> {
     ms = Math.min(5000, Math.max(800, ms)) * (this.isNight() ? 1.5 : 1)
+    // в блоке / «смерти» / у Карине шапка не врёт «печатает…» → «в сети» (#257)
+    if (this.alikSilent()) { await this.sleep(ms); return }
     const show = () => { this.ui.typing = label; this.ui.status = { text: label, cls: 'typing' }; this.emit() }
     const hide = () => { this.ui.typing = null; this.ui.status = { text: 'в сети', cls: 'online' }; this.emit() }
     show()
@@ -807,9 +814,13 @@ export class Game {
     this.ui.status = { text, cls }
     this.emit()
   }
+  /** Алик не на связи: блок, «смерть», телефон у Карине. Одно место для шапки, typing, праздников (#257). */
+  alikSilent(): boolean {
+    const m = this.S.mem
+    return !!(m[memkeys.blocked] || m[memkeys.alikDead] || m[memkeys.phoneKarine])
+  }
   restStatus(): void {
-    // в блоке / «смерти» / у Карине шапка не врёт «в сети» рядом со «скрыл статус» (#223)
-    if (this.S.mem[memkeys.blocked] || this.S.mem[memkeys.alikDead] || this.S.mem[memkeys.phoneKarine]) {
+    if (this.alikSilent()) {
       this.setStatus('не в сети')
       return
     }
@@ -991,7 +1002,7 @@ export class Game {
     for (const k in S.ach) progress['since.' + k] = S.day - S.ach[k]
     const moneyLv = this.moneyLevel()
     return {
-      day: S.day, tier: S.tier, mood: S.mood, sent: S.stats.sent, moo: S.stats.moo, patience: S.patience, money: S.money, debt: S.debt, fifty: S.stats.fifty,
+      day: S.day, tier: S.tier, mood: S.mood, sent: S.stats.sent, moo: S.stats.moo, patience: S.patience, money: S.money, debt: S.debt, fifty: S.stats.fifty, paid: S.stats.paid,
       moneyNormal: moneyLv === 'normal', moneyLow: moneyLv === 'low', moneyBottom: moneyLv === 'bottom',
       // завтра списывают: только если банк уже предупредил (bill.due после BillWarn с SMS, #251)
       paymentDueTomorrow: (() => {
@@ -1299,12 +1310,14 @@ export class Game {
     try {
       await this.sleep((500 + this.rnd(700)) * (this.isNight() ? 2 : 1))
       if (this.disposed) return
-      this.setStatus('прочитано')
+      // в молчании «прочитано» — ложь: сообщение не доставлено (#257)
+      if (this.alikSilent()) this.setStatus('не в сети')
+      else this.setStatus('прочитано')
 
       // реакция на сообщение игрока; иногда — вместо ответа
       let reactOnly = false
       // реакция — Алика: не бывает, когда он не видит (заблокирован) или телефон у Карине
-      if (!o.scene && !S.mem[memkeys.blocked] && !S.mem[memkeys.phoneKarine] && this.chance(0.18) && mine.kind === 'text') {
+      if (!o.scene && !this.alikSilent() && this.chance(0.18) && mine.kind === 'text') {
         await this.sleep(600)
         if (this.disposed) return
         this.replaceMsg(mine, { react: this.draw('R_' + tone, L.REACT[tone] ?? L.REACT.neutral) })
@@ -1357,8 +1370,8 @@ export class Game {
         this.sys('Алик Воздухонесян сменил фото профиля. На фото — баран')
         this.unlock('ram')
       }
-      // подпись профиля — одно место молчания (#223): quietStatus; «скрыл» только в живом блоке
-      const quietStatus = !!(S.mem[memkeys.blocked] || S.mem[memkeys.alikDead] || S.mem[memkeys.phoneKarine] || S.mem[memkeys.endgame.active])
+      // подпись профиля — молчание: alikSilent + эндгейм; «скрыл» только в живом блоке (#223/#257)
+      const quietStatus = this.alikSilent() || !!S.mem[memkeys.endgame.active]
       if (S.mem[memkeys.blocked] && !S.mem[memkeys.endgame.active] && !S.mem[memkeys.alikDead] && !S.mem[memkeys.phoneKarine]) {
         if (!S.mem[memkeys.statusHidden]) {
           S.mem[memkeys.statusHidden] = true
@@ -1371,8 +1384,7 @@ export class Game {
       // праздник в окне звучит хотя бы раз: отмазку вытесняют серия, сцена или легенда, а окно короткое.
       // Поздравляет сам Алик: в блоке, при «смерти» и с телефоном у Карине он не пишет (как и статус)
       const holiday = holidayOf(S.day)
-      const muted = S.mem[memkeys.blocked] || S.mem[memkeys.alikDead] || S.mem[memkeys.phoneKarine]
-      if (holiday && !muted && S.mem[memkeys.holidayGreeted] !== `${holiday}@${dateOf(S.day).getFullYear()}`) {
+      if (holiday && !this.alikSilent() && S.mem[memkeys.holidayGreeted] !== `${holiday}@${dateOf(S.day).getFullYear()}`) {
         const festive = this.line('HOLIDAY', HOLIDAY_EXCUSES)
         if (festive) {
           await this.say([festive])
@@ -1540,7 +1552,7 @@ export class Game {
     this.S.ctx = { type: 'transfer', amount }
     if (this.adjustDebt(-amount)) {
       this.adjustMoney(amount, 'Перевод от Алика')
-      if (++this.S.stats.fifty >= 5) this.unlock('fifty5')
+      this.noteAlikPay(amount)
     }
   }
 
@@ -1737,8 +1749,8 @@ export class Game {
     let debtMoved = !!ep.fx?.debt && this.adjustDebt(ep.fx.debt)
     if (ep.fx?.pay && this.adjustDebt(-ep.fx.pay)) {
       this.adjustMoney(ep.fx.pay, 'Выплата')
-      // перевод Алика (в т.ч. финал) — тот же факт, что читает ответ на «спасибо» (#223)
-      if (++this.S.stats.fifty >= 5) this.unlock('fifty5')
+      // любой перевод Алика — paid; fifty только при ровно 50 ₽ (#223/#257)
+      this.noteAlikPay(ep.fx.pay)
       debtMoved = true
     }
     if (ep.item) this.S.items.push(ep.item)
@@ -2110,7 +2122,7 @@ export class Game {
       try {
         if (this.disposed) return
         if (!this.ui.busy && !this.battery.dead && this.S.offlineDays === 0) {
-          if (this.S.mem[memkeys.blocked] || this.S.mem[memkeys.alikDead] || this.S.mem[memkeys.phoneKarine]) {
+          if (this.alikSilent()) {
             this.setStatus('не в сети')
           } else if (this.chance(0.2)) {
             // «печатает…» — и ничего не приходит
@@ -2155,7 +2167,7 @@ export class Game {
       case 'transfer':
         if (!this.adjustDebt(-50)) return // после выплаты перевода нет — и пузыря тоже
         this.adjustMoney(50, 'Перевод от Алика')
-        this.S.stats.fifty++
+        this.noteAlikPay(50)
         deliver({ kind: 'transfer', from: 'alik', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE), amount: 50 })
         return
       case 'formality': for (const text of this.formalityLines()) deliver({ kind: 'text', from: 'alik', text }); return

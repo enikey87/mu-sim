@@ -125,7 +125,9 @@ describe('оракул: негативный контроль', () => {
     const clean = oracle(await dump(9, 40, dead)).verdict!
     expect(clean.coverage.games_with_dead).toBe(1)
     expect(clean.violations.dead_speech).toBeUndefined()
-    for (const names of [['Says_WhileDead'], ['Turn_WhileDead', 'Tone_WhileDead']]) {
+    // Tone_WhileDead — путь ответа на сообщение; Turn — ход Алика. Says_* бот редко бьёт без act.
+    // Раньше NC ловил «реакцию» мёртвого (r=null); теперь реакция в молчании не ставится (#257).
+    for (const names of [['Tone_WhileDead'], ['Turn_WhileDead', 'Tone_WhileDead']]) {
       const restore = ungate(names)
       try {
         const v = oracle(await dump(9, 40, dead)).verdict!
