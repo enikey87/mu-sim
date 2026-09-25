@@ -197,7 +197,9 @@ export function loadState(storage: Storage | null): GameState | null {
     const raw = storage.getItem(SAVE_KEY)
     if (!raw) return null
     const s = JSON.parse(raw)
-    return s && Array.isArray(s.msgs) ? sealCounts({ ...freshState(), ...s }) : null
+    if (!s || !Array.isArray(s.msgs)) return null
+    // старые сохранения без introShown — сразу в чат: иначе интро врёт по обрезанной ленте (#249)
+    return sealCounts({ ...freshState(), ...s, introShown: typeof s.introShown === 'boolean' ? s.introShown : true })
   } catch {
     return null
   }
