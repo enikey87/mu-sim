@@ -1,7 +1,7 @@
 // Сценарии правил: именно те места, где в оригинале были нелогичные ответы.
 import { describe, it, expect } from 'vitest'
 import { makeGame, alikTexts } from '../../test/helpers'
-import { spec, valueOf } from '../../engine/rules'
+import { type Entry, spec, valueOf } from '../../engine/rules'
 import type { Game } from '../../engine/game'
 import type { Choice, Ctx } from '../../engine/state'
 import { D } from '../excuses'
@@ -277,7 +277,7 @@ describe('тон сообщения (PlayerMessage)', () => {
   it('угроза судом — насмешка, дальше линия суда: юрист, претензия', async () => {
     const { game } = makeGame()
     const t1 = await reply(game, { text: 'Я иду в суд!', tone: 'rude' })
-    expect(oneOf(D.THREAT_A, t1.join(' '))).toBe(true)
+    expect(oneOf((D.THREAT_A as Entry<string>[]).map(valueOf), t1.join(' '))).toBe(true) // строки пула с гейтом — Gated, не строки
     expect(game.S.ach.threat).toBeDefined()
     game.S.offlineDays = 0
     const t2 = game.S.msgs.length
@@ -293,13 +293,14 @@ describe('тон сообщения (PlayerMessage)', () => {
 })
 
 describe('Алик пишет сам (AlikIdle)', () => {
-  it('посреди сцены не перебивает — только карточка телефона (#287)', async () => {
+  it('посреди сцены не перебивает ленту — карточка телефона ждёт конца сцены (#287/#300)', async () => {
     const { game } = makeGame()
     game.S.scene = { id: 'deathbed', node: 'ask', vars: {} }
     const n = game.S.msgs.length
     await game.fire('AlikIdle')
-    const added = game.S.msgs.slice(n)
-    expect(added.map((m) => m.kind)).toEqual(['card'])
+    expect(game.S.msgs.slice(n)).toEqual([])
+    await game.enterNode('deathbed', null)
+    expect(game.S.msgs.slice(n).some((m) => m.kind === 'card')).toBe(true)
   })
   it('в обычном режиме пишет сам', async () => {
     let wrote = 0

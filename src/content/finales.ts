@@ -22,7 +22,7 @@ export interface Finale extends Episode {
 export const DEFAULT_FINALE: Record<string, string> = {
   boris: 'Налоговая', beton: 'Неотделимое улучшение', samvel: 'Снова женится', niva: 'Не ищи', nune: 'Второй декрет',
   grant: 'Близнец', alik_death: 'Жив, к сожалению', garik: 'Не хочет вылезать', tile: 'Квиты', grandpa: 'Шаурмичная',
-  rubik: 'Он из налоговой', razmik: 'Ты первый',
+  rubik: 'Он из налоговой', razmik: 'Ты первый', collectors: 'На объекте',
 }
 
 export const FINALES: Record<string, Finale[]> = {
@@ -70,7 +70,7 @@ export const FINALES: Record<string, Finale[]> = {
     {
       id: 'groom', title: 'Жених', when: [is('ach.saint'), lte(count.rude, 0)],
       m: [{ w: 'samvel', t: 'Алик, этот плиточник ни разу на тебя не крикнул. Такого человека надо брать в семью.' }, 'Брат… Самвел выдаёт за тебя племянницу. Ануш. Она согласна, я спрашивал. Свадьба — три дня, как положено.', 'Теперь ты семья. А в семье деньги не считают.'],
-      fx: { ach: 'arc_samvel' }, state: { key: wedding('anush'), days: 8 },
+      fx: { ach: 'arc_samvel' }, state: { key: wedding('anush') }, // навсегда: иначе через 8 дней снова холостой (#328)
       done: ['Как Ануш? Тёща спрашивает, почему не звонишь. Про деньги не спрашивает — семья же.', 'Брат, семья — это главное. Долг — это второстепенное. Даже третье.'],
     },
   ],

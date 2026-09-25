@@ -6,8 +6,9 @@ import type { GameEvent, Offer } from './events'
 import { WORLD, SPEAKS } from '../world'
 import { CHORUS_LEGEND } from '../legends'
 import { PROMISE_DUE, PROMISE_DUE_COSMIC, PROMISE_DUE_KEPT, PROMISE_MET, PROMISE_SHAVE, PROMISE_SHAVE_KEPT, CHORUS, CHORUS_FED_UP, WEDDING_NOISE, BORIS_SICK, DEAD_KARINE, DEAD_ALIK } from '../world'
-import { alikDead, alikShaved, blocked, count, grantPaid, interjections, intro, met, mourning, payday, sick } from '../memkeys'
+import { alikDead, alikShaved, blocked, count, endgame, grantPaid, interjections, intro, met, mourning, payday, sick } from '../memkeys'
 import { JournalForAmnesty } from './criteria'
+import { low } from '../excuses'
 
 type R = Rule<Game, GameEvent, Offer>
 
@@ -59,31 +60,47 @@ export const questRules: R[] = [
 const promiseText = (game: Game, f: Facts) => game.S.promises[Number(f.promise)]
 const dueLine = (game: Game, f: Facts, key: string, arr: readonly Entry<string>[]) => {
   const p = promiseText(game, f)!
-  return game.uniq(() => `${game.X.g('ADDR')}, ${game.X.fill(game.draw(key, arr), { t: p.t })}`)
+  return game.uniq(() => `${game.X.g('ADDR')}, ${low(game.X.fill(game.draw(key, arr), { t: p.t }))}`)
 }
 // срок актуален: обещание есть и его не «переписали» в когда-нибудь
 const live = eq('promiseLive', true)
 const stakeMoustache = eq('promiseStake', 'moustache')
+// не promiseLive: срок мог остаться позади (#327)
+const stakeOpen = [eq('promisePassed', true), stakeMoustache, missing(alikShaved), missing(endgame.active)] as const
+const stakeKept = async ({ game, facts }: { game: Game; facts: Facts }) => {
+  await game.say([dueLine(game, facts, 'DUE_SHAVE_KEPT', PROMISE_SHAVE_KEPT)])
+  await game.transfer()
+  const p = game.S.promises[Number(facts.promise)]
+  if (p) { p.asked = true; p.kept = true; p.stakeDone = true }
+}
+const stakeShave = async ({ game, facts }: { game: Game; facts: Facts }) => {
+  const p = game.S.promises[Number(facts.promise)]
+  if (p) p.stakeDone = true
+  game.sys('Алик Воздухонесян сменил фото профиля. На фото — Алик без усов.')
+  await game.say([dueLine(game, facts, 'DUE_SHAVE', PROMISE_SHAVE)])
+  game.unlock('shaved')
+}
 export const promiseRules: R[] = [
   {
     // ставка «усы» сдержана переводом — выше обычного Due_Kept
-    name: 'Due_StakeKept', event: 'PromiseDue', when: [live, stakeMoustache, gte('mood', 8)], odds: 0.5, cooldown: { days: 10 }, priority: 'chatter', specificity: 4,
-    respond: async ({ game, facts }) => {
-      await game.say([dueLine(game, facts, 'DUE_SHAVE_KEPT', PROMISE_SHAVE_KEPT)])
-      await game.transfer()
-      const p = game.S.promises[Number(facts.promise)]
-      if (p) { p.asked = true; p.kept = true }
-    },
+    name: 'Due_StakeKept', event: 'PromiseDue', when: [...stakeOpen, gte('mood', 8)], odds: 0.5, cooldown: { days: 10 }, priority: 'chatter', specificity: 4,
+    respond: stakeKept,
   },
   {
     // ставка сорвана: системное фото без усов + реплика; факт ~40 дней
-    name: 'Due_StakeShave', event: 'PromiseDue', when: [live, stakeMoustache, missing(alikShaved)], priority: 'chatter', specificity: 3,
+    name: 'Due_StakeShave', event: 'PromiseDue', when: [...stakeOpen], priority: 'chatter', specificity: 3,
     remember: [during(alikShaved, 40)],
-    respond: async ({ game, facts }) => {
-      game.sys('Алик Воздухонесян сменил фото профиля. На фото — Алик без усов.')
-      await game.say([dueLine(game, facts, 'DUE_SHAVE', PROMISE_SHAVE)])
-      game.unlock('shaved')
-    },
+    respond: stakeShave,
+  },
+  {
+    // событийный срок: условие наступило без денег — та же ставка (#307)
+    name: 'Condition_StakeKept', event: 'PromiseConditionMet', when: [...stakeOpen, gte('mood', 8)], odds: 0.5, cooldown: { days: 10 }, priority: 'chatter', specificity: 4,
+    respond: stakeKept,
+  },
+  {
+    name: 'Condition_StakeShave', event: 'PromiseConditionMet', when: [...stakeOpen], priority: 'chatter', specificity: 3,
+    remember: [during(alikShaved, 40)],
+    respond: stakeShave,
   },
   {
     // не через ход: наступивший срок — событие, а не фон

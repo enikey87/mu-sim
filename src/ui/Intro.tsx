@@ -39,10 +39,13 @@ export function Intro({ data, gate, onDone }: { data: IntroView; gate: boolean; 
     if (!started) return
     const T = (ms: number, f: () => void) => timers.current.push(window.setTimeout(f, ms))
     if (reduced) {
+      // три фазы подряд: обещание → завязка → титул — без наложений (#321)
       setNotes([{ icon: '💬', app: 'Алик', text: data.intro }, { icon: '💬', app: 'Вы', text: data.reply, me: true }])
       setDays(data.day)
-      setPhase('title')
-      T(2500, () => finishRef.current(false))
+      setPhase('play')
+      T(1500, () => setPhase('gap'))
+      T(3000, () => setPhase('title'))
+      T(4500, () => finishRef.current(false))
       return () => { for (const t of timers.current) clearTimeout(t) }
     }
     T(300, () => setNotes((n) => [{ icon: '💬', app: 'Алик', text: data.intro }, ...n]))
@@ -84,8 +87,8 @@ export function Intro({ data, gate, onDone }: { data: IntroView; gate: boolean; 
       </div>
       {started && !reduced && <div className="intro-count">Дней после сдачи: <b>{days}</b></div>}
       <div className="intro-stack">
-        {notes.map((n, i) => (
-          <div className={`intro-note${n.me ? ' me' : ''}`} key={`${i}-${n.text.slice(0, 12)}`}>
+        {notes.map((n) => (
+          <div className={`intro-note${n.me ? ' me' : ''}`} key={`${n.app}:${n.text}`}>
             <div className="intro-note-h"><span>{n.icon} {n.app}</span><span>сейчас</span></div>
             {n.text}
           </div>

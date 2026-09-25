@@ -4,14 +4,18 @@ import type { Due } from '../engine/time'
 import { type Entry, gate, eq, gte, lt, lte, matches, missing, exists, is, of } from './fact'
 import type { LegalClaim } from '../engine/input'
 import { needs, WORLD } from './world'
-import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, count, evicted, grantPaid, met, nuneDekretOver, nuneKeyPassed, sick, taxThawed, threatClaim, tileCornerRemoved } from './memkeys'
+import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, collectorsRecruited, count, evicted, finaleOf, grantPaid, met, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, sick, taxThawed, threatClaim, tileCornerRemoved } from './memkeys'
 
 // draw(key, arr) выдаёт уместный сейчас элемент «из колоды» (без повторов до конца колоды); noRefill — после исчерпания null
 export type DrawFn = <T = unknown>(key: string, arr: readonly Entry<T>[], noRefill?: boolean) => T
 /** n — кто, g — кого; you — как его назовёт игрок, если Алик сказал «мой»/«я». */
 /** id — кто это из CAST, если отмазка называет его роль: такая реплика знакомит с персонажем. */
 export interface Rel { n: string; g: string; you?: string; id?: string }
-export const PROMISE_CONDITIONS = [betonSet, borisSmetaReady, grantPaid, nuneDekretOver, nuneKeyPassed, actSigned, taxThawed, borisMarried] as const
+export const PROMISE_CONDITIONS = [
+  betonSet, borisSmetaReady, grantPaid, nuneDekretOver, nuneKeyPassed, actSigned, taxThawed, borisMarried,
+  nivaAway, nivaBack, razmikMarried,
+  finaleOf('rubik'), finaleOf('razmik'), finaleOf('garik'), finaleOf('tile'),
+] as const
 export type PromiseCondition = typeof PROMISE_CONDITIONS[number]
 /** Срок: календарный (`d`/`due`), событийный (`condition`) или неопределённый (`d: null`). */
 export interface When { t: string; d: number | null; due?: Due; condition?: PromiseCondition; /** срок назван словом «завтра» — на него игрок и Алик потом ссылаются */ tomorrow?: boolean }
@@ -202,7 +206,7 @@ D.ESC1 = [ // международный уровень
   'Деньги застряли на таможне в Верхнем Ларсе, их досматривают с собакой', 'Перевод ушёл в Турцию, а с Турцией у нас сложно',
   'Банк в Лос-Анджелесе требует, чтобы я прилетел лично', 'Деньги в Дубае у двоюродного брата, он их выгуливает',
   'Швейцарский банк отказал: сказали, у меня слишком честное лицо', 'Кипр заморозил мой офшор. Офшор — это банка в огороде на Кипре',
-  'Деньги идут караваном через Иран, верблюды устали', needs('niva')('Интерпол ищет мою «Ниву», все счета проверяют'),
+  'Деньги идут караваном через Иран, верблюды устали', needs('nivaAway', 'niva')('Интерпол ищет мою «Ниву», все счета проверяют'),
   'Деньги в криптокошельке, пароль знает только сват в Глендейле', 'Мой вопрос рассматривает ООН',
   'Санкции, брат. Против меня лично. Не знаю, за что', 'Деньги на пароме в Батуми, на Чёрном море шторм',
   'Французская родня взяла деньги посмотреть Эйфелеву башню', 'Посольство проверяет, законно ли тебе платить',
@@ -243,7 +247,10 @@ D.THREAT_A = [
   needs('samvel')(claim('lawyer')('Адвокат? Мой адвокат — Самвел, он в суде тридцать лет. Подсудимым, но опыт есть.')),
   claim('court')('Суд — это хорошо, там бесплатный кофе.'),
   needs('boris', 'baran')(claim('court')('Иди, брат. Присяжные — бараны, Борис у них старший.')),
-  claim('collectors')('Коллекторы? Приходили. Остались работать у меня на объекте.'),
+  claim('collectors')(needs('collectorsRecruited')('Коллекторы? Приходили. Остались работать у меня на объекте.')),
+  // «пусть найдут» — пока не приехали (3-я серия); у Алика, но не завербованы — чай (#324)
+  claim('collectors')(gate(lt('arc.collectors', 3))('Коллекторы? Пусть сначала найдут меня. Я их тоже ищу — для дружбы.')),
+  claim('collectors')(gate(gte('arc.collectors', 3), missing(collectorsRecruited))('Коллекторы? Они у меня, чай пьют. Хорошие ребята — про смысл платежа говорим.')),
   needs('arsen')(claim('lawyer')('Юрист? Мой юрист — Арсен, ему девятнадцать, он смотрел сериал про юристов.')),
   claim('tax')('Налоговая? Они мне сами должны, за нервы.'),
   // без предмета — без «там»: строка открыта любой инстанции, и коллекторам, и заявлению

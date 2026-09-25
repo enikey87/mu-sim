@@ -4,10 +4,11 @@ import userEvent from '@testing-library/user-event'
 import { App } from './App'
 import { messageRenderStats } from './Message'
 import { messageListRenderStats, messageListBuildStats } from './Chat'
-import { makeGame, setMoney } from '../test/helpers'
-import { SAVE_KEY } from '../engine/state'
+import { makeGame, setMoney, memStorage } from '../test/helpers'
+import { SAVE_KEY, loadState, START_MONEY } from '../engine/state'
 import { fmtDate } from '../engine/time'
 import type { Game } from '../engine/game'
+import { introOf, uiOf } from './view'
 
 function renderApp(game: Game, onReset = vi.fn()) {
   const utils = render(<App game={game} onReset={onReset} />)
@@ -736,11 +737,28 @@ describe('интро новой партии', () => {
     expect(screen.getByText(p.gap)).toBeInTheDocument()
   })
 
-  it('перезагрузка посреди партии: отметка в сохранении — интро не показывает', () => {
-    const { game } = makeGame()
+  it('перезагрузка посреди партии: отметка в сохранении — интро не показывает (#321)', () => {
+    const storage = memStorage()
+    const { game } = makeGame({ storage })
     game.introDone()
-    renderIntro(game)
+    const { game: again } = makeGame({ storage, seed: 2 })
+    renderIntro(again)
     expect(document.querySelector('.intro')).toBeNull()
+    expect(again.S.introShown).toBe(true)
+  })
+
+  it('NC: без save в introDone перезагрузка снова показывает интро (#321)', () => {
+    const storage = memStorage()
+    const { game } = makeGame({ storage })
+    const save = game.save.bind(game)
+    game.save = () => {}
+    game.introDone()
+    game.save = save
+    expect(game.S.introShown).toBe(true)
+    const { game: again } = makeGame({ storage, seed: 3 })
+    renderIntro(again)
+    expect(document.querySelector('.intro')).not.toBeNull()
+    expect(again.S.introShown).toBe(false)
   })
 
   it('касание во время анимации — сразу чат', () => {
@@ -765,17 +783,91 @@ describe('интро новой партии', () => {
     expect(document.querySelector('.intro-note')).not.toBeNull()
   })
 
-  it('prefers-reduced-motion: статичная версия — обещание, строка завязки и титул сразу', () => {
+  it('prefers-reduced-motion: три фазы без наложений стопки и строки (#321)', async () => {
     vi.useFakeTimers()
     vi.stubGlobal('matchMedia', () => ({ matches: true }))
+    const { readFileSync } = await import('node:fs')
+    const css = readFileSync('src/styles.css', 'utf8')
+    expect(css).toMatch(/\.intro-reduced\.phase-play[\s\S]*?\.intro-gap[\s\S]*?opacity:\s*0/)
+    expect(css).toMatch(/\.intro-reduced\.phase-gap[\s\S]*?\.intro-stack[\s\S]*?opacity:\s*0/)
+    expect(css).toMatch(/\.intro-reduced\.phase-title[\s\S]*?\.intro-gap[\s\S]*?opacity:\s*0/)
     const { game } = makeGame()
     const p = prologue(game)
     renderIntro(game)
-    const intro = document.querySelector('.intro')!
-    expect(within(intro as HTMLElement).getByText(p.gap)).toBeInTheDocument()
+    const intro = document.querySelector('.intro') as HTMLElement
+    expect(intro.className).toMatch(/intro-reduced/)
+    expect(intro.className).toMatch(/phase-play/)
+    expect(intro.className).not.toMatch(/phase-gap|phase-title/)
+    expect(within(intro).getByText(p.alik)).toBeInTheDocument()
+    act(() => { vi.advanceTimersByTime(1600) })
+    expect(intro.className).toMatch(/phase-gap/)
+    expect(intro.className).not.toMatch(/phase-play|phase-title/)
+    expect(within(intro).getByText(p.gap)).toBeInTheDocument()
+    act(() => { vi.advanceTimersByTime(1600) })
+    expect(intro.className).toMatch(/phase-title/)
+    expect(intro.className).not.toMatch(/phase-play|phase-gap/)
     expect(intro.querySelector('.intro-title-big')!.textContent).toContain('Алик,')
-    act(() => { vi.advanceTimersByTime(2600) })
+    act(() => { vi.advanceTimersByTime(2000) })
     expect(document.querySelector('.intro')).toBeNull()
     expect(game.S.introShown).toBe(true)
+  })
+
+  it('промежуточные уведомления — из пулов, баланс = старт партии, без незнакомых (#249/#321)', async () => {
+    const { introMidNotes } = await import('./view')
+    const a = introOf(uiOf(makeGame({ seed: 1 }).game))!
+    expect(a.notes.length).toBe(6)
+    expect(a.notes.some((n) => n.app === 'Банк' && /Списание/.test(n.text))).toBe(true)
+    expect(a.notes.some((n) => n.app === 'Алик' && n.text.includes('🏗️'))).toBe(true)
+    expect(a.notes.every((n) => n.app === 'Алик' || n.app === 'Банк')).toBe(true)
+    expect(a.notes.some((n) => /Мама|Авито|Карине|Гарик/i.test(n.app + n.text))).toBe(false)
+    const bal = a.notes.find((n) => n.app === 'Банк')!.text.match(/Баланс: ([\d\s\u00a0]+) ₽/)![1].replace(/\s/g, '')
+    expect(Number(bal)).toBe(START_MONEY - 340)
+    expect(introMidNotes(START_MONEY, 1).map((n) => n.text).join('|'))
+      .not.toBe(introMidNotes(START_MONEY, 2).map((n) => n.text).join('|'))
+  })
+
+  it('NC: без фильтра незнакомых имя из подмешанного пула попадает в интро (#321)', async () => {
+    const { INTRO_UNKNOWN, introMidNotes } = await import('./view')
+    const { SPEND } = await import('../content/life')
+    const { spec } = await import('../engine/rules')
+    const decoy = 'Перевод маме на закатки'
+    expect(INTRO_UNKNOWN.test(decoy)).toBe(true)
+    const raw = [...SPEND.map((e) => spec(e).t), decoy]
+    expect(raw.some((t) => INTRO_UNKNOWN.test(t))).toBe(true)
+    const filtered = raw.filter((t) => !INTRO_UNKNOWN.test(t))
+    expect(filtered.some((t) => INTRO_UNKNOWN.test(t))).toBe(false)
+    expect(introMidNotes(28_000, 1).every((n) => !INTRO_UNKNOWN.test(n.text))).toBe(true)
+  })
+
+  it('старое сохранение без introShown — интро не показывает (#249)', () => {
+    const storage = memStorage()
+    const { game } = makeGame({ storage })
+    game.save()
+    const raw = JSON.parse(storage.getItem(SAVE_KEY)!) as Record<string, unknown>
+    delete raw.introShown
+    storage.setItem(SAVE_KEY, JSON.stringify(raw))
+    expect(loadState(storage)!.introShown).toBe(true)
+    const again = makeGame({ storage })
+    renderIntro(again.game)
+    expect(document.querySelector('.intro')).toBeNull()
+  })
+
+  it('строка завязки одна на экране в фазе gap; «Мууу» звучит; ответ — игрока (#249)', () => {
+    vi.useFakeTimers()
+    const { game } = makeGame({ seed: 2 })
+    const p = prologue(game)
+    const moo = vi.spyOn(game.audio, 'moo')
+    renderIntro(game)
+    const intro = document.querySelector('.intro')!
+    act(() => { vi.advanceTimersByTime(1200) })
+    expect(within(intro as HTMLElement).getByText(p.alik)).toBeInTheDocument()
+    const me = game.S.msgs.find((m) => m.kind === 'text' && m.from === 'me')!
+    expect(within(intro as HTMLElement).getByText(me.kind === 'text' ? me.text : '')).toBeInTheDocument()
+    act(() => { vi.advanceTimersByTime(4000) })
+    expect(moo).toHaveBeenCalled()
+    act(() => { vi.advanceTimersByTime(1500) })
+    expect(intro.className).toMatch(/phase-gap/)
+    expect(intro.className).not.toMatch(/phase-title/)
+    expect(within(intro as HTMLElement).getByText(p.gap)).toBeInTheDocument()
   })
 })

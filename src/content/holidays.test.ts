@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import { makeGame, alikTexts } from '../test/helpers'
 import { FWD, FWD_HOLIDAY, NOTIF } from './life'
-import { holidayOf, HOLIDAY_EXCUSES } from './holidays'
+import { holidayOf, holidayGreetKey, HOLIDAY_EXCUSES } from './holidays'
 import { dateOf } from '../engine/time'
 import { endgame } from './memkeys'
 import { spec } from '../engine/rules'
@@ -102,21 +102,87 @@ describe('праздники', () => {
     expect(String(first)).toMatch(/^newYear@\d{4}$/)
     await game.send({ text: 'Спасибо!', tone: 'polite' })
     expect(greeted()).toBe(first) // тайл больше не поздравляет: отметка держит праздник и год
-    // тот же праздник, но год новый: день ставим в само окно, а не «+365» — ход двигает календарь на 1–3 дня
-    const year = dateOf(game.S.day).getFullYear()
-    while (!(holidayOf(game.S.day) === 'newYear' && dateOf(game.S.day).getFullYear() > year)) game.S.day++
+    // 31.12 → 1.01 — то же окно, ключ по году начала: второго поздравления нет (#255)
+    game.S.day = 289
+    const before = said().filter((t) => holiday.includes(t)).length
+    await game.send({ text: 'Спасибо!', tone: 'polite' })
+    expect(greeted()).toBe(first)
+    expect(said().filter((t) => holiday.includes(t)).length).toBe(before)
+    // следующий Новый год — другое окно
+    const year = Number(String(first).split('@')[1])
+    while (!(holidayOf(game.S.day) === 'newYear' && holidayGreetKey(game.S.day) === `newYear@${year + 1}`)) game.S.day++
     await game.send({ text: 'Спасибо!', tone: 'polite' })
     expect(greeted()).not.toBe(first)
-    expect(said().at(-1)).toMatch(/Новым годом|Ёлка|шампанское|Новый год на носу|Первый день года|по-новому/)
+    expect(said().at(-1)).toMatch(/Новым годом|Ёлка|шампанское|Новый год на носу|Первый день года|по-новому|наступающим/i)
   })
 
-  it('окно: в блоке, при «смерти» и с телефоном у Карине сам Алик не поздравляет', async () => {
-    for (const key of ['blocked', 'alik_dead', 'phone.karine']) {
+  it('праздник один раз на все пути: тайл, отмазка и «пока тебя не было» делят holiday.greeted (#328)', async () => {
+    const { game } = makeGame({ seed: 3 })
+    const holiday = HOLIDAY_EXCUSES.map((l) => spec(l).t)
+    const said = () => game.S.msgs.flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : []))
+    const count = () => said().filter((t) => holiday.includes(t)).length
+    game.S.day = 289
+    await game.send({ text: 'Спасибо!', tone: 'polite' })
+    expect(count()).toBe(1)
+    const key = game.S.mem['holiday.greeted']
+    expect(String(key)).toMatch(/^newYear@/)
+    await game.excuseTurn()
+    expect(game.S.mem['holiday.greeted']).toBe(key)
+    expect(count()).toBe(1)
+    const from = game.S.msgs.length
+    for (let i = 0; i < 20; i++) game.awayMsg('excuse')
+    expect(said().slice(from).filter((t) => holiday.includes(t))).toEqual([])
+    expect(game.S.mem['holiday.greeted']).toBe(key)
+  })
+
+  it('возврат из пропажи в праздник: тайл молчит, отмазка пишет отметку один раз (#328)', async () => {
+    const { game } = makeGame({ seed: 3 })
+    const holiday = HOLIDAY_EXCUSES.map((l) => spec(l).t)
+    const count = () => game.S.msgs.flatMap((m) => (m.kind === 'text' && m.from === 'alik' && holiday.includes(m.text) ? [m.text] : [])).length
+    game.S.day = 289
+    game.goOffline(2)
+    // как после alikTurn: пропажа снята, тайл хода пропускает поздравление (startedOffline)
+    game.S.offlineDays = 0
+    await game.excuseTurn()
+    expect(count()).toBe(1)
+    expect(String(game.S.mem['holiday.greeted'])).toMatch(/^newYear@/)
+    await game.excuseTurn()
+    expect(count()).toBe(1)
+    await game.send({ text: 'Спасибо!', tone: 'polite' })
+    expect(count()).toBe(1)
+  })
+
+  it('NC: без общей отметки отмазка поздравляет после тайла (#328)', async () => {
+    const { game } = makeGame({ seed: 3 })
+    const holiday = HOLIDAY_EXCUSES.map((l) => spec(l).t)
+    const count = () => game.S.msgs.flatMap((m) => (m.kind === 'text' && m.from === 'alik' && holiday.includes(m.text) ? [m.text] : [])).length
+    game.S.day = 289
+    await game.send({ text: 'Спасибо!', tone: 'polite' })
+    expect(count()).toBe(1)
+    delete game.S.mem['holiday.greeted']
+    await game.excuseTurn()
+    expect(count()).toBe(2)
+  })
+
+  it('NC: ключ по году даты поздравил бы дважды на стыке лет (#255)', () => {
+    expect(holidayGreetKey(288)).toBe('newYear@2026') // 31.12.2026
+    expect(holidayGreetKey(289)).toBe('newYear@2026') // 1.01.2027 — то же окно
+    expect(`newYear@${dateOf(289).getFullYear()}`).toBe('newYear@2027')
+    expect(holidayGreetKey(289)).not.toBe(`newYear@${dateOf(289).getFullYear()}`)
+  })
+
+  it('окно: в блоке, при «смерти», с телефоном у Карине и пропавший сам Алик не поздравляет', async () => {
+    for (const setup of [
+      (g: ReturnType<typeof makeGame>['game']) => { g.S.mem.blocked = true },
+      (g: ReturnType<typeof makeGame>['game']) => { g.S.mem.alik_dead = true },
+      (g: ReturnType<typeof makeGame>['game']) => { g.S.mem['phone.karine'] = true },
+      (g: ReturnType<typeof makeGame>['game']) => { g.S.offlineDays = 2 },
+    ]) {
       const { game } = makeGame({ seed: 3 })
       game.S.day = 288
-      game.S.mem[key] = true
+      setup(game)
       await game.send({ text: 'Спасибо!', tone: 'polite' })
-      expect(game.S.mem['holiday.greeted'], key).toBeUndefined()
+      expect(game.S.mem['holiday.greeted']).toBeUndefined()
     }
   })
 
@@ -161,10 +227,14 @@ describe('праздники', () => {
     expect(pool(288)).not.toMatch(/начался|Первый день|по-новому/)
     expect(pool(289)).toMatch(/С Новым годом|Первый день|по-новому/) // 1.01 — про начавшийся
     expect(pool(289)).not.toMatch(/на носу|наступающим/)
+    expect(pool(290)).toMatch(/С Новым годом|по-новому/) // 2.01
+    expect(pool(290)).not.toMatch(/Первый день/) // только 1 января (#255)
     expect(pool(353)).toMatch(/на носу|Готовлюсь/) // 6.03 — подготовка
     expect(pool(353)).not.toMatch(/С 8 Марта|женский день|праздником весны/)
-    expect(pool(355)).toMatch(/С 8 Марта|женский день|праздником весны/) // 8.03 — поздравление
+    expect(pool(355)).toMatch(/С 8 Марта|женский день|праздником весны|Сегодня не про переводы/) // 8.03
     expect(pool(355)).not.toMatch(/на носу|Готовлюсь/)
+    expect(pool(356)).toMatch(/С 8 Марта|праздником весны/) // 9.03
+    expect(pool(356)).not.toMatch(/Сегодня не про переводы/) // «Сегодня» только 8-го (#255)
     // открытки и мама — тот же календарь: накануне — про скорый день, в сам день — поздравление
     const postcards = (day: number) => {
       game.S.day = day

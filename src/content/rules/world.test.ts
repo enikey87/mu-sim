@@ -2,6 +2,8 @@
 import { describe, it, expect } from 'vitest'
 import { makeGame, alikTexts } from '../../test/helpers'
 import { ARCS } from '../arcs'
+import { FINALES } from '../finales'
+import { finaleOf } from '../memkeys'
 import { CHORUS, CHORUS_FED_UP, WEDDING_NOISE, BORIS_SICK, DEAD_KARINE, DEAD_ALIK, PROMISE_DUE } from '../world'
 import { PROMISE_CONDITIONS } from '../excuses'
 import { LEGENDS, CHORUS_LEGEND } from '../legends'
@@ -166,10 +168,25 @@ describe('обещания наступают', () => {
       const spec = valueOf(line)
       return typeof spec === 'string' ? [] : spec.remember ?? []
     }))
-    const producers = new Set([...fromArcs, ...fromLegends, ...Object.values(TALK_REMEMBER).flat()].filter((op) => op.op === '=' && op.value === true).map((op) => op.key))
+    const fromFinales = Object.values(FINALES).flatMap((fs) => fs.flatMap((f) => f.remember ?? []))
+    const producers = new Set([...fromArcs, ...fromFinales, ...fromLegends, ...Object.values(TALK_REMEMBER).flat()].filter((op) => op.op === '=' && op.value === true).map((op) => op.key))
+    // finale.<сериал> пишет playFinale любым финалом: не remember, а код — его проверяет тест ниже
+    for (const id of Object.keys(ARCS)) producers.add(finaleOf(id))
     const missing = (conditions: readonly string[]) => conditions.filter((condition) => !producers.has(condition))
     expect(missing(PROMISE_CONDITIONS)).toEqual([])
-    expect(missing([...PROMISE_CONDITIONS, 'without.producer'])).toEqual(['without.producer'])
+    expect(missing([...PROMISE_CONDITIONS, 'without.producer', 'finale.nope'])).toEqual(['without.producer', 'finale.nope'])
+  })
+  it('условие `finale.<сериал>` пишет любой финал этого сериала, в том числе частный', async () => {
+    const conditionArcs = PROMISE_CONDITIONS.filter((c) => c.startsWith('finale.')).map((c) => c.slice('finale.'.length))
+    expect(conditionArcs.length).toBeGreaterThan(0)
+    for (const arc of conditionArcs) {
+      for (const f of [null, ...(FINALES[arc] ?? [])]) {
+        const { game } = makeGame()
+        expect(game.S.mem[finaleOf(arc)], `${arc}/${f?.id ?? 'default'} до финала`).toBeUndefined()
+        await game.playFinale(arc, f)
+        expect(game.S.mem[finaleOf(arc)], `${arc}/${f?.id ?? 'default'}`).toBeTruthy()
+      }
+    }
   })
 })
 
@@ -333,15 +350,20 @@ describe('состояния мира со сроком', () => {
 })
 
 describe('приоритеты: посреди сцены Алик не болтает', () => {
-  it('во время сцены «Алик пишет сам» даёт только карточку телефона (#287)', async () => {
+  it('во время сцены «Алик пишет сам» молчит в ленте; карточка — после сцены (#287/#300)', async () => {
     const { game } = makeGame()
     game.S.scene = { id: 'deathbed', node: 'ask', vars: {} }
+    let deferred = 0
     for (let i = 0; i < 20; i++) {
       const n = game.S.msgs.length
       const r = await game.fire('AlikIdle')
       expect(r?.name).toBe('Idle_Notif')
-      expect(game.S.msgs.slice(n).filter((m) => m.kind !== 'card')).toEqual([])
+      expect(game.S.msgs.slice(n)).toEqual([])
+      deferred++
     }
+    expect(deferred).toBe(20)
+    await game.enterNode('deathbed', null)
+    expect(game.S.msgs.some((m) => m.kind === 'card')).toBe(true)
   })
   it('без сцены — болтает', async () => {
     const { game } = makeGame()

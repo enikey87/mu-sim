@@ -17,10 +17,10 @@ import {
   vendetta, court, courtVerdict, courtReferral, ritualCount, ritualCut, caughtCount, cryptoHodl,
   bathAsked, mamaCalls, phoneKarine, alikShaved, alikDay, mooAt, sorryAt, rudeAt, thanksAt, topicRun, topicLast,
   legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway, nivaPlayer,
-  garikConcrete, garikCut, houseOnGarik, borisMarried, borisSmetaReady, taxFrozen, taxThawed,
+  garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, threatClaim, nuneKeyPassed, nuneDekretOver, grandpaDying,
   betonSet, cardSent, saidTomorrow, saidFriday, payday, count, endgame, holidayGreeted, lend50,
-  lie, paydayScene, lightOff, netRation, phoneWarn, creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor,
+  lie, paydayScene, lightOff, netRation, phoneWarn, creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited,
 } from './memkeys'
 import type { LoanId, MomId, ThingId } from './credit'
 import { valueOf } from '../engine/rules'
@@ -48,12 +48,13 @@ export type MemExactKey =
   | typeof bathAsked | typeof mamaCalls | typeof phoneKarine | typeof alikShaved | typeof alikDay | typeof mooAt | typeof sorryAt
   | typeof rudeAt | typeof thanksAt | typeof topicRun | typeof topicLast | typeof legendPromiseAt
   | typeof legendId | typeof legendDay | typeof legendArc | typeof nextTransfer | typeof tileCornerRemoved
-  | typeof nivaAway | typeof nivaPlayer | typeof garikConcrete | typeof garikCut | typeof houseOnGarik | typeof borisMarried
+  | typeof nivaAway | typeof nivaBack | typeof nivaPlayer | typeof garikConcrete | typeof garikCut | typeof houseOnGarik | typeof borisMarried
+  | typeof razmikMarried
   | typeof borisSmetaReady | typeof taxFrozen | typeof taxThawed | typeof actSigned | typeof grantPaid
   | typeof rubikFined | typeof threatClaim | typeof nuneKeyPassed | typeof nuneDekretOver | typeof grandpaDying
   | typeof betonSet | typeof cardSent | typeof saidTomorrow | typeof saidFriday | typeof paydayScene
   | typeof lightOff | typeof netRation | typeof phoneWarn | typeof holidayGreeted
-  | typeof creditStage | typeof creditOffer | typeof creditBroke | typeof momDone | typeof creditDeclined | typeof moneyPoor
+  | typeof creditStage | typeof creditOffer | typeof creditBroke | typeof momDone | typeof creditDeclined | typeof moneyPoor | typeof collectorsRecruited
   | typeof payday[keyof typeof payday] | typeof count[keyof typeof count]
   | typeof endgame[keyof typeof endgame] | typeof lend50[keyof typeof lend50] | typeof lie[keyof typeof lie]
 

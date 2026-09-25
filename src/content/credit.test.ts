@@ -1,12 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import { Game } from '../engine/game'
-import { makeGame, setMoney, cards, moneyLog } from '../test/helpers'
+import { makeGame, setMoney, cards, moneyLog, memStorage } from '../test/helpers'
 import { NOTIF } from './life'
 import { moneyPoor } from './memkeys'
 import {
   LOANS, THINGS, MOM_HELPS, creditOffer, creditStage, creditBroke, momDone,
-  sold, momHelp, loanTaken, loanDueAt, allSold,
+  sold, momHelp, loanTaken, loanDueAt, loanPayment, allSold,
 } from './credit'
+import { SAVE_KEY, freshState, setCount } from '../engine/state'
 
 describe('кредитная лестница', () => {
   it('на дне банк предлагает первую ступень', () => {
@@ -310,30 +311,93 @@ describe('после первого дна бедность до выплаты 
     expect(game.moneyLevel()).toBe('normal')
   })
 
-  it('кривая: после первого дна доля дней в «норме» = 0 до выплаты', async () => {
+  it('кривая: после первого дна передышка не поднимает баланс выше порога «мало» до выплаты (#299); выше — только деньги Алика (#322)', async () => {
     const { botTurn } = await import('../tools/bot')
-    const shares: number[] = []
+    const { Game } = await import('../engine/game')
+    const peaks: number[] = []
     for (const seed of [1, 2, 3, 5, 8, 13]) {
       const { game } = makeGame({ seed })
       let firstBottom: number | null = null
-      let normalAfter = 0
+      let peak = 0
       let daysAfter = 0
+      let alik = 0 // переводы, серии, сцены — приходят целиком, их потолок не касается
+      const adjust = game.adjustMoney.bind(game)
+      game.adjustMoney = (delta, reason, opts) => {
+        const ok = adjust(delta, reason, opts)
+        if (ok && delta > 0 && game.S.mem[moneyPoor]) {
+          expect(/^(Кредит: |Авито$|Мама$|Перевод от Алика$|Выплата$|По карте$|День выплаты$)/.test(reason), `seed ${seed}: неизвестный приход «${reason}»`).toBe(true)
+          if (/Алика|Выплата|По карте/.test(reason)) alik += delta
+        }
+        return ok
+      }
       for (let i = 0; i < 200; i++) {
         await botTurn(game)
         if (game.S.mem[moneyPoor] && firstBottom == null) firstBottom = game.S.day
         if (firstBottom != null && !game.S.mem['payday.chain'] && !game.S.mem['endgame.active']) {
           daysAfter++
-          if (game.moneyLevel() === 'normal') normalAfter++
+          peak = Math.max(peak, game.S.money)
+          expect(game.S.money, `seed ${seed} day ${game.S.day}`).toBeLessThanOrEqual(Game.MONEY_LOW + alik)
         }
         if (game.S.mem['payday.chain'] || game.S.mem['endgame.active']) break
       }
       expect(firstBottom, `seed ${seed} never bottom`).not.toBeNull()
-      const share = daysAfter ? normalAfter / daysAfter : 0
-      shares.push(share)
-      expect(share, `seed ${seed} normal share ${share} days=${daysAfter}`).toBe(0)
+      expect(daysAfter, `seed ${seed}`).toBeGreaterThan(0)
+      peaks.push(peak)
     }
-    console.log('normal-after-bottom shares:', shares.map((s) => s.toFixed(2)).join(', '))
+    console.log('balance peaks after bottom (≤9000):', peaks.join(', '))
   }, 180_000)
+
+  it('после дна кредит/продажа не поднимают баланс выше MONEY_LOW (#299) — потолок у передышки, не у adjustMoney (#322)', () => {
+    const { game } = makeGame()
+    setMoney(game, 100)
+    game.S.mem[moneyPoor] = true
+    game.S.mem[creditOffer] = true
+    game.S.mem[creditStage] = 0
+    game.takeCredit()
+    expect(game.S.money).toBe(Game.MONEY_LOW)
+    setMoney(game, 5_000)
+    game.S.mem[creditOffer] = true
+    game.sellThing('microwave')
+    expect(game.S.money).toBe(Game.MONEY_LOW)
+    expect(game.relief(5_000)).toBe(0)
+    // NC: сам adjustMoney не режет — иначе сумма в тексте и на карте расходятся (#322)
+    expect(game.adjustMoney(5_000, 'Перевод от Алика')).toBe(true)
+    expect(game.S.money).toBe(Game.MONEY_LOW + 5_000)
+  })
+
+  it('после дна платёж по кредиту — доля от зачисленного (#299)', () => {
+    const { game } = makeGame()
+    setMoney(game, Game.MONEY_BOTTOM)
+    game.S.mem[moneyPoor] = true
+    game.S.mem[creditOffer] = true
+    game.S.mem[creditStage] = 0
+    game.takeCredit()
+    expect(game.S.money).toBe(Game.MONEY_LOW)
+    const got = Game.MONEY_LOW - Game.MONEY_BOTTOM
+    const pay = Math.max(1, Math.round(LOANS[0].payment * got / LOANS[0].amount))
+    expect(Number(game.S.mem[loanPayment('consumer')])).toBe(pay)
+    setMoney(game, pay)
+    game.chargeCredit('consumer')
+    expect(game.S.money).toBe(0)
+  })
+
+  it('без money.poor кредит даёт полную сумму (NC #299)', () => {
+    const { game } = makeGame()
+    setMoney(game, 100)
+    expect(game.S.mem[moneyPoor]).toBeFalsy()
+    expect(game.adjustMoney(30_000, 'Кредит: Всё будет')).toBe(true)
+    expect(game.S.money).toBe(30_100)
+  })
+
+  it('без money.poor платёж полный (NC #299)', () => {
+    const { game } = makeGame()
+    setMoney(game, Game.MONEY_BOTTOM)
+    game.S.mem[creditOffer] = true
+    game.S.mem[creditStage] = 0
+    game.takeCredit()
+    expect(game.S.money).toBe(Game.MONEY_BOTTOM + LOANS[0].amount)
+    expect(game.S.mem[loanPayment('consumer')]).toBe(LOANS[0].payment)
+  })
 })
 
 describe('негативные контроли', () => {
@@ -342,6 +406,32 @@ describe('негативные контроли', () => {
     setMoney(game, 10000)
     game.maybeCreditOffer()
     expect(game.S.mem[creditOffer]).toBeFalsy()
+  })
+
+  it('старое сохранение с credit.offer без карточки — снова карточка, не кнопка Алику (#300)', () => {
+    const storage = memStorage()
+    const s = freshState()
+    setCount(s, 'money', 100)
+    s.mem[creditOffer] = true
+    s.mem[creditStage] = 0
+    s.choices = [{ text: 'Взять кредит «Всё будет»', tone: 'polite', act: 'creditTake' }]
+    s.msgs = [{ id: 1, kind: 'text', from: 'alik', text: 'Брат', time: '14:00' }]
+    s.nextId = 2
+    storage.setItem(SAVE_KEY, JSON.stringify(s))
+    const { game } = makeGame({ storage, seed: 2 })
+    expect(game.choices.some((c) => /Взять кредит/.test(c.text) || c.act === 'creditTake')).toBe(false)
+    const offer = game.S.msgs.find((m) => m.kind === 'card' && m.offer && !m.answered)
+    expect(offer?.kind === 'card' && offer.offer?.take).toMatch(/Взять кредит/)
+    expect(game.S.mem[creditOffer]).toBe(true)
+  })
+
+  it('перезагрузка не пересобирает обычные варианты ответа (#323)', () => {
+    const storage = memStorage()
+    const { game } = makeGame({ storage, seed: 4 })
+    const offered = game.choices.map((c) => c.text)
+    game.save()
+    const { game: loaded } = makeGame({ storage, seed: 9 })
+    expect(loaded.choices.map((c) => c.text)).toEqual(offered)
   })
 
   it('реплика про микроволновку — только при sold.microwave', () => {

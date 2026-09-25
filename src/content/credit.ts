@@ -56,9 +56,10 @@ export const THINGS: readonly Thing[] = [
 ]
 
 export const MOM_HELPS: readonly MomHelp[] = [
-  { id: 'pension', amount: 1500, text: 'перевела с пенсии 1 500 ₽. Не говори папе' },
-  { id: 'pickles', amount: 4000, text: 'продала соседке закатки. Огурцы были хорошие, соседка плачет' },
-  { id: 'dacha', amount: 45000, text: 'продала дачу. Помидоры всё равно не росли' },
+  // {sum} — сколько дошло до карты: после дна помощь режется до порога «мало», и текст называет зачтённое (#322)
+  { id: 'pension', amount: 1500, text: 'перевела с пенсии {sum}. Не говори папе' },
+  { id: 'pickles', amount: 4000, text: 'продала соседке закатки, {sum}. Огурцы были хорошие, соседка плачет' },
+  { id: 'dacha', amount: 45000, text: 'продала дачу. Помидоры всё равно не росли. Перевела {sum}, остальное спрятала от папы' },
 ]
 
 export const MOM_DONE_TEXT = 'Сынок, я всё. Проси у Алика. Он же тебе должен?'
@@ -74,6 +75,7 @@ export const sold = <T extends ThingId>(id: T): `sold.${T}` => `sold.${id}`
 export const momHelp = <T extends MomId>(id: T): `mom.${T}` => `mom.${id}`
 export const loanTaken = <T extends LoanId>(id: T): `credit.${T}.taken` => `credit.${id}.taken`
 export const loanDueAt = <T extends LoanId>(id: T): `credit.${T}.dueAt` => `credit.${id}.dueAt`
+export const loanPayment = <T extends LoanId>(id: T): `credit.${T}.payment` => `credit.${id}.payment`
 /** Полоса неоплат по займу: банк говорит один раз за полосу, не каждую неделю (#184). */
 export const loanFailed = <T extends LoanId>(id: T): `credit.${T}.failed` => `credit.${id}.failed`
 

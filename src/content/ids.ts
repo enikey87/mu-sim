@@ -63,6 +63,7 @@ export type AchId =
   | 'arc_garik'
   | 'arc_tile'
   | 'arc_grandpa'
+  | 'arc_collectors'
   | 'memory'
   | 'liar'
   | 'liar3'
@@ -103,6 +104,7 @@ export type CastId =
   | 'goar'
   | 'razmik'
   | 'rubik'
+  | 'collectors'
 
 export type ArcId =
   'boris'
@@ -117,6 +119,7 @@ export type ArcId =
   | 'garik'
   | 'tile'
   | 'grandpa'
+  | 'collectors'
 
 export type TopicId =
   'beton'

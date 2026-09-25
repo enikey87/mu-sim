@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest'
 import { makeGame } from '../test/helpers'
 import { ARCS } from './arcs'
 import { LEGENDS, CHORUS_LEGEND } from './legends'
+import { meet } from './world'
 import { spec, lintLines } from '../engine/rules'
 import type { Game } from '../engine/game'
 
@@ -122,6 +123,49 @@ describe('легенда денег', () => {
     expect(inJournal()).toBe(1) // но это не новая запись
   })
 
+  it('проходная серия ту же легенду гейт клятвы не открывает (#246)', async () => {
+    const { game } = makeGame()
+    await game.playArc('samvel') // ep0: wedding + обязательная клятва
+    const until = LEGENDS.wedding.until
+    expect(vows(game, until)).toBe(1)
+    const at = game.S.mem.legendPromiseAt
+    await game.playArc('samvel') // ep1: без своей легенды — возвращает wedding
+    expect(game.legend()).toBe('wedding')
+    expect(game.S.mem.legendPromiseAt).toBe(at) // гейт не сброшен
+    const n = vows(game, until)
+    await game.excuseTurn() // пауза ещё не прошла
+    expect(vows(game, until)).toBe(n)
+  })
+
+  // NC #246: setLegend всегда открывал гейт — проходная серия снова клялась бы сразу
+  it('NC: повторный setLegend той же id гейт не открывает (#246)', () => {
+    const { game } = makeGame()
+    game.setLegend('wedding', 'samvel')
+    const opened = game.S.mem.legendPromiseAt
+    game.S.stats.sent += 3
+    game.setLegend('wedding', 'samvel')
+    expect(game.S.mem.legendPromiseAt).toBe(opened)
+    game.setLegend('niva_stuck', 'niva') // смена — открывает
+    expect(game.S.mem.legendPromiseAt).toBe(game.S.stats.sent - 8)
+  })
+
+  it('повтор клятвы не в журнал у всех 30 легенд, в т.ч. без condition (#246)', async () => {
+    for (const [id, spec] of Object.entries(LEGENDS)) {
+      const { game } = makeGame({ seed: 1 })
+      game.setLegend(id, 'nune')
+      const until = spec.until
+      const inJournal = () => game.S.promises.filter((p) =>
+        spec.condition ? p.condition === spec.condition : p.t.includes(until)).length
+      game.S.stats.sent += 100
+      await game.excuseTurn()
+      expect(inJournal(), id).toBe(1)
+      game.S.stats.sent += 100
+      await game.excuseTurn()
+      expect(vows(game, until), id).toBeGreaterThanOrEqual(2)
+      expect(inJournal(), id).toBe(1)
+    }
+  })
+
   it('хор не противоречит легенде: Нуне про сейф, а не «денег нет»', () => {
     const { game } = makeGame()
     game.setLegend('safe_baby', 'nune')
@@ -156,5 +200,101 @@ describe('легенда денег', () => {
     game.alikMsg({ kind: 'text', from: 'alik', text: 'Маленький Алик проглотил ключ от сейфа. Ждём.' })
     game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в Дубае.' })
     expect(game.S.mem['lie.old']).toBe('money_safe')
+  })
+
+  /** Сроки, которых сюжет не приводит: ни факта, ни срока в днях. Клятва со ставкой на них не звучит. */
+  const NEVER: Record<string, string> = {
+    safe_wrongkey: 'второй ключ не находят: сериал кончается «мы должны всем»',
+    niva_back: 'колёса не продают: «Нива» уезжает снова',
+    boris_object: 'объект не сдают: Бориса забирает налоговая',
+    crypto: 'рост «Лаваш-коина» не показывает ни одна серия; исход — «лавашами» в День выплаты',
+    beton_money: 'фундамент вскрывают только редкие финалы («Вскрыли», «Угол конверта»): по умолчанию дом уходит судье',
+    beton_law: 'Грант не признаёт долг: «я вам ничего не должен»',
+    beton_goar: 'угол снимают только те же редкие финалы',
+    wedding: 'свадьба Самвела не кончается: финал — «женится снова», ARC_DONE — «она теперь всегда идёт»',
+    grant_la: 'Грант вернётся «когда Арарат вернут»',
+    grant_twin: 'настоящий Грант так и не находится',
+    grandpa: 'дедушка не умирает',
+    grandpa_will: 'завещание не вступает в силу: дедушка жив',
+    grandpa_wedding: 'свадьба прошла в той же серии, где встала легенда: факта «после» нет',
+    dead: 'срок — возвращение Алика: `alik_dead` снимается, а не ставится, факта «наступило» нет',
+  }
+
+  it('у каждой легенды срок — факт или дни, либо она названа «никогда» с причиной (#327)', () => {
+    for (const id of Object.keys(NEVER)) expect(LEGENDS[id], `NEVER: нет легенды ${id}`).toBeDefined()
+    for (const [id, l] of Object.entries(LEGENDS)) {
+      const term = l.condition !== undefined || l.days !== undefined
+      expect(term, `${id}: нет ни condition, ни days, и в NEVER её нет`).toBe(!(id in NEVER))
+      if (id in NEVER) expect(NEVER[id].length, id).toBeGreaterThan(10)
+    }
+    expect(Object.keys(NEVER).length).toBeLessThan(Object.keys(LEGENDS).length / 2) // «никогда» — меньшинство
+  })
+
+  it('форма клятвы со ставкой звучит на срок легенды, который может наступить, и молчит на «никогда» (#327)', async () => {
+    const stakes = async (id: string): Promise<number> => {
+      const { game } = makeGame({ seed: 3 })
+      game.rules.applyOps(meet('karine'), {})
+      game.setLegend(id, 'nune')
+      let n = 0
+      for (let i = 0; i < 40; i++) {
+        game.S.stats.sent += 20
+        game.S.day += 5
+        game.setLegend(id, 'nune')
+        game.S.mem.legendPromiseAt = -99
+        const from = game.S.msgs.length
+        await game.promiseLine(undefined, true)
+        if (texts(game, from).some((t) => /сбрею усы/.test(t))) n++
+      }
+      return n
+    }
+    let withTerm = 0
+    for (const id of Object.keys(LEGENDS)) {
+      const n = await stakes(id)
+      if (id in NEVER) expect(n, `${id}: ставка на срок «никогда»`).toBe(0)
+      else if (n > 0) withTerm++
+    }
+    // не пустая проверка: ставка на срок с фактом или днями звучит хотя бы у большинства таких легенд
+    expect(withTerm).toBeGreaterThan((Object.keys(LEGENDS).length - Object.keys(NEVER).length) / 2)
+  })
+
+  // сюжет приводит срок: легенда → клятва → серии играются → условие истинно и обещание получило событие срока
+  it.each([
+    ['niva_stuck', 'niva'], ['niva_gone', 'niva'], ['niva_abroad', 'niva'], ['inspect_karine', 'rubik'],
+    ['crane_queue', 'razmik'], ['crane_wedding', 'razmik'], ['garik', 'garik'], ['court_tile', 'tile'],
+  ])('срок легенды %s наступает, когда сериал %s доигран (#327)', async (id, arc) => {
+    const { game } = makeGame()
+    const l = LEGENDS[id]
+    expect(l.condition, id).toBeDefined()
+    game.recordPromise({ text: l.until, d: null, condition: l.condition })
+    expect(game.S.promises[0].met).toBeUndefined()
+    for (let i = 0; i < ARCS[arc].eps.length; i++) {
+      game.nextDay(40) // отложенные факты (свадьба — через дни) успевают наступить
+      await game.playArc(arc)
+    }
+    game.nextDay(40)
+    expect(game.S.mem[l.condition!], `${id}: ${l.condition} после серий ${arc}`).toBeTruthy()
+    await game.afterTurn()
+    expect(game.S.promises[0].met, `${id}: событие срока`).toBeDefined()
+  })
+
+  // #319: гейт клятвы открывает только серия, которая сама заводит или меняет легенду
+  it.each([
+    ['другая серия по дороге', async (game: Game) => { await game.playArc('niva') }],
+    ['финал другой серии стёр легенду', async (game: Game) => { await game.playArc('grant'); await game.playFinale('grant', null) }],
+  ])('проходная серия при чередовании сериалов гейт клятвы не открывает: %s (#327)', async (_name, between) => {
+    const { game } = makeGame()
+    await game.playArc('samvel') // ep0: wedding + обязательная клятва
+    const until = LEGENDS.wedding.until
+    expect(vows(game, until)).toBe(1)
+    game.S.stats.sent += 1
+    await between(game)
+    game.S.stats.sent += 1
+    const gate = game.S.mem.legendPromiseAt
+    await game.playArc('samvel') // ep1: без своей легенды — возвращает wedding
+    expect(game.legend()).toBe('wedding')
+    expect(game.S.mem.legendPromiseAt).toBe(gate) // возврат легенды сериала гейт не открыл
+    const n = vows(game, until)
+    await game.excuseTurn() // пауза ещё не прошла
+    expect(vows(game, until)).toBe(n)
   })
 })

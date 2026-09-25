@@ -4,9 +4,11 @@ import type { UiState } from '../engine/ui-state'
 import { ACH } from '../content/achievements'
 import { ARCS } from '../content/arcs'
 import { ENDINGS } from '../content/finales'
-import { NOTIF } from '../content/life'
+import { SPEND } from '../content/life'
 import { payday } from '../content/memkeys'
 import { fmtDate } from '../engine/time'
+import { START_MONEY } from '../engine/state'
+import { spec } from '../engine/rules'
 
 /** Граница между движком и интерфейсом: единственный модуль UI, который знает устройство S и ключей памяти.
  *  Компоненты получают фасад GameUi и плоский снимок; контент и memkeys не импортируют (страж — view.test.ts). */
@@ -153,8 +155,37 @@ export type IntroView = {
   day: number
   /** Дата календаря для листания — той же функцией, что разделители чата. */
   dateAt: (day: number) => string
-  /** Промежуточные уведомления: пул телефона, открытый в свежей партии (без незнакомых имён). */
+  /** Промежуточные: обещания Алика, стикер, списания банка — без незнакомых имён (#249). */
   notes: IntroNote[]
+}
+
+/** Имена, которых на старте партии ещё нет — иначе уведомление интро врёт о знакомстве (#249/#321). */
+export const INTRO_UNKNOWN = /мам[аеуы]|Карине|Гарик|Самвел|Нуне|Борис|Грант|Размик|Рубик|Арсен|Гоар|Мкртич/i
+
+/** Уведомления середины интро: обещания, стикер, банк из пулов партии (docs/design/intro.md). */
+export function introMidNotes(money = START_MONEY, seed = 1): IntroNote[] {
+  const why = SPEND.map((e) => spec(e).t).filter((t) => !INTRO_UNKNOWN.test(t))
+  const i = Math.abs(seed) % Math.max(1, why.length)
+  const a = why[i] ?? 'Продукты'
+  const b = why[(i + 1) % why.length] ?? 'Кофе с горя'
+  const rub = (n: number) => n.toLocaleString('ru-RU')
+  const bal1 = money - 340
+  const bal2 = bal1 - 128
+  const vows = [
+    'Завтра всё будет, брат',
+    'В понедельник, какой — не скажу',
+    'Деньги в пути. Путь длинный',
+  ]
+  const v0 = vows[seed % vows.length]!
+  const v1 = vows[(seed + 1) % vows.length]!
+  return [
+    { icon: '💬', app: 'Алик', text: v0 },
+    { icon: '💬', app: 'Алик', text: '🏗️' },
+    { icon: '🏦', app: 'Банк', text: `Списание 340 ₽. ${a}. Баланс: ${rub(bal1)} ₽` },
+    { icon: '💬', app: 'Алик', text: v1 },
+    { icon: '💬', app: 'Алик', text: vows[(seed + 2) % vows.length]! },
+    { icon: '🏦', app: 'Банк', text: `Списание 128 ₽. ${b}. Баланс: ${rub(bal2)} ₽` },
+  ]
 }
 
 /** Интро новой партии: null, если уже показано. Пролог читается из ленты — интро совпадает с чатом по построению. */
@@ -165,7 +196,6 @@ export const introOf = (u: GameUi): IntroView | null => {
   const me = S.msgs.find((m): m is Extract<Msg, { kind: 'text' }> => m.kind === 'text' && m.from === 'me')
   const sys = S.msgs.find((m): m is Extract<Msg, { kind: 'sys' }> => m.kind === 'sys')
   if (!alik || !me || !sys) return null
-  const pool = NOTIF.filter((n) => !n.when?.length && !n.spend)
-  const notes = [...pool].sort(() => Math.random() - 0.5).slice(0, 6).map((n) => ({ icon: n.icon, app: n.app, text: n.t }))
-  return { intro: alik.text, reply: me.text, gap: sys.text, day: S.day, dateAt: fmtDate, notes }
+  const seed = [...alik.text].reduce((n, c) => n + c.charCodeAt(0), 0)
+  return { intro: alik.text, reply: me.text, gap: sys.text, day: S.day, dateAt: fmtDate, notes: introMidNotes(S.money, seed) }
 }

@@ -8,6 +8,7 @@ import { ENDGAME_RETURNERS } from './endgame'
 import { CONDOLE_REVIVED, GREET_A, FLOOR } from './misc'
 import { SPEND } from './life'
 import { WORLD, needs } from './world'
+import { turnRules } from './rules/turn'
 import { valueOf, type Entry } from '../engine/rules'
 import type { Game } from '../engine/game'
 
@@ -49,12 +50,10 @@ describe('несостыковки из партии пользователя', 
     game.S.items.push('Место на кране (40 м)')
     game.S.stats.sent = 20
     const n = game.S.msgs.length
-    // Turn_Memory — редкий гость среди ходов Алика: ждём, пока он выиграет розыгрыш (гейт легенды сдвинул поток, #179)
-    for (let i = 0; i < 60 && !texts(game, n).some((t) => /отдал тебе/.test(t)); i++) {
-      game.S.rules.cooldown = {}
-      game.S.scene = null // квест/сцена иначе поднимает floor и глушит Turn_Memory
-      await game.fire('AlikTurn')
-    }
+    // само правило, а не розыгрыш хода: Turn_Memory — редкий гость среди ходов Алика (вес в розыгрыше), и цикл AlikTurn
+    // с лимитом держал тест на удаче сида: p90≈45 ходов, max 88, лимит 60 не покрывал 3 сида из 100 (#327)
+    const rule = turnRules.find((r) => r.name === 'Turn_Memory')!
+    await rule.respond!(game.rules.ctx(game, rule, { event: 'AlikTurn' }, game.facts()))
     const line = texts(game, n).find((t) => /отдал тебе/.test(t))!
     expect(line).toContain('«Место на кране»')
     expect(line).not.toContain('(40 м)')
@@ -451,5 +450,31 @@ describe('несостыковки из плейтеста ботами, рау�
     const { low } = await import('./excuses')
     expect(low('Гарика достали?')).toBe('Гарика достали?')
     expect(low('Как там с оплатой?')).toBe('как там с оплатой?')
+  })
+  it('«Интерпол ищет Ниву» — только в бегах; «отдал тебе Ниву» — только у игрока (#328)', async () => {
+    const { game } = makeGame({ seed: 2 })
+    const { D } = await import('./excuses')
+    const { valueOf } = await import('../engine/rules')
+    const interpol = D.ESC1.find((e: unknown) => String(valueOf(e)).includes('Интерпол'))!
+    game.S.mem['intro.niva'] = true
+    expect(game.open([interpol])).toEqual([]) // знакомы, но не в бегах
+    game.S.mem['niva.away'] = true
+    expect(game.open([interpol]).map((x) => (typeof x === 'string' ? x : x.t))).toEqual(['Интерпол ищет мою «Ниву», все счета проверяют'])
+    // NC: без nivaAway в гейте строка открыта и без бегов
+    const ungated = { t: 'Интерпол ищет мою «Ниву», все счета проверяют', when: [WORLD.niva] }
+    delete game.S.mem['niva.away']
+    expect(game.open([ungated]).length).toBe(1)
+
+    const mem = game.rules.all.find((r) => r.name === 'Turn_Memory')!
+    const ask = async () => {
+      const from = game.S.msgs.length
+      await mem.respond!({ game, facts: game.facts() } as Parameters<NonNullable<typeof mem.respond>>[0])
+      return game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : []))
+    }
+    game.S.items.push('«Нива» 1987 года')
+    game.S.stats.sent = 20
+    expect((await ask()).join(' ')).not.toMatch(/отдал тебе «Ниву»/)
+    game.S.mem['niva.player'] = true
+    expect((await ask()).join(' ')).toMatch(/отдал тебе «Ниву»/)
   })
 })

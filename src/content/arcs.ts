@@ -1,8 +1,8 @@
 // Сквозные сюжеты, другие участники чата, групповой чат, «не тот чат».
 // Эпизод: m — сообщения (строка — от Алика, { w, t } — от участника), fx, sys, then: 'promise'.
-import { type Entry, type FactOp, set, gate, is, eq, missing, gte, lte } from './fact'
+import { type Entry, type FactOp, type Criterion, set, gate, is, eq, missing, gte, lte } from './fact'
 import { needs, meet, WORLD } from './world'
-import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, garikConcrete, garikCut, grandpaDying, grantPaid, houseOnGarik, intro, met, mourning, nivaAway, nuneDekretOver, nuneKeyPassed, sick, taxFrozen, wedding } from './memkeys'
+import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, collectorsRecruited, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantPaid, houseOnGarik, intro, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, sick, taxFrozen, wedding } from './memkeys'
 
 export type ArcMsg = string | { w: string; t: string }
 export interface Episode {
@@ -17,12 +17,12 @@ export interface Episode {
   item?: string
   /** Легенда денег (legends.ts): где деньги и что мешает; null — легенда этого сериала кончилась. */
   legend?: string | null
-  /** Состояние мира на N дней (свадьба идёт, Борис болеет…); actor — чья это доска, иначе общая. */
-  state?: { key: string; days: number; actor?: string }
+  /** Состояние мира на N дней (свадьба идёт, Борис болеет…); без days — навсегда; actor — чья доска. */
+  state?: { key: string; days?: number; actor?: string }
   sys?: string
   then?: 'promise'
 }
-export interface Arc { title: string; minDay?: number; follow: Entry<string>[]; eps: Episode[] }
+export interface Arc { title: string; minDay?: number; /** Условие старта (не продолжения): иначе сериал в пуле nextArc (#128). */ when?: Criterion[]; follow: Entry<string>[]; eps: Episode[] }
 export const CAST: Record<string, { name: string; color: string }> = {
   boris: { name: 'Борис 🐏', color: '#b07b2c' },
   grant: { name: 'Заказчик Грант', color: '#2f6fb3' },
@@ -39,6 +39,7 @@ export const CAST: Record<string, { name: string; color: string }> = {
   goar: { name: 'Тётя Гоар', color: '#8a5a8c' },
   razmik: { name: 'Крановщик Размик 🏗️', color: '#c46a1d' },
   rubik: { name: 'Инспектор Рубик', color: '#4a5d7e' },
+  collectors: { name: 'Коллекторы «Деньги-Ара»', color: '#5a4a3a' },
 };
 
 export const ARCS: Record<string, Arc> = {
@@ -96,7 +97,7 @@ export const ARCS: Record<string, Arc> = {
       { m: ['«Ниву» видели в Гюмри. Заправилась и не заплатила. Вся в меня.'], legend: 'niva_gone' }, // ещё в Армении — Грузия со следующей серии
       { m: ['«Нива» пересекла границу с Грузией. Без документов. Пропустили — узнали.'], legend: 'niva_abroad' },
       { m: [{ w: 'niva', t: 'Би-бип.' }, 'Это «Нива» тебе из Тбилиси. Роуминг, брат, дорого. Она за мой счёт звонит.'] },
-      { m: ['«Нива» вернулась! Без денег. Но с новыми колёсами и грузинскими номерами. Кто-то её любил.'], remember: [set(nivaAway, false)], then: 'promise', legend: 'niva_back' },
+      { m: ['«Нива» вернулась! Без денег. Но с новыми колёсами и грузинскими номерами. Кто-то её любил.'], remember: [set(nivaAway, false), set(nivaBack, true)], then: 'promise', legend: 'niva_back' },
       { m: ['«Нива» опять уехала. Оставила записку: «Не ищи». Уважаю её выбор.'], remember: [set(nivaAway, true)], fx: { ach: 'arc_niva' }, legend: null },
     ],
   },
@@ -167,7 +168,7 @@ export const ARCS: Record<string, Arc> = {
       },
       { m: ['Приехало телевидение. Я дал интервью: сказал, что всем плачу. Размик сверху кричал «врёт!» — но звук не записался. Высоко.', 'В эфир пошло «всем плачу». Теперь это официально, брат. Можешь ссылаться.'] },
       { m: ['К Размику приехала мама. Стоит внизу, плачет. Потом встретила мою маму. Теперь плачут вдвоём. Про нас обоих. Про тебя немного тоже.', { w: 'mama', t: 'Размик хороший мальчик. Ты хороший мальчик. Алик тоже хороший, но денег не даст. Покушай хоть ты.' }] },
-      { m: [needs('samvel')('Размик женится! Прямо на кране. Невесту подняли в бадье для бетона. Самвел командует снизу в мегафон.'), 'Все деньги — на свадьбу, брат. Высотная свадьба — это дорого. Страховка одна чего стоит.'], then: 'promise', state: { key: wedding('razmik'), days: 5 }, legend: 'crane_wedding' },
+      { remember: [set(razmikMarried, true, { delay: 5 })], m: [needs('samvel')('Размик женится! Прямо на кране. Невесту подняли в бадье для бетона. Самвел командует снизу в мегафон.'), 'Все деньги — на свадьбу, брат. Высотная свадьба — это дорого. Страховка одна чего стоит.'], then: 'promise', state: { key: wedding('razmik'), days: 5 }, legend: 'crane_wedding' },
       { m: ['Слушай, соседний кран свободен. Залезай. Вдвоём — это уже профсоюз, с профсоюзом я считаюсь. Первое время.', 'Лаваш подавать буду лично. Крюком. В долг.'] },
       { m: ['Размик слез! Я ему всё заплатил. Твоими деньгами, брат — он был выше в очереди. В прямом смысле.', 'Зато ты теперь первый! Денег нет. Но ты первый. Это тоже чего-то стоит.'], fx: { ach: 'arc_razmik' }, legend: null },
     ],
@@ -236,6 +237,51 @@ export const ARCS: Record<string, Arc> = {
       { m: ['Дедушка пережил медсестру, врача и хоспис. Хоспис закрылся. Дедушка открыл в нём шаурмичную.'], fx: { ach: 'arc_grandpa' }, legend: null },
     ],
   },
+  // старт только после credit.broke — не раньше и не в эндгейме (#128)
+  collectors: {
+    title: 'Коллекторы «Деньги-Ара»',
+    when: [is(creditBroke), missing(endgame.active)],
+    follow: [
+      gate(missing(collectorsRecruited))('Коллекторы ещё звонят?'),
+      gate(is(collectorsRecruited))('Как там твои коллекторы на объекте?'),
+      'Алик, что с «Деньги-Ара»?',
+    ],
+    eps: [
+      {
+        remember: meet('collectors'),
+        m: [
+          { w: 'collectors', t: 'Здравствуйте. Мы из МФО «Деньги-Ара». Вы нам должны. Мы не злимся — мы философствуем.' },
+          { w: 'collectors', t: 'В договоре поручитель — Алик Воздухонесян. Поручитель — почти друг. Где он?' },
+        ],
+      },
+      {
+        m: [
+          { w: 'collectors', t: 'Мы узнали: Алик должен вам больше, чем вы — нам. Это уже не долг. Это диалектика.' },
+          'Брат, тебе коллекторы пишут? Скажи, я в отпуске. Внутреннем. Без интернета и без денег.',
+        ],
+      },
+      {
+        m: [
+          { w: 'collectors', t: 'Мы приехали к Алику. Он напоил чаем. Чай крепкий. Долг — ещё крепче. Разговариваем о смысле платежа.' },
+          'Они у меня. Хорошие ребята. Говорят «нечем платить» так красиво, что я почти заплакал.',
+        ],
+      },
+      {
+        remember: [set(collectorsRecruited, true)],
+        m: [
+          'Брат, предложил им работу на объекте. Они подумали — и остались. Раствор вместо процентов.',
+          { w: 'collectors', t: 'Мы остаёмся у Алика. Ваш микрозайм отрабатываем на стройке. «Деньги-Ара» пусть ждёт — вертикально.' },
+        ],
+      },
+      {
+        m: [
+          { w: 'collectors', t: 'С вас больше не требуем. Мы теперь люди Алика. Если что — мы на объекте, месим.' },
+          'Видишь? Коллекторы мои. Банк пусть капает — рейтинг у тебя и так упал. А эти — свои.',
+        ],
+        fx: { ach: 'arc_collectors' },
+      },
+    ],
+  },
 };
 
 export const NO_NEWS_A = ['Пока без новостей, брат.', 'Всё так же.', 'Тишина пока.', 'Ничего нового, джан.', 'Ждём.', 'Не спрашивай, сглазишь.'];
@@ -250,6 +296,10 @@ export const GROUP: Record<string, Entry<string>[]> = {
   mkrtich: ['Плитка там нормальная, кстати.', 'Я бы заплатил. Шучу.', needs('crane')('Кран опять на свадьбе, кто взял?'), 'Ребята, кто видел мою рулетку?', 'Бетон, кстати, правда обиделся.'],
   arsen: ['Дядя, можно я плиточнику напишу от твоего имени? Практикуюсь.', 'Я прочитал про это в интернете. Это называется «кидалово».', 'Дядя, я ему напишу, что ты в горах.', 'А если он в суд подаст?', 'Я юрист, я посчитал: платить невыгодно.'],
   boris: ['Бееее.', 'Бее-бее?', 'Бее!!!', 'Бе.'],
+  collectors: [
+    needs('collectorsRecruited')('Алик, плиточнику скажи: мы теперь свои. Раствор месим, долги — нет.'),
+    needs('collectorsRecruited')('Смена на объекте. «Деньги-Ара» пусть пишет стихи.'),
+  ],
 };
 export const GROUP_OOPS = ['Ой. Не тот чат.', 'Брат, это не то, что ты думаешь.', 'Это я случайно.', 'Ара, удалите его кто-нибудь!'];
 export const GROUP_SEEN_A = ['Что видел? Там ничего не было.', 'Это была шутка. Групповая.', 'Это другой плиточник. У нас их много.', 'Это нейросеть писала, брат. Сейчас всё нейросеть.', 'Это была репетиция спектакля.', 'Ты не так понял, у нас так любовь выражают.'];
@@ -284,4 +334,5 @@ export const ARC_DONE: Record<string, string[]> = {
   garik: ['Гарик вернулся в фундамент. Сам. Говорит, дома.', 'Гарик всё ещё блогер. Спонсор — цемент, подписчики — бетон.'],
   tile: ['Твоя плитка теперь достопримечательность. Туристы спрашивают автора.', 'Суд закрыт. Плитка оправдана. Ты — под вопросом.'],
   grandpa: ['Дедушка жив. Дедушка всегда жив.', 'Дедушка открыл вторую шаурмичную. В бывшей больнице.'],
+  collectors: ['Коллекторы? Мои. Месят раствор и философию.', '«Деньги-Ара» звонит им — они не берут. У них смена.'],
 }

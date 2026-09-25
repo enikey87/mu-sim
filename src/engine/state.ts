@@ -101,6 +101,7 @@ export interface PromiseRec {
   kept?: boolean
   /** Ставка клятвы: «если нет — сбрею усы» (docs/design/moustache.md). */
   stake?: 'moustache'
+  stakeDone?: true
   /** День амнистии: срок больше не припомнишь. Не `asked` — то «припомнил» или «сдержал на 50 ₽». */
   amnesty?: number
 }
@@ -149,6 +150,8 @@ export interface GameState {
   /** Интро на экране блокировки показано (или пропущено): повтор — только на новой партии. */
   introShown: boolean
   bank: BankWeek | null
+  /** Карточки телефона, отложенные до конца сцены (#300); переживают перезагрузку (#323). */
+  pendingCards: Array<{ icon: string; app: string; text: string } & Partial<Pick<Card, 'lines' | 'offer' | 'answered' | 'result'>>>
 }
 
 export function freshState(): GameState {
@@ -157,7 +160,7 @@ export function freshState(): GameState {
     msgs: [], nextId: 1, ach: {}, promises: [], seen: [], bags: {}, items: [],
     stats: { moo: 0, fifty: 0, paid: 0, sent: 0 },
     offlineDays: 0, ram: false, muted: false, scene: null, ctx: null, choices: null, arcs: {}, tier: 0,
-    battery: 100, money: START_MONEY, lastSeen: 0, mem: {}, actors: {}, rules: freshRuleState(), endings: {}, ending: null, introShown: false, bank: null,
+    battery: 100, money: START_MONEY, lastSeen: 0, mem: {}, actors: {}, rules: freshRuleState(), endings: {}, ending: null, introShown: false, bank: null, pendingCards: [],
   })
 }
 
@@ -197,7 +200,13 @@ export function loadState(storage: Storage | null): GameState | null {
     const raw = storage.getItem(SAVE_KEY)
     if (!raw) return null
     const s = JSON.parse(raw)
-    return s && Array.isArray(s.msgs) ? sealCounts({ ...freshState(), ...s }) : null
+    if (!s || !Array.isArray(s.msgs)) return null
+    // старые сохранения без introShown — сразу в чат: иначе интро врёт по обрезанной ленте (#249)
+    return sealCounts({
+      ...freshState(), ...s,
+      introShown: typeof s.introShown === 'boolean' ? s.introShown : true,
+      pendingCards: Array.isArray(s.pendingCards) ? s.pendingCards : [],
+    })
   } catch {
     return null
   }

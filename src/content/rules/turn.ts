@@ -1,13 +1,13 @@
 // Ход Алика в ответ на обычное сообщение игрока.
 import type { Game } from '../../engine/game'
-import { type Rule, eq, ne, gte, lte, is, exists, missing, add, set } from '../fact'
+import { type Rule, eq, ne, gte, lte, is, exists, missing, add, set, gate } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { meet } from '../world'
 import { AlikOffline } from './criteria'
 import { IDLE } from '../life'
 import { MEMORY } from '../memory'
 import { LEGENDS } from '../legends'
-import { count, endgame, payday, polite, thanksAt, vendetta } from '../memkeys'
+import { count, creditBroke, endgame, payday, polite, thanksAt, vendetta, nivaPlayer } from '../memkeys'
 import { GREET, GREET_MORNING, GREET_NIGHT, THANKS } from '../misc'
 
 type R = Rule<Game, GameEvent, Offer>
@@ -49,6 +49,24 @@ export const toneRules: R[] = [
 // Событие StoryBeat — после хода игрока, даже если он спорил, кричал или отвечал на контекст:
 // сюжет не ждёт «обычного» хода. Первый сериал — в первые ходы; изредка — мини-квест.
 export const storyRules: R[] = [
+  // «нечем платить» → коллекторы; не ждём случайного nextArc (#128)
+  {
+    name: 'Beat_Collectors', event: 'StoryBeat',
+    when: [is(creditBroke), missing(endgame.active)],
+    once: true, bonus: 10, priority: 'cinematic',
+    respond: async ({ game }) => {
+      if (game.S.arcs.collectors) return false
+      await game.playArc('collectors')
+    },
+  },
+  // начатая линия идёт своим битом по факту прошлой серии, а не общей лотереей Beat_Arc: иначе две трети партий
+  // не доходят до перевербовки до Дня выплаты (#324). Шанс 0,5 при серии раз в ≥ 3 дня — развязка за ~2–3 недели
+  {
+    name: 'Beat_CollectorsNext', event: 'StoryBeat',
+    when: [gte('arc.collectors', 1), is('collectorsCanAdvance'), missing(endgame.active)],
+    odds: 0.5, cooldown: { turns: 2 },
+    respond: ({ game }) => game.playArc('collectors'),
+  },
   { name: 'Beat_FirstArc', event: 'StoryBeat', when: [gte('sent', 3), lte('arcsStarted', 0), is('arcAvailable')], odds: 0.5, priority: 'chatter', respond: async ({ game }) => { const id = game.nextArc(); if (id) await game.playArc(id) } },
   // идущие сериалы продолжаются и между «обычными» ходами — не реже серии в ~8 ходов
   { name: 'Beat_Arc', event: 'StoryBeat', when: [gte('arcsStarted', 1), is('arcAvailable')], specificity: 0, odds: 0.14, cooldown: { turns: 4 }, priority: 'chatter', respond: async ({ game }) => { const id = game.nextArc(); if (id) await game.playArc(id) } },
@@ -105,7 +123,17 @@ export const turnRules: R[] = [
       // без пояснения из досье и в кавычках: «Место на кране (40 м)» → «Место на кране»
       const short = item && item.replace(/\s*\([^()]*\)\s*$/, '')
       const named = short && (short.startsWith('«') ? short : `«${short}»`)
-      const pool = named ? [{ id: 'MEMORY_ITEM_' + item, t: `Помнишь, я отдал тебе ${named}? Всё ещё у тебя?`, prio: 2 }, ...MEMORY] : MEMORY
+      // «Нива» в винительном; только если она у игрока — иначе противоречит финалу (#328)
+      const acc = named && /«Нива»/.test(named) ? named.replace('«Нива»', '«Ниву»') : named
+      const itemLine = named && {
+        id: 'MEMORY_ITEM_' + item,
+        t: `Помнишь, я отдал тебе ${acc}? Всё ещё у тебя?`,
+        prio: 2 as const,
+      }
+      const gated = itemLine && /Нив/.test(named!)
+        ? gate(is(nivaPlayer))(itemLine)
+        : itemLine
+      const pool = gated ? [gated, ...MEMORY] : MEMORY
       const t = game.line('MEMORY', pool)
       if (t) { await game.say([t]); game.unlock('memory') } else await game.excuseTurn()
     },
