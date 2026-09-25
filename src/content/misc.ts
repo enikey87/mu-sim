@@ -1,7 +1,7 @@
 // Мелкие тексты движка: «полежал на полу», застолье, платёжки, ответы на допработу и т.д.
-import { type Line, eq, gate, gte, is, of, set, type Entry } from './fact'
+import { type Line, eq, gate, gte, is, missing, of, set, type Entry } from './fact'
 import { needs, WORLD } from './world'
-import { bloodGiven, court, polite, sick, threatClaim, wedding } from './memkeys'
+import { bloodGiven, court, endgame, polite, sick, threatClaim, wedding } from './memkeys'
 import { sold } from './credit'
 // повторяемые занятия — после перерыва; события («продали микроволновку») — один раз
 export const FLOOR: Line[] = [
@@ -91,7 +91,13 @@ export const OATH_FORMS: Line[] = [
   { t: '{o}, {p}.', prio: 0, repeat: true, cooldown: { turns: 1 } },
   needs('karineHome')(needs('karine')({ t: 'Карине свидетель: {p}.', repeat: true, cooldown: { turns: 12 } })),
   { t: 'Поставил себе напоминание в телефоне: «{P}». Телефон не врёт. Я — бывает, телефон — нет.', repeat: true, cooldown: { turns: 15 } },
-  needs('karineHome')(needs('karine')({ t: '{P}. Если нет — сбрею усы. Карине давно просит, так что мне в любом случае выгодно.', repeat: true, cooldown: { turns: 15 } })),
+  // ставка «усы»: пока не сбриты и не эндгейм (docs/design/moustache.md)
+  gate(missing(endgame.active))(needs('karineHome')(needs('karine')(needs('moustache')({
+    id: 'oath_stake_moustache',
+    t: '{P}. Если нет — сбрею усы. Карине давно просит, так что мне в любом случае выгодно.',
+    repeat: true,
+    cooldown: { turns: 15 },
+  })))),
   { t: 'Мама рядом стоит, слышит, я говорю: {p}.', repeat: true, cooldown: { turns: 12 } },
   { t: 'Не клянусь даже. Клятвы — для тех, кто врёт. Просто говорю: {p}.', repeat: true, cooldown: { turns: 15 } },
   { t: 'Запиши где-нибудь: {p}. Я тоже запишу. Потом сверим.', repeat: true, cooldown: { turns: 15 } },

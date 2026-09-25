@@ -1,12 +1,12 @@
 // Правила новых возможностей: выбор сцен, наступившие обещания, хор персонажей, состояния мира.
 import type { Game } from '../../engine/game'
-import { type Rule, type Facts, type Entry, eq, ne, gte, lte, is, add, of, missing } from '../fact'
+import { type Rule, type Facts, type Entry, eq, ne, gte, lte, is, add, of, missing, during } from '../fact'
 
 import type { GameEvent, Offer } from './events'
 import { WORLD, SPEAKS } from '../world'
 import { CHORUS_LEGEND } from '../legends'
-import { PROMISE_DUE, PROMISE_DUE_COSMIC, PROMISE_DUE_KEPT, PROMISE_MET, CHORUS, CHORUS_FED_UP, WEDDING_NOISE, BORIS_SICK, DEAD_KARINE, DEAD_ALIK } from '../world'
-import { alikDead, blocked, count, grantPaid, interjections, intro, met, mourning, payday, sick } from '../memkeys'
+import { PROMISE_DUE, PROMISE_DUE_COSMIC, PROMISE_DUE_KEPT, PROMISE_MET, PROMISE_SHAVE, PROMISE_SHAVE_KEPT, CHORUS, CHORUS_FED_UP, WEDDING_NOISE, BORIS_SICK, DEAD_KARINE, DEAD_ALIK } from '../world'
+import { alikDead, alikShaved, blocked, count, grantPaid, interjections, intro, met, mourning, payday, sick } from '../memkeys'
 import { JournalForAmnesty } from './criteria'
 
 type R = Rule<Game, GameEvent, Offer>
@@ -63,7 +63,28 @@ const dueLine = (game: Game, f: Facts, key: string, arr: readonly Entry<string>[
 }
 // срок актуален: обещание есть и его не «переписали» в когда-нибудь
 const live = eq('promiseLive', true)
+const stakeMoustache = eq('promiseStake', 'moustache')
 export const promiseRules: R[] = [
+  {
+    // ставка «усы» сдержана переводом — выше обычного Due_Kept
+    name: 'Due_StakeKept', event: 'PromiseDue', when: [live, stakeMoustache, gte('mood', 8)], odds: 0.5, cooldown: { days: 10 }, priority: 'chatter', specificity: 4,
+    respond: async ({ game, facts }) => {
+      await game.say([dueLine(game, facts, 'DUE_SHAVE_KEPT', PROMISE_SHAVE_KEPT)])
+      await game.transfer()
+      const p = game.S.promises[Number(facts.promise)]
+      if (p) { p.asked = true; p.kept = true }
+    },
+  },
+  {
+    // ставка сорвана: системное фото без усов + реплика; факт ~40 дней
+    name: 'Due_StakeShave', event: 'PromiseDue', when: [live, stakeMoustache, missing(alikShaved)], priority: 'chatter', specificity: 3,
+    remember: [during(alikShaved, 40)],
+    respond: async ({ game, facts }) => {
+      game.sys('Алик Воздухонесян сменил фото профиля. На фото — Алик без усов.')
+      await game.say([dueLine(game, facts, 'DUE_SHAVE', PROMISE_SHAVE)])
+      game.unlock('shaved')
+    },
+  },
   {
     // не через ход: наступивший срок — событие, а не фон
     name: 'Due_Default', event: 'PromiseDue', when: [live], odds: 0.5, cooldown: { days: 6 }, priority: 'chatter',
