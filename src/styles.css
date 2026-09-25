@@ -472,7 +472,11 @@ body {
 .intro-title-big { font-weight: 700; font-size: 38px; text-align: center; line-height: 1.05; }
 /* статичная версия: обещание, строка завязки и титул — вместе, без анимаций */
 .intro-reduced .intro-note, .intro-reduced .intro-hint, .intro-reduced .intro-moo { animation: none; }
-.intro-reduced.phase-title .intro-stack, .intro-reduced.phase-title .intro-gap { opacity: 1; }
+/* reduced: стопка → строка → титул по фазам, без наложений (#249) */
+.intro-reduced.phase-gap .intro-stack { opacity: 1; }
+.intro-reduced.phase-title .intro-stack { opacity: 0; }
+.intro-reduced.phase-gap .intro-gap { opacity: 1; }
+.intro-reduced.phase-title .intro-gap { opacity: 0; }
 @media (prefers-reduced-motion: reduce) {
   .intro-note, .intro-moo, .intro-hint { animation: none; }
   .intro-leave { transition: none; }

@@ -4,10 +4,11 @@ import userEvent from '@testing-library/user-event'
 import { App } from './App'
 import { messageRenderStats } from './Message'
 import { messageListRenderStats, messageListBuildStats } from './Chat'
-import { makeGame, setMoney } from '../test/helpers'
-import { SAVE_KEY } from '../engine/state'
+import { makeGame, setMoney, memStorage } from '../test/helpers'
+import { SAVE_KEY, loadState } from '../engine/state'
 import { fmtDate } from '../engine/time'
 import type { Game } from '../engine/game'
+import { introOf, uiOf } from './view'
 
 function renderApp(game: Game, onReset = vi.fn()) {
   const utils = render(<App game={game} onReset={onReset} />)
@@ -765,17 +766,64 @@ describe('интро новой партии', () => {
     expect(document.querySelector('.intro-note')).not.toBeNull()
   })
 
-  it('prefers-reduced-motion: статичная версия — обещание, строка завязки и титул сразу', () => {
+  it('prefers-reduced-motion: статичная версия — обещание, строка завязки и титул без наложений', () => {
     vi.useFakeTimers()
     vi.stubGlobal('matchMedia', () => ({ matches: true }))
     const { game } = makeGame()
     const p = prologue(game)
     renderIntro(game)
     const intro = document.querySelector('.intro')!
+    expect(within(intro as HTMLElement).getByText(p.alik)).toBeInTheDocument()
     expect(within(intro as HTMLElement).getByText(p.gap)).toBeInTheDocument()
+    expect(intro.className).toMatch(/phase-gap/)
+    expect(intro.className).not.toMatch(/phase-title/)
+    act(() => { vi.advanceTimersByTime(1600) })
+    expect(intro.className).toMatch(/phase-title/)
     expect(intro.querySelector('.intro-title-big')!.textContent).toContain('Алик,')
-    act(() => { vi.advanceTimersByTime(2600) })
+    act(() => { vi.advanceTimersByTime(2000) })
     expect(document.querySelector('.intro')).toBeNull()
     expect(game.S.introShown).toBe(true)
+  })
+
+  it('промежуточные уведомления — обещания, стикер и банк, без мамы и незнакомых (#249)', () => {
+    const { game } = makeGame({ seed: 1 })
+    const data = introOf(uiOf(game))!
+    expect(data.notes.length).toBe(6)
+    expect(data.notes.some((n) => n.app === 'Банк' && /Списание/.test(n.text))).toBe(true)
+    expect(data.notes.some((n) => n.app === 'Алик' && n.text.includes('🏗️'))).toBe(true)
+    expect(data.notes.every((n) => n.app === 'Алик' || n.app === 'Банк')).toBe(true)
+    expect(data.notes.some((n) => /Мама|Авито|Карине|Гарик/i.test(n.app + n.text))).toBe(false)
+  })
+
+  it('старое сохранение без introShown — интро не показывает (#249)', () => {
+    const storage = memStorage()
+    const { game } = makeGame({ storage })
+    game.save()
+    const raw = JSON.parse(storage.getItem(SAVE_KEY)!) as Record<string, unknown>
+    delete raw.introShown
+    storage.setItem(SAVE_KEY, JSON.stringify(raw))
+    expect(loadState(storage)!.introShown).toBe(true)
+    const again = makeGame({ storage })
+    renderIntro(again.game)
+    expect(document.querySelector('.intro')).toBeNull()
+  })
+
+  it('строка завязки одна на экране в фазе gap; «Мууу» звучит; ответ — игрока (#249)', () => {
+    vi.useFakeTimers()
+    const { game } = makeGame({ seed: 2 })
+    const p = prologue(game)
+    const moo = vi.spyOn(game.audio, 'moo')
+    renderIntro(game)
+    const intro = document.querySelector('.intro')!
+    act(() => { vi.advanceTimersByTime(1200) })
+    expect(within(intro as HTMLElement).getByText(p.alik)).toBeInTheDocument()
+    const me = game.S.msgs.find((m) => m.kind === 'text' && m.from === 'me')!
+    expect(within(intro as HTMLElement).getByText(me.kind === 'text' ? me.text : '')).toBeInTheDocument()
+    act(() => { vi.advanceTimersByTime(4000) })
+    expect(moo).toHaveBeenCalled()
+    act(() => { vi.advanceTimersByTime(1500) })
+    expect(intro.className).toMatch(/phase-gap/)
+    expect(intro.className).not.toMatch(/phase-title/)
+    expect(within(intro as HTMLElement).getByText(p.gap)).toBeInTheDocument()
   })
 })
