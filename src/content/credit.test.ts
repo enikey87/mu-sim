@@ -5,7 +5,7 @@ import { NOTIF } from './life'
 import { moneyPoor } from './memkeys'
 import {
   LOANS, THINGS, MOM_HELPS, creditOffer, creditStage, creditBroke, momDone,
-  sold, momHelp, loanTaken, loanDueAt, allSold,
+  sold, momHelp, loanTaken, loanDueAt, loanPayment, allSold,
 } from './credit'
 import { SAVE_KEY, freshState, setCount } from '../engine/state'
 
@@ -347,12 +347,38 @@ describe('после первого дна бедность до выплаты 
     expect(game.S.money).toBe(Game.MONEY_LOW)
   })
 
+  it('после дна платёж по кредиту — доля от зачисленного (#299)', () => {
+    const { game } = makeGame()
+    setMoney(game, Game.MONEY_BOTTOM)
+    game.S.mem[moneyPoor] = true
+    game.S.mem[creditOffer] = true
+    game.S.mem[creditStage] = 0
+    game.takeCredit()
+    expect(game.S.money).toBe(Game.MONEY_LOW)
+    const got = Game.MONEY_LOW - Game.MONEY_BOTTOM
+    const pay = Math.max(1, Math.round(LOANS[0].payment * got / LOANS[0].amount))
+    expect(Number(game.S.mem[loanPayment('consumer')])).toBe(pay)
+    setMoney(game, pay)
+    game.chargeCredit('consumer')
+    expect(game.S.money).toBe(0)
+  })
+
   it('без money.poor кредит даёт полную сумму (NC #299)', () => {
     const { game } = makeGame()
     setMoney(game, 100)
     expect(game.S.mem[moneyPoor]).toBeFalsy()
     expect(game.adjustMoney(30_000, 'Кредит: Всё будет')).toBe(true)
     expect(game.S.money).toBe(30_100)
+  })
+
+  it('без money.poor платёж полный (NC #299)', () => {
+    const { game } = makeGame()
+    setMoney(game, Game.MONEY_BOTTOM)
+    game.S.mem[creditOffer] = true
+    game.S.mem[creditStage] = 0
+    game.takeCredit()
+    expect(game.S.money).toBe(Game.MONEY_BOTTOM + LOANS[0].amount)
+    expect(game.S.mem[loanPayment('consumer')]).toBe(LOANS[0].payment)
   })
 })
 
