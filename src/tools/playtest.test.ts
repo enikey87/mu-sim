@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { is, missing } from '../engine/rules'
-import { playtest, transcript, worldDump, deathGated, requiresKey, attachSpeechAttribution } from './playtest'
+import { playtest, transcript, worldDump, deathGated, requiresKey, attachSpeechAttribution, notifFails } from './playtest'
 import { alikDead } from '../content/memkeys'
 import type { Game } from '../engine/game'
 import type { Rule } from '../engine/rules'
@@ -75,6 +75,48 @@ describe('плейтест', () => {
     const deadGate = [{ name: 'Dead', event: 'X', when: [is(alikDead)] }] as Rule<Game>[]
     expect(deathGated(liveOnly)).toEqual([])
     expect(deathGated(deadGate)).toEqual(['Dead'])
+  })
+  it('notifFails: выселение через randomNotif чисто; донор без крови — fails; remember до notify — ложь (#339)', async () => {
+    const { makeGame, setMoney } = await import('../test/helpers')
+    const { NOTIF } = await import('../content/life')
+    const eviction = NOTIF.find((n) => /Выселяю/.test(n.t))!
+    const donor = NOTIF.find((n) => n.app === 'Донорский центр')!
+
+    // настоящее нарушение
+    const cold = makeGame().game
+    expect(notifFails(cold, donor.app, donor.t)).toEqual(['blood.given'])
+    cold.S.mem['blood.given'] = true
+    expect(notifFails(cold, donor.app, donor.t)).toEqual([])
+
+    // выселение: remember после notify — fails пуст
+    const { game } = makeGame()
+    setMoney(game, 0)
+    game.chargeBill('rent')
+    game.chargeBill('rent')
+    game.chargeBill('rent')
+    const pick = game.lines.pick.bind(game.lines)
+    game.lines.pick = (key, pool, facts, opts) =>
+      key === 'NOTIF' ? pick(key, [eviction], facts, opts) : pick(key, pool, facts, opts)
+    let seen: string[] | null = null
+    const notify = game.notify.bind(game)
+    game.notify = (icon, app, text, card) => {
+      const ok = notify(icon, app, text, card)
+      if (ok && app === eviction.app) seen = notifFails(game, app, text)
+      return ok
+    }
+    game.randomNotif()
+    expect(seen).toEqual([])
+    expect(game.S.mem.evicted).toBe(true)
+
+    // NC: remember до notify (как linePicked) → ложное нарушение
+    const early = makeGame().game
+    setMoney(early, 0)
+    early.chargeBill('rent')
+    early.chargeBill('rent')
+    early.chargeBill('rent')
+    const hit = early.linePicked('NOTIF_EVICT_NC', [eviction])
+    expect(hit?.text).toMatch(/Выселяю/)
+    expect(notifFails(early, eviction.app, hit!.text)).toContain('evicted')
   })
   it('иногда отвечает на допработу зеркалом, когда оно открыто (#328)', async () => {
     let mirrored = 0
