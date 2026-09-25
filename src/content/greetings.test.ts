@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { alikTexts, makeGame } from '../test/helpers'
 import { specificityOf, valueOf, type Entry } from '../engine/rules'
 import type { Game } from '../engine/game'
-import { GREET, GREET_MORNING, GREET_NIGHT, THANKS } from './misc'
+import { GREET, GREET_MORNING, GREET_NIGHT, THANKS, THANKS_THIRD } from './misc'
+import { count } from './memkeys'
 
 /** Реплика из пула: обращение в начале и подстановки ({night}) не мешают — ищем по самому длинному куску шаблона. */
 const fromPool = (pool: readonly Entry<string>[], text: string) =>
@@ -97,5 +98,49 @@ describe('«спасибо» и «привет»: у Алика свой отв�
     const spec = (name: string) => specificityOf(game.rules.all.find((r) => r.name === name)!)
     for (const older of ['Tone_WhileBlocked', 'Tone_WhileDead', 'Phone_Karine_PlayerMessage', 'Tone_MissRude'])
       for (const mine of ['Tone_Thanks', 'Tone_Greeting']) expect(spec(older), `${older} > ${mine}`).toBeGreaterThan(spec(mine))
+  })
+  it('третье «спасибо» — особая реплика один раз; в S5 счётчик не растёт (#354)', async () => {
+    const { game } = makeGame()
+    const say = async () => {
+      const from = alikTexts(game.S.msgs).length
+      await game.fire('PlayerMessage', { category: 'gratitude', tone: 'polite' })
+      return alikTexts(game.S.msgs).slice(from)
+    }
+    expect((await say()).every((t) => !t.includes('единственный'))).toBe(true)
+    expect(game.S.mem[count.thanks]).toBe(1)
+    expect((await say()).every((t) => !t.includes('единственный'))).toBe(true)
+    expect(game.S.mem[count.thanks]).toBe(2)
+    const third = await say()
+    expect(third.some((t) => t.includes(THANKS_THIRD.slice(0, 20)))).toBe(true)
+    expect(game.S.mem[count.thanks]).toBe(3)
+    const fourth = await say()
+    expect(fourth.every((t) => !t.includes('единственный'))).toBe(true)
+    expect(game.S.mem[count.thanks]).toBe(4)
+
+    const cold = makeGame().game
+    cold.S.mem.polite = true
+    await cold.fire('PlayerMessage', { category: 'gratitude', tone: 'polite' })
+    expect(cold.S.mem[count.thanks]).toBeUndefined()
+  })
+  it('NC: без счётчика третья реплика не выбирается (#354)', async () => {
+    const { game } = makeGame()
+    const rule = game.rules.all.find((r) => r.name === 'Tone_Thanks')!
+    const respond = rule.respond!
+    rule.respond = async (ctx) => {
+      // как Tone_Thanks, но всегда обычный пул — имитация «забыли ветку === 3»
+      const g = ctx.game
+      if (g.S.stats.sent - Number(g.S.mem['thanksAt'] ?? -99) >= 8) {
+        g.mood(1)
+        g.rules.applyOps([{ key: 'thanksAt', op: '=', value: g.S.stats.sent }], {})
+      }
+      await g.say([g.uniq(() => g.draw('THANKS', THANKS))])
+    }
+    game.S.mem[count.thanks] = 2 // remember всё ещё add → 3, но ветка третьего отключена
+    const from = alikTexts(game.S.msgs).length
+    await game.fire('PlayerMessage', { category: 'gratitude', tone: 'polite' })
+    const said = alikTexts(game.S.msgs).slice(from)
+    rule.respond = respond
+    expect(said.every((t) => !t.includes('единственный'))).toBe(true)
+    expect(game.S.mem[count.thanks]).toBe(3)
   })
 })

@@ -8,7 +8,7 @@ import { IDLE } from '../life'
 import { MEMORY } from '../memory'
 import { LEGENDS } from '../legends'
 import { count, creditBroke, endgame, payday, polite, thanksAt, vendetta, nivaPlayer } from '../memkeys'
-import { GREET, GREET_MORNING, GREET_NIGHT, THANKS } from '../misc'
+import { GREET, GREET_MORNING, GREET_NIGHT, THANKS, THANKS_THIRD } from '../misc'
 
 type R = Rule<Game, GameEvent, Offer>
 
@@ -25,16 +25,19 @@ export const toneRules: R[] = [
   // угрозы судом — линия суда (court.ts): каждая угроза двигает дело на ступень
   { name: 'Tone_Cow', event: 'PlayerMessage', when: [eq('tone', 'cow')], remember: [add(count.cow)], respond: async ({ game }) => { await game.say([game.uniq(game.X.cow)]) } },
   // «спасибо» / «привет» свободным текстом: ответ на это слово. В S5, вендетте и эндгейме — прежний ход;
-  // блок, смерть, телефон у Карине и Tone_MissRude специфичнее и выигрывают сами
+  // блок, смерть, телефон у Карине и Tone_MissRude специфичнее и выигрывают сами.
+  // Счётчик и третья реплика — внутри Tone_Thanks: отдельное правило с eq(count.thanks,2) сравнивалось бы с Tone_MissRude (#354).
   {
     name: 'Tone_Thanks', event: 'PlayerMessage', when: [eq('category', 'gratitude'), ...warm],
+    remember: [add(count.thanks)],
     respond: async ({ game }) => {
       // «спасибо» — бесплатный текст, а настроение двигает переводы и сцены: бамп не чаще раза в THANKS_MOOD_GAP ходов
       if (game.S.stats.sent - Number(game.S.mem[thanksAt] ?? -99) >= THANKS_MOOD_GAP) {
         game.mood(1)
         game.rules.applyOps([set(thanksAt, game.S.stats.sent)], {})
       }
-      await game.say([game.uniq(() => game.draw('THANKS', THANKS))])
+      if (Number(game.S.mem[count.thanks] ?? 0) === 3) await game.say([THANKS_THIRD])
+      else await game.say([game.uniq(() => game.draw('THANKS', THANKS))])
     },
   },
   {
