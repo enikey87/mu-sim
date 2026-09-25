@@ -1587,7 +1587,8 @@ export class Game {
         this.sys('Алик Воздухонесян сменил фото профиля. На фото — баран')
         this.unlock('ram')
       }
-      // подпись профиля — молчание: alikSilent + эндгейм; «скрыл» только в живом блоке (#223/#257)
+      // подпись профиля — молчание: alikSilent + эндгейм; «скрыл» только в живом блоке (#223/#257).
+      // «смерть»: Карине один раз меняет статус из того же пула (#353)
       const quietStatus = this.alikSilent() || !!S.mem[memkeys.endgame.active]
       if (S.mem[memkeys.blocked] && !S.mem[memkeys.endgame.active] && !S.mem[memkeys.alikDead] && !S.mem[memkeys.phoneKarine]) {
         if (!S.mem[memkeys.statusHidden]) {
@@ -1596,6 +1597,11 @@ export class Game {
         }
       } else if (!quietStatus) {
         const status = this.line('ALIK_STATUS', ALIK_STATUS)
+        if (status) this.sys(`Алик Воздухонесян изменил статус: «${status}»`)
+      } else if (S.mem[memkeys.alikDead] && !S.mem[memkeys.endgame.active] && !S.mem[memkeys.blocked] && !S.mem[memkeys.phoneKarine] && !S.offlineDays) {
+        const status = this.line('ALIK_STATUS', ALIK_STATUS, {
+          filter: (s) => (s.when ?? []).some((c) => c.key === memkeys.alikDead && (c.op === 'exist' || (c.op === '==' && c.value === true))),
+        })
         if (status) this.sys(`Алик Воздухонесян изменил статус: «${status}»`)
       }
       // праздник в окне звучит хотя бы раз: отмазку вытесняют серия, сцена или легенда, а окно короткое.

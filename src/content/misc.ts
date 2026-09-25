@@ -1,7 +1,7 @@
 // Мелкие тексты движка: «полежал на полу», застолье, платёжки, ответы на допработу и т.д.
 import { type Line, eq, gate, gte, is, missing, of, set, type Entry } from './fact'
 import { needs, WORLD } from './world'
-import { bloodGiven, court, endgame, polite, sick, threatClaim, wedding } from './memkeys'
+import { alikDead, bloodGiven, court, endgame, polite, sick, threatClaim, wedding } from './memkeys'
 import { sold } from './credit'
 /** Плата за сдачу крови на дне (#339): комедийный масштаб под MONEY_BOTTOM, через adjustMoney. */
 export const BLOOD_PAY = 1000
@@ -203,6 +203,8 @@ export const ALIK_STATUS: Line[] = [
   needs('niva')({ t: 'Ищу «Ниву». Видели — звоните', when: [WORLD.nivaAway], prio: 1 }),
   needs('razmik')({ t: 'Снимаю Размика с крана. Не отвлекать, высоко', when: [WORLD.razmikUp], prio: 1 }),
   { t: 'Уважаемые клиенты! Ваше обращение очень важно для нас', when: [is(polite)], prio: 1 },
+  // Карине меняет подпись, пока Алик «мёртв»; тон — временность, не настоящая смерть (#353)
+  { t: 'Покинул нас. Временно', when: [is(alikDead)], prio: 1 },
 ]
 /** В блоке статус не сменить, и игрок узнаёт об этом один раз за блок. */
 export const STATUS_HIDDEN = 'Алик скрыл от вас статус'
