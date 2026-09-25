@@ -406,6 +406,38 @@ describe('ставка «усы»', () => {
     expect(await said(null)).toBe(0)
   })
 
+  it('пока усы отрастают — кнопка «как усы?»; без факта — нет; ответ из пула (#352)', async () => {
+    const { game } = makeGame()
+    const hasAsk = () => game.buildChoices().some((c) => c.act === 'moustacheAsk')
+    expect(hasAsk()).toBe(false)
+    game.S.mem[alikShaved] = true
+    expect(hasAsk()).toBe(true)
+    const choice = game.buildChoices().find((c) => c.act === 'moustacheAsk')!
+    expect(choice.text).toMatch(/ус/i)
+    const from = game.S.msgs.length
+    await game.fire('PlayerSays', { intent: 'moustacheAsk' })
+    expect(alik(game, from).some((t) => /ус|отраст|без усов/i.test(t))).toBe(true)
+    // cooldown: сразу снова не предлагаем
+    expect(hasAsk()).toBe(false)
+    game.S.day += 5
+    expect(hasAsk()).toBe(true)
+  })
+
+  it('NC: без alik.shaved Opt_Moustache закрыт (#352)', () => {
+    const { game } = makeGame()
+    const rule = game.rules.all.find((r) => r.name === 'Opt_Moustache')!
+    const onlyMine = { skip: new Set(game.rules.all.filter((r) => r.name !== 'Opt_Moustache').map((r) => r.name)) }
+    delete game.S.mem[alikShaved]
+    expect(game.rules.match({ event: 'BuildChoices' }, game.facts(), onlyMine)?.name).not.toBe('Opt_Moustache')
+    game.S.mem[alikShaved] = true
+    expect(game.rules.match({ event: 'BuildChoices' }, game.facts(), onlyMine)?.name).toBe('Opt_Moustache')
+    const was = rule.when
+    rule.when = []
+    delete game.S.mem[alikShaved]
+    expect(game.rules.match({ event: 'BuildChoices' }, game.facts(), onlyMine)?.name).toBe('Opt_Moustache')
+    rule.when = was
+  })
+
   it('строки пулов ставки и «условие наступило» после обращения — с маленькой буквы, имена остаются (#327)', async () => {
     const cases: Array<[string, readonly Entry<string>[], string, string, () => Game]> = []
     const staked = (): Game => {

@@ -10,6 +10,8 @@ const march8 = gate(eq('holiday', 'march8'), missing(endgame.active), gte('dom',
 const march8Before = gate(eq('holiday', 'march8'), missing(endgame.active), lte('dom', 7))
 const holidayNewYear = [eq('holiday', 'newYear'), missing(endgame.active)] as const
 const holidayMarch8 = [eq('holiday', 'march8'), missing(endgame.active)] as const
+/** После Дня выплаты / в эндгейме деньги запечатаны — банк, МФО и коллекторы по долгу молчат (#366). */
+const moneyOpen = [missing(paydayScene), missing(endgame.active)] as const
 
 // «Живость»: Алик пишет сам, режим дня, стикеры, пересылки, удаления, правки,
 // опечатки, реакции, уведомления телефона.
@@ -109,7 +111,7 @@ export const VOICE = [
 export interface Notif extends LineSpec { icon: string; app: string; spend?: true }
 const often = { repeat: true, cooldown: { turns: 40 } }
 export const NOTIF: Notif[] = [
-  { icon: '🏦', app: 'Банк', t: 'Списание {spend} ₽. {what}. Баланс: {money} ₽', spend: true, repeat: true, cooldown: { turns: 8 } },
+  { icon: '🏦', app: 'Банк', t: 'Списание {spend} ₽. {what}. Баланс: {money} ₽', spend: true, when: [...moneyOpen], repeat: true, cooldown: { turns: 8 } },
   { icon: '👩', app: 'Мама', t: 'Сынок, ты поел?', ...often }, { icon: '👩', app: 'Мама', t: 'Сынок, Алик заплатил?', ...often },
   { icon: '👩', app: 'Мама', t: 'Сынок, позвони маме.', ...often },
   { icon: '👩', app: 'Мама', t: 'Сынок, с Новым годом. Алик тебя поздравил? А перевёл?', when: [...holidayNewYear] },
@@ -132,12 +134,12 @@ export const NOTIF: Notif[] = [
   { icon: '📺', app: 'Новости', t: 'В Ереване бетон отказался застывать. Эксперты разводят руками.' },
   // «сдал объект» — новость финала Бориса, не серии о назначении
   { icon: '📺', app: 'Новости', t: 'Баран-прораб из Абовяна дал первое интервью. На вопрос «как платить людям» ответил «бее».', when: [WORLD.baran, gte('arc.boris', 8)] },
-  { icon: '🏦', app: 'Банк', t: 'Кредит одобрен! 94% годовых. Поздравляем!', when: [gte('credit.stage', 1)] },
-  // эхо второй серии («узнали: Алик должен вам»), пока они не приехали к нему; после выплаты и в эндгейме линии нет (#324)
-  { icon: '📞', app: 'Коллекторы', t: 'Мы знаем, где живёт ваш Алик. Он нам тоже должен. Давайте дружить.', when: [eq('arc.collectors', 2), missing(paydayScene), missing(endgame.active)] },
+  { icon: '🏦', app: 'Банк', t: 'Кредит одобрен! 94% годовых. Поздравляем!', when: [gte('credit.stage', 1), ...moneyOpen] },
+  // эхо второй серии («узнали: Алик должен вам»), пока они не приехали к нему; после выплаты и в эндгейме линии нет (#324/#366)
+  { icon: '📞', app: 'Коллекторы', t: 'Мы знаем, где живёт ваш Алик. Он нам тоже должен. Давайте дружить.', when: [eq('arc.collectors', 2), ...moneyOpen] },
   { icon: '👩', app: 'Мама', t: 'Сынок, я продала дачу, чтобы ты дождался Алика.', when: [is(momHelp('dacha'))] },
   // три неоплаты коммуналки подряд — хозяин выселяет; оплата сбрасывает полосу (#301); после выплаты — нет (#323)
-  { icon: '🏠', app: 'Хозяин квартиры', t: 'Выселяю. Можешь пожить у Алика, он же тебе как отец.', when: [missing(evicted), gte(billStreak('rent'), 3), missing(paydayScene), missing(endgame.active)], remember: [set(evicted, true)] },
+  { icon: '🏠', app: 'Хозяин квартиры', t: 'Выселяю. Можешь пожить у Алика, он же тебе как отец.', when: [missing(evicted), gte(billStreak('rent'), 3), ...moneyOpen], remember: [set(evicted, true)] },
   { icon: '🩸', app: 'Донорский центр', t: 'Спасибо, что пришли сдать кровь! Вы наш герой. Приходите ещё.', when: [is(bloodGiven)] },
   // память о проданном: иначе две несвязанные микроволновки
   { icon: '🍽', app: 'Соседка', t: 'Микроволновку вашу грею. Спасибо, что продали.', when: [is(sold('microwave'))] },
@@ -147,7 +149,7 @@ export const NOTIF: Notif[] = [
   { icon: '⚰️', app: 'Ритуальные услуги', t: 'Скидка 10% на похороны для должников… то есть кредиторов Воздухонесяна. Промокод: БРАТДЖАН' },
   { icon: '🏥', app: 'Поликлиника', t: 'Анализы готовы: гречка в крови превышена в 4 раза.' },
   { icon: '🧑', app: 'Серёга', t: 'Братан, я тоже работал на Алика. В 2011-м. Жду до сих пор.' },
-  { icon: '🏦', app: 'Банк', t: 'Банк удивлён: переводы по 50 ₽ — это не доход, это хобби.', when: [gte('fifty', 2)] },
+  { icon: '🏦', app: 'Банк', t: 'Банк удивлён: переводы по 50 ₽ — это не доход, это хобби.', when: [gte('fifty', 2), ...moneyOpen] },
   // новость о похоронах Алика — когда они уже прошли
   { icon: '📺', app: 'Новости', t: 'В Ереване человек пережил собственные похороны и сказал на них тост.', when: [gte('arc.alik_death', 4)] },
 ]

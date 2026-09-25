@@ -67,6 +67,8 @@ describe('долг: одна точка записи', () => {
 // выплата серии, бартер, счёт — объявляет движение долга ровно тогда, когда оно случилось.
 describe('долг: объявление звучит ровно тогда, когда долг сдвинулся', () => {
   const sys = (g: Game): string => g.S.msgs.filter((m) => m.kind === 'sys').map((m) => m.text).join(' ')
+  /** Реплики Алика: он объявляет счёт не только через sys, но и словами. */
+  const said = (g: Game): string => g.S.msgs.filter((m) => m.kind === 'text').map((m) => m.text).join(' ')
   const sealed = (g: Game): Game => { g.S.mem.payday = 'default'; return g }
 
   it('выплата серии: до выплаты — перевод и объявление, после — ни того, ни другого', async () => {
@@ -145,6 +147,8 @@ describe('долг: объявление звучит ровно тогда, к�
     expect(game.S.debt).toBe(debt - 1000)
     expect(game.S.ach.q_tamada).toBeDefined()
     expect(sys(game)).toMatch(/долг Алика уменьшился на 1 000/)
+    // реплика Алика — то же объявление, что sys: «Бухгалтерия уже посчитала» (#266)
+    expect(said(game)).toMatch(/Бухгалтерия уже посчитала/)
 
     const { game: after } = makeGame()
     const sealedDay = sealed(after).S.day
@@ -154,6 +158,7 @@ describe('долг: объявление звучит ровно тогда, к�
     expect(after.S.day).toBe(sealedDay)
     expect(after.S.debt).toBe(sealedDebt)
     expect(sys(after)).not.toMatch(/долг Алика уменьшился/)
+    expect(said(after)).not.toMatch(/Бухгалтерия уже посчитала/)
     // решение (#259): отказ — про долг и календарь, не про «узел целиком»
     expect(after.S.ach.q_tamada).toBeDefined()
     expect(after.S.mood).toBe(sealedMood + 3)

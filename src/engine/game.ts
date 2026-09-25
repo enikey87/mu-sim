@@ -435,14 +435,24 @@ export class Game {
     return t
   }
   /**
-   * Реплика бедности: пока пул уровня не исчерпан — без повторов, дальше редко и по кругу: одна строка
-   * на окно в POOR_REPEAT_DAYS дней. Бедность держится до Дня выплаты — голос не должен смолкать (#184).
+   * Бедность: свежие без повторов; исчерпанный пул — одна строка на окно POOR_REPEAT_DAYS,
+   * повтор в той же сборке дня — null (#184/#348).
    */
+  private poorShownDay = -1
+  private poorShown = new Set<string>()
   poorLine(key: string, arr: readonly Entry<string>[]): string | null {
+    if (this.poorShownDay !== this.S.day) {
+      this.poorShown.clear()
+      this.poorShownDay = this.S.day
+    }
     const fresh = this.freshPlayer(key, arr)
     if (fresh !== null) return fresh
     const open = arr.filter((e) => isOpen(e, this.lineFacts())).map(valueOf)
-    return open.length ? open[Math.floor(this.S.day / POOR_REPEAT_DAYS) % open.length] : null
+    if (!open.length) return null
+    const t = open[Math.floor(this.S.day / POOR_REPEAT_DAYS) % open.length]!
+    if (this.poorShown.has(t)) return null
+    this.poorShown.add(t)
+    return t
   }
   pair = (ka: string, a: readonly Entry<string>[], kb: string, b: readonly Entry<string>[]): string =>
     this.uniq(() => `${this.draw(ka, a)} ${this.draw(kb, b)}`)
@@ -1059,6 +1069,8 @@ export class Game {
   /** false — отброшено дедупом; true — показано, в очереди или карточкой в ленте. */
   notify(icon: string, app: string, text: string, card: Partial<Card> & { event: PhoneEvent }): boolean {
     if (this.disposed) return false
+    // после выплаты банк/МФО молчат везде, не только в очереди сцены (#323/#366)
+    if ((app === 'Банк' || app === 'МФО') && this.moneySealed()) return false
     // банк: одно и то же событие (не баланс) — один раз за игровой день (#251/#265)
     if (app === 'Банк' || app === 'МФО') {
       if (!this.bankSmsDay || this.bankSmsDay.day !== this.S.day) this.bankSmsDay = { day: this.S.day, keys: new Set() }
@@ -1068,8 +1080,6 @@ export class Game {
     }
     // событие денег не перебивает сцену — карточки после её конца (#300)
     if (!Game.isBanner(app) && this.S.scene) {
-      // после выплаты банк/МФО в очередь не кладём — иначе flush отменит #316 (#323)
-      if ((app === 'Банк' || app === 'МФО') && this.moneySealed()) return false
       this.S.pendingCards.push({ icon, app, text, ...card })
       return true
     }
@@ -1505,6 +1515,7 @@ export class Game {
     if (o.act === 'sorry') S.mem[memkeys.sorryAt] = [...String(S.mem[memkeys.sorryAt] ?? '').split(',').filter(Boolean), S.stats.sent].slice(-4).join(',') // для «качелей»
     if (tone === 'rude') S.mem[memkeys.rudeAt] = S.stats.sent
     S.choices = null
+    this.poorShown.clear() // повтор бедности режет внутри сборки, не между ходами
     this.battery.drain(1)
     this.save()
     if (this.disposed) { this.inPlayerTurn = false; return }
@@ -1587,7 +1598,8 @@ export class Game {
         this.sys('Алик Воздухонесян сменил фото профиля. На фото — баран')
         this.unlock('ram')
       }
-      // подпись профиля — молчание: alikSilent + эндгейм; «скрыл» только в живом блоке (#223/#257)
+      // подпись профиля — молчание: alikSilent + эндгейм; «скрыл» только в живом блоке (#223/#257).
+      // «смерть»: Карине один раз меняет статус из того же пула (#353)
       const quietStatus = this.alikSilent() || !!S.mem[memkeys.endgame.active]
       if (S.mem[memkeys.blocked] && !S.mem[memkeys.endgame.active] && !S.mem[memkeys.alikDead] && !S.mem[memkeys.phoneKarine]) {
         if (!S.mem[memkeys.statusHidden]) {
@@ -1596,6 +1608,11 @@ export class Game {
         }
       } else if (!quietStatus) {
         const status = this.line('ALIK_STATUS', ALIK_STATUS)
+        if (status) this.sys(`Алик Воздухонесян изменил статус: «${status}»`)
+      } else if (S.mem[memkeys.alikDead] && !S.mem[memkeys.endgame.active] && !S.mem[memkeys.blocked] && !S.mem[memkeys.phoneKarine] && !S.offlineDays) {
+        const status = this.line('ALIK_STATUS', ALIK_STATUS, {
+          filter: (s) => (s.when ?? []).some((c) => c.key === memkeys.alikDead && (c.op === 'exist' || (c.op === '==' && c.value === true))),
+        })
         if (status) this.sys(`Алик Воздухонесян изменил статус: «${status}»`)
       }
       // праздник в окне звучит хотя бы раз: отмазку вытесняют серия, сцена или легенда, а окно короткое.
@@ -2272,8 +2289,8 @@ export class Game {
     if (fx.set) this.rules.applyOps(Object.entries(fx.set).map(([key, value]) => ({ key, op: '=' as const, value })), {})
     if (fx.during) this.rules.applyOps([{ key: fx.during.key, op: '=', value: true, forDays: fx.during.days }], {})
     if (n.sys && (!debtFx || debtMoved)) { await this.sleep(700); this.sys(gen('sys', n.sys)()) }
-    // перевод не прошёл — Алик не благодарит за то, чего не было (#252)
-    if (n.a && (!pays || paid)) await this.say([n.who ? gen('a', n.a)() : variant('a', n.a)], false, n.who)
+    // перевод не прошёл или долг запечатан — Алик не объявляет счёт, которого не было (#252, #266)
+    if (n.a && (!pays || paid) && (!debtFx || debtMoved)) await this.say([n.who ? gen('a', n.a)() : variant('a', n.a)], false, n.who)
     if (n.doc) {
       await this.typingFor(2000, 'отправляет документ…')
       this.alikMsg({ kind: 'doc', from: 'alik', title: `АКТ ВЗАИМОЗАЧЁТА № ${100 + this.rnd(900)}`, rows: v.rows, total: v.total })

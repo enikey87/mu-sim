@@ -200,7 +200,7 @@ export const DIRECT: Record<string, DirectCase> = {
   Endgame_Turn: { event: 'AlikTurn', setup: endgame },
   Quiet_PaydayOpen_AlikAway: { event: 'AlikAway', setup: paydayOpen },
   Quiet_PaydayOpen_PeriodLine: { event: 'PeriodLine', setup: paydayOpen },
-  Quiet_PaydayOpen_StoryBeat: { event: 'StoryBeat', setup: paydayOpen },
+  Quiet_PaydayOpen_StoryBeat: { event: 'StoryBeat', setup: (g) => { paydayOpen(g); g.S.stats.sent = 5 } },
   Away_ColdWar: { event: 'AlikAway', setup: offended },
   Quiet_Offended_AlikAway: { event: 'AlikAway', setup: offended },
   Due_StakeKept: {
