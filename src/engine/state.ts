@@ -1,7 +1,7 @@
 // Состояние игры (сохраняется целиком) и сообщения чата.
 import type { Bags } from './deck'
 import { type Facts, type RuleState, freshRuleState } from './rules'
-import type { PromiseCondition, Rel } from '../content/excuses'
+import type { PromiseCondition, Rel, WhenKind } from '../content/excuses'
 import type { Vars } from '../content/scenes'
 
 export const SAVE_KEY = 'alik-save-v4'
@@ -56,6 +56,9 @@ export interface Ctx {
   s?: string
   when?: string
   whenNever?: boolean
+  whenKind?: WhenKind
+  /** Абсолютный день горизонта срока (у «никогда» и абсурда нет); дни до него от сегодня — `ctx.whenDays`. */
+  whenAt?: number
   /** Игровой день, в который Алик назвал срок — варианты игрока сверяются с календарём. */
   whenMade?: number
   /** Абсолютный день срока (`null` — «когда-нибудь»). */

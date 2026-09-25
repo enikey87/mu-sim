@@ -14,6 +14,38 @@ export function holidayOf(day: number): Holiday | undefined {
   if (month === 3 && dom >= 6 && dom <= 9) return 'march8'
 }
 
+/** Праздники и сезоны, на которые Алик ссылается сроком: по календарю считается горизонт. */
+export type HolidayRef = 'navasard' | 'vardavar' | 'easter' | 'winter' | 'apricots' | 'snowmelt' | 'heating'
+const FIXED: Record<Exclude<HolidayRef, 'easter' | 'vardavar'>, [month: number, dom: number]> = {
+  navasard: [8, 11], winter: [12, 1], apricots: [7, 1], snowmelt: [4, 1], heating: [10, 15],
+}
+// Пасха — григорианский компут (армянская церковь перешла на него в 1924-м); Вардавар — через 98 дней после неё
+function easterOf(year: number): Date {
+  const a = year % 19, b = Math.floor(year / 100), c = year % 100
+  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3)
+  const h = (19 * a + b - d - g + 15) % 30
+  const i = Math.floor(c / 4), k = c % 4
+  const l = (32 + 2 * e + 2 * i - h - k) % 7
+  const m = Math.floor((a + 11 * h + 22 * l) / 451)
+  const n = h + l - 7 * m + 114
+  return new Date(year, Math.floor(n / 31) - 1, (n % 31) + 1)
+}
+/** Сколько дней от `day` до ближайшего наступления праздника или сезона (0 — сегодня). */
+export function holidayDays(ref: HolidayRef, day: number): number {
+  const from = dateOf(day)
+  const between = (to: Date) => Math.round((Date.UTC(to.getFullYear(), to.getMonth(), to.getDate()) - Date.UTC(from.getFullYear(), from.getMonth(), from.getDate())) / 864e5)
+  const at = (year: number): Date => {
+    if (ref === 'easter' || ref === 'vardavar') {
+      const d = easterOf(year)
+      if (ref === 'vardavar') d.setDate(d.getDate() + 98)
+      return d
+    }
+    return new Date(year, FIXED[ref][0] - 1, FIXED[ref][1])
+  }
+  const thisYear = between(at(from.getFullYear()))
+  return thisYear >= 0 ? thisYear : between(at(from.getFullYear() + 1))
+}
+
 /** Ключ «поздравили»: год начала окна, не текущей даты — NY через 31.12→1.01 один раз (#255). */
 export function holidayGreetKey(day: number): string | undefined {
   const h = holidayOf(day)
