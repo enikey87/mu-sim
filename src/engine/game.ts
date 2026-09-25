@@ -1563,7 +1563,7 @@ export class Game {
   meetRel(r?: Rel): void {
     if (r?.id) this.rules.applyOps(meet(r.id), {})
   }
-  recordPromise(p?: { text: string; d: number | null; due?: Due; condition?: PromiseCondition; tomorrow?: boolean; stake?: 'moustache' } | null): void {
+  recordPromise(p?: (Partial<When> & { text: string; d: number | null; stake?: 'moustache' }) | null): void {
     if (!p) return
     if (p.condition && this.S.mem[p.condition] === true) return
     if (p.tomorrow) this.rules.applyOps([set(memkeys.saidTomorrow, true)], {})
