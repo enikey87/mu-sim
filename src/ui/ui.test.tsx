@@ -928,3 +928,27 @@ describe('интро: вибрация на уведомлениях (#351)', ()
     expect(vibrate).not.toHaveBeenCalled()
   })
 })
+
+describe('усы: аватар без усов, пока верен факт сбрития (#350)', () => {
+  const avatar = () => document.querySelector('#avatar') as HTMLElement
+
+  it('ставка исполнилась — аватар сбрит; факт ушёл — прежний, с усами', () => {
+    const { game } = makeGame()
+    game.S.mem['alik.shaved'] = true
+    const { unmount } = renderApp(game)
+    expect(avatar().className).toContain('shaved')
+    unmount()
+    delete game.S.mem['alik.shaved']
+    renderApp(game)
+    expect(avatar().className).not.toContain('shaved')
+  })
+
+  it('баран важнее: на аватаре-баране сбритие не показывается', () => {
+    const { game } = makeGame()
+    game.S.ram = true
+    game.S.mem['alik.shaved'] = true
+    renderApp(game)
+    expect(avatar().className).toContain('ram')
+    expect(avatar().className).not.toContain('shaved')
+  })
+})
