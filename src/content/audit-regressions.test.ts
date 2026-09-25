@@ -394,7 +394,7 @@ describe('регрессии раунда 16', () => {
       if (name === 'THREAT_A' && named.length) expect(claims, `${name}: ${t}`).toEqual(named)
     }
     // гейт не мёртвый: своему предмету строка открыта, чужому закрыта
-    const collector = (D.THREAT_A as Entry<unknown>[]).find((e) => /Коллектор/.test(String(valueOf(e))))!
+    const collector = (D.THREAT_A as Entry<unknown>[]).find((e) => /Пусть сначала найдут/.test(String(valueOf(e))))!
     expect(isOpen(collector, { [threatClaim]: 'collectors' })).toBe(true)
     expect(isOpen(collector, { [threatClaim]: 'court' })).toBe(false)
     expect(isOpen(collector, {})).toBe(false)

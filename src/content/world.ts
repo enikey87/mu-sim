@@ -160,6 +160,7 @@ export const CHORUS: Record<string, Entry<string>[]> = {
   collectors: [
     needs('collectorsRecruited')('Мы теперь у Алика. Раствор — наш процент.'),
     needs('collectorsRecruited')('Не верьте «Деньги-Ара». Верьте вертикали. Мы на объекте.'),
+    needs('collectorsRecruited')('Плиточник? Мы свои. Долги месим вместе с раствором.'),
   ],
 }
 // упомянули много раз — персонажу надоело (по порядку, как нарастание)
