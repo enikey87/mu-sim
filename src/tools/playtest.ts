@@ -19,6 +19,7 @@ const HOURS = [14, 20, 9, 2, 17, 12]
 export type Act =
   | { kind: 'send'; i: number; offered: string[]; at: number }
   | { kind: 'job'; yes: boolean; at?: number }
+  | { kind: 'card'; pick: 'take' | 'sell' | 'later' }
   | { kind: 'charge' }
   | { kind: 'idle' }
 
@@ -91,6 +92,10 @@ function pick(rng: Rng, style: Style, cs: Choice[]): number {
   return safe.length ? any(safe) : 0
 }
 
+/** Открытое предложение банка в ленте (кнопки не нажаты). */
+export const openOffer = (game: Game): Extract<Msg, { kind: 'card' }> | undefined =>
+  game.S.msgs.find((m): m is Extract<Msg, { kind: 'card' }> => m.kind === 'card' && !!m.offer && !m.answered)
+
 /** Сыграть партию ботом (или повторить записанные действия replay); watch — посмотреть на игру до первого хода. */
 /** Атрибуция речи для оракула: сообщение → правило, чей respond сейчас идёт (#229/#268).
  *  Вложенный `fire` сохраняет и возвращает прежнюю атрибуцию — иначе `Turn_Quest` → `PickQuest`
@@ -130,10 +135,10 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
   }
   const notifBuf: WorldFrame['notif'] = []
   const notify = game.notify.bind(game)
-  game.notify = (icon, app, text) => {
-    // только показанное: дедуп банка иначе попадает в расшифровку (#265)
-    if (!notify(icon, app, text)) return false
-    asides.push({ at: game.S.msgs.length, text: `(уведомление телефона: ${icon} ${app} — ${text})` })
+  game.notify = (icon, app, text, card) => {
+    // только показанное: дедуп банка иначе попадает в расшифровку (#265); карточка в ленте — сообщение, не асайд (#287)
+    if (!notify(icon, app, text, card)) return false
+    if (Game.isBanner(app)) asides.push({ at: game.S.msgs.length, text: `(уведомление телефона: ${icon} ${app} — ${text})` })
     notifBuf.push({ text: `${app} — ${text}`, fails: notifFails(game, app, text) })
     return true
   }
@@ -157,7 +162,7 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
     const mem = worldFacts(game)
     const range = game.S.msgs.slice(msgAt)
     const said = range.flatMap((m, i) => {
-      if (m.kind === 'sep' || m.kind === 'sys' || awayIdx.has(msgAt + i)) return []
+      if (m.kind === 'sep' || m.kind === 'sys' || m.kind === 'card' || awayIdx.has(msgAt + i)) return []
       return [{ w: m.from === 'me' ? 'me' : (('who' in m && m.who) || 'alik'), k: m.kind as string, r: ruleOf.get(m.id) ?? null }]
     })
     world.push({
@@ -173,6 +178,8 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
     if (game.battery.dead) return { kind: 'charge' }
     const job = game.S.msgs.find((m) => m.kind === 'job' && !m.answered)
     if (job) return { kind: 'job', yes: bot.random() < 0.5, at: game.S.msgs.length }
+    // карточка банка с кнопками: чаще выбирает, иногда откладывает или пишет дальше, не выбрав
+    if (openOffer(game) && bot.random() < 0.7) { const r = bot.random(); return { kind: 'card', pick: r < 0.5 ? 'take' : r < 0.85 ? 'sell' : 'later' } }
     if (game.S.stats.sent >= 5 && bot.random() < PROFILE[style].idle) return { kind: 'idle' }
     const offered = game.choices.map((c) => c.text)
     return { kind: 'send', i: pick(bot, style, game.choices), offered, at: game.S.msgs.length }
@@ -187,6 +194,7 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
     acts.push(a)
     if (a.kind === 'charge') await game.battery.charge()
     else if (a.kind === 'job') { const job = game.S.msgs.find((m) => m.kind === 'job' && !m.answered)!; await game.answerJob(job.id, a.yes) }
+    else if (a.kind === 'card') game.answerCard(openOffer(game)!.id, a.pick)
     else if (a.kind === 'idle') await game.onIdle()
     else {
       await game.send(game.choices[a.i])
@@ -249,6 +257,10 @@ function line(m: Msg): string {
     case 'fwd': return `${t}Алик: ↪ переслано от «${m.f}»: ${m.text}`
     case 'doc': return `${t}Алик: 📄 ${m.title}: ${m.rows.map(([r, n]) => `${r} — ${n} ₽`).join('; ')}. Итого ${m.total} ₽`
     case 'job': return `${t}Алик: 🛠 допработа: ${m.text}${m.answered ? '' : ' (без ответа)'}`
+    case 'card': {
+      const btns = m.offer ? ` [кнопки: ${[m.offer.take, m.offer.sell, 'Не сейчас'].filter(Boolean).join(' / ')}]` : ''
+      return `(карточка в ленте: ${m.icon} ${m.app} — ${[m.text, ...(m.lines ?? [])].join(' · ')}${btns}${m.result ? ` → ${m.result}` : ''})`
+    }
   }
 }
 

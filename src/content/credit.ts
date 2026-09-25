@@ -67,6 +67,8 @@ export const creditStage = 'credit.stage'
 export const creditOffer = 'credit.offer'
 export const creditBroke = 'credit.broke'
 export const momDone = 'mom.done'
+/** «Не сейчас» в карточке: банк повторит предложение только по новой причине (отказ, падение уровня). */
+export const creditDeclined = 'credit.declined'
 
 export const sold = <T extends ThingId>(id: T): `sold.${T}` => `sold.${id}`
 export const momHelp = <T extends MomId>(id: T): `mom.${T}` => `mom.${id}`

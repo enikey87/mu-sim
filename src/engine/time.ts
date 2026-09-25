@@ -16,6 +16,8 @@ const byDay = (opts: Intl.DateTimeFormatOptions) => {
 export const fmtDate = byDay({ day: 'numeric', month: 'long', year: 'numeric' })
 export const fmtDayMonth = byDay({ day: 'numeric', month: 'long' })
 export const fmtShortDate = byDay({ day: 'numeric', month: 'short' })
+/** Понедельник недели дня `day` (номер дня) — ключ недельной сводки банка. */
+export const weekOf = (day: number): number => day - (dateOf(day).getDay() + 6) % 7
 export const fmtTime = (m: number): string =>
   `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
 

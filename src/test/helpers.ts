@@ -37,3 +37,20 @@ export { botTurn } from '../tools/bot'
 
 /** Деньги партии — только через adjustMoney: в тестах ставим их здесь, одной строкой и явно. */
 export const setMoney = (g: Game, n: number): void => { setCount(g.S, 'money', n) }
+
+export type CardMsg = Extract<Msg, { kind: 'card' }>
+/** Карточки телефона в ленте (банк, мама, Авито, #287); `app` — только этого приложения. */
+export const cards = (g: Game, app?: string): CardMsg[] =>
+  g.S.msgs.filter((m): m is CardMsg => m.kind === 'card' && (!app || m.app === app))
+
+/** Прошедшие движения денег («-Связь», «+Авито»): факт списания, а не текст банка — тот теперь в недельной сводке. */
+export function moneyLog(g: Game): string[] {
+  const log: string[] = []
+  const adjust = g.adjustMoney.bind(g)
+  g.adjustMoney = (delta, reason, opts) => {
+    const ok = adjust(delta, reason, opts)
+    if (ok && delta) log.push(`${delta < 0 ? '-' : '+'}${opts?.group ?? reason}`)
+    return ok
+  }
+  return log
+}
