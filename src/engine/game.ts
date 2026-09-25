@@ -1551,7 +1551,8 @@ export class Game {
     if (p.due && 'weekday' in p.due && p.due.weekday === 5) this.rules.applyOps([set(memkeys.saidFriday, true)], {})
     const due = p.d == null ? null : this.S.day + (p.due ? dueIn(p.due, this.S.day) : p.d)
     this.S.promises.push({ t: p.text, made: this.S.day, due, condition: p.condition, stake: p.stake })
-    if (due !== null && due > this.S.day) this.scheduleEvent(due, 'PromiseDue', { promise: this.S.promises.length - 1 })
+    // «сегодня» (due === day) тоже планируем — иначе d:0 молчит (#307)
+    if (due !== null && due >= this.S.day) this.scheduleEvent(due, 'PromiseDue', { promise: this.S.promises.length - 1 })
     if (this.S.promises.length >= 20) this.unlock('promises20')
   }
   /** Пора снова назвать срок легенды: перерыв прошёл (#179). Серия, заведшая легенду, открывает гейт сама (setLegend). */
@@ -1559,7 +1560,7 @@ export class Game {
     return this.S.stats.sent - Number(this.S.mem[memkeys.legendPromiseAt] ?? -99) >= LEGEND_VOW_GAP
   }
   /** Срок легенды второй раз в журнал не пишем — повтор не новость (#179). Ключ — условие срока: тексты клятвы разные. */
-  private recordPromiseOnce(p: Promise3): void {
+  private recordPromiseOnce(p: { text: string; d: number | null; due?: Due; condition?: PromiseCondition; tomorrow?: boolean; stake?: 'moustache' }): void {
     if (p.condition && this.S.promises.some((x) => x.condition === p.condition)) return
     this.recordPromise(p)
   }
@@ -1592,7 +1593,7 @@ export class Game {
       const tpl = form?.text ?? '{o}, {p}.'
       return { text: tpl.replace('{o}', this.X.g('OATH')).replace('{P}', cap(q.text)).replace('{p}', q.text), q, stake }
     })
-    if (fromLegend) this.recordPromiseOnce(p.q)
+    if (fromLegend) this.recordPromiseOnce({ ...p.q, stake: p.stake })
     else this.recordPromise({ ...p.q, stake: p.stake })
     await this.say([p.text])
     this.S.ctx = { ...(this.S.ctx ?? {}), ...this.ctxFromPromise(p.q) }
