@@ -933,7 +933,7 @@ describe('Game: деньги на карте', () => {
     expect(game.facts().moneyBottom).toBe(true)
     expect(game.S.mem['credit.offer']).toBe(true)
     // «критический» и предложение — одна карточка: причина рядом с кредитом
-    expect(cards(game, 'Банк').at(-1)?.text).toMatch(/^Остаток критический: 5\s400 ₽ после «Гречка»\. Вам одобрен/)
+    expect(cards(game, 'Банк').at(-1)?.text).toMatch(/^Остаток критический после «Гречка»\. Вам одобрен кредит «Всё будет» — 3\s600 ₽/) // без остатка в шапке, сумма — та, что даст (#337)
     expect(cards(game, 'Банк')).toHaveLength(2)
     expect(game.ui.notif).toBeNull()
   })
