@@ -27,6 +27,8 @@ export const cryptoHodl = 'crypto.hodl'
 export const bathAsked = 'bath.asked'
 export const mamaCalls = 'mama.calls'
 export const phoneKarine = 'phone.karine'
+/** Алик сбрил усы по ставке — живёт ~40 дней (`during`), пока отрастут. */
+export const alikShaved = 'alik.shaved'
 export const alikDay = 'alik.day'
 export const mooAt = 'mooAt'
 export const sorryAt = 'sorryAt'
@@ -122,7 +124,7 @@ export const interjections = 'interjections'
 export const EVENT_KEY_LIST = [
   'day', 'dow', 'month', 'dom', 'holiday', 'sent', 'moo', 'tier', 'mood', 'patience', 'money', 'debt', 'fifty', 'paid',
   'moneyNormal', 'moneyLow', 'moneyBottom', 'paymentDueTomorrow',
-  'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sorrySwing', 'promiseLive',
+  'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sorrySwing', 'promiseLive', 'promiseStake',
   'period', 'night', 'offline', 'scene', 'sinceAlik', 'lateCount', 'arcAvailable',
   'arcsStarted', 'arcsDone', 'quests', 'callbackReady', 'arcUnfinished', 'deathCanAdvance',
   'intent', 'tone', 'arg', 'category', 'arc', 'argArcDone', 'greet', 'promise', 'somedayCount',
@@ -136,7 +138,7 @@ export const ACTOR_KEYS: ReadonlySet<string> = new Set(ACTOR_KEY_LIST)
 
 export const MEM_KEYS: ReadonlySet<string> = new Set([
   HEAT, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, evicted, vendetta, court, courtVerdict,
-  ritualCount, ritualCut, caughtCount, cryptoHodl, bathAsked, mamaCalls, phoneKarine, alikDay, mooAt, sorryAt, courtReferral,
+  ritualCount, ritualCut, caughtCount, cryptoHodl, bathAsked, mamaCalls, phoneKarine, alikShaved, alikDay, mooAt, sorryAt, courtReferral,
   rudeAt, thanksAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway,
   garikConcrete, garikCut, houseOnGarik, borisMarried, borisSmetaReady, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday,
