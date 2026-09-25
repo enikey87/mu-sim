@@ -65,14 +65,17 @@ const dueLine = (game: Game, f: Facts, key: string, arr: readonly Entry<string>[
 // срок актуален: обещание есть и его не «переписали» в когда-нибудь
 const live = eq('promiseLive', true)
 const stakeMoustache = eq('promiseStake', 'moustache')
-const stakeOpen = [live, stakeMoustache, missing(alikShaved), missing(endgame.active)] as const
+// не promiseLive: срок мог остаться позади (#327)
+const stakeOpen = [eq('promisePassed', true), stakeMoustache, missing(alikShaved), missing(endgame.active)] as const
 const stakeKept = async ({ game, facts }: { game: Game; facts: Facts }) => {
   await game.say([dueLine(game, facts, 'DUE_SHAVE_KEPT', PROMISE_SHAVE_KEPT)])
   await game.transfer()
   const p = game.S.promises[Number(facts.promise)]
-  if (p) { p.asked = true; p.kept = true }
+  if (p) { p.asked = true; p.kept = true; p.stakeDone = true }
 }
 const stakeShave = async ({ game, facts }: { game: Game; facts: Facts }) => {
+  const p = game.S.promises[Number(facts.promise)]
+  if (p) p.stakeDone = true
   game.sys('Алик Воздухонесян сменил фото профиля. На фото — Алик без усов.')
   await game.say([dueLine(game, facts, 'DUE_SHAVE', PROMISE_SHAVE)])
   game.unlock('shaved')

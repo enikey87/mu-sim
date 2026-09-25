@@ -101,6 +101,7 @@ export interface PromiseRec {
   kept?: boolean
   /** Ставка клятвы: «если нет — сбрею усы» (docs/design/moustache.md). */
   stake?: 'moustache'
+  stakeDone?: true
   /** День амнистии: срок больше не припомнишь. Не `asked` — то «припомнил» или «сдержал на 50 ₽». */
   amnesty?: number
 }

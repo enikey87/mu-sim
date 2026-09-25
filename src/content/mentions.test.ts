@@ -232,6 +232,11 @@ function corpus(): Found[] {
   return out
 }
 
+/** Усы Алика на месте: реплика, называющая их, звучит, пока они не сбриты (`needs('moustache')`, docs/design/moustache.md). */
+const MOUSTACHE = new RegExp(W + 'ус(?:ы|ами|ах)(?![а-яё])', 'i')
+/** Строки исполненной ставки: звучат уже после того, как усы сбриты или спасены. */
+const AFTER_STAKE = /^world\.PROMISE_SHAVE/
+
 function problems(found: Found[]): string[] {
   const out: string[] = []
   for (const { path, text, known, who, stateOf } of found) {
@@ -251,6 +256,17 @@ describe('упоминания в контенте', () => {
     const found = corpus()
     expect(found.length).toBeGreaterThan(3000)
     expect(problems(found)).toEqual([])
+  })
+  it('реплика об усах Алика закрыта, пока они сбриты: снятое needs(moustache) краснеет (#327)', () => {
+    const found = corpus().filter((f) => MOUSTACHE.test(f.text) && !AFTER_STAKE.test(f.path))
+    // сегодня их шесть: три отмазки, «Нива» в легенде, «у дяди усы» в сцене и форма клятвы со ставкой
+    expect(found.length, 'реплик об усах меньше известных — проверка пустеет').toBeGreaterThanOrEqual(6)
+    expect(found.filter((f) => !holds('moustache', f.known)).map((f) => `${f.path}: «${f.text.slice(0, 70)}»`)).toEqual([])
+    // сам детектор: без требования — находка, с требованием — нет
+    const bare = strings(['Клянусь своими усами'], 'x', [], []).filter((f) => MOUSTACHE.test(f.text) && !holds('moustache', f.known))
+    expect(bare).toHaveLength(1)
+    const gated = strings([new Gated([WORLD.moustache], 'Клянусь своими усами')], 'x', [], []).filter((f) => MOUSTACHE.test(f.text) && !holds('moustache', f.known))
+    expect(gated).toEqual([])
   })
   it('проверка ловит упоминание без требования и принимает требование, серию и финал', () => {
     const bare = strings(['Кран уехал.', 'Гарик на рынке.', ['boris', 'Бее.'], { w: 'karine', t: 'Алик!' }], 'x', [], [])

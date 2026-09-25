@@ -44,12 +44,16 @@ export const legendArc = 'legend.arc'
 export const nextTransfer = 'nextTransfer'
 export const tileCornerRemoved = 'tile.cornerRemoved'
 export const nivaAway = 'niva.away'
+/** «Нива» вернулась (серия «Нива вернулась!»). */
+export const nivaBack = 'niva.back'
 /** «Нива» у игрока после финала «Нива выбрала тебя» (#256). */
 export const nivaPlayer = 'niva.player'
 export const garikConcrete = 'garik.concrete'
 export const garikCut = 'garik.cut'
 export const houseOnGarik = 'house.onGarik'
 export const borisMarried = 'boris.married'
+/** Свадьба Размика на кране прошла — как `boris.married`. */
+export const razmikMarried = 'razmik.married'
 export const borisSmetaReady = 'boris.smetaReady'
 export const taxFrozen = 'tax.frozen'
 export const taxThawed = 'tax.thawed'
@@ -130,7 +134,7 @@ export const interjections = 'interjections'
 export const EVENT_KEY_LIST = [
   'day', 'dow', 'month', 'dom', 'holiday', 'sent', 'moo', 'tier', 'mood', 'patience', 'money', 'debt', 'fifty', 'paid',
   'moneyNormal', 'moneyLow', 'moneyBottom', 'paymentDueTomorrow',
-  'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sorrySwing', 'promiseLive', 'promiseStake',
+  'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sorrySwing', 'promiseLive', 'promisePassed', 'promiseStake',
   'period', 'night', 'offline', 'scene', 'sinceAlik', 'lateCount', 'arcAvailable',
   'arcsStarted', 'arcsDone', 'quests', 'callbackReady', 'arcUnfinished', 'deathCanAdvance', 'collectorsCanAdvance',
   'intent', 'tone', 'arg', 'category', 'arc', 'argArcDone', 'greet', 'promise', 'somedayCount',
@@ -146,7 +150,7 @@ export const MEM_KEYS: ReadonlySet<string> = new Set([
   HEAT, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, evicted, vendetta, court, courtVerdict,
   ritualCount, ritualCut, caughtCount, cryptoHodl, bathAsked, mamaCalls, phoneKarine, alikShaved, alikDay, mooAt, sorryAt, courtReferral,
   rudeAt, thanksAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway, nivaPlayer,
-  garikConcrete, garikCut, houseOnGarik, borisMarried, borisSmetaReady, taxFrozen, taxThawed,
+  garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday,
   lightOff, netRation, phoneWarn, holidayGreeted,
   creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited,

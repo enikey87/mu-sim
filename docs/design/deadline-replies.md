@@ -25,7 +25,7 @@
 
 Как это устроено на `main`:
 - Кнопки на обещание — два правила в `content/rules/choices.ts`: `When` (пул `P_WHEN`, акт `promiseCheck`) и `WhenOk` (пул `P_WHEN_OK`, акт `promiseOk`). Оба в слоте `when`, условие одно: `exists('ctx.when')` и `is('ctx.whenFresh')`. Род срока и его даль не смотрит ни одно правило.
-- У срока (`When`, `content/excuses.ts`) есть только `d` (дни или `null`), `due`, `condition`, `tomorrow`. Сроки легенд (`Legend.until`, `content/legends.ts`) — просто строка: `Game.alignPromise` (`engine/game.ts`) ставит им `d = null`.
+- У срока (`When`, `content/excuses.ts`) есть только `d` (дни или `null`), `due`, `condition`, `tomorrow`. Сроки легенд (`Legend.until`, `content/legends.ts`) — строка, а при ней либо `condition` (факт мира), либо `days` (срок в днях, если факта нет), либо ничего — «никогда»: `Game.alignPromise` (`engine/game.ts`) ставит `d = Legend.days ?? null` и `condition` (#327).
 - `ctx.whenDate` — `fmtDayMonth(c.whenMade)`, то есть день обещания, а не срок (`Game.facts()`).
 - Ответ Алика на «принять» — общий `PROMISE_OK`. На «переспросить» — `X.promiseCheck`, а при `ctx.whenNever` — `PROMISE_NEVER` / `WHEN_COND` (`content/rules/replies.ts`).
 

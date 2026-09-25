@@ -2,7 +2,7 @@
 // Эпизод: m — сообщения (строка — от Алика, { w, t } — от участника), fx, sys, then: 'promise'.
 import { type Entry, type FactOp, type Criterion, set, gate, is, eq, missing, gte, lte } from './fact'
 import { needs, meet, WORLD } from './world'
-import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, collectorsRecruited, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantPaid, houseOnGarik, intro, met, mourning, nivaAway, nuneDekretOver, nuneKeyPassed, sick, taxFrozen, wedding } from './memkeys'
+import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, collectorsRecruited, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantPaid, houseOnGarik, intro, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, sick, taxFrozen, wedding } from './memkeys'
 
 export type ArcMsg = string | { w: string; t: string }
 export interface Episode {
@@ -97,7 +97,7 @@ export const ARCS: Record<string, Arc> = {
       { m: ['«Ниву» видели в Гюмри. Заправилась и не заплатила. Вся в меня.'], legend: 'niva_gone' }, // ещё в Армении — Грузия со следующей серии
       { m: ['«Нива» пересекла границу с Грузией. Без документов. Пропустили — узнали.'], legend: 'niva_abroad' },
       { m: [{ w: 'niva', t: 'Би-бип.' }, 'Это «Нива» тебе из Тбилиси. Роуминг, брат, дорого. Она за мой счёт звонит.'] },
-      { m: ['«Нива» вернулась! Без денег. Но с новыми колёсами и грузинскими номерами. Кто-то её любил.'], remember: [set(nivaAway, false)], then: 'promise', legend: 'niva_back' },
+      { m: ['«Нива» вернулась! Без денег. Но с новыми колёсами и грузинскими номерами. Кто-то её любил.'], remember: [set(nivaAway, false), set(nivaBack, true)], then: 'promise', legend: 'niva_back' },
       { m: ['«Нива» опять уехала. Оставила записку: «Не ищи». Уважаю её выбор.'], remember: [set(nivaAway, true)], fx: { ach: 'arc_niva' }, legend: null },
     ],
   },
@@ -168,7 +168,7 @@ export const ARCS: Record<string, Arc> = {
       },
       { m: ['Приехало телевидение. Я дал интервью: сказал, что всем плачу. Размик сверху кричал «врёт!» — но звук не записался. Высоко.', 'В эфир пошло «всем плачу». Теперь это официально, брат. Можешь ссылаться.'] },
       { m: ['К Размику приехала мама. Стоит внизу, плачет. Потом встретила мою маму. Теперь плачут вдвоём. Про нас обоих. Про тебя немного тоже.', { w: 'mama', t: 'Размик хороший мальчик. Ты хороший мальчик. Алик тоже хороший, но денег не даст. Покушай хоть ты.' }] },
-      { m: [needs('samvel')('Размик женится! Прямо на кране. Невесту подняли в бадье для бетона. Самвел командует снизу в мегафон.'), 'Все деньги — на свадьбу, брат. Высотная свадьба — это дорого. Страховка одна чего стоит.'], then: 'promise', state: { key: wedding('razmik'), days: 5 }, legend: 'crane_wedding' },
+      { remember: [set(razmikMarried, true, { delay: 5 })], m: [needs('samvel')('Размик женится! Прямо на кране. Невесту подняли в бадье для бетона. Самвел командует снизу в мегафон.'), 'Все деньги — на свадьбу, брат. Высотная свадьба — это дорого. Страховка одна чего стоит.'], then: 'promise', state: { key: wedding('razmik'), days: 5 }, legend: 'crane_wedding' },
       { m: ['Слушай, соседний кран свободен. Залезай. Вдвоём — это уже профсоюз, с профсоюзом я считаюсь. Первое время.', 'Лаваш подавать буду лично. Крюком. В долг.'] },
       { m: ['Размик слез! Я ему всё заплатил. Твоими деньгами, брат — он был выше в очереди. В прямом смысле.', 'Зато ты теперь первый! Денег нет. Но ты первый. Это тоже чего-то стоит.'], fx: { ach: 'arc_razmik' }, legend: null },
     ],
