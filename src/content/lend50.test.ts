@@ -255,27 +255,28 @@ describe('«Займи 50»', () => {
     expect(unread).toBeGreaterThan(link) // пачка away — строго после просьбы
   })
 
-  it('NC: checkAway до просьбы ставит формальность раньше (#248)', async () => {
-    // механизм: void checkAway до deliver → первый AlikAway успевает до yield, просьба встаёт в середину
-    // этот тест зелёный на фиксе; регресс ловит прогон с переставленным порядком в game.ts
-    const storage = memStorage()
-    const { game, clock } = makeGame({ storage })
-    game.S.mem.payday = 'default'
-    game.S.ending = 'payday_default'
-    game.S.endings.payday_default = game.S.day
+  it('формальности могут прийти при висящей просьбе — кнопки остаются (#321)', async () => {
+    const { game } = makeGame()
+    await enter(game)
+    expect(game.S.mem['lend50.asked']).toBe(true)
+    expect(game.S.mem['lend50.answer']).toBeUndefined()
+    const before = game.choices.map((c) => c.act)
+    expect(before).toEqual(['lend50Yes', 'lend50Serious', 'lend50No'])
+    game.awayMsg('formality')
+    expect(game.S.mem['lend50.answer']).toBeUndefined()
+    game.S.choices = null
+    expect(game.choices.map((c) => c.act)).toEqual(before)
+  })
+
+  it('NC: без asked формальность не открывает кнопки займа (#321)', () => {
+    const { game } = makeGame()
     game.S.mem['endgame.active'] = true
     game.S.mem['endgame.started'] = game.S.day
-    game.S.msgs.push({ kind: 'text', from: 'alik', text: LEND50_ASK[0], id: game.S.nextId++, time: '12:00' })
-    game.S.stats.sent = 5
-    game.S.lastSeen = clock.now() - 2 * 60 * 60 * 1000
-    game.save()
-    const { game: again } = makeGame({ storage, away: 120 })
-    await flush()
-    const t = texts(again)
-    const ask0 = t.indexOf(LEND50_ASK[0])
-    const unread = t.findIndex((x) => /непрочитанные/.test(x))
-    expect(unread).toBeGreaterThan(ask0)
-    expect(t.slice(ask0, ask0 + 5)).toEqual([...LEND50_ASK, LEND50_SYS, LEND50_LINK])
+    game.S.choices = null
+    expect(game.choices.some((c) => c.act?.startsWith('lend50'))).toBe(false)
+    game.awayMsg('formality')
+    game.S.choices = null
+    expect(game.choices.some((c) => c.act?.startsWith('lend50'))).toBe(false)
   })
 
   it('ответы Алика на кнопки без опечаток (#248)', async () => {
