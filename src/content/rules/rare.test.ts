@@ -100,8 +100,6 @@ const CASES: Record<string, Case> = {
   Bill_Warn: { event: 'BillWarn', facts: { bill: 'phone' } },
   Bill_Due: { event: 'BillDue', facts: { bill: 'phone' } },
   Credit_Due: { event: 'CreditDue', facts: { credit: 'consumer' }, setup: (g) => { g.S.mem['credit.consumer.taken'] = true; setMoney(g, 50000) } },
-  Says_creditTake: { event: 'PlayerSays', facts: { intent: 'creditTake' }, setup: (g) => { g.S.mem['credit.offer'] = true; setMoney(g, 1000) } },
-  Says_creditSell: { event: 'PlayerSays', facts: { intent: 'creditSell' }, setup: (g) => { g.S.mem['credit.offer'] = true; setMoney(g, 1000) } },
   Payday_coins: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['payday.caught'] = true } },
   Ending_payday_coins: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'coins' } },
   // бывшие PROVEN (#269): стенд доходит не в каждой выборке; наследство деда уходит Борису — он уже в партии

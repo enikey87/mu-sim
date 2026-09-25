@@ -31,6 +31,21 @@ export type Msg =
   | (MsgBase & { kind: 'fwd'; from: 'alik'; f: string; text: string })
   | (MsgBase & { kind: 'doc'; from: 'alik'; title: string; rows: Array<[string, number]>; total: number })
   | (MsgBase & { kind: 'job'; from: 'alik'; text: string; answered?: boolean })
+  | (MsgBase & { kind: 'card' } & Card)
+
+/** Карточка телефона в ленте (банк, МФО, мама, Авито): не реплика и не требует нажатия; `offer` — кнопки кредита (#287). */
+export interface Card {
+  icon: string
+  app: string
+  text: string
+  lines?: string[]
+  offer?: { take?: string; sell?: string }
+  /** Кнопки закрыты; `result` — чем кончилось. */
+  answered?: boolean
+  result?: string
+}
+/** Недельная сводка банка: что прошло по карте с понедельника `week`; баланс — после последней строки. */
+export interface BankWeek { week: number; lines: Record<string, { sum: number; n: number }>; bal: number }
 
 export type NewMsg = Msg extends infer M ? (M extends Msg ? Omit<M, 'id'> : never) : never
 
@@ -131,6 +146,7 @@ export interface GameState {
   ending: string | null
   /** Интро на экране блокировки показано (или пропущено): повтор — только на новой партии. */
   introShown: boolean
+  bank: BankWeek | null
 }
 
 export function freshState(): GameState {
@@ -139,7 +155,7 @@ export function freshState(): GameState {
     msgs: [], nextId: 1, ach: {}, promises: [], seen: [], bags: {}, items: [],
     stats: { moo: 0, fifty: 0, paid: 0, sent: 0 },
     offlineDays: 0, ram: false, muted: false, scene: null, ctx: null, choices: null, arcs: {}, tier: 0,
-    battery: 100, money: START_MONEY, lastSeen: 0, mem: {}, actors: {}, rules: freshRuleState(), endings: {}, ending: null, introShown: false,
+    battery: 100, money: START_MONEY, lastSeen: 0, mem: {}, actors: {}, rules: freshRuleState(), endings: {}, ending: null, introShown: false, bank: null,
   })
 }
 

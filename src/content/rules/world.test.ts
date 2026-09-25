@@ -333,14 +333,14 @@ describe('состояния мира со сроком', () => {
 })
 
 describe('приоритеты: посреди сцены Алик не болтает', () => {
-  it('во время сцены «Алик пишет сам» даёт только уведомление телефона', async () => {
+  it('во время сцены «Алик пишет сам» даёт только карточку телефона (#287)', async () => {
     const { game } = makeGame()
     game.S.scene = { id: 'deathbed', node: 'ask', vars: {} }
     for (let i = 0; i < 20; i++) {
       const n = game.S.msgs.length
       const r = await game.fire('AlikIdle')
       expect(r?.name).toBe('Idle_Notif')
-      expect(game.S.msgs.length).toBe(n)
+      expect(game.S.msgs.slice(n).filter((m) => m.kind !== 'card')).toEqual([])
     }
   })
   it('без сцены — болтает', async () => {

@@ -78,10 +78,11 @@ describe('повторы в эндгейме (#267)', () => {
 })
 
 describe('разнообразие', () => {
-  it('за пять партий срабатывают все виды хода Алика и все сцены', async () => {
+  it('за десять партий срабатывают все виды хода Алика и все сцены', async () => {
     const fired = new Set<string>()
     const scenes = new Set<string>()
-    for (const seed of [11, 12, 13, 14, 15]) {
+    // Turn_Wrong — меньше одного за партию: на пяти сидах ноль попаданий случался и на main (#287)
+    for (const seed of [11, 12, 13, 14, 15, 16, 17, 18, 19, 20]) {
       const { game } = makeGame({ seed })
       const orig = game.rules.fire.bind(game.rules)
       game.rules.fire = async (...a: Parameters<typeof orig>) => { const r = await orig(...a); if (r) fired.add(r.name); return r }
@@ -93,7 +94,7 @@ describe('разнообразие', () => {
     for (const r of ['Turn_Scene', 'Turn_Arc', 'Turn_Group', 'Turn_Wrong', 'Turn_Sticker', 'Turn_Forward', 'Turn_Transfer', 'Turn_Job', 'Turn_Photo', 'Turn_Voice', 'Turn_Short', 'Turn_Excuse', 'Tone_Rude'])
       expect(fired, r).toContain(r)
     expect(scenes.size).toBeGreaterThanOrEqual(12)
-  }, 120_000)
+  }, 240_000)
   it('SAD покрывает печальные события словаря', () => {
     expect((D.EVENT as string[]).filter((e) => SAD.test(e)).length).toBeGreaterThan(15)
   })
