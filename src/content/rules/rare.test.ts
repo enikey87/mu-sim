@@ -123,7 +123,7 @@ const CASES: Record<string, Case> = {
     setup: (g) => { g.S.mem.blocked = true; g.S.mem['blocked.hint'] = true },
   },
   Says_via_mama: { event: 'PlayerSays', facts: { intent: 'via', arg: 'mama' } },
-  Scene_amnesty: { event: 'PickScene', setup: (g) => { for (let i = 0; i < 8; i++) g.recordPromise({ text: `завтра №${i}`, d: 1 }); g.S.day += 5 } },
+  Scene_amnesty: { event: 'PickScene', setup: (g) => { for (let i = 0; i < 5; i++) g.recordPromise({ text: `завтра №${i}`, d: 1 }); g.S.day += 5 } },
   Ending_payday_lavash: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'lavash' } },
   Ending_ram: {
     event: 'CheckEnding',

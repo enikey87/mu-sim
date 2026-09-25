@@ -26,7 +26,7 @@ gh pr list --state open --label agent:<я>
 
 ## 2. Взять одну задачу
 
-Кандидаты — открытые issues с меткой `task` и без метки `agent:*`:
+Кандидаты — открытые issues с меткой `task`, без метки `agent:*` и либо без метки `for:*` (общая задача), либо с меткой `for:<я>` (задача для тебя). Задачу с меткой `for:<другое имя>` не бери, даже если она первая в очереди.
 
 ```sh
 gh issue list --state open --label task --json number,title,labels
