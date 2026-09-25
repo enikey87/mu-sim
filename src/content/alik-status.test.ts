@@ -100,7 +100,7 @@ describe('статус Алика живёт миром', () => {
     expect(game.ui.status?.text).toBe('не в сети')
     expect(game.alikSilent()).toBe(true)
   })
-  it('alikSilent — одно место: блок, смерть, телефон у Карине; эндгейм сам по себе не глушит шапку', () => {
+  it('alikSilent — одно место: блок, смерть, телефон у Карине, пропал; эндгейм сам по себе не глушит шапку', () => {
     const { game } = makeGame()
     expect(game.alikSilent()).toBe(false)
     game.S.mem['endgame.active'] = true
@@ -110,6 +110,9 @@ describe('статус Алика живёт миром', () => {
       g.S.mem[key] = true
       expect(g.alikSilent(), key).toBe(true)
     }
+    const { game: off } = makeGame()
+    off.S.offlineDays = 2
+    expect(off.alikSilent()).toBe(true)
   })
   it('в блоке статус скрыт: строка один раз за блок, после разблокировки пул возвращается', async () => {
     const { game } = makeGame()

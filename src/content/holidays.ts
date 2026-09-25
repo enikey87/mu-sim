@@ -14,6 +14,18 @@ export function holidayOf(day: number): Holiday | undefined {
   if (month === 3 && dom >= 6 && dom <= 9) return 'march8'
 }
 
+/** Ключ «поздравили»: год начала окна, не текущей даты — NY через 31.12→1.01 один раз (#255). */
+export function holidayGreetKey(day: number): string | undefined {
+  const h = holidayOf(day)
+  if (!h) return undefined
+  const d = dateOf(day)
+  if (h === 'newYear') {
+    const startYear = d.getMonth() === 0 ? d.getFullYear() - 1 : d.getFullYear()
+    return `newYear@${startYear}`
+  }
+  return `march8@${d.getFullYear()}`
+}
+
 const ny = [eq('holiday', 'newYear'), missing(endgame.active)] as const
 const m8 = [eq('holiday', 'march8'), missing(endgame.active)] as const
 
@@ -29,11 +41,11 @@ export const HOLIDAY_EXCUSES: Line[] = [
   { t: 'С наступающим, брат! Шампанское открыли, а сейф — нет.', when: [...ny, eq('month', 12)] },
   { t: 'С Новым годом, брат! Год только начался, куда спешить.', when: [...ny, eq('month', 1)] },
   { t: 'В новом году всё по-новому: гирлянда мигает, сейф — по-старому.', when: [...ny, eq('month', 1)] },
-  { t: 'Первый день года, брат. Начинать с переводов — плохая примета.', when: [...ny, eq('month', 1)] },
-  // 8 Марта: 06–07.03 — подготовка, 08–09.03 — поздравление
+  { t: 'Первый день года, брат. Начинать с переводов — плохая примета.', when: [...ny, eq('month', 1), eq('dom', 1)] },
+  // 8 Марта: 06–07.03 — подготовка, 08–09.03 — поздравление; «Сегодня» — только 8-го (#255)
   { t: 'Восьмое марта на носу, брат. Уже выбираю тюльпаны. Себе.', when: [...m8, lte('dom', 7)] },
   { t: 'Готовлюсь к женскому дню: цветы, открытки, уважение. По списку.', when: [...m8, lte('dom', 7)] },
   { t: 'С 8 Марта, брат! Женщинам — цветы, тебе — моё уважение.', when: [...m8, gte('dom', 8)] },
-  { t: 'Международный женский день, джан. Сегодня не про переводы — сегодня про тюльпаны.', when: [...m8, gte('dom', 8)] },
+  { t: 'Международный женский день, джан. Сегодня не про переводы — сегодня про тюльпаны.', when: [...m8, eq('dom', 8)] },
   { t: 'С праздником весны! Я уже всем поздравил. Тебя поздравляю терпением.', when: [...m8, gte('dom', 8)] },
 ]

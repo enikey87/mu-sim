@@ -84,7 +84,7 @@ export const endgame = {
   exits: 'endgame.exits', mutes: 'endgame.mutes', renames: 'endgame.renames',
 } as const
 
-/** Праздник, который партия уже поздравила: «newYear@2027» — новый год тот же, но год другой. */
+/** Праздник, который партия уже поздравила: «newYear@2026» — год начала окна (#255). */
 export const holidayGreeted = 'holiday.greeted'
 
 /** «Займи 50» в эндгейме: просьба прозвучала и что игрок ответил (docs/design/lend-50.md). */
