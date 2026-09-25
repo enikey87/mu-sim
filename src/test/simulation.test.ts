@@ -11,7 +11,8 @@ interface Step { choice: Choice | null; ctxBefore: Ctx | null; mourning: boolean
 async function play(seed: number, turns: number) {
   const { game } = makeGame({ seed })
   const steps: Step[] = []
-  // эндгейм намеренно гоняет формальности по кругу (#190) — дубли после закрытия концовки не считаем
+  // эндгейм гоняет формальности по кругу (#190/#267) — абсолютный uniq только до закрытия концовки;
+  // после — запрет подряд (docs/design/endgame.md), не полное исключение эндгейма
   let beforeEndgame = Infinity
   for (let i = 0; i < turns; i++) {
     const ctxBefore = game.S.ctx ? { ...game.S.ctx } : null
@@ -24,6 +25,10 @@ async function play(seed: number, turns: number) {
   return { game, steps, beforeEndgame }
 }
 
+/** Реплики Алика без исправлений опечаток; подряд — соседние одинаковые. */
+const alikLines = (msgs: Parameters<typeof alikTexts>[0]) => alikTexts(msgs).filter((t) => !FIX_RE.test(t))
+const consecutive = (texts: string[]) => texts.filter((t, i) => i > 0 && t === texts[i - 1])
+
 describe.each([1, 2, 3])('симуляция, seed %i', (seed) => {
   it('300 ходов без ошибок, повторов и нелогичных ответов', async () => {
     const { game, steps, beforeEndgame } = await play(seed, 300)
@@ -32,10 +37,10 @@ describe.each([1, 2, 3])('симуляция, seed %i', (seed) => {
     const all = JSON.stringify(game.S.msgs)
     expect(all).not.toMatch(/undefined|NaN|\[object|null,"t|г\.\./)
 
-    // 2. реплики Алика не повторяются (исправления опечаток — естественно повторяются)
-    const texts = alikTexts(game.S.msgs.slice(0, beforeEndgame)).filter((t) => !FIX_RE.test(t))
-    const dups = texts.filter((t, i) => texts.indexOf(t) !== i)
-    expect(dups).toEqual([])
+    // 2. до эндгейма — без повторов вовсе; в эндгейме — без подряд (колода формальностей по кругу)
+    const pre = alikLines(game.S.msgs.slice(0, beforeEndgame))
+    expect(pre.filter((t, i) => pre.indexOf(t) !== i)).toEqual([])
+    expect(consecutive(alikLines(game.S.msgs.slice(beforeEndgame)))).toEqual([])
 
     // 3. логика пар «вариант → контекст»
     for (const s of steps) {
@@ -58,6 +63,18 @@ describe.each([1, 2, 3])('симуляция, seed %i', (seed) => {
     expect(game.S.stats.sent).toBeGreaterThan(200)
     expect(Object.keys(game.S.ach).length).toBeGreaterThan(20)
   }, 60_000)
+})
+
+describe('повторы в эндгейме (#267)', () => {
+  it('повтор реплики подряд в эндгейме ловит consecutive — вырезание эндгейма прячет', () => {
+    const pre = ['утро', 'день']
+    const end = ['формальность', 'формальность', 'другая']
+    const whole = [...pre, ...end]
+    // старый тест смотрел только pre — подряд в эндгейме не видел
+    expect(pre.filter((t, i) => pre.indexOf(t) !== i)).toEqual([])
+    expect(consecutive(end)).toEqual(['формальность'])
+    expect(consecutive(whole.slice(pre.length))).toEqual(['формальность'])
+  })
 })
 
 describe('разнообразие', () => {
