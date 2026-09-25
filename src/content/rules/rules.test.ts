@@ -350,7 +350,7 @@ describe('промолчавшее правило не оставляет сле
   })
   it('уведомление промолчавшего — SilenceBreach', async () => {
     const { game } = makeGame()
-    game.rules.add({ name: 'Noisy', event: 'PlayerMessage', when: [], specificity: 999, respond: ({ game }) => { game.notify('📺', 'Новости', 'утечка'); return false } })
+    game.rules.add({ name: 'Noisy', event: 'PlayerMessage', when: [], specificity: 999, respond: ({ game }) => { game.notify('📺', 'Новости', 'утечка', { event: 'life' }); return false } })
     await expect(game.fire('PlayerMessage', { tone: 'polite' })).rejects.toThrow(/Noisy промолчало/)
   })
   it('правка текста существующего сообщения — SilenceBreach', async () => {

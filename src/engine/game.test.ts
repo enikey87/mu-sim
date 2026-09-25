@@ -975,12 +975,12 @@ describe('Game: деньги на карте', () => {
   })
   it('баннер — только батарея и непрочитанные; банк, мама, Авито — карточки в ленте (#287)', () => {
     const { game } = makeGame()
-    for (const [icon, app] of [['🏦', 'Банк'], ['🏦', 'МФО'], ['👩', 'Мама'], ['🛒', 'Авито']]) game.notify(icon, app, `${app}: текст`)
+    for (const [icon, app] of [['🏦', 'Банк'], ['🏦', 'МФО'], ['👩', 'Мама'], ['🛒', 'Авито']]) game.notify(icon, app, `${app}: текст`, { event: 'life' })
     expect(game.ui.notif).toBeNull()
     expect(cards(game).map((c) => c.app)).toEqual(['Банк', 'МФО', 'Мама', 'Авито'])
     game.S.battery = 16
     game.battery.drain(1)
-    game.notify('💬', 'Алик Воздухонесян', '3 новых сообщения')
+    game.notify('💬', 'Алик Воздухонесян', '3 новых сообщения', { event: 'unread' })
     const shown: string[] = []
     while (game.ui.notif) { shown.push(game.ui.notif.text); game.dismissNotif() }
     expect(shown).toEqual(['Низкий заряд батареи: 15%', '3 новых сообщения'])
@@ -989,7 +989,7 @@ describe('Game: деньги на карте', () => {
   it('очередь баннеров: предел — самое старое уходит (#272)', () => {
     const { game } = makeGame()
     const texts = ['раз', 'два', 'три', 'четыре', 'пять', 'шесть', 'семь']
-    for (const t of texts) game.notify('💬', 'Алик Воздухонесян', t)
+    for (const t of texts) game.notify('💬', 'Алик Воздухонесян', t, { event: 'unread' })
     const shown: string[] = []
     while (game.ui.notif) { shown.push(game.ui.notif.text); game.dismissNotif() }
     expect(shown).toHaveLength(1 + Game.NOTIF_QUEUE_MAX)

@@ -23,7 +23,7 @@ export const billRules: R[] = [
       const bill = BILLS.find((b) => b.id === id)!
       if (bill.skip?.(game.S.mem)) return
       game.rules.applyOps([set(billDue(id), true)], {})
-      game.notify('🏦', 'Банк', `Завтра списание: ${bill.label}, ${bill.amount.toLocaleString('ru-RU')} ₽. Успейте накопить достоинство.`)
+      game.notify('🏦', 'Банк', `Завтра списание: ${bill.label}, ${bill.amount.toLocaleString('ru-RU')} ₽. Успейте накопить достоинство.`, { event: 'bank.warn' })
     },
   },
   {
