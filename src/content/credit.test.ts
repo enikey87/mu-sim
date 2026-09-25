@@ -311,7 +311,7 @@ describe('после первого дна бедность до выплаты 
     expect(game.moneyLevel()).toBe('normal')
   })
 
-  it('кривая: после первого дна баланс не выше порога «мало» до выплаты (#299)', async () => {
+  it('кривая: после первого дна передышка не поднимает баланс выше порога «мало» до выплаты (#299); выше — только деньги Алика (#322)', async () => {
     const { botTurn } = await import('../tools/bot')
     const { Game } = await import('../engine/game')
     const peaks: number[] = []
@@ -320,13 +320,23 @@ describe('после первого дна бедность до выплаты 
       let firstBottom: number | null = null
       let peak = 0
       let daysAfter = 0
+      let alik = 0 // переводы, серии, сцены — приходят целиком, их потолок не касается
+      const adjust = game.adjustMoney.bind(game)
+      game.adjustMoney = (delta, reason, opts) => {
+        const ok = adjust(delta, reason, opts)
+        if (ok && delta > 0 && game.S.mem[moneyPoor]) {
+          expect(/^(Кредит: |Авито$|Мама$|Перевод от Алика$|Выплата$|По карте$|День выплаты$)/.test(reason), `seed ${seed}: неизвестный приход «${reason}»`).toBe(true)
+          if (/Алика|Выплата|По карте/.test(reason)) alik += delta
+        }
+        return ok
+      }
       for (let i = 0; i < 200; i++) {
         await botTurn(game)
         if (game.S.mem[moneyPoor] && firstBottom == null) firstBottom = game.S.day
         if (firstBottom != null && !game.S.mem['payday.chain'] && !game.S.mem['endgame.active']) {
           daysAfter++
           peak = Math.max(peak, game.S.money)
-          expect(game.S.money, `seed ${seed} day ${game.S.day}`).toBeLessThanOrEqual(Game.MONEY_LOW)
+          expect(game.S.money, `seed ${seed} day ${game.S.day}`).toBeLessThanOrEqual(Game.MONEY_LOW + alik)
         }
         if (game.S.mem['payday.chain'] || game.S.mem['endgame.active']) break
       }
@@ -337,14 +347,22 @@ describe('после первого дна бедность до выплаты 
     console.log('balance peaks after bottom (≤9000):', peaks.join(', '))
   }, 180_000)
 
-  it('после дна кредит/продажа не поднимают баланс выше MONEY_LOW (#299)', () => {
+  it('после дна кредит/продажа не поднимают баланс выше MONEY_LOW (#299) — потолок у передышки, не у adjustMoney (#322)', () => {
     const { game } = makeGame()
     setMoney(game, 100)
     game.S.mem[moneyPoor] = true
-    expect(game.adjustMoney(30_000, 'Кредит: Всё будет')).toBe(true)
+    game.S.mem[creditOffer] = true
+    game.S.mem[creditStage] = 0
+    game.takeCredit()
     expect(game.S.money).toBe(Game.MONEY_LOW)
-    expect(game.adjustMoney(5_000, 'Авито')).toBe(true)
+    setMoney(game, 5_000)
+    game.S.mem[creditOffer] = true
+    game.sellThing('microwave')
     expect(game.S.money).toBe(Game.MONEY_LOW)
+    expect(game.relief(5_000)).toBe(0)
+    // NC: сам adjustMoney не режет — иначе сумма в тексте и на карте расходятся (#322)
+    expect(game.adjustMoney(5_000, 'Перевод от Алика')).toBe(true)
+    expect(game.S.money).toBe(Game.MONEY_LOW + 5_000)
   })
 
   it('после дна платёж по кредиту — доля от зачисленного (#299)', () => {

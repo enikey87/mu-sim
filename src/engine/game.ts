@@ -481,14 +481,10 @@ export class Game {
   moneySealed(): boolean {
     return this.debtSealed() || !!this.S.mem[memkeys.endgame.active]
   }
-  /** Единственная точка изменения S.money: строка недельной сводки + смена уровня (#287). `group` — строка сводки вместо `reason`; `onDay` — неделя срока, не день обработки (#300). */
+  /** Единственная точка изменения S.money: строка недельной сводки + смена уровня (#287). `group` — строка сводки вместо `reason`; `onDay` — неделя срока, не день обработки (#300). Сумму не режет — потолок бедности у `relief` (#322). */
   adjustMoney(delta: number, reason: string, opts?: { group?: string; onDay?: number }): boolean {
     if (this.moneySealed()) return false
     if (delta < 0 && -delta > this.S.money) return false
-    // после первого дна до выплаты приход не поднимает выше «мало»: кредит/продажа — передышка, не богатство (#299)
-    if (delta > 0 && this.S.mem[memkeys.moneyPoor]) {
-      delta = Math.min(delta, Math.max(0, Game.MONEY_LOW - this.S.money))
-    }
     if (delta === 0) return true
     const before = this.moneyLevel()
     setCount(this.S, 'money', Math.max(0, countOf(this.S, 'money') + delta))
@@ -727,17 +723,17 @@ export class Game {
       this.audio.vibrate(30)
     }
   }
+  /** Передышка после дна (кредит, Авито, мама) — до порога «мало» (#299); считается там, где пишется текст: названное и зачисленное — одно число (#322). Деньги Алика сюда не ходят. */
+  relief(amount: number): number {
+    return this.S.mem[memkeys.moneyPoor] ? Math.min(amount, Math.max(0, Game.MONEY_LOW - this.S.money)) : amount
+  }
   takeCredit(): void {
     if (this.moneySealed() || !this.S.mem[creditOffer]) return
     const stage = Number(this.S.mem[creditStage] ?? 0)
     const loan = nextLoan(stage)
     if (!loan) return
-    let amount = loan.amount
-    if (this.S.mem[memkeys.moneyPoor]) {
-      const room = Math.max(0, Game.MONEY_LOW - this.S.money)
-      if (room === 0) return
-      amount = Math.min(amount, room)
-    }
+    const amount = this.relief(loan.amount)
+    if (amount === 0) return
     const payment = amount === loan.amount ? loan.payment : Math.max(1, Math.round(loan.payment * amount / loan.amount))
     this.rules.applyOps([
       set(creditOffer, false),
@@ -752,8 +748,10 @@ export class Game {
     if (this.moneySealed() || !this.S.mem[creditOffer]) return
     const thing = id ? THINGS.find((t) => t.id === id) : nextThing(this.S.mem)
     if (!thing || this.S.mem[sold(thing.id)]) return
+    const got = this.relief(thing.amount)
+    if (got === 0) return
     this.rules.applyOps([set(creditOffer, false), set(sold(thing.id), true)], {})
-    this.adjustMoney(thing.amount, 'Авито')
+    this.adjustMoney(got, 'Авито')
     // продажа могла не вытащить со дна — снова предложить, с этой причиной
     if (this.moneyLevel() === 'bottom') this.maybeCreditOffer(`Продано, а остаток ${this.rub(this.S.money)}`)
   }
@@ -773,8 +771,10 @@ export class Game {
         if (!this.S.mem[loanTaken(loan.id)]) return
         result = `${loan.id === 'micro' ? 'Микрозайм' : 'Кредит'} взят: +${this.rub(this.S.money - before)}. Баланс: ${this.rub(this.S.money)}`
       } else if (pick === 'sell' && m.offer.sell && thing) {
+        const before = this.S.money
         this.sellThing(thing.id)
-        result = `${thing.done}. +${this.rub(thing.amount)}. Баланс: ${this.rub(this.S.money)}`
+        if (!this.S.mem[sold(thing.id)]) return
+        result = `${thing.done}. +${this.rub(this.S.money - before)}. Баланс: ${this.rub(this.S.money)}`
       } else if (pick === 'later') {
         this.rules.applyOps([set(creditOffer, false), set(creditDeclined, true)], {})
         result = 'Не сейчас'
@@ -795,11 +795,13 @@ export class Game {
       this.notify('👩', 'Мама', MOM_DONE_TEXT)
       return
     }
+    const got = this.relief(help.amount)
+    if (got === 0) return
     this.rules.applyOps([set(momHelp(help.id), true)], {})
-    this.adjustMoney(help.amount, 'Мама')
+    this.adjustMoney(got, 'Мама')
     const done = !nextMom(this.S.mem)
     if (done) this.rules.applyOps([set(momDone, true)], {})
-    this.notify('👩', 'Мама', help.text, done ? { lines: [MOM_DONE_TEXT] } : undefined)
+    this.notify('👩', 'Мама', help.text.replace('{sum}', this.rub(got)), done ? { lines: [MOM_DONE_TEXT] } : undefined)
   }
   /** Закрыть кнопки допработ в ленте (после Дня выплаты). */
   sealOpenJobs(): void {
