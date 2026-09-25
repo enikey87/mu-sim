@@ -122,12 +122,12 @@ describe('матрица: кнопка по роду и горизонту — �
     expect(checked, 'кнопок в матрице меньше известных — проверка пустеет').toBeGreaterThan(400)
   })
 
-  it('акты кнопок — существующие promiseCheck / promiseOk: у каждой уже есть ответ Алика; иронию за согласие не принять', async () => {
+  it('у каждой кнопки срока свой акт, и он не совпадает с актом согласия, если кнопка — не согласие', async () => {
     const acts: Record<string, Set<string>> = {}
     for (const [, w] of terms()) for (const b of buttons(await said(w), 2)) (acts[b.rule] ??= new Set()).add(String(b.act))
     expect(Object.fromEntries(Object.entries(acts).map(([rule, a]) => [rule, [...a]]))).toEqual({
-      Opt_WhenOk: ['promiseOk'], Opt_WhenCheck: ['promiseCheck'], Opt_WhenPencil: ['promiseOk'], Opt_WhenFar: ['promiseCheck'],
-      Opt_When_never: ['promiseCheck'], Opt_When_absurd: ['promiseCheck'],
+      Opt_WhenOk: ['promiseOk'], Opt_WhenCheck: ['promiseCheck'], Opt_WhenPencil: ['promisePencil'], Opt_WhenFar: ['promiseFar'],
+      Opt_When_never: ['promiseNever'], Opt_When_absurd: ['promiseNever'],
     })
   })
 })
@@ -171,7 +171,7 @@ describe('игрок видит кнопки настоящим путём', () 
       const shown = new Set<string>()
       for (let i = 0; i < 60; i++) {
         g.S.choices = null
-        for (const c of g.buildChoices()) if (c.act === 'promiseOk' || c.act === 'promiseCheck') shown.add(c.text)
+        for (const c of g.buildChoices()) if (c.act?.startsWith('promise')) shown.add(c.text)
       }
       expect(shown.size, what).toBeGreaterThan(0)
       for (const text of shown) expect(pools.some((k) => fromPool(k, text)), `${what}: ${text}`).toBe(true)

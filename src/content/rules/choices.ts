@@ -98,9 +98,9 @@ export const choiceRules: R[] = [
     return [
       when({ name: 'WhenOk', when: near, weight: 0.4, act: 'promiseOk', tone: 'polite', text: (g, f) => fromD(g, f['ctx.whenDate'] ? 'P_WHEN_OK' : 'P_WHEN_OK_EVENT', args(f)) }),
       when({ name: 'WhenCheck', when: near, weight: 0.6, act: 'promiseCheck', tone: 'neutral', text: (g, f) => fromD(g, 'P_WHEN', args(f)), arg: (_g, f) => String(f['ctx.when']) }),
-      when({ name: 'WhenPencil', when: [...term, eq('ctx.whenHorizon', 'far')], act: 'promiseOk', tone: 'neutral', text: (g, f) => fromD(g, 'P_WHEN_PENCIL', args(f)) }),
-      when({ name: 'WhenFar', when: [...term, eq('ctx.whenHorizon', 'veryFar')], act: 'promiseCheck', tone: 'neutral', text: (g, f) => fromD(g, 'P_WHEN_FAR', args(f)), arg: (_g, f) => String(f['ctx.when']) }),
-      ...(['never', 'absurd'] as const).map((kind) => when({ name: `When_${kind}`, when: [...term, eq('ctx.whenKind', kind)], act: 'promiseCheck', tone: 'neutral', text: (g, f) => fromD(g, 'P_WHEN_NEVER', args(f)), arg: (_g, f) => String(f['ctx.when']) })),
+      when({ name: 'WhenPencil', when: [...term, eq('ctx.whenHorizon', 'far')], act: 'promisePencil', tone: 'neutral', text: (g, f) => fromD(g, 'P_WHEN_PENCIL', args(f)) }),
+      when({ name: 'WhenFar', when: [...term, eq('ctx.whenHorizon', 'veryFar')], act: 'promiseFar', tone: 'neutral', text: (g, f) => fromD(g, 'P_WHEN_FAR', args(f)), arg: (_g, f) => String(f['ctx.when']) }),
+      ...(['never', 'absurd'] as const).map((kind) => when({ name: `When_${kind}`, when: [...term, eq('ctx.whenKind', kind)], act: 'promiseNever', tone: 'neutral', text: (g, f) => fromD(g, 'P_WHEN_NEVER', args(f)), arg: (_g, f) => String(f['ctx.when']) })),
     ]
   })(),
 
