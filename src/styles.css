@@ -73,10 +73,17 @@ body {
   border-bottom: 1px solid rgba(0, 0, 0, .06);
 }
 .avatar {
+  position: relative;
   width: 40px; height: 40px; border-radius: 50%;
   background: linear-gradient(135deg, #f0a24a, #d2553a);
   color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 18px;
 }
+/* усы Алика — часть прежнего аватара; после ставки (#350) и у барана их нет */
+.avatar::after {
+  content: ''; position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
+  width: 20px; height: 7px; background: #4a2c1a; border-radius: 0 0 14px 14px / 0 0 10px 10px;
+}
+.avatar.shaved::after, .avatar.ram::after { content: none; }
 .avatar.ram { background: #cfe3f2; font-size: 24px; }
 .who { flex: 1; min-width: 0; }
 .name { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

@@ -5,7 +5,7 @@ import { ACH } from '../content/achievements'
 import { ARCS } from '../content/arcs'
 import { ENDINGS } from '../content/finales'
 import { SPEND } from '../content/life'
-import { payday } from '../content/memkeys'
+import { alikShaved, payday } from '../content/memkeys'
 import { fmtDate } from '../engine/time'
 import { START_MONEY } from '../engine/state'
 import { spec } from '../engine/rules'
@@ -81,6 +81,8 @@ export type View = {
   day: number
   debt: number
   ram: boolean
+  /** Усы сбриты по ставке — аватар без усов, пока факт живёт (~40 дней). */
+  shaved: boolean
   muted: boolean
   sceneId: string | null
   payday: PaydayView
@@ -109,6 +111,7 @@ export const viewOf = (u: GameUi): View => {
     day: S.day,
     debt: S.debt,
     ram: S.ram,
+    shaved: !!S.mem[alikShaved],
     muted: S.muted,
     sceneId: S.scene?.id ?? null,
     payday:

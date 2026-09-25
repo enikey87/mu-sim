@@ -18,7 +18,7 @@ export function ChatHeader({ onInfo }: { onInfo: () => void }) {
   const v = viewOf(game)
   return (
     <header className="chat-head">
-      <div className={'avatar' + (v.ram ? ' ram' : '')} id="avatar">{v.ram ? '🐏' : 'А'}</div>
+      <div className={'avatar' + (v.ram ? ' ram' : v.shaved ? ' shaved' : '')} id="avatar">{v.ram ? '🐏' : 'А'}</div>
       <div className="who">
         <div className="name">Алик Воздухонесян</div>
         <div className={'status ' + game.ui.status.cls} id="status">{game.ui.status.text}</div>
