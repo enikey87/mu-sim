@@ -60,6 +60,14 @@ export const storyRules: R[] = [
       await game.playArc('collectors')
     },
   },
+  // начатая линия идёт своим битом по факту прошлой серии, а не общей лотереей Beat_Arc: иначе две трети партий
+  // не доходят до перевербовки до Дня выплаты (#324). Шанс 0,5 при серии раз в ≥ 3 дня — развязка за ~2–3 недели
+  {
+    name: 'Beat_CollectorsNext', event: 'StoryBeat',
+    when: [gte('arc.collectors', 1), is('collectorsCanAdvance'), missing(endgame.active)],
+    odds: 0.5, cooldown: { turns: 2 },
+    respond: ({ game }) => game.playArc('collectors'),
+  },
   { name: 'Beat_FirstArc', event: 'StoryBeat', when: [gte('sent', 3), lte('arcsStarted', 0), is('arcAvailable')], odds: 0.5, priority: 'chatter', respond: async ({ game }) => { const id = game.nextArc(); if (id) await game.playArc(id) } },
   // идущие сериалы продолжаются и между «обычными» ходами — не реже серии в ~8 ходов
   { name: 'Beat_Arc', event: 'StoryBeat', when: [gte('arcsStarted', 1), is('arcAvailable')], specificity: 0, odds: 0.14, cooldown: { turns: 4 }, priority: 'chatter', respond: async ({ game }) => { const id = game.nextArc(); if (id) await game.playArc(id) } },

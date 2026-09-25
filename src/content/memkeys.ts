@@ -132,7 +132,7 @@ export const EVENT_KEY_LIST = [
   'moneyNormal', 'moneyLow', 'moneyBottom', 'paymentDueTomorrow',
   'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sorrySwing', 'promiseLive', 'promiseStake',
   'period', 'night', 'offline', 'scene', 'sinceAlik', 'lateCount', 'arcAvailable',
-  'arcsStarted', 'arcsDone', 'quests', 'callbackReady', 'arcUnfinished', 'deathCanAdvance',
+  'arcsStarted', 'arcsDone', 'quests', 'callbackReady', 'arcUnfinished', 'deathCanAdvance', 'collectorsCanAdvance',
   'intent', 'tone', 'arg', 'category', 'arc', 'argArcDone', 'greet', 'promise', 'somedayCount',
 ] as const
 export type EventKey = (typeof EVENT_KEY_LIST)[number]
