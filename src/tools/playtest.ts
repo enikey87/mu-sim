@@ -65,7 +65,7 @@ export const deathGated = (rules: readonly Rule<Game>[]): string[] => rules.filt
 export const DEATH_GATED: readonly string[] = deathGated(allRules)
 
 /** Ложные условия самой строки уведомления: `holds` — разбор выборщика, иначе именованные врут. */
-function notifFails(game: Game, app: string, text: string): string[] {
+export function notifFails(game: Game, app: string, text: string): string[] {
   const entry = NOTIF.find((n) => n.app === app && n.t === text)
   if (!entry) return []
   return (entry.when ?? []).filter((c) => !game.holds(c)).map((c) => c.key)

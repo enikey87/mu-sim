@@ -13,7 +13,7 @@ import { ARCS, ARC_DONE, CAST, type Episode, GROUP, GROUP_OOPS, WRONG_TO, WRONG_
 import * as L from '../content/life'
 import { ACH } from '../content/achievements'
 import { SPEAKS, meet } from '../content/world'
-import { ALIK_STATUS, FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_HIDDEN, STATUS_WANDER, OATH_FORMS, OATH_STAKE_MOUSTACHE } from '../content/misc'
+import { ALIK_STATUS, BLOOD_PAY, FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_HIDDEN, STATUS_WANDER, OATH_FORMS, OATH_STAKE_MOUSTACHE } from '../content/misc'
 import { STARTS } from '../content/quests'
 import { BILLS, billDue, billDueAt, billStreak, billUnpaid, lightOff, netRation, phoneWarn, type BillId } from '../content/bills'
 import {
@@ -1100,18 +1100,23 @@ export class Game {
     else this.emit()
   }
   randomNotif(): void {
-    const p = this.linePicked('NOTIF', L.NOTIF)
+    // remember после notify: плейтест судит when до факта строки (#339)
+    const p = this.lines.pick('NOTIF', L.NOTIF, this.lineFacts())
     if (!p) return
+    this.lines.mark(p.id)
+    this.seen.mark(p.text)
     const n = p.spec as L.Notif
     if (n.spend) {
-      if (this.moneySealed()) return // после выплаты мелочь не шумит «недостаточно» (#252)
-      const spend = 90 + this.rnd(40) * 10
-      const why = this.draw('SPEND', L.SPEND)
-      // отказ не молчит (#185), но мелочь — строка сводки, а не карточка (#287)
-      if (!this.adjustMoney(-spend, why, { group: 'По мелочи' })) this.bankLine('По мелочи', -spend, true)
-      return
+      if (!this.moneySealed()) { // после выплаты мелочь не шумит «недостаточно» (#252)
+        const spend = 90 + this.rnd(40) * 10
+        const why = this.draw('SPEND', L.SPEND)
+        // отказ не молчит (#185), но мелочь — строка сводки, а не карточка (#287)
+        if (!this.adjustMoney(-spend, why, { group: 'По мелочи' })) this.bankLine('По мелочи', -spend, true)
+      }
+    } else {
+      this.notify(n.icon, n.app, p.text)
     }
-    this.notify(n.icon, n.app, p.text)
+    if (p.spec.remember) this.rules.applyOps(p.spec.remember, {})
   }
   // ---------- телефон: что Game делает по событиям Battery ----------
   private onPhoneDead(): void {
@@ -1555,7 +1560,12 @@ export class Game {
         await this.sleep(600)
         if (this.disposed) return
         // без fallback: он проходит через украшение реплик Алика и получает обращение («Сынок, слушай, вы полежали…»)
-        this.sys(this.line('FLOOR', FLOOR) ?? 'Вы полежали на полу. Терпение восстановлено.')
+        const floor = this.linePicked('FLOOR', FLOOR)
+        // «за деньги» — поступление; adjustMoney без потолка бедности (как Алик), сумма под дном (#339/#279)
+        if (floor?.spec.remember?.some((o) => o.key === memkeys.bloodGiven && o.op === '=' && o.value === true)) {
+          this.adjustMoney(BLOOD_PAY, 'Донорский центр')
+        }
+        this.sys(floor?.text ?? 'Вы полежали на полу. Терпение восстановлено.')
         S.patience = MAX_PATIENCE
         this.unlock('floor')
       }
