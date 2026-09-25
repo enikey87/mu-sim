@@ -12,7 +12,7 @@ import { valueOf } from '../engine/rules'
 
 /** Факты контекста последней реплики — facts() кладёт их все на каждый fire; сверка — factkeys.test.ts. */
 export const CTX_KEYS: readonly string[] = [
-  'topic', 'type', 'amount', 's', 'shortTimey', 'when', 'whenNever', 'whenFresh', 'whenDate', 'rel', 'relYou',
+  'topic', 'type', 'amount', 's', 'shortTimey', 'when', 'whenNever', 'whenFresh', 'whenDate', 'whenKind', 'whenDays', 'whenHorizon', 'rel', 'relYou',
   'sad', 'festive', 'revived', 'constr', 'legendary', 'arc', 'quote', 'arcCanAdvance', 'legend', 'chorus', 'memory',
   'group', 'wrong', 'deleted', 'offended',
 ]

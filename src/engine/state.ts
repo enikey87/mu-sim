@@ -41,6 +41,14 @@ export interface Ctx {
   s?: string
   when?: string
   whenNever?: boolean
+  /** Род срока — из разметки срока, а не из числа в тексте (docs/design/deadline-replies.md). */
+  whenKind?: 'clear' | 'dodge' | 'event' | 'holiday' | 'never' | 'absurd'
+  /** Дней до срока от текущего дня — нет у «никогда» и абсурда. */
+  whenDays?: number
+  /** near — до 7 дней, far — до 30, veryFar — дальше; нет у «никогда» и абсурда. */
+  whenHorizon?: 'near' | 'far' | 'veryFar'
+  /** Дата срока — только у ясного срока и увёртки (сам срок, а не день обещания). */
+  whenDate?: string
   /** Игровой день, в который Алик назвал срок — варианты игрока сверяются с календарём. */
   whenMade?: number
   /** Абсолютный день срока (`null` — «когда-нибудь»). */

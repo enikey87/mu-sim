@@ -1,6 +1,6 @@
 // Игра: состояние, сообщения, ход Алика, «живость». Решения — что ответить, что предложить игроку,
 // что сделать Алику — принимает система правил (engine/rules/, content/rules/*).
-import { make, D, low, cap, type ExcuseApi, type Promise3, type PromiseCondition, type Rel } from '../content/excuses'
+import { make, D, low, cap, type ExcuseApi, type Promise3, type PromiseCondition, type Rel, type When } from '../content/excuses'
 import { makeScenes, invKey, type Scene, type Line } from '../content/scenes'
 import { COLD_WAR, TRIBUNAL } from '../content/rude'
 import { MIRROR, MIRROR_AGAIN, MIRROR_OPEN, MIRROR_REPLY, type Mirror } from '../content/mirror'
@@ -45,8 +45,8 @@ import { type Audio, silentAudio } from './audio'
 import { typo } from './typo'
 import { UiState, type Moo, type Notif, type SendFeel } from './ui-state'
 import { classifyUserInput, legalClaim, type ClassifiedInput } from './input'
-import { holidayOf, HOLIDAY_EXCUSES } from '../content/holidays'
-import { dueIn, dateOf, fmtDate, fmtDayMonth, fmtTime, nightHour, periodOf, tierOf, TIERS, type Due, type Period } from './time'
+import { holidayOf, HOLIDAY_EXCUSES, holidayDays } from '../content/holidays'
+import { dueIn, dateOf, fmtDate, fmtDayMonth, fmtTime, nightHour, periodOf, tierOf, TIERS, type Period } from './time'
 import { type GameState, type Msg, type NewMsg, type Choice, type Ctx, type Tone, type Storage, type InputCategory, freshState, loadState, saveState, SAVE_KEY, LEND50_SEEN_KEY, MAX_PATIENCE, isLate, countOf, setCount, type PromiseRec } from './state'
 
 /** Текст срока как буквальный шаблон без учёта регистра; кэш — topicOfLast зовётся из facts() на каждую реплику. */
@@ -1007,7 +1007,7 @@ export class Game {
         if (c.whenMade != null) return c.whenMade >= S.day
         return false
       })(),
-      'ctx.whenDate': c.when != null ? fmtDayMonth(c.whenMade ?? S.day) : undefined,
+      'ctx.whenDate': c.whenDate, 'ctx.whenKind': c.whenKind, 'ctx.whenDays': c.whenDays, 'ctx.whenHorizon': c.whenHorizon,
       'ctx.rel': c.rel?.n, 'ctx.relYou': c.rel?.you ?? c.rel?.n, 'ctx.sad': c.sad, 'ctx.festive': c.festive, 'ctx.revived': c.revived,
       'ctx.constr': c.constr, 'ctx.legendary': c.legendary, 'ctx.arc': c.arc, 'ctx.quote': c.quote,
       // спросить про сериал есть смысл: будет новая серия, или сериал закончен и сегодня про финал ещё не спрашивали
@@ -1359,7 +1359,7 @@ export class Game {
   meetRel(r?: Rel): void {
     if (r?.id) this.rules.applyOps(meet(r.id), {})
   }
-  recordPromise(p?: { text: string; d: number | null; due?: Due; condition?: PromiseCondition; tomorrow?: boolean } | null): void {
+  recordPromise(p?: (Partial<When> & { text: string; d: number | null }) | null): void {
     if (!p) return
     if (p.condition && this.S.mem[p.condition] === true) return
     if (p.tomorrow) this.rules.applyOps([set(memkeys.saidTomorrow, true)], {})
@@ -1369,11 +1369,15 @@ export class Game {
     if (due !== null && due > this.S.day) this.scheduleEvent(due, 'PromiseDue', { promise: this.S.promises.length - 1 })
     if (this.S.promises.length >= 20) this.unlock('promises20')
   }
-  private alignPromise(p: Promise3, until: string, condition?: PromiseCondition): Promise3 {
-    p.text = p.text.replace(p.t, until)
-    p.t = until
+  private alignPromise(p: Promise3, until: When, condition?: PromiseCondition): Promise3 {
+    p.text = p.text.replace(p.t, until.t)
+    p.t = until.t
     p.d = null
-    p.due = undefined
+    p.due = until.due
+    p.kind = until.kind
+    p.est = until.est
+    p.state = until.state
+    p.holiday = until.holiday
     p.condition = condition
     p.tomorrow = undefined // срок из легенды — не «завтра»: иначе said.tomorrow без слова «завтра»
     return p
@@ -1403,8 +1407,43 @@ export class Game {
   }
   ctxFromPromise(p?: Promise3): Ctx {
     if (!p) return {}
+    const days = this.promiseDays(p)
     const due = p.d == null ? null : this.S.day + (p.due ? dueIn(p.due, this.S.day) : p.d)
-    return { when: p.t, whenNever: p.d == null, whenMade: this.S.day, whenDue: due }
+    return {
+      when: p.t, whenNever: p.d == null, whenMade: this.S.day, whenDue: due,
+      whenKind: p.kind,
+      whenDays: days ?? undefined,
+      whenHorizon: days == null ? undefined : days <= 7 ? 'near' : days <= 30 ? 'far' : 'veryFar',
+      // дата — срок, и только у ясного срока и увёртки: у события и праздника в кнопке даты нет
+      whenDate: days != null && (p.kind === 'clear' || p.kind === 'dodge') ? fmtDayMonth(this.S.day + days) : undefined,
+    }
+  }
+
+  /** Горизонт срока — дней от сегодня до него; нет у «никогда» и абсурда. */
+  private promiseDays(p: Pick<Promise3, 'kind' | 'd' | 'due' | 'est' | 'state' | 'holiday'>): number | null {
+    if (p.kind === 'clear' || p.kind === 'dodge') return p.due ? dueIn(p.due, this.S.day) : p.d
+    if (p.kind === 'event') {
+      if (p.state) {
+        const left = this.stateLeft(p.state)
+        if (left != null) return left
+      }
+      return p.est ?? null
+    }
+    if (p.kind === 'holiday') return p.holiday ? holidayDays(p.holiday, this.S.day) : null
+    return null
+  }
+
+  /** Остаток идущего состояния мира со сроком (снятие — записью restore в расписании правил). */
+  private stateLeft(state: { key?: string; actor?: string; prefix?: string }): number | null {
+    const day = this.S.day
+    let best: number | null = null
+    for (const x of this.S.rules.schedule) {
+      if (x.kind !== 'restore' || x.at <= day) continue
+      const keyOk = state.key !== undefined ? x.key === state.key : x.key.startsWith(state.prefix ?? '')
+      if (!keyOk || (state.actor !== undefined && x.actor !== state.actor)) continue
+      if (best === null || x.at < best) best = x.at
+    }
+    return best === null ? null : best - day
   }
 
   // ---------- ход Алика ----------
@@ -1548,7 +1587,7 @@ export class Game {
       text = m.text.slice(0, at) + repl + m.text.slice(at + p.t.length)
       const rec = this.S.promises[this.S.promises.length - 1]
       if (rec && rec.t.includes(p.t)) { rec.t = rec.t.replace(p.t, w); rec.due = null }
-      this.S.ctx = { ...this.S.ctx, when: w, whenNever: true, whenMade: this.S.day, whenDue: null }
+      this.S.ctx = { ...this.S.ctx, when: w, whenNever: true, whenKind: 'never', whenDays: undefined, whenHorizon: undefined, whenDate: undefined, whenMade: this.S.day, whenDue: null }
     } else {
       text = m.text.replace(/[.!]?$/, this.draw('EDIT_SUFFIX', L.EDIT_SUFFIX) + '.')
     }
