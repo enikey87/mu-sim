@@ -13,7 +13,7 @@ import { P_LIE } from '../lies'
 import { TOPICS } from '../topics'
 import { WORLD, SPEAKS, needs } from '../world'
 import { fmtDayMonth, fmtDays } from '../../engine/time'
-import { HEAT, alikDead, blocked, court, lie, mourning } from '../memkeys'
+import { HEAT, alikDead, alikShaved, moustacheAskAt, blocked, court, lie, mourning } from '../memkeys'
 
 type R = Rule<Game, GameEvent, Offer>
 
@@ -64,6 +64,21 @@ export const choiceRules: R[] = [
   offer({ name: 'Via_karine', slot: 'via', when: [is(blocked), WORLD.karineHome, WORLD.karine], act: 'via', arg: () => 'karine', tone: 'polite', bonus: 6, text: (g) => g.draw('P_VIA_KARINE', ['Карине, передайте Алику: я извиняюсь', 'Попросить Карине передать извинения']) }),
   offer({ name: 'Via_mama', slot: 'via', when: [is(blocked)], act: 'via', arg: () => 'mama', tone: 'polite', bonus: 6, text: (g) => g.draw('P_VIA_MAMA', ['Попросить маму Алика передать извинения']) }),
   offer({ name: 'Moo', when: [is('ctx.offended'), gte(HEAT, 1)], odds: 0.5, act: 'moo', tone: 'neutral', bonus: 4, text: (g) => fromArr(g, 'P_MOO', ['Мууу.', 'Мууууу 🐄', 'Му. (Это значит «мир».)']) }),
+
+  // пока усы отрастают — подколоть Алика (#352); не чаще раза в 5 дней после вопроса
+  {
+    name: 'Opt_Moustache', event: 'BuildChoices', when: [is(alikShaved)], bonus: 2,
+    slot: 'moustache',
+    offer: ({ game }) => {
+      if (game.S.day - Number(game.S.mem[moustacheAskAt] ?? -99) < 5) return null
+      const text = freshFromArr(game, 'P_MOUSTACHE', [
+        'Алик, как усы?',
+        'Алик, усы отрастают?',
+        'Ну что, усы?',
+      ])
+      return text ? { text, tone: 'neutral' as const, act: 'moustacheAsk' } : null
+    },
+  },
 
   // ответ на то, ЧТО прислал Алик
   offer({ name: 'Photo', when: [eq('ctx.type', 'photo')], act: 'photo', tone: 'neutral', bonus: 3, text: (g) => fromD(g, 'P_PHOTO') }),

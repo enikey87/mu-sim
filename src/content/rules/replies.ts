@@ -2,7 +2,7 @@
 // Общее правило по intent + более специфичные для частных случаев (память, контекст).
 import type { Game } from '../../engine/game'
 import { fmtDays } from '../../engine/time'
-import { type Rule, eq, ne, is, gte, add, valueOf } from '../fact'
+import { type Rule, eq, ne, is, gte, add, set, valueOf } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { AlikOffline, ThickJournal } from './criteria'
 import { cooldown } from './rude'
@@ -14,7 +14,8 @@ import { ARCS, NO_NEWS_A, NO_NEWS_B, GROUP_SEEN_A, GROUP_SEEN_B, WRONG_A, WRONG_
 import * as L from '../life'
 import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, PROMISE_PENCIL, PROMISE_FAR } from '../misc'
 import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_SENT, LIE_THIRD, LIE_NOCRED } from '../lies'
-import { HEAT, asked, caughtCount, count, doneAsked, finaleOf, lie, nextTransfer, topic, topicMute } from '../memkeys'
+import { HEAT, alikShaved, moustacheAskAt, asked, caughtCount, count, doneAsked, finaleOf, lie, nextTransfer, topic, topicMute } from '../memkeys'
+import { PROMISE_SHAVE_ASK } from '../world'
 
 type R = Rule<Game, GameEvent, Offer>
 const says = (intent: string, rest: Partial<R> & Pick<R, 'respond'>, extra: R['when'] = []): R => ({
@@ -102,6 +103,14 @@ export const replyRules: R[] = [
   says('legendQ', { respond: async ({ game }) => { game.mood(1); await game.say([game.uniq(game.X.legendQ)]); game.setCtx(null) } }),
   says('shortQ', { respond: async ({ game, facts }) => { await game.say([game.uniq(() => game.X.shortQ(String(facts.arg ?? '')))]); game.setCtx(null) } }),
   simple('short2', (g) => g.pair('SHORT2_A', D.SHORT2_A, 'SHORT2_B', D.SHORT2_B)),
+
+  says('moustacheAsk', {
+    respond: async ({ game }) => {
+      game.rules.applyOps([set(moustacheAskAt, game.S.day)], {})
+      await game.say([game.uniq(() => game.draw('PROMISE_SHAVE_ASK', PROMISE_SHAVE_ASK))])
+      game.setCtx(null)
+    },
+  }, [is(alikShaved)]),
 
   says('promiseCheck', { respond: async ({ game, facts }) => { await game.say([game.uniq(() => game.X.promiseCheck(String(facts.arg ?? '')))]); game.setCtx(null) } }),
   says('promiseOk', { respond: async ({ game }) => { await game.say([game.uniq(() => game.draw('PROMISE_OK', D.PROMISE_OK))]); game.setCtx(null) } }),
