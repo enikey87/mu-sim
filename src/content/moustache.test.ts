@@ -103,7 +103,7 @@ describe('ставка «усы»', () => {
     game.linePicked = (key, pool, o) => {
       if (key === 'OATH_FORMS') {
         const s = stakeForm()
-        return { text: s.t, spec: s, id: s.id }
+        return { text: s.t, spec: s, id: s.id ?? 'oath_stake_moustache' }
       }
       return pick(key, pool, o)
     }
