@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { browserAudio } from './audio'
+import { browserAudio, mooVoice, MOO_VOL, type MooContext } from './audio'
+import { renderOffline, level } from '../test/offline-audio'
 
 describe('browserAudio.dispose', () => {
   afterEach(() => {
@@ -129,7 +130,7 @@ describe('browserAudio.moo', () => {
     vi.restoreAllMocks()
   })
 
-  it('один путь синтеза: один осциллятор через lowpass, речи нет, громкость не выше прежней', () => {
+  it('один путь синтеза: один осциллятор через lowpass, речи нет', () => {
     const { heard, speak } = stubAudio()
     const audio = browserAudio()
     audio.unlock()
@@ -139,7 +140,6 @@ describe('browserAudio.moo', () => {
     expect(heard.osc[0].from).toBeGreaterThan(110) // ориентир 120 Гц
     expect(heard.osc[0].to).toBeLessThan(heard.osc[0].from) // частота идёт вниз
     expect(heard.filters).toEqual([{ type: 'lowpass', freq: 700 }])
-    expect(Math.max(...heard.gains)).toBeLessThanOrEqual(0.25) // прежняя громкость cow(0.25)
     expect(speak).not.toHaveBeenCalled() // синтеза речи поверх «Мууу» больше нет
   })
 
@@ -207,5 +207,70 @@ describe('browserAudio.жест страницы', () => {
     const afterReset = browserAudio() // новая игра — новый экземпляр
     afterReset.moo() // «Мууу» интро не должно срезаться гейтом жеста
     expect(made.length).toBeGreaterThan(0)
+  })
+})
+
+/** Прежний «Мууу» до #243 (`cow(0.25)` из c7aeff1^, без синтеза речи поверх) — эталон уровня для #282. */
+function oldCow(c: MooContext, t: number, vol: number, rnd: () => number) {
+  const dur = 1.4 + rnd() * 1.2
+  const out = c.createGain()
+  out.gain.setValueAtTime(0.0001, t)
+  out.gain.exponentialRampToValueAtTime(vol, t + 0.25)
+  out.gain.setValueAtTime(vol, t + dur - 0.4)
+  out.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+  out.connect(c.destination)
+  const f0 = 95 + rnd() * 30
+  for (const k of [1, 1.005]) {
+    const o = c.createOscillator(); o.type = 'sawtooth'
+    o.frequency.setValueAtTime(f0 * k, t)
+    o.frequency.linearRampToValueAtTime(f0 * 1.25 * k, t + dur * 0.35)
+    o.frequency.linearRampToValueAtTime(f0 * 0.8 * k, t + dur)
+    for (const [freq, q] of [[320, 4], [800, 6]]) {
+      const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = q
+      o.connect(f).connect(out)
+    }
+    o.start(t); o.stop(t + dur)
+  }
+}
+
+describe('«Мууу»: выходной уровень (#282)', () => {
+  // разброс длины и высоты: крайние и средние значения генератора
+  const R = [0, 0.25, 0.5, 0.75, 0.999]
+  const at = (build: (c: MooContext, rnd: () => number) => void) => R.map((r) => level(renderOffline((c) => build(c, () => r), 3)))
+
+  it('рендер откалиброван: синус, пила, lowpass и полоса дают расчётные уровни', () => {
+    const tone = (type: OscillatorType, hz: number, filter?: [BiquadFilterType, number, number]) => level(renderOffline((c) => {
+      const o = c.createOscillator(); o.type = type; o.frequency.value = hz
+      const g = c.createGain(); g.gain.value = 0.5
+      if (filter) {
+        const f = c.createBiquadFilter(); f.type = filter[0]; f.frequency.value = filter[1]; f.Q.value = filter[2]
+        o.connect(f).connect(g)
+      } else o.connect(g)
+      g.connect(c.destination)
+      o.start(0); o.stop(1)
+    }, 1))
+    expect(tone('sine', 1000).peak).toBeCloseTo(0.5, 2)
+    expect(tone('sine', 1000).rms).toBeCloseTo(0.5 / Math.SQRT2, 2)
+    expect(tone('sawtooth', 110).rms).toBeCloseTo(0.5 / Math.sqrt(3), 2)
+    expect(tone('sine', 5000, ['lowpass', 700, 1]).rms).toBeLessThan(0.5 / Math.SQRT2 / 30) // 12 дБ/окт: −33 дБ
+    expect(tone('sine', 320, ['bandpass', 320, 4]).rms).toBeCloseTo(0.5 / Math.SQRT2, 2) // центр полосы — усиление 1
+  })
+
+  it('пик и RMS нового не выше самого тихого прежнего; звук не пропал', () => {
+    const old = at((c, rnd) => oldCow(c, 0, 0.25, rnd))
+    const now = at((c, rnd) => mooVoice(c, 0, MOO_VOL, rnd))
+    const quietPeak = Math.min(...old.map((x) => x.peak)), quietRms = Math.min(...old.map((x) => x.rms))
+    expect(Math.max(...now.map((x) => x.peak))).toBeLessThanOrEqual(quietPeak)
+    expect(Math.max(...now.map((x) => x.rms))).toBeLessThanOrEqual(quietRms)
+    // пустой рендер прошёл бы «не громче» — нижняя граница: слышно, а не тишина
+    expect(Math.min(...now.map((x) => x.rms))).toBeGreaterThan(quietRms / 2)
+  }, 60_000)
+
+  it('в браузере «Мууу» звучит с тем же усилением, что измерено', () => {
+    const { heard } = stubAudio()
+    const audio = browserAudio()
+    audio.unlock()
+    audio.moo()
+    expect(Math.max(...heard.gains)).toBe(MOO_VOL)
   })
 })
