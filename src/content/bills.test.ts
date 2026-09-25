@@ -183,7 +183,7 @@ describe('платежи по календарю', () => {
     const notify = game.notify.bind(game)
     game.notify = (icon, app, text) => {
       if (/Списани/.test(text)) for (const label of Object.keys(charges)) if (text.includes(label)) charges[label]++
-      notify(icon, app, text)
+      return notify(icon, app, text)
     }
     // сроки коммуналки и проездного совпали (#183) — дальше только путь игрока: +1…3 дня за ход
     const same = Number(game.S.mem[billDueAt('rent')])
