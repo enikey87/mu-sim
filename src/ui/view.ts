@@ -159,20 +159,31 @@ export type IntroView = {
   notes: IntroNote[]
 }
 
-/** Уведомления середины интро: как в макете — обещания, стикер, банк (docs/design/intro.md). */
-export function introMidNotes(money = START_MONEY): IntroNote[] {
-  const why = SPEND.map((e) => spec(e).t).filter((t) => !/мама|Карине|Гарик|Самвел|Нуне|Борис|Грант/i.test(t))
-  const a = why[0] ?? 'Продукты'
-  const b = why.find((t) => t !== a) ?? 'Кофе с горя'
+/** Имена, которых на старте партии ещё нет — иначе уведомление интро врёт о знакомстве (#249/#321). */
+export const INTRO_UNKNOWN = /мам[аеуы]|Карине|Гарик|Самвел|Нуне|Борис|Грант|Размик|Рубик|Арсен|Гоар|Мкртич/i
+
+/** Уведомления середины интро: обещания, стикер, банк из пулов партии (docs/design/intro.md). */
+export function introMidNotes(money = START_MONEY, seed = 1): IntroNote[] {
+  const why = SPEND.map((e) => spec(e).t).filter((t) => !INTRO_UNKNOWN.test(t))
+  const i = Math.abs(seed) % Math.max(1, why.length)
+  const a = why[i] ?? 'Продукты'
+  const b = why[(i + 1) % why.length] ?? 'Кофе с горя'
   const rub = (n: number) => n.toLocaleString('ru-RU')
   const bal1 = money - 340
   const bal2 = bal1 - 128
+  const vows = [
+    'Завтра всё будет, брат',
+    'В понедельник, какой — не скажу',
+    'Деньги в пути. Путь длинный',
+  ]
+  const v0 = vows[seed % vows.length]!
+  const v1 = vows[(seed + 1) % vows.length]!
   return [
-    { icon: '💬', app: 'Алик', text: 'Завтра всё будет, брат' },
+    { icon: '💬', app: 'Алик', text: v0 },
     { icon: '💬', app: 'Алик', text: '🏗️' },
     { icon: '🏦', app: 'Банк', text: `Списание 340 ₽. ${a}. Баланс: ${rub(bal1)} ₽` },
-    { icon: '💬', app: 'Алик', text: 'В понедельник, какой — не скажу' },
-    { icon: '💬', app: 'Алик', text: 'Деньги в пути. Путь длинный' },
+    { icon: '💬', app: 'Алик', text: v1 },
+    { icon: '💬', app: 'Алик', text: vows[(seed + 2) % vows.length]! },
     { icon: '🏦', app: 'Банк', text: `Списание 128 ₽. ${b}. Баланс: ${rub(bal2)} ₽` },
   ]
 }
@@ -185,5 +196,6 @@ export const introOf = (u: GameUi): IntroView | null => {
   const me = S.msgs.find((m): m is Extract<Msg, { kind: 'text' }> => m.kind === 'text' && m.from === 'me')
   const sys = S.msgs.find((m): m is Extract<Msg, { kind: 'sys' }> => m.kind === 'sys')
   if (!alik || !me || !sys) return null
-  return { intro: alik.text, reply: me.text, gap: sys.text, day: S.day, dateAt: fmtDate, notes: introMidNotes(S.money) }
+  const seed = [...alik.text].reduce((n, c) => n + c.charCodeAt(0), 0)
+  return { intro: alik.text, reply: me.text, gap: sys.text, day: S.day, dateAt: fmtDate, notes: introMidNotes(S.money, seed) }
 }

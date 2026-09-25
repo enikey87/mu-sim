@@ -39,11 +39,13 @@ export function Intro({ data, gate, onDone }: { data: IntroView; gate: boolean; 
     if (!started) return
     const T = (ms: number, f: () => void) => timers.current.push(window.setTimeout(f, ms))
     if (reduced) {
+      // три фазы подряд: обещание → завязка → титул — без наложений (#321)
       setNotes([{ icon: '💬', app: 'Алик', text: data.intro }, { icon: '💬', app: 'Вы', text: data.reply, me: true }])
       setDays(data.day)
-      setPhase('gap')
-      T(1500, () => setPhase('title'))
-      T(3000, () => finishRef.current(false))
+      setPhase('play')
+      T(1500, () => setPhase('gap'))
+      T(3000, () => setPhase('title'))
+      T(4500, () => finishRef.current(false))
       return () => { for (const t of timers.current) clearTimeout(t) }
     }
     T(300, () => setNotes((n) => [{ icon: '💬', app: 'Алик', text: data.intro }, ...n]))
