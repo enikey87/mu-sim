@@ -256,6 +256,11 @@ describe('оракул: сторож у каждой проверки', () => {
       expect(oracle(synthetic(lines)).verdict!.violations.notif_event_repeat, t).toBeUndefined()
     }
   })
+  it('повтор предложения кредита — находка; префикс «Банк —» его не прячет (#268)', () => {
+    const offer = 'Вам одобрен кредит «Всё будет» — 30 000 ₽ под 39,9%. Всё будет. Проценты — точно'
+    const lines = [`(уведомление телефона: 🏦 Банк — ${offer})`, `(уведомление телефона: 🏦 Банк — ${offer})`]
+    expect(oracle(synthetic(lines)).verdict!.violations.notif_event_repeat).toBe(1)
+  })
   it('факты на момент сообщения: после последнего кадра — его «после», а не пустота', () => {
     const late = (mem: Record<string, unknown>) => ({ frames: [{ at: 0, before: {}, mem, said: [], fired: [] }], rules: { deathGated: [] }, coverage: {} })
     const line = ['[10:00] Алик: Вы же обещали в пятницу']
