@@ -164,6 +164,26 @@ describe('«Мууу» и корова', () => {
     await game.send({ text: 'Алик, добрый день', tone: 'polite' })
     expect(offered(game, cow)).toBe(false)
   })
+  it('после «Нива выбрала тебя» нельзя продать «Ниву» Алика — она у игрока (#256)', () => {
+    const { game } = makeGame()
+    Object.assign(game.S.mem, { 'intro.niva': true, 'niva.away': false, 'niva.player': true, 'finale.niva': 'chose' })
+    game.alikMsg({ kind: 'text', from: 'alik', text: '«Нива» у тебя сияет.', topical: true })
+    expect(game.topicOfLast()).toBe('niva')
+    const sell = /продать|Продай свою|Где сейчас «Нива»\? Я подъеду/i
+    expect(offered(game, (c) => c.act === 'topic' && sell.test(c.text))).toBe(false)
+    // без факта «у игрока» те же реплики открыты — иначе тест ничего не ловит
+    delete game.S.mem['niva.player']
+    game.S.choices = null
+    expect(offered(game, (c) => c.act === 'topic' && sell.test(c.text))).toBe(true)
+  })
+  it('свадьба игрока: «А мне когда?» закрыта; «Ануш уже дома?» открыта (#256)', () => {
+    const { game } = makeGame()
+    game.S.mem['wedding.anush'] = true
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Свадьба — пятый день. Я уже не помню, чья.', topical: true })
+    expect(game.topicOfLast()).toBe('wedding')
+    expect(offered(game, (c) => /А мне когда\?|Меня позовёте/.test(c.text))).toBe(false)
+    expect(offered(game, (c) => /Ануш уже дома/.test(c.text))).toBe(true)
+  })
 })
 
 describe('общие реплики по стадии игры', () => {

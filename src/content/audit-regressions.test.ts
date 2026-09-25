@@ -251,6 +251,7 @@ describe('регрессии раунда 16', () => {
     expect(la.remember ?? []).toEqual([])
     expect(texts(ARCS.beton.follow, { 'arc.beton': 2 })).not.toContain('Фундамент вскрыли?')
     expect(texts(PERIOD.evening, { 'wedding.samvel': true }).join(' ')).not.toMatch(/дома|футбол/)
+    expect(texts(PERIOD.evening, { 'wedding.anush': true }).join(' ')).not.toMatch(/дома|футбол/)
     expect(JSON.stringify([PERIOD, GRAND])).not.toMatch(/тамада не отпускает|ты её снимал с крыши/)
     expect(JSON.stringify(LEGENDS)).not.toMatch(/третий раз гадает/)
     expect(JSON.stringify(CLAIMS)).not.toMatch(/Вы сомневались/)

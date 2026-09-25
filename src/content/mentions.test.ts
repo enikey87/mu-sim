@@ -53,7 +53,7 @@ export const STATE: Array<[string, RegExp, string[]]> = [
   ['Гарик (фундамент)', /Гарик/, ['garikFree', 'garik.concrete', 'finale.garik']],
   ['Карине (ушла к Рубику)', /Карине|[Жж]ена сказала/, ['karineHome', 'finale.rubik']],
   ['Размик (на кране)', /Размик[^.!?]*кран|кран[^.!?]*Размик|с крана/i, ['razmikUp', 'finale.razmik']],
-  ['«Нива» (в бегах)', /Нив[аеуыо]/, ['nivaHome', 'niva.away', 'finale.niva', 'has.niva']],
+  ['«Нива» (в бегах)', /Нив[аеуыо]/, ['nivaHome', 'niva.away', 'niva.player', 'finale.niva', 'has.niva']],
 ]
 
 const atoms = (cs: readonly Criterion[]): Criterion[] => cs.flatMap((c) => (c.op === 'all' ? [c, ...atoms(c.all ?? [])] : [c]))

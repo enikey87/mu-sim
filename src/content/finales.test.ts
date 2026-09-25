@@ -117,6 +117,11 @@ describe('финалы сериалов: выбор', () => {
     toLast(b, 'niva')
     await b.playArc('niva')
     expect(b.S.items).toContain('«Нива» (сама приехала)')
+    expect(b.S.mem['niva.player']).toBe(true)
+    expect(b.S.mem['niva.away']).toBe(false)
+    const { WORLD } = await import('./world')
+    expect(b.holds(WORLD.nivaHome)).toBe(false)
+    expect(b.holds(WORLD.nivaPlayer)).toBe(true)
 
     const c = makeGame().game
     c.S.day = 300
@@ -134,6 +139,14 @@ describe('финалы сериалов: выбор', () => {
     expect(game.S.mem['finale.samvel']).toBe('groom')
     expect(game.S.mem['wedding.anush']).toBe(true)
     expect(game.S.mem['wedding.samvel']).toBeUndefined()
+    // свадьба игрока окрашивает ходы своим правилом, не Самвела (#256)
+    game.S.arcs.beton = { i: 1, last: 0 }
+    let noise = 0
+    for (let i = 0; i < 150; i++) {
+      game.S.stats.sent += 4
+      if (game.rules.match({ event: 'AlikTurn' }, game.facts())?.name === 'Turn_Wedding_Anush') noise++
+    }
+    expect(noise).toBeGreaterThan(3)
   })
   it('грубил хоть раз — в женихи не берут', async () => {
     const { game } = makeGame()

@@ -10,7 +10,7 @@ export const RARE = new Set([
   'Away_Offline', 'Court_Verdict_Lettered',
   // окно состояния или счётчик, который складывается не в каждой партии
   'Opt_Cow', 'Says_catchLie_caught2', 'Says_catchLie_liekind_grandpa',
-  'Turn_Wedding_Samvel', 'Turn_Wedding_Razmik', 'Turn_Wedding_Boris', 'Turn_BorisSick', 'Quest_q_niva',
+  'Turn_Wedding_Samvel', 'Turn_Wedding_Razmik', 'Turn_Wedding_Boris', 'Turn_Wedding_Anush', 'Turn_BorisSick', 'Quest_q_niva',
   'Says_sorry_blocked_boris',
   // частные финалы и концовки по стилю партии (z ≥ required; после #190 бот закрывает концовку)
   'Finale_grant_ally', 'Finale_alik_death_will', 'Finale_beton_corner', 'Finale_beton_opened_or',

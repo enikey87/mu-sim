@@ -1,7 +1,7 @@
 // Тексты для новых возможностей системы правил: обещания, которые наступают, хор персонажей,
 // состояния мира со сроком (свадьба, болезнь Бориса, «Алик умер»).
 import { type Criterion, type Entry, named, exists, is, eq, gte, ne, missing, set, gate } from './fact'
-import { cryptoHodl, garikConcrete, garikCut, grandpaDying, grantPaid, intro, met, mourning, nivaAway, nuneDekretOver, payday, saidFriday, saidTomorrow, alikShaved } from './memkeys'
+import { cryptoHodl, garikConcrete, garikCut, grandpaDying, grantPaid, intro, met, mourning, nivaAway, nivaPlayer, nuneDekretOver, payday, saidFriday, saidTomorrow, alikShaved, wedding } from './memkeys'
 import type { WhoId } from './ids'
 
 // Мир последователен: кто и что есть в истории и в каком оно положении — факты, их ставит серия (remember), ступень суда
@@ -70,8 +70,11 @@ export const WORLD = {
   /** Гарик вошёл в историю и сейчас не в фундаменте без связи — можно писать самому. */
   garikKnown: named('garikKnown', is(intro('garik')), missing(garikCut)),
   razmikUp: named('razmikUp', exists('arc.razmik'), missing('finale.razmik')),
-  nivaHome: named('nivaHome', missing(nivaAway)),
+  /** «Нива» у Алика: не в бегах и не у игрока (#256). */
+  nivaHome: named('nivaHome', missing(nivaAway), missing(nivaPlayer)),
   nivaAway: named('nivaAway', is(nivaAway)),
+  /** «Нива» у игрока после финала «Нива выбрала тебя». */
+  nivaPlayer: named('nivaPlayer', is(nivaPlayer)),
   /** Игрок оставил деньги в «Лаваш-коине», и его ещё не продали в День выплаты. */
   lavashHeld: named('lavashHeld', is(cryptoHodl), missing(payday.chain)),
 }
@@ -160,6 +163,9 @@ export const CHORUS_FED_UP: Record<string, string[]> = {
 export const WEDDING_NOISE = [
   needs('tamada')(needs('samvel')('Брат, тут ещё свадьба идёт. Самвел требует тост про тебя. Я тамада — я и скажу.')),
   needs('samvel')('Не слышу, музыка! Самвел танцует на столе.'),
+  // свадьба игрока (финал «жених») — не «свадьба Самвела» (#256)
+  gate(is(wedding('anush')))('Брат, твоя свадьба! Ануш ждёт тост. Я уже третий.'),
+  gate(is(wedding('anush')))('Семья гуляет за тебя. Долги на свадьбе не вспоминают — я проверял.'),
   'Свадьба — пятый день. Я уже не помню, чья.',
   'Брат, я тебе позже, тут горячее вынесли.',
   'Ара, тут хоровод, меня не выпускают. Если что — я в центре.',

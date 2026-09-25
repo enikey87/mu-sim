@@ -18,7 +18,7 @@ export interface Source extends LineSpec { amount: number }
 export const SOURCES: Source[] = [
   // сериалы
   { t: 'Сейф открыли! Второй ключ нашёлся — у малыша в игрушках. Внутри 120 000 и соска.', when: [exists('finale.nune')], prio: 2, amount: 120000 },
-  { t: '«Нива» же у тебя! Загляни в бардачок: там 80 000 и грузинский сыр. Я говорил — деньги в «Ниве». Ты просто не искал. Сыр верни.', when: [WORLD.niva, eq('finale.niva', 'chose')], prio: 2, amount: 80000 },
+  { t: '«Нива» же у тебя! Загляни в бардачок: там 80 000 и грузинский сыр. Я говорил — деньги в «Ниве». Ты просто не искал. Сыр верни.', when: [WORLD.niva, WORLD.nivaPlayer], prio: 2, amount: 80000 },
   { t: '«Нива» прислала из Батуми перевод. 60 000. Подпись: «Не ищи. Но деньги — вот».', when: [WORLD.niva, eq('finale.niva', 'default')], prio: 2, amount: 60000 },
   { t: 'Борис-прораб выписал премию. Всей бригаде. И тебе. Премия — 50 000. И клок шерсти.', when: [eq('finale.boris', 'brigadir')], prio: 2, amount: 50000 },
   { t: 'Налоговая разморозила счета! Сказали: Борис дал такие показания, что им стыдно. 90 000.', when: [eq('finale.boris', 'default'), missing(taxThawed)], prio: 2, amount: 90000 },

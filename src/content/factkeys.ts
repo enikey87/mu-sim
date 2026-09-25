@@ -16,7 +16,7 @@ import {
   HEAT, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, evicted,
   vendetta, court, courtVerdict, courtReferral, ritualCount, ritualCut, caughtCount, cryptoHodl,
   bathAsked, mamaCalls, phoneKarine, alikShaved, alikDay, mooAt, sorryAt, rudeAt, thanksAt, topicRun, topicLast,
-  legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway,
+  legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway, nivaPlayer,
   garikConcrete, garikCut, houseOnGarik, borisMarried, borisSmetaReady, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, threatClaim, nuneKeyPassed, nuneDekretOver, grandpaDying,
   betonSet, cardSent, saidTomorrow, saidFriday, payday, count, endgame, holidayGreeted, lend50,
@@ -48,7 +48,7 @@ export type MemExactKey =
   | typeof bathAsked | typeof mamaCalls | typeof phoneKarine | typeof alikShaved | typeof alikDay | typeof mooAt | typeof sorryAt
   | typeof rudeAt | typeof thanksAt | typeof topicRun | typeof topicLast | typeof legendPromiseAt
   | typeof legendId | typeof legendDay | typeof legendArc | typeof nextTransfer | typeof tileCornerRemoved
-  | typeof nivaAway | typeof garikConcrete | typeof garikCut | typeof houseOnGarik | typeof borisMarried
+  | typeof nivaAway | typeof nivaPlayer | typeof garikConcrete | typeof garikCut | typeof houseOnGarik | typeof borisMarried
   | typeof borisSmetaReady | typeof taxFrozen | typeof taxThawed | typeof actSigned | typeof grantPaid
   | typeof rubikFined | typeof threatClaim | typeof nuneKeyPassed | typeof nuneDekretOver | typeof grandpaDying
   | typeof betonSet | typeof cardSent | typeof saidTomorrow | typeof saidFriday | typeof paydayScene
