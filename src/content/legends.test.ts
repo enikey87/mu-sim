@@ -122,6 +122,49 @@ describe('легенда денег', () => {
     expect(inJournal()).toBe(1) // но это не новая запись
   })
 
+  it('проходная серия ту же легенду гейт клятвы не открывает (#246)', async () => {
+    const { game } = makeGame()
+    await game.playArc('samvel') // ep0: wedding + обязательная клятва
+    const until = LEGENDS.wedding.until
+    expect(vows(game, until)).toBe(1)
+    const at = game.S.mem.legendPromiseAt
+    await game.playArc('samvel') // ep1: без своей легенды — возвращает wedding
+    expect(game.legend()).toBe('wedding')
+    expect(game.S.mem.legendPromiseAt).toBe(at) // гейт не сброшен
+    const n = vows(game, until)
+    await game.excuseTurn() // пауза ещё не прошла
+    expect(vows(game, until)).toBe(n)
+  })
+
+  // NC #246: setLegend всегда открывал гейт — проходная серия снова клялась бы сразу
+  it('NC: повторный setLegend той же id гейт не открывает (#246)', () => {
+    const { game } = makeGame()
+    game.setLegend('wedding', 'samvel')
+    const opened = game.S.mem.legendPromiseAt
+    game.S.stats.sent += 3
+    game.setLegend('wedding', 'samvel')
+    expect(game.S.mem.legendPromiseAt).toBe(opened)
+    game.setLegend('niva_stuck', 'niva') // смена — открывает
+    expect(game.S.mem.legendPromiseAt).toBe(game.S.stats.sent - 8)
+  })
+
+  it('повтор клятвы не в журнал у всех 30 легенд, в т.ч. без condition (#246)', async () => {
+    for (const [id, spec] of Object.entries(LEGENDS)) {
+      const { game } = makeGame({ seed: 1 })
+      game.setLegend(id, 'nune')
+      const until = spec.until
+      const inJournal = () => game.S.promises.filter((p) =>
+        spec.condition ? p.condition === spec.condition : p.t.includes(until)).length
+      game.S.stats.sent += 100
+      await game.excuseTurn()
+      expect(inJournal(), id).toBe(1)
+      game.S.stats.sent += 100
+      await game.excuseTurn()
+      expect(vows(game, until), id).toBeGreaterThanOrEqual(2)
+      expect(inJournal(), id).toBe(1)
+    }
+  })
+
   it('хор не противоречит легенде: Нуне про сейф, а не «денег нет»', () => {
     const { game } = makeGame()
     game.setLegend('safe_baby', 'nune')
