@@ -1071,6 +1071,7 @@ export class Game {
     if (!p) return
     const n = p.spec as L.Notif
     if (n.spend) {
+      if (this.moneySealed()) return // после выплаты мелочь не шумит «недостаточно» (#252)
       const spend = 90 + this.rnd(40) * 10
       const why = this.draw('SPEND', L.SPEND)
       // отказ не молчит (#185), но мелочь — строка сводки, а не карточка (#287)
@@ -2140,7 +2141,10 @@ export class Game {
     // платёж с карты идёт первым: не прошёл — узел не брал денег и не берёт их следствий (#185)
     const pays = (fx.money ?? 0) < 0
     const paid = !pays || this.adjustMoney(fx.money!, 'По карте')
-    if (pays && !paid) this.notify('🏦', 'Банк', `Не прошло: недостаточно средств. Перевод ${Math.abs(fx.money!).toLocaleString('ru-RU')} ₽ не ушёл.`)
+    // запечатано — тишина; мало денег — «недостаточно» (#252)
+    if (pays && !paid && !this.moneySealed()) {
+      this.notify('🏦', 'Банк', `Не прошло: недостаточно средств. Перевод ${Math.abs(fx.money!).toLocaleString('ru-RU')} ₽ не ушёл.`)
+    }
     if (!pays && fx.money) this.adjustMoney(fx.money, 'По карте')
     let debtMoved = !!fx.debt && paid && this.adjustDebt(fx.debt)
     if (fx.mood) this.mood(fx.mood)
@@ -2153,8 +2157,8 @@ export class Game {
     if (fx.set) this.rules.applyOps(Object.entries(fx.set).map(([key, value]) => ({ key, op: '=' as const, value })), {})
     if (fx.during) this.rules.applyOps([{ key: fx.during.key, op: '=', value: true, forDays: fx.during.days }], {})
     if (n.sys && (!debtFx || debtMoved)) { await this.sleep(700); this.sys(gen('sys', n.sys)()) }
-    // обращение «Брат мой, …» — манера Алика; реплики других персонажей (Борис: «Бее.») не украшаем
-    if (n.a) await this.say([n.who ? gen('a', n.a)() : variant('a', n.a)], false, n.who)
+    // перевод не прошёл — Алик не благодарит за то, чего не было (#252)
+    if (n.a && (!pays || paid)) await this.say([n.who ? gen('a', n.a)() : variant('a', n.a)], false, n.who)
     if (n.doc) {
       await this.typingFor(2000, 'отправляет документ…')
       this.alikMsg({ kind: 'doc', from: 'alik', title: `АКТ ВЗАИМОЗАЧЁТА № ${100 + this.rnd(900)}`, rows: v.rows, total: v.total })
