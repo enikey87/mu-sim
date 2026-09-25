@@ -20,7 +20,7 @@ gh pr list --state open --label agent:<я>
 
 - Ветка отстала от `main` или конфликт → `git fetch && git merge origin/main` (**не** rebase, **не** force-push), разреши конфликт, прогони `npm run typecheck`, `npm run lint`, `npx vitest run`, запушь.
 - CI красный → почини в той же ветке.
-- CI зелёный и ветка на текущем `main` → `gh pr merge <N> --merge`.
+- CI зелёный, ветка на текущем `main` и задача ещё открыта → `gh pr merge <N> --merge`. Задачу закрыли — не мержи (см. шаг 5).
 
 Есть незаконченный PR — доведи его и **закончи сессию**, новую задачу не бери.
 
@@ -61,6 +61,8 @@ gh api repos/enikey87/mu-sim/issues/<N>/events \
 
 ## 4. PR
 
+Перед PR проверь, что задача ещё открыта: `gh issue view <N> --json state --jq .state` → `OPEN`. Если оператор её закрыл (например, заменил другой задачей) — PR не открывай, прочитай последний комментарий в issue и закончи сессию: работа не нужна или ушла в другую задачу.
+
 ```sh
 gh pr create --base main --label agent:<я>
 ```
@@ -69,7 +71,7 @@ gh pr create --base main --label agent:<я>
 
 ## 5. Мерж — сам
 
-Когда CI зелёный и ветка на текущем `main` (иначе — шаг 1): `gh pr merge <N> --merge`.
+Когда CI зелёный и ветка на текущем `main` (иначе — шаг 1), и задача всё ещё открыта (`gh issue view <N> --json state --jq .state` → `OPEN`): `gh pr merge <N> --merge`. Задачу закрыли, пока ты работал, — не мержи, напиши в PR, что задача закрыта, и закрой PR.
 
 ## Нельзя
 
