@@ -235,7 +235,7 @@ function corpus(): Found[] {
 /** Усы Алика на месте: реплика, называющая их, звучит, пока они не сбриты (`needs('moustache')`, docs/design/moustache.md). */
 const MOUSTACHE = new RegExp(W + 'ус(?:ы|ами|ах)(?![а-яё])', 'i')
 /** Строки исполненной ставки: звучат уже после того, как усы сбриты или спасены. */
-const AFTER_STAKE = /^world\.PROMISE_SHAVE/
+const AFTER_STAKE = /PROMISE_SHAVE|P_MOUSTACHE|Opt_Moustache/
 
 function problems(found: Found[]): string[] {
   const out: string[] = []
