@@ -206,6 +206,21 @@ describe('typo', () => {
 })
 
 describe('срок по календарю', () => {
+  it('в последний день месяца и квартала срок — конец следующего, а не завтра (#292)', async () => {
+    const { dueIn, dateOf } = await import('./time')
+    const last = (d: number) => dateOf(d + 1).getDate() === 1
+    const ends = Array.from({ length: 400 }, (_, d) => d).filter(last)
+    expect(ends.length).toBeGreaterThan(10)
+    for (const d of ends) {
+      const next = d + dueIn({ monthEnd: 0 }, d)
+      expect(last(next), `день ${d}`).toBe(true)
+      expect((dateOf(next).getMonth() - dateOf(d).getMonth() + 12) % 12, `день ${d}`).toBe(1)
+      if (dateOf(d).getMonth() % 3 === 2) {
+        const q = d + dueIn({ quarter: true }, d)
+        expect(last(q) && (dateOf(q).getMonth() - dateOf(d).getMonth() + 12) % 12 === 3, `квартал, день ${d}`).toBe(true)
+      }
+    }
+  })
   it('день недели, «край — в понедельник», конец месяца, Новый год, квартал, неделя — последний день срока', async () => {
     const { dueIn, dateOf } = await import('./time')
     const day = 200

@@ -63,8 +63,13 @@ export function dueIn(due: Due, day: number): number {
   const now = dateOf(day)
   const until = (to: Date) => Math.max(1, Math.round((to.getTime() - now.getTime()) / 864e5))
   if ('weekday' in due) return ((due.weekday - now.getDay() + 7) % 7 || 7) + (due.next ? 7 : 0) + (due.plus ?? 0)
-  if ('monthEnd' in due) return until(new Date(now.getFullYear(), now.getMonth() + due.monthEnd + 1, 0))
+  // конец периода сегодня — срок в конце следующего, а не завтра: иначе коммуналка списывается и 30-го, и 1-го (#292)
+  const endOf = (month: number, step: number) => {
+    const d = Math.round((new Date(now.getFullYear(), month + 1, 0).getTime() - now.getTime()) / 864e5)
+    return d > 0 ? d : until(new Date(now.getFullYear(), month + step + 1, 0))
+  }
+  if ('monthEnd' in due) return endOf(now.getMonth() + due.monthEnd, 1)
   if ('newYear' in due) return until(new Date(now.getFullYear() + 1, 0, 1))
-  if ('quarter' in due) return until(new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3 + 3, 0))
+  if ('quarter' in due) return endOf(Math.floor(now.getMonth() / 3) * 3 + 2, 3)
   return (7 - now.getDay()) % 7 || 7
 }
