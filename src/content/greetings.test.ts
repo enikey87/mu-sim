@@ -53,11 +53,11 @@ describe('«спасибо» и «привет»: у Алика свой отв�
   })
   it('после перевода «я ничего не перевёл» не звучит', async () => {
     const lie = 'я же ничего не перевёл'
-    const heard = async (fifty: number) => {
+    const heard = async (paid: number) => {
       let n = 0
       for (let seed = 1; seed <= 40; seed++) {
         const { game } = makeGame({ seed })
-        game.S.stats.fifty = fifty
+        game.S.stats.paid = paid
         const from = alikTexts(game.S.msgs).length
         await game.send('Спасибо!')
         if (alikTexts(game.S.msgs).slice(from).some((t) => t.includes(lie))) n++

@@ -99,6 +99,8 @@ export type SayItem = string | { w: string; t: string }
 export type AwayKind = 'text' | 'sticker' | 'fwd' | 'deleted' | 'voice' | 'transfer' | 'excuse' | 'formality' | 'coldWar'
 
 const POOR_REPEAT_DAYS = 14
+/** Минимум сообщений игрока между клятвами легенды — одна защита на все пути (#179). */
+const LEGEND_VOW_GAP = 8
 
 export class Game {
   /** Только чтение: подмена состояния целиком (`this.S = …`) — один из обходов долга из аудита #142. */
@@ -146,6 +148,10 @@ export class Game {
   /** Ход игрока: nextDay уже был (offline / fx.days) — обычный +1…3 в конце не дублируем. */
   private inPlayerTurn = false
   private dayMovedInTurn = false
+  /** Списания дня для одного СМС («Списания: Связь …, Проездной …», #178). */
+  private bankCharges: { day: number; parts: string[] } | null = null
+  /** Ключи банковских SMS за день — одно и то же не дважды (#251 / #178). */
+  private bankSmsDay: { day: number; keys: Set<string> } | null = null
 
   constructor(opts: GameOptions = {}) {
     this.storage = opts.storage === undefined ? (typeof localStorage !== 'undefined' ? localStorage : null) : opts.storage
@@ -187,7 +193,7 @@ export class Game {
     this.rawAudio.setMuted(this.S.muted)
 
     if (!this.S.msgs.length) this.seed()
-    else { this.scheduleBills(); this.scheduleCredits() }
+    else { this.restoreDueEvents(); this.scheduleBills(); this.scheduleCredits() }
     void this.checkAway(opts.away ?? null)
     // перезагрузка посреди «займи 50»: доиграть просьбу+пометку, иначе лента врёт (#219)
     if (this.S.mem[memkeys.endgame.active] && !this.S.mem[memkeys.lend50.asked]) {
@@ -474,8 +480,8 @@ export class Game {
   moneySealed(): boolean {
     return this.debtSealed() || !!this.S.mem[memkeys.endgame.active]
   }
-  /** Единственная точка изменения S.money: СМС банка + смена уровня. */
-  adjustMoney(delta: number, reason: string): boolean {
+  /** Единственная точка изменения S.money: СМС банка + смена уровня. `quiet` — без СМС списания (дайджест дня, #178). */
+  adjustMoney(delta: number, reason: string, opts?: { quiet?: boolean }): boolean {
     if (this.moneySealed()) return false
     if (delta === 0) return true
     if (delta < 0 && -delta > this.S.money) return false
@@ -484,8 +490,10 @@ export class Game {
     const after = this.moneyLevel()
     const amount = Math.abs(delta).toLocaleString('ru-RU')
     const bal = countOf(this.S, 'money').toLocaleString('ru-RU')
-    const kind = delta < 0 ? 'Списание' : 'Поступление'
-    this.notify('🏦', 'Банк', `${kind} ${amount} ₽. ${reason}. Баланс: ${bal} ₽`)
+    if (!opts?.quiet) {
+      const kind = delta < 0 ? 'Списание' : 'Поступление'
+      this.notify('🏦', 'Банк', `${kind} ${amount} ₽. ${reason}. Баланс: ${bal} ₽`)
+    }
     const rank = { normal: 2, low: 1, bottom: 0 }
     if (rank[after] < rank[before]) {
       const warn = after === 'bottom'
@@ -495,6 +503,11 @@ export class Game {
       if (after === 'bottom') this.maybeCreditOffer()
     }
     return true
+  }
+  /** Перевод от Алика: paid — любой; fifty — только ровно 50 ₽ (ачивка «пять раз»). */
+  noteAlikPay(amount: number): void {
+    this.S.stats.paid++
+    if (amount === 50 && ++this.S.stats.fifty >= 5) this.unlock('fifty5')
   }
   /** Поставить в расписание ближайшие платежи (и предупреждение за день). */
   scheduleBills(): void {
@@ -506,16 +519,38 @@ export class Game {
       if (this.S.mem[atKey] != null) continue
       const at = this.S.day + dueIn(bill.due, this.S.day)
       this.S.mem[atKey] = at
-      this.scheduleEvent(at, 'BillDue', { bill: bill.id, at })
-      if (at - 1 > this.S.day) this.scheduleEvent(at - 1, 'BillWarn', { bill: bill.id, at })
+      this.scheduleBillDue(bill.id, at)
     }
   }
-  /** Событие по сроку — текущий срок, а не устаревший дубль. Без `at` — событие из старого сохранения. */
+  private scheduleBillDue(id: BillId, at: number): void {
+    this.scheduleEvent(at, 'BillDue', { bill: id, at })
+    // предупреждение SMS — только коммуналка (#178/#251); иначе игрок кричит «списание завтра» без SMS
+    if (id === 'rent' && at - 1 > this.S.day) this.scheduleEvent(at - 1, 'BillWarn', { bill: id, at })
+  }
+  /** Срок стоит, а события в сохранении нет — платёж молчал бы навсегда: вернуть событие на срок (#272). */
+  private restoreDueEvents(): void {
+    if (this.moneySealed()) return
+    const has = (event: GameEvent, k: 'bill' | 'credit', id: string, at: number): boolean =>
+      this.rules.state.schedule.some((it) => it.kind === 'event' && it.event === event && it.facts?.[k] === id
+        && (it.facts.at == null || Number(it.facts.at) === at))
+    for (const bill of BILLS) {
+      const at = this.S.mem[billDueAt(bill.id)]
+      if (at == null || bill.skip?.(this.S.mem) || has('BillDue', 'bill', bill.id, Number(at))) continue
+      this.scheduleBillDue(bill.id, Number(at))
+    }
+    for (const loan of LOANS) {
+      const at = this.S.mem[loanDueAt(loan.id)]
+      if (at == null || !this.S.mem[loanTaken(loan.id)] || has('CreditDue', 'credit', loan.id, Number(at))) continue
+      this.scheduleEvent(Number(at), 'CreditDue', { credit: loan.id, at: Number(at) })
+    }
+  }
+  /** Событие по сроку — текущий срок, не устаревший дубль (без `at` — из старого сохранения); «завтра» — только накануне (#272). */
   private dueLive(key: string, at: unknown, dayBefore = false): boolean {
     const cur = this.S.mem[key]
     if (cur == null) return false
-    if (at != null) return Number(at) === Number(cur)
-    return dayBefore ? Number(cur) === this.S.day + 1 : Number(cur) <= this.S.day
+    if (at != null && Number(at) !== Number(cur)) return false
+    if (dayBefore) return Number(cur) === this.S.day + 1
+    return at != null || Number(cur) <= this.S.day
   }
   billEventLive(id: BillId, at: unknown, event: 'BillDue' | 'BillWarn'): boolean {
     return this.dueLive(billDueAt(id), at, event === 'BillWarn')
@@ -530,12 +565,13 @@ export class Game {
     if (!bill || bill.skip?.(this.S.mem)) return
     this.rules.applyOps([set(billDue(id), false)], {})
     delete this.S.mem[billDueAt(id)]
-    if (this.adjustMoney(-bill.amount, bill.label)) {
+    if (this.adjustMoney(-bill.amount, bill.label, { quiet: true })) {
       this.rules.applyOps([set(billUnpaid(id), false), set(billStreak(id), 0)], {})
+      this.queueBankCharge(bill.label, bill.amount)
     } else {
       const streak = Number(this.S.mem[billStreak(id)] ?? 0) + 1
       this.rules.applyOps([set(billUnpaid(id), true), set(billStreak(id), streak)], {})
-      // неоплата — факт и последствия, а не ежедневное эхо: банк говорит один раз за полосу (#184)
+      // неоплата — факт и последствия, а не ежедневное эхо: банк говорит один раз за полосу (#184/#178)
       if (streak === 1) this.notify('🏦', 'Банк', `Не прошло: недостаточно средств. ${bill.label}, ${bill.amount.toLocaleString('ru-RU')} ₽. Достоинство не принимается.`)
       if (id === 'rent' && streak >= 1) this.rules.applyOps([set(lightOff, true)], {})
       if (id === 'phone' && streak >= 1) this.rules.applyOps([set(phoneWarn, true)], {})
@@ -544,6 +580,22 @@ export class Game {
     }
     this.scheduleBills()
     if (this.moneyLevel() === 'bottom') this.maybeCreditOffer()
+  }
+  /** Накопить успешные списания дня в одно СМС. */
+  private queueBankCharge(label: string, amount: number): void {
+    if (!this.bankCharges || this.bankCharges.day !== this.S.day) this.bankCharges = { day: this.S.day, parts: [] }
+    this.bankCharges.parts.push(`${label} ${amount.toLocaleString('ru-RU')} ₽`)
+  }
+  /** Одно СМС на все тихие списания текущего дня (#178). */
+  flushBankCharges(): void {
+    const dig = this.bankCharges
+    this.bankCharges = null
+    if (!dig?.parts.length || dig.day !== this.S.day) return
+    const bal = countOf(this.S, 'money').toLocaleString('ru-RU')
+    const text = dig.parts.length === 1
+      ? `Списание ${dig.parts[0]}. Баланс: ${bal} ₽`
+      : `Списания: ${dig.parts.join(', ')}. Баланс: ${bal} ₽`
+    this.notify('🏦', 'Банк', text)
   }
   /** Расписание платежей по взятым кредитам. */
   scheduleCredits(): void {
@@ -563,12 +615,13 @@ export class Game {
     const loan = LOANS.find((l) => l.id === id)
     if (!loan || !this.S.mem[loanTaken(id)]) return
     delete this.S.mem[loanDueAt(id)]
-    if (this.adjustMoney(-loan.payment, loan.label)) {
+    if (this.adjustMoney(-loan.payment, loan.label, { quiet: true })) {
+      this.queueBankCharge(loan.label, loan.payment)
       this.rules.applyOps([set(loanFailed(id), false)], {}) // платёж прошёл — полоса неоплат закрыта
       this.scheduleCredits()
       return
     }
-    // банк говорит один раз за полосу неоплат, а не каждую неделю (#184)
+    // банк говорит один раз за полосу неоплат, а не каждую неделю (#184/#178)
     if (!this.S.mem[loanFailed(id)]) {
       this.rules.applyOps([set(loanFailed(id), true)], {})
       this.notify('🏦', 'Банк', `Не прошло: недостаточно средств. ${loan.label}, ${loan.payment.toLocaleString('ru-RU')} ₽.`)
@@ -731,6 +784,8 @@ export class Game {
 
   async typingFor(ms: number, label = 'печатает…'): Promise<void> {
     ms = Math.min(5000, Math.max(800, ms)) * (this.isNight() ? 1.5 : 1)
+    // в блоке / «смерти» / у Карине шапка не врёт «печатает…» → «в сети» (#257)
+    if (this.alikSilent()) { await this.sleep(ms); return }
     const show = () => { this.ui.typing = label; this.ui.status = { text: label, cls: 'typing' }; this.emit() }
     const hide = () => { this.ui.typing = null; this.ui.status = { text: 'в сети', cls: 'online' }; this.emit() }
     show()
@@ -780,9 +835,13 @@ export class Game {
     this.ui.status = { text, cls }
     this.emit()
   }
+  /** Алик не на связи: блок, «смерть», телефон у Карине. Одно место для шапки, typing, праздников (#257). */
+  alikSilent(): boolean {
+    const m = this.S.mem
+    return !!(m[memkeys.blocked] || m[memkeys.alikDead] || m[memkeys.phoneKarine])
+  }
   restStatus(): void {
-    // в блоке / «смерти» / у Карине шапка не врёт «в сети» рядом со «скрыл статус» (#223)
-    if (this.S.mem[memkeys.blocked] || this.S.mem[memkeys.alikDead] || this.S.mem[memkeys.phoneKarine]) {
+    if (this.alikSilent()) {
       this.setStatus('не в сети')
       return
     }
@@ -845,11 +904,35 @@ export class Game {
   }
 
   // ---------- уведомления, батарея ----------
-  notify(icon: string, app: string, text: string): void {
-    const n: Notif = { id: this.seq++, icon, app, text }
-    if (this.ui.notif) { this.notifQueue.push(n); return }
-    this.showNotif(n)
+  /** Ключ банковского SMS: событие без баланса; суммы различают события (#265). */
+  private bankSmsKey(text: string): string {
+    return text.replace(/\s*Баланс:\s*[\d\s\u00a0]*₽\.?/gi, '').trim()
   }
+  /** false — отброшено дедупом; true — показано или в очереди. */
+  notify(icon: string, app: string, text: string): boolean {
+    // банк: одно и то же событие (не баланс) — один раз за игровой день (#251/#265)
+    if (app === 'Банк' || app === 'МФО') {
+      if (!this.bankSmsDay || this.bankSmsDay.day !== this.S.day) this.bankSmsDay = { day: this.S.day, keys: new Set() }
+      const key = this.bankSmsKey(text)
+      if (this.bankSmsDay.keys.has(key)) return false
+      this.bankSmsDay.keys.add(key)
+    }
+    const n: Notif = { id: this.seq++, icon, app, text }
+    if (!this.ui.notif) { this.showNotif(n); return true }
+    // телефон и переписка — впереди банка: банк — фон (money.md), а «низкий заряд» ждал за его пачкой (#272)
+    const urgent = (x: Notif): boolean => x.app === 'Система' || x.app === 'Алик Воздухонесян'
+    const q = this.notifQueue
+    const first = q.findIndex((x) => !urgent(x))
+    if (urgent(n)) q.splice(first < 0 ? q.length : first, 0, n)
+    else q.push(n)
+    // предел ожидания 4,2 с × очередь: лишнее из фона уходит — его факт уже на доске
+    while (q.length > Game.NOTIF_QUEUE_MAX) {
+      const i = q.findIndex((x) => !urgent(x))
+      q.splice(i < 0 ? 0 : i, 1)
+    }
+    return true
+  }
+  static readonly NOTIF_QUEUE_MAX = 4
   private showNotif(n: Notif): void {
     this.ui.notif = n
     if (this.notifWall !== null) wallClock.clearTimeout(this.notifWall)
@@ -957,13 +1040,14 @@ export class Game {
     for (const k in S.ach) progress['since.' + k] = S.day - S.ach[k]
     const moneyLv = this.moneyLevel()
     return {
-      day: S.day, tier: S.tier, mood: S.mood, sent: S.stats.sent, moo: S.stats.moo, patience: S.patience, money: S.money, debt: S.debt, fifty: S.stats.fifty,
+      day: S.day, tier: S.tier, mood: S.mood, sent: S.stats.sent, moo: S.stats.moo, patience: S.patience, money: S.money, debt: S.debt, fifty: S.stats.fifty, paid: S.stats.paid,
       moneyNormal: moneyLv === 'normal', moneyLow: moneyLv === 'low', moneyBottom: moneyLv === 'bottom',
-      // завтра списывают платёж (счёт или кредит) — для отчаянных реплик про срок (#187)
+      // завтра списывают: только если банк уже предупредил (bill.due после BillWarn с SMS, #251)
       paymentDueTomorrow: (() => {
         const tom = S.day + 1
-        for (const b of BILLS) if (Number(S.mem[billDueAt(b.id)]) === tom) return true
-        for (const l of LOANS) if (Number(S.mem[loanDueAt(l.id)]) === tom) return true
+        for (const b of BILLS) {
+          if (Number(S.mem[billDueAt(b.id)]) === tom && S.mem[billDue(b.id)]) return true
+        }
         return false
       })(),
       dow: date.getDay(), month: date.getMonth() + 1, dom: date.getDate(),
@@ -1100,6 +1184,7 @@ export class Game {
   async afterTurn(): Promise<void> {
     try {
       await this.rules.runDue(this, this.facts, { floor: this.floor() })
+      this.flushBankCharges()
       await this.fulfillConditionalPromise()
       await this.flushChorus()
     } catch (e) { this.swallowDisposed(e) }
@@ -1263,12 +1348,14 @@ export class Game {
     try {
       await this.sleep((500 + this.rnd(700)) * (this.isNight() ? 2 : 1))
       if (this.disposed) return
-      this.setStatus('прочитано')
+      // в молчании «прочитано» — ложь: сообщение не доставлено (#257)
+      if (this.alikSilent()) this.setStatus('не в сети')
+      else this.setStatus('прочитано')
 
       // реакция на сообщение игрока; иногда — вместо ответа
       let reactOnly = false
       // реакция — Алика: не бывает, когда он не видит (заблокирован) или телефон у Карине
-      if (!o.scene && !S.mem[memkeys.blocked] && !S.mem[memkeys.phoneKarine] && this.chance(0.18) && mine.kind === 'text') {
+      if (!o.scene && !this.alikSilent() && this.chance(0.18) && mine.kind === 'text') {
         await this.sleep(600)
         if (this.disposed) return
         this.replaceMsg(mine, { react: this.draw('R_' + tone, L.REACT[tone] ?? L.REACT.neutral) })
@@ -1299,6 +1386,7 @@ export class Game {
       if (this.disposed) return
       this.advanceTurnDay()
       await this.rules.runDue(this, this.facts, { floor: this.floor() })
+      this.flushBankCharges()
       if (this.disposed) return
       // сюжетный ход: только вне сцены, если Алик не «пропал» и в этом ходу ещё не было сцены или серии
       if (!S.scene && !o.scene && !S.offlineDays && !this.battery.dead && this.arcAt !== S.stats.sent) await this.fire('StoryBeat')
@@ -1320,8 +1408,8 @@ export class Game {
         this.sys('Алик Воздухонесян сменил фото профиля. На фото — баран')
         this.unlock('ram')
       }
-      // подпись профиля — одно место молчания (#223): quietStatus; «скрыл» только в живом блоке
-      const quietStatus = !!(S.mem[memkeys.blocked] || S.mem[memkeys.alikDead] || S.mem[memkeys.phoneKarine] || S.mem[memkeys.endgame.active])
+      // подпись профиля — молчание: alikSilent + эндгейм; «скрыл» только в живом блоке (#223/#257)
+      const quietStatus = this.alikSilent() || !!S.mem[memkeys.endgame.active]
       if (S.mem[memkeys.blocked] && !S.mem[memkeys.endgame.active] && !S.mem[memkeys.alikDead] && !S.mem[memkeys.phoneKarine]) {
         if (!S.mem[memkeys.statusHidden]) {
           S.mem[memkeys.statusHidden] = true
@@ -1334,8 +1422,7 @@ export class Game {
       // праздник в окне звучит хотя бы раз: отмазку вытесняют серия, сцена или легенда, а окно короткое.
       // Поздравляет сам Алик: в блоке, при «смерти» и с телефоном у Карине он не пишет (как и статус)
       const holiday = holidayOf(S.day)
-      const muted = S.mem[memkeys.blocked] || S.mem[memkeys.alikDead] || S.mem[memkeys.phoneKarine]
-      if (holiday && !muted && S.mem[memkeys.holidayGreeted] !== `${holiday}@${dateOf(S.day).getFullYear()}`) {
+      if (holiday && !this.alikSilent() && S.mem[memkeys.holidayGreeted] !== `${holiday}@${dateOf(S.day).getFullYear()}`) {
         const festive = this.line('HOLIDAY', HOLIDAY_EXCUSES)
         if (festive) {
           await this.say([festive])
@@ -1369,6 +1456,15 @@ export class Game {
     if (due !== null && due > this.S.day) this.scheduleEvent(due, 'PromiseDue', { promise: this.S.promises.length - 1 })
     if (this.S.promises.length >= 20) this.unlock('promises20')
   }
+  /** Пора снова назвать срок легенды: перерыв прошёл (#179). Серия, заведшая легенду, открывает гейт сама (setLegend). */
+  private legendDue(): boolean {
+    return this.S.stats.sent - Number(this.S.mem[memkeys.legendPromiseAt] ?? -99) >= LEGEND_VOW_GAP
+  }
+  /** Срок легенды второй раз в журнал не пишем — повтор не новость (#179). Ключ — условие срока: тексты клятвы разные. */
+  private recordPromiseOnce(p: Promise3): void {
+    if (p.condition && this.S.promises.some((x) => x.condition === p.condition)) return
+    this.recordPromise(p)
+  }
   private alignPromise(p: Promise3, until: When, condition?: PromiseCondition): Promise3 {
     p.text = p.text.replace(p.t, until.t)
     p.t = until.t
@@ -1389,9 +1485,8 @@ export class Game {
     // событие легенды уже случилось («свадьба Бориса прошла») — обещать «сразу после него» поздно
     const done = legendSpec?.condition ? this.S.mem[legendSpec.condition] === true : false
     const until = done ? undefined : legendSpec?.until
-    // срок из легенды — после серии обязательно, дальше изредка: одна и та же клятва «как „Нива“ заведётся» приедается
-    const recent = this.S.stats.sent - Number(this.S.mem[memkeys.legendPromiseAt] ?? -99) < 4
-    const fromLegend = !!until && (legend || (!recent && this.chance(0.4)))
+    // срок из легенды — не чаще, чем раз в LEGEND_VOW_GAP сообщений игрока: одна и та же клятва приедается (#179)
+    const fromLegend = !!until && this.legendDue() && (legend || this.chance(0.4))
     if (fromLegend) this.S.mem[memkeys.legendPromiseAt] = this.S.stats.sent
     const p = this.uniq(() => {
       const q = this.X.promise()
@@ -1401,7 +1496,8 @@ export class Game {
       const form = this.line('OATH_FORMS', OATH_FORMS) ?? '{o}, {p}.'
       return { text: form.replace('{o}', this.X.g('OATH')).replace('{P}', cap(q.text)).replace('{p}', q.text), q }
     })
-    this.recordPromise(p.q)
+    if (fromLegend) this.recordPromiseOnce(p.q)
+    else this.recordPromise(p.q)
     await this.say([p.text])
     this.S.ctx = { ...(this.S.ctx ?? {}), ...this.ctxFromPromise(p.q) }
   }
@@ -1483,7 +1579,7 @@ export class Game {
   }
 
   async excuseTurn(): Promise<void> {
-    if (this.legend()) return this.promiseLine(undefined, true)
+    if (this.legend() && this.legendDue()) return this.promiseLine(undefined, true)
     const festive = this.line('HOLIDAY', HOLIDAY_EXCUSES)
     if (festive) { await this.say([festive]); return }
     const ex = this.uniq(() => this.X.excuse({ preferLong: this.S.politeStreak >= 3 }))
@@ -1533,7 +1629,7 @@ export class Game {
     this.S.ctx = { type: 'transfer', amount }
     if (this.adjustDebt(-amount)) {
       this.adjustMoney(amount, 'Перевод от Алика')
-      if (++this.S.stats.fifty >= 5) this.unlock('fifty5')
+      this.noteAlikPay(amount)
     }
   }
 
@@ -1730,8 +1826,8 @@ export class Game {
     let debtMoved = !!ep.fx?.debt && this.adjustDebt(ep.fx.debt)
     if (ep.fx?.pay && this.adjustDebt(-ep.fx.pay)) {
       this.adjustMoney(ep.fx.pay, 'Выплата')
-      // перевод Алика (в т.ч. финал) — тот же факт, что читает ответ на «спасибо» (#223)
-      if (++this.S.stats.fifty >= 5) this.unlock('fifty5')
+      // любой перевод Алика — paid; fifty только при ровно 50 ₽ (#223/#257)
+      this.noteAlikPay(ep.fx.pay)
       debtMoved = true
     }
     if (ep.item) this.S.items.push(ep.item)
@@ -1755,6 +1851,8 @@ export class Game {
     if (arc) m[memkeys.legendOf(arc)] = id
     m[memkeys.legendId] = id
     m[memkeys.legendDay] = this.S.day
+    // серия завела легенду — её срок звучит сразу (новость); дальше гейт закрыт на LEGEND_VOW_GAP сообщений (#179)
+    m[memkeys.legendPromiseAt] = this.S.stats.sent - LEGEND_VOW_GAP
     if (arc) m[memkeys.legendArc] = arc
   }
   /** Текущая легенда (если не устарела). */
@@ -2101,7 +2199,7 @@ export class Game {
       try {
         if (this.disposed) return
         if (!this.ui.busy && !this.battery.dead && this.S.offlineDays === 0) {
-          if (this.S.mem[memkeys.blocked] || this.S.mem[memkeys.alikDead] || this.S.mem[memkeys.phoneKarine]) {
+          if (this.alikSilent()) {
             this.setStatus('не в сети')
           } else if (this.chance(0.2)) {
             // «печатает…» — и ничего не приходит
@@ -2146,7 +2244,7 @@ export class Game {
       case 'transfer':
         if (!this.adjustDebt(-50)) return // после выплаты перевода нет — и пузыря тоже
         this.adjustMoney(50, 'Перевод от Алика')
-        this.S.stats.fifty++
+        this.noteAlikPay(50)
         deliver({ kind: 'transfer', from: 'alik', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE), amount: 50 })
         return
       case 'formality': for (const text of this.formalityLines()) deliver({ kind: 'text', from: 'alik', text }); return
@@ -2158,10 +2256,11 @@ export class Game {
       }
       case 'excuse': {
         const legend = this.legend()
-        if (legend) {
+        if (legend && this.legendDue()) {
           const spec = LEGENDS[legend]
           const promise = this.alignPromise(this.X.promise(), spec.until, spec.condition)
-          this.recordPromise(promise)
+          this.S.mem[memkeys.legendPromiseAt] = this.S.stats.sent
+          this.recordPromiseOnce(promise)
           deliver({ kind: 'text', from: 'alik', text: promise.text })
           return
         }

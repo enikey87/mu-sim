@@ -1,13 +1,14 @@
 // Тексты для новых возможностей системы правил: обещания, которые наступают, хор персонажей,
 // состояния мира со сроком (свадьба, болезнь Бориса, «Алик умер»).
-import { type Criterion, type Entry, named, exists, is, eq, gte, ne, missing, set, gate } from '../engine/rules'
+import { type Criterion, type Entry, named, exists, is, eq, gte, ne, missing, set, gate } from './fact'
 import { cryptoHodl, garikConcrete, garikCut, grandpaDying, grantPaid, intro, met, mourning, nivaAway, nuneDekretOver, payday, saidFriday, saidTomorrow } from './memkeys'
+import type { WhoId } from './ids'
 
 // Мир последователен: кто и что есть в истории и в каком оно положении — факты, их ставит серия (remember), ступень суда
 // или ход, где персонаж входит в историю. Реплика, которая на них опирается, объявляет это сама — needs('crane')('…').
 // Текст игра не разбирает; полноту разметки проверяет mentions.test.ts.
 /** Кого, кроме труппы чата (CAST), игра знакомит с игроком через intro/met. */
-export const EXTRAS: readonly string[] = ['baran', 'grachik', 'gagik', 'tamada']
+export { EXTRAS, type ExtraId } from './ids'
 
 export const WORLD = {
   boris: named('boris', exists('arc.boris')),
@@ -74,7 +75,7 @@ export const WORLD = {
 }
 export type WorldKey = keyof typeof WORLD
 export const needs = (...keys: WorldKey[]) => gate(...keys.map((k) => WORLD[k]))
-export const meet = (...ids: string[]) => ids.map((id) => set(intro('') + id, true))
+export const meet = (...ids: string[]) => ids.map((id) => set(intro(id as WhoId), true))
 
 /** Кто пишет в чат сам (хор, семейный чат, родня на крик) только при условии знакомства, а не просто состояния; остальные — всегда. */
 export const SPEAKS: Record<string, Criterion> = {

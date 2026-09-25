@@ -113,7 +113,8 @@ export interface GameState {
   seen: number[]
   bags: Bags
   items: string[]
-  stats: { moo: number; fifty: number; sent: number }
+  /** fifty — только переводы ровно 50 ₽ (ачивка); paid — любой перевод от Алика (ответ на «спасибо»). */
+  stats: { moo: number; fifty: number; paid: number; sent: number }
   offlineDays: number
   ram: boolean
   muted: boolean
@@ -144,7 +145,7 @@ export function freshState(): GameState {
   return sealCounts({
     day: START_DAY, clock: 9 * 60 + 41, debt: DEBT0, patience: MAX_PATIENCE, politeStreak: 0, mood: 5,
     msgs: [], nextId: 1, ach: {}, promises: [], seen: [], bags: {}, items: [],
-    stats: { moo: 0, fifty: 0, sent: 0 },
+    stats: { moo: 0, fifty: 0, paid: 0, sent: 0 },
     offlineDays: 0, ram: false, muted: false, scene: null, ctx: null, choices: null, arcs: {}, tier: 0,
     battery: 100, money: START_MONEY, lastSeen: 0, mem: {}, actors: {}, rules: freshRuleState(), endings: {}, ending: null, introShown: false,
   })

@@ -1,6 +1,6 @@
 // Правила новых возможностей: выбор сцен, наступившие обещания, хор персонажей, состояния мира.
 import type { Game } from '../../engine/game'
-import { type Rule, type Facts, type Entry, eq, ne, gte, lte, is, add, of, missing } from '../../engine/rules'
+import { type Rule, type Facts, type Entry, eq, ne, gte, lte, is, add, of, missing } from '../fact'
 
 import type { GameEvent, Offer } from './events'
 import { WORLD, SPEAKS } from '../world'
@@ -33,7 +33,7 @@ export const sceneRules: R[] = [
   { ...scene('wife', [gte(count.rude, 1), missing(met('karine')), WORLD.karineHome]), once: true }, // Карине знакомится один раз: «Вы кто такой?» дважды — нелепо
   scene('invoice', [gte('day', 215)]),
   { ...scene('loan', [gte('day', 230)]), once: true }, // кредит «на твоё имя» — один раз
-  // амнистия обещаний — один раз, при 8+ просроченных и пока не начался День выплаты (после него журнал ни на что не влияет)
+  // амнистия обещаний — один раз, при 5+ просроченных и пока не начался День выплаты (после него журнал ни на что не влияет)
   { ...scene('amnesty', [JournalForAmnesty, missing(payday.chain)]), once: true, specificity: 1 }, // распухший журнал важнее розыгрыша обычных сцен
   // умирать Алик начинает, когда дела плохи, и только один раз: после похорон и воскрешения смертный одр уже был
   { ...scene('deathbed', [gte('day', 240), lte('mood', 6), missing(mourning)], 2), once: true },
@@ -120,7 +120,7 @@ const noise = (key: string, arr: readonly Entry<string>[]) => async ({ game }: {
   await game.say([game.uniq(() => game.draw(key, arr))])
 }
 /** Факт у каждой свадьбы свой: два срока на одном ключе откатывали бы друг друга. */
-const weddingNoise = (who: string): R => ({
+const weddingNoise = (who: import('../ids').CastId): R => ({
   name: `Turn_Wedding_${who.charAt(0).toUpperCase()}${who.slice(1)}`, event: 'AlikTurn', when: [is(`wedding.${who}`)],
   specificity: 0, weight: 12, cooldown: { turns: 3 }, respond: noise('WEDDING', WEDDING_NOISE),
 })

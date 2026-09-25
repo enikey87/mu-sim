@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest'
 import { makeGame, setMoney } from '../test/helpers'
 import { Game } from '../engine/game'
-import { valueOf, test as holds, missing } from '../engine/rules'
+import { valueOf, test as holds, missing } from './fact'
 import type { Choice } from '../engine/state'
 import { P_MONEY, P_DESPERATE, DESPERATE_REPLY } from './topics'
 import { sold } from './credit'
@@ -93,11 +93,13 @@ describe('отчаяние от бедности', () => {
     setMoney(game, Game.MONEY_LOW)
     expect(game.facts().paymentDueTomorrow).toBe(false)
     expect(rebuilds(game, 80).flat().some((c) => c.text.includes(DUE_TOMORROW))).toBe(false)
-    game.S.mem[billDueAt('phone')] = game.S.day + 1
+    game.S.mem[billDueAt('rent')] = game.S.day + 1
+    game.S.mem['bills.rent.due'] = true
     expect(game.facts().paymentDueTomorrow).toBe(true)
     expect(rebuilds(game, 80).flat().some((c) => c.text.includes(DUE_TOMORROW))).toBe(true)
     // негативный контроль: снять факт — снова тишина
-    delete game.S.mem[billDueAt('phone')]
+    delete game.S.mem[billDueAt('rent')]
+    delete game.S.mem['bills.rent.due']
     game.S.choices = null
     expect(game.facts().paymentDueTomorrow).toBe(false)
     expect(rebuilds(game, 80).flat().some((c) => c.text.includes(DUE_TOMORROW))).toBe(false)

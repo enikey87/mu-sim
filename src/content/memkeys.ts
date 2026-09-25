@@ -88,20 +88,20 @@ export const lend50 = { asked: 'lend50.asked', answer: 'lend50.answer' } as cons
 
 export const lie = { old: 'lie.old', new: 'lie.new', alikOld: 'lie.alikOld', kind: 'lie.kind' } as const
 
-export const said = (claim: string): string => `said.${claim}`
-export const saidLast = (claim: string): string => `saidLast.${claim}`
-export const byClaim = (claim: string): string => `by.${claim}`
-export const cb = (claim: string): string => `cb.${claim}`
-export const met = (who: string): string => `met.${who}`
-export const intro = (who: string): string => `intro.${who}`
-export const asked = (arc: string): string => `asked.${arc}`
-export const doneAsked = (arc: string): string => `doneAsked.${arc}`
-export const topic = (k: string): string => `topic.${k}`
-export const topicMute = (k: string): string => `topicMute.${k}`
-export const finaleOf = (arc: string): string => `finale.${arc}`
-export const legendOf = (arc: string): string => `legend.of.${arc}`
-export const caughtPair = (a: string, b: string): string => `caught.${pairKey(a, b)}`
-export const wedding = (who: string): string => `wedding.${who}`
+export const said = <C extends string>(claim: C): `said.${C}` => `said.${claim}`
+export const saidLast = <C extends string>(claim: C): `saidLast.${C}` => `saidLast.${claim}`
+export const byClaim = <C extends string>(claim: C): `by.${C}` => `by.${claim}`
+export const cb = <C extends string>(claim: C): `cb.${C}` => `cb.${claim}`
+export const met = <W extends string>(who: W): `met.${W}` => `met.${who}`
+export const intro = <W extends string>(who: W): `intro.${W}` => `intro.${who}`
+export const asked = <A extends string>(arc: A): `asked.${A}` => `asked.${arc}`
+export const doneAsked = <A extends string>(arc: A): `doneAsked.${A}` => `doneAsked.${arc}`
+export const topic = <K extends string>(k: K): `topic.${K}` => `topic.${k}`
+export const topicMute = <K extends string>(k: K): `topicMute.${K}` => `topicMute.${k}`
+export const finaleOf = <A extends string>(arc: A): `finale.${A}` => `finale.${arc}`
+export const legendOf = <A extends string>(arc: A): `legend.of.${A}` => `legend.of.${arc}`
+export const caughtPair = (a: string, b: string): `caught.${string}` => `caught.${pairKey(a, b)}`
+export const wedding = <W extends string>(who: W): `wedding.${W}` => `wedding.${who}`
 /** Активная сцена Дня выплаты (id узла) — факт на доске мира. */
 export const paydayScene = 'payday'
 export const lightOff = 'light.off'
@@ -116,17 +116,22 @@ export const momDone = 'mom.done'
 /** Ключи досок персонажей (S.actors), не мира. */
 export const sick = 'sick'
 export const interjections = 'interjections'
-export const ACTOR_KEYS: ReadonlySet<string> = new Set([sick, interjections])
 
 /** Факты события (собираются в facts() на каждый fire) — не mem, но валидатор обязан их знать; сверка с facts() — factkeys.test.ts. */
-export const EVENT_KEYS: ReadonlySet<string> = new Set([
-  'day', 'dow', 'month', 'dom', 'holiday', 'sent', 'moo', 'tier', 'mood', 'patience', 'money', 'debt', 'fifty',
+export const EVENT_KEY_LIST = [
+  'day', 'dow', 'month', 'dom', 'holiday', 'sent', 'moo', 'tier', 'mood', 'patience', 'money', 'debt', 'fifty', 'paid',
   'moneyNormal', 'moneyLow', 'moneyBottom', 'paymentDueTomorrow',
   'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sorrySwing', 'promiseLive',
   'period', 'night', 'offline', 'scene', 'sinceAlik', 'lateCount', 'arcAvailable',
   'arcsStarted', 'arcsDone', 'quests', 'callbackReady', 'arcUnfinished', 'deathCanAdvance',
   'intent', 'tone', 'arg', 'category', 'arc', 'argArcDone', 'greet', 'promise', 'somedayCount',
-])
+] as const
+export type EventKey = (typeof EVENT_KEY_LIST)[number]
+export const EVENT_KEYS: ReadonlySet<string> = new Set(EVENT_KEY_LIST)
+
+export const ACTOR_KEY_LIST = [sick, interjections] as const
+export type ActorKey = (typeof ACTOR_KEY_LIST)[number]
+export const ACTOR_KEYS: ReadonlySet<string> = new Set(ACTOR_KEY_LIST)
 
 export const MEM_KEYS: ReadonlySet<string> = new Set([
   HEAT, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, evicted, vendetta, court, courtVerdict,

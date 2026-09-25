@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { is, missing } from '../engine/rules'
-import { playtest, transcript, worldDump, deathGated, requiresKey } from './playtest'
+import { playtest, transcript, worldDump, deathGated, requiresKey, attachSpeechAttribution } from './playtest'
 import { alikDead } from '../content/memkeys'
 import type { Game } from '../engine/game'
 import type { Rule } from '../engine/rules'
@@ -38,24 +38,35 @@ describe('плейтест', () => {
     })
     expect(p2.world.flatMap((f) => f.said).filter((s) => s.r === 'Quiet_Probe_Silent')).toEqual([])
   }, 90_000)
-  it('пустой Quiet не удерживает атрибуцию на push после fire', async () => {
+  it('пустой Quiet не удерживает атрибуцию на push после fire — обёртка из playtest', async () => {
     const { makeGame } = await import('../test/helpers')
     const { game } = makeGame()
-    let lastRule: string | null = null
-    game.rules.onRespond = (r, ok) => { lastRule = ok ? r.name : null }
-    const fire = game.rules.fire.bind(game.rules)
-    game.rules.fire = (async (...args: Parameters<typeof fire>) => {
-      try { return await fire(...args) }
-      finally { lastRule = null }
-    }) as typeof game.rules.fire
-    const ruleOf = new Map<number, string | null>()
-    const push = game.push.bind(game)
-    game.push = ((m) => { const msg = push(m); ruleOf.set(msg.id, lastRule); return msg }) as typeof game.push
+    const { ruleOf } = attachSpeechAttribution(game)
     game.S.mem[alikDead] = true
     const chosen = await game.fire('StoryBeat')
     expect(chosen?.name).toMatch(/^Quiet_Dead_/)
     const after = game.push({ kind: 'text', from: 'alik', text: 'речь движка после тихого правила' })
     expect(ruleOf.get(after.id)).toBeNull()
+  })
+  it('вложенный fire восстанавливает атрибуцию родителя (Turn_Quest → PickQuest → excuse)', async () => {
+    const { makeGame } = await import('../test/helpers')
+    const { game } = makeGame()
+    const { ruleOf } = attachSpeechAttribution(game)
+    // свой event — иначе живые Quest_* перехватят вложенный fire
+    game.rules.add({
+      name: 'Nest_Child', event: 'NestProbe', when: [], specificity: 10_000,
+      respond: () => false, // молчит
+    })
+    game.rules.add({
+      name: 'Nest_Parent', event: 'AlikTurn', when: [], specificity: 10_000,
+      respond: async ({ game: g }) => {
+        const nested = await g.rules.fire(g, { event: 'NestProbe' }, g.facts, { floor: g.floor() })
+        if (!nested) await g.say(['речь родителя после вложенного fire'])
+      },
+    })
+    await game.fire('AlikTurn')
+    const mine = [...ruleOf.entries()].map(([, r]) => r).filter((r) => r === 'Nest_Parent')
+    expect(mine.length).toBeGreaterThan(0)
   })
   it('requiresKey: missing(alik_dead) — не гейт смерти; is(alik_dead) — гейт', () => {
     expect(requiresKey(missing(alikDead), alikDead)).toBe(false)

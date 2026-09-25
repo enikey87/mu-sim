@@ -2,7 +2,7 @@
 // Запускаются правилами PickScene (случайно, с перерывом) и из разговора — ответом по теме
 // («Приезжай! Хаш в 7 утра» → квест «хаш»). Формат — как у сцен (scenes.ts).
 import type { Scene } from './scenes'
-import { gate, missing } from '../engine/rules'
+import { gate, missing } from './fact'
 import { needs } from './world'
 import { courtVerdict, cryptoHodl, intro } from './memkeys'
 

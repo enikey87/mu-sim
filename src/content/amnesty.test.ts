@@ -23,15 +23,15 @@ const sys = (g: Game, from: number) => g.S.msgs.slice(from).flatMap((m) => (m.ki
 const offersPrev = (g: Game) => { for (let i = 0; i < 20; i++) { g.S.choices = null; if (g.choices.some((c) => c.act === 'prev')) return true } return false }
 
 describe('амнистия обещаний', () => {
-  it('приходит при 8+ просроченных, один раз за партию; 7 — мало', async () => {
+  it('приходит при 5+ просроченных, один раз за партию; 4 — мало', async () => {
     const { game } = makeGame()
-    journal(game, 7)
-    expect(game.lateCount()).toBe(7)
+    journal(game, 4)
+    expect(game.lateCount()).toBe(4)
     expect(holds(JournalForAmnesty, game.facts())).toBe(false)
     for (let i = 0; i < 30; i++) expect(pick(game)).not.toBe('Scene_amnesty')
-    game.recordPromise({ text: 'завтра, восьмое', d: 1 })
+    game.recordPromise({ text: 'завтра, пятое', d: 1 })
     game.S.day += 2
-    expect(game.lateCount()).toBe(8)
+    expect(game.lateCount()).toBe(5)
     expect(holds(JournalForAmnesty, game.facts())).toBe(true)
     expect(pick(game)).toBe('Scene_amnesty')
     expect((await game.fire('PickScene'))?.name).toBe('Scene_amnesty')
@@ -43,6 +43,23 @@ describe('амнистия обещаний', () => {
     game.S.day += 30 // перерыв сцен прошёл — а амнистия всё равно один раз
     for (let i = 0; i < 30; i++) expect(pick(game)).not.toBe('Scene_amnesty')
   })
+
+  it('порог 5 достижим у бота: lateCount ≥ 5 хотя бы в части партий (#281)', async () => {
+    const { botTurn } = await import('../tools/bot')
+    const peaks: number[] = []
+    for (const seed of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]) {
+      const { game } = makeGame({ seed })
+      let peak = 0
+      for (let i = 0; i < 300; i++) {
+        await botTurn(game)
+        peak = Math.max(peak, game.lateCount())
+        if (game.S.mem['payday.chain'] || game.S.mem['endgame.active']) break
+      }
+      peaks.push(peak)
+    }
+    // при пороге 8 пик был ≤3; при 5 — ≥5 в части партий (сцена всё ещё редка: бот жмёт «вы обещали»)
+    expect(peaks.filter((p) => p >= 5).length, `peaks=${peaks.join(',')}`).toBeGreaterThan(0)
+  }, 300_000)
 
   it('после начала Дня выплаты не предлагается: журнал уже ни на что не влияет', () => {
     const { game } = makeGame()

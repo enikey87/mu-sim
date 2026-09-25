@@ -1,7 +1,7 @@
 // Легенда денег: где, по версии Алика, сейчас деньги и что мешает отдать. Факт на доске мира (legend.id),
 // ставят серии сериалов; пока легенда жива (до 30 дней или до следующей серии), сроки вытекают из неё,
 // часть ходов Алика продолжает её, хор говорит в её рамках, а противоречие ловится бухгалтерией лжи.
-import { type Line, type Entry, eq, exists, gate, gte, is, missing, set } from '../engine/rules'
+import { type Line, type Entry, eq, exists, gate, gte, is, missing, set } from './fact'
 import type { TalkPair } from './talk'
 import type { When } from './excuses'
 import type { PromiseCondition } from './excuses'

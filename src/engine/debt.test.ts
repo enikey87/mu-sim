@@ -101,18 +101,22 @@ describe('долг: объявление звучит ровно тогда, к�
     expect(sys(after)).not.toMatch(/Долг уменьшился/)
   })
 
-  it('взаимозачёт: до выплаты списывает итог акта, после — нет', async () => {
+  it('взаимозачёт: до выплаты списывает итог акта и объявляет ту же сумму, после — ни долга, ни объявления', async () => {
     const { game } = makeGame()
     const debt = game.S.debt
     await game.enterNode('invoice', 'ask')
     const doc = game.S.msgs.find((m): m is Extract<Msg, { kind: 'doc' }> => m.kind === 'doc')
     expect(doc?.total).toBeGreaterThan(0)
-    expect(debt - game.S.debt).toBe(doc!.total) // списали ровно то, что стоит в акте
+    const moved = debt - game.S.debt
+    expect(moved).toBe(doc!.total) // списали ровно то, что стоит в акте
+    // число в сообщении = вычет: иначе «вычел X» при другом долге — дыра (#259)
+    expect(sys(game)).toContain(`Алик вычел из долга ${moved.toLocaleString('ru-RU')} ₽ по акту.`)
 
     const { game: after } = makeGame()
     const sealedDebt = sealed(after).S.debt
     await after.enterNode('invoice', 'ask')
     expect(after.S.debt).toBe(sealedDebt)
+    expect(sys(after)).not.toMatch(/вычел из долга/)
   })
 
   it('отказ после выплаты не двигает и календарь (#189): неделя финала идёт только с долгом', async () => {
@@ -129,6 +133,31 @@ describe('долг: объявление звучит ровно тогда, к�
     await after.playEpisode(cutter, 'garik')
     expect(after.S.day).toBe(sealedDay)
     expect(sys(after)).not.toMatch(/Неделя на выковыривании/)
+  })
+
+  // узел сцены (тамада): те же правила отказа, что у серии — календарь/долг/sys глушатся; ach/mood/set остаются (#237/#259)
+  it('отказ в узле сцены: день и долг стоят, ачивка и настроение — работа без сдвига суток', async () => {
+    const { game } = makeGame()
+    const day = game.S.day
+    const debt = game.S.debt
+    await game.enterNode('q_tamada', 'yes')
+    expect(game.S.day).toBe(day + 1)
+    expect(game.S.debt).toBe(debt - 1000)
+    expect(game.S.ach.q_tamada).toBeDefined()
+    expect(sys(game)).toMatch(/долг Алика уменьшился на 1 000/)
+
+    const { game: after } = makeGame()
+    const sealedDay = sealed(after).S.day
+    const sealedDebt = after.S.debt
+    const sealedMood = after.S.mood
+    await after.enterNode('q_tamada', 'yes')
+    expect(after.S.day).toBe(sealedDay)
+    expect(after.S.debt).toBe(sealedDebt)
+    expect(sys(after)).not.toMatch(/долг Алика уменьшился/)
+    // решение (#259): отказ — про долг и календарь, не про «узел целиком»
+    expect(after.S.ach.q_tamada).toBeDefined()
+    expect(after.S.mood).toBe(sealedMood + 3)
+    expect(after.S.mem['intro.goar']).toBe(true)
   })
 })
 

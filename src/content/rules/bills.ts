@@ -1,6 +1,6 @@
 // Платежи по календарю: предупреждение за день, списание или неоплата с последствиями.
 import type { Game } from '../../engine/game'
-import { type Rule, is, set } from '../../engine/rules'
+import { type Rule, is, set } from '../fact'
 import type { GameEvent, Offer } from './events'
 import {
   BILLS, billDue, lightOff, netRation, phoneWarn, type BillId,
@@ -19,6 +19,7 @@ export const billRules: R[] = [
     respond: ({ game, facts }) => {
       const id = billOf(facts)
       if (!id || game.moneySealed() || !game.billEventLive(id, facts.at, 'BillWarn')) return
+      if (id !== 'rent') return // warn в расписании только у коммуналки (#251)
       const bill = BILLS.find((b) => b.id === id)!
       if (bill.skip?.(game.S.mem)) return
       game.rules.applyOps([set(billDue(id), true)], {})

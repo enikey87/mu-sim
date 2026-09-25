@@ -134,17 +134,14 @@ describe('реестр mem-ключей', () => {
     expect(bad).toEqual([])
   })
 
-  it('верхняя граница since.* — только рядом с нижней; gte(..., 0) не считается', async () => {
-    const { gte, lte, is } = await import('../engine/rules/criteria')
+  it('верхняя граница since.* — sinceWithin; сырой lte(since) не компилируется', async () => {
+    const { sinceWithin, gte, is } = await import('./typed-criteria')
     const bad: string[] = []
-    sinceGuarded('ok1', [gte('since.dead', 1), lte('since.dead', 3)], bad)
-    sinceGuarded('ok2', [is('ach.dead'), lte('since.dead', 3)], bad)
+    sinceGuarded('ok1', sinceWithin('dead', 3), bad)
+    sinceGuarded('ok2', [is('ach.dead'), ...sinceWithin('dead', 3).slice(1)], bad)
+    // sinceWithin уже с нижней; gte+is варианты
+    sinceGuarded('ok3', [gte('since.dead', 1), ...sinceWithin('dead', 3).slice(1)], bad)
     expect(bad).toEqual([])
-    sinceGuarded('alone', [lte('since.dead', 3)], bad)
-    expect(bad).toEqual(['alone: since.dead <= 3 без нижней границы'])
-    bad.length = 0
-    sinceGuarded('zero', [gte('since.dead', 0), lte('since.dead', 3)], bad)
-    expect(bad).toEqual(['zero: since.dead <= 3 без нижней границы'])
   })
 
   it('since.* в контенте — с настоящей нижней границей', async () => {

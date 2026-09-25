@@ -6,7 +6,7 @@ import type { Facts } from '../../engine/rules'
 import type { Msg } from '../../engine/state'
 import * as T from '../rude'
 import { HEAT } from '../memkeys'
-import { valueOf, spec, during, isOpen, type Entry } from '../../engine/rules'
+import { valueOf, spec, during, isOpen, type Entry } from '../fact'
 
 const texts = (game: Game, from: number) => game.S.msgs.slice(from).map((m) => (m.kind === 'text' || m.kind === 'sys' ? m.text : m.kind === 'sticker' ? m.e : ''))
 const whos = (game: Game, from: number) => game.S.msgs.slice(from).filter((m): m is Extract<Msg, { kind: 'text' }> => m.kind === 'text').map((m) => m.who ?? 'alik')

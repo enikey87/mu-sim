@@ -4,7 +4,7 @@
 // go: 'node' | 'scene:node' | null (конец). Нет opts — сцена закончилась.
 import type { ExcuseApi } from './excuses'
 import type { Rng } from '../engine/rng'
-import { type Entry, gate, is, missing, gte, lte, valueOf } from '../engine/rules'
+import { type Entry, gate, is, missing, gte, lte, valueOf } from './fact'
 import { needs, WORLD } from './world'
 import { QUESTS, COURT_SCENE } from './quests'
 import { PAYDAY_SCENE } from './payday'
@@ -31,7 +31,7 @@ export interface SceneNode {
   opts?: SceneOpt[]
 }
 /** Ключ строки акта без пояснения в скобках: одну и ту же позицию не вычитают дважды. */
-export const invKey = (t: string): string => 'inv.' + t.replace(/\s*\([^)]*\)\s*$/, '')
+export const invKey = (t: string): `inv.${string}` => `inv.${t.replace(/\s*\([^)]*\)\s*$/, '')}`
 /** Позиции акта, которые ещё не вычитали. */
 const invoiceRows = (rows: Entry<[string, number]>[]): Entry<[string, number]>[] =>
   rows.map((r) => gate(missing(invKey(valueOf(r)[0])))(r))
@@ -188,7 +188,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
             'Эээ, а у меня как раз другой банк. Между банками комиссия! Я не могу тебя так грабить.',
             needs('garik')('В этот банк не перевожу, там работает бывшая жена Гарика.'),
             'Этот банк мне не нравится, у них логотип грустный.',
-            'Ара, у меня приложение только армянского банка. Он в твой не умеет.',
+            'Ара, у меня приложение только моего банка. Он в твой не умеет.',
           ],
           opts: [
             { t: 'Алик, комиссия ноль рублей!', go: 'comm' },

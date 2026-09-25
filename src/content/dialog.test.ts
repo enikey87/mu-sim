@@ -49,7 +49,8 @@ describe('несостыковки из партии пользователя', 
     game.S.items.push('Место на кране (40 м)')
     game.S.stats.sent = 20
     const n = game.S.msgs.length
-    for (let i = 0; i < 20 && !texts(game, n).some((t) => /отдал тебе/.test(t)); i++) {
+    // Turn_Memory — редкий гость среди ходов Алика: ждём, пока он выиграет розыгрыш (гейт легенды сдвинул поток, #179)
+    for (let i = 0; i < 60 && !texts(game, n).some((t) => /отдал тебе/.test(t)); i++) {
       game.S.rules.cooldown = {}
       game.S.scene = null // квест/сцена иначе поднимает floor и глушит Turn_Memory
       await game.fire('AlikTurn')

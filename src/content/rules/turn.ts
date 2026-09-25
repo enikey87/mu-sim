@@ -1,6 +1,6 @@
 // Ход Алика в ответ на обычное сообщение игрока.
 import type { Game } from '../../engine/game'
-import { type Rule, eq, ne, gte, lte, is, exists, missing, add, set } from '../../engine/rules'
+import { type Rule, eq, ne, gte, lte, is, exists, missing, add, set } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { meet } from '../world'
 import { AlikOffline } from './criteria'

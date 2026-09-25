@@ -1,6 +1,6 @@
 // Ответ по теме: игрок цепляется за то, что Алик только что сказал (бетон, «Нива», свадьба, банк…).
 // re — узнаёт тему в последнем сообщении Алика; p — реплики игрока; a — ответы Алика, парой: p[i] ↔ a[i].
-import { type Entry, gate, gte, is, missing } from '../engine/rules'
+import { type Entry, gate, gte, is, missing } from './fact'
 import { needs, WORLD } from './world'
 import { sold } from './credit'
 /** r — грубые реплики игрока по теме (красная кнопка тоже отвечает на сказанное). */

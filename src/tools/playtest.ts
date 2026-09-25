@@ -92,6 +92,27 @@ function pick(rng: Rng, style: Style, cs: Choice[]): number {
 }
 
 /** Сыграть партию ботом (или повторить записанные действия replay); watch — посмотреть на игру до первого хода. */
+/** Атрибуция речи для оракула: сообщение → правило, чей respond сейчас идёт (#229/#268).
+ *  Вложенный `fire` сохраняет и возвращает прежнюю атрибуцию — иначе `Turn_Quest` → `PickQuest`
+ *  обнуляет имя и `excuseTurn()` пишется как ничья. */
+export function attachSpeechAttribution(game: Game): {
+  ruleOf: Map<number, string | null>
+  clearRule: () => void
+} {
+  let lastRule: string | null = null
+  game.rules.onRespond = (r, ok) => { lastRule = ok ? r.name : null }
+  const fire = game.rules.fire.bind(game.rules)
+  game.rules.fire = (async (...args: Parameters<typeof fire>) => {
+    const prev = lastRule
+    try { return await fire(...args) }
+    finally { lastRule = prev }
+  }) as typeof game.rules.fire
+  const ruleOf = new Map<number, string | null>()
+  const push = game.push.bind(game)
+  game.push = ((m: NewMsg) => { const msg = push(m); ruleOf.set(msg.id, lastRule); return msg }) as typeof game.push
+  return { ruleOf, clearRule: () => { lastRule = null } }
+}
+
 export async function playtest(seed: number, turns: number, replay?: Act[], watch?: (game: Game) => void | Promise<void>): Promise<Played> {
   const style = STYLES[seed % STYLES.length]
   const hour = HOURS[seed % HOURS.length]
@@ -103,28 +124,18 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
   const asides: Aside[] = []
   const world: WorldFrame[] = []
   const firedBuf: WorldFrame['fired'] = []
-  // сообщение принадлежит правилу, чей respond сейчас идёт (onRespond до/после); молчание снимает атрибуцию.
-  // после выхода из fire атрибуция сбрасывается: пустой Quiet_* (respond → undefined) иначе оставляет
-  // своё имя на всё, что движок напишет следом (#229)
-  let lastRule: string | null = null
-  game.rules.onRespond = (r, ok) => { lastRule = ok ? r.name : null }
-  const fire = game.rules.fire.bind(game.rules)
-  game.rules.fire = (async (...args: Parameters<typeof fire>) => {
-    try { return await fire(...args) }
-    finally { lastRule = null }
-  }) as typeof game.rules.fire
+  const { ruleOf, clearRule } = attachSpeechAttribution(game)
   game.rules.tracer = (t) => {
     if (t.chosen.length) firedBuf.push({ event: t.event, chosen: [...t.chosen] })
   }
-  const ruleOf = new Map<number, string | null>()
-  const push = game.push.bind(game)
-  game.push = ((m: NewMsg) => { const msg = push(m); ruleOf.set(msg.id, lastRule); return msg }) as typeof game.push
   const notifBuf: WorldFrame['notif'] = []
   const notify = game.notify.bind(game)
   game.notify = (icon, app, text) => {
+    // только показанное: дедуп банка иначе попадает в расшифровку (#265)
+    if (!notify(icon, app, text)) return false
     asides.push({ at: game.S.msgs.length, text: `(уведомление телефона: ${icon} ${app} — ${text})` })
     notifBuf.push({ text: `${app} — ${text}`, fails: notifFails(game, app, text) })
-    notify(icon, app, text)
+    return true
   }
   const awayBuf: WorldFrame['away'] = []
   const awayIdx = new Set<number>()
@@ -168,7 +179,7 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
   }
   for (let k = 0; k < (replay?.length ?? turns); k++) {
     const a = replay ? replay[k] : next()
-    lastRule = null // речь до первого выбора правила в этом ходе — ничья
+    clearRule() // речь до первого выбора правила в этом ходе — ничья
     if (a.kind === 'send' && replay) {
       const now = game.choices.map((c) => c.text)
       if (now.join('\n') !== a.offered.join('\n')) throw new Error(`replay разошёлся на ходу ${k}: ${JSON.stringify(now)}`)

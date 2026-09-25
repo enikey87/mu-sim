@@ -15,6 +15,7 @@ import { HEAT } from '../content/memkeys'
 import { valueOf } from './rules'
 import { MENTION_RE } from '../content/world'
 import { P_MONEY, P_DESPERATE } from '../content/topics'
+import { LOANS } from '../content/credit'
 
 describe('Game: начало и ход', () => {
   it('новая игра: одна из завязок, 184-й день, 3–4 варианта реплик', () => {
@@ -471,11 +472,15 @@ describe('Game: пачка непрочитанных подчиняется м�
     expect(game.ui.unread).toBe(0)
     expect([game.S.promises.length, game.S.debt, game.S.money]).toEqual([promises + 1, debt, money])
     expect(game.S.ending).toBe('payday_coins')
-    // каждое Quiet_PaydayOpen_* охраняет своё событие, пока экран концовки открыт
+    // без Quiet болтовня нашлась бы: обида + тепло → Idle/Away_ColdWar; срок обещания уже записан выше
+    game.S.mem[HEAT] = 1
+    game.S.ctx = { offended: true }
+    game.S.offlineDays = 0
+    // каждое Quiet_PaydayOpen_* глушит своё событие, пока экран концовки открыт (#259)
     for (const event of ['AlikAway', 'AlikIdle', 'StoryBeat', 'PeriodLine', 'PromiseDue', 'Mentioned'] as const) {
       const n = game.S.msgs.length
       expect((await game.fire(event))?.name, event).toBe('Quiet_PaydayOpen_' + event)
-      expect(game.S.msgs.slice(n)).toEqual([])
+      expect(game.S.msgs.slice(n), event).toEqual([])
     }
     await game.closeEnding()
     expect(game.S.mem['endgame.active']).toBe(true)
@@ -515,6 +520,24 @@ describe('Game: пачка непрочитанных подчиняется м�
       const r = game.rules.match({ event: 'AlikAway', facts: {} }, game.facts())
       expect(r?.name, `seed ${seed}`).not.toBe('Away_ColdWar')
       expect(['Away_Offline', 'Quiet_Offended_AlikAway']).toContain(r?.name)
+    }
+  })
+  // #259: Idle_ColdWar — тот же гейт offline; путь игрока — onIdle после грубости
+  it('после первой грубости пропавший Алик в простое не пишет холодную войну', async () => {
+    const pool = new Set(COLD_WAR.map(valueOf))
+    for (let seed = 1; seed <= 30; seed++) {
+      const { game } = makeGame({ seed })
+      game.S.stats.sent = 6
+      await game.send({ text: 'Ты вор и мошенник!!!', tone: 'rude' })
+      expect(game.S.offlineDays).toBeGreaterThan(0)
+      expect(game.S.ctx?.offended).toBe(true)
+      expect(game.facts().offline).toBe(true)
+      const idle = game.rules.match({ event: 'AlikIdle', facts: {} }, game.facts())
+      expect(idle?.name, `seed ${seed}`).not.toBe('Idle_ColdWar')
+      const from = game.S.msgs.length
+      await game.onIdle()
+      const body = arrived(game, from)
+      expect(body.some((m) => m.kind === 'text' && pool.has(m.text)), `seed ${seed}`).toBe(false)
     }
   })
   it('посреди сцены пачки нет — как и болтовни простоя; сцена продолжается', async () => {
@@ -924,7 +947,31 @@ describe('Game: деньги на карте', () => {
     game.dismissNotif()
     expect(game.ui.notif?.text).toMatch(/критический/)
     game.dismissNotif()
-    expect(game.ui.notif?.text).toMatch(/Всё будет|одобрен/i)
+    expect(game.ui.notif?.text).toBe(LOANS[0].offer)
+  })
+  it('очередь уведомлений: батарея и непрочитанные — впереди банка, но не впереди показанного (#272)', () => {
+    const { game } = makeGame()
+    game.notify('🏦', 'Банк', 'Списание один')
+    game.notify('🏦', 'Банк', 'Списание два')
+    game.notify('🏦', 'Банк', 'Списание три')
+    game.S.battery = 16
+    game.battery.drain(1)
+    game.notify('💬', 'Алик Воздухонесян', '3 новых сообщения')
+    const shown: string[] = []
+    while (game.ui.notif) { shown.push(game.ui.notif.text); game.dismissNotif() }
+    expect(shown).toEqual(['Списание один', 'Низкий заряд батареи: 15%', '3 новых сообщения', 'Списание два', 'Списание три'])
+  })
+  it('очередь уведомлений: предел — старое из фона уходит, срочное остаётся (#272)', () => {
+    const { game } = makeGame()
+    const texts = ['раз', 'два', 'три', 'четыре', 'пять', 'шесть', 'семь']
+    for (const t of texts) game.notify('🏦', 'Банк', `Списание ${t}`)
+    game.S.battery = 16
+    game.battery.drain(1)
+    game.notify('🏦', 'Банк', 'Списание восемь')
+    const shown: string[] = []
+    while (game.ui.notif) { shown.push(game.ui.notif.text); game.dismissNotif() }
+    expect(shown).toHaveLength(1 + Game.NOTIF_QUEUE_MAX)
+    expect(shown).toEqual(['Списание раз', 'Низкий заряд батареи: 15%', 'Списание шесть', 'Списание семь', 'Списание восемь'])
   })
   it('бедность не смолкает: исчерпанный пул уровня звучит редко и по кругу (#184)', () => {
     const { game } = makeGame()

@@ -43,6 +43,85 @@ describe('легенда денег', () => {
     }
     expect(got).toBe(true)
   })
+  // #179: срок легенды — шутка, пока звучит редко; раньше каждый путь клялся по-своему
+  const vows = (g: Game, until: string): number => g.S.msgs.filter((m) => m.kind === 'text' && m.from === 'alik' && m.text.includes(until)).length
+
+  it('срок легенды звучит не чаще, чем раз в 8 сообщений игрока (#179)', async () => {
+    const { game } = makeGame({ seed: 5 })
+    game.setLegend('safe_baby', 'nune')
+    const until = LEGENDS.safe_baby.until.t
+    const at: number[] = []
+    for (let i = 0; i < 120; i++) {
+      game.S.stats.sent += 1
+      const n = game.S.msgs.length
+      await game.excuseTurn() // самый настойчивый путь: раньше он клялся каждый ход
+      if (vows(game, until) > 0 && game.S.msgs.slice(n).some((m) => m.kind === 'text' && m.from === 'alik' && m.text.includes(until))) at.push(game.S.stats.sent)
+      game.S.scene = null
+    }
+    expect(at.length, 'ни одной клятвы за 120 ходов — проверка была бы пустой').toBeGreaterThan(2)
+    expect(Math.min(...at.slice(1).map((s, i) => s - at[i]))).toBeGreaterThanOrEqual(8)
+  })
+
+  it('на паузе клятва легенды молчит, а отмазка звучит (#179)', async () => {
+    const { game } = makeGame()
+    game.setLegend('safe_baby', 'nune')
+    game.S.day += 3 // легенда не сегодняшняя: обязательной клятвы нет
+    let n = game.S.msgs.length
+    await game.excuseTurn()
+    expect(vows(game, LEGENDS.safe_baby.until.t)).toBe(1) // перерыв прошёл — клятва
+    n = game.S.msgs.length
+    await game.excuseTurn()
+    expect(vows(game, LEGENDS.safe_baby.until.t)).toBe(1) // пауза: второй клятвы нет
+    expect(texts(game, n).length).toBeGreaterThan(0) // но отмазка жива
+  })
+
+  it('ход Алика по линии легенды подчиняется той же паузе (#179)', async () => {
+    const { game } = makeGame()
+    game.setLegend('safe_baby', 'nune')
+    game.S.day += 3
+    game.S.arcs = { nune: { i: 4, last: game.S.day } } // сериалы уже идут: свои легенды не ставят
+    await game.excuseTurn() // клятва сразу после заведения легенды — дальше пауза
+    let lines = 0
+    for (let i = 0; i < 60 && lines < 2; i++) {
+      game.S.stats.sent += 3
+      const n = game.S.msgs.length
+      const r = await game.fire('AlikTurn')
+      if (r?.name !== 'Turn_Legend') { game.S.scene = null; continue }
+      const said = texts(game, n)
+      if (!said.some((t) => LEGENDS.safe_baby.lines.map((l) => spec(l).t).includes(t))) { game.S.scene = null; continue }
+      lines++
+      // сразу после строки легенды клятвы быть не должно: пауза не прошла
+      expect(said.filter((t) => t.includes(LEGENDS.safe_baby.until.t))).toEqual([])
+      game.S.scene = null
+    }
+    expect(lines).toBeGreaterThan(1)
+  })
+
+  it('в пачке «пока тебя не было» срок легенды тоже под паузой (#179)', async () => {
+    const { game } = makeGame()
+    game.setLegend('safe_baby', 'nune')
+    game.S.day += 3
+    await game.excuseTurn() // клятва — дальше пауза
+    const n = game.S.msgs.length
+    await game.awayMsg('excuse')
+    expect(game.S.msgs.slice(n).filter((m) => m.kind === 'text' && m.text.includes(LEGENDS.safe_baby.until.t))).toEqual([])
+    expect(game.S.msgs.length).toBeGreaterThan(n) // пачка не молчит
+  })
+
+  it('повторный срок легенды звучит, но в журнал второй раз не пишется (#179)', async () => {
+    const { game } = makeGame()
+    game.setLegend('safe_baby', 'nune')
+    const until = LEGENDS.safe_baby.until.t
+    const inJournal = () => game.S.promises.filter((p) => p.t.includes(until)).length
+    game.S.stats.sent += 100
+    await game.excuseTurn()
+    expect(inJournal()).toBe(1)
+    game.S.stats.sent += 100
+    await game.excuseTurn()
+    expect(vows(game, until)).toBe(2) // сказал ещё раз
+    expect(inJournal()).toBe(1) // но это не новая запись
+  })
+
   it('хор не противоречит легенде: Нуне про сейф, а не «денег нет»', () => {
     const { game } = makeGame()
     game.setLegend('safe_baby', 'nune')

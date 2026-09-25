@@ -2,7 +2,7 @@
 // Берутся два самых приоритетных (специфичность + bonus); из одного слота — только одна.
 import type { Game } from '../../engine/game'
 import type { Choice, Tone } from '../../engine/state'
-import { type Rule, type Facts, type Criterion, type Entry, eq, is, exists, missing, gt, gte, lte, isOpen, valueOf } from '../../engine/rules'
+import { type Rule, type Facts, type Criterion, type Entry, eq, is, exists, missing, gt, gte, lte, isOpen, valueOf } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { D, cap } from '../excuses'
 import { talkPairs, talkId } from '../talk'
@@ -155,7 +155,7 @@ export const choiceRules: R[] = [
   ...(['legend', 'chorus', 'memory'] as const).map((kind) => {
     let arg = ''
     return offer({
-      name: 'Talk_' + kind, when: [kind === 'memory' ? is('ctx.memory') : exists('ctx.' + kind)], act: 'talk', tone: 'neutral', bonus: 2, odds: 0.8,
+      name: 'Talk_' + kind, when: [kind === 'memory' ? is('ctx.memory') : exists(`ctx.${kind}`)], act: 'talk', tone: 'neutral', bonus: 2, odds: 0.8,
       text: (g, f) => {
         const sub = kind === 'memory' ? '' : String(f['ctx.' + kind])
         const said = g.S.msgs.slice(-6).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : [])).join(' ')

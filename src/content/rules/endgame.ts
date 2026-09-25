@@ -1,5 +1,5 @@
 import type { Game } from '../../engine/game'
-import { type Rule, eq, exists, is, missing, named } from '../../engine/rules'
+import { type Rule, eq, exists, is, missing, named } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { endgame, paydayScene } from '../memkeys'
 

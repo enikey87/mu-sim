@@ -125,7 +125,9 @@ describe('оракул: негативный контроль', () => {
     const clean = oracle(await dump(9, 40, dead)).verdict!
     expect(clean.coverage.games_with_dead).toBe(1)
     expect(clean.violations.dead_speech).toBeUndefined()
-    for (const names of [['Says_WhileDead'], ['Turn_WhileDead', 'Tone_WhileDead']]) {
+    // Tone_WhileDead — путь ответа на сообщение; Turn — ход Алика. Says_* бот редко бьёт без act.
+    // Раньше NC ловил «реакцию» мёртвого (r=null); теперь реакция в молчании не ставится (#257).
+    for (const names of [['Tone_WhileDead'], ['Turn_WhileDead', 'Tone_WhileDead']]) {
       const restore = ungate(names)
       try {
         const v = oracle(await dump(9, 40, dead)).verdict!
@@ -175,7 +177,7 @@ describe('оракул: негативный контроль', () => {
 
   it('уведомление, показанное мимо выборщика, ловится по своему же условию', async () => {
     const text = 'Спасибо, что пришли сдать кровь! Вы наш герой. Приходите ещё.'
-    const dir = await dump(5, 2, (g) => g.notify('🩸', 'Донорский центр', text))
+    const dir = await dump(5, 2, (g) => { g.notify('🩸', 'Донорский центр', text) })
     const v = oracle(dir).verdict!
     expect(v.violations.notif_gate_false).toBe(1)
     // та же партия без обхода гейта — чисто: проверка различает показанное и объявленное
@@ -253,6 +255,11 @@ describe('оракул: сторож у каждой проверки', () => {
       const lines = [`(уведомление телефона: 🏦 Банк — ${t})`, `(уведомление телефона: 🏦 Банк — ${t})`]
       expect(oracle(synthetic(lines)).verdict!.violations.notif_event_repeat, t).toBeUndefined()
     }
+  })
+  it('повтор предложения кредита — находка; префикс «Банк —» его не прячет (#268)', () => {
+    const offer = 'Вам одобрен кредит «Всё будет» — 30 000 ₽ под 39,9%. Всё будет. Проценты — точно'
+    const lines = [`(уведомление телефона: 🏦 Банк — ${offer})`, `(уведомление телефона: 🏦 Банк — ${offer})`]
+    expect(oracle(synthetic(lines)).verdict!.violations.notif_event_repeat).toBe(1)
   })
   it('факты на момент сообщения: после последнего кадра — его «после», а не пустота', () => {
     const late = (mem: Record<string, unknown>) => ({ frames: [{ at: 0, before: {}, mem, said: [], fired: [] }], rules: { deathGated: [] }, coverage: {} })

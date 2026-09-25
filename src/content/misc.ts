@@ -1,5 +1,5 @@
 // Мелкие тексты движка: «полежал на полу», застолье, платёжки, ответы на допработу и т.д.
-import { type Line, eq, gate, gte, is, of, set, type Entry } from '../engine/rules'
+import { type Line, eq, gate, gte, is, of, set, type Entry } from './fact'
 import { needs, WORLD } from './world'
 import { bloodGiven, court, polite, sick, threatClaim, wedding } from './memkeys'
 import { sold } from './credit'
@@ -95,7 +95,7 @@ export const OATH_FORMS: Line[] = [
   { t: 'Мама рядом стоит, слышит, я говорю: {p}.', repeat: true, cooldown: { turns: 12 } },
   { t: 'Не клянусь даже. Клятвы — для тех, кто врёт. Просто говорю: {p}.', repeat: true, cooldown: { turns: 15 } },
   { t: 'Запиши где-нибудь: {p}. Я тоже запишу. Потом сверим.', repeat: true, cooldown: { turns: 15 } },
-  { t: 'Слово армянина: {p}. Армянское слово крепче банковского.', repeat: true, cooldown: { turns: 15 } },
+  { t: 'Слово Алика: {p}. Слово Алика крепче банковского. Банк так не считает.', repeat: true, cooldown: { turns: 15 } },
 ]
 
 // «крик → мир → крик → мир»: третье извинение за 6 ходов
@@ -135,8 +135,8 @@ export const PROMISE_NEVER = [
 
 // Свободный ввод «спасибо» / «привет» (docs/design/greetings.md): свой ответ вместо обычного хода. Кошелёк игрока не трогаем (#125)
 export const THANKS: Entry<string>[] = [
-  // после перевода «я ничего не перевёл» — ложь: fifty считает поступления (#192)
-  gate(eq('fifty', 0))('Не за что, брат. Правда, не за что — я же ничего не перевёл.'),
+  // после любого перевода «я ничего не перевёл» — ложь; fifty только для 50 ₽ (#192, #257)
+  gate(eq('paid', 0))('Не за что, брат. Правда, не за что — я же ничего не перевёл.'),
   'Спасибо — это приятно. Приятнее только, когда платят. Говорят.',
   'Ты вежливый, брат. Я это ценю. Пока словами.',
   'Пожалуйста! За что — не понял, но пожалуйста.',
@@ -165,7 +165,7 @@ export const GREET_MORNING = [
 
 // Подпись профиля Алика (docs/design/alik-status.md): состояние мира одной системной строкой в конце хода.
 // Каждая — под фактом своего состояния и один раз за партию; без сроков и дат (текст без записи — не обещание).
-// Молчание в блоке / смерти / у Карине / эндгейме — только в sendTurn (quietStatus), не дублировать гейтами пула (#223).
+// Молчание в блоке / смерти / у Карине / эндгейме — Game.alikSilent (+ endgame для подписи), не гейтами пула (#223, #257).
 export const ALIK_STATUS: Line[] = [
   needs('samvel')({ t: 'Тамада. До последнего тоста не беспокоить 🥂', when: [is(wedding('samvel')), WORLD.tamada], prio: 1 }),
   needs('boris', 'baran')({ t: 'Сиделка барана. Звонить шёпотом', when: [of('boris', is(sick))], prio: 1 }),
