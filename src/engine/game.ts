@@ -193,7 +193,7 @@ export class Game {
     this.rawAudio.setMuted(this.S.muted)
 
     if (!this.S.msgs.length) this.seed()
-    else { this.scheduleBills(); this.scheduleCredits() }
+    else { this.restoreDueEvents(); this.scheduleBills(); this.scheduleCredits() }
     void this.checkAway(opts.away ?? null)
     // перезагрузка посреди «займи 50»: доиграть просьбу+пометку, иначе лента врёт (#219)
     if (this.S.mem[memkeys.endgame.active] && !this.S.mem[memkeys.lend50.asked]) {
@@ -514,17 +514,38 @@ export class Game {
       if (this.S.mem[atKey] != null) continue
       const at = this.S.day + dueIn(bill.due, this.S.day)
       this.S.mem[atKey] = at
-      this.scheduleEvent(at, 'BillDue', { bill: bill.id, at })
-      // предупреждение SMS — только коммуналка (#178/#251); иначе игрок кричит «списание завтра» без SMS
-      if (bill.id === 'rent' && at - 1 > this.S.day) this.scheduleEvent(at - 1, 'BillWarn', { bill: bill.id, at })
+      this.scheduleBillDue(bill.id, at)
     }
   }
-  /** Событие по сроку — текущий срок, а не устаревший дубль. Без `at` — событие из старого сохранения. */
+  private scheduleBillDue(id: BillId, at: number): void {
+    this.scheduleEvent(at, 'BillDue', { bill: id, at })
+    // предупреждение SMS — только коммуналка (#178/#251); иначе игрок кричит «списание завтра» без SMS
+    if (id === 'rent' && at - 1 > this.S.day) this.scheduleEvent(at - 1, 'BillWarn', { bill: id, at })
+  }
+  /** Срок стоит, а события в сохранении нет — платёж молчал бы навсегда: вернуть событие на срок (#272). */
+  private restoreDueEvents(): void {
+    if (this.moneySealed()) return
+    const has = (event: GameEvent, k: 'bill' | 'credit', id: string, at: number): boolean =>
+      this.rules.state.schedule.some((it) => it.kind === 'event' && it.event === event && it.facts?.[k] === id
+        && (it.facts.at == null || Number(it.facts.at) === at))
+    for (const bill of BILLS) {
+      const at = this.S.mem[billDueAt(bill.id)]
+      if (at == null || bill.skip?.(this.S.mem) || has('BillDue', 'bill', bill.id, Number(at))) continue
+      this.scheduleBillDue(bill.id, Number(at))
+    }
+    for (const loan of LOANS) {
+      const at = this.S.mem[loanDueAt(loan.id)]
+      if (at == null || !this.S.mem[loanTaken(loan.id)] || has('CreditDue', 'credit', loan.id, Number(at))) continue
+      this.scheduleEvent(Number(at), 'CreditDue', { credit: loan.id, at: Number(at) })
+    }
+  }
+  /** Событие по сроку — текущий срок, не устаревший дубль (без `at` — из старого сохранения); «завтра» — только накануне (#272). */
   private dueLive(key: string, at: unknown, dayBefore = false): boolean {
     const cur = this.S.mem[key]
     if (cur == null) return false
-    if (at != null) return Number(at) === Number(cur)
-    return dayBefore ? Number(cur) === this.S.day + 1 : Number(cur) <= this.S.day
+    if (at != null && Number(at) !== Number(cur)) return false
+    if (dayBefore) return Number(cur) === this.S.day + 1
+    return at != null || Number(cur) <= this.S.day
   }
   billEventLive(id: BillId, at: unknown, event: 'BillDue' | 'BillWarn'): boolean {
     return this.dueLive(billDueAt(id), at, event === 'BillWarn')
@@ -881,9 +902,20 @@ export class Game {
       this.bankSmsDay.keys.add(key)
     }
     const n: Notif = { id: this.seq++, icon, app, text }
-    if (this.ui.notif) { this.notifQueue.push(n); return }
-    this.showNotif(n)
+    if (!this.ui.notif) { this.showNotif(n); return }
+    // телефон и переписка — впереди банка: банк — фон (money.md), а «низкий заряд» ждал за его пачкой (#272)
+    const urgent = (x: Notif): boolean => x.app === 'Система' || x.app === 'Алик Воздухонесян'
+    const q = this.notifQueue
+    const first = q.findIndex((x) => !urgent(x))
+    if (urgent(n)) q.splice(first < 0 ? q.length : first, 0, n)
+    else q.push(n)
+    // предел ожидания 4,2 с × очередь: лишнее из фона уходит — его факт уже на доске
+    while (q.length > Game.NOTIF_QUEUE_MAX) {
+      const i = q.findIndex((x) => !urgent(x))
+      q.splice(i < 0 ? 0 : i, 1)
+    }
   }
+  static readonly NOTIF_QUEUE_MAX = 4
   private showNotif(n: Notif): void {
     this.ui.notif = n
     if (this.notifWall !== null) wallClock.clearTimeout(this.notifWall)
