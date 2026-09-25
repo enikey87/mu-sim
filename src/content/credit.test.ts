@@ -425,6 +425,15 @@ describe('негативные контроли', () => {
     expect(game.S.mem[creditOffer]).toBe(true)
   })
 
+  it('перезагрузка не пересобирает обычные варианты ответа (#323)', () => {
+    const storage = memStorage()
+    const { game } = makeGame({ storage, seed: 4 })
+    const offered = game.choices.map((c) => c.text)
+    game.save()
+    const { game: loaded } = makeGame({ storage, seed: 9 })
+    expect(loaded.choices.map((c) => c.text)).toEqual(offered)
+  })
+
   it('реплика про микроволновку — только при sold.microwave', () => {
     const { game } = makeGame()
     const open = () => game.lines.eligible('NOTIF', NOTIF, game.lineFacts()).some((p) => p.text.includes('Микроволновку'))

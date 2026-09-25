@@ -145,7 +145,6 @@ export class Game {
   private noTimers: boolean
   private typos: boolean
   private hiddenAt = 0
-  private sceneCards: { icon: string; app: string; text: string; card?: Partial<Card> }[] = []
   /** Ход игрока: nextDay уже был (offline / fx.days) — обычный +1…3 в конце не дублируем. */
   private inPlayerTurn = false
   private dayMovedInTurn = false
@@ -703,7 +702,12 @@ export class Game {
   }
   /** Старое сохранение до #287: кнопки кредита в S.choices и credit.offer без карточки (#300). */
   private migrateCreditSave(): void {
-    this.S.choices = null
+    // только кредитные кнопки из старых сохранений — не весь пул вариантов (#323)
+    const creditAct = (c: { act?: string }) => c.act === 'creditTake' || c.act === 'creditSell' || c.act === 'creditLater'
+    if (this.S.choices?.some(creditAct)) {
+      this.S.choices = this.S.choices.filter((c) => !creditAct(c))
+      if (!this.S.choices.length) this.S.choices = null
+    }
     if (!this.S.mem[creditOffer]) return
     if (this.S.msgs.some((m) => m.kind === 'card' && m.offer && !m.answered)) return
     delete this.S.mem[creditOffer]
@@ -716,10 +720,12 @@ export class Game {
     this.flushSceneCards()
   }
   private flushSceneCards(): void {
-    const q = this.sceneCards.splice(0)
+    const q = this.S.pendingCards.splice(0)
     for (const c of q) {
+      // после выплаты банк/МФО из очереди не выпускаем (#323)
+      if ((c.app === 'Банк' || c.app === 'МФО') && this.moneySealed()) continue
       // уже прошли дедуп при откладывании — повторный notify снова отбросил бы банк (#300)
-      this.push({ kind: 'card', time: fmtTime(this.S.clock), icon: c.icon, app: c.app, text: c.text, ...c.card })
+      this.push({ kind: 'card', time: fmtTime(this.S.clock), icon: c.icon, app: c.app, text: c.text, lines: c.lines, offer: c.offer, answered: c.answered, result: c.result })
       this.audio.vibrate(30)
     }
   }
@@ -1037,7 +1043,9 @@ export class Game {
     }
     // событие денег не перебивает сцену — карточки после её конца (#300)
     if (!Game.isBanner(app) && this.S.scene) {
-      this.sceneCards.push({ icon, app, text, card })
+      // после выплаты банк/МФО в очередь не кладём — иначе flush отменит #316 (#323)
+      if ((app === 'Банк' || app === 'МФО') && this.moneySealed()) return false
+      this.S.pendingCards.push({ icon, app, text, ...card })
       return true
     }
     if (!Game.isBanner(app)) {
