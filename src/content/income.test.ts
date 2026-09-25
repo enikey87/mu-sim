@@ -86,14 +86,16 @@ describe('приход после дна (#322)', () => {
     expect((game.S.msgs.find((m) => m.id === again.id) as { answered?: boolean }).answered).toBeFalsy()
   })
 
-  it('кредит на пороге не берётся, а карточка ждёт (как продажа)', () => {
+  it('кредит даёт ровно обещанное, даже если баланс с тех пор изменился (#337)', () => {
     const game = poor(5_000)
-    game.maybeCreditOffer()
+    game.maybeCreditOffer() // обещано 4 000 — до порога от 5 000
     const card = lastCard(game, 'Банк')
-    setMoney(game, Game.MONEY_LOW)
+    expect(card.text).toContain(rub(4_000))
+    setMoney(game, Game.MONEY_LOW) // пришли деньги Алика — обещание не пересчитывается
     game.answerCard(card.id, 'take')
-    expect(game.S.mem[loanTaken('consumer')]).toBeFalsy()
-    expect(game.S.mem[creditOffer]).toBe(true)
+    expect(game.S.mem[loanTaken('consumer')]).toBe(true)
+    expect(game.S.money).toBe(Game.MONEY_LOW + 4_000)
+    expect(game.S.mem[creditOffer]).toBe(false)
   })
 
   it('мама: текст называет зачтённое; на пороге помощь не тратится', () => {
