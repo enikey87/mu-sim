@@ -17,8 +17,8 @@ export interface Episode {
   item?: string
   /** Легенда денег (legends.ts): где деньги и что мешает; null — легенда этого сериала кончилась. */
   legend?: string | null
-  /** Состояние мира на N дней (свадьба идёт, Борис болеет…); actor — чья это доска, иначе общая. */
-  state?: { key: string; days: number; actor?: string }
+  /** Состояние мира на N дней (свадьба идёт, Борис болеет…); без days — навсегда; actor — чья доска. */
+  state?: { key: string; days?: number; actor?: string }
   sys?: string
   then?: 'promise'
 }

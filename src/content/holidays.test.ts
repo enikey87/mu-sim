@@ -113,7 +113,55 @@ describe('праздники', () => {
     while (!(holidayOf(game.S.day) === 'newYear' && holidayGreetKey(game.S.day) === `newYear@${year + 1}`)) game.S.day++
     await game.send({ text: 'Спасибо!', tone: 'polite' })
     expect(greeted()).not.toBe(first)
-    expect(said().at(-1)).toMatch(/Новым годом|Ёлка|шампанское|Новый год на носу|Первый день года|по-новому/)
+    expect(said().at(-1)).toMatch(/Новым годом|Ёлка|шампанское|Новый год на носу|Первый день года|по-новому|наступающим/i)
+  })
+
+  it('праздник один раз на все пути: тайл, отмазка и «пока тебя не было» делят holiday.greeted (#328)', async () => {
+    const { game } = makeGame({ seed: 3 })
+    const holiday = HOLIDAY_EXCUSES.map((l) => spec(l).t)
+    const said = () => game.S.msgs.flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : []))
+    const count = () => said().filter((t) => holiday.includes(t)).length
+    game.S.day = 289
+    await game.send({ text: 'Спасибо!', tone: 'polite' })
+    expect(count()).toBe(1)
+    const key = game.S.mem['holiday.greeted']
+    expect(String(key)).toMatch(/^newYear@/)
+    await game.excuseTurn()
+    expect(game.S.mem['holiday.greeted']).toBe(key)
+    expect(count()).toBe(1)
+    const from = game.S.msgs.length
+    for (let i = 0; i < 20; i++) game.awayMsg('excuse')
+    expect(said().slice(from).filter((t) => holiday.includes(t))).toEqual([])
+    expect(game.S.mem['holiday.greeted']).toBe(key)
+  })
+
+  it('возврат из пропажи в праздник: тайл молчит, отмазка пишет отметку один раз (#328)', async () => {
+    const { game } = makeGame({ seed: 3 })
+    const holiday = HOLIDAY_EXCUSES.map((l) => spec(l).t)
+    const count = () => game.S.msgs.flatMap((m) => (m.kind === 'text' && m.from === 'alik' && holiday.includes(m.text) ? [m.text] : [])).length
+    game.S.day = 289
+    game.goOffline(2)
+    // как после alikTurn: пропажа снята, тайл хода пропускает поздравление (startedOffline)
+    game.S.offlineDays = 0
+    await game.excuseTurn()
+    expect(count()).toBe(1)
+    expect(String(game.S.mem['holiday.greeted'])).toMatch(/^newYear@/)
+    await game.excuseTurn()
+    expect(count()).toBe(1)
+    await game.send({ text: 'Спасибо!', tone: 'polite' })
+    expect(count()).toBe(1)
+  })
+
+  it('NC: без общей отметки отмазка поздравляет после тайла (#328)', async () => {
+    const { game } = makeGame({ seed: 3 })
+    const holiday = HOLIDAY_EXCUSES.map((l) => spec(l).t)
+    const count = () => game.S.msgs.flatMap((m) => (m.kind === 'text' && m.from === 'alik' && holiday.includes(m.text) ? [m.text] : [])).length
+    game.S.day = 289
+    await game.send({ text: 'Спасибо!', tone: 'polite' })
+    expect(count()).toBe(1)
+    delete game.S.mem['holiday.greeted']
+    await game.excuseTurn()
+    expect(count()).toBe(2)
   })
 
   it('NC: ключ по году даты поздравил бы дважды на стыке лет (#255)', () => {
