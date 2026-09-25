@@ -326,13 +326,13 @@ describe('после первого дна бедность до выплаты 
       let firstBottom: number | null = null
       let peak = 0
       let daysAfter = 0
-      let alik = 0 // переводы, серии, сцены — приходят целиком, их потолок не касается
+      let whole = 0 // приходит целиком, потолок не касается: деньги Алика и кровь за деньги (#339)
       const adjust = game.adjustMoney.bind(game)
       game.adjustMoney = (delta, reason, opts) => {
         const ok = adjust(delta, reason, opts)
         if (ok && delta > 0 && game.S.mem[moneyPoor]) {
-          expect(/^(Кредит: |Авито$|Мама$|Перевод от Алика$|Выплата$|По карте$|День выплаты$)/.test(reason), `seed ${seed}: неизвестный приход «${reason}»`).toBe(true)
-          if (/Алика|Выплата|По карте/.test(reason)) alik += delta
+          expect(/^(Кредит: |Авито$|Мама$|Перевод от Алика$|Выплата$|По карте$|День выплаты$|Донорский центр$)/.test(reason), `seed ${seed}: неизвестный приход «${reason}»`).toBe(true)
+          if (/Алика|Выплата|По карте|Донорский/.test(reason)) whole += delta
         }
         return ok
       }
@@ -342,7 +342,7 @@ describe('после первого дна бедность до выплаты 
         if (firstBottom != null && !game.S.mem['payday.chain'] && !game.S.mem['endgame.active']) {
           daysAfter++
           peak = Math.max(peak, game.S.money)
-          expect(game.S.money, `seed ${seed} day ${game.S.day}`).toBeLessThanOrEqual(Game.MONEY_LOW + alik)
+          expect(game.S.money, `seed ${seed} day ${game.S.day}`).toBeLessThanOrEqual(Game.MONEY_LOW + whole)
         }
         if (game.S.mem['payday.chain'] || game.S.mem['endgame.active']) break
       }
