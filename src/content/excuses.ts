@@ -4,14 +4,18 @@ import type { Due } from '../engine/time'
 import { type Entry, gate, eq, gte, lt, lte, matches, missing, exists, is, of } from './fact'
 import type { LegalClaim } from '../engine/input'
 import { needs, WORLD } from './world'
-import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, collectorsRecruited, count, evicted, grantPaid, met, nuneDekretOver, nuneKeyPassed, sick, taxThawed, threatClaim, tileCornerRemoved } from './memkeys'
+import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, collectorsRecruited, count, evicted, finaleOf, grantPaid, met, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, sick, taxThawed, threatClaim, tileCornerRemoved } from './memkeys'
 
 // draw(key, arr) выдаёт уместный сейчас элемент «из колоды» (без повторов до конца колоды); noRefill — после исчерпания null
 export type DrawFn = <T = unknown>(key: string, arr: readonly Entry<T>[], noRefill?: boolean) => T
 /** n — кто, g — кого; you — как его назовёт игрок, если Алик сказал «мой»/«я». */
 /** id — кто это из CAST, если отмазка называет его роль: такая реплика знакомит с персонажем. */
 export interface Rel { n: string; g: string; you?: string; id?: string }
-export const PROMISE_CONDITIONS = [betonSet, borisSmetaReady, grantPaid, nuneDekretOver, nuneKeyPassed, actSigned, taxThawed, borisMarried] as const
+export const PROMISE_CONDITIONS = [
+  betonSet, borisSmetaReady, grantPaid, nuneDekretOver, nuneKeyPassed, actSigned, taxThawed, borisMarried,
+  nivaAway, nivaBack, razmikMarried,
+  finaleOf('rubik'), finaleOf('razmik'), finaleOf('garik'), finaleOf('tile'),
+] as const
 export type PromiseCondition = typeof PROMISE_CONDITIONS[number]
 /** Срок: календарный (`d`/`due`), событийный (`condition`) или неопределённый (`d: null`). */
 export interface When { t: string; d: number | null; due?: Due; condition?: PromiseCondition; /** срок назван словом «завтра» — на него игрок и Алик потом ссылаются */ tomorrow?: boolean }

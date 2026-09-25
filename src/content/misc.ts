@@ -86,6 +86,7 @@ export const WHEN_COND = [
   needs('karineHome')(needs('karine')('{T} — вот тогда. Я тебе сразу напишу. Или Карине напишет.')),
   'Это зависит не от меня, брат. «{t}» — это от судьбы зависит.',
 ]
+export const OATH_STAKE_MOUSTACHE = 'oath_stake_moustache'
 // формы обещания: {o} — клятва, {p} — «срок — глагол», {P} — то же с большой буквы
 export const OATH_FORMS: Line[] = [
   { t: '{o}, {p}.', prio: 0, repeat: true, cooldown: { turns: 1 } },
@@ -93,7 +94,7 @@ export const OATH_FORMS: Line[] = [
   { t: 'Поставил себе напоминание в телефоне: «{P}». Телефон не врёт. Я — бывает, телефон — нет.', repeat: true, cooldown: { turns: 15 } },
   // ставка «усы»: пока не сбриты и не эндгейм (docs/design/moustache.md)
   gate(missing(endgame.active))(needs('karineHome')(needs('karine')(needs('moustache')({
-    id: 'oath_stake_moustache',
+    id: OATH_STAKE_MOUSTACHE,
     t: '{P}. Если нет — сбрею усы. Карине давно просит, так что мне в любом случае выгодно.',
     repeat: true,
     cooldown: { turns: 15 },

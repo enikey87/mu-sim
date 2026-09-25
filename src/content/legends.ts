@@ -5,12 +5,15 @@ import { type Line, type Entry, eq, exists, gate, gte, is, missing, set } from '
 import type { TalkPair } from './talk'
 import type { PromiseCondition } from './excuses'
 import { needs, WORLD } from './world'
-import { actSigned, borisMarried, borisSmetaReady, grantPaid, nuneDekretOver, nuneKeyPassed, taxFrozen, taxThawed } from './memkeys'
+import { actSigned, borisMarried, borisSmetaReady, finaleOf, grantPaid, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, taxFrozen, taxThawed } from './memkeys'
 
 export interface Legend {
   /** Срок, который из неё следует: «как ключ выйдет». */
   until: string
+  /** Факт мира, чьё наступление и есть срок. Ни его, ни `days` — срок «никогда» (NEVER в legends.test.ts): ставка на него не звучит. */
   condition?: PromiseCondition
+  /** Срок в днях, когда факта нет, а легенда сама его называет. */
+  days?: number
   /** Реплики Алика, продолжающие линию (каждая один раз). */
   lines: Line[]
   /** Что игрок может переспросить после реплики легенды: вопрос ↔ ответ Алика (каждая пара один раз). */
@@ -65,6 +68,7 @@ export const LEGENDS: Record<string, Legend> = {
   // --- «Нива» с деньгами в бардачке
   niva_stuck: {
     until: 'как «Нива» заведётся',
+    condition: nivaAway, // «завелась. И уехала сама»
     lines: [
       needs('garikFree')(needs('garik')('Толкали «Ниву» с Гариком. Она ни в какую. Деньги в бардачке, бардачок заклинило — из солидарности.')),
       '«Нива» стоит, деньги в ней. Я каждый день подхожу, глажу капот. Она молчит. Как банк.',
@@ -78,6 +82,7 @@ export const LEGENDS: Record<string, Legend> = {
   },
   niva_gone: {
     until: 'как «Нива» найдётся',
+    condition: nivaBack,
     lines: [
       'Если увидишь «Ниву» — не пугай её, брат. Она нервная. Скажи, что я не злюсь.',
       'Дал объявление: «Пропала «Нива», белая, с деньгами. Нашедшему — половина». Половина твоя, брат. Шучу. Моя.',
@@ -91,6 +96,7 @@ export const LEGENDS: Record<string, Legend> = {
   },
   niva_abroad: {
     until: 'как «Нива» вернётся из Грузии',
+    condition: nivaBack,
     lines: [
       '«Нива» в Тбилиси. Деньги с ней. Грузины говорят: машина хорошая, пусть остаётся. Переговоры идут.',
       needs('moustache')('Позвонил в грузинскую полицию. Спросили: «Нива» белая, с усами на капоте? Нет, говорю, усы — это я.'),
@@ -132,6 +138,7 @@ export const LEGENDS: Record<string, Legend> = {
   },
   boris_receipts: {
     until: 'как квитанции восстановим',
+    days: 3, // «квитанции выйдут дня через три» — из строки самой легенды
     lines: [
       'Без квитанций перевод не пройдёт, а Борис ест только квитанции. Замкнутый круг, брат.',
       'Ветеринар говорит: квитанции выйдут дня через три. В каком виде — не уточнял. Подождём.',
@@ -251,6 +258,7 @@ export const LEGENDS: Record<string, Legend> = {
   },
   inspect_karine: {
     until: 'как Карине с Рубиком разберётся',
+    condition: finaleOf('rubik'), // любой финал Рубика: Карине с ним разобралась, так или иначе
     lines: [
       'Рубик читает Карине стихи. Про плитку. Карине смеётся. Я — нет.',
       'Пока семья решает, деньги трогать нельзя — это может быть приданое. Моё или Карине — пока неясно.',
@@ -265,6 +273,7 @@ export const LEGENDS: Record<string, Legend> = {
   // --- Размик на кране
   crane_queue: {
     until: 'как Размик с крана слезет',
+    condition: finaleOf('razmik'),
     lines: [
       'Сначала Размик — он выше. Потом ты. Очередь, брат. Я уважаю очередь больше, чем деньги.',
       'Размик который день ничего не ест. Ты хотя бы ешь. Кому нужнее? Вот.',
@@ -278,6 +287,7 @@ export const LEGENDS: Record<string, Legend> = {
   },
   crane_wedding: {
     until: 'как Размик свадьбу на кране отгуляет',
+    condition: razmikMarried,
     lines: [
       'Гости поднимаются на кран по двое. Очередь на подъём — как к тебе на деньги. Длинная, но движется.',
       'Невеста уронила туфлю с сорока метров. Попала в козу тёти Гоар. Лечим козу. Деньги туда.',
@@ -394,6 +404,7 @@ export const LEGENDS: Record<string, Legend> = {
   // --- Гарик в фундаменте
   garik: {
     until: 'как Гарика достанем',
+    condition: finaleOf('garik'),
     lines: [
       'Код от сейфа знает только Гарик. А Гарик в фундаменте. Кричу ему в трубочку — он не слышит, бетон толстый.',
       'Гарику передали в трубочку бумагу и ручку — пусть напишет код. Он написал «помогите». Это не код.',
@@ -407,6 +418,7 @@ export const LEGENDS: Record<string, Legend> = {
   // --- плитка-убийца (суд)
   court_tile: {
     until: 'как суд по плитке закончится',
+    condition: finaleOf('tile'),
     lines: [
       'Пока идёт суд по твоей плитке, все мои счета арестованы. Из-за тебя, кстати. Плитка — твоя.',
       needs('grant')('Адвокат Гранта требует плитку как вещдок. Снимать будешь ты — ты же её клал.'),

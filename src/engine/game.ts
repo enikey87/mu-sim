@@ -13,7 +13,7 @@ import { ARCS, ARC_DONE, CAST, type Episode, GROUP, GROUP_OOPS, WRONG_TO, WRONG_
 import * as L from '../content/life'
 import { ACH } from '../content/achievements'
 import { SPEAKS, meet } from '../content/world'
-import { ALIK_STATUS, FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_HIDDEN, STATUS_WANDER, OATH_FORMS } from '../content/misc'
+import { ALIK_STATUS, FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_HIDDEN, STATUS_WANDER, OATH_FORMS, OATH_STAKE_MOUSTACHE } from '../content/misc'
 import { STARTS } from '../content/quests'
 import { BILLS, billDue, billDueAt, billStreak, billUnpaid, lightOff, netRation, phoneWarn, type BillId } from '../content/bills'
 import {
@@ -1194,6 +1194,8 @@ export class Game {
       'has.niva': S.items.some((n) => /Нива/.test(n)),
       // Календарное обещание живо в день срока; событийное — в ход, когда его факт стал истиной.
       promiseLive: !!pr && (pr.condition ? pr.met === S.day : pr.due === S.day),
+      // срок вышел: advanceTurnDay идёт раньше события срока и может перескочить день срока
+      promisePassed: !!pr && (pr.condition ? pr.met !== undefined : pr.due != null && pr.due <= S.day),
       promiseStake: pr?.stake ?? false,
       period: this.period(), night: this.isNight(), offline: S.offlineDays > 0, scene: S.scene?.id,
       sinceAlik: S.day - Number(S.mem[memkeys.alikDay] ?? S.day),
@@ -1294,7 +1296,7 @@ export class Game {
   }
   private async fulfillConditionalPromise(): Promise<void> {
     const promise = !this.S.mem[memkeys.alikDead] && !this.S.mem[memkeys.blocked]
-      ? this.S.promises.findIndex((p) => p.condition && p.met === undefined && this.S.mem[p.condition] === true)
+      ? this.S.promises.findIndex((p) => p.condition && p.met === undefined && this.conditionHolds(p.condition))
       : -1
     if (promise < 0) return
     const record = this.S.promises[promise]
@@ -1308,11 +1310,20 @@ export class Game {
     }
     await this.fire('PromiseConditionMet', { promise })
   }
+  /** Ставка со сроком позади, которую событие срока не сыграло (сцена, смерть, блок, выплата глотают событие: оно одноразовое), играет на ближайшем свободном ходе (#327). */
+  private async settleStake(): Promise<void> {
+    const S = this.S
+    if (this.alikSilent() || S.mem[memkeys.alikShaved] || S.mem[memkeys.endgame.active]) return
+    const i = S.promises.findIndex((p) => p.stake && !p.stakeDone && !p.kept && p.amnesty === undefined
+      && (p.condition ? p.met !== undefined : p.due != null && p.due <= S.day))
+    if (i >= 0) await this.fire(S.promises[i].condition ? 'PromiseConditionMet' : 'PromiseDue', { promise: i })
+  }
   async afterTurn(): Promise<void> {
     try {
       await this.rules.runDue(this, this.facts, { floor: this.floor() })
       this.flushBankWeek()
       await this.fulfillConditionalPromise()
+      await this.settleStake()
       await this.flushChorus()
     } catch (e) { this.swallowDisposed(e) }
   }
@@ -1502,6 +1513,7 @@ export class Game {
       if (this.disposed) return
       this.advanceTurnDay()
       await this.rules.runDue(this, this.facts, { floor: this.floor() })
+      await this.settleStake()
       this.flushBankWeek()
       if (this.disposed) return
       // сюжетный ход: только вне сцены, если Алик не «пропал» и в этом ходу ещё не было сцены или серии
@@ -1565,7 +1577,7 @@ export class Game {
   }
   recordPromise(p?: { text: string; d: number | null; due?: Due; condition?: PromiseCondition; tomorrow?: boolean; stake?: 'moustache' } | null): void {
     if (!p) return
-    if (p.condition && this.S.mem[p.condition] === true) return
+    if (p.condition && this.conditionHolds(p.condition)) return
     if (p.tomorrow) this.rules.applyOps([set(memkeys.saidTomorrow, true)], {})
     if (p.due && 'weekday' in p.due && p.due.weekday === 5) this.rules.applyOps([set(memkeys.saidFriday, true)], {})
     const due = p.d == null ? null : this.S.day + (p.due ? dueIn(p.due, this.S.day) : p.d)
@@ -1578,18 +1590,24 @@ export class Game {
   private legendDue(): boolean {
     return this.S.stats.sent - Number(this.S.mem[memkeys.legendPromiseAt] ?? -99) >= LEGEND_VOW_GAP
   }
-  /** Срок легенды второй раз в журнал не пишем — повтор не новость (#179). Условие — если есть; иначе фраза срока внутри текста записи (у 23 легенд condition нет, #246). */
-  private recordPromiseOnce(p: { text: string; t?: string; d: number | null; due?: Due; condition?: PromiseCondition; tomorrow?: boolean; stake?: 'moustache' }): void {
-    const seen = p.condition
-      ? this.S.promises.some((x) => x.condition === p.condition)
-      : !!p.t && this.S.promises.some((x) => x.t.includes(p.t!))
-    if (seen) return
-    this.recordPromise(p)
+  /** `finale.<сериал>` хранит id финала, а не `true`: условие срока — «факт есть». */
+  private conditionHolds(c: PromiseCondition): boolean {
+    return !!this.S.mem[c]
   }
-  private alignPromise(p: Promise3, until: string, condition?: PromiseCondition): Promise3 {
+  /** Срок легенды второй раз в журнал не пишем — повтор не новость (#179); прошедший срок в днях — новость. Повтор со ставкой переносит ставку в живую запись (#327). */
+  private recordPromiseOnce(p: { text: string; t?: string; d: number | null; due?: Due; condition?: PromiseCondition; tomorrow?: boolean; stake?: 'moustache' }): void {
+    const day = this.S.day
+    const seen = p.condition
+      ? this.S.promises.find((x) => x.condition === p.condition)
+      : p.t ? this.S.promises.find((x) => x.t.includes(p.t!) && (x.due == null || x.due >= day)) : undefined
+    if (!seen) return this.recordPromise(p)
+    const pending = seen.condition ? seen.met === undefined : seen.due != null && seen.due >= day
+    if (p.stake && pending) seen.stake ??= p.stake
+  }
+  private alignPromise(p: Promise3, until: string, condition?: PromiseCondition, days?: number): Promise3 {
     p.text = p.text.replace(p.t, until)
     p.t = until
-    p.d = null
+    p.d = days ?? null
     p.due = undefined
     p.condition = condition
     p.tomorrow = undefined // срок из легенды — не «завтра»: иначе said.tomorrow без слова «завтра»
@@ -1600,18 +1618,18 @@ export class Game {
   async promiseLine(prefix?: string, legend?: boolean): Promise<void> {
     const legendSpec = this.legend() ? LEGENDS[this.legend()!] : undefined
     // событие легенды уже случилось («свадьба Бориса прошла») — обещать «сразу после него» поздно
-    const done = legendSpec?.condition ? this.S.mem[legendSpec.condition] === true : false
+    const done = legendSpec?.condition ? this.conditionHolds(legendSpec.condition) : false
     const until = done ? undefined : legendSpec?.until
     // срок из легенды — не чаще, чем раз в LEGEND_VOW_GAP сообщений игрока: одна и та же клятва приедается (#179)
     const fromLegend = !!until && this.legendDue() && (legend || this.chance(0.4))
     if (fromLegend) this.S.mem[memkeys.legendPromiseAt] = this.S.stats.sent
     const p = this.uniq(() => {
       const q = this.X.promise()
-      if (fromLegend) this.alignPromise(q, until!, legendSpec?.condition)
+      if (fromLegend) this.alignPromise(q, until!, legendSpec?.condition, legendSpec?.days)
       if (prefix) return { text: `${prefix} ${low(q.text)}.`, q, stake: undefined as undefined | 'moustache' }
-      // форма клятвы — из пула (одна формула в каждом втором сообщении приедается)
-      const form = this.linePicked('OATH_FORMS', OATH_FORMS)
-      const stake = form?.id === 'oath_stake_moustache' ? 'moustache' as const : undefined
+      // форма клятвы — из пула (одна формула в каждом втором сообщении приедается); ставка — только на срок, который может наступить
+      const form = this.linePicked('OATH_FORMS', OATH_FORMS, { filter: (s) => s.id !== OATH_STAKE_MOUSTACHE || q.d != null || !!q.condition })
+      const stake = form?.id === OATH_STAKE_MOUSTACHE ? 'moustache' as const : undefined
       const tpl = form?.text ?? '{o}, {p}.'
       return { text: tpl.replace('{o}', this.X.g('OATH')).replace('{P}', cap(q.text)).replace('{p}', q.text), q, stake }
     })
@@ -1897,8 +1915,8 @@ export class Game {
   async playEpisode(ep: Episode, arc?: string): Promise<void> {
     if (ep.remember) this.rules.applyOps(ep.remember, {})
     if (ep.legend !== undefined) this.setLegend(ep.legend, arc)
-    // серия без своей легенды возвращает легенду своего сериала: свадьба идёт — значит, деньги «после свадьбы»
-    else if (arc && this.S.mem[memkeys.legendOf(arc)]) this.setLegend(String(this.S.mem[memkeys.legendOf(arc)]), arc)
+    // серия без своей легенды возвращает легенду своего сериала: свадьба идёт — значит, деньги «после свадьбы»; гейт клятвы возврат не открывает (#327)
+    else if (arc && this.S.mem[memkeys.legendOf(arc)]) this.setLegend(String(this.S.mem[memkeys.legendOf(arc)]), arc, false)
     const m = this.open(ep.m)
     for (const x of m) this.seen.mark(typeof x === 'string' ? x : x.t)
     this.markTopical(await this.say(m))
@@ -1923,7 +1941,7 @@ export class Game {
     if (ep.then === 'promise') await this.promiseLine(undefined, !!ep.legend)
   }
   /** Легенда денег — факт на доске мира: где деньги и что мешает. Живёт 30 дней или до следующей серии. */
-  setLegend(id: string | null, arc?: string): void {
+  setLegend(id: string | null, arc?: string, opensVow = true): void {
     const m = this.S.mem
     // после Дня выплаты деньги «выплачены» — новые легенды о том, где они, спорили бы с утром выплаты
     if (id !== null && m[memkeys.payday.chain]) return
@@ -1936,8 +1954,8 @@ export class Game {
     if (arc) m[memkeys.legendOf(arc)] = id
     m[memkeys.legendId] = id
     m[memkeys.legendDay] = this.S.day
-    // гейт клятвы — только при новой или сменившейся легенде; проходная серия ту же не открывает (#246)
-    if (prev !== id) m[memkeys.legendPromiseAt] = this.S.stats.sent - LEGEND_VOW_GAP
+    // гейт клятвы открывает только серия, которая сама заводит или меняет легенду (#246, #327)
+    if (opensVow && prev !== id) m[memkeys.legendPromiseAt] = this.S.stats.sent - LEGEND_VOW_GAP
     if (arc) m[memkeys.legendArc] = arc
   }
   /** Текущая легенда (если не устарела). */
@@ -2352,7 +2370,7 @@ export class Game {
         const legend = this.legend()
         if (legend && this.legendDue()) {
           const spec = LEGENDS[legend]
-          const promise = this.alignPromise(this.X.promise(), spec.until, spec.condition)
+          const promise = this.alignPromise(this.X.promise(), spec.until, spec.condition, spec.days)
           this.S.mem[memkeys.legendPromiseAt] = this.S.stats.sent
           this.recordPromiseOnce(promise)
           deliver({ kind: 'text', from: 'alik', text: promise.text })
