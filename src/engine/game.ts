@@ -435,14 +435,24 @@ export class Game {
     return t
   }
   /**
-   * Реплика бедности: пока пул уровня не исчерпан — без повторов, дальше редко и по кругу: одна строка
-   * на окно в POOR_REPEAT_DAYS дней. Бедность держится до Дня выплаты — голос не должен смолкать (#184).
+   * Бедность: свежие без повторов; исчерпанный пул — одна строка на окно POOR_REPEAT_DAYS,
+   * повтор в той же сборке дня — null (#184/#348).
    */
+  private poorShownDay = -1
+  private poorShown = new Set<string>()
   poorLine(key: string, arr: readonly Entry<string>[]): string | null {
+    if (this.poorShownDay !== this.S.day) {
+      this.poorShown.clear()
+      this.poorShownDay = this.S.day
+    }
     const fresh = this.freshPlayer(key, arr)
     if (fresh !== null) return fresh
     const open = arr.filter((e) => isOpen(e, this.lineFacts())).map(valueOf)
-    return open.length ? open[Math.floor(this.S.day / POOR_REPEAT_DAYS) % open.length] : null
+    if (!open.length) return null
+    const t = open[Math.floor(this.S.day / POOR_REPEAT_DAYS) % open.length]!
+    if (this.poorShown.has(t)) return null
+    this.poorShown.add(t)
+    return t
   }
   pair = (ka: string, a: readonly Entry<string>[], kb: string, b: readonly Entry<string>[]): string =>
     this.uniq(() => `${this.draw(ka, a)} ${this.draw(kb, b)}`)
@@ -1505,6 +1515,7 @@ export class Game {
     if (o.act === 'sorry') S.mem[memkeys.sorryAt] = [...String(S.mem[memkeys.sorryAt] ?? '').split(',').filter(Boolean), S.stats.sent].slice(-4).join(',') // для «качелей»
     if (tone === 'rude') S.mem[memkeys.rudeAt] = S.stats.sent
     S.choices = null
+    this.poorShown.clear() // повтор бедности режет внутри сборки, не между ходами
     this.battery.drain(1)
     this.save()
     if (this.disposed) { this.inPlayerTurn = false; return }
@@ -1587,7 +1598,8 @@ export class Game {
         this.sys('Алик Воздухонесян сменил фото профиля. На фото — баран')
         this.unlock('ram')
       }
-      // подпись профиля — молчание: alikSilent + эндгейм; «скрыл» только в живом блоке (#223/#257)
+      // подпись профиля — молчание: alikSilent + эндгейм; «скрыл» только в живом блоке (#223/#257).
+      // «смерть»: Карине один раз меняет статус из того же пула (#353)
       const quietStatus = this.alikSilent() || !!S.mem[memkeys.endgame.active]
       if (S.mem[memkeys.blocked] && !S.mem[memkeys.endgame.active] && !S.mem[memkeys.alikDead] && !S.mem[memkeys.phoneKarine]) {
         if (!S.mem[memkeys.statusHidden]) {
@@ -1596,6 +1608,11 @@ export class Game {
         }
       } else if (!quietStatus) {
         const status = this.line('ALIK_STATUS', ALIK_STATUS)
+        if (status) this.sys(`Алик Воздухонесян изменил статус: «${status}»`)
+      } else if (S.mem[memkeys.alikDead] && !S.mem[memkeys.endgame.active] && !S.mem[memkeys.blocked] && !S.mem[memkeys.phoneKarine] && !S.offlineDays) {
+        const status = this.line('ALIK_STATUS', ALIK_STATUS, {
+          filter: (s) => (s.when ?? []).some((c) => c.key === memkeys.alikDead && (c.op === 'exist' || (c.op === '==' && c.value === true))),
+        })
         if (status) this.sys(`Алик Воздухонесян изменил статус: «${status}»`)
       }
       // праздник в окне звучит хотя бы раз: отмазку вытесняют серия, сцена или легенда, а окно короткое.

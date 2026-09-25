@@ -21,7 +21,7 @@ type BatteryView = Readonly<Pick<Game['battery'], 'level' | 'dead' | 'charging'>
 export type GameUi = Readonly<
   Pick<Game, 'subscribe' | 'getVersion' | 'getMsgsEpoch' | 'getMsgsDirtyFrom' | 'ackMsgsDirty' | 'choices' | 'clockText' | 'gameDate'
     | 'send' | 'answerJob' | 'answerCard' | 'canMirror' | 'playVoice' | 'castOf' | 'flash' | 'closeEnding' | 'dismissNotif' | 'toggleMute' | 'gesture' | 'onVisibility' | 'reset' | 'introDone'>
-  & { ui: UiView; battery: BatteryView; mooSound: () => void }
+  & { ui: UiView; battery: BatteryView; mooSound: () => void; vibrate: (p: number | number[]) => void }
 >
 
 const REAL = new WeakMap<GameUi, Game>()
@@ -49,6 +49,7 @@ export function uiOf(g: Game): GameUi {
     toggleMute: () => g.toggleMute(), gesture: () => g.gesture(), onVisibility: (h) => g.onVisibility(h), reset: () => g.reset(),
     introDone: () => g.introDone(),
     mooSound: () => { g.audio.moo() },
+    vibrate: (p) => { g.audio.vibrate(p) },
   }
   FACADE.set(g, u)
   REAL.set(u, g)
@@ -159,12 +160,11 @@ export type IntroView = {
   notes: IntroNote[]
 }
 
-/** Имена, которых на старте партии ещё нет — иначе уведомление интро врёт о знакомстве (#249/#321). */
-export const INTRO_UNKNOWN = /мам[аеуы]|Карине|Гарик|Самвел|Нуне|Борис|Грант|Размик|Рубик|Арсен|Гоар|Мкртич/i
-
-/** Уведомления середины интро: обещания, стикер, банк из пулов партии (docs/design/intro.md). */
+/** Уведомления середины интро: обещания, стикер, банк из пулов партии (docs/design/intro.md).
+ *  Сторож «интро не знакомит с чужими» живёт в ui.test.tsx и идёт по настоящему выводу (аудит #335):
+ *  прежний фильтр ниже отсеивал ничего — в SPEND имён нет. */
 export function introMidNotes(money = START_MONEY, seed = 1): IntroNote[] {
-  const why = SPEND.map((e) => spec(e).t).filter((t) => !INTRO_UNKNOWN.test(t))
+  const why = SPEND.map((e) => spec(e).t)
   const i = Math.abs(seed) % Math.max(1, why.length)
   const a = why[i] ?? 'Продукты'
   const b = why[(i + 1) % why.length] ?? 'Кофе с горя'

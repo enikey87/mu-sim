@@ -9,6 +9,7 @@ import { SAVE_KEY, loadState, START_MONEY } from '../engine/state'
 import { fmtDate } from '../engine/time'
 import type { Game } from '../engine/game'
 import { introOf, uiOf } from './view'
+import { browserAudio } from '../engine/audio'
 
 function renderApp(game: Game, onReset = vi.fn()) {
   const utils = render(<App game={game} onReset={onReset} />)
@@ -826,17 +827,31 @@ describe('интро новой партии', () => {
       .not.toBe(introMidNotes(START_MONEY, 2).map((n) => n.text).join('|'))
   })
 
-  it('NC: без фильтра незнакомых имя из подмешанного пула попадает в интро (#321)', async () => {
-    const { INTRO_UNKNOWN, introMidNotes } = await import('./view')
+  it('NC: уведомления интро не знакомят с чужими — проверка по настоящему выводу (#367)', async () => {
+    const { introMidNotes } = await import('./view')
+    const { CAST } = await import('../content/arcs')
+    const { STARTS } = await import('../content/quests')
     const { SPEND } = await import('../content/life')
-    const { spec } = await import('../engine/rules')
-    const decoy = 'Перевод маме на закатки'
-    expect(INTRO_UNKNOWN.test(decoy)).toBe(true)
-    const raw = [...SPEND.map((e) => spec(e).t), decoy]
-    expect(raw.some((t) => INTRO_UNKNOWN.test(t))).toBe(true)
-    const filtered = raw.filter((t) => !INTRO_UNKNOWN.test(t))
-    expect(filtered.some((t) => INTRO_UNKNOWN.test(t))).toBe(false)
-    expect(introMidNotes(28_000, 1).every((n) => !INTRO_UNKNOWN.test(n.text))).toBe(true)
+    const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    // имя персонажа — последнее слово с заглавной из CAST: роли («Заказчик», «Дядя», «Прораб») отпадают сами
+    const names = Object.values(CAST)
+      .map((c) => c.name.replace(/[^А-Яа-яЁё\s]/g, '').trim().split(/\s+/).filter((w) => /^[А-ЯЁ]/.test(w) && w.length > 3).at(-1)!)
+    const re = new RegExp(names.map(escape).join('|'), 'i')
+    const stray = (texts: string[]) => texts.filter((t) => re.test(t))
+    // настоящий путь: ни одно уведомление ни при одном сиде и ни один пролог завязки не называют чужого
+    for (let seed = 0; seed < 40; seed++) {
+      const texts = introMidNotes(START_MONEY, seed).map((n) => n.text)
+      expect(stray(texts), `seed ${seed}: ${stray(texts).join(' | ')}`).toEqual([])
+    }
+    expect(stray(STARTS.flatMap((s) => [s.intro, s.reply]))).toEqual([])
+    // контроль: строка с именем, подложенная в пул, ловится
+    SPEND.push('Перевод Борису на закатки')
+    try {
+      const hits = Array.from({ length: 40 }, (_, seed) => stray(introMidNotes(START_MONEY, seed).map((n) => n.text))).flat()
+      expect(hits.length, 'декой с именем должен краснеть').toBeGreaterThan(0)
+    } finally {
+      SPEND.pop()
+    }
   })
 
   it('старое сохранение без introShown — интро не показывает (#249)', () => {
@@ -869,5 +884,47 @@ describe('интро новой партии', () => {
     expect(intro.className).toMatch(/phase-gap/)
     expect(intro.className).not.toMatch(/phase-title/)
     expect(within(intro as HTMLElement).getByText(p.gap)).toBeInTheDocument()
+  })
+})
+
+describe('интро: вибрация на уведомлениях (#351)', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  const vibrateGame = (muted = false) => {
+    const vibrate = vi.fn()
+    vi.stubGlobal('navigator', { vibrate })
+    const audio = browserAudio()
+    const { game } = makeGame({ audio })
+    game.gesture() // касание страницы было — иначе гейт жеста audio срежет вибрацию
+    if (muted) game.toggleMute()
+    return { game, vibrate }
+  }
+
+  it('на каждое уведомление — встряска: обещание, ответ и 6 из пула', () => {
+    vi.useFakeTimers()
+    const { game, vibrate } = vibrateGame()
+    render(<App game={game} onReset={vi.fn()} intro />)
+    act(() => { vi.advanceTimersByTime(7000) })
+    expect(vibrate).toHaveBeenCalledTimes(8)
+  })
+
+  it('выключенный звук — без вибраций: гейт живёт в audio, интро его не обходит', () => {
+    vi.useFakeTimers()
+    const { game, vibrate } = vibrateGame(true)
+    render(<App game={game} onReset={vi.fn()} intro />)
+    act(() => { vi.advanceTimersByTime(7000) })
+    expect(vibrate).not.toHaveBeenCalled()
+  })
+
+  it('prefers-reduced-motion — статика без вибраций', () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('matchMedia', () => ({ matches: true }))
+    const { game, vibrate } = vibrateGame()
+    render(<App game={game} onReset={vi.fn()} intro />)
+    act(() => { vi.advanceTimersByTime(6000) })
+    expect(vibrate).not.toHaveBeenCalled()
   })
 })

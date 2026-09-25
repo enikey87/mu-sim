@@ -38,6 +38,8 @@ export function Intro({ data, gate, onDone }: { data: IntroView; gate: boolean; 
   useEffect(() => {
     if (!started) return
     const T = (ms: number, f: () => void) => timers.current.push(window.setTimeout(f, ms))
+    // уведомление — со встряхой; reduced-ветка их не зовёт: статика без вибраций
+    const note = (ms: number, f: () => void) => T(ms, () => { game.vibrate(30); f() })
     if (reduced) {
       // три фазы подряд: обещание → завязка → титул — без наложений (#321)
       setNotes([{ icon: '💬', app: 'Алик', text: data.intro }, { icon: '💬', app: 'Вы', text: data.reply, me: true }])
@@ -48,8 +50,8 @@ export function Intro({ data, gate, onDone }: { data: IntroView; gate: boolean; 
       T(4500, () => finishRef.current(false))
       return () => { for (const t of timers.current) clearTimeout(t) }
     }
-    T(300, () => setNotes((n) => [{ icon: '💬', app: 'Алик', text: data.intro }, ...n]))
-    T(1100, () => setNotes((n) => [{ icon: '💬', app: 'Вы', text: data.reply, me: true }, ...n]))
+    note(300, () => setNotes((n) => [{ icon: '💬', app: 'Алик', text: data.intro }, ...n]))
+    note(1100, () => setNotes((n) => [{ icon: '💬', app: 'Вы', text: data.reply, me: true }, ...n]))
     T(1800, () => {
       let k = 0
       const tick = () => {
@@ -59,7 +61,7 @@ export function Intro({ data, gate, onDone }: { data: IntroView; gate: boolean; 
       }
       tick()
     })
-    data.notes.forEach((n, i) => T(2100 + i * 650, () => setNotes((prev) => [n, ...prev].slice(0, 6))))
+    data.notes.forEach((n, i) => note(2100 + i * 650, () => setNotes((prev) => [n, ...prev].slice(0, 6))))
     T(5000, () => { setMooKey((k) => k + 1); game.mooSound() })
     T(6300, () => setPhase('gap'))
     T(9300, () => setPhase('title'))

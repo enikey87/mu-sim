@@ -65,25 +65,57 @@ describe('статус Алика живёт миром', () => {
     for (let i = 0; i < 3; i++) await turn(game)
     expect(statuses(game)).toEqual([])
   })
-  it('в блоке, при «смерти», с телефоном у Карине и в эндгейме — молчит путём игрока; «скрыл» только в блоке', async () => {
-    const quiet: Record<string, { setup: (g: Game) => void; hidden: boolean }> = {
+  it('в блоке, с телефоном у Карине и в эндгейме — молчит; при «смерти» — статус Карине один раз (#353)', async () => {
+    const quiet: Record<string, { setup: (g: Game) => void; hidden: boolean; status?: string }> = {
       блок: { setup: (g) => { g.S.mem.blocked = true }, hidden: true },
-      смерть: { setup: (g) => { g.S.mem.alik_dead = true }, hidden: false },
+      смерть: { setup: (g) => { g.S.mem.alik_dead = true }, hidden: false, status: 'Алик Воздухонесян изменил статус: «Покинул нас. Временно»' },
       'телефон у Карине': { setup: (g) => { g.S.mem['phone.karine'] = true }, hidden: false },
       эндгейм: { setup: (g) => { g.S.mem['endgame.active'] = true }, hidden: false },
     }
-    for (const [name, { setup, hidden: wantHidden }] of Object.entries(quiet)) {
+    for (const [name, { setup, hidden: wantHidden, status }] of Object.entries(quiet)) {
       const { game } = makeGame()
       await playUntil(game, 'niva', nivaAway)
       setup(game)
       await turn(game)
-      expect(statuses(game), name).toEqual([])
+      expect(statuses(game), name).toEqual(status ? [status] : [])
       expect(hidden(game), name).toEqual(wantHidden ? [HIDDEN] : [])
       if (name !== 'эндгейм') {
         expect(game.ui.status?.text, name).toBe('не в сети')
         expect(game.ui.status?.cls ?? '', name).not.toBe('online')
       }
     }
+  })
+  it('статус «смерти» один раз; после «понял, что жив» и в блоке/эндгейме не звучит (#353)', async () => {
+    const { game } = makeGame()
+    game.S.mem.alik_dead = true
+    await turn(game)
+    expect(statuses(game)).toEqual(['Алик Воздухонесян изменил статус: «Покинул нас. Временно»'])
+    await turn(game)
+    expect(statuses(game)).toHaveLength(1)
+    game.S.mem.alik_dead = false
+    await turn(game)
+    expect(statuses(game)).toHaveLength(1)
+
+    const blocked = makeGame().game
+    blocked.S.mem.alik_dead = true
+    blocked.S.mem.blocked = true
+    await turn(blocked)
+    expect(statuses(blocked)).toEqual([])
+
+    const end = makeGame().game
+    end.S.mem.alik_dead = true
+    end.S.mem['endgame.active'] = true
+    await turn(end)
+    expect(statuses(end)).toEqual([])
+  })
+  it('NC: без строки alikDead в пуле «смерть» молчит (#353)', async () => {
+    const { game } = makeGame()
+    game.S.mem.alik_dead = true
+    const { spec } = await import('../engine/rules')
+    const live = ALIK_STATUS.filter((l) => spec(l).t !== 'Покинул нас. Временно')
+    expect(game.line('ALIK_STATUS_NC', live, {
+      filter: (s) => (s.when ?? []).some((c) => c.key === 'alik_dead' && (c.op === 'exist' || (c.op === '==' && c.value === true))),
+    })).toBeNull()
   })
   it('в блоке шапка не показывает «прочитано»/«печатает…»/«в сети» ни в какой момент хода', async () => {
     const { game } = makeGame()
