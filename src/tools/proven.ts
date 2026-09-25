@@ -36,4 +36,6 @@ export const PROVEN = new Set([
   'Quiet_PaydayOpen_StoryBeat',
   'Away_ColdWar',
   'Quiet_Offended_AlikAway',
+  // ставка «усы» сдержана: mood+odds; бот почти не копит срок со stake (#285)
+  'Due_StakeKept',
 ])
