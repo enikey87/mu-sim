@@ -6,7 +6,7 @@ import { LEGENDS } from './legends'
 import { holidayDays, type HolidayRef } from './holidays'
 import { sick, wedding } from './memkeys'
 import { valueOf, type Entry } from './fact'
-import { dateOf, dueIn, fmtDayMonth, HANDOVER } from '../engine/time'
+import { dueIn, fmtDayMonth, HANDOVER } from '../engine/time'
 import type { Game } from '../engine/game'
 
 /** До ближайшей даты — не больше года; Пасха гуляет на 35 дней, и Вардавар вместе с ней. */
@@ -181,11 +181,13 @@ describe('факты контекста: род и горизонт', () => {
     expect(ctx(game)).toEqual({ kind: 'never', days: undefined, horizon: undefined })
   })
 
-  it('кнопки этого шага не тронуты: ctx.whenDate — по-прежнему день обещания, у любого рода', async () => {
-    for (const t of ['завтра', 'после Навасарда', 'как Нуне из декрета выйдет', 'когда рак на Арагаце свистнет']) {
-      const g = await said(byText(t))
-      expect(g.facts()['ctx.whenDate'], t).toBe(fmtDayMonth(g.S.day))
+  it('ctx.whenDate — дата срока, и только у ясного срока и увёртки', async () => {
+    const day = (await said(byText('завтра'))).S.day
+    expect((await said(byText('завтра'))).facts()['ctx.whenDate']).toBe(fmtDayMonth(day + 1))
+    const dodge = await said(byText('в пятницу, край — в понедельник'))
+    expect(dodge.facts()['ctx.whenDate']).toBe(fmtDayMonth(dodge.S.day + dueIn({ weekday: 5, plus: 3 }, dodge.S.day))) // поздняя из двух дат
+    for (const t of ['после Навасарда', 'как Нуне из декрета выйдет', 'когда рак на Арагаце свистнет', 'в следующем веке, в начале']) {
+      expect((await said(byText(t))).facts()['ctx.whenDate'], t).toBeUndefined()
     }
-    expect(dateOf(0).getFullYear()).toBe(2026) // календарь партии — тот же, что у кнопок
   })
 })
