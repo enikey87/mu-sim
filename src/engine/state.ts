@@ -33,6 +33,9 @@ export type Msg =
   | (MsgBase & { kind: 'job'; from: 'alik'; text: string; answered?: boolean })
   | (MsgBase & { kind: 'card' } & Card)
 
+/** Что за событие телефона: по нему оракул отличает законный повтор (сводка, отказ, уровень) от настоящего (#304). */
+export type PhoneEvent = 'bank.summary' | 'bank.offer' | 'bank.refusal' | 'bank.level' | 'bank.warn' | 'mom' | 'life' | 'battery' | 'unread'
+
 /** Карточка телефона в ленте (банк, МФО, мама, Авито): не реплика и не требует нажатия; `offer` — кнопки кредита (#287). */
 export interface Card {
   icon: string
@@ -40,6 +43,7 @@ export interface Card {
   text: string
   lines?: string[]
   offer?: { take?: string; sell?: string }
+  event?: PhoneEvent
   /** Кнопки закрыты; `result` — чем кончилось. */
   answered?: boolean
   result?: string

@@ -68,6 +68,29 @@ describe('плейтест', () => {
     const mine = [...ruleOf.entries()].map(([, r]) => r).filter((r) => r === 'Nest_Parent')
     expect(mine.length).toBeGreaterThan(0)
   })
+  // #304: не функция, а сама партия — playtest() обязан вешать ту же атрибуцию (раньше тест видел только обёртку)
+  it('playtest(): речь после вложенного fire атрибутирована родителю в кадрах партии', async () => {
+    const p = await playtest(5, 12, undefined, (g) => {
+      g.rules.add({ name: 'Nest_Child', event: 'NestProbe', when: [], specificity: 10_000, respond: () => false })
+      g.rules.add({
+        name: 'Nest_Parent', event: 'AlikTurn', when: [], specificity: 10_000,
+        respond: async ({ game: gg }) => {
+          const nested = await gg.rules.fire(gg, { event: 'NestProbe' }, gg.facts, { floor: gg.floor() })
+          if (!nested) await gg.say(['речь родителя после вложенного fire'])
+        },
+      })
+    })
+    const said = p.world.flatMap((f) => f.said)
+    expect(p.game.S.msgs.some((m) => m.kind === 'text' && m.text === 'речь родителя после вложенного fire'), 'родитель ни разу не говорил — проверка пуста').toBe(true)
+    expect(said.filter((s) => s.r === 'Nest_Parent').length).toBeGreaterThan(0)
+  }, 60_000)
+  it('каждое уведомление партии выгружено с событием — оракул судит повтор по нему (#304)', async () => {
+    const p = await playtest(80001, 200)
+    const notif = p.world.flatMap((f) => f.notif)
+    expect(notif.length, 'уведомлений нет — проверка пуста').toBeGreaterThan(20)
+    expect(notif.filter((n) => !n.event)).toEqual([])
+    expect(new Set(notif.map((n) => n.event)).size).toBeGreaterThan(2)
+  }, 60_000)
   it('requiresKey: missing(alik_dead) — не гейт смерти; is(alik_dead) — гейт', () => {
     expect(requiresKey(missing(alikDead), alikDead)).toBe(false)
     expect(requiresKey(is(alikDead), alikDead)).toBe(true)

@@ -47,14 +47,10 @@ ONCE_SCENES = [
     'Займи 5000 до пятницы', 'радостная новость! Я взял кредит', 'есть новый объект!',
     'если позвонят и спросят — ты у меня не работал', 'Теперь мы кровные братья',
 ]
-# Повторяемые уведомления: у них повтор — не находка. Банк/платежи — механика календаря (#229).
-# Не «Банк —»: префикс приложения прятал разовые события (предложение кредита, #268).
-REPEATABLE_NOTIF = [
-    'Списание', 'Поступление', 'Не прошло', 'Завтра списание', 'Недостаточно',
-    'остаток критический', 'Остаток критический', 'Банк обеспокоен', 'Сводка за неделю',
-    'Сынок, ты поел', 'Когда за квартиру', 'Сынок, Алик заплатил',
-    'позвони маме', 'заплатил твой Алик', 'Система', 'новых сообщ',
-]
+# Повторяемые события телефона: повтор — механика (календарь банка, батарея, непрочитанные), не находка.
+# Судим по событию из выгрузки плейтеста (`notif[].event`), а не по подстроке текста: причина в начале
+# карточки предложения кредита («Остаток критический…») прятала повтор предложения (#304).
+REPEATABLE_EVENTS = {'bank.summary', 'bank.refusal', 'bank.level', 'bank.warn', 'battery', 'unread'}
 # Телефон вне переписки: баннер сверху (батарея, непрочитанные) или карточка в ленте (банк, мама, Авито, #287).
 PHONE_RE = r'\((?:уведомление телефона|карточка в ленте): (.*)\)$'
 # Недельная сводка банка: у каждой недели — одна (#287). Неделя — по датам в самом тексте.
@@ -186,13 +182,47 @@ def check_mute(frames):
 
 
 def check_notifications(frames):
-    """Уведомление при ложном собственном условии: класс, а не имя приложения."""
+    """Уведомления по кадрам: ложное собственное условие; повтор разового события; две сводки одной недели.
+
+    Разовое — по событию: мама, строка пула без `repeat`. Ключ повтора — событие и текст без цифр
+    («…Баланс: 9 700» и «…9 150» — одно событие). Предложение кредита повторяется законно, когда прежнее
+    закрыто (продажа, «не сейчас», кредит взят, #287): находка — то же предложение, пока прежнее ещё висит
+    (`credit.offer` на начало хода). Выгрузка без событий (старый формат) не судится — coverage.notif_without_event.
+    """
     v = collections.Counter()
+    cov = collections.Counter()
+    seen = collections.Counter()
+    weeks = collections.Counter()
+    pending = None  # текст открытого предложения кредита
     for f in frames:
+        if not (f.get('before') or {}).get('credit.offer'):
+            pending = None
         for n in f.get('notif') or []:
             if n.get('fails'):
                 v['notif_gate_false'] += 1
-    return v
+            ev = n.get('event')
+            if not ev:
+                cov['notif_without_event'] += 1
+                continue
+            text = n.get('text') or ''
+            if ev == 'bank.summary':
+                w = re.search(SUMMARY_RE, text)
+                if w:
+                    weeks[w.group(1)] += 1
+                    if weeks[w.group(1)] > 1:
+                        v['bank_week_repeat'] += 1
+            if ev in REPEATABLE_EVENTS or (ev == 'life' and n.get('repeat')):
+                continue
+            key = ev + ':' + re.sub(r'\d[\d\s]*', '#', text)
+            if ev == 'bank.offer':
+                if pending == key:
+                    v['notif_event_repeat'] += 1
+                pending = key
+                continue
+            seen[key] += 1
+            if seen[key] > 1:
+                v['notif_event_repeat'] += 1
+    return v, cov
 
 
 def check_transcript(path, frames):
@@ -200,8 +230,6 @@ def check_transcript(path, frames):
     v = collections.Counter()
     lines = msg_lines(path)
     last_me = None
-    notifs = collections.Counter()
-    weeks = collections.Counter()
     meets = {k: False for k in ('boris', 'arsen', 'nune', 'grant', 'razmik')}
     boris_msgs = 0
     seen_once = collections.Counter()
@@ -246,18 +274,6 @@ def check_transcript(path, frames):
         r = re.match(MARKERS['read_before_send'], ln)
         if r and last_me is not None and int(r.group(1)) * 60 + int(r.group(2)) < last_me:
             v['read_before_send'] += 1
-        n = re.match(PHONE_RE, ln)
-        if n:
-            w = re.search(SUMMARY_RE, n.group(1))
-            if w:
-                weeks[w.group(1)] += 1
-                if weeks[w.group(1)] > 1:
-                    v['bank_week_repeat'] += 1
-            txt = re.sub(r'\d[\d\s]*', '#', n.group(1))
-            if not any(x in txt for x in REPEATABLE_NOTIF):
-                notifs[txt] += 1
-                if notifs[txt] > 1:
-                    v['notif_event_repeat'] += 1
         if re.search(MARKERS['evicted'], ln):
             evicted = True
         if evicted and re.search(MARKERS['landlord_after'], ln):
@@ -397,7 +413,9 @@ if __name__ == '__main__':
             cov['games_without_speech_rules'] += 1
         # сколько кадров линия смерти остаётся открытой без факта — мера длины сломанного окна
         cov['dead_lost_frames'] += sum(1 for x in st if x == 'lost')
-        after.update(check_notifications(frames))
+        nv, nc = check_notifications(frames)
+        after.update(nv)
+        cov.update(nc)
         mv, mc = check_mute(frames)
         after.update(mv)
         after.update(check_transcript(p, frames))

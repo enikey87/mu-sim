@@ -47,7 +47,7 @@ import { UiState, type Moo, type Notif, type SendFeel } from './ui-state'
 import { classifyUserInput, legalClaim, type ClassifiedInput } from './input'
 import { holidayOf, holidayGreetKey, HOLIDAY_EXCUSES } from '../content/holidays'
 import { dueIn, dateOf, fmtDate, fmtDayMonth, fmtShortDate, fmtTime, weekOf, nightHour, periodOf, tierOf, TIERS, type Due, type Period } from './time'
-import { type GameState, type Msg, type NewMsg, type Card, type Choice, type Ctx, type Tone, type Storage, type InputCategory, freshState, loadState, saveState, SAVE_KEY, LEND50_SEEN_KEY, MAX_PATIENCE, isLate, countOf, setCount, type PromiseRec } from './state'
+import { type GameState, type Msg, type NewMsg, type Card, type PhoneEvent, type Choice, type Ctx, type Tone, type Storage, type InputCategory, freshState, loadState, saveState, SAVE_KEY, LEND50_SEEN_KEY, MAX_PATIENCE, isLate, countOf, setCount, type PromiseRec } from './state'
 
 /** Текст срока как буквальный шаблон без учёта регистра; кэш — topicOfLast зовётся из facts() на каждую реплику. */
 const LITERAL = new Map<string, RegExp>()
@@ -162,7 +162,7 @@ export class Game {
     this.S = loadState(this.storage) ?? freshState()
     // колбеки батареи — в узком хосте, а не в публичном интерфейсе Game: game.dead() путался бы со смертью Алика
     this.battery = new Battery(this.S, {
-      low: (level) => this.notify('🪫', 'Система', `Низкий заряд батареи: ${level}%`),
+      low: (level) => this.notify('🪫', 'Система', `Низкий заряд батареи: ${level}%`, { event: 'battery' }),
       dead: () => this.onPhoneDead(),
       chargeDone: () => this.onPhoneCharged(),
       sleep: (ms) => this.sleep(ms),
@@ -493,12 +493,12 @@ export class Game {
     const rank = { normal: 2, low: 1, bottom: 0 }
     if (rank[after] < rank[before]) {
       const bal = this.rub(this.S.money)
-      if (after === 'low') this.bankCard(`Банк обеспокоен остатком: ${bal}. Рекомендуем не ждать Алика.`)
+      if (after === 'low') this.bankCard(`Банк обеспокоен остатком: ${bal}. Рекомендуем не ждать Алика.`, { event: 'bank.level' })
       // шапка предложения — без остатка: карточку жмут позже, а число в ней стареет (#337)
       else if (!this.newFall()) { /* дно не новость */ }
       else if (this.loanOffer()) this.maybeCreditOffer(`Остаток критический после «${reason}»`)
       else {
-        this.criticalCard(`Остаток критический: ${bal}. Гречка и достоинство — разные статьи расходов.`)
+        this.criticalCard(`Остаток критический: ${bal}. Гречка и достоинство — разные статьи расходов.`, { event: 'bank.level' })
         this.maybeCreditOffer()
       }
     }
@@ -509,12 +509,12 @@ export class Game {
     const at = this.S.mem[memkeys.criticalAt]
     return at == null || this.S.day - Number(at) >= POOR_REPEAT_DAYS
   }
-  private criticalCard(text: string, extra?: Partial<Card>): void {
+  private criticalCard(text: string, extra: Partial<Card> & { event: PhoneEvent }): void {
     this.S.mem[memkeys.criticalAt] = this.S.day
     this.bankCard(text, extra)
   }
   private rub(n: number): string { return `${n.toLocaleString('ru-RU')} ₽` }
-  private bankCard(text: string, extra?: Partial<Card>): void { this.notify('🏦', 'Банк', text, extra) }
+  private bankCard(text: string, extra: Partial<Card> & { event: PhoneEvent }): void { this.notify('🏦', 'Банк', text, extra) }
   /** Строка недельной сводки; `refused` — трата не прошла; `onDay` — день срока платежа (#300). */
   private bankLine(label: string, delta: number, refused = false, onDay = this.S.day): void {
     if (this.moneySealed()) return
@@ -540,7 +540,7 @@ export class Game {
     }
     const lines = [...part('-', 'Списано'), ...part('+', 'Поступило'), ...part('!', 'Не прошло')]
     if (!lines.length) return
-    this.bankCard(`Сводка за неделю ${fmtShortDate(b.week)} – ${fmtShortDate(b.week + 6)}: баланс ${this.rub(b.bal)}`, { lines })
+    this.bankCard(`Сводка за неделю ${fmtShortDate(b.week)} – ${fmtShortDate(b.week + 6)}: баланс ${this.rub(b.bal)}`, { lines, event: 'bank.summary' })
   }
   /** Перевод от Алика: paid — любой; fifty — только ровно 50 ₽ (ачивка «пять раз»). */
   noteAlikPay(amount: number): void {
@@ -626,7 +626,7 @@ export class Game {
   /** Отказ платежа: карточка с причиной — или сразу предложение кредита с ней же (#287). */
   private refused(why: string, tail: string, say: boolean): void {
     if (say && this.loanOffer() && this.newFall()) { this.maybeCreditOffer(why); return }
-    if (say) this.bankCard(`${why}. ${tail}`)
+    if (say) this.bankCard(`${why}. ${tail}`, { event: 'bank.refusal' })
     if (this.moneyLevel() === 'bottom' && this.newFall()) this.maybeCreditOffer()
   }
   /** Расписание платежей по взятым кредитам. */
@@ -669,7 +669,7 @@ export class Game {
     const why = `Не прошло: ${loan.label}, ${this.rub(payment)}`
     if (id === 'micro' && !this.S.mem[creditBroke]) {
       this.rules.applyOps([set(creditBroke, true), set(creditStage, 4)], {})
-      this.notify('🏦', 'МФО', `${why}. Мы не злимся. Мы записываем`)
+      this.notify('🏦', 'МФО', `${why}. Мы не злимся. Мы записываем`, { event: 'bank.refusal' })
       if (this.moneyLevel() === 'bottom' && this.newFall()) this.maybeCreditOffer()
       return
     }
@@ -707,7 +707,7 @@ export class Game {
     const take = loan.id === 'consumer' ? 'Взять кредит «Всё будет»'
       : loan.id === 'refi' ? 'Взять кредит на погашение кредита'
       : 'Взять микрозайм «Деньги-Ара»'
-    this.criticalCard(`${why ?? 'Остаток критический'}. ${loan.offer.replace('{sum}', this.rub(sum))}`, { offer: { take, sell: thing?.choice } })
+    this.criticalCard(`${why ?? 'Остаток критический'}. ${loan.offer.replace('{sum}', this.rub(sum))}`, { offer: { take, sell: thing?.choice }, event: 'bank.offer' })
     return true
   }
   private closeOffers(): void {
@@ -815,7 +815,7 @@ export class Game {
     const help = nextMom(this.S.mem)
     if (!help) {
       this.rules.applyOps([set(momDone, true)], {})
-      this.notify('👩', 'Мама', MOM_DONE_TEXT)
+      this.notify('👩', 'Мама', MOM_DONE_TEXT, { event: 'mom' })
       return
     }
     const got = this.relief(help.amount)
@@ -824,7 +824,7 @@ export class Game {
     this.adjustMoney(got, 'Мама')
     const done = !nextMom(this.S.mem)
     if (done) this.rules.applyOps([set(momDone, true)], {})
-    this.notify('👩', 'Мама', help.text.replace('{sum}', this.rub(got)), done ? { lines: [MOM_DONE_TEXT] } : undefined)
+    this.notify('👩', 'Мама', help.text.replace('{sum}', this.rub(got)), { event: 'mom', ...(done ? { lines: [MOM_DONE_TEXT] } : {}) })
   }
   /** Закрыть кнопки допработ в ленте (после Дня выплаты). */
   sealOpenJobs(): void {
@@ -1057,7 +1057,7 @@ export class Game {
   /** Баннер сверху — только батарея и непрочитанные; остальное телефона — карточка в ленте, без нажатий (#287). */
   static isBanner(app: string): boolean { return app === 'Система' || app === 'Алик Воздухонесян' }
   /** false — отброшено дедупом; true — показано, в очереди или карточкой в ленте. */
-  notify(icon: string, app: string, text: string, card?: Partial<Card>): boolean {
+  notify(icon: string, app: string, text: string, card: Partial<Card> & { event: PhoneEvent }): boolean {
     if (this.disposed) return false
     // банк: одно и то же событие (не баланс) — один раз за игровой день (#251/#265)
     if (app === 'Банк' || app === 'МФО') {
@@ -1122,7 +1122,7 @@ export class Game {
         if (!this.adjustMoney(-spend, why, { group: 'По мелочи' })) this.bankLine('По мелочи', -spend, true)
       }
     } else {
-      this.notify(n.icon, n.app, p.text)
+      this.notify(n.icon, n.app, p.text, { event: 'life' })
     }
     if (p.spec.remember) this.rules.applyOps(p.spec.remember, {})
   }
@@ -2235,7 +2235,7 @@ export class Game {
     const paid = !pays || this.adjustMoney(fx.money!, 'По карте')
     // запечатано — тишина; мало денег — «недостаточно» (#252)
     if (pays && !paid && !this.moneySealed()) {
-      this.notify('🏦', 'Банк', `Не прошло: недостаточно средств. Перевод ${Math.abs(fx.money!).toLocaleString('ru-RU')} ₽ не ушёл.`)
+      this.notify('🏦', 'Банк', `Не прошло: недостаточно средств. Перевод ${Math.abs(fx.money!).toLocaleString('ru-RU')} ₽ не ушёл.`, { event: 'bank.refusal' })
     }
     if (!pays && fx.money) this.adjustMoney(fx.money, 'По карте')
     let debtMoved = !!fx.debt && paid && this.adjustDebt(fx.debt)
@@ -2452,7 +2452,7 @@ export class Game {
       this.ui.unread = got
       this.ui.title = `(${got}) Алик, где деньги?`
       this.unlock('away')
-      this.notify('💬', 'Алик Воздухонесян', `${got} ${got < 5 ? 'новых сообщения' : 'новых сообщений'}`)
+      this.notify('💬', 'Алик Воздухонесян', `${got} ${got < 5 ? 'новых сообщения' : 'новых сообщений'}`, { event: 'unread' })
       this.audio.beep()
       this.S.ctx = { type: 'idle' }
     }

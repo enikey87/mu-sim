@@ -369,7 +369,7 @@ describe('App', () => {
   it('досье поверх уведомления: фон inert, клик по notif не dismiss', () => {
     const { game } = makeGame()
     renderApp(game)
-    act(() => { game.notify('👩', 'Мама', 'Сынок, ты поел?') })
+    act(() => { game.notify('👩', 'Мама', 'Сынок, ты поел?', { event: 'life' }) })
     expect(screen.getByText('Сынок, ты поел?')).toBeInTheDocument()
     fireEvent.click(screen.getByTitle('Обещания и ачивки'))
     const dialog = screen.getByRole('dialog', { name: 'Досье на Алика' })
@@ -535,7 +535,7 @@ describe('App', () => {
   it('уведомление телефона и тост ачивки', () => {
     const { game } = makeGame()
     renderApp(game)
-    act(() => { game.notify('💬', 'Алик Воздухонесян', '3 новых сообщения'); game.unlock('cow') })
+    act(() => { game.notify('💬', 'Алик Воздухонесян', '3 новых сообщения', { event: 'unread' }); game.unlock('cow') })
     expect(screen.getByText('3 новых сообщения')).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('Это корова?')
     act(() => { fireEvent.click(screen.getByText('3 новых сообщения')) })
@@ -545,7 +545,7 @@ describe('App', () => {
   it('мама и банк — карточки в ленте, а не баннер (#287)', () => {
     const { game } = makeGame()
     renderApp(game)
-    act(() => { game.notify('👩', 'Мама', 'Сынок, ты поел?'); game.notify('🏦', 'Банк', 'Банк обеспокоен') })
+    act(() => { game.notify('👩', 'Мама', 'Сынок, ты поел?', { event: 'life' }); game.notify('🏦', 'Банк', 'Банк обеспокоен', { event: 'bank.level' }) })
     expect(document.getElementById('notif')).not.toHaveTextContent(/Сынок|Банк/)
     const shown = screen.getAllByTestId('card')
     expect(shown.map((c) => c.textContent)).toEqual([expect.stringContaining('Сынок, ты поел?'), expect.stringContaining('Банк обеспокоен')])
