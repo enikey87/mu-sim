@@ -16,4 +16,23 @@ describe('coverage bot', () => {
     expect(game.S.mem['endgame.active']).toBe(true)
     expect(game.S.mem['lend50.asked']).toBe(true)
   })
+
+  it('иногда отвечает на допработу зеркалом, когда оно открыто (#256)', async () => {
+    let mirrored = 0
+    for (let seed = 1; seed <= 80; seed++) {
+      const { game } = makeGame({ seed })
+      game.S.arcs.boris = { i: 2, last: 0 }
+      game.S.actors.boris = { sick: true }
+      await game.job()
+      const job = game.S.msgs.find((m) => m.kind === 'job' && !m.answered)!
+      expect(game.canMirror()).toBe(true)
+      const from = game.S.msgs.length
+      await botTurn(game)
+      const me = game.S.msgs.slice(from).find((m) => m.kind === 'text' && m.from === 'me')
+      if (me && me.kind === 'text' && /Борис болеет|Нива|Самвел|кран|декрет/i.test(me.text)) mirrored++
+      expect(game.S.msgs.find((m) => m.id === job.id)).toMatchObject({ answered: true })
+    }
+    expect(mirrored).toBeGreaterThan(5)
+    expect(mirrored).toBeLessThan(60)
+  })
 })

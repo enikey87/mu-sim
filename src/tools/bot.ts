@@ -13,7 +13,12 @@ export async function botTurn(game: Game, pickCtx = 0.7, rude = 0.06, freeText =
   if (game.S.ending) { await game.closeEnding(); return null }
   if (game.battery.dead) { await game.battery.charge(); return null }
   const job = game.S.msgs.find((m) => m.kind === 'job' && !m.answered)
-  if (job) { await game.answerJob(job.id, game.chance(0.5)); return null }
+  if (job) {
+    // иногда зеркало — иначе оракул плейтеста его не видит (#256)
+    const ans = game.canMirror() && game.chance(0.25) ? 'mirror' as const : game.chance(0.5)
+    await game.answerJob(job.id, ans)
+    return null
+  }
   // карточка банка: кредит или продажа кнопкой в ленте, а не репликой Алику (#287)
   const offer = game.S.msgs.find((m) => m.kind === 'card' && m.offer && !m.answered)
   if (offer && game.rng.random() < 0.7) { game.answerCard(offer.id, game.rng.random() < 0.5 ? 'take' : 'sell'); return null }

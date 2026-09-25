@@ -18,7 +18,7 @@ const HOURS = [14, 20, 9, 2, 17, 12]
 /** Что бот сделал за ход: выбрал вариант i из offered, ответил на допработу, зарядил телефон, промолчал. */
 export type Act =
   | { kind: 'send'; i: number; offered: string[]; at: number }
-  | { kind: 'job'; yes: boolean; at?: number }
+  | { kind: 'job'; yes: boolean | 'mirror'; at?: number }
   | { kind: 'card'; pick: 'take' | 'sell' | 'later' }
   | { kind: 'charge' }
   | { kind: 'idle' }
@@ -177,7 +177,11 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
   const next = (): Act => {
     if (game.battery.dead) return { kind: 'charge' }
     const job = game.S.msgs.find((m) => m.kind === 'job' && !m.answered)
-    if (job) return { kind: 'job', yes: bot.random() < 0.5, at: game.S.msgs.length }
+    if (job) {
+      // иногда зеркало — иначе оракул не видит его в партиях (#256)
+      const yes: boolean | 'mirror' = game.canMirror() && bot.random() < 0.25 ? 'mirror' : bot.random() < 0.5
+      return { kind: 'job', yes, at: game.S.msgs.length }
+    }
     // карточка банка с кнопками: чаще выбирает, иногда откладывает или пишет дальше, не выбрав
     if (openOffer(game) && bot.random() < 0.7) { const r = bot.random(); return { kind: 'card', pick: r < 0.5 ? 'take' : r < 0.85 ? 'sell' : 'later' } }
     if (game.S.stats.sent >= 5 && bot.random() < PROFILE[style].idle) return { kind: 'idle' }
