@@ -1017,6 +1017,17 @@ describe('Game: деньги на карте', () => {
     expect(at(300 + 14)).not.toBe(fallback) // следующее окно — другая строка
     expect(at(300 + 56)).toBe(fallback) // через полный круг — снова она: не чаще, чем раз в 14 дней
   })
+  it('исчерпанный пул бедности не отдаёт одну строку в каждой сборке за день (#348)', () => {
+    const { game } = makeGame()
+    setMoney(game, 1000)
+    game.S.day = 300
+    for (let i = 0; i < 20; i++) game.poorLine('P_DESPERATE_bottom', P_DESPERATE.bottom)
+    game.S.day = 301
+    const first = game.poorLine('P_DESPERATE_bottom', P_DESPERATE.bottom)
+    const second = game.poorLine('P_DESPERATE_bottom', P_DESPERATE.bottom)
+    expect(first).not.toBeNull()
+    expect(second).toBeNull() // повтор в тот же день — молчит, не копия
+  })
   it('после выплаты и в эндгейме деньги не меняются', () => {
     const { game } = makeGame()
     game.S.mem.payday = 'default'
