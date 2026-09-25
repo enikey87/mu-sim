@@ -64,4 +64,7 @@ export const PROVEN: Record<string, string> = {
   Quiet_Offended_AlikAway: 'Quiet_Offended_AlikAway: тишина обиженного в пачке',
   // бот копит ≤3 просрочек; амнистия — сцена на куче (#149)
   Scene_amnesty: 'Scene_amnesty: сцена амнистии при куче просрочек',
+  // ставка «усы» — прямой случай; бот редко копит срок со stake (#285)
+  Due_StakeShave: 'Due_StakeShave: сорванный срок со ставкой усов',
+  Due_StakeKept: 'Due_StakeKept: сдержал слово при ставке усов',
 }

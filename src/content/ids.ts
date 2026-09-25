@@ -15,6 +15,7 @@ export type AchId =
   | 'ram'
   | 'promises20'
   | 'amnesty'
+  | 'shaved'
   | 'meet'
   | 'cafe'
   | 'hash'

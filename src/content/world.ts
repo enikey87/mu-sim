@@ -1,7 +1,7 @@
 // Тексты для новых возможностей системы правил: обещания, которые наступают, хор персонажей,
 // состояния мира со сроком (свадьба, болезнь Бориса, «Алик умер»).
 import { type Criterion, type Entry, named, exists, is, eq, gte, ne, missing, set, gate } from './fact'
-import { cryptoHodl, garikConcrete, garikCut, grandpaDying, grantPaid, intro, met, mourning, nivaAway, nuneDekretOver, payday, saidFriday, saidTomorrow } from './memkeys'
+import { cryptoHodl, garikConcrete, garikCut, grandpaDying, grantPaid, intro, met, mourning, nivaAway, nuneDekretOver, payday, saidFriday, saidTomorrow, alikShaved } from './memkeys'
 import type { WhoId } from './ids'
 
 // Мир последователен: кто и что есть в истории и в каком оно положении — факты, их ставит серия (remember), ступень суда
@@ -56,6 +56,8 @@ export const WORLD = {
   /** Алик хоть раз назвал сроком «завтра» — теперь на это слово можно ссылаться. */
   saidTomorrow: named('saidTomorrow', is(saidTomorrow)),
   saidFriday: named('saidFriday', is(saidFriday)),
+  /** Усы на месте: ставки и клятвы усами молчат, пока сбриты (`alik.shaved`). */
+  moustache: named('moustache', missing(alikShaved)),
   /** В семье прощаются: дедушка умирает или хоронят Алика. */
   mourning: named('mourning', is(mourning)),
   grandpaDying: named('grandpaDying', is(grandpaDying)),
@@ -112,6 +114,17 @@ export const PROMISE_MET = [
   'Помнишь «{t}»? Случилось. Но вместе с этим случилось ещё кое-что, и оно всё отменило.',
   'Условие «{t}» выполнено. Я проверил. Денег это почему-то не добавило.',
   '«{t}» — готово. Теперь нужен следующий шаг. Какой — выясняем.',
+]
+/** Срок со ставкой «усы» сорван — Алик без усов (docs/design/moustache.md). */
+export const PROMISE_SHAVE = [
+  'Слово Алика — закон. Усы — нет. Теперь меня в банке не узнают, брат. Это тоже задержка.',
+  'Деньги — как усы. Отрастут.',
+  needs('karineHome')(needs('karine')('Карине довольна: усы сбриты. Ты — тоже, надеюсь. Денег по-прежнему нет, но ставка сыграла.')),
+]
+/** Срок со ставкой сдержан переводом 50 ₽ — усы на месте. */
+export const PROMISE_SHAVE_KEPT = [
+  'Усы спасены! Держи 50. «{t}» — частично, но усы на месте.',
+  'сказал «{t}» — сделал. Усы целы. Держи 50, брат.',
 ]
 
 // --- хор: упомянутый персонаж вклинивается

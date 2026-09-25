@@ -15,7 +15,7 @@ import {
   ACTOR_KEYS, EVENT_KEYS, MEM_KEYS, type EventKey, type ActorKey,
   HEAT, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, evicted,
   vendetta, court, courtVerdict, courtReferral, ritualCount, ritualCut, caughtCount, cryptoHodl,
-  bathAsked, mamaCalls, phoneKarine, alikDay, mooAt, sorryAt, rudeAt, thanksAt, topicRun, topicLast,
+  bathAsked, mamaCalls, phoneKarine, alikShaved, alikDay, mooAt, sorryAt, rudeAt, thanksAt, topicRun, topicLast,
   legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway,
   garikConcrete, garikCut, houseOnGarik, borisMarried, borisSmetaReady, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, threatClaim, nuneKeyPassed, nuneDekretOver, grandpaDying,
@@ -45,7 +45,7 @@ export type MemExactKey =
   | typeof HEAT | typeof blocked | typeof blockedHint | typeof statusHidden | typeof polite | typeof bloodGiven
   | typeof alikDead | typeof mourning | typeof evicted | typeof vendetta | typeof court | typeof courtVerdict
   | typeof courtReferral | typeof ritualCount | typeof ritualCut | typeof caughtCount | typeof cryptoHodl
-  | typeof bathAsked | typeof mamaCalls | typeof phoneKarine | typeof alikDay | typeof mooAt | typeof sorryAt
+  | typeof bathAsked | typeof mamaCalls | typeof phoneKarine | typeof alikShaved | typeof alikDay | typeof mooAt | typeof sorryAt
   | typeof rudeAt | typeof thanksAt | typeof topicRun | typeof topicLast | typeof legendPromiseAt
   | typeof legendId | typeof legendDay | typeof legendArc | typeof nextTransfer | typeof tileCornerRemoved
   | typeof nivaAway | typeof garikConcrete | typeof garikCut | typeof houseOnGarik | typeof borisMarried

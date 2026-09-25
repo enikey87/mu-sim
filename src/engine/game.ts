@@ -1068,6 +1068,7 @@ export class Game {
       'has.niva': S.items.some((n) => /Нива/.test(n)),
       // Календарное обещание живо в день срока; событийное — в ход, когда его факт стал истиной.
       promiseLive: !!pr && (pr.condition ? pr.met === S.day : pr.due === S.day),
+      promiseStake: pr?.stake ?? false,
       period: this.period(), night: this.isNight(), offline: S.offlineDays > 0, scene: S.scene?.id,
       sinceAlik: S.day - Number(S.mem[memkeys.alikDay] ?? S.day),
       lateCount: this.lateCount(),
@@ -1446,13 +1447,13 @@ export class Game {
   meetRel(r?: Rel): void {
     if (r?.id) this.rules.applyOps(meet(r.id), {})
   }
-  recordPromise(p?: { text: string; d: number | null; due?: Due; condition?: PromiseCondition; tomorrow?: boolean } | null): void {
+  recordPromise(p?: { text: string; d: number | null; due?: Due; condition?: PromiseCondition; tomorrow?: boolean; stake?: 'moustache' } | null): void {
     if (!p) return
     if (p.condition && this.S.mem[p.condition] === true) return
     if (p.tomorrow) this.rules.applyOps([set(memkeys.saidTomorrow, true)], {})
     if (p.due && 'weekday' in p.due && p.due.weekday === 5) this.rules.applyOps([set(memkeys.saidFriday, true)], {})
     const due = p.d == null ? null : this.S.day + (p.due ? dueIn(p.due, this.S.day) : p.d)
-    this.S.promises.push({ t: p.text, made: this.S.day, due, condition: p.condition })
+    this.S.promises.push({ t: p.text, made: this.S.day, due, condition: p.condition, stake: p.stake })
     if (due !== null && due > this.S.day) this.scheduleEvent(due, 'PromiseDue', { promise: this.S.promises.length - 1 })
     if (this.S.promises.length >= 20) this.unlock('promises20')
   }
@@ -1487,13 +1488,15 @@ export class Game {
     const p = this.uniq(() => {
       const q = this.X.promise()
       if (fromLegend) this.alignPromise(q, until!, legendSpec?.condition)
-      if (prefix) return { text: `${prefix} ${low(q.text)}.`, q }
+      if (prefix) return { text: `${prefix} ${low(q.text)}.`, q, stake: undefined as undefined | 'moustache' }
       // форма клятвы — из пула (одна формула в каждом втором сообщении приедается)
-      const form = this.line('OATH_FORMS', OATH_FORMS) ?? '{o}, {p}.'
-      return { text: form.replace('{o}', this.X.g('OATH')).replace('{P}', cap(q.text)).replace('{p}', q.text), q }
+      const form = this.linePicked('OATH_FORMS', OATH_FORMS)
+      const stake = form?.id === 'oath_stake_moustache' ? 'moustache' as const : undefined
+      const tpl = form?.text ?? '{o}, {p}.'
+      return { text: tpl.replace('{o}', this.X.g('OATH')).replace('{P}', cap(q.text)).replace('{p}', q.text), q, stake }
     })
     if (fromLegend) this.recordPromiseOnce(p.q)
-    else this.recordPromise(p.q)
+    else this.recordPromise({ ...p.q, stake: p.stake })
     await this.say([p.text])
     this.S.ctx = { ...(this.S.ctx ?? {}), ...this.ctxFromPromise(p.q) }
   }
