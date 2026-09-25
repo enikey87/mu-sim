@@ -22,6 +22,31 @@ export const silentAudio: Audio = {
 
 let everGestured = false
 
+/** Узлы Web Audio, которые строит «Мууу»: браузерный контекст или офлайн-рендер теста выходного уровня (#282). */
+export type MooContext = Pick<BaseAudioContext, 'createOscillator' | 'createBiquadFilter' | 'createGain' | 'destination'>
+
+/**
+ * «Мууу»: один пилообразный осциллятор, частота вниз 120→95 Гц, lowpass 700 Гц — ориентир из макета интро (#161).
+ * Разброс длины и высоты — чтобы не звучало одинаково.
+ */
+export function mooVoice(c: MooContext, t: number, vol: number, rnd: () => number): void {
+  const dur = 1.6 + rnd() * 0.4
+  const f0 = 114 + rnd() * 12
+  const o = c.createOscillator(); o.type = 'sawtooth'
+  o.frequency.setValueAtTime(f0, t)
+  o.frequency.linearRampToValueAtTime(f0 * 95 / 120, t + dur)
+  const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 700
+  const g = c.createGain()
+  g.gain.setValueAtTime(0, t)
+  g.gain.linearRampToValueAtTime(vol, t + 0.25)
+  g.gain.linearRampToValueAtTime(vol * 0.8, t + dur - 0.4)
+  g.gain.linearRampToValueAtTime(0, t + dur)
+  o.connect(f).connect(g).connect(c.destination)
+  o.start(t); o.stop(t + dur + 0.02)
+}
+/** Усиление «Мууу»: выходной уровень не выше прежнего звука (офлайн-рендер, audio.test.ts, #282). */
+export const MOO_VOL = 0.09
+
 export function browserAudio(): Audio {
   let ac: AudioContext | null = null
   // жест — свойство страницы, а не экземпляра: звук не должен молчать в интро после «Начать заново»
@@ -54,25 +79,6 @@ export function browserAudio(): Audio {
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
     o.connect(g).connect(c.destination); o.start(t); o.stop(t + dur + 0.02)
   }
-  /**
-   * «Мууу»: один пилообразный осциллятор, частота вниз 120→95 Гц, lowpass 700 Гц — ориентир из макета интро (#161).
-   * Разброс длины и высоты — чтобы не звучало одинаково; выше прежнего не стало: было два осциллятора и синтез речи.
-   */
-  function mooVoice(vol: number) {
-    const c = ctx(), t = c.currentTime, dur = 1.6 + Math.random() * 0.4
-    const f0 = 114 + Math.random() * 12
-    const o = c.createOscillator(); o.type = 'sawtooth'
-    o.frequency.setValueAtTime(f0, t)
-    o.frequency.linearRampToValueAtTime(f0 * 95 / 120, t + dur)
-    const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 700
-    const g = c.createGain()
-    g.gain.setValueAtTime(0, t)
-    g.gain.linearRampToValueAtTime(vol, t + 0.25)
-    g.gain.linearRampToValueAtTime(vol * 0.8, t + dur - 0.4)
-    g.gain.linearRampToValueAtTime(0, t + dur)
-    o.connect(f).connect(g).connect(c.destination)
-    o.start(t); o.stop(t + dur + 0.02)
-  }
   const api: Audio = {
     unlock() {
       if (disposed || gestured) return
@@ -93,7 +99,7 @@ export function browserAudio(): Audio {
     },
     beep: () => safe(() => { tone(1320, 0.1, 0.15); tone(1320, 0.1, 0.15, 'sine', 0.12) }),
     // синтеза речи поверх нет: голос браузера звучит по-разному на устройствах, а ориентир — без него (#161)
-    moo: () => safe(() => mooVoice(0.22)),
+    moo: () => safe(() => { const c = ctx(); mooVoice(c, c.currentTime, MOO_VOL, Math.random) }),
     speak(text, { pitch = 1, rate = 1, volume = 0.5 } = {}) {
       if (muted || disposed || !gestured) return
       try {
