@@ -1,6 +1,6 @@
 import { type Entry, type LineSpec, gate, gte, lte, eq, ne, is, missing, set } from './fact'
 import { needs, WORLD } from './world'
-import { bloodGiven, collectorsRecruited, count, creditBroke, endgame, evicted, wedding } from './memkeys'
+import { bloodGiven, collectorsRecruited, count, creditBroke, endgame, evicted, paydayScene, wedding } from './memkeys'
 import { sold, momHelp } from './credit'
 import { billStreak } from './bills'
 
@@ -135,8 +135,8 @@ export const NOTIF: Notif[] = [
   { icon: '🏦', app: 'Банк', t: 'Кредит одобрен! 94% годовых. Поздравляем!', when: [gte('credit.stage', 1)] },
   { icon: '📞', app: 'Коллекторы', t: 'Мы знаем, где живёт ваш Алик. Он нам тоже должен. Давайте дружить.', when: [is(creditBroke), missing(collectorsRecruited)] },
   { icon: '👩', app: 'Мама', t: 'Сынок, я продала дачу, чтобы ты дождался Алика.', when: [is(momHelp('dacha'))] },
-  // три неоплаты коммуналки подряд — хозяин выселяет; оплата сбрасывает полосу (#301)
-  { icon: '🏠', app: 'Хозяин квартиры', t: 'Выселяю. Можешь пожить у Алика, он же тебе как отец.', when: [missing(evicted), gte(billStreak('rent'), 3)], remember: [set(evicted, true)] },
+  // три неоплаты коммуналки подряд — хозяин выселяет; оплата сбрасывает полосу (#301); после выплаты — нет (#323)
+  { icon: '🏠', app: 'Хозяин квартиры', t: 'Выселяю. Можешь пожить у Алика, он же тебе как отец.', when: [missing(evicted), gte(billStreak('rent'), 3), missing(paydayScene), missing(endgame.active)], remember: [set(evicted, true)] },
   { icon: '🩸', app: 'Донорский центр', t: 'Спасибо, что пришли сдать кровь! Вы наш герой. Приходите ещё.', when: [is(bloodGiven)] },
   // память о проданном: иначе две несвязанные микроволновки
   { icon: '🍽', app: 'Соседка', t: 'Микроволновку вашу грею. Спасибо, что продали.', when: [is(sold('microwave'))] },
