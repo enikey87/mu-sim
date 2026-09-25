@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { makeGame, setMoney, cards, moneyLog } from '../test/helpers'
+import { makeGame, setMoney, cards, moneyLog, memStorage } from '../test/helpers'
 import { BILLS, billUnpaid, billStreak, lightOff, billDueAt } from './bills'
 import { NOTIF } from './life'
 import { dateOf, dueIn, weekOf } from '../engine/time'
@@ -296,10 +296,11 @@ describe('платежи по календарю', () => {
     g2.notify('🏦', 'Банк', 'Поступление 500 ₽. Выплата. Баланс: 13 000 ₽')
     expect(shown).toHaveLength(2)
   })
-  it('доля банковских уведомлений к репликам Алика до Дня выплаты (#301)', async () => {
-    // после #293 на 12 сидах max ≈ 0.227 до выплаты; порог 0.28 — с запасом, не подгонка под два сида
+  it('доля банковских уведомлений к репликам Алика до Дня выплаты (#301/#323)', async () => {
+    // после #293/#316 на расширенной выборке (не только «удобные» 8) max ≈ 0.24–0.27; порог 0.30 — с запасом
     const { botTurn } = await import('../tools/bot')
-    const seeds = [1, 3, 5, 7, 11, 13, 17, 19]
+    const seeds = [1, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89]
+    const ratios: number[] = []
     for (const seed of seeds) {
       const { game } = makeGame({ seed })
       let bank = 0
@@ -315,9 +316,11 @@ describe('платежи по календарю', () => {
       }
       const alik = game.S.msgs.filter((m) => m.kind === 'text' && m.from === 'alik').length
       expect(alik, `seed ${seed} alik`).toBeGreaterThan(50)
-      expect(bank / alik, `seed ${seed} bank=${bank} alik=${alik}`).toBeLessThan(0.28)
+      ratios.push(bank / alik)
+      expect(bank / alik, `seed ${seed} bank=${bank} alik=${alik}`).toBeLessThan(0.30)
     }
-  }, 180_000)
+    expect(Math.max(...ratios), `max ratio ${Math.max(...ratios)}`).toBeGreaterThan(0.15) // выборка видит нагрузку, не пустой набор
+  }, 480_000)
   it('выселение — после трёх неоплат коммуналки подряд, не по календарю (#301)', () => {
     const { game } = makeGame()
     game.S.day = 500
@@ -346,6 +349,42 @@ describe('платежи по календарю', () => {
     expect((line.when ?? []).every((c) => test(c, { day: 500, 'bills.rent.streak': 0 }))).toBe(false)
     expect((line.when ?? []).every((c) => test(c, { 'bills.rent.streak': 3 }))).toBe(true)
   })
+  it('выселение только до выплаты — через BillDue, после payday закрыто (#323)', async () => {
+    const { game } = makeGame()
+    setMoney(game, 0)
+    game.chargeBill('rent')
+    game.chargeBill('rent')
+    const at = Number(game.S.mem[billDueAt('rent')])
+    game.S.day = at
+    await game.fire('BillDue', { bill: 'rent', at })
+    expect(game.S.mem[billStreak('rent')]).toBe(3)
+    expect(game.lines.eligible('NOTIF', NOTIF, game.lineFacts()).some((p) => /Выселяю/.test(p.text))).toBe(true)
+    const hit = game.linePicked('NOTIF_EVICT2', NOTIF.filter((n) => /Выселяю/.test(n.t)))
+    expect(hit?.text).toMatch(/Выселяю/)
+    expect(game.S.mem.evicted).toBe(true)
+
+    const after = makeGame().game
+    setMoney(after, 0)
+    after.chargeBill('rent')
+    after.chargeBill('rent')
+    const at2 = Number(after.S.mem[billDueAt('rent')])
+    after.S.day = at2
+    await after.fire('BillDue', { bill: 'rent', at: at2 })
+    after.S.mem.payday = 'default'
+    expect(after.lines.eligible('NOTIF', NOTIF, after.lineFacts()).some((p) => /Выселяю/.test(p.text))).toBe(false)
+    after.S.mem['endgame.active'] = true
+    delete after.S.mem.payday
+    expect(after.lines.eligible('NOTIF', NOTIF, after.lineFacts()).some((p) => /Выселяю/.test(p.text))).toBe(false)
+  })
+  it('NC: без гейта выплаты выселение открыто и после payday (#323)', () => {
+    const { game } = makeGame()
+    game.S.mem[billStreak('rent')] = 3
+    game.S.mem.payday = 'default'
+    const live = NOTIF.find((n) => /Выселяю/.test(n.t))!
+    const ungated = { ...live, when: (live.when ?? []).filter((c) => !('key' in c && (c.key === 'payday' || c.key === 'endgame.active'))) }
+    expect(game.lines.eligible('NOTIF', [ungated], game.lineFacts()).some((p) => /Выселяю/.test(p.text))).toBe(true)
+    expect(game.lines.eligible('NOTIF', [live], game.lineFacts()).some((p) => /Выселяю/.test(p.text))).toBe(false)
+  })
   it('платёж после перескока срока идёт в сводку недели срока, не обработки (#300)', async () => {
     const { game } = makeGame()
     setMoney(game, 10_000_000)
@@ -369,9 +408,53 @@ describe('платежи по календарю', () => {
     const n = game.S.msgs.length
     game.notify('🏦', 'Банк', 'Сводка за неделю тест: баланс 1 ₽', { lines: ['Списано: Связь 400 ₽'] })
     expect(game.S.msgs.slice(n).filter((m) => m.kind === 'card')).toEqual([])
+    expect(game.S.pendingCards.length).toBe(1)
     await game.enterNode('meet', null)
     expect(game.S.scene).toBeNull()
+    expect(game.S.pendingCards).toEqual([])
     expect(game.S.msgs.some((m) => m.kind === 'card' && m.app === 'Банк' && /Сводка за неделю тест/.test(m.text))).toBe(true)
+  })
+  it('после выплаты отложенные банк/МФО из сцены не выходят (#323)', async () => {
+    const { game } = makeGame()
+    game.S.scene = { id: 'meet', node: game.scenes.meet.start, vars: {} }
+    game.notify('🏦', 'Банк', 'Кредит одобрен! после сцены', { offer: { take: 'Взять' } })
+    game.notify('🏦', 'МФО', 'Мы записываем после сцены')
+    game.notify('👩', 'Мама', 'Сынок, держись')
+    expect(game.S.pendingCards.length).toBe(3)
+    game.S.mem.payday = 'default'
+    expect(game.moneySealed()).toBe(true)
+    const n = game.S.msgs.length
+    await game.enterNode('meet', null)
+    const cards = game.S.msgs.slice(n).filter((m) => m.kind === 'card')
+    expect(cards.every((m) => m.kind === 'card' && m.app !== 'Банк' && m.app !== 'МФО')).toBe(true)
+    expect(cards.some((m) => m.kind === 'card' && m.app === 'Мама')).toBe(true)
+  })
+  it('NC: без moneySealed отложенный банк выходит после сцены (#323)', async () => {
+    const { game } = makeGame()
+    game.S.scene = { id: 'meet', node: game.scenes.meet.start, vars: {} }
+    game.notify('🏦', 'Банк', 'Кредит без печати')
+    expect(game.S.pendingCards.length).toBe(1)
+    await game.enterNode('meet', null)
+    expect(game.S.msgs.some((m) => m.kind === 'card' && m.app === 'Банк' && /Кредит без печати/.test(m.text))).toBe(true)
+  })
+  it('очередь карточек переживает перезагрузку (#323)', () => {
+    const storage = memStorage()
+    const { game } = makeGame({ storage })
+    game.S.scene = { id: 'meet', node: game.scenes.meet.start, vars: {} }
+    game.notify('🏦', 'Банк', 'Сводка в очереди: баланс 7 ₽')
+    game.save()
+    const { game: loaded } = makeGame({ storage, seed: 2 })
+    expect(loaded.S.scene?.id).toBe('meet')
+    expect(loaded.S.pendingCards.some((c) => /Сводка в очереди/.test(c.text))).toBe(true)
+  })
+  it('варианты ответа переживают перезагрузку — migrate не сбрасывает весь пул (#323)', () => {
+    const storage = memStorage()
+    const { game } = makeGame({ storage })
+    const offered = game.choices.map((c) => c.text)
+    expect(offered.length).toBeGreaterThan(2)
+    game.save()
+    const { game: loaded } = makeGame({ storage, seed: 3 })
+    expect(loaded.choices.map((c) => c.text)).toEqual(offered)
   })
   it('paymentDueTomorrow только после предупреждения с SMS (#251)', () => {
     const { game } = makeGame()
