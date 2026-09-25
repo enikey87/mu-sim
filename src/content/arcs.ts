@@ -22,7 +22,7 @@ export interface Episode {
   sys?: string
   then?: 'promise'
 }
-export interface Arc { title: string; minDay?: number; /** Условие старта (не продолжения): иначе сериал в пуле nextArc (#128). */ when?: Criterion[]; follow: Entry<string>[]; eps: Episode[] }
+export interface Arc { title: string; /** Линия механики денег, а не сюжетный сериал: не считается законченным сериалом партии (#338). */ mechanic?: true; minDay?: number; /** Условие старта (не продолжения): иначе сериал в пуле nextArc (#128). */ when?: Criterion[]; follow: Entry<string>[]; eps: Episode[] }
 export const CAST: Record<string, { name: string; color: string }> = {
   boris: { name: 'Борис 🐏', color: '#b07b2c' },
   grant: { name: 'Заказчик Грант', color: '#2f6fb3' },
@@ -240,6 +240,7 @@ export const ARCS: Record<string, Arc> = {
   // старт только после credit.broke — не раньше и не в эндгейме (#128)
   collectors: {
     title: 'Коллекторы «Деньги-Ара»',
+    mechanic: true,
     when: [is(creditBroke), missing(endgame.active)],
     follow: [
       gate(missing(collectorsRecruited))('Коллекторы ещё звонят?'),
