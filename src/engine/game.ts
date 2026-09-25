@@ -19,7 +19,7 @@ import { BILLS, billDue, billDueAt, billStreak, billUnpaid, lightOff, netRation,
 import {
   LOANS, THINGS, MOM_DONE_TEXT,
   creditStage, creditOffer, creditBroke, momDone, creditDeclined,
-  sold, momHelp, loanTaken, loanDueAt, loanFailed, nextLoan, nextThing, allSold, nextMom,
+  sold, momHelp, loanTaken, loanDueAt, loanPayment, loanFailed, nextLoan, nextThing, allSold, nextMom,
   type LoanId, type ThingId, type Loan,
 } from '../content/credit'
 import { allRules } from '../content/rules'
@@ -484,8 +484,12 @@ export class Game {
   /** Единственная точка изменения S.money: строка недельной сводки + смена уровня (#287). `group` — строка сводки вместо `reason`; `onDay` — неделя срока, не день обработки (#300). */
   adjustMoney(delta: number, reason: string, opts?: { group?: string; onDay?: number }): boolean {
     if (this.moneySealed()) return false
-    if (delta === 0) return true
     if (delta < 0 && -delta > this.S.money) return false
+    // после первого дна до выплаты приход не поднимает выше «мало»: кредит/продажа — передышка, не богатство (#299)
+    if (delta > 0 && this.S.mem[memkeys.moneyPoor]) {
+      delta = Math.min(delta, Math.max(0, Game.MONEY_LOW - this.S.money))
+    }
+    if (delta === 0) return true
     const before = this.moneyLevel()
     setCount(this.S, 'money', Math.max(0, countOf(this.S, 'money') + delta))
     if (this.S.money <= Game.MONEY_BOTTOM) this.S.mem[memkeys.moneyPoor] = true
@@ -636,11 +640,12 @@ export class Game {
     if (this.moneySealed()) return
     const loan = LOANS.find((l) => l.id === id)
     if (!loan || !this.S.mem[loanTaken(id)]) return
+    const payment = Number(this.S.mem[loanPayment(id)] ?? loan.payment)
     const dueAt = this.S.mem[loanDueAt(id)]
     const dueDay = dueAt != null ? Number(dueAt) : this.S.day
     const onDay = Math.min(dueDay, this.S.day)
     delete this.S.mem[loanDueAt(id)]
-    if (this.adjustMoney(-loan.payment, loan.label, { onDay })) {
+    if (this.adjustMoney(-payment, loan.label, { onDay })) {
       this.rules.applyOps([set(loanFailed(id), false)], {}) // платёж прошёл — полоса неоплат закрыта
       this.scheduleCredits()
       return
@@ -649,7 +654,7 @@ export class Game {
     const first = !this.S.mem[loanFailed(id)]
     if (first) this.rules.applyOps([set(loanFailed(id), true)], {})
     this.scheduleCredits()
-    const why = `Не прошло: ${loan.label}, ${this.rub(loan.payment)}`
+    const why = `Не прошло: ${loan.label}, ${this.rub(payment)}`
     if (id === 'micro' && !this.S.mem[creditBroke]) {
       this.rules.applyOps([set(creditBroke, true), set(creditStage, 4)], {})
       this.notify('🏦', 'МФО', `${why}. Мы не злимся. Мы записываем`)
@@ -721,12 +726,20 @@ export class Game {
     const stage = Number(this.S.mem[creditStage] ?? 0)
     const loan = nextLoan(stage)
     if (!loan) return
+    let amount = loan.amount
+    if (this.S.mem[memkeys.moneyPoor]) {
+      const room = Math.max(0, Game.MONEY_LOW - this.S.money)
+      if (room === 0) return
+      amount = Math.min(amount, room)
+    }
+    const payment = amount === loan.amount ? loan.payment : Math.max(1, Math.round(loan.payment * amount / loan.amount))
     this.rules.applyOps([
       set(creditOffer, false),
       set(creditStage, loan.stage),
       set(loanTaken(loan.id), true),
+      set(loanPayment(loan.id), payment),
     ], {})
-    this.adjustMoney(loan.amount, `Кредит: ${loan.label.replace(/^Платёж по /, '').replace(/^Платёж /, '')}`)
+    this.adjustMoney(amount, `Кредит: ${loan.label.replace(/^Платёж по /, '').replace(/^Платёж /, '')}`)
     this.scheduleCredits()
   }
   sellThing(id?: ThingId): void {
@@ -749,8 +762,10 @@ export class Game {
       const thing = nextThing(this.S.mem)
       let result: string
       if (pick === 'take' && m.offer.take && loan) {
+        const before = this.S.money
         this.takeCredit()
-        result = `${loan.id === 'micro' ? 'Микрозайм' : 'Кредит'} взят: +${this.rub(loan.amount)}. Баланс: ${this.rub(this.S.money)}`
+        if (!this.S.mem[loanTaken(loan.id)]) return
+        result = `${loan.id === 'micro' ? 'Микрозайм' : 'Кредит'} взят: +${this.rub(this.S.money - before)}. Баланс: ${this.rub(this.S.money)}`
       } else if (pick === 'sell' && m.offer.sell && thing) {
         this.sellThing(thing.id)
         result = `${thing.done}. +${this.rub(thing.amount)}. Баланс: ${this.rub(this.S.money)}`

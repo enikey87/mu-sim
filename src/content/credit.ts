@@ -74,6 +74,7 @@ export const sold = <T extends ThingId>(id: T): `sold.${T}` => `sold.${id}`
 export const momHelp = <T extends MomId>(id: T): `mom.${T}` => `mom.${id}`
 export const loanTaken = <T extends LoanId>(id: T): `credit.${T}.taken` => `credit.${id}.taken`
 export const loanDueAt = <T extends LoanId>(id: T): `credit.${T}.dueAt` => `credit.${id}.dueAt`
+export const loanPayment = <T extends LoanId>(id: T): `credit.${T}.payment` => `credit.${id}.payment`
 /** Полоса неоплат по займу: банк говорит один раз за полосу, не каждую неделю (#184). */
 export const loanFailed = <T extends LoanId>(id: T): `credit.${T}.failed` => `credit.${id}.failed`
 
