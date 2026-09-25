@@ -1,6 +1,6 @@
 // Игра: состояние, сообщения, ход Алика, «живость». Решения — что ответить, что предложить игроку,
 // что сделать Алику — принимает система правил (engine/rules/, content/rules/*).
-import { make, D, low, cap, type ExcuseApi, type Promise3, type PromiseCondition, type Rel } from '../content/excuses'
+import { make, D, low, cap, type ExcuseApi, type Promise3, type PromiseCondition, type Rel, type When } from '../content/excuses'
 import { makeScenes, invKey, type Scene, type Line } from '../content/scenes'
 import { COLD_WAR, TRIBUNAL } from '../content/rude'
 import { MIRROR, MIRROR_AGAIN, MIRROR_OPEN, MIRROR_REPLY, type Mirror } from '../content/mirror'
@@ -45,7 +45,7 @@ import { type Audio, silentAudio } from './audio'
 import { typo } from './typo'
 import { UiState, type Moo, type Notif, type SendFeel } from './ui-state'
 import { classifyUserInput, legalClaim, type ClassifiedInput } from './input'
-import { holidayOf, holidayGreetKey, HOLIDAY_EXCUSES } from '../content/holidays'
+import { holidayOf, holidayGreetKey, holidayDays, HOLIDAY_EXCUSES } from '../content/holidays'
 import { dueIn, dateOf, fmtDate, fmtDayMonth, fmtShortDate, fmtTime, weekOf, nightHour, periodOf, tierOf, TIERS, type Due, type Period } from './time'
 import { type GameState, type Msg, type NewMsg, type Card, type PhoneEvent, type Choice, type Ctx, type Tone, type Storage, type InputCategory, freshState, loadState, saveState, SAVE_KEY, LEND50_SEEN_KEY, MAX_PATIENCE, isLate, countOf, setCount, type PromiseRec } from './state'
 
@@ -1205,6 +1205,7 @@ export class Game {
     for (const k in S.ach) progress['ach.' + k] = true
     for (const k in S.ach) progress['since.' + k] = S.day - S.ach[k]
     const moneyLv = this.moneyLevel()
+    const whenDays = c.whenAt === undefined ? undefined : Math.max(0, c.whenAt - S.day)
     return {
       day: S.day, tier: S.tier, mood: S.mood, sent: S.stats.sent, moo: S.stats.moo, patience: S.patience, money: S.money, debt: S.debt, fifty: S.stats.fifty, paid: S.stats.paid,
       moneyNormal: moneyLv === 'normal', moneyLow: moneyLv === 'low', moneyBottom: moneyLv === 'bottom',
@@ -1263,6 +1264,8 @@ export class Game {
         return false
       })(),
       'ctx.whenDate': c.when != null ? fmtDayMonth(c.whenMade ?? S.day) : undefined,
+      'ctx.whenKind': c.whenKind, 'ctx.whenDays': whenDays,
+      'ctx.whenHorizon': whenDays === undefined ? undefined : whenDays <= 7 ? 'near' : whenDays <= 30 ? 'far' : 'veryFar',
       'ctx.rel': c.rel?.n, 'ctx.relYou': c.rel?.you ?? c.rel?.n, 'ctx.sad': c.sad, 'ctx.festive': c.festive, 'ctx.revived': c.revived,
       'ctx.constr': c.constr, 'ctx.legendary': c.legendary, 'ctx.arc': c.arc, 'ctx.quote': c.quote,
       // спросить про сериал есть смысл: будет новая серия, или сериал закончен и сегодня про финал ещё не спрашивали
@@ -1346,7 +1349,7 @@ export class Game {
       if (candidate.condition === record.condition && candidate.met === undefined) candidate.met = this.S.day
     }
     const legend = this.legend()
-    if (legend && LEGENDS[legend]?.condition === record.condition) {
+    if (legend && LEGENDS[legend]?.until.condition === record.condition) {
       const arc = this.S.mem[memkeys.legendArc]
       this.setLegend(null, typeof arc === 'string' ? arc : undefined)
     }
@@ -1646,28 +1649,25 @@ export class Game {
     const pending = seen.condition ? seen.met === undefined : seen.due != null && seen.due >= day
     if (p.stake && pending) seen.stake ??= p.stake
   }
-  private alignPromise(p: Promise3, until: string, condition?: PromiseCondition, days?: number): Promise3 {
-    p.text = p.text.replace(p.t, until)
-    p.t = until
-    p.d = days ?? null
-    p.due = undefined
-    p.condition = condition
-    p.tomorrow = undefined // срок из легенды — не «завтра»: иначе said.tomorrow без слова «завтра»
-    return p
+  private alignPromise(p: Promise3, until: When): Promise3 {
+    p.text = p.text.replace(p.t, until.t)
+    const { t, d, due, condition, kind, est, state, holiday } = until
+    // срок из легенды — не «завтра»: иначе said.tomorrow без слова «завтра»
+    return Object.assign(p, { t, d, due, condition, kind, est, state, holiday, tomorrow: undefined })
   }
   /** «Клянусь мамой, завтра — всё отдам» + запись в журнал. */
   /** Обещание. Пока жива легенда денег — срок чаще вытекает из неё («как ключ выйдет»); legend = true — всегда из неё. */
   async promiseLine(prefix?: string, legend?: boolean): Promise<void> {
     const legendSpec = this.legend() ? LEGENDS[this.legend()!] : undefined
     // событие легенды уже случилось («свадьба Бориса прошла») — обещать «сразу после него» поздно
-    const done = legendSpec?.condition ? this.conditionHolds(legendSpec.condition) : false
+    const done = legendSpec?.until.condition ? this.conditionHolds(legendSpec.until.condition) : false
     const until = done ? undefined : legendSpec?.until
     // срок из легенды — не чаще, чем раз в LEGEND_VOW_GAP сообщений игрока: одна и та же клятва приедается (#179)
     const fromLegend = !!until && this.legendDue() && (legend || this.chance(0.4))
     if (fromLegend) this.S.mem[memkeys.legendPromiseAt] = this.S.stats.sent
     const p = this.uniq(() => {
       const q = this.X.promise()
-      if (fromLegend) this.alignPromise(q, until!, legendSpec?.condition, legendSpec?.days)
+      if (fromLegend) this.alignPromise(q, until!)
       if (prefix) return { text: `${prefix} ${low(q.text)}.`, q, stake: undefined as undefined | 'moustache' }
       // форма клятвы — из пула (одна формула в каждом втором сообщении приедается); ставка — только на срок, который может наступить
       const form = this.linePicked('OATH_FORMS', OATH_FORMS, { filter: (s) => s.id !== OATH_STAKE_MOUSTACHE || q.d != null || !!q.condition })
@@ -1683,7 +1683,29 @@ export class Game {
   ctxFromPromise(p?: Promise3): Ctx {
     if (!p) return {}
     const due = p.d == null ? null : this.S.day + (p.due ? dueIn(p.due, this.S.day) : p.d)
-    return { when: p.t, whenNever: p.d == null, whenMade: this.S.day, whenDue: due }
+    return { when: p.t, whenNever: p.d == null, whenMade: this.S.day, whenDue: due, whenKind: p.kind, whenAt: this.horizonAt(p, due) }
+  }
+  /** Абсолютный день горизонта: срок по дате (у увёртки — поздняя из двух), событие — остаток идущего состояния или оценка, праздник — календарь; «никогда» и абсурд — нет. */
+  private horizonAt(p: Promise3, due: number | null): number | undefined {
+    const day = this.S.day
+    switch (p.kind) {
+      case 'clear': return due ?? undefined
+      case 'dodge': return p.est === undefined ? due ?? undefined : Math.max(due ?? day, day + p.est)
+      case 'event': return (p.state && this.stateEnd(p.state)) ?? (p.est === undefined ? undefined : day + p.est)
+      case 'holiday': return p.holiday === undefined ? undefined : day + holidayDays(p.holiday, day)
+      default: return undefined
+    }
+  }
+  /** День, когда идущее состояние мира со сроком (свадьба, болезнь) кончится: запись `restore` в расписании правил. */
+  private stateEnd(state: NonNullable<When['state']>): number | undefined {
+    let end: number | undefined
+    for (const x of this.S.rules.schedule) {
+      if (x.kind !== 'restore' || x.at <= this.S.day) continue
+      if (state.key !== undefined ? x.key !== state.key : !x.key.startsWith(state.prefix ?? '')) continue
+      if (state.actor !== undefined && x.actor !== state.actor) continue
+      if (end === undefined || x.at < end) end = x.at
+    }
+    return end
   }
 
   // ---------- ход Алика ----------
@@ -1837,7 +1859,7 @@ export class Game {
       text = m.text.slice(0, at) + repl + m.text.slice(at + p.t.length)
       const rec = this.S.promises[this.S.promises.length - 1]
       if (rec && rec.t.includes(p.t)) { rec.t = rec.t.replace(p.t, w); rec.due = null }
-      this.S.ctx = { ...this.S.ctx, when: w, whenNever: true, whenMade: this.S.day, whenDue: null }
+      this.S.ctx = { ...this.S.ctx, when: w, whenNever: true, whenKind: 'never', whenAt: undefined, whenMade: this.S.day, whenDue: null }
     } else {
       text = m.text.replace(/[.!]?$/, this.draw('EDIT_SUFFIX', L.EDIT_SUFFIX) + '.')
     }
@@ -2421,7 +2443,7 @@ export class Game {
         const legend = this.legend()
         if (legend && this.legendDue()) {
           const spec = LEGENDS[legend]
-          const promise = this.alignPromise(this.X.promise(), spec.until, spec.condition, spec.days)
+          const promise = this.alignPromise(this.X.promise(), spec.until)
           this.S.mem[memkeys.legendPromiseAt] = this.S.stats.sent
           this.recordPromiseOnce(promise)
           deliver({ kind: 'text', from: 'alik', text: promise.text })

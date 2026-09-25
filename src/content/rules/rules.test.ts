@@ -119,7 +119,7 @@ describe('варианты игрока (BuildChoices)', () => {
   })
   it('отмазка через ctxFromPromise: в день речи — кнопка с датой; после сдвига хода — нет', async () => {
     const { game } = makeGame()
-    const p = { t: 'завтра', d: 1, text: 'завтра — рассчитаюсь', tomorrow: true as const }
+    const p = { t: 'завтра', d: 1, kind: 'clear' as const, text: 'завтра — рассчитаюсь', tomorrow: true as const }
     const excuse = game.X.excuse
     game.X.excuse = () => ({ texts: ['Брат, завтра — рассчитаюсь.'], p, legendary: false })
     try {
@@ -247,7 +247,7 @@ describe('ответы Алика (PlayerSays)', () => {
   })
   it('на срок — либо вопрос, либо согласие; на согласие Алик не клянётся заново, а подтверждает', async () => {
     const { game } = makeGame()
-    const ctx = game.ctxFromPromise({ t: 'в среду утром', d: 2, text: 'в среду утром' })
+    const ctx = game.ctxFromPromise({ t: 'в среду утром', d: 2, kind: 'clear', text: 'в среду утром' })
     const acts = new Set<string>()
     for (let i = 0; i < 40; i++) { game.S.ctx = ctx; game.S.choices = null; for (const c of game.choices) if (c.act) acts.add(c.act) }
     expect(acts).toContain('promiseCheck')

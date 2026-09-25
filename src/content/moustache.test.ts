@@ -392,7 +392,7 @@ describe('ставка «усы»', () => {
     const said = async (d: number | null): Promise<number> => {
       const { game } = makeGame()
       game.rules.applyOps(meet('karine'), {})
-      vi.spyOn(game.X, 'promise').mockImplementation(() => ({ text: d === null ? 'когда-нибудь — отдам' : 'через два дня — отдам', t: d === null ? 'когда-нибудь' : 'через два дня', d }))
+      vi.spyOn(game.X, 'promise').mockImplementation(() => ({ text: d === null ? 'когда-нибудь — отдам' : 'через два дня — отдам', t: d === null ? 'когда-нибудь' : 'через два дня', d, kind: d === null ? 'never' : 'clear' }))
       let n = 0
       for (let i = 0; i < 60; i++) {
         game.S.stats.sent += 20
