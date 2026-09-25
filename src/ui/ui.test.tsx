@@ -827,17 +827,31 @@ describe('интро новой партии', () => {
       .not.toBe(introMidNotes(START_MONEY, 2).map((n) => n.text).join('|'))
   })
 
-  it('NC: без фильтра незнакомых имя из подмешанного пула попадает в интро (#321)', async () => {
-    const { INTRO_UNKNOWN, introMidNotes } = await import('./view')
+  it('NC: уведомления интро не знакомят с чужими — проверка по настоящему выводу (#367)', async () => {
+    const { introMidNotes } = await import('./view')
+    const { CAST } = await import('../content/arcs')
+    const { STARTS } = await import('../content/quests')
     const { SPEND } = await import('../content/life')
-    const { spec } = await import('../engine/rules')
-    const decoy = 'Перевод маме на закатки'
-    expect(INTRO_UNKNOWN.test(decoy)).toBe(true)
-    const raw = [...SPEND.map((e) => spec(e).t), decoy]
-    expect(raw.some((t) => INTRO_UNKNOWN.test(t))).toBe(true)
-    const filtered = raw.filter((t) => !INTRO_UNKNOWN.test(t))
-    expect(filtered.some((t) => INTRO_UNKNOWN.test(t))).toBe(false)
-    expect(introMidNotes(28_000, 1).every((n) => !INTRO_UNKNOWN.test(n.text))).toBe(true)
+    const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    // имя персонажа — последнее слово с заглавной из CAST: роли («Заказчик», «Дядя», «Прораб») отпадают сами
+    const names = Object.values(CAST)
+      .map((c) => c.name.replace(/[^А-Яа-яЁё\s]/g, '').trim().split(/\s+/).filter((w) => /^[А-ЯЁ]/.test(w) && w.length > 3).at(-1)!)
+    const re = new RegExp(names.map(escape).join('|'), 'i')
+    const stray = (texts: string[]) => texts.filter((t) => re.test(t))
+    // настоящий путь: ни одно уведомление ни при одном сиде и ни один пролог завязки не называют чужого
+    for (let seed = 0; seed < 40; seed++) {
+      const texts = introMidNotes(START_MONEY, seed).map((n) => n.text)
+      expect(stray(texts), `seed ${seed}: ${stray(texts).join(' | ')}`).toEqual([])
+    }
+    expect(stray(STARTS.flatMap((s) => [s.intro, s.reply]))).toEqual([])
+    // контроль: строка с именем, подложенная в пул, ловится
+    SPEND.push('Перевод Борису на закатки')
+    try {
+      const hits = Array.from({ length: 40 }, (_, seed) => stray(introMidNotes(START_MONEY, seed).map((n) => n.text))).flat()
+      expect(hits.length, 'декой с именем должен краснеть').toBeGreaterThan(0)
+    } finally {
+      SPEND.pop()
+    }
   })
 
   it('старое сохранение без introShown — интро не показывает (#249)', () => {
