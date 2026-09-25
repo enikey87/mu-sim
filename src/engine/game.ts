@@ -45,7 +45,7 @@ import { type Audio, silentAudio } from './audio'
 import { typo } from './typo'
 import { UiState, type Moo, type Notif, type SendFeel } from './ui-state'
 import { classifyUserInput, legalClaim, type ClassifiedInput } from './input'
-import { holidayOf, HOLIDAY_EXCUSES } from '../content/holidays'
+import { holidayOf, holidayGreetKey, HOLIDAY_EXCUSES } from '../content/holidays'
 import { dueIn, dateOf, fmtDate, fmtDayMonth, fmtShortDate, fmtTime, weekOf, nightHour, periodOf, tierOf, TIERS, type Due, type Period } from './time'
 import { type GameState, type Msg, type NewMsg, type Card, type Choice, type Ctx, type Tone, type Storage, type InputCategory, freshState, loadState, saveState, SAVE_KEY, LEND50_SEEN_KEY, MAX_PATIENCE, isLate, countOf, setCount, type PromiseRec } from './state'
 
@@ -939,18 +939,21 @@ export class Game {
     this.ui.status = { text, cls }
     this.emit()
   }
-  /** Алик не на связи: блок, «смерть», телефон у Карине. Одно место для шапки, typing, праздников (#257). */
+  /** Алик не на связи: блок, «смерть», телефон у Карине, пропал. Одно место для шапки, typing, праздников (#257/#255). */
   alikSilent(): boolean {
     const m = this.S.mem
-    return !!(m[memkeys.blocked] || m[memkeys.alikDead] || m[memkeys.phoneKarine])
+    return !!(m[memkeys.blocked] || m[memkeys.alikDead] || m[memkeys.phoneKarine] || this.S.offlineDays > 0)
   }
   restStatus(): void {
+    if (this.S.offlineDays > 0) {
+      this.setStatus('был давно')
+      return
+    }
     if (this.alikSilent()) {
       this.setStatus('не в сети')
       return
     }
-    if (this.S.offlineDays > 0) this.setStatus('был давно')
-    else if (this.isNight()) this.setStatus(`был(а) в ${this.realHHMM()}`)
+    if (this.isNight()) this.setStatus(`был(а) в ${this.realHHMM()}`)
     else this.setStatus(this.chance(0.5) ? 'был недавно' : 'в сети', 'online')
   }
 
@@ -1444,10 +1447,12 @@ export class Game {
     }
 
     try {
+      const startedOffline = this.S.offlineDays > 0
       await this.sleep((500 + this.rnd(700)) * (this.isNight() ? 2 : 1))
       if (this.disposed) return
       // в молчании «прочитано» — ложь: сообщение не доставлено (#257)
-      if (this.alikSilent()) this.setStatus('не в сети')
+      if (this.S.offlineDays > 0) this.setStatus('был давно')
+      else if (this.alikSilent()) this.setStatus('не в сети')
       else this.setStatus('прочитано')
 
       // реакция на сообщение игрока; иногда — вместо ответа
@@ -1518,13 +1523,14 @@ export class Game {
         if (status) this.sys(`Алик Воздухонесян изменил статус: «${status}»`)
       }
       // праздник в окне звучит хотя бы раз: отмазку вытесняют серия, сцена или легенда, а окно короткое.
-      // Поздравляет сам Алик: в блоке, при «смерти» и с телефоном у Карине он не пишет (как и статус)
+      // Поздравляет сам Алик: молчит там же, где шапка (alikSilent — блок/смерть/Карине/пропал)
       const holiday = holidayOf(S.day)
-      if (holiday && !this.alikSilent() && S.mem[memkeys.holidayGreeted] !== `${holiday}@${dateOf(S.day).getFullYear()}`) {
+      const greetKey = holidayGreetKey(S.day)
+      if (holiday && greetKey && !this.alikSilent() && !startedOffline && S.mem[memkeys.holidayGreeted] !== greetKey) {
         const festive = this.line('HOLIDAY', HOLIDAY_EXCUSES)
         if (festive) {
           await this.say([festive])
-          S.mem[memkeys.holidayGreeted] = `${holiday}@${dateOf(S.day).getFullYear()}`
+          S.mem[memkeys.holidayGreeted] = greetKey
         }
       }
       if (this.chance(0.12)) this.randomNotif()
