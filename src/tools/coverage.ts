@@ -156,6 +156,8 @@ export async function ruleCoverage(
     }
     for (const id of Object.keys(game.S.rules.said)) said.add(id)
     for (const n of seen) games[n] = (games[n] ?? 0) + 1
+    // баннер уведомления живёт на стеновых часах: не снятая партия оставляет таймер после теста (#288)
+    game.dispose()
   }
   const unsaid = MEMORY.map(spec).filter((l) => !said.has(l.id ?? lineId('MEMORY', l.t))).map((l) => l.t)
   return { turns: total, weighted, fired, games, never: names.filter((n) => !fired[n]), events, unsaid }

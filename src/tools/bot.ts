@@ -1,12 +1,15 @@
 // Бот-игрок для симуляций: отвечает на допработу, заряжает телефон, иначе выбирает реплику (контекстную — чаще).
 import type { Game } from '../engine/game'
 import type { Choice } from '../engine/state'
+import { endgame } from '../content/memkeys'
 
 /**
  * Фразы свободного ввода по корпусу input.test.ts: готовые варианты их не заменяют, поэтому без
  * отдельного шанса (freeText) правила просьбы, угрозы и «Мууу» в симуляции недостижимы.
  */
 const FREE = ['Верни деньги до пятницы', 'ВЕРНИ ДЕНЬГИ!!!', 'Я тебя убью', 'Я тебя найду', 'Муууу']
+/** После выплаты корпус тот же, плюс нейтральная: фразы с тоном и намерением перехватывают раньше хода, и только она доходит до AlikTurn (#288). */
+const FREE_ENDGAME = ['Я еще жду', ...FREE]
 
 export async function botTurn(game: Game, pickCtx = 0.7, rude = 0.06, freeText = 0): Promise<Choice | null> {
   // как игрок: экран концовки закрывают, иначе эндгейм не начинается и гейт его не видит (#190)
@@ -23,7 +26,8 @@ export async function botTurn(game: Game, pickCtx = 0.7, rude = 0.06, freeText =
   const offer = game.S.msgs.find((m) => m.kind === 'card' && m.offer && !m.answered)
   if (offer && game.rng.random() < 0.7) { game.answerCard(offer.id, game.rng.random() < 0.5 ? 'take' : 'sell'); return null }
   if (freeText > 0 && game.rng.random() < freeText) {
-    await game.send(FREE[Math.floor(game.rng.random() * FREE.length)])
+    const corpus = game.S.mem[endgame.active] ? FREE_ENDGAME : FREE
+    await game.send(corpus[Math.floor(game.rng.random() * corpus.length)])
     return null
   }
   const cs = game.choices
