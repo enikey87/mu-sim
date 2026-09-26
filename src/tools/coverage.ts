@@ -4,6 +4,8 @@
 // Гейт покрытия (#278): правило достижимо, если сработало хотя бы раз в объединении больших выборок; правило
 // основной игры — хотя бы раз в выборках «до концовки». Не срабатывает — прямой случай в direct.ts или удалить.
 // Верхней полосы, снимка и списков «почти всегда» нет: правка текста не делает правило «слишком частым».
+// DIRECT (#329) освобождает только правила, которые в выборках срабатывают реже DIRECT_MIN_GAMES партий:
+// запись у срабатывающего чаще правила — красное «снять из DIRECT», гейт его видит и без прямого случая.
 import { Game } from '../engine/game'
 import { manualClock } from '../engine/clock'
 import { seededRng } from '../engine/rng'
@@ -79,19 +81,35 @@ export function neverInAllSamples(sampleNevers: string[][]): string[] {
 export const endgameOnly = (r: Pick<Rule<unknown>, 'when'>): boolean => (r.when ?? []).some((c) => requiresKey(c, endgame.active))
 
 /**
- * Нарушения гейта: правило без прямого случая, которое ни разу не сработало — в выборках «до концовки», если это
- * правило основной игры (эндгейм не прячет его пропажу), или во всех выборках, если это правило эндгейма.
+ * Порог разрешения гейта (#329). DIRECT освобождает правило, которое в релевантных выборках срабатывает
+ * реже чем в стольких партиях: при 7 из 72 («до концовки») вероятность случайно пропустить правило,
+ * которое бот находит часто, — меньше 0.1%, а правила стиля (1–3 партии на семейство сидов) не мигают.
+ */
+export const DIRECT_MIN_GAMES = 7
+
+/**
+ * Нарушения гейта. Не освобождённое правило, которое ни разу не сработало — в выборках «до концовки», если
+ * это правило основной игры (эндгейм не прячет его пропажу), или во всех выборках, если правило эндгейма.
+ * Правило из DIRECT срабатывает в выборках ≥ DIRECT_MIN_GAMES раз — его запись устарела, гейт его видит.
  */
 export function gateIssues(
-  samples: ReadonlyArray<Pick<SampleReport, 'kind' | 'fired'>>,
+  samples: ReadonlyArray<Pick<SampleReport, 'kind' | 'games'>>,
   rules: ReadonlyArray<Pick<Rule<unknown>, 'name' | 'when'>>,
   direct: Readonly<Record<string, unknown>> = DIRECT,
 ): string[] {
-  const hit = (name: string, kinds: readonly SampleKind[]) => samples.some((s) => kinds.includes(s.kind) && (s.fired[name] ?? 0) > 0)
-  return rules.filter((r) => !(r.name in direct)).flatMap((r) => {
-    const late = endgameOnly(r)
-    if (hit(r.name, late ? ['full', 'main'] : ['main'])) return []
-    return [`${r.name}: ${late ? 'правило эндгейма ни разу не сработало' : 'ни разу до экрана концовки'} — прямой случай в direct.ts или удалить`]
+  const kindsFor = (r: Pick<Rule<unknown>, 'when'>): readonly SampleKind[] => (endgameOnly(r) ? ['full', 'main'] : ['main'])
+  const games = (name: string, kinds: readonly SampleKind[]) =>
+    samples.reduce((acc, s) => acc + (kinds.includes(s.kind) ? (s.games[name] ?? 0) : 0), 0)
+  return rules.flatMap((r) => {
+    const kinds = kindsFor(r)
+    const played = games(r.name, kinds)
+    if (r.name in direct) {
+      return played >= DIRECT_MIN_GAMES
+        ? [`${r.name}: сработало в ${played} партиях (порог ${DIRECT_MIN_GAMES}) — снять из DIRECT, гейт его видит`]
+        : []
+    }
+    if (played > 0) return []
+    return [`${r.name}: ${kinds.length > 1 ? 'правило эндгейма ни разу не сработало' : 'ни разу до экрана концовки'} — прямой случай в direct.ts или удалить`]
   })
 }
 
