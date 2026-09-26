@@ -1294,7 +1294,7 @@ export class Game {
       'ctx.whenKind': c.whenKind, 'ctx.whenDays': whenDays,
       'ctx.whenHorizon': whenDays === undefined ? undefined : whenDays <= 7 ? 'near' : whenDays <= 30 ? 'far' : 'veryFar',
       'ctx.rel': c.rel?.n, 'ctx.relYou': c.rel?.you ?? c.rel?.n, 'ctx.sad': c.sad, 'ctx.festive': c.festive, 'ctx.revived': c.revived,
-      'ctx.constr': c.constr, 'ctx.legendary': c.legendary, 'ctx.arc': c.arc, 'ctx.quote': c.quote,
+      'ctx.constr': c.constr, 'ctx.legendary': c.legendary, 'ctx.arc': c.arc, 'ctx.debtMoved': c.debtMoved, 'ctx.quote': c.quote,
       // спросить про сериал есть смысл: будет новая серия, или сериал закончен и сегодня про финал ещё не спрашивали
       'ctx.arcCanAdvance': c.arc ? this.arcCanAdvance(c.arc, true) || (S.arcs[c.arc]?.i >= ARCS[c.arc].eps.length && S.mem[memkeys.doneAsked(c.arc)] !== S.day) : false,
       'arc.done': c.arc ? this.S.arcs[c.arc]?.i >= ARCS[c.arc].eps.length : false,
@@ -2027,13 +2027,8 @@ export class Game {
     if (ep.legend !== undefined) this.setLegend(ep.legend, arc)
     // серия без своей легенды возвращает легенду своего сериала: свадьба идёт — значит, деньги «после свадьбы»; гейт клятвы возврат не открывает (#327)
     else if (arc && this.S.mem[memkeys.legendOf(arc)]) this.setLegend(String(this.S.mem[memkeys.legendOf(arc)]), arc, false)
-    const m = this.open(ep.m)
-    for (const x of m) this.seen.mark(typeof x === 'string' ? x : x.t)
-    this.markTopical(await this.say(m))
-    if (typeof ep.legend === 'string' && this.S.ctx) this.S.ctx.legend = ep.legend // новая легенда — есть что переспросить
-    // серия, которая двигает долг, объявляет это в sys — объявление только о том, что случилось
+    // Строки о вычете/доплате сами требуют факт успешного сдвига; после отбора строк он не утекает в контекст кнопок.
     const debtFx = !!(ep.fx?.debt || ep.fx?.pay)
-    // после выплаты долг запечатан: adjustDebt откажет в любой ветке — серия не двигает и календарь (#189)
     const refused = debtFx && this.debtSealed()
     let debtMoved = !!ep.fx?.debt && this.adjustDebt(ep.fx.debt)
     if (ep.fx?.pay && this.adjustDebt(-ep.fx.pay)) {
@@ -2042,6 +2037,17 @@ export class Game {
       this.noteAlikPay(ep.fx.pay)
       debtMoved = true
     }
+    if (debtFx) (this.S.ctx ??= {}).debtMoved = debtMoved
+    const m = this.open(ep.m)
+    if (this.S.ctx) {
+      delete this.S.ctx.debtMoved
+      if (!Object.keys(this.S.ctx).length) this.S.ctx = null
+    }
+    for (const x of m) this.seen.mark(typeof x === 'string' ? x : x.t)
+    this.markTopical(await this.say(m))
+    if (typeof ep.legend === 'string' && this.S.ctx) this.S.ctx.legend = ep.legend // новая легенда — есть что переспросить
+    // серия, которая двигает долг, объявляет это в sys — объявление только о том, что случилось
+    // после выплаты долг запечатан: adjustDebt откажет в любой ветке — серия не двигает и календарь (#189)
     if (ep.item) this.S.items.push(ep.item)
     if (ep.state) this.rules.applyOps([{ key: ep.state.key, op: '=', value: true, forDays: ep.state.days, scope: ep.state.actor ? 'target' : 'world' }], { target: ep.state.actor })
     if (ep.fx?.days && !refused) this.nextDay(ep.fx.days)
