@@ -74,6 +74,8 @@ export interface Ctx {
   constr?: boolean
   legendary?: boolean
   arc?: string
+  /** Временный факт для строк серии: adjustDebt применил её debt/pay-эффект. */
+  debtMoved?: boolean
   group?: boolean
   /** Что сказали в семейном чате — игрок может это процитировать. */
   quote?: string

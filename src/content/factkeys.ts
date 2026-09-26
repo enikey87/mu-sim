@@ -29,7 +29,7 @@ import { valueOf } from '../engine/rules'
 /** Факты контекста последней реплики — facts() кладёт их все на каждый fire; сверка — factkeys.test.ts. */
 export const CTX_KEYS = [
   'topic', 'type', 'amount', 's', 'shortTimey', 'when', 'whenNever', 'whenFresh', 'whenDate', 'whenKind', 'whenDays', 'whenHorizon', 'rel', 'relYou',
-  'sad', 'festive', 'revived', 'constr', 'legendary', 'arc', 'quote', 'arcCanAdvance', 'legend', 'chorus', 'memory',
+  'sad', 'festive', 'revived', 'constr', 'legendary', 'arc', 'debtMoved', 'quote', 'arcCanAdvance', 'legend', 'chorus', 'memory',
   'group', 'wrong', 'deleted', 'offended',
 ] as const
 export type CtxKey = (typeof CTX_KEYS)[number]
