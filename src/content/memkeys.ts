@@ -88,7 +88,7 @@ export const count = {
 } as const
 
 export const endgame = {
-  active: 'endgame.active', started: 'endgame.started', forms: 'endgame.forms',
+  active: 'endgame.active', started: 'endgame.started', intro: 'endgame.intro', forms: 'endgame.forms',
   exits: 'endgame.exits', mutes: 'endgame.mutes', renames: 'endgame.renames',
 } as const
 

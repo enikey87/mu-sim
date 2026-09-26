@@ -192,12 +192,20 @@ export class Game {
 
     if (!this.S.msgs.length) this.seed()
     else { this.restoreDueEvents(); this.scheduleBills(); this.scheduleCredits(); this.migrateCreditSave() }
-    // незаконченная просьба — до пачки непрочитанных: иначе «Займи 50» рвётся away-burst (#248)
-    if (this.S.mem[memkeys.endgame.active] && !this.S.mem[memkeys.lend50.asked]) {
-      this.ui.busy = true
-      try { this.deliverLend50Ask() } finally { this.ui.busy = false }
+    // Старое сохранение с готовой просьбой уже прошло вступление; новый маркер появился позже (#358).
+    if (this.S.mem[memkeys.endgame.active] && this.S.mem[memkeys.lend50.asked] && !this.S.mem[memkeys.endgame.intro]) {
+      this.S.mem[memkeys.endgame.intro] = true
     }
-    void this.checkAway(opts.away ?? null)
+    // Незаконченные вступление/просьба — до пачки непрочитанных: иначе opening рвётся away-burst (#248/#358).
+    if (this.S.mem[memkeys.endgame.active]
+      && (!this.S.mem[memkeys.endgame.intro] || !this.S.mem[memkeys.lend50.asked])) {
+      this.ui.busy = true
+      this.S.choices = []
+      const outcome = String(this.S.mem[memkeys.paydayScene] ?? 'default')
+      void this.resumeEndgameOpening(outcome, opts.away ?? null).catch((e) => {
+        if (!(e instanceof GameDisposed)) console.error('[alik] вступление эндгейма не восстановлено', e)
+      })
+    } else void this.checkAway(opts.away ?? null)
     if (!this.S.choices) this.S.choices = this.buildChoices()
     this.restStatus()
     if (this.battery.level === 0) this.battery.die()
@@ -1389,6 +1397,8 @@ export class Game {
     const S = this.S
     // «займи 50»: кнопки — факт сцены (asked без answer), а не разовая запись в S.choices (#219)
     if (S.mem[memkeys.endgame.active]) {
+      // Ни обычные действия группы, ни ответы на просьбу не появляются раньше её системной пометки (#358).
+      if (!S.mem[memkeys.endgame.intro] || !S.mem[memkeys.lend50.asked]) return []
       if (S.mem[memkeys.lend50.asked] && !S.mem[memkeys.lend50.answer]) return LEND50_CHOICES.map((c) => ({ ...c }))
       return ENDGAME_CHOICES.map((c) => ({ ...c }))
     }
@@ -2113,7 +2123,7 @@ export class Game {
 
   private async startEndgame(outcome: string): Promise<void> {
     const S = this.S
-    // пока вступление и просьба — busy: иначе кнопки эндгейма и таймеры вклиниваются между «Займи 50» и «Верну»
+    // Пока вступление и просьба — busy: иначе кнопки эндгейма и таймеры вклиниваются в цепочку.
     this.ui.busy = true
     try {
       S.mem[memkeys.endgame.active] = true
@@ -2125,17 +2135,10 @@ export class Game {
       this.clearScene(true)
       S.offlineDays = 0
       S.rules.schedule = S.rules.schedule.filter((item) => item.kind !== 'event')
-      this.sys(`Алик создал группу «${ENDGAME_GROUP}»`)
-      this.sys('Алик добавил вас')
-      for (const text of ENDGAME_OPEN) this.alikMsg({ kind: 'text', from: 'alik', text })
-      const intro = S.endings.vendetta ? ENDGAME_VENDETTA : ENDGAME_INTRO[outcome] ?? ENDGAME_FALLBACK
-      this.alikMsg({ kind: 'text', from: 'alik', text: intro })
-      S.choices = null // до ответа на «займи 50» обычных кнопок эндгейма нет
+      S.choices = [] // до системной пометки просьбы кнопок нет
       this.save()
       this.emit()
-      await this.sleep(1500)
-      if (this.disposed) return
-      this.deliverLend50Ask()
+      await this.completeEndgameOpening(outcome)
     } finally {
       if (!this.disposed) this.ui.busy = false
       this.save()
@@ -2144,35 +2147,103 @@ export class Game {
   }
 
   /**
-   * Просьба «займи 50» и системная пометка — одним куском: либо обе в ленте, либо ни одной (#219).
-   * Без опечаток и без «печатает…»: три реплики — пакет, чтобы загрузка/away не рвали его (#248).
+   * Продолжить opening после перезагрузки, а затем только пустить пачку непрочитанных.
+   * Незавершённая часть перед повтором удаляется, поэтому в ленте нет дублей и обрывков (#358).
+   */
+  private async resumeEndgameOpening(outcome: string, away: number | null): Promise<void> {
+    try {
+      await this.completeEndgameOpening(outcome)
+    } finally {
+      if (!this.disposed) this.ui.busy = false
+      this.save()
+      this.emit()
+    }
+    if (!this.disposed) await this.checkAway(away)
+  }
+
+  private async completeEndgameOpening(outcome: string): Promise<void> {
+    if (!this.S.mem[memkeys.endgame.intro]) {
+      this.stripIncompleteEndgameIntro()
+      await this.deliverEndgameIntro(outcome)
+      await this.sleep(1500)
+    }
+    if (!this.S.mem[memkeys.lend50.asked]) await this.deliverLend50Ask()
+  }
+
+  /** Одна точная реплика Алика: typing, сообщение, сохранение видимого шага, пауза. */
+  private async endgameLine(text: string): Promise<void> {
+    await this.typingFor(600 + text.length * 22)
+    if (this.disposed) throw new GameDisposed()
+    this.alikMsg({ kind: 'text', from: 'alik', text })
+    this.save()
+    await this.sleep(250)
+  }
+
+  /** Создание группы и вступление — по одному сообщению; маркер ставится только после полной цепочки. */
+  private async deliverEndgameIntro(outcome: string): Promise<void> {
+    const S = this.S
+    this.sys(`Алик создал группу «${ENDGAME_GROUP}»`)
+    this.save()
+    await this.sleep(500)
+    this.sys('Алик добавил вас')
+    this.save()
+    const intro = S.endings.vendetta ? ENDGAME_VENDETTA : ENDGAME_INTRO[outcome] ?? ENDGAME_FALLBACK
+    for (const text of [...ENDGAME_OPEN, intro]) await this.endgameLine(text)
+    S.mem[memkeys.endgame.intro] = true
+    S.choices = []
+    this.save()
+  }
+
+  /**
+   * Просьба «займи 50» идёт реплика за репликой с typing; системная пометка и ссылка завершают цепочку.
+   * asked ставится только после ссылки, поэтому кнопки не могут появиться у неполной просьбы (#219/#248/#358).
    * Звать только при endgame.active и !asked.
    */
-  private deliverLend50Ask(): void {
+  private async deliverLend50Ask(): Promise<void> {
     const S = this.S
     if (!S.mem[memkeys.endgame.active] || S.mem[memkeys.lend50.asked]) return
     this.stripIncompleteLend50()
     const again = !!this.storage?.getItem(LEND50_SEEN_KEY)
     const lines = again ? LEND50_ASK_AGAIN : LEND50_ASK
-    for (const text of lines) this.alikMsg({ kind: 'text', from: 'alik', text })
+    for (const text of lines) await this.endgameLine(text)
+    await this.sleep(500)
     this.sys(LEND50_SYS)
+    this.save()
+    await this.sleep(250)
     this.sys(LEND50_LINK)
     this.storage?.setItem(LEND50_SEEN_KEY, '1') // отметка устройства, а не партии: она только выбирает текст
     S.mem[memkeys.lend50.asked] = true
     S.choices = null // buildChoices отдаст LEND50_CHOICES
+    this.save()
   }
 
-  /** Убрать сиротские реплики просьбы без системной пометки — перед доигрыванием или с нуля. */
-  private stripIncompleteLend50(): void {
-    if (this.S.msgs.some((m) => m.kind === 'sys' && m.text === LEND50_SYS)) return
-    const pool = new Set<string>([...LEND50_ASK, ...LEND50_ASK_AGAIN])
-    while (this.S.msgs.length) {
-      const last = this.S.msgs[this.S.msgs.length - 1]
-      if (last.kind === 'text' && last.from === 'alik' && pool.has(last.text)) {
-        this.S.msgs.pop()
-        this.touchMsgs(this.S.msgs.length)
-      } else break
+  /** Убрать незавершённое вступление целиком: при повторе оно не дублируется и не остаётся оборванным. */
+  private stripIncompleteEndgameIntro(): void {
+    if (this.S.mem[memkeys.endgame.intro]) return
+    const marker = `Алик создал группу «${ENDGAME_GROUP}»`
+    let at = -1
+    for (let i = this.S.msgs.length - 1; i >= 0; i--) {
+      const m = this.S.msgs[i]
+      if (m.kind === 'sys' && m.text === marker) { at = i; break }
     }
+    if (at < 0) { this.stripIncompleteLend50(); return }
+    this.S.msgs.splice(at)
+    this.touchMsgs(at)
+  }
+
+  /** Убрать хвост просьбы без asked — перед воспроизведением с начала. */
+  private stripIncompleteLend50(): void {
+    if (this.S.mem[memkeys.lend50.asked]) return
+    const pool = new Set<string>([...LEND50_ASK, ...LEND50_ASK_AGAIN])
+    let at = -1
+    for (let i = this.S.msgs.length - 1; i >= 0; i--) {
+      const m = this.S.msgs[i]
+      if (m.kind === 'text' && m.from === 'alik' && pool.has(m.text)) at = i
+      else if (at >= 0) break
+    }
+    if (at < 0) return
+    this.S.msgs.splice(at)
+    this.touchMsgs(at)
   }
 
   /** Ответ на «займи 50»: реплики и ачивка — без движения денег и долга; без опечаток (#248). */
