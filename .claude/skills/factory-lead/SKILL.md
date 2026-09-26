@@ -14,7 +14,7 @@ description: "**Использовать**, когда Claude — ведущий
 
 Игровой код сам не пишешь. Сам меняешь только документы, `.claude/`, процесс (`/agent-task`), `.github/` и `package.json` — то, что агентам запрещено.
 
-Прочитай перед работой: `CLAUDE.md`, `README.md`, `docs/design/README.md`, `.claude/commands/agent-task.md`.
+Прочитай перед работой: `CLAUDE.md`, `README.md`, `docs/design/README.md`, `.claude/skills/agent-task/SKILL.md`.
 
 ## 1. Механика: идея → документ → задачи
 
