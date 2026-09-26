@@ -5,8 +5,8 @@ import { flush, makeGame, memStorage } from '../test/helpers'
 import type { Game } from '../engine/game'
 import { uiOf, viewOf } from '../ui/view'
 import {
-  ENDGAME_CHOICES, LEND50_ASK, LEND50_ASK_AGAIN, LEND50_LINK, LEND50_LOCKED, LEND50_NO, LEND50_NUNE,
-  LEND50_RENAME, LEND50_SERIOUS, LEND50_SYS, LEND50_YES,
+  ENDGAME_CHOICES, ENDGAME_GROUP, ENDGAME_INTRO, ENDGAME_OPEN, LEND50_ASK, LEND50_ASK_AGAIN, LEND50_LINK,
+  LEND50_LOCKED, LEND50_NO, LEND50_NUNE, LEND50_RENAME, LEND50_SERIOUS, LEND50_SYS, LEND50_YES,
 } from './endgame'
 
 const texts = (g: Game, from = 0) => g.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' || m.kind === 'sys' ? [m.text] : []))
@@ -62,6 +62,60 @@ describe('«Займи 50»', () => {
     const ask = t.indexOf('Брат. Слушай сюда. Только не смейся.')
     expect(ask).toBeGreaterThan(t.indexOf('Алик добавил вас'))
     expect(ask).toBeGreaterThan(t.findIndex((x) => /Остаток выплачен|Французский оригинал|Деньги настоящие|Не хватает одной монеты/.test(x)))
+  })
+  it('вступление и просьба приходят цепочкой: системные строки разделены паузой, перед каждой репликой Алик печатает', async () => {
+    const { game } = makeGame()
+    const events: string[] = []
+    const pausedAfter: string[] = []
+    let count = game.S.msgs.length
+    const sleep = game.sleep
+    game.sleep = async (ms) => {
+      const last = texts(game).at(-1)
+      if (last) pausedAfter.push(last)
+      await sleep(ms)
+    }
+    game.subscribe(() => {
+      if (game.ui.typing === 'печатает…') events.push('typing')
+      for (const m of game.S.msgs.slice(count)) {
+        if (m.kind === 'text' || m.kind === 'sys') events.push(`msg:${m.text}`)
+      }
+      count = game.S.msgs.length
+    })
+
+    await enter(game)
+
+    const created = `Алик создал группу «${ENDGAME_GROUP}»`
+    expect(pausedAfter).toContain(created)
+    const chain = [...ENDGAME_OPEN, ENDGAME_INTRO.default, ...LEND50_ASK]
+    let previous = events.indexOf('msg:Алик добавил вас')
+    for (const line of chain) {
+      const message = events.indexOf(`msg:${line}`)
+      expect(message, line).toBeGreaterThan(previous)
+      expect(events.slice(previous + 1, message), line).toContain('typing')
+      previous = message
+    }
+  })
+  it('перезагрузка посреди вступления удаляет обрывок и воспроизводит полное вступление ровно один раз', async () => {
+    const storage = memStorage()
+    const { game } = makeGame({ storage })
+    game.S.mem.payday = 'default'
+    game.S.mem['endgame.active'] = true
+    game.S.mem['endgame.started'] = game.S.day
+    game.sys(`Алик создал группу «${ENDGAME_GROUP}»`)
+    game.alikMsg({ kind: 'text', from: 'alik', text: ENDGAME_OPEN[0] })
+    game.save()
+
+    const again = makeGame({ storage })
+    await flush()
+    const t = texts(again.game)
+    const once = (line: string) => t.filter((x) => x === line).length
+    expect(once(`Алик создал группу «${ENDGAME_GROUP}»`)).toBe(1)
+    expect(once('Алик добавил вас')).toBe(1)
+    expect(once(ENDGAME_OPEN[0])).toBe(1)
+    expect(once(ENDGAME_INTRO.default)).toBe(1)
+    expect(t.indexOf('Алик добавил вас')).toBeLessThan(t.indexOf(ENDGAME_OPEN[0]))
+    expect(t.indexOf(ENDGAME_INTRO.default)).toBeLessThan(t.indexOf(LEND50_ASK[0]))
+    expect(again.game.S.mem['lend50.asked']).toBe(true)
   })
   it('пока пауза и подводка — busy: ход игрока не вклинивается', async () => {
     const { game } = makeGame()
@@ -273,10 +327,10 @@ describe('«Займи 50»', () => {
     game.S.mem['endgame.active'] = true
     game.S.mem['endgame.started'] = game.S.day
     game.S.choices = null
-    expect(game.choices.some((c) => c.act?.startsWith('lend50'))).toBe(false)
+    expect(game.choices).toEqual([])
     game.awayMsg('formality')
     game.S.choices = null
-    expect(game.choices.some((c) => c.act?.startsWith('lend50'))).toBe(false)
+    expect(game.choices).toEqual([])
   })
 
   it('ответы Алика на кнопки без опечаток (#248)', async () => {
