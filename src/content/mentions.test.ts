@@ -1,8 +1,9 @@
 // Мир последователен: персонаж или предмет, который появляется по ходу истории, упоминается только под требованием
 // (needs / when / структура: серия сериала, финал, реплика персонажа). Регулярки — здесь, в проверке контента: игра текст не разбирает.
 import { describe, it, expect } from 'vitest'
-import { Gated, describeCriterion, valueOf, gate, is, type Criterion, type Entry, type FactOp } from './fact'
-import { WORLD, SPEAKS, CHORUS, type WorldKey } from './world'
+import { Gated, describeCriterion, valueOf, gate, is, type Entry, type FactOp } from './fact'
+import type { Criterion } from '../engine/rules'
+import { WORLD, SPEAKS, CHORUS, speaks, type WorldKey } from './world'
 import { ARCS, CAST, GROUP } from './arcs'
 import { RUDE_FAMILY } from './rude'
 import { makeGame } from '../test/helpers'
@@ -150,7 +151,7 @@ function expand(cs: Criterion[]): Criterion[] {
   return cs.flatMap((c) => (c.key === 'legend' && c.op === '==' && typeof c.value === 'string' ? [c, ...legendAt(c.value)] : [c]))
 }
 /** Реплика персонажа: он ею и входит в историю, плюс условия, при которых он вообще пишет. */
-const speaker = (who: string): Criterion[] => [...selfIntro(who), ...(SPEAKS[who] ? atoms([SPEAKS[who]]) : [])]
+const speaker = (who: string): Criterion[] => { const criterion = speaks(who); return [...selfIntro(who), ...(criterion ? atoms([criterion]) : [])] }
 
 const mods = import.meta.glob(['./*.ts', '!./*.test.ts'], { eager: true }) as Record<string, Record<string, unknown>>
 function corpus(): Found[] {
@@ -241,7 +242,8 @@ function problems(found: Found[]): string[] {
   const out: string[] = []
   for (const { path, text, known, who, stateOf } of found) {
     for (const [key, re] of MENTION) if (re.test(text) && !holds(key, known)) out.push(`${path}: «${text.slice(0, 70)}» — нужно needs('${key}')`)
-    if (who && SPEAKS[who] && !atoms([SPEAKS[who]]).filter((a) => a.op !== 'all').every((a) => implied(a, known))) out.push(`${path}: пишет ${who} — «${text.slice(0, 50)}» — нужно, чтобы он мог писать`)
+    const speak = who ? speaks(who) : undefined
+    if (who && speak && !atoms([speak]).filter((a) => a.op !== 'all').every((a) => implied(a, known))) out.push(`${path}: пишет ${who} — «${text.slice(0, 50)}» — нужно, чтобы он мог писать`)
     if (ANY_STATE.has(text)) continue
     const keys = new Set(known.map((c) => c.key))
     STATE.forEach(([what, re, ok], i) => {

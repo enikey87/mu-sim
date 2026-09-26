@@ -81,18 +81,22 @@ export const WORLD = {
   collectors: named('collectors', is(intro('collectors'))),
   /** Алик перевербовал коллекторов — микрозайм с игрока не требуют (#128). */
   collectorsRecruited: named('collectorsRecruited', is(collectorsRecruited)),
-}
+} satisfies Record<string, Criterion>
 export type WorldKey = keyof typeof WORLD
 export const needs = (...keys: WorldKey[]) => gate(...keys.map((k) => WORLD[k]))
-export const meet = (...ids: string[]) => ids.map((id) => set(intro(id as WhoId), true))
+export const meet = (...ids: WhoId[]) => ids.map((id) => set(intro(id), true))
 
 /** Кто пишет в чат сам (хор, семейный чат, родня на крик) только при условии знакомства, а не просто состояния; остальные — всегда. */
-export const SPEAKS: Record<string, Criterion> = {
+export const SPEAKS = {
   boris: WORLD.borisWrites, arsen: WORLD.arsen, razmik: WORLD.razmik, rubik: WORLD.rubik,
   karine: WORLD.karineSpeaks, garik: WORLD.garikKnown,
   samvel: WORLD.samvel, nune: WORLD.nune, mkrtich: WORLD.mkrtich, grant: WORLD.grant,
   collectors: WORLD.collectors,
-}
+} satisfies Partial<Record<WhoId, Criterion>>
+
+/** Динамический id из сообщения/реестра: lookup без string-index у самого SPEAKS. */
+export const speaks = (who: string): Criterion | undefined =>
+  Object.entries(SPEAKS).find(([id]) => id === who)?.[1]
 
 // --- обещание наступило: Алик пишет сам, до игрока ({t} — текст обещания)
 export const PROMISE_DUE = [
