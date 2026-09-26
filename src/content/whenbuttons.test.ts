@@ -157,6 +157,21 @@ describe('дата в кнопке — срок, а не день обещани
 })
 
 describe('игрок видит кнопки настоящим путём', () => {
+  it.each(['как отопление дадут', 'как снег в горах сойдёт'])('«%s» → только ирония из пула «никогда»', async (term) => {
+    const g = await said(byText(term))
+    const shown = new Map<string, string>()
+    for (let i = 0; i < 60; i++) {
+      g.S.choices = null
+      for (const c of g.buildChoices()) if (c.act?.startsWith('promise')) shown.set(c.text, c.act)
+    }
+    expect(shown.size).toBeGreaterThan(0)
+    for (const [text, act] of shown) {
+      expect(act, text).toBe('promiseNever')
+      expect(fromPool('P_WHEN_NEVER', text), text).toBe(true)
+      expect(text, text).not.toMatch(SERIOUS)
+    }
+  })
+
   it('Алик называет срок → в слоте «срок» кнопки только из пулов, что положены роду и горизонту', async () => {
     const cases: Array<[string, string[], string]> = [
       ['завтра', ['P_WHEN_OK', 'P_WHEN'], 'близкий ясный срок'],
