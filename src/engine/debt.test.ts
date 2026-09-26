@@ -87,6 +87,61 @@ describe('долг: объявление звучит ровно тогда, к�
     expect(sys(after)).not.toMatch(/перевёл/)
   })
 
+  it('финал Рубика после Дня выплаты не объявляет несостоявшийся вычет', async () => {
+    const { ARCS } = await import('../content/arcs')
+    const { game } = makeGame()
+    sealed(game)
+    game.S.ach.redo = game.S.day
+    game.S.arcs.rubik = { i: ARCS.rubik.eps.length - 1, last: -99 }
+
+    await game.playArc('rubik')
+
+    expect(game.S.mem['finale.rubik']).toBe('bribe')
+    expect(said(game)).not.toMatch(/Из долга вычел/)
+  })
+
+  it('все серии с debt/pay объявляют сдвиг только когда adjustDebt его принял', async () => {
+    const { ARCS } = await import('../content/arcs')
+    const { FINALES } = await import('../content/finales')
+    const cases = [
+      ['arc.tile.3', ARCS.tile.eps[3], /из твоего долга вычту/i],
+      ['finale.boris.brigadir', FINALES.boris.find((f) => f.id === 'brigadir')!, /Тебе тоже/],
+      ['finale.boris.toyou', FINALES.boris.find((f) => f.id === 'toyou')!, /Алименты на барана/],
+      ['finale.beton.opened', FINALES.beton.find((f) => f.id === 'opened')!, /Внутри — 50 рублей/],
+      ['finale.niva.chose', FINALES.niva.find((f) => f.id === 'chose')!, /В бардачке — 50 рублей/],
+      ['finale.nune.ledger', FINALES.nune.find((f) => f.id === 'ledger')!, /должен не 240 000, а больше/],
+      ['finale.grant.ally', FINALES.grant.find((f) => f.id === 'ally')!, /Держите — за моральный ущерб/],
+      ['finale.alik_death.will', FINALES.alik_death.find((f) => f.id === 'will')!, /Мой кредит в банке/],
+      ['finale.garik.cutter', FINALES.garik.find((f) => f.id === 'cutter')!, /Неделя работы/],
+      ['finale.tile.lost', FINALES.tile.find((f) => f.id === 'lost')!, /плиточник мне должен 8 000/],
+      ['finale.rubik.bribe', FINALES.rubik.find((f) => f.id === 'bribe')!, /Из долга вычел/],
+      ['finale.razmik.union', FINALES.razmik.find((f) => f.id === 'union')!, /Тебе — 500/],
+      ['finale.razmik.shift', FINALES.razmik.find((f) => f.id === 'shift')!, /Оплата потом/],
+    ] as const
+    const everyDebtEpisode = [
+      ...Object.entries(ARCS).flatMap(([arc, a]) => a.eps.map((ep, i) => [`arc.${arc}.${i}`, ep] as const)),
+      ...Object.entries(FINALES).flatMap(([arc, fs]) => fs.map((ep) => [`finale.${arc}.${ep.id}`, ep] as const)),
+    ].filter(([, ep]) => ep.fx?.debt || ep.fx?.pay).map(([name]) => name).sort()
+    expect(everyDebtEpisode).toEqual(cases.map(([name]) => name).sort())
+
+    for (const [name, ep, claim] of cases) {
+      const { game } = makeGame()
+      game.S.mem['intro.grant'] = true
+      const debt = game.S.debt
+      await game.playEpisode(ep)
+      expect(game.S.debt, name).not.toBe(debt)
+      expect(said(game), `${name}: до выплаты`).toMatch(claim)
+
+      const { game: after } = makeGame()
+      after.S.mem['intro.grant'] = true
+      const sealedDebt = sealed(after).S.debt
+      await after.playEpisode(ep)
+      expect(after.S.debt, name).toBe(sealedDebt)
+      expect(said(after), `${name}: после выплаты`).not.toMatch(claim)
+      expect(after.facts()['ctx.debtMoved'], `${name}: временный факт не утёк`).toBeUndefined()
+    }
+  })
+
   it('бартер: до выплаты объявляет зачтённую сумму, после — молчит и долг не двигает', async () => {
     const { game } = makeGame()
     const debt = game.S.debt
