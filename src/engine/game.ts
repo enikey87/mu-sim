@@ -1621,7 +1621,8 @@ export class Game {
         const festive = this.holidayGreetLine()
         if (festive) await this.say([festive])
       }
-      if (this.chance(0.12)) this.randomNotif()
+      // Idle_Notif копит в очереди; ход посреди сцены — нет (#378)
+      if (!S.scene && this.chance(0.12)) this.randomNotif()
       this.restStatus()
       this.ui.busy = false
       S.choices = this.buildChoices()
