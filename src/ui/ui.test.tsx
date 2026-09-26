@@ -832,25 +832,29 @@ describe('интро новой партии', () => {
     const { CAST } = await import('../content/arcs')
     const { STARTS } = await import('../content/quests')
     const { SPEND } = await import('../content/life')
-    const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    // имя персонажа — последнее слово с заглавной из CAST: роли («Заказчик», «Дядя», «Прораб») отпадают сами
+    const escRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    // имя персонажа — последнее слово с заглавной из CAST: роли («Заказчик», «Дядя», «Прораб») отпадают сами.
+    // Эвристика молча теряет двоих — маму (в тексте «мама», не «Алика») и коллекторов (#377): формы перечислены.
     const names = Object.values(CAST)
-      .map((c) => c.name.replace(/[^А-Яа-яЁё\s]/g, '').trim().split(/\s+/).filter((w) => /^[А-ЯЁ]/.test(w) && w.length > 3).at(-1)!)
-    const re = new RegExp(names.map(escape).join('|'), 'i')
+      .map((c) => escRe(c.name.replace(/[^А-Яа-яЁё\s]/g, '').trim().split(/\s+/).filter((w) => /^[А-ЯЁ]/.test(w) && w.length > 3).at(-1)!))
+    const re = new RegExp([...names, 'мам[аеуы]', 'коллектор'].join('|'), 'i')
     const stray = (texts: string[]) => texts.filter((t) => re.test(t))
-    // настоящий путь: ни одно уведомление ни при одном сиде и ни один пролог завязки не называют чужого
+    // настоящий путь: ни одно уведомление ни при одном сиде и ни один пролог завязки не называют чужего
     for (let seed = 0; seed < 40; seed++) {
       const texts = introMidNotes(START_MONEY, seed).map((n) => n.text)
       expect(stray(texts), `seed ${seed}: ${stray(texts).join(' | ')}`).toEqual([])
     }
     expect(stray(STARTS.flatMap((s) => [s.intro, s.reply]))).toEqual([])
-    // контроль: строка с именем, подложенная в пул, ловится
-    SPEND.push('Перевод Борису на закатки')
+    // контроль: строки с именем — Борисом, мамой, коллекторами — подложенные в пул, ловятся
+    const allTexts = () => Array.from({ length: 60 }, (_, seed) => introMidNotes(START_MONEY, seed).map((n) => n.text)).flat()
+    SPEND.push('Перевод Борису на закатки', 'Перевод маме на закатки', 'Оплата коллекторам')
     try {
-      const hits = Array.from({ length: 40 }, (_, seed) => stray(introMidNotes(START_MONEY, seed).map((n) => n.text))).flat()
-      expect(hits.length, 'декой с именем должен краснеть').toBeGreaterThan(0)
+      // каждый декой с именем должен быть отловлен где-то по диапазону сидов
+      for (const decoy of ['Борис', 'маме', 'коллекторам']) {
+        expect(stray(allTexts()).some((t) => t.includes(decoy)), `декой «${decoy}» должен краснеть`).toBe(true)
+      }
     } finally {
-      SPEND.pop()
+      SPEND.pop(); SPEND.pop(); SPEND.pop()
     }
   })
 
