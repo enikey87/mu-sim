@@ -1,6 +1,6 @@
 // Сквозные сюжеты, другие участники чата, групповой чат, «не тот чат».
 // Эпизод: m — сообщения (строка — от Алика, { w, t } — от участника), fx, sys, then: 'promise'.
-import { type Entry, type FactOp, type Criterion, set, gate, is, eq, missing, gte, lte } from './fact'
+import { type Entry, type FactOp, type Criterion, type FactKey, set, gate, is, eq, missing, gte, lte } from './fact'
 import { needs, meet, WORLD } from './world'
 import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, collectorsRecruited, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantPaid, houseOnGarik, intro, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, sick, taxFrozen, wedding } from './memkeys'
 
@@ -18,7 +18,7 @@ export interface Episode {
   /** Легенда денег (legends.ts): где деньги и что мешает; null — легенда этого сериала кончилась. */
   legend?: string | null
   /** Состояние мира на N дней (свадьба идёт, Борис болеет…); без days — навсегда; actor — чья доска. */
-  state?: { key: string; days?: number; actor?: string }
+  state?: { key: FactKey; days?: number; actor?: string }
   sys?: string
   then?: 'promise'
 }

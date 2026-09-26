@@ -88,23 +88,11 @@ export type AchId =
   | 'court'
   | 'strasbourg'
 
-export type CastId =
-  'boris'
-  | 'grant'
-  | 'nune'
-  | 'samvel'
-  | 'karine'
-  | 'garik'
-  | 'arsen'
-  | 'mkrtich'
-  | 'niva'
-  | 'mama'
-  | 'intercom'
-  | 'judge'
-  | 'goar'
-  | 'razmik'
-  | 'rubik'
-  | 'collectors'
+export const CAST_IDS = [
+  'boris', 'grant', 'nune', 'samvel', 'karine', 'garik', 'arsen', 'mkrtich',
+  'niva', 'mama', 'intercom', 'judge', 'goar', 'razmik', 'rubik', 'collectors',
+] as const
+export type CastId = (typeof CAST_IDS)[number]
 
 export type ArcId =
   'boris'
@@ -161,3 +149,5 @@ export type ClaimKey =
 export const EXTRAS = ['baran', 'grachik', 'gagik', 'tamada'] as const
 export type ExtraId = (typeof EXTRAS)[number]
 export type WhoId = CastId | ExtraId
+export const WHO_IDS: readonly WhoId[] = [...CAST_IDS, ...EXTRAS]
+export const isWhoId = (id: string): id is WhoId => WHO_IDS.some((known) => known === id)
