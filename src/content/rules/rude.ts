@@ -5,7 +5,7 @@
 import type { Game } from '../../engine/game'
 import { type Rule, type Line, type Entry, eq, ne, gte, lte, is, add, set, missing, mapEntry, valueOf } from '../fact'
 import type { GameEvent, Offer } from './events'
-import { WORLD, SPEAKS } from '../world'
+import { WORLD, speaks } from '../world'
 import * as T from '../rude'
 import { RUDE_AGAIN } from '../misc'
 import { HEAT, blocked, blockedHint, count, mamaCalls, phoneKarine, polite, ritualCount, statusHidden, vendetta } from '../memkeys'
@@ -33,6 +33,7 @@ export const cooldown = (game: Game, n: number) => { game.S.mem[HEAT] = Math.max
 const line = (game: Game, key: string, arr: readonly Line[]) => game.line(key, arr, { repeat: true, cooldown: { turns: 6 }, fallback: game.X.offended })!
 /** Реплика по правилам Hades (условия, приоритет, один раз); пул исчерпан — генератор, а не повтор. */
 const freshOr = (game: Game, key: string, arr: readonly Line[], fallback: () => string) => game.line(key, arr, { fallback })!
+const speakerWhen = (who: string) => { const criterion = speaks(who); return criterion ? [criterion] : [] }
 
 async function offended(game: Game, text?: string, away = true): Promise<void> {
   game.mood(-2)
@@ -45,7 +46,7 @@ async function offended(game: Game, text?: string, away = true): Promise<void> {
 
 const family = (who: string): R => ({
   // «может ли писать» — ворота, а не частный случай: ступень лестницы та же, что у остальной родни
-  name: `Rude_Family_${who}`, event: 'PlayerMessage', when: [rude, gte(HEAT, 1), ...(SPEAKS[who] ? [SPEAKS[who]] : [])], specificity: 3, cooldown: { days: 4 }, remember: cools, trigger: cool,
+  name: `Rude_Family_${who}`, event: 'PlayerMessage', when: [rude, gte(HEAT, 1), ...speakerWhen(who)], specificity: 3, cooldown: { days: 4 }, remember: cools, trigger: cool,
   respond: async ({ game }) => {
     game.mood(-1)
     // у родственника кончились новые фразы — пишет сам Алик
@@ -201,7 +202,7 @@ export const rudeSaysRules: R[] = [
   { name: 'Says_moo', event: 'PlayerSays', when: [eq('intent', 'moo')], respond: async ({ game }) => { await game.say([freshOr(game, 'MOO_ODD', T.MOO_ODD, game.X.cow)]); game.setCtx(null) } },
   // заблокирован — извинение не доходит; подсказывает посредник: Борис, Карине, иначе мама (Карине и мама — раз за блок)
   {
-    name: 'Says_sorry_blocked_boris', event: 'PlayerSays', when: [eq('intent', 'sorry'), is(blocked), SPEAKS.boris], bonus: 7,
+    name: 'Says_sorry_blocked_boris', event: 'PlayerSays', when: [eq('intent', 'sorry'), is(blocked), WORLD.borisWrites], bonus: 7,
     respond: async ({ game }) => { game.sys(T.NOT_DELIVERED); await game.sleep(700); await game.say([{ w: 'boris', t: game.line('BORIS_HINT', T.BORIS_HINT, { repeat: true, cooldown: { turns: 5 }, fallback: () => 'Бее.' })! }]) },
   },
   {

@@ -4,6 +4,7 @@ import type { Due } from '../engine/time'
 import { type Entry, gate, eq, gte, lt, lte, matches, missing, exists, is, of } from './fact'
 import type { LegalClaim } from '../engine/input'
 import type { HolidayRef } from './holidays'
+import { isWhoId, type WhoId } from './ids'
 import { needs, WORLD } from './world'
 import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, collectorsRecruited, count, evicted, finaleOf, grantPaid, met, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, sick, taxThawed, threatClaim, tileCornerRemoved } from './memkeys'
 
@@ -11,7 +12,7 @@ import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, collector
 export type DrawFn = <T = unknown>(key: string, arr: readonly Entry<T>[], noRefill?: boolean) => T
 /** n — кто, g — кого; you — как его назовёт игрок, если Алик сказал «мой»/«я». */
 /** id — кто это из CAST, если отмазка называет его роль: такая реплика знакомит с персонажем. */
-export interface Rel { n: string; g: string; you?: string; id?: string }
+export interface Rel { n: string; g: string; you?: string; id?: WhoId }
 export const PROMISE_CONDITIONS = [
   betonSet, borisSmetaReady, grantPaid, nuneDekretOver, nuneKeyPassed, actSigned, taxThawed, borisMarried,
   nivaAway, nivaBack, razmikMarried,
@@ -684,7 +685,7 @@ export function make(draw: DrawFn, getTier: () => number = () => 0, rng: Rng = m
   const g = <T = string>(k: string): T => draw(k, D[k]);
   // уровень отмазки: чаще текущий, иногда более ранний
   const escTier = () => { const t = getTier(); return t && rng.random() < [0, 0.35, 0.5, 0.6][t] ? (rng.random() < 0.65 ? t : 1 + Math.floor(rng.random() * t)) : 0; };
-  const rel = (): Rel => { const [n, gen, you, id] = g('REL').split('|'); return { n, g: gen, you: you || undefined, id: id || undefined }; };
+  const rel = (): Rel => { const [n, gen, you, id] = g('REL').split('|'); return { n, g: gen, you: you || undefined, id: id && isWhoId(id) ? id : undefined }; };
   const when = (): When => { const t = escTier(); return t ? g<When>('WHEN' + t) : g<When>('WHEN'); };
   const promise = (): Promise3 => {
     const w = when(), v: string = g('VERB');

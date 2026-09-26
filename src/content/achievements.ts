@@ -3,8 +3,12 @@ import { ARCS } from './arcs'
 import { FINALES, ENDINGS } from './finales'
 import { LEND50_DESC, LEND50_LOCKED } from './endgame'
 import { lend50 } from './memkeys'
+import type { AchId } from './ids'
 
-export const ACH: Record<string, readonly [string, string | ((s: import("../engine/state").GameState) => string)]> = {
+type Achievement = readonly [string, string | ((s: import("../engine/state").GameState) => string)]
+
+/** Статический реестр обязан в точности покрывать ручной AchId; динамические финалы добавляются ниже. */
+const CORE_ACH = {
   first: ['Первый шаг', 'Написал Алику'],
   brat: ['Брат джан', 'Алик назвал тебя «брат джан»'],
   night: ['Прочитано в 3:14', 'Алик прочитал и промолчал'],
@@ -95,6 +99,10 @@ export const ACH: Record<string, readonly [string, string | ((s: import("../engi
   payday: ['День выплаты', 'Дожил до Дня выплаты'],
   court: ['Ваша честь', 'Дошёл до заседания суда'],
   strasbourg: ['Страсбург', 'Дело Алика дошло до Европейского суда'],
+} satisfies Record<AchId, Achievement>
+
+export const ACH: Record<string, Achievement> = {
+  ...CORE_ACH,
   // разные финалы сериалов и концовки игры
   ...Object.fromEntries(Object.entries(FINALES).flatMap(([arc, fs]) => fs.map((f) => [`fin_${arc}_${f.id}`, [f.title, `Другой финал: «${ARCS[arc].title}»`] as const]))),
   ...Object.fromEntries(ENDINGS.map((e) => [`end_${e.id}`, [`${e.icon} ${e.title}`, 'Концовка игры'] as const])),

@@ -12,7 +12,7 @@ import { FINALES, ENDINGS, DEFAULT_FINALE, type Finale } from '../content/finale
 import { ARCS, ARC_DONE, CAST, type Episode, GROUP, GROUP_OOPS, WRONG_TO, WRONG_WHAT, WRONG_OOPS } from '../content/arcs'
 import * as L from '../content/life'
 import { ACH } from '../content/achievements'
-import { SPEAKS, meet } from '../content/world'
+import { meet, speaks } from '../content/world'
 import { ALIK_STATUS, BLOOD_PAY, FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_HIDDEN, STATUS_WANDER, OATH_FORMS, OATH_STAKE_MOUSTACHE } from '../content/misc'
 import { STARTS } from '../content/quests'
 import { BILLS, billDue, billDueAt, billStreak, billUnpaid, lightOff, netRation, phoneWarn, type BillId } from '../content/bills'
@@ -358,7 +358,7 @@ export class Game {
     const facts = this.lineFacts()
     return arr.filter((e) => isOpen(e, facts)).map(valueOf)
   }
-  canSpeak = (who: string): boolean => !SPEAKS[who] || this.holds(SPEAKS[who])
+  canSpeak = (who: string): boolean => { const criterion = speaks(who); return !criterion || this.holds(criterion) }
   /**
    * Реплика из пула по правилам Hades: подходящие условия, не сказанные, верхний приоритет.
    * Пул исчерпан — fallback (обычно генератор отмазок) или null.

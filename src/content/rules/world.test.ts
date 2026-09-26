@@ -169,7 +169,7 @@ describe('обещания наступают', () => {
       return typeof spec === 'string' ? [] : spec.remember ?? []
     }))
     const fromFinales = Object.values(FINALES).flatMap((fs) => fs.flatMap((f) => f.remember ?? []))
-    const producers = new Set([...fromArcs, ...fromFinales, ...fromLegends, ...Object.values(TALK_REMEMBER).flat()].filter((op) => op.op === '=' && op.value === true).map((op) => op.key))
+    const producers = new Set<string>([...fromArcs, ...fromFinales, ...fromLegends, ...Object.values(TALK_REMEMBER).flat()].filter((op) => op.op === '=' && op.value === true).map((op) => op.key))
     // finale.<сериал> пишет playFinale любым финалом: не remember, а код — его проверяет тест ниже
     for (const id of Object.keys(ARCS)) producers.add(finaleOf(id))
     const missing = (conditions: readonly string[]) => conditions.filter((condition) => !producers.has(condition))

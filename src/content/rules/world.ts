@@ -3,7 +3,7 @@ import type { Game } from '../../engine/game'
 import { type Rule, type Facts, type Entry, eq, ne, gte, lte, is, add, of, missing, during } from '../fact'
 
 import type { GameEvent, Offer } from './events'
-import { WORLD, SPEAKS } from '../world'
+import { WORLD, speaks as speaksCriterion } from '../world'
 import { CHORUS_LEGEND } from '../legends'
 import { PROMISE_DUE, PROMISE_DUE_COSMIC, PROMISE_DUE_KEPT, PROMISE_MET, PROMISE_SHAVE, PROMISE_SHAVE_KEPT, CHORUS, CHORUS_FED_UP, WEDDING_NOISE, BORIS_SICK, DEAD_KARINE, DEAD_ALIK } from '../world'
 import { alikDead, alikShaved, blocked, count, endgame, grantPaid, interjections, intro, met, mourning, payday, sick } from '../memkeys'
@@ -129,7 +129,7 @@ export const promiseRules: R[] = [
 ]
 
 // ---- хор (Mentioned, target — упомянутый персонаж) ----
-const speaks = (who: string) => (SPEAKS[who] ? [SPEAKS[who]] : [])
+const speaks = (who: string) => { const criterion = speaksCriterion(who); return criterion ? [criterion] : [] }
 const chorus = (who: string): R => ({
   name: `Chorus_${who}`, event: 'Mentioned', target: who, when: speaks(who), odds: 0.3, cooldown: { turns: 12 }, priority: 'chatter',
   remember: [add(interjections, 1, { scope: 'target' })],
