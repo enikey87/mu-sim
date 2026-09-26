@@ -15,9 +15,9 @@ export function holidayOf(day: number): Holiday | undefined {
 }
 
 /** Праздники и сезоны, на которые Алик ссылается сроком: по календарю считается горизонт. */
-export type HolidayRef = 'navasard' | 'vardavar' | 'easter' | 'winter' | 'apricots' | 'snowmelt' | 'heating'
+export type HolidayRef = 'navasard' | 'vardavar' | 'easter' | 'winter' | 'apricots'
 const FIXED: Record<Exclude<HolidayRef, 'easter' | 'vardavar'>, [month: number, dom: number]> = {
-  navasard: [8, 11], winter: [12, 1], apricots: [7, 1], snowmelt: [4, 1], heating: [10, 15],
+  navasard: [8, 11], winter: [12, 1], apricots: [7, 1],
 }
 // Пасха — григорианский компут (армянская церковь перешла на него в 1924-м); Вардавар — через 98 дней после неё
 function easterOf(year: number): Date {

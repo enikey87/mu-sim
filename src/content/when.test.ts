@@ -65,6 +65,14 @@ describe('разметка сроков', () => {
     }
   })
 
+  it('отопление и снег в горах — «никогда»; абрикосы остаются сезоном', () => {
+    for (const t of ['как отопление дадут', 'как снег в горах сойдёт']) {
+      expect(byText(t), t).toMatchObject({ d: null, kind: 'never' })
+      expect(byText(t).holiday, t).toBeUndefined()
+    }
+    expect(byText('как только абрикосы созреют')).toMatchObject({ d: null, kind: 'holiday', holiday: 'apricots' })
+  })
+
   it('срок легенды — событие своей легенды с оценкой; у свадеб — идущее состояние', () => {
     for (const [id, l] of Object.entries(LEGENDS)) expect(l.until.kind, id).toBe('event')
     expect(LEGENDS.boris_wedding.until.state).toEqual({ key: wedding('boris') })
@@ -82,12 +90,12 @@ describe('календарь праздников и сезонов', () => {
     expect(holidayDays('vardavar', dayOf(2026, 7, 12))).toBe(0) // Пасха + 98
     expect(holidayDays('navasard', dayOf(2026, 8, 1))).toBe(10)
     expect(holidayDays('navasard', dayOf(2026, 8, 12))).toBeGreaterThan(300)
-    const seasons: Array<[HolidayRef, number, number]> = [['winter', 12, 1], ['apricots', 7, 1], ['snowmelt', 4, 1], ['heating', 10, 15]]
+    const seasons: Array<[HolidayRef, number, number]> = [['winter', 12, 1], ['apricots', 7, 1]]
     for (const [ref, m, d] of seasons) expect(holidayDays(ref, dayOf(2027, m, d) - 10), ref).toBe(10)
   })
 
   it('каждая ссылка отвечает на любой день партии числом от 0 до года с запасом на переходящие даты', () => {
-    const refs: HolidayRef[] = ['navasard', 'vardavar', 'easter', 'winter', 'apricots', 'snowmelt', 'heating']
+    const refs: HolidayRef[] = ['navasard', 'vardavar', 'easter', 'winter', 'apricots']
     for (const ref of refs) for (let day = 150; day < 150 + 800; day += 7) {
       const n = holidayDays(ref, day)
       expect(n >= 0 && n <= MAX_AHEAD, `${ref} / день ${day}: ${n}`).toBe(true)
