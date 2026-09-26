@@ -1027,6 +1027,28 @@ describe('Game: деньги на карте', () => {
     expect(first).toBeNull() // вчерашнюю строку в новом дне не повторяем
     expect(second).toBeNull() // и на следующей сборке того же хода
   })
+  it('окно тишины пула бедности переживает перезагрузку (#387)', () => {
+    const storage = memStorage()
+    const { game } = makeGame({ storage })
+    setMoney(game, 1000)
+    const line = (g: Game, day: number): string | null => {
+      g.S.day = day
+      return g.poorLine('P_MONEY_bottom_POL', P_MONEY.bottom.polite)
+    }
+    const fresh = [line(game, 300), line(game, 300), line(game, 300)].filter((x): x is string => x !== null)
+    expect(fresh).toHaveLength(3)
+    for (const f of fresh) game.seen.mark(f) // как при отправке: иначе shown обнулится и пул снова «свежий»
+    expect(line(game, 301)).toBeNull()
+    game.save()
+    const { game: again } = makeGame({ storage, seed: 2 })
+    setMoney(again, 1000)
+    expect(line(again, 301)).toBeNull()
+    expect(line(again, 300 + 13)).toBeNull()
+    const back = [line(again, 300 + 14), line(again, 300 + 15), line(again, 300 + 16)]
+      .filter((x): x is string => x !== null)
+    expect(back).toHaveLength(3)
+    for (const b of back) expect(fresh.some((f) => b.startsWith(f))).toBe(true)
+  })
   it('отчаяние не пропадает с исчерпанным пулом: строку окна перефразируем, а не глушим (#167/#240)', () => {
     const { game } = makeGame()
     setMoney(game, 1000)
