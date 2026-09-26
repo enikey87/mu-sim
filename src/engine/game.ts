@@ -461,6 +461,9 @@ export class Game {
     if (!ready.length && !opts?.act) return null
     const raw = ready.length ? ready.reduce((a, b) => (said(b) < said(a) ? b : a))
       : open[Math.floor(this.S.day / POOR_REPEAT_DAYS) % open.length]!
+    // отметка на исходной строке тоже: иначе самая старая так и остаётся самой старой, и пул
+    // перефразирует её одну, а не идёт по кругу
+    this.poorSaid.set(raw, this.S.day)
     // суффикс, а не префикс: строка обязана остаться узнаваемой как реплика своего пула
     const rephrase = (x: string): string => x + this.draw('PSUF', PLAYER_SUFFIX)
     const t = this.seen.pickFresh(() => rephrase(raw), rephrase)

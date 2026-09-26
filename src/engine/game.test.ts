@@ -1006,14 +1006,15 @@ describe('Game: деньги на карте', () => {
     const { game } = makeGame()
     setMoney(game, 1000)
     const line = (day: number): string | null => { game.S.day = day; return game.poorLine('P_MONEY_bottom_POL', P_MONEY.bottom.polite) }
-    const fresh = [line(300), line(300), line(300)]
+    const fresh = [line(300), line(300), line(300)].filter((x): x is string => x !== null)
     expect(new Set(fresh).size).toBe(3) // весь пул уровня — без повторов
     expect(line(300)).toBeNull() // пул исчерпан — повтор той же строки молчит
     expect(line(301)).toBeNull() // и в пределах окна сказанное не возвращается
     expect(line(300 + 13)).toBeNull()
-    const back = line(300 + 14) ?? ''
-    expect(back).not.toBe('') // окно прошло — пул звучит снова, а не замолкает навсегда
-    expect(fresh.some((f) => f !== null && back.startsWith(f))).toBe(true) // повторяет сказанное, но другими словами
+    const back = [line(300 + 14), line(300 + 15), line(300 + 16)].filter((x): x is string => x !== null)
+    expect(back).toHaveLength(3) // окно прошло — пул звучит снова, а не замолкает навсегда
+    for (const b of back) expect(fresh.some((f) => b.startsWith(f))).toBe(true) // повторяет сказанное, но другими словами
+    expect(new Set(back.map((b) => fresh.find((f) => b.startsWith(f)))).size).toBe(3) // и идёт по кругу, а не долбит одну строку
   })
   it('исчерпанный пул бедности не отдаёт одну строку в каждой сборке за день (#348)', () => {
     const { game } = makeGame()
