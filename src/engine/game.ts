@@ -435,23 +435,29 @@ export class Game {
     return t
   }
   /**
-   * Бедность: свежие без повторов; исчерпанный пул — одна строка на окно POOR_REPEAT_DAYS,
-   * повтор в той же сборке дня — null (#184/#348).
+   * Бедность: свежие без повторов; исчерпанный пул молчит, пока строку не отпустит POOR_REPEAT_DAYS (#184/#240).
+   * `act` — строка несёт намерение игрока: оно не пропадает вместе с копирайтом (#167).
    */
-  private poorShownDay = -1
-  private poorShown = new Set<string>()
-  poorLine(key: string, arr: readonly Entry<string>[]): string | null {
-    if (this.poorShownDay !== this.S.day) {
-      this.poorShown.clear()
-      this.poorShownDay = this.S.day
-    }
+  private poorSaid = new Map<string, number>()
+  poorLine(key: string, arr: readonly Entry<string>[], opts?: { act?: boolean }): string | null {
     const fresh = this.freshPlayer(key, arr)
-    if (fresh !== null) return fresh
+    if (fresh !== null) {
+      this.poorSaid.set(fresh, this.S.day)
+      return fresh
+    }
+    const said = (t: string): number => this.poorSaid.get(t) ?? -POOR_REPEAT_DAYS
     const open = arr.filter((e) => isOpen(e, this.lineFacts())).map(valueOf)
     if (!open.length) return null
-    const t = open[Math.floor(this.S.day / POOR_REPEAT_DAYS) % open.length]!
-    if (this.poorShown.has(t)) return null
-    this.poorShown.add(t)
+    const ready = open.filter((t) => this.S.day - said(t) >= POOR_REPEAT_DAYS)
+    let t: string | null = ready.length ? ready.reduce((a, b) => (said(b) < said(a) ? b : a)) : null
+    if (t === null && opts?.act) {
+      // суффикс, а не префикс: строка обязана остаться узнаваемой как реплика своего пула
+      const raw = open[Math.floor(this.S.day / POOR_REPEAT_DAYS) % open.length]!
+      const rephrase = (x: string): string => x + this.draw('PSUF', PLAYER_SUFFIX)
+      t = this.seen.pickFresh(() => rephrase(raw), rephrase)
+    }
+    if (t === null) return null
+    this.poorSaid.set(t, this.S.day)
     return t
   }
   pair = (ka: string, a: readonly Entry<string>[], kb: string, b: readonly Entry<string>[]): string =>
@@ -1427,7 +1433,7 @@ export class Game {
     if (out.length < 3) {
       const period = this.period()
       // отчаяние — своё намерение, чаще на дне; вежливый вариант выше остаётся при любом уровне
-      const cry = money && level && this.chance(level === 'bottom' ? 0.6 : 0.3) ? this.poorLine(`P_DESPERATE_${level}`, P_DESPERATE[level]) : null
+      const cry = money && level && this.chance(level === 'bottom' ? 0.6 : 0.3) ? this.poorLine(`P_DESPERATE_${level}`, P_DESPERATE[level], { act: true }) : null
       const poor = !cry && money && this.chance(0.5) ? this.poorLine(`P_MONEY_${level}_NEU`, money.neutral) : null
       if (cry) out.push({ text: cry, tone: 'neutral', act: 'desperate' })
       else if (poor) out.push({ text: poor, tone: 'neutral' })
@@ -1515,7 +1521,6 @@ export class Game {
     if (o.act === 'sorry') S.mem[memkeys.sorryAt] = [...String(S.mem[memkeys.sorryAt] ?? '').split(',').filter(Boolean), S.stats.sent].slice(-4).join(',') // для «качелей»
     if (tone === 'rude') S.mem[memkeys.rudeAt] = S.stats.sent
     S.choices = null
-    this.poorShown.clear() // повтор бедности режет внутри сборки, не между ходами
     this.battery.drain(1)
     this.save()
     if (this.disposed) { this.inPlayerTurn = false; return }

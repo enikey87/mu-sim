@@ -208,14 +208,11 @@ describe('Game: начало и ход', () => {
   })
   it('реплики игрока не повторяются', async () => {
     const { game } = makeGame({ seed: 3 })
-    // пул бедности на дне исчерпывается за партию и дальше звучит редко по кругу (#184): повторы там
-    // разрешены осознанно, их темп сторожит тест «бедность не смолкает» ниже
-    const poor = new Set([...P_MONEY.low.polite, ...P_MONEY.low.neutral, ...P_MONEY.bottom.polite, ...P_MONEY.bottom.neutral, ...P_DESPERATE.low, ...P_DESPERATE.bottom].map(valueOf))
     const mine: string[] = []
     for (let i = 0; i < 80; i++) {
       const c = game.choices.find((x) => x.tone === 'polite' && !x.act) ?? game.choices[0]
       // короткие кнопки сцен («Сбер», «Алик…») по замыслу не перефразируются — их не считаем
-      if (!(c.scene && c.text.length <= 8) && !poor.has(c.text)) mine.push(c.text)
+      if (!(c.scene && c.text.length <= 8)) mine.push(c.text)
       game.S.offlineDays = 0
       await game.send(c)
       if (game.battery.dead) await game.battery.charge()
@@ -1005,28 +1002,42 @@ describe('Game: деньги на карте', () => {
     expect(shown).toHaveLength(1 + Game.NOTIF_QUEUE_MAX)
     expect(shown).toEqual(['раз', 'четыре', 'пять', 'шесть', 'семь'])
   })
-  it('бедность не смолкает: исчерпанный пул уровня звучит редко и по кругу (#184)', () => {
+  it('бедность не смолкает: исчерпанный пул уровня молчит окно и звучит снова (#184/#240)', () => {
     const { game } = makeGame()
     setMoney(game, 1000)
-    const at = (day: number): string | null => { game.S.day = day; return game.poorLine('P_DESPERATE_bottom', P_DESPERATE.bottom) }
-    const fresh = [at(300), at(300), at(300), at(300)]
-    expect(new Set(fresh).size).toBe(4) // весь пул уровня — без повторов
-    const fallback = at(300)
-    expect(fallback).not.toBeNull() // исчерпанный пул не молчит
-    expect(at(301)).toBe(fallback) // внутри окна строка та же
-    expect(at(300 + 14)).not.toBe(fallback) // следующее окно — другая строка
-    expect(at(300 + 56)).toBe(fallback) // через полный круг — снова она: не чаще, чем раз в 14 дней
+    const line = (day: number): string | null => { game.S.day = day; return game.poorLine('P_MONEY_bottom_POL', P_MONEY.bottom.polite) }
+    const fresh = [line(300), line(300), line(300)]
+    expect(new Set(fresh).size).toBe(3) // весь пул уровня — без повторов
+    expect(line(300)).toBeNull() // пул исчерпан — повтор той же строки молчит
+    expect(line(301)).toBeNull() // и в пределах окна сказанное не возвращается
+    expect(line(300 + 13)).toBeNull()
+    const back = line(300 + 14)
+    expect(back).not.toBeNull() // окно прошло — пул звучит снова, а не замолкает навсегда
+    expect(fresh).toContain(back) // но повторяет сказанное, а не выдаёт новую строку
   })
   it('исчерпанный пул бедности не отдаёт одну строку в каждой сборке за день (#348)', () => {
     const { game } = makeGame()
     setMoney(game, 1000)
     game.S.day = 300
-    for (let i = 0; i < 20; i++) game.poorLine('P_DESPERATE_bottom', P_DESPERATE.bottom)
+    for (let i = 0; i < 20; i++) game.poorLine('P_MONEY_bottom_POL', P_MONEY.bottom.polite)
     game.S.day = 301
-    const first = game.poorLine('P_DESPERATE_bottom', P_DESPERATE.bottom)
-    const second = game.poorLine('P_DESPERATE_bottom', P_DESPERATE.bottom)
-    expect(first).not.toBeNull()
-    expect(second).toBeNull() // повтор в тот же день — молчит, не копия
+    const first = game.poorLine('P_MONEY_bottom_POL', P_MONEY.bottom.polite)
+    const second = game.poorLine('P_MONEY_bottom_POL', P_MONEY.bottom.polite)
+    expect(first).toBeNull() // вчерашнюю строку в новом дне не повторяем
+    expect(second).toBeNull() // и на следующей сборке того же хода
+  })
+  it('отчаяние не пропадает с исчерпанным пулом: строку окна перефразируем, а не глушим (#167/#240)', () => {
+    const { game } = makeGame()
+    setMoney(game, 1000)
+    const at = (day: number): string | null => {
+      game.S.day = day
+      return game.poorLine('P_DESPERATE_bottom', P_DESPERATE.bottom, { act: true })
+    }
+    const fresh = [at(300), at(300), at(300), at(300)]
+    expect(new Set(fresh).size).toBe(4)
+    const again = at(301)
+    expect(again).not.toBeNull() // акт «desperate» не исчезает вместе с копирайтом
+    expect(fresh).not.toContain(again) // но и не повторяет сказанное слово в слово
   })
   it('после выплаты и в эндгейме деньги не меняются', () => {
     const { game } = makeGame()
