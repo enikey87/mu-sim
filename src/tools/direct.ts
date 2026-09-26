@@ -9,12 +9,6 @@ import { HEAT, nuneKeyPassed } from '../content/memkeys'
 
 export type DirectCase = { event: string; facts?: Facts; target?: string; setup?: (g: Game) => void }
 
-const endgame = (g: Game) => {
-  g.S.mem.payday = 'default'
-  g.S.ending = 'payday_default'
-  g.S.endings.payday_default = g.S.day
-  g.closeEnding()
-}
 /** Экран концовки выплаты открыт, эндгейм ещё не начат — окно Quiet_PaydayOpen_* (#190). */
 const paydayOpen = (g: Game) => {
   g.S.mem.payday = 'default'
@@ -146,7 +140,6 @@ export const DIRECT: Record<string, DirectCase> = {
     },
   },
   Payday_niva: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['finale.niva'] = 'chose' } },
-  Endgame_Turn: { event: 'AlikTurn', setup: endgame },
   Quiet_PaydayOpen_AlikAway: { event: 'AlikAway', setup: paydayOpen },
   Quiet_PaydayOpen_PeriodLine: { event: 'PeriodLine', setup: paydayOpen },
   Quiet_PaydayOpen_StoryBeat: { event: 'StoryBeat', setup: (g) => { paydayOpen(g); g.S.stats.sent = 5 } },
