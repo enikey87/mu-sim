@@ -7,6 +7,8 @@ import { multiSampleCoverage, formatCoverage, neverClass, neverInAllSamples, gat
 import { DIRECT } from './direct'
 import { is } from '../content/fact'
 import { endgame } from '../content/memkeys'
+import { wallClock } from '../engine/clock'
+import { ruleCoverage } from './coverage'
 
 describe('линтер правил', () => {
   it('в игре нет правил, которые никогда не могут победить, и правил без ответа', () => {
@@ -105,4 +107,26 @@ describe('покрытие правил', () => {
     // правило без прямого случая обязано сработать хоть раз; основной игры — до концовки
     expect(gateIssues(r.samples, allRules)).toEqual([])
   }, 900_000)
+
+  it('партии стенда не оставляют живых таймеров: баннер уведомления пережил бы прогон (#288)', async () => {
+    const pending = new Set<unknown>()
+    let banners = 0
+    const set = wallClock.setTimeout.bind(wallClock)
+    const clear = wallClock.clearTimeout.bind(wallClock)
+    wallClock.setTimeout = (fn, ms) => {
+      banners++
+      const id = set(() => { pending.delete(id); fn() }, ms)
+      pending.add(id)
+      return id
+    }
+    wallClock.clearTimeout = (id) => { pending.delete(id); clear(id) }
+    try {
+      await ruleCoverage([7], 60, undefined, 0, { freeText: 0.2 })
+    } finally {
+      wallClock.setTimeout = set
+      wallClock.clearTimeout = clear
+    }
+    expect(banners, 'баннеров не было — проверка была бы пустой').toBeGreaterThan(0)
+    expect(pending.size, 'таймер баннера остался живым после прогона').toBe(0)
+  }, 300_000)
 })
