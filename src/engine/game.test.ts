@@ -1089,6 +1089,23 @@ describe('Game: деньги на карте', () => {
     expect(game.S.bank?.lines['!По мелочи']).toBeUndefined()
   })
 
+  it('ход посреди сцены не зовёт randomNotif — в ленте нет случайных карточек до конца (#378)', async () => {
+    const { game } = makeGame()
+    await game.enterNode('payday', 'announce')
+    expect(game.S.scene?.id).toBe('payday')
+    game.S.choices = game.buildChoices()
+    const choice = game.choices.find((c) => c.scene === 'payday' && c.go)!
+    expect(choice, 'нет кнопки сцены — проверка была бы пустой').toBeTruthy()
+    let calls = 0
+    game.randomNotif = () => { calls++ }
+    game.chance = () => true
+    const n = game.S.msgs.length
+    await game.send(choice)
+    expect(game.S.scene?.id, 'сцена должна ещё идти').toBe('payday')
+    expect(calls).toBe(0)
+    expect(game.S.msgs.slice(n).filter((m) => m.kind === 'card')).toEqual([])
+  })
+
   it('NC: без seal «займи» без денег пишет недостаточно (#252)', async () => {
     const { game } = makeGame()
     setMoney(game, 100)
