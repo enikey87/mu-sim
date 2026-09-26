@@ -447,14 +447,13 @@ export class Game {
    * а отпущенную перефразирует — сказанное слово в слово не возвращается (#184/#240).
    * `act` — строка несёт намерение игрока: пул не молчит, даже когда окно не отпустило ни одной (#167).
    */
-  private poorSaid = new Map<string, number>()
   poorLine(key: string, arr: readonly Entry<string>[], opts?: { act?: boolean }): string | null {
     const fresh = this.freshPlayer(key, arr)
     if (fresh !== null) {
-      this.poorSaid.set(fresh, this.S.day)
+      this.S.poorSaid[fresh] = this.S.day
       return fresh
     }
-    const said = (t: string): number => this.poorSaid.get(t) ?? -POOR_REPEAT_DAYS
+    const said = (t: string): number => this.S.poorSaid[t] ?? -POOR_REPEAT_DAYS
     const open = arr.filter((e) => isOpen(e, this.lineFacts())).map(valueOf)
     if (!open.length) return null
     const ready = open.filter((t) => this.S.day - said(t) >= POOR_REPEAT_DAYS)
@@ -463,11 +462,11 @@ export class Game {
       : open[Math.floor(this.S.day / POOR_REPEAT_DAYS) % open.length]!
     // отметка на исходной строке тоже: иначе самая старая так и остаётся самой старой, и пул
     // перефразирует её одну, а не идёт по кругу
-    this.poorSaid.set(raw, this.S.day)
+    this.S.poorSaid[raw] = this.S.day
     // суффикс, а не префикс: строка обязана остаться узнаваемой как реплика своего пула
     const rephrase = (x: string): string => x + this.draw('PSUF', PLAYER_SUFFIX)
     const t = this.seen.pickFresh(() => rephrase(raw), rephrase)
-    this.poorSaid.set(t, this.S.day)
+    this.S.poorSaid[t] = this.S.day
     return t
   }
   pair = (ka: string, a: readonly Entry<string>[], kb: string, b: readonly Entry<string>[]): string =>
