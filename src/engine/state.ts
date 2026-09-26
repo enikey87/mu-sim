@@ -161,6 +161,8 @@ export interface GameState {
   bank: BankWeek | null
   /** Карточки телефона, отложенные до конца сцены (#300); переживают перезагрузку (#323). */
   pendingCards: Array<{ icon: string; app: string; text: string } & Partial<Pick<Card, 'lines' | 'offer' | 'answered' | 'result'>>>
+  /** День, когда звучала строка бедности: окно тишины пула переживает перезагрузку (#387). */
+  poorSaid: Record<string, number>
 }
 
 export function freshState(): GameState {
@@ -169,7 +171,7 @@ export function freshState(): GameState {
     msgs: [], nextId: 1, ach: {}, promises: [], seen: [], bags: {}, items: [],
     stats: { moo: 0, fifty: 0, paid: 0, sent: 0 },
     offlineDays: 0, ram: false, muted: false, scene: null, ctx: null, choices: null, arcs: {}, tier: 0,
-    battery: 100, money: START_MONEY, lastSeen: 0, mem: {}, actors: {}, rules: freshRuleState(), endings: {}, ending: null, introShown: false, bank: null, pendingCards: [],
+    battery: 100, money: START_MONEY, lastSeen: 0, mem: {}, actors: {}, rules: freshRuleState(), endings: {}, ending: null, introShown: false, bank: null, pendingCards: [], poorSaid: {},
   })
 }
 
@@ -215,6 +217,7 @@ export function loadState(storage: Storage | null): GameState | null {
       ...freshState(), ...s,
       introShown: typeof s.introShown === 'boolean' ? s.introShown : true,
       pendingCards: Array.isArray(s.pendingCards) ? s.pendingCards : [],
+      poorSaid: s.poorSaid && typeof s.poorSaid === 'object' && !Array.isArray(s.poorSaid) ? s.poorSaid : {},
     })
   } catch {
     return null
