@@ -443,8 +443,9 @@ export class Game {
     return t
   }
   /**
-   * Бедность: свежие без повторов; исчерпанный пул молчит, пока строку не отпустит POOR_REPEAT_DAYS (#184/#240).
-   * `act` — строка несёт намерение игрока: оно не пропадает вместе с копирайтом (#167).
+   * Бедность: свежие без повторов; исчерпанный пул молчит, пока строку не отпустит POOR_REPEAT_DAYS,
+   * а отпущенную перефразирует — сказанное слово в слово не возвращается (#184/#240).
+   * `act` — строка несёт намерение игрока: пул не молчит, даже когда окно не отпустило ни одной (#167).
    */
   private poorSaid = new Map<string, number>()
   poorLine(key: string, arr: readonly Entry<string>[], opts?: { act?: boolean }): string | null {
@@ -457,14 +458,12 @@ export class Game {
     const open = arr.filter((e) => isOpen(e, this.lineFacts())).map(valueOf)
     if (!open.length) return null
     const ready = open.filter((t) => this.S.day - said(t) >= POOR_REPEAT_DAYS)
-    let t: string | null = ready.length ? ready.reduce((a, b) => (said(b) < said(a) ? b : a)) : null
-    if (t === null && opts?.act) {
-      // суффикс, а не префикс: строка обязана остаться узнаваемой как реплика своего пула
-      const raw = open[Math.floor(this.S.day / POOR_REPEAT_DAYS) % open.length]!
-      const rephrase = (x: string): string => x + this.draw('PSUF', PLAYER_SUFFIX)
-      t = this.seen.pickFresh(() => rephrase(raw), rephrase)
-    }
-    if (t === null) return null
+    if (!ready.length && !opts?.act) return null
+    const raw = ready.length ? ready.reduce((a, b) => (said(b) < said(a) ? b : a))
+      : open[Math.floor(this.S.day / POOR_REPEAT_DAYS) % open.length]!
+    // суффикс, а не префикс: строка обязана остаться узнаваемой как реплика своего пула
+    const rephrase = (x: string): string => x + this.draw('PSUF', PLAYER_SUFFIX)
+    const t = this.seen.pickFresh(() => rephrase(raw), rephrase)
     this.poorSaid.set(t, this.S.day)
     return t
   }

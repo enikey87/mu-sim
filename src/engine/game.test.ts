@@ -1011,9 +1011,9 @@ describe('Game: деньги на карте', () => {
     expect(line(300)).toBeNull() // пул исчерпан — повтор той же строки молчит
     expect(line(301)).toBeNull() // и в пределах окна сказанное не возвращается
     expect(line(300 + 13)).toBeNull()
-    const back = line(300 + 14)
-    expect(back).not.toBeNull() // окно прошло — пул звучит снова, а не замолкает навсегда
-    expect(fresh).toContain(back) // но повторяет сказанное, а не выдаёт новую строку
+    const back = line(300 + 14) ?? ''
+    expect(back).not.toBe('') // окно прошло — пул звучит снова, а не замолкает навсегда
+    expect(fresh.some((f) => f !== null && back.startsWith(f))).toBe(true) // повторяет сказанное, но другими словами
   })
   it('исчерпанный пул бедности не отдаёт одну строку в каждой сборке за день (#348)', () => {
     const { game } = makeGame()
