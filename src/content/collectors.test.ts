@@ -57,6 +57,23 @@ describe('коллекторы (#128)', () => {
     expect(texts(game).some((t) => /Деньги-Ара|философствуем/.test(t))).toBe(true)
   })
 
+  it('в окне смерти коллекторы не стартуют и не продолжают (#397)', async () => {
+    const { game } = makeGame()
+    game.S.mem[creditBroke] = true
+    game.S.mem.alik_dead = true
+    game.S.stats.sent = 10
+    expect((await game.fire('StoryBeat'))?.name).not.toBe('Beat_Collectors')
+    expect(game.S.arcs.collectors).toBeUndefined()
+    game.S.arcs.collectors = { i: 2, last: game.S.day - 5 }
+    game.S.day += 3
+    game.S.stats.sent++
+    for (let i = 0; i < 12; i++) {
+      expect((await game.fire('StoryBeat'))?.name).not.toBe('Beat_CollectorsNext')
+      game.S.day++; game.S.stats.sent++
+    }
+    expect(game.S.arcs.collectors.i).toBe(2)
+  })
+
   // playArc не сверяется с availableArcs — старт держит только when правила; NC: when → [] красит оба случая
   it('гейт старта: без broke и в эндгейме Beat_Collectors молчит', async () => {
     const beats = async (g: ReturnType<typeof makeGame>['game']) => {
@@ -114,15 +131,17 @@ describe('коллекторы (#128)', () => {
     expect(game.S.arcs.collectors?.i).toBe(1)
   })
 
-  it('старт и бит сами объявляют «не в эндгейме» — NC: снять missing(endgame.active) у Beat_Collectors / Beat_CollectorsNext', () => {
+  it('старт и бит сами объявляют «не в эндгейме» и «не мёртв» — NC: снять missing(endgame.active) / missing(alik_dead)', () => {
     const { game } = makeGame()
     const whenOf = (name: string) => game.rules.rules('StoryBeat').find((r) => r.name === name)!.when
     const open = (name: string, f: Facts) => whenOf(name).every((c) => test(c, f))
     expect(open('Beat_Collectors', { [creditBroke]: true })).toBe(true)
     expect(open('Beat_Collectors', { [creditBroke]: true, [endgame.active]: true })).toBe(false)
+    expect(open('Beat_Collectors', { [creditBroke]: true, alik_dead: true })).toBe(false)
     const going = { 'arc.collectors': 2, collectorsCanAdvance: true }
     expect(open('Beat_CollectorsNext', going)).toBe(true)
     expect(open('Beat_CollectorsNext', { ...going, [endgame.active]: true })).toBe(false)
+    expect(open('Beat_CollectorsNext', { ...going, alik_dead: true })).toBe(false)
   })
 
   it('уведомление «где живёт ваш Алик» — эхо второй серии, не после выплаты и не в эндгейме (#324)', () => {

@@ -7,7 +7,7 @@ import { AlikOffline } from './criteria'
 import { IDLE } from '../life'
 import { MEMORY } from '../memory'
 import { LEGENDS } from '../legends'
-import { count, creditBroke, endgame, payday, polite, thanksAt, vendetta, nivaPlayer } from '../memkeys'
+import { count, creditBroke, endgame, payday, polite, thanksAt, vendetta, nivaPlayer, alikDead } from '../memkeys'
 import { GREET, GREET_MORNING, GREET_NIGHT, THANKS, THANKS_THIRD } from '../misc'
 
 type R = Rule<Game, GameEvent, Offer>
@@ -55,7 +55,7 @@ export const storyRules: R[] = [
   // «нечем платить» → коллекторы; не ждём случайного nextArc (#128)
   {
     name: 'Beat_Collectors', event: 'StoryBeat',
-    when: [is(creditBroke), missing(endgame.active)],
+    when: [is(creditBroke), missing(endgame.active), missing(alikDead)],
     once: true, bonus: 10, priority: 'cinematic',
     respond: async ({ game }) => {
       if (game.S.arcs.collectors) return false
@@ -66,7 +66,7 @@ export const storyRules: R[] = [
   // не доходят до перевербовки до Дня выплаты (#324). Шанс 0,5 при серии раз в ≥ 3 дня — развязка за ~2–3 недели
   {
     name: 'Beat_CollectorsNext', event: 'StoryBeat',
-    when: [gte('arc.collectors', 1), is('collectorsCanAdvance'), missing(endgame.active)],
+    when: [gte('arc.collectors', 1), is('collectorsCanAdvance'), missing(endgame.active), missing(alikDead)],
     odds: 0.5, cooldown: { turns: 2 },
     respond: ({ game }) => game.playArc('collectors'),
   },
