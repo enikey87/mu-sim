@@ -205,6 +205,16 @@ export interface Storage {
   removeItem(k: string): void
 }
 
+/** Не-числа в сейве дают NaN в окне тишины и навсегда глушат строку (#401). */
+function loadPoorSaid(raw: unknown): Record<string, number> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
+  const out: Record<string, number> = {}
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof v === 'number') out[k] = v
+  }
+  return out
+}
+
 export function loadState(storage: Storage | null): GameState | null {
   if (!storage) return null
   try {
@@ -217,7 +227,7 @@ export function loadState(storage: Storage | null): GameState | null {
       ...freshState(), ...s,
       introShown: typeof s.introShown === 'boolean' ? s.introShown : true,
       pendingCards: Array.isArray(s.pendingCards) ? s.pendingCards : [],
-      poorSaid: s.poorSaid && typeof s.poorSaid === 'object' && !Array.isArray(s.poorSaid) ? s.poorSaid : {},
+      poorSaid: loadPoorSaid(s.poorSaid),
     })
   } catch {
     return null

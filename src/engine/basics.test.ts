@@ -179,6 +179,16 @@ describe('state', () => {
     expect(loadState(null)).toBeNull()
     expect(() => saveState(null, freshState())).not.toThrow()
   })
+  it('poorSaid: не-числа из сейва отбрасываются (#401)', () => {
+    const line = 'Алик, простите, что часто. На карте дно, а я всё ещё вежливый.'
+    const st = memStorage({
+      [SAVE_KEY]: JSON.stringify({
+        msgs: [],
+        poorSaid: { [line]: 'abc', ok: 290, bad: null, also: true },
+      }),
+    })
+    expect(loadState(st)!.poorSaid).toEqual({ ok: 290 })
+  })
 })
 
 describe('typo', () => {
