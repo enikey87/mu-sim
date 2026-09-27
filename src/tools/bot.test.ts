@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { makeGame } from '../test/helpers'
+import { flush, makeGame } from '../test/helpers'
 import { botTurn } from './bot'
-import { flush } from '../test/helpers'
 
 describe('coverage bot', () => {
   it('закрывает экран концовки — как игрок, иначе эндгейм не начинается (#190)', async () => {
@@ -18,17 +17,28 @@ describe('coverage bot', () => {
   })
 
   it('в эндгейме свободный текст бота доходит до AlikTurn (#288)', async () => {
-    const { game } = makeGame({ seed: 4 })
-    game.S.mem.payday = 'default'
-    game.S.ending = 'payday_default'
-    game.S.endings.payday_default = game.S.day
-    await botTurn(game)
-    await flush()
-    expect(game.S.mem['endgame.active']).toBe(true)
-    const chosen: string[] = []
-    game.rules.tracer = (t) => chosen.push(...t.chosen)
-    await botTurn(game, 0.7, 0.06, 1) // freeText = 1: всегда свободный текст
-    expect(chosen).toContain('Endgame_Turn')
+    for (let seed = 1; seed <= 8; seed++) {
+      const { game } = makeGame({ seed })
+      game.S.mem.payday = 'default'
+      game.S.ending = 'payday_default'
+      game.S.endings.payday_default = game.S.day
+      await botTurn(game)
+      await flush()
+      expect(game.S.mem['endgame.active']).toBe(true)
+
+      let reached = false
+      const sent: string[] = []
+      for (let attempt = 0; attempt < 24 && !reached; attempt++) {
+        const chosen: string[] = []
+        game.rules.tracer = (t) => chosen.push(...t.chosen)
+        const from = game.S.msgs.length
+        await botTurn(game, 0.7, 0.06, 1) // freeText = 1: всегда свободный текст
+        sent.push(...game.S.msgs.slice(from)
+          .flatMap((m) => m.kind === 'text' && m.from === 'me' ? [m.text] : []))
+        reached = chosen.includes('Endgame_Turn')
+      }
+      expect(reached, `seed ${seed}, корпус: ${sent.join(' | ')}`).toBe(true)
+    }
   })
 
   it('иногда отвечает на допработу зеркалом, когда оно открыто (#256)', async () => {
