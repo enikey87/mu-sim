@@ -1,6 +1,6 @@
 // Правила новых возможностей: выбор сцен, наступившие обещания, хор персонажей, состояния мира.
 import type { Game } from '../../engine/game'
-import { type Rule, type Facts, type Entry, eq, ne, gte, lte, is, add, of, missing, during } from '../fact'
+import { type Rule, type Facts, type Entry, type Line, eq, ne, gte, lte, is, add, of, missing, during, spec } from '../fact'
 
 import type { GameEvent, Offer } from './events'
 import { WORLD, speaks as speaksCriterion } from '../world'
@@ -130,18 +130,27 @@ export const promiseRules: R[] = [
 
 // ---- хор (Mentioned, target — упомянутый персонаж) ----
 const speaks = (who: string) => { const criterion = speaksCriterion(who); return criterion ? [criterion] : [] }
+const chorusResponse = (who: string, pool: readonly Line[]): R['respond'] => async ({ game }) => {
+  const t = game.line('CH_' + who, pool)
+  if (!t) return false // новых реплик нет — молчит
+  await game.say([{ w: who, t }])
+  game.S.ctx = { ...(game.S.ctx ?? {}), chorus: who } // можно ответить самому персонажу
+}
 const chorus = (who: string): R => ({
-  name: `Chorus_${who}`, event: 'Mentioned', target: who, when: speaks(who), odds: 0.3, cooldown: { turns: 12 }, priority: 'chatter',
+  name: `Chorus_${who}`, event: 'Mentioned', target: who, when: [missing(alikDead), ...speaks(who)], odds: 0.3, cooldown: { turns: 12 }, priority: 'chatter',
   remember: [add(interjections, 1, { scope: 'target' })],
-  respond: async ({ game }) => {
-    // при alik_dead — только легендные строки (CHORUS_LEGEND с eq('legend','dead') и т.п.); общий пул смерть-агностичен (#397)
-    const legend = CHORUS_LEGEND[who] ?? []
-    const pool = game.S.mem[alikDead] ? legend : [...legend, ...CHORUS[who]]
-    const t = game.line('CH_' + who, pool)
-    if (!t) return false // новых реплик нет — молчит
-    await game.say([{ w: who, t }])
-    game.S.ctx = { ...(game.S.ctx ?? {}), chorus: who } // можно ответить самому персонажу
-  },
+  // сначала реплики в рамках легенды денег (Нуне не скажет «денег нет», пока деньги в сейфе)
+  respond: chorusResponse(who, [...(CHORUS_LEGEND[who] ?? []), ...CHORUS[who]]),
+})
+const deathLegend = (line: Line) => spec(line).when?.some((c) => c.key === 'legend' && c.op === '==' && c.value === 'dead')
+const deadChorus = (who: string, pool: readonly Line[]): R => ({
+  name: `Chorus_${who}_Dead`, event: 'Mentioned', target: who, when: [is(alikDead), ...speaks(who)], odds: 0.3, cooldown: { turns: 12 }, priority: 'chatter',
+  remember: [add(interjections, 1, { scope: 'target' })],
+  respond: chorusResponse(who, pool),
+})
+const deadChorusRules = Object.entries(CHORUS_LEGEND).flatMap(([who, lines]) => {
+  const pool = lines.filter(deathLegend)
+  return pool.length ? [deadChorus(who, pool)] : []
 })
 const fedUp = (who: string): R => ({
   name: `Chorus_${who}_FedUp`, event: 'Mentioned', target: who, when: [missing(alikDead), gte(interjections, 3, 'target'), ...speaks(who)], odds: 0.5, cooldown: { turns: 12 }, priority: 'chatter',
@@ -153,7 +162,7 @@ const fedUp = (who: string): R => ({
     await game.say([{ w: who, t }])
   },
 })
-export const chorusRules: R[] = [...Object.keys(CHORUS).map(chorus), ...Object.keys(CHORUS_FED_UP).map(fedUp)]
+export const chorusRules: R[] = [...Object.keys(CHORUS).map(chorus), ...deadChorusRules, ...Object.keys(CHORUS_FED_UP).map(fedUp)]
 
 // ---- состояния мира со сроком: окрашивают обычный ход ----
 const noise = (key: string, arr: readonly Entry<string>[]) => async ({ game }: { game: Game }) => {
