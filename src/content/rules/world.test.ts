@@ -250,6 +250,41 @@ describe('хор: упомянутый персонаж вклинивается
     // Гарик в очереди первым: раньше его молчание обрывало хор целиком — Карине не получала слова
     expect(spokeWhileExhausted).toBeGreaterThan(5)
   })
+  it('хор при смерти не берёт общий пул; траурная строка легенды — уместна (#397)', async () => {
+    const generalOf = (t: string) => CHORUS.karine.some((e) => t.includes(String(valueOf(e)).slice(0, 24)))
+    const deadEntry = CHORUS_LEGEND.karine.find((e) => spec(e).when?.some((c) => c.key === 'legend' && c.value === 'dead'))!
+    const deadLine = spec(deadEntry).t
+    let general = 0
+    let mourning = 0
+    for (let seed = 1; seed <= 50; seed++) {
+      const { game } = makeGame({ seed })
+      game.S.mem.alik_dead = true
+      game.S.mem['intro.karine'] = true
+      game.S.stats.sent = seed * 20
+      const before = game.S.msgs.length
+      await game.fire('Mentioned', {}, { target: 'karine' })
+      for (const m of game.S.msgs.slice(before)) {
+        if (m.kind === 'text' && m.who === 'karine') {
+          if (generalOf(m.text)) general++
+          if (m.text.includes(deadLine.slice(0, 24))) mourning++
+        }
+      }
+    }
+    expect(general).toBe(0)
+    for (let seed = 1; seed <= 50 && mourning === 0; seed++) {
+      const { game } = makeGame({ seed })
+      game.S.mem.alik_dead = true
+      game.S.mem['intro.karine'] = true
+      game.setLegend('dead', 'alik_death')
+      game.S.stats.sent = seed * 20
+      const before = game.S.msgs.length
+      await game.fire('Mentioned', {}, { target: 'karine' })
+      for (const m of game.S.msgs.slice(before)) {
+        if (m.kind === 'text' && m.who === 'karine' && m.text.includes(deadLine.slice(0, 24))) mourning++
+      }
+    }
+    expect(mourning).toBeGreaterThan(0)
+  })
 })
 
 describe('состояния мира со сроком', () => {

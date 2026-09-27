@@ -134,15 +134,17 @@ const chorus = (who: string): R => ({
   name: `Chorus_${who}`, event: 'Mentioned', target: who, when: speaks(who), odds: 0.3, cooldown: { turns: 12 }, priority: 'chatter',
   remember: [add(interjections, 1, { scope: 'target' })],
   respond: async ({ game }) => {
-    // сначала реплики в рамках легенды денег (Нуне не скажет «денег нет», пока деньги в сейфе)
-    const t = game.line('CH_' + who, [...(CHORUS_LEGEND[who] ?? []), ...CHORUS[who]])
+    // при alik_dead — только легендные строки (CHORUS_LEGEND с eq('legend','dead') и т.п.); общий пул смерть-агностичен (#397)
+    const legend = CHORUS_LEGEND[who] ?? []
+    const pool = game.S.mem[alikDead] ? legend : [...legend, ...CHORUS[who]]
+    const t = game.line('CH_' + who, pool)
     if (!t) return false // новых реплик нет — молчит
     await game.say([{ w: who, t }])
     game.S.ctx = { ...(game.S.ctx ?? {}), chorus: who } // можно ответить самому персонажу
   },
 })
 const fedUp = (who: string): R => ({
-  name: `Chorus_${who}_FedUp`, event: 'Mentioned', target: who, when: [gte(interjections, 3, 'target'), ...speaks(who)], odds: 0.5, cooldown: { turns: 12 }, priority: 'chatter',
+  name: `Chorus_${who}_FedUp`, event: 'Mentioned', target: who, when: [missing(alikDead), gte(interjections, 3, 'target'), ...speaks(who)], odds: 0.5, cooldown: { turns: 12 }, priority: 'chatter',
   remember: [add(interjections, 1, { scope: 'target' })],
   // по порядку и один раз: нарастание, а не случайная реплика
   respond: async ({ game }) => {
