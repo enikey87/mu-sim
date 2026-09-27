@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest'
 import { makeGame, alikTexts } from '../../test/helpers'
 import { ARCS } from '../arcs'
 import { FINALES } from '../finales'
-import { finaleOf } from '../memkeys'
+import { alikDead, finaleOf } from '../memkeys'
 import { CHORUS, CHORUS_FED_UP, WEDDING_NOISE, BORIS_SICK, DEAD_KARINE, DEAD_ALIK, PROMISE_DUE } from '../world'
 import { PROMISE_CONDITIONS } from '../excuses'
 import { LEGENDS, CHORUS_LEGEND } from '../legends'
@@ -11,8 +11,9 @@ import { TALK_REMEMBER } from '../talk'
 import type { Game } from '../../engine/game'
 import type { Msg } from '../../engine/state'
 import { valueOf, spec, lineId, type Entry } from '../../engine/rules'
-import { QUEST_WHEN, questRules } from './world'
+import { chorusRules, QUEST_WHEN, questRules } from './world'
 import { TOPICS } from '../topics'
+import { deathGated } from '../../tools/playtest'
 
 const pickScene = (game: Game) => game.rules.match({ event: 'PickScene' }, game.facts())?.name
 const texts = (msgs: Msg[]) => msgs.filter((m) => m.kind === 'text').map((m) => (m.kind === 'text' ? m.text : ''))
@@ -249,6 +250,16 @@ describe('хор: упомянутый персонаж вклинивается
     }
     // Гарик в очереди первым: раньше его молчание обрывало хор целиком — Карине не получала слова
     expect(spokeWhileExhausted).toBeGreaterThan(5)
+  })
+  it('живой, траурный и уставший хор сами объявляют ворота смерти (#406)', () => {
+    const rule = (name: string) => chorusRules.find((r) => r.name === name)!
+    const live = rule('Chorus_karine')
+    const dead = rule('Chorus_karine_Dead')
+    const fedUp = rule('Chorus_karine_FedUp')
+    expect(live.when).toContainEqual({ key: alikDead, op: '!exist' })
+    expect(dead.when).toContainEqual({ key: alikDead, op: '==', value: true })
+    expect(fedUp.when).toContainEqual({ key: alikDead, op: '!exist' })
+    expect(deathGated([live, dead, fedUp])).toEqual(['Chorus_karine_Dead'])
   })
   it('хор при смерти не берёт общий пул; траурная строка легенды — уместна (#397)', async () => {
     const generalOf = (t: string) => CHORUS.karine.some((e) => t.includes(String(valueOf(e)).slice(0, 24)))
