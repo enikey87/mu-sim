@@ -1049,6 +1049,28 @@ describe('Game: деньги на карте', () => {
     expect(back).toHaveLength(3)
     for (const b of back) expect(fresh.some((f) => b.startsWith(f))).toBe(true)
   })
+  it('не-число в poorSaid сейва не глушит строку навсегда (#401)', () => {
+    const storage = memStorage()
+    const { game } = makeGame({ storage })
+    setMoney(game, 1000)
+    game.S.day = 300
+    const fresh = [0, 1, 2].map(() => game.poorLine('P_MONEY_bottom_POL', P_MONEY.bottom.polite))
+      .filter((x): x is string => x !== null)
+    expect(fresh).toHaveLength(3)
+    for (const f of fresh) game.seen.mark(f)
+    expect(game.poorLine('P_MONEY_bottom_POL', P_MONEY.bottom.polite)).toBeNull()
+    game.save()
+    const raw = JSON.parse(storage.data[SAVE_KEY])
+    raw.poorSaid = Object.fromEntries(fresh.map((f) => [f, 'abc']))
+    storage.data[SAVE_KEY] = JSON.stringify(raw)
+    const { game: again } = makeGame({ storage, seed: 2 })
+    setMoney(again, 1000)
+    again.S.day = 301
+    // без фильтра: day - Number('abc') → NaN, ready пуст, пул молчит и после окна
+    const back = again.poorLine('P_MONEY_bottom_POL', P_MONEY.bottom.polite)
+    expect(back).not.toBeNull()
+    expect(fresh.some((f) => back!.startsWith(f))).toBe(true)
+  })
   it('отчаяние не пропадает с исчерпанным пулом: строку окна перефразируем, а не глушим (#167/#240)', () => {
     const { game } = makeGame()
     setMoney(game, 1000)
