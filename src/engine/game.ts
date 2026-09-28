@@ -25,6 +25,8 @@ import {
 import { allRules } from '../content/rules'
 import type { GameEvent, Offer } from '../content/rules/events'
 import { CLAIMS, claimByKey, conflicts, CALLBACK_OPEN, type Claim } from '../content/lies'
+import { CLAIM_LEDGER, publishClaim } from '../content/ledger'
+import { isWhoId } from '../content/ids'
 import * as memkeys from '../content/memkeys'
 import {
   ENDGAME_CHOICES, ENDGAME_FALLBACK, ENDGAME_FORMALITIES, ENDGAME_GROUP, ENDGAME_INTRO, ENDGAME_JUBILEES,
@@ -920,22 +922,24 @@ export class Game {
   }
   sys(text: string): Msg { return this.push({ kind: 'sys', text }) }
 
-  alikMsg<M extends NewMsg>(m: M): Msg {
+  alikMsg<M extends NewMsg>(m: M, intent?: string): Msg {
     // персонаж написал сам — он в истории (intro) и игрок его встречал (met, для переклички в День выплаты)
     if (m.kind === 'text' && m.who) { this.S.mem[memkeys.met(m.who)] = true; this.S.mem[memkeys.intro(m.who)] = true }
     this.tick(1 + this.rnd(3))
-    const msg = this.noteAlik(this.push({ from: 'alik', time: fmtTime(this.S.clock), ...m } as NewMsg))
+    const msg = this.noteAlik(this.push({ from: 'alik', time: fmtTime(this.S.clock), ...m } as NewMsg), intent)
     this.audio.beep()
     this.audio.vibrate(40)
     if (this.chance(this.mooChance())) this.schedule(() => this.moo(), 300 + this.rnd(900))
     return msg
   }
 
-  /** Что сообщение Алика записывает в мир, каким бы путём ни пришло: день речи, заявления, упоминания, «брат джан». */
-  private noteAlik(msg: Msg): Msg {
+  /** Что сообщение Алика записывает в мир, каким бы путём ни пришло: день речи, заявления, упоминания, «брат джан».
+   *  `intent` — смысл, который говорящий вложил в реплику: опечатанное сообщение публикует в журнал намеренный
+   *  текст (исправление пузырём повторно не публикует), а старые ключи по-прежнему ищутся в показанной строке. */
+  private noteAlik(msg: Msg, intent?: string): Msg {
     this.S.mem[memkeys.alikDay] = this.S.day
     if (msg.kind === 'text' && /брат джан/i.test(msg.text)) this.unlock('brat')
-    if (msg.kind === 'text' || msg.kind === 'photo') this.noteClaims(msg.text, msg.kind === 'text' ? msg.who : undefined)
+    if (msg.kind === 'text' || msg.kind === 'photo') this.noteClaims(msg.text, msg.kind === 'text' ? msg.who : undefined, msg.id, intent)
     // хор: Алик кого-то упомянул — тот, может быть, вклинится после его ответа
     if (msg.kind === 'text' && !msg.who) {
       for (const [who, re] of Object.entries(MENTION_RE)) if (re.test(msg.text)) this.pending.push({ event: 'Mentioned', target: who })
@@ -974,17 +978,21 @@ export class Game {
       let text = typeof x === 'string' ? x : x.t
       const from = typeof x === 'string' ? who : x.w
       let fix: string | null = null
+      let intent: string | undefined
       if (!from && this.typos && this.chance(this.isNight() ? 0.2 : 0.06)) {
         const t = typo(text, this.rng, this.decks)
         if (t) ({ text, fix } = t)
+        // журнал публикует намеренный смысл реплики, а не опечатанную строку (#425)
+        if (fix) intent = typeof x === 'string' ? x : x.t
       }
       await this.typingFor(600 + text.length * 22)
       if (this.disposed) throw new GameDisposed()
-      out.push(this.alikMsg({ kind: 'text', from: 'alik', text, legend, who: from }))
+      out.push(this.alikMsg({ kind: 'text', from: 'alik', text, legend, who: from }, intent))
       if (fix) {
         await this.typingFor(500)
         if (this.disposed) throw new GameDisposed()
-        this.alikMsg({ kind: 'text', from: 'alik', text: fix })
+        // пустой intent: смысл уже опубликован исходным пузырём — исправление не создаёт вторую запись
+        this.alikMsg({ kind: 'text', from: 'alik', text: fix }, '')
         this.unlock('typo')
       }
       await this.sleep(250)
@@ -1939,7 +1947,7 @@ export class Game {
 
   // ---------- бухгалтерия лжи ----------
   /** Запомнить, что Алик «заявил»; если это противоречит сказанному раньше — дать игроку поймать его. */
-  noteClaims(text: string, who?: string): void {
+  noteClaims(text: string, who?: string, msgId?: number, intent?: string): void {
     const mem = this.S.mem
     const found = CLAIMS.filter((c) => c.re.test(text))
     for (const c of found) {
@@ -1958,6 +1966,13 @@ export class Game {
       if (mem[memkeys.said(c.key)] === undefined) mem[memkeys.said(c.key)] = this.S.day
       mem[memkeys.saidLast(c.key)] = this.S.day
       mem[memkeys.byClaim(c.key)] = who ?? 'alik'
+    }
+    // типизированный журнал: regex пока лишь адаптер (#425), кнопка живёт по старым ключам выше.
+    // Смысл берётся из намеренного текста реплики (intent) — опечатка и исправление его не меняют.
+    const semantic = intent !== undefined ? intent : text
+    for (const c of CLAIMS.filter((x) => x.re.test(semantic))) {
+      const point = CLAIM_LEDGER[c.key]
+      publishClaim(this.S.ledger, point.subject, point.value, { source: who && isWhoId(who) ? who : 'alik', day: this.S.day, msgId, claimKey: c.key })
     }
   }
   lie(): { old: Claim; new: Claim } | null {

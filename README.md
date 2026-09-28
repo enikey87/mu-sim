@@ -56,6 +56,7 @@ src/
             состояние интерфейса), battery.ts (заряд телефона), state.ts, deck.ts + uniq.ts, rng.ts, time.ts, clock.ts, audio.ts, typo.ts
   content/  тексты и данные: excuses.ts, scenes.ts, arcs.ts, finales.ts, legends.ts, lies.ts,
             memory.ts, quests.ts, payday.ts, endgame.ts, rude.ts, life.ts, talk.ts, topics.ts, misc.ts,
+            ledger.ts — типизированный журнал знаний игрока (утверждения, переходы, эпизоды противоречий);
             achievements.ts; world.ts — труппа как факты (WORLD, SPEAKS); memkeys.ts — реестр ключей памяти; factkeys.ts — какие ключи игра
             порождает (семейства `arc.<id>`, `said.<claim>`… до элемента);
             rules/ — events (тип событий), criteria, turn, replies, choices, world, finales, rude,
