@@ -199,6 +199,7 @@ describe('легенда денег', () => {
     const { game } = makeGame()
     game.alikMsg({ kind: 'text', from: 'alik', text: 'Маленький Алик проглотил ключ от сейфа. Ждём.' })
     game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в Дубае.' })
+    expect(game.lie()?.old.key).toBe('money_safe')
     expect(game.S.mem['lie.old']).toBe('money_safe')
   })
 
