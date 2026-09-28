@@ -24,8 +24,8 @@ import {
 } from '../content/credit'
 import { allRules } from '../content/rules'
 import type { GameEvent, Offer } from '../content/rules/events'
-import { CLAIMS, claimByKey, conflicts, CALLBACK_OPEN, type Claim } from '../content/lies'
-import { CLAIM_LEDGER, publishClaim } from '../content/ledger'
+import { CLAIMS, claimByKey, CALLBACK_OPEN, type Claim } from '../content/lies'
+import { CLAIM_LEDGER, claimKeyOf, closeEpisode, currentEpisode, publishClaim } from '../content/ledger'
 import { isWhoId } from '../content/ids'
 import * as memkeys from '../content/memkeys'
 import {
@@ -162,6 +162,7 @@ export class Game {
     this.noTimers = !!opts.noTimers
     this.typos = opts.typos ?? true
     this.S = loadState(this.storage) ?? freshState()
+    this.syncLieMem()
     // колбеки батареи — в узком хосте, а не в публичном интерфейсе Game: game.dead() путался бы со смертью Алика
     this.battery = new Battery(this.S, {
       low: (level) => this.notify('🪫', 'Система', `Низкий заряд батареи: ${level}%`, { event: 'battery' }),
@@ -1521,7 +1522,6 @@ export class Game {
     this.clearSchedule(this.idleT)
     this.idleCount = 0
     this.clearUnread()
-    if (o.act !== 'catchLie') this.forgetLie() // не поймал сразу — момент упущен
     let tone = o.tone
     // Готовая кнопка может быть помечена как rude, но текст с судом всё равно двигает ветку угроз.
     if (tone === 'rude' && !o.scene && this.classifyInput(o.text).category === 'threat') tone = 'threat'
@@ -1946,49 +1946,59 @@ export class Game {
   }
 
   // ---------- бухгалтерия лжи ----------
-  /** Запомнить, что Алик «заявил»; если это противоречит сказанному раньше — дать игроку поймать его. */
   noteClaims(text: string, who?: string, msgId?: number, intent?: string): void {
     const mem = this.S.mem
     const found = CLAIMS.filter((c) => c.re.test(text))
-    for (const c of found) {
-      // где деньги — меняется по сюжету: противоречие ловится, только если старое место звучало недавно (не «Нива» полгода назад)
-      const fresh = (o: Claim) => o.group !== 'money' || this.S.day - Number(mem[memkeys.saidLast(o.key)] ?? mem[memkeys.said(o.key)]) <= 14
-      const old = CLAIMS.find((o) => mem[memkeys.said(o.key)] !== undefined && conflicts(o.key, c.key) && !mem[memkeys.caughtPair(o.key, c.key)] && fresh(o))
-      if (old) {
-        mem[memkeys.lie.old] = old.key
-        mem[memkeys.lie.new] = c.key
-        // «вы же говорили» — только если прошлую версию сказал сам Алик, а не родня в семейном чате
-        mem[memkeys.lie.alikOld] = mem[memkeys.byClaim(old.key)] === undefined || mem[memkeys.byClaim(old.key)] === 'alik'
-        mem[memkeys.lie.kind] = old.group === 'money' ? 'money' : ({ grandpa_dead: 'grandpa', grandpa_alive: 'grandpa', customer_owes: 'customer', customer_paid: 'customer', sent: 'sent', no_money: 'sent' } as Record<string, string>)[c.key] ?? 'other'
-      }
-    }
     for (const c of found) {
       if (mem[memkeys.said(c.key)] === undefined) mem[memkeys.said(c.key)] = this.S.day
       mem[memkeys.saidLast(c.key)] = this.S.day
       mem[memkeys.byClaim(c.key)] = who ?? 'alik'
     }
-    // типизированный журнал: regex пока лишь адаптер (#425), кнопка живёт по старым ключам выше.
-    // Смысл берётся из намеренного текста реплики (intent) — опечатка и исправление его не меняют.
+    // intent — намеренный смысл; опечатанная строка его не меняет (#425)
     const semantic = intent !== undefined ? intent : text
     for (const c of CLAIMS.filter((x) => x.re.test(semantic))) {
       const point = CLAIM_LEDGER[c.key]
       publishClaim(this.S.ledger, point.subject, point.value, { source: who && isWhoId(who) ? who : 'alik', day: this.S.day, msgId, claimKey: c.key })
     }
+    this.syncLieMem()
   }
   lie(): { old: Claim; new: Claim } | null {
-    const o = claimByKey(String(this.S.mem[memkeys.lie.old] ?? '')), n = claimByKey(String(this.S.mem[memkeys.lie.new] ?? ''))
+    const ep = currentEpisode(this.S.ledger)
+    if (!ep) return null
+    const a = this.S.ledger.claims.find((c) => c.id === ep.aClaim)
+    const b = this.S.ledger.claims.find((c) => c.id === ep.bClaim)
+    if (!a || !b) return null
+    const ok = a.claimKey ?? claimKeyOf(a.subject, a.value)
+    const nk = b.claimKey ?? claimKeyOf(b.subject, b.value)
+    const o = ok ? claimByKey(ok) : undefined, n = nk ? claimByKey(nk) : undefined
     return o && n ? { old: o, new: n } : null
   }
-  forgetLie(): void {
-    delete this.S.mem[memkeys.lie.old]
-    delete this.S.mem[memkeys.lie.new]
-    delete this.S.mem[memkeys.lie.kind]
-  }
-  /** Алик пойман: запомнить пару, отдать реплику, счётчик растёт. */
-  async caught(line: string): Promise<void> {
+  /** lie.* зеркалят текущий эпизод для правил BuildChoices / catchLie / P_LIE. */
+  syncLieMem(): void {
+    const mem = this.S.mem
+    const ep = currentEpisode(this.S.ledger)
     const l = this.lie()
-    if (l) this.S.mem[memkeys.caughtPair(l.old.key, l.new.key)] = true
-    this.forgetLie()
+    if (!ep || !l) {
+      delete mem[memkeys.lie.old]
+      delete mem[memkeys.lie.new]
+      delete mem[memkeys.lie.kind]
+      delete mem[memkeys.lie.alikOld]
+      return
+    }
+    mem[memkeys.lie.old] = l.old.key
+    mem[memkeys.lie.new] = l.new.key
+    const a = this.S.ledger.claims.find((c) => c.id === ep.aClaim)
+    mem[memkeys.lie.alikOld] = !a || a.source === 'alik'
+    mem[memkeys.lie.kind] = ep.subject === 'grandpa.life' ? 'grandpa'
+      : ep.subject === 'customer.payment' ? 'customer'
+      : ep.subject === 'money.location' ? 'money'
+      : 'other'
+  }
+  forgetLie(): void { this.syncLieMem() }
+  async caught(line: string): Promise<void> {
+    const ep = currentEpisode(this.S.ledger)
+    if (ep) closeEpisode(this.S.ledger, ep.id, 'caught')
+    this.syncLieMem()
     const n = Number(this.S.mem[memkeys.caughtCount] ?? 0)
     this.unlock('liar')
     if (n >= 3) this.unlock('liar3')

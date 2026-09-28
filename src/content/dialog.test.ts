@@ -282,13 +282,13 @@ describe('несостыковки из плейтеста ботами', () => 
     game.S.mem.blocked = true
     for (const ev of ['AlikAway', 'StoryBeat', 'PeriodLine', 'PromiseDue'] as GameEvent[]) expect((await game.fire(ev))?.name).toBe('Quiet_Blocked_' + ev)
   })
-  it('где деньги — меняется по сюжету: «Нива» полгода назад не ловится как ложь', () => {
+  it('где деньги — меняется по сюжету: старое место всё ещё ловится как открытый эпизод', () => {
     const { game } = makeGame()
     game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в банке с огурцами.' })
-    game.forgetLie()
     game.S.day += 60
     game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в фундаменте, брат.' })
-    expect(game.lie()).toBeNull()
+    expect(game.lie()).not.toBeNull()
+    expect(game.buildChoices().some((c) => c.act === 'catchLie')).toBe(true)
   })
   it('серия по вопросу — не в тот же день, что предыдущая; сама — не больше одной в день', async () => {
     const { game } = makeGame()

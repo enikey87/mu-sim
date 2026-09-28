@@ -273,6 +273,7 @@ describe('новые сериалы: фундамент, Рубик, Разми�
     const { game } = makeGame()
     game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в банке с огурцами.' })
     game.alikMsg({ kind: 'text', from: 'alik', text: lines(ARCS.beton.eps[0])[1] })
+    expect(game.lie()?.old.key).toBe('money_jar')
     expect(game.S.mem['lie.old']).toBe('money_jar')
   })
 })
