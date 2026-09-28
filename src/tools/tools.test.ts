@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest'
 import { lintRules, type Rule } from '../engine/rules'
 import { allRules } from '../content/rules'
 import { isFactKey } from '../content/factkeys'
-import { multiSampleCoverage, formatCoverage, neverClass, neverInAllSamples, gateIssues, endgameOnly, COVERAGE_SAMPLES, DIRECT_MIN_GAMES } from './coverage'
+import { multiSampleCoverage, runCoverageJobs, formatCoverage, neverClass, neverInAllSamples, gateIssues, endgameOnly, COVERAGE_SAMPLES, DIRECT_MIN_GAMES, type SampleReport, type SampleSpec } from './coverage'
 import { DIRECT } from './direct'
 import { is } from '../content/fact'
 import { endgame } from '../content/memkeys'
@@ -27,6 +27,37 @@ describe('линтер правил', () => {
 })
 
 describe('гейт покрытия: сработало хоть раз (#278)', () => {
+  it('выборки стартуют вместе, возвращаются по порядку и не теряются', async () => {
+    const specs: SampleSpec[] = [1, 2, 3].map((seed) => ({ kind: 'full', seeds: [seed], turns: 1, grumpy: 0 }))
+    const complete: Array<(report: SampleReport) => void> = []
+    const pending = runCoverageJobs(specs, () => new Promise((resolve) => complete.push(resolve)))
+    expect(complete).toHaveLength(3)
+    const report = (seed: number): SampleReport => ({
+      kind: 'full', turns: seed, weighted: [], fired: {}, games: {}, never: seed === 2 ? ['B'] : ['A', 'B'], unsaid: [], events: {},
+    })
+    complete[2](report(3))
+    complete[0](report(1))
+    complete[1](report(2))
+    const result = await pending
+    expect(result.samples.map((s) => s.turns)).toEqual([1, 2, 3])
+    expect(result.never).toEqual(['B'])
+    await expect(runCoverageJobs([], async () => report(0))).rejects.toThrow('Нет выборок')
+    await expect(multiSampleCoverage([])).rejects.toThrow('Нет выборок')
+    await expect(runCoverageJobs(specs, async () => undefined as unknown as SampleReport)).rejects.toThrow()
+    await expect(runCoverageJobs(specs, async () => { throw new Error('sample failed') })).rejects.toThrow('sample failed')
+  })
+  it('воркеры дают те же отчёты, что последовательные выборки', async () => {
+    const specs: SampleSpec[] = [
+      { kind: 'full', seeds: [7], turns: 12, grumpy: 0 },
+      { kind: 'main', seeds: [103], turns: 12, grumpy: 0 },
+    ]
+    const parallel = await multiSampleCoverage(specs, { freeText: 0.15 })
+    const serial = await Promise.all(specs.map(async (s) => ({
+      ...await ruleCoverage(s.seeds, s.turns, undefined, s.grumpy, { freeText: 0.15, untilEnding: s.kind === 'main' }), kind: s.kind,
+    })))
+    expect(parallel.samples).toEqual(serial)
+    expect(parallel.never).toEqual(neverInAllSamples(serial.map((s) => s.never)))
+  })
   it('недостижимость в отчёте — пересечение never по выборкам', () => {
     expect(neverInAllSamples([['A', 'B'], ['B', 'C'], ['B']])).toEqual(['B'])
     expect(neverInAllSamples([['A'], ['B'], ['C']])).toEqual([])
