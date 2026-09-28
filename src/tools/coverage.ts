@@ -16,6 +16,8 @@ import { endgame } from '../content/memkeys'
 import { DIRECT } from './direct'
 import { botTurn } from './bot'
 import { requiresKey } from './playtest'
+import { Worker } from 'node:worker_threads'
+import { resolve } from 'node:path'
 
 /** Почему правило не сработало в симуляции: `direct` — у него прямой случай (direct.ts), иначе гейт падает. */
 export type NeverClass = 'direct' | 'unexplained'
@@ -164,17 +166,65 @@ export async function ruleCoverage(
 }
 
 /** Несколько выборок → достижимость по объединению. */
+export function runCoverageJobs(
+  samples: readonly SampleSpec[],
+  run: (sample: SampleSpec) => Promise<SampleReport>,
+): Promise<MultiCoverage> {
+  if (!samples.length) return Promise.reject(new Error('Нет выборок покрытия'))
+  return Promise.all(samples.map(async (sample) => {
+    const report = await run(sample)
+    if (!report || report.kind !== sample.kind) throw new Error('Выборка покрытия не вернула отчёт своего рода')
+    return report
+  })).then((reports) => ({ samples: reports, never: neverInAllSamples(reports.map((r) => r.never)) }))
+}
+
+async function coverageWorkerCode(): Promise<string> {
+  const { build } = await import('vite')
+  const output = await build({
+    configFile: false,
+    logLevel: 'silent',
+    build: {
+      ssr: resolve(process.cwd(), 'src/tools/coverage-worker.ts'),
+      write: false,
+      rolldownOptions: { output: { format: 'cjs', codeSplitting: false } },
+    },
+  })
+  if (Array.isArray(output) || !('output' in output)) throw new Error('Не удалось собрать воркер покрытия')
+  const code = output.output.find((entry) => entry.type === 'chunk')
+  if (!code || code.type !== 'chunk') throw new Error('Пустая сборка воркера покрытия')
+  return code.code
+}
+
+function coverageInWorker(code: string, sample: SampleSpec, freeText: number): Promise<SampleReport> {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(code, { eval: true, execArgv: [], workerData: { sample, freeText } })
+    let settled = false
+    const fail = (error: Error) => {
+      if (settled) return
+      settled = true
+      reject(error)
+      void worker.terminate()
+    }
+    worker.once('message', (message: SampleReport | { error: string }) => {
+      if (!message || 'error' in message) return fail(new Error(message?.error ?? 'Воркер вернул пустой отчёт'))
+      settled = true
+      resolve(message)
+      void worker.terminate()
+    })
+    worker.once('error', fail)
+    worker.once('exit', (exitCode) => {
+      if (!settled) fail(new Error(`Воркер покрытия завершился до отчёта: ${exitCode}`))
+    })
+  })
+}
+
 export async function multiSampleCoverage(
   samples = COVERAGE_SAMPLES,
   opts: { freeText?: number } = { freeText: 0.15 },
 ): Promise<MultiCoverage> {
-  const reports: SampleReport[] = []
-  for (const s of samples) {
-    const r = await ruleCoverage(s.seeds, s.turns, undefined, s.grumpy, { ...opts, untilEnding: s.kind === 'main' })
-    reports.push({ ...r, kind: s.kind })
-  }
-  const never = neverInAllSamples(reports.map((r) => r.never))
-  return { samples: reports, never }
+  if (!samples.length) throw new Error('Нет выборок покрытия')
+  const code = await coverageWorkerCode()
+  return runCoverageJobs(samples, (sample) => coverageInWorker(code, sample, opts.freeText ?? 0))
 }
 
 export function formatCoverage(r: CoverageReport): string {
