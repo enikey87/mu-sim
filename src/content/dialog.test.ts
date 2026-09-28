@@ -5,6 +5,7 @@ import { makeGame , setMoney} from '../test/helpers'
 import { ARCS, GROUP } from './arcs'
 import { D } from './excuses'
 import { ENDGAME_RETURNERS } from './endgame'
+import { NOTIF } from './life'
 import { CONDOLE_REVIVED, GREET_A, FLOOR } from './misc'
 import { SPEND } from './life'
 import { WORLD, needs } from './world'
@@ -15,6 +16,25 @@ import type { Game } from '../engine/game'
 const texts = (g: Game, n = 0) => g.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' ? [m.text] : []))
 
 describe('несостыковки из партии пользователя', () => {
+  it('реплика о своём хозяине доступна до знакомства в чате и закрывается выселением', () => {
+    const { game } = makeGame()
+    const offer = (g: Game) => Array.from({ length: 250 }, () => g.buildChoices())
+      .flat().filter((c) => c.tone === 'neutral').map((c) => c.text)
+    expect(game.S.msgs.some((m) => m.kind === 'card' && m.app === 'Хозяин квартиры')).toBe(false)
+    const before = offer(game)
+    expect(before.some((t) => t.includes('Мой хозяин квартиры тоже из Еревана. Скучает по деньгам.'))).toBe(true)
+    expect(before.join(' ')).not.toContain('Он не верит')
+
+    const evicted = makeGame().game
+    evicted.adjustMoney(-evicted.S.money, 'пустой кошелёк')
+    for (let i = 0; i < 3; i++) evicted.chargeBill('rent')
+    const notice = evicted.linePicked('NOTIF_EVICT_TEST', NOTIF.filter((n) => /Выселяю/.test(n.t)))
+    expect(notice?.text).toMatch(/Выселяю/)
+    expect(evicted.S.mem.evicted).toBe(true)
+    const after = offer(evicted)
+    expect(after.length).toBeGreaterThan(10)
+    expect(after.join(' ')).not.toMatch(/хозяин квартиры тоже из Еревана/i)
+  })
   it('Борис не звучит до своего сериала: ни в генераторе отмазок, ни в семейном чате, ни в хоре на слово «баран»', async () => {
     const { game } = makeGame()
     for (let i = 0; i < 300; i++) expect(game.X.prev().text).not.toMatch(/Борис/)
