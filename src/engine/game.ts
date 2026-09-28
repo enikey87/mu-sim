@@ -1169,13 +1169,14 @@ export class Game {
   // ---------- факты для правил ----------
   availableArcs(): string[] {
     // when проверяем по mem+day, не через facts(): там arcAvailable → availableArcs
-    const slim = { ...this.S.mem, day: this.S.day }
+    const { mem, day } = this.S
+    const fact = (key: string) => key === 'day' ? day : Object.prototype.propertyIsEnumerable.call(mem, key) ? mem[key] : undefined
     return Object.keys(ARCS).filter((id) => {
       const a = ARCS[id]
       const st = this.S.arcs[id]
       if (st) return st.i < a.eps.length && this.S.day - st.last >= 3
       if (this.S.day < (a.minDay ?? 0)) return false
-      if (a.when?.length && !a.when.every((c) => test(c, slim))) return false
+      if (a.when?.length && !a.when.every((c) => test(c, fact))) return false
       return true
     })
   }
