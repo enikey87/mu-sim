@@ -321,7 +321,8 @@ describe('ход Алика (AlikTurn): веса как в оригинале', 
     const { game } = makeGame({ seed: 5 })
     const f = { ...game.facts(), sent: 20, arcAvailable: true, arcsStarted: 3, mood: 5 } // сериалы уже идут — без «первого сериала»
     const n: Record<string, number> = {}
-    const N = 6000
+    // доля Turn_Scene ≈ 0,094 при пороге 0,09: на 6000 ходах шум (σ ≈ 0,004) решал исход по сиду
+    const N = 72000
     for (let i = 0; i < N; i++) { const r = game.rules.match({ event: 'AlikTurn' }, f)!.name; n[r] = (n[r] ?? 0) + 1 }
     const p = (k: string) => (n[k] ?? 0) / N
     expect(p('Turn_Excuse')).toBeGreaterThan(0.12)
