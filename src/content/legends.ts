@@ -417,7 +417,7 @@ export const CHORUS_LEGEND: Record<string, Line[]> = {
     { t: 'Сейф закрыт, ключ у меня. Я в декрете. Не торопите декрет.', claims: ['money_safe'], when: [eq('legend', 'safe_nune')], prio: 1 },
     { t: 'Сейф закрыт, ключ в ребёнке. Не торопите ребёнка.', claims: ['money_safe'], when: [eq('legend', 'safe_baby')], prio: 1 },
     { t: 'Второй ключ, скорее всего, у Алика в кармане. В том, который он не проверяет.', when: [eq('legend', 'safe_wrongkey')], prio: 1 },
-    { t: 'По бумагам деньги в «Ниве». По факту — тоже. Где «Нива» — не по бумагам.', when: [eq('legend', 'niva_gone')], prio: 1 },
+    { t: 'По бумагам деньги в «Ниве». По факту — тоже. Где «Нива» — не по бумагам.', claims: ['money_niva'], when: [eq('legend', 'niva_gone')], prio: 1 },
     needs('boris', 'dekret')({ t: 'Счета заморожены, я в декрете, Борис в налоговой. Отчётность идеальная.', when: [eq('legend', 'frozen')], prio: 1 }),
   ],
   karine: [
