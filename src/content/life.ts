@@ -1,7 +1,7 @@
 import { type Entry, type LineSpec, type Said, gate, gte, lte, eq, ne, is, missing, set } from './fact'
 import { needs, WORLD } from './world'
 import { bloodGiven, count, endgame, evicted, paydayScene, wedding } from './memkeys'
-import { sold, momHelp } from './credit'
+import { sold, momHelp, momDachaDays } from './credit'
 import { billStreak } from './bills'
 
 const newYear = gate(eq('holiday', 'newYear'), missing(endgame.active))
@@ -137,7 +137,7 @@ export const NOTIF: Notif[] = [
   { icon: '🏦', app: 'Банк', t: 'Кредит одобрен! 94% годовых. Поздравляем!', when: [gte('credit.stage', 1), ...moneyOpen] },
   // эхо второй серии («узнали: Алик должен вам»), пока они не приехали к нему; после выплаты и в эндгейме линии нет (#324/#366)
   { icon: '📞', app: 'Коллекторы', t: 'Мы знаем, где живёт ваш Алик. Он нам тоже должен. Давайте дружить.', when: [eq('arc.collectors', 2), ...moneyOpen] },
-  { icon: '👩', app: 'Мама', t: 'Сынок, помнишь, я уже продала дачу, чтобы ты дождался Алика? Помогло?', when: [is(momHelp('dacha'))] },
+  { icon: '👩', app: 'Мама', t: 'Сынок, помнишь, я уже продала дачу, чтобы ты дождался Алика? Помогло?', when: [is(momHelp('dacha')), gte(momDachaDays, 30)] },
   // три неоплаты коммуналки подряд — хозяин выселяет; оплата сбрасывает полосу (#301); после выплаты — нет (#323)
   { icon: '🏠', app: 'Хозяин квартиры', t: 'Выселяю. Можешь пожить у Алика, он же тебе как отец.', when: [missing(evicted), gte(billStreak('rent'), 3), ...moneyOpen], remember: [set(evicted, true)] },
   { icon: '🩸', app: 'Донорский центр', t: 'Спасибо, что пришли сдать кровь! Вы наш герой. Приходите ещё.', when: [is(bloodGiven)] },

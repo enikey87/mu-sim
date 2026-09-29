@@ -23,7 +23,7 @@ import {
   paydayScene, lightOff, netRation, phoneWarn, creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited,
   criticalAt, creditOfferSum,
 } from './memkeys'
-import type { LoanId, MomId, ThingId } from './credit'
+import { momDachaAt, momDachaDays, type LoanId, type MomId, type ThingId } from './credit'
 import { valueOf } from '../engine/rules'
 
 /** Факты контекста последней реплики — facts() кладёт их все на каждый fire; сверка — factkeys.test.ts. */
@@ -74,7 +74,7 @@ export type FactKey =
   | `topic.${TopicId}` | `topicMute.${TopicId}`
   | `wedding.${WeddingId}`
   | `bills.${BillPart}.${BillField}`
-  | `sold.${ThingId}` | `mom.${MomId}` | `mom.done`
+  | `sold.${ThingId}` | `mom.${MomId}` | `mom.done` | typeof momDachaAt | typeof momDachaDays
   | `credit.${LoanId}.taken` | `credit.${LoanId}.dueAt` | `credit.${LoanId}.failed`
   | `inv.${string}` // позиции акта — русские названия из invoiceItems; рантайм-сторож в isFactKey
 
@@ -101,7 +101,7 @@ export const FAMILIES: Record<string, (rest: string) => boolean> = {
   'wedding.': (r) => Object.hasOwn(CAST, r) || r === 'anush',
   'bills.': (r) => /^(rent|phone|transit)\.(dueAt|due|unpaid|streak)$/.test(r),
   'sold.': (r) => /^(microwave|guitar|tile|tires)$/.test(r),
-  'mom.': (r) => /^(pension|pickles|dacha|done)$/.test(r),
+  'mom.': (r) => /^(pension|pickles|dacha|dacha\.at|dacha\.days|done)$/.test(r),
   'credit.': (r) => /^(consumer|refi|micro)\.(taken|dueAt|failed)$/.test(r),
 }
 

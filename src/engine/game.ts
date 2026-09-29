@@ -19,7 +19,7 @@ import { BILLS, billDue, billDueAt, billStreak, billUnpaid, lightOff, netRation,
 import {
   LOANS, THINGS, MOM_DONE_TEXT,
   creditStage, creditOffer, creditBroke, momDone, creditDeclined,
-  sold, momHelp, loanTaken, loanDueAt, loanPayment, loanFailed, nextLoan, nextThing, allSold, nextMom,
+  sold, momHelp, momDachaAt, momDachaDays, loanTaken, loanDueAt, loanPayment, loanFailed, nextLoan, nextThing, allSold, nextMom,
   type LoanId, type ThingId, type Loan,
 } from '../content/credit'
 import { allRules } from '../content/rules'
@@ -168,6 +168,7 @@ export class Game {
     this.noTimers = !!opts.noTimers
     this.typos = opts.typos ?? true
     this.S = loadState(this.storage) ?? freshState()
+    if (this.S.mem[momHelp('dacha')] && this.S.mem[momDachaAt] == null) this.S.mem[momDachaAt] = this.S.day
     // колбеки батареи — в узком хосте, а не в публичном интерфейсе Game: game.dead() путался бы со смертью Алика
     this.battery = new Battery(this.S, {
       low: (level) => this.notify('🪫', 'Система', `Низкий заряд батареи: ${level}%`, { event: 'battery' }),
@@ -872,7 +873,7 @@ export class Game {
     }
     const got = this.relief(help.amount)
     if (got === 0) return
-    this.rules.applyOps([set(momHelp(help.id), true)], {})
+    this.rules.applyOps([set(momHelp(help.id), true), ...(help.id === 'dacha' ? [set(momDachaAt, this.S.day)] : [])], {})
     this.adjustMoney(got, 'Мама')
     const done = !nextMom(this.S.mem)
     if (done) this.rules.applyOps([set(momDone, true)], {})
@@ -1275,6 +1276,7 @@ export class Game {
         return false
       })(),
       dow: date.getDay(), month: date.getMonth() + 1, dom: date.getDate(),
+      [momDachaDays]: S.mem[momDachaAt] == null ? 0 : S.day - Number(S.mem[momDachaAt]),
       holiday: holidayOf(S.day) ?? false,
       ...progress,
       items: S.items.length,

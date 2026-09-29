@@ -68,6 +68,8 @@ export const creditStage = 'credit.stage'
 export const creditOffer = 'credit.offer'
 export const creditBroke = 'credit.broke'
 export const momDone = 'mom.done'
+export const momDachaAt = 'mom.dacha.at'
+export const momDachaDays = 'mom.dacha.days'
 /** «Не сейчас» в карточке: банк повторит предложение только по новой причине (отказ, падение уровня). */
 export const creditDeclined = 'credit.declined'
 
