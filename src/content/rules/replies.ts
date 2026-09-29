@@ -6,7 +6,7 @@ import { type Rule, eq, ne, is, gte, add, set, valueOf } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { AlikOffline, ThickJournal } from './criteria'
 import { cooldown } from './rude'
-import { TOPICS, TOPIC_FALLBACK, TOPIC_NAME, TOPIC_OBSESSED, DESPERATE_REPLY } from '../topics'
+import { TOPICS, TOPIC_FALLBACK, TOPIC_NAME, TOPIC_OBSESSED, DESPERATE_PAIRS, DESPERATE_REPLY } from '../topics'
 import { D, low, cap } from '../excuses'
 import { GREET_A, WHEN_COND, SWING } from '../misc'
 import { type TalkKind, talkPairs, talkId, TALK_REMEMBER } from '../talk'
@@ -162,7 +162,11 @@ export const replyRules: R[] = [
   says('defend', { respond: async ({ game }) => { const r = game.uniq(game.X.defend); game.recordPromise(r.p); await game.say([r.text]); game.setCtx(game.ctxFromPromise(r.p)) } }),
   says('ping', { respond: async ({ game }) => { const r = game.uniq(game.X.ping); game.recordPromise(r.p); await game.say([r.text]); game.setCtx(game.ctxFromPromise(r.p)) } }),
   // отчаяние от бедности — не крик: ссора не греется, Алик отвечает человеку, потом отмазывается как обычно
-  says('desperate', { respond: async ({ game }) => { await game.say([game.uniq(() => game.draw('DESPERATE_REPLY', DESPERATE_REPLY))]); await game.excuseTurn() } }),
+  says('desperate', { respond: async ({ game, facts }) => {
+    const pair = DESPERATE_PAIRS[String(facts.arg ?? '')]
+    await game.say([game.uniq(() => pair?.answer ?? game.draw('DESPERATE_REPLY', DESPERATE_REPLY))])
+    await game.excuseTurn()
+  } }),
 
   says('prev', {
     respond: async ({ game, facts }) => {
