@@ -1,15 +1,17 @@
 // Словари и генератор отмазок Алика Воздухонесяна.
 import { type Rng, mathRng } from '../engine/rng'
 import type { Due } from '../engine/time'
-import { type Entry, type Said, saidJoin, saidMap, gate, eq, gte, lt, lte, matches, missing, exists, is, of } from './fact'
+import { type Entry, type Said, saidClaims, saidJoin, saidMap, valueOf, gate, eq, gte, lt, lte, matches, missing, exists, is, of } from './fact'
 import type { LegalClaim } from '../engine/input'
 import type { HolidayRef } from './holidays'
 import { isWhoId, type WhoId } from './ids'
 import { needs, WORLD } from './world'
+import { selfConflict } from './ledger'
+import type { LedgerEvent } from './fact-types'
 import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, collectorsRecruited, count, evicted, finaleOf, grantPaid, met, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, sick, taxThawed, threatClaim, tileCornerRemoved } from './memkeys'
 
 // draw(key, arr) выдаёт уместный сейчас элемент «из колоды» (без повторов до конца колоды); noRefill — после исчерпания null
-export type DrawFn = <T = unknown>(key: string, arr: readonly Entry<T>[], noRefill?: boolean) => T
+export type DrawFn = <T = unknown>(key: string, arr: readonly Entry<T>[], noRefill?: boolean, eligible?: (e: Entry<T>) => boolean) => T
 /** n — кто, g — кого; you — как его назовёт игрок, если Алик сказал «мой»/«я». */
 /** id — кто это из CAST, если отмазка называет его роль: такая реплика знакомит с персонажем. */
 export interface Rel { n: string; g: string; you?: string; id?: WhoId }
@@ -695,16 +697,25 @@ export function make(draw: DrawFn, getTier: () => number = () => 0, rng: Rng = m
     return { text, ...w };
   };
   // ESC на месте «стройки» — не стройка: «Я сам там работал» к санкциям не подходит
+  // части одной реплики не спорят между собой: слот сборки не берёт строку, несовместимую с уже выбранными (#451)
+  let drawn: LedgerEvent[] | null = null
+  const slot = (k: string): Said => {
+    const got = drawn
+    const x = draw<Said>(k, D[k], false, got ? (e) => !selfConflict([...got, ...saidClaims(valueOf(e))]) : undefined)
+    if (drawn) drawn = [...drawn, ...saidClaims(x)]
+    return x
+  }
+  const assembly = <R>(f: () => R): R => { drawn = []; try { return f() } finally { drawn = null } }
   let constrHits = 0, constrReal = 0
   const constr = (): Said => {
     constrHits++
     const t = escTier()
-    if (t) return g('ESC' + t)
+    if (t) return slot('ESC' + t)
     constrReal++
-    return g('CONSTR')
+    return slot('CONSTR')
   }
-  const absurd = (): Said => { const t = escTier(); return t ? g('ESC' + t) : g('ABSURD'); };
-  const reason = (): Said => { const t = escTier(); if (t) return g('ESC' + t); const k = draw('RSRC', [0, 1, 1, 2]); return k === 2 ? g('GROT') : k ? g('CONSTR') : g('ABSURD'); };
+  const absurd = (): Said => { const t = escTier(); return t ? slot('ESC' + t) : slot('ABSURD'); };
+  const reason = (): Said => { const t = escTier(); if (t) return slot('ESC' + t); const k = draw('RSRC', [0, 1, 1, 2]); return k === 2 ? slot('GROT') : k ? slot('CONSTR') : slot('ABSURD'); };
   // строки с явной семантикой (claims) склеиваются saidJoin: семантика частей не теряется (#426)
   const lowSaid = (x: Said): Said => saidMap(x, low)
 
@@ -749,7 +760,7 @@ export function make(draw: DrawFn, getTier: () => number = () => 0, rng: Rng = m
     lastEv = null
     constrHits = 0
     constrReal = 0
-    const parts = tpl()
+    const parts = assembly(tpl)
     return {
       ...parts,
       constr: !!(parts.constr && constrHits > 0 && constrReal === constrHits),
@@ -770,9 +781,9 @@ export function make(draw: DrawFn, getTier: () => number = () => 0, rng: Rng = m
     jobYes: () => `${g('JOB_YES_A')} ${g('JOB_YES_B')}`,
     jobNo: () => `${g('JOB_NO_A')} ${g('JOB_NO_B')}`,
     promiseCheck: (t: string) => { const v = g('VERB'); return `${g('OATH')}! ${cap(t)} — ${v}. ${g('PC_TAIL')}`; },
-    whyRel: (r: Rel) => { const p = promise(); return { text: saidJoin(`Как при чём? ${cap(r.n)} — ${g('REL_ROLE')}! `, reason(), `. ${cap(p.text)}.`), p }; },
+    whyRel: (r: Rel) => assembly(() => { const p = promise(); return { text: saidJoin(`Как при чём? ${cap(r.n)} — ${g('REL_ROLE')}! `, reason(), `. ${cap(p.text)}.`), p }; }),
     congrats: (r: Rel) => `Спасибо, ${low(g('ADDR'))}! ${cap(r.n)} тебя тоже помнит, говорит: ${g('COMPLIMENT')}.`,
-    defend: () => { const o = g('DEFEND'), c = constr(), p = promise(); return { text: saidJoin(`${g('ADDR')}, ${o} `, o.endsWith(':') ? lowSaid(c) : c, `. ${cap(p.text)}.`), p }; },
+    defend: () => assembly(() => { const o = g('DEFEND'), c = constr(), p = promise(); return { text: saidJoin(`${g('ADDR')}, ${o} `, o.endsWith(':') ? lowSaid(c) : c, `. ${cap(p.text)}.`), p }; }),
     photo: (): Said => saidJoin(g('PHOTO_A'), ' ', g('PHOTO_B')),
     transferQ: (): TransferReply => {
       const opening = g('TRQ_A')

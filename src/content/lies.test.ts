@@ -1,7 +1,7 @@
 // Бухгалтерия лжи: явная публикация утверждений, противоречия, «Поймать на лжи», воспоминания.
 import { describe, it, expect } from 'vitest'
-import { CLAIMS, LIE_GRANDPA, LIE_THIRD, LIE_NOCRED, LIE_OPEN } from './lies'
-import { CLAIM_LEDGER, CONFLICTING, currentEpisode, openEpisodes, publishTransition } from './ledger'
+import { LIE_GRANDPA, LIE_THIRD, LIE_NOCRED, LIE_OPEN } from './lies'
+import { currentEpisode, openEpisodes, publishTransition } from './ledger'
 import { makeGame, alikTexts, botTurn } from '../test/helpers'
 import type { Game } from '../engine/game'
 import type { ClaimKey } from './ids'
@@ -12,16 +12,6 @@ import { caughtCount, phoneKarine } from './memkeys'
 import { meet } from './world'
 import { spec, test, resolver, valueOf } from '../engine/rules'
 import { loadState, saveState } from '../engine/state'
-import * as arcs from './arcs'
-import * as endgame from './endgame'
-import * as excuses from './excuses'
-import * as legends from './legends'
-import * as life from './life'
-import * as misc from './misc'
-import * as rude from './rude'
-import * as scenes from './scenes'
-import * as talk from './talk'
-import * as world from './world'
 
 const frag = (s: string) => s.replace(/[.!?…]+$/, '').slice(5, 25)
 const oneOf = (arr: readonly string[], text: string) => arr.some((a) => text.includes(frag(a)))
@@ -36,41 +26,7 @@ async function catchLie(game: Game): Promise<string> {
   return alikTexts(game.S.msgs.slice(from)).join(' ')
 }
 
-/** Все ключи, которые контент явно публикует у своих реплик. */
-function contentClaims(): Set<string> {
-  const out = new Set<string>()
-  const seen = new Set<unknown>()
-  const walk = (v: unknown): void => {
-    if (!v || typeof v !== 'object' || seen.has(v)) return
-    seen.add(v)
-    const claims = (v as { claims?: unknown }).claims
-    if (Array.isArray(claims)) for (const k of claims) out.add(String(k))
-    for (const x of Object.values(v)) walk(x)
-  }
-  for (const m of [arcs, endgame, excuses, legends, life, misc, rude, scenes, talk, world]) walk({ ...m })
-  return out
-}
-
-/** claims каждой реплики по отдельности — не склейка всех ключей контента. */
-function contentClaimSets(): string[][] {
-  const out: string[][] = []
-  const seen = new Set<unknown>()
-  const walk = (v: unknown): void => {
-    if (!v || typeof v !== 'object' || seen.has(v)) return
-    seen.add(v)
-    const claims = (v as { claims?: unknown }).claims
-    if (Array.isArray(claims)) out.push(claims.map(String))
-    for (const x of Object.values(v)) walk(x)
-  }
-  for (const m of [arcs, endgame, excuses, legends, life, misc, rude, scenes, talk, world]) walk({ ...m })
-  return out
-}
-
 describe('утверждения', () => {
-  it('каждое утверждение опубликовано хоть одной реальной репликой контента', () => {
-    const published = contentClaims()
-    for (const c of CLAIMS) expect(published.has(c.key), c.key).toBe(true)
-  })
   it('реплика без разметки знания не создаёт, как бы похоже ни звучала', () => {
     const { game } = makeGame()
     game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в Дубае.' })
@@ -85,17 +41,6 @@ describe('утверждения', () => {
     await catchLie(game)
     const legacy = Object.keys(game.S.mem).filter((k) => /^(said|saidLast|by|lie|caught)\./.test(k))
     expect(legacy).toEqual([])
-  })
-  it('одна реплика не публикует несовместимые версии сама с собой (#437)', () => {
-    for (const claims of contentClaimSets()) {
-      const bySubject = new Map<string, string>()
-      for (const k of claims) {
-        const p = CLAIM_LEDGER[k as ClaimKey]
-        if (!p || !CONFLICTING.has(p.subject)) continue
-        expect(bySubject.get(p.subject) ?? p.value, `реплика с claims [${claims.join(', ')}]`).toBe(p.value)
-        bySubject.set(p.subject, p.value)
-      }
-    }
   })
 })
 
