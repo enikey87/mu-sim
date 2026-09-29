@@ -76,7 +76,7 @@ export const storyRules: R[] = [
   // легенда денег продолжается и между «обычными» ходами
   {
     name: 'Beat_Legend', event: 'StoryBeat', when: [exists('legend')], specificity: 0, odds: 0.12, cooldown: { turns: 5 }, priority: 'chatter',
-    respond: async ({ game, facts }) => { const t = game.line('LEG_' + facts.legend, LEGENDS[String(facts.legend)].lines); if (!t) return false; game.markTopical(await game.say([t])); game.S.ctx = { ...(game.S.ctx ?? {}), legend: String(facts.legend) } },
+    respond: async ({ game, facts }) => { const p = game.linePicked('LEG_' + facts.legend, LEGENDS[String(facts.legend)].lines); if (!p) return false; game.markTopical(await game.say([{ t: p.text, claims: p.spec.claims ?? [] }])); game.S.ctx = { ...(game.S.ctx ?? {}), legend: String(facts.legend) } },
   },
   { name: 'Beat_Memory', event: 'StoryBeat', when: [gte('sent', 10)], specificity: 0, odds: 0.08, cooldown: { turns: 6 }, priority: 'chatter', respond: async ({ game }) => { const t = game.line('MEMORY', MEMORY); if (!t) return false; await game.say([t]); game.unlock('memory'); game.S.ctx = { ...(game.S.ctx ?? {}), memory: true } } },
   { name: 'Beat_Quest', event: 'StoryBeat', when: [gte('sent', 6)], specificity: 0, odds: 0.06, cooldown: { turns: 8 }, priority: 'chatter', respond: ({ game }) => game.fire('PickQuest').then((r) => !!r) },
@@ -111,9 +111,9 @@ export const turnRules: R[] = [
   {
     name: 'Turn_Legend', event: 'AlikTurn', when: [exists('legend')], specificity: 0, weight: 22, cooldown: { turns: 2 },
     respond: async ({ game, facts }) => {
-      const t = game.line('LEG_' + facts.legend, LEGENDS[String(facts.legend)].lines)
-      if (!t) return game.excuseTurn()
-      game.markTopical(await game.say([t]))
+      const p = game.linePicked('LEG_' + facts.legend, LEGENDS[String(facts.legend)].lines)
+      if (!p) return game.excuseTurn()
+      game.markTopical(await game.say([{ t: p.text, claims: p.spec.claims ?? [] }]))
       game.S.ctx = { ...(game.S.ctx ?? {}), legend: String(facts.legend) } // можно переспросить именно про это
       if (game.chance(0.6)) await game.promiseLine(undefined, true)
     },
@@ -175,7 +175,7 @@ export const idleRules: R[] = [
     name: 'Idle_Text', event: 'AlikIdle', when: [], specificity: 0, priority: 'chatter', weight: idleW.text,
     respond: async ({ game }) => {
       await game.sleep(300)
-      await game.say([game.addrLine('IDLE', IDLE)])
+      await game.say([game.addrSaidLine('IDLE', IDLE)])
       game.unlock('idle')
       game.setCtx({ type: 'idle' })
     },

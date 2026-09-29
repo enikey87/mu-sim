@@ -131,9 +131,9 @@ export const promiseRules: R[] = [
 // ---- хор (Mentioned, target — упомянутый персонаж) ----
 const speaks = (who: string) => { const criterion = speaksCriterion(who); return criterion ? [criterion] : [] }
 const chorusResponse = (who: string, pool: readonly Line[]): R['respond'] => async ({ game }) => {
-  const t = game.line('CH_' + who, pool)
-  if (!t) return false // новых реплик нет — молчит
-  await game.say([{ w: who, t }])
+  const p = game.linePicked('CH_' + who, pool)
+  if (!p) return false // новых реплик нет — молчит
+  await game.say([{ w: who, t: p.text, claims: p.spec.claims ?? [] }])
   game.S.ctx = { ...(game.S.ctx ?? {}), chorus: who } // можно ответить самому персонажу
 }
 const chorus = (who: string): R => ({

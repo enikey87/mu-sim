@@ -49,7 +49,7 @@ describe('финалы сериалов: контент', () => {
         expect(ACH[f.fx?.ach ?? ''], `${arc}.${f.id} ach`).toBeDefined()
         expect(ACH[`fin_${arc}_${f.id}`]).toBeDefined()
         expect(SETUP[`${arc}.${f.id}`], `нет теста на ${arc}.${f.id}`).toBeDefined()
-        for (const m of f.m.map(valueOf)) if (typeof m !== 'string') expect(CAST[m.w], m.w).toBeDefined()
+        for (const m of f.m.map(valueOf)) if (typeof m !== 'string' && 'w' in m) expect(CAST[m.w], m.w).toBeDefined()
       }
     }
   })

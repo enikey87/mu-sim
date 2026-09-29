@@ -7,7 +7,8 @@ export {
   Lines, lineId, lintLines,
   type Facts, type Scope, type Value, type Resolver, type WriteScope, type SaidState,
 } from '../engine/rules'
-export type { Criterion, Entry, Line, LineSpec, FactOp, Rule } from './fact-types'
+export type { Criterion, Entry, Line, LineSpec, FactOp, Rule, Claimed, Said } from './fact-types'
+export { saidJoin, saidText, saidClaims, saidMap } from './fact-types'
 export {
   eq, ne, gt, gte, lt, lte, between, exists, missing, matches, is,
   set, add, mul, invert, during, named, of, sinceWithin, sincePast,

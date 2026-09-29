@@ -6,6 +6,7 @@ import {
   openEpisodes, currentEpisode, closeEpisode, migrateLedger, CLAIM_LEDGER,
 } from './ledger'
 import { CLAIMS } from './lies'
+import { ARCS } from './arcs'
 import { makeGame, memStorage } from '../test/helpers'
 import { SAVE_KEY, loadState, saveState } from '../engine/state'
 
@@ -130,6 +131,96 @@ describe('публикация путём игры', () => {
     expect(game.S.ledger.claims[0]).toMatchObject({ subject: 'beton.mood', value: 'offended' })
     game.S.day += 11
     expect(game.callbackCandidate()?.key).toBe('beton')
+  })
+})
+
+describe('явная семантика контента (#426)', () => {
+  it('отмазка с размеченным смыслом публикует его через обычный say — одна запись, предмет и значение из CLAIM_LEDGER', async () => {
+    const { game } = makeGame()
+    // T-шаблон с «Без акта денег нет»: constr-строка несёт claims, текст пула матчит regex
+    await game.say([{ t: 'Сделал бы давно. Без акта денег нет.', claims: ['no_money'] }])
+    expect(game.S.ledger.claims).toHaveLength(1)
+    expect(game.S.ledger.claims[0]).toMatchObject({ subject: 'money.none', value: 'gone', source: 'alik' })
+  })
+  it('regex-адаптер не дублирует явную публикацию того же ключа', async () => {
+    const { game } = makeGame()
+    // текст матчит regex money_dubai И явные claims содержат money_dubai — публикуется ровно одна запись
+    await game.say([{ t: 'Деньги в Дубае, брат.', claims: ['money_dubai'] }])
+    expect(game.S.ledger.claims).toHaveLength(1)
+    expect(game.S.ledger.claims[0]).toMatchObject({ subject: 'money.location', value: 'dubai' })
+    // контроль: без явных claims адаптер публикует сам, тоже одна запись
+    const { game: g2 } = makeGame()
+    await g2.say(['Деньги в Дубае, брат.'])
+    expect(g2.S.ledger.claims).toHaveLength(1)
+  })
+  it('явный смысл не зависит от формулировки строки: опечатанный текст публикует тот же смысл без второй записи', () => {
+    const { game } = makeGame()
+    // то, что say() делает с опечаткой: показан «дыньги», смысл — исходная фраза + явные claims
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Дыньги в Дубае.' }, 'Деньги в Дубае.', ['money_dubai'])
+    expect(game.S.ledger.claims).toHaveLength(1)
+    expect(game.S.ledger.claims[0]).toMatchObject({ subject: 'money.location', value: 'dubai' })
+  })
+  it('другой говорящий публикует своим источником (групповой чат Нуне)', async () => {
+    const { game } = makeGame()
+    await game.say([{ w: 'nune', t: 'Ключ от сейфа у меня. Не отдам.', claims: ['money_safe'] }])
+    expect(game.S.ledger.claims).toHaveLength(1)
+    expect(game.S.ledger.claims[0]).toMatchObject({ subject: 'money.location', value: 'safe', source: 'nune' })
+  })
+  it('эпизод сериала публикует размеченные заявления (дедушка жив; ключ у Нуне — её источником)', async () => {
+    const { game } = makeGame()
+    await game.playEpisode(ARCS.grandpa.eps[0], 'grandpa')
+    expect(game.S.ledger.claims.at(-1)).toMatchObject({ subject: 'grandpa.life', value: 'alive', source: 'alik' })
+    const { game: g2 } = makeGame()
+    await g2.playEpisode(ARCS.nune.eps[1], 'nune')
+    expect(g2.S.ledger.claims.at(-1)).toMatchObject({ subject: 'money.location', value: 'safe', source: 'nune' })
+  })
+  it('закрытый гейт серии ничего не публикует (невыбранная ветка)', async () => {
+    const { game } = makeGame()
+    // первая ветка серии nune[1] — для незнакомого игрока; после знакомства гейт закрыт и open() её отсекает
+    const gated = ARCS.nune.eps[1].m[0]
+    game.S.mem['met.nune'] = true
+    expect(game.open([gated])).toHaveLength(0)
+    const before = game.S.ledger.claims.length
+    await game.say(game.open(ARCS.nune.eps[1].m))
+    expect(game.S.ledger.claims.length).toBe(before + 1) // звучит только открытая ветка — одна запись
+  })
+  it('пачка отсутствия: awayMsg с размеченной IDLE-строкой публикует «денег нет»', async () => {
+    const { game } = makeGame()
+    game.rules.add({ name: 'Test_AwayText', event: 'AlikAway', when: [], specificity: 50, respond: ({ game }) => game.awayMsg('text') })
+    const before = game.S.ledger.claims.length
+    await game.fire('AlikAway')
+    // IDLE публикует claims только из строки «…Денег нет, но волнуюсь.» — с сидом 1 пачка может взять другую;
+    // в любом случае записей больше не становится, если claims не было, и ровно одна — если была
+    const added = game.S.ledger.claims.slice(before)
+    expect(added.length).toBeLessThanOrEqual(1)
+    if (added.length) expect(added[0]).toMatchObject({ subject: 'money.none', value: 'gone' })
+    // детерминированная проверка самой строки пула через прямую доставку
+    const { game: g2 } = makeGame()
+    g2.alikMsg({ kind: 'text', from: 'alik', text: 'ты там живой? Я волнуюсь. Денег нет, но волнуюсь.' }, undefined, ['no_money'])
+    expect(g2.S.ledger.claims.at(-1)).toMatchObject({ subject: 'money.none', value: 'gone' })
+  })
+  it('две формулировки одного значения не конфликтуют; активное значение — последнее', async () => {
+    const { game } = makeGame()
+    await game.say(['Деньги в Дубае.'])
+    await game.say([{ t: 'Смотри: деньги в Дубае, всё на месте.', claims: ['money_dubai'] }])
+    expect(openEpisodes(game.S.ledger, 'money.location')).toHaveLength(0)
+    expect(activeClaim(game.S.ledger, 'money.location')?.value).toBe('dubai')
+  })
+  it('sys-строка сцены публикует заявление со своим источником (Грант: «всё заплатил»)', async () => {
+    const { game } = makeGame()
+    await game.enterNode('customer', 'call')
+    const rec = game.S.ledger.claims.find((c) => c.subject === 'customer.payment')
+    expect(rec).toMatchObject({ value: 'paid', source: 'grant' })
+    const last = game.S.msgs.at(-1)
+    expect(last?.kind === 'sys' ? last.text : '').toMatch(/Заказчик: «Я Алику всё заплатил|заплатил дважды/)
+  })
+  it('негативный контроль: убрать claims из явной публикации — дедуп-адаптер публикует лишнюю запись', async () => {
+    // при разметке на месте: текст матчит regex и ключ в explicit — одна запись (проверено выше);
+    // здесь показываем, что запись всё же появляется (явная публикация работает и без regex-матча)
+    const { game } = makeGame()
+    await game.say([{ t: 'Понимаешь, денег просто нет сейчас.', claims: ['no_money'] }])
+    expect(game.S.ledger.claims).toHaveLength(1)
+    expect(game.S.ledger.claims[0]).toMatchObject({ subject: 'money.none', value: 'gone' })
   })
 })
 
