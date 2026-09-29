@@ -1,8 +1,8 @@
 // Бухгалтерия лжи: типизированный журнал знаний игрока (docs/design/lie-ledger.md).
-// Реплика публикует смысл (предмет + значение + источник), а не строку переписки:
+// Реплика публикует смысл (предмет + значение + источник), а не строка переписки:
 // показанный текст, опечатка и формат сообщения не определяют знание. Пока контент
 // не переехал на явную публикацию (#426), старый regex-путь кормит журнал адаптером
-// (CLAIM_LEDGER); кнопка «Поймать на лжи» живёт по прежним ключам памяти.
+// (CLAIM_LEDGER); кнопка «Поймать на лжи» читает открытые эпизоды журнала (#427).
 import type { ClaimKey, WhoId } from './ids'
 import { isWhoId } from './ids'
 import { pairKey } from './memkeys'
@@ -175,6 +175,14 @@ function claimOfValue(l: LedgerState, subject: LedgerSubject, value: string): Cl
 
 // --- временный адаптер: какое типизированное знание публикует старое regex-утверждение.
 const point = <S extends LedgerSubject>(subject: S, value: LedgerValueMap[S]): LedgerPoint => ({ subject, value }) as LedgerPoint
+
+/** Regex-ключ утверждения по предмету и значению — текст кнопки и тематические ответы. */
+export function claimKeyOf(subject: LedgerSubject, value: string): ClaimKey | undefined {
+  for (const [k, p] of Object.entries(CLAIM_LEDGER) as [ClaimKey, LedgerPoint][]) {
+    if (p.subject === subject && p.value === value) return k
+  }
+  return undefined
+}
 
 export const CLAIM_LEDGER: Record<ClaimKey, LedgerPoint> = {
   money_jar: point('money.location', 'bank'),
