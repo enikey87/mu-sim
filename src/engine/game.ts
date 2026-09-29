@@ -70,6 +70,9 @@ export class GameDisposed extends Error {
   constructor() { super('Game disposed') }
 }
 
+type PoorText = string | { t: string; arg?: string }
+const poorText = (item: PoorText): string => typeof item === 'string' ? item : item.t
+
 export interface GameOptions {
   storage?: Storage | null
   rng?: Rng
@@ -458,27 +461,33 @@ export class Game {
    * а отпущенную перефразирует — сказанное слово в слово не возвращается (#184/#240).
    * `act` — строка несёт намерение игрока: пул не молчит, даже когда окно не отпустило ни одной (#167).
    */
-  poorLine(key: string, arr: readonly Entry<string>[], opts?: { act?: boolean }): string | null {
-    const fresh = this.freshPlayer(key, arr)
+  poorChoice<T extends PoorText>(key: string, arr: readonly Entry<T>[], opts?: { act?: boolean }): { value: T; text: string } | null {
+    const fresh = this.decks.pick(key, arr, this.lineFacts(), { eligible: (e) => !this.shown.has(poorText(valueOf(e))) && !this.seen.has(poorText(valueOf(e))) })
     if (fresh !== null) {
-      this.S.poorSaid[fresh] = this.S.day
-      return fresh
+      const text = poorText(fresh)
+      this.shown.add(text)
+      if (this.shown.size > 60) this.shown.delete(this.shown.values().next().value!)
+      this.S.poorSaid[text] = this.S.day
+      return { value: fresh, text }
     }
     const said = (t: string): number => this.S.poorSaid[t] ?? -POOR_REPEAT_DAYS
     const open = arr.filter((e) => isOpen(e, this.lineFacts())).map(valueOf)
     if (!open.length) return null
-    const ready = open.filter((t) => this.S.day - said(t) >= POOR_REPEAT_DAYS)
+    const ready = open.filter((t) => this.S.day - said(poorText(t)) >= POOR_REPEAT_DAYS)
     if (!ready.length && !opts?.act) return null
-    const raw = ready.length ? ready.reduce((a, b) => (said(b) < said(a) ? b : a))
+    const raw = ready.length ? ready.reduce((a, b) => (said(poorText(b)) < said(poorText(a)) ? b : a))
       : open[Math.floor(this.S.day / POOR_REPEAT_DAYS) % open.length]!
     // отметка на исходной строке тоже: иначе самая старая так и остаётся самой старой, и пул
     // перефразирует её одну, а не идёт по кругу
-    this.S.poorSaid[raw] = this.S.day
+    this.S.poorSaid[poorText(raw)] = this.S.day
     // суффикс, а не префикс: строка обязана остаться узнаваемой как реплика своего пула
     const rephrase = (x: string): string => x + this.draw('PSUF', PLAYER_SUFFIX)
-    const t = this.seen.pickFresh(() => rephrase(raw), rephrase)
+    const t = this.seen.pickFresh(() => rephrase(poorText(raw)), rephrase)
     this.S.poorSaid[t] = this.S.day
-    return t
+    return { value: raw, text: t }
+  }
+  poorLine(key: string, arr: readonly Entry<PoorText>[], opts?: { act?: boolean }): string | null {
+    return this.poorChoice(key, arr, opts)?.text ?? null
   }
   pair = (ka: string, a: readonly Entry<string>[], kb: string, b: readonly Entry<string>[]): string =>
     this.uniq(() => `${this.draw(ka, a)} ${this.draw(kb, b)}`)
@@ -1460,15 +1469,16 @@ export class Game {
     if (S.mem[memkeys.polite] && this.chance(0.6)) out.push({ text: one('P_POL_POLITE', P_POL_POLITE), tone: 'polite' })
     else {
       // бедность — своими словами: пул уровня без повторов, исчерпанный звучит редко (#184)
-      const poor = money && this.chance(level === 'bottom' ? 0.7 : 0.4) ? this.poorLine(`P_MONEY_${level}_POL`, money.polite) : null
-      out.push({ text: poor ?? P2('P_POL_A', 'P_POL_B'), tone: 'polite' })
+      const poor = money && this.chance(level === 'bottom' ? 0.7 : 0.4) ? this.poorChoice(`P_MONEY_${level}_POL`, money.polite) : null
+      const arg = poor && typeof poor.value !== 'string' ? poor.value.arg : undefined
+      out.push({ text: poor?.text ?? P2('P_POL_A', 'P_POL_B'), tone: 'polite', ...(arg ? { act: 'desperate', arg } : {}) })
     }
     if (out.length < 3) {
       const period = this.period()
       // отчаяние — своё намерение, чаще на дне; вежливый вариант выше остаётся при любом уровне
-      const cry = money && level && this.chance(level === 'bottom' ? 0.6 : 0.3) ? this.poorLine(`P_DESPERATE_${level}`, P_DESPERATE[level], { act: true }) : null
+      const cry = money && level && this.chance(level === 'bottom' ? 0.6 : 0.3) ? this.poorChoice(`P_DESPERATE_${level}`, P_DESPERATE[level], { act: true }) : null
       const poor = !cry && money && this.chance(0.5) ? this.poorLine(`P_MONEY_${level}_NEU`, money.neutral) : null
-      if (cry) out.push({ text: cry, tone: 'neutral', act: 'desperate' })
+      if (cry) out.push({ text: cry.text, tone: 'neutral', act: 'desperate', arg: typeof cry.value === 'string' ? undefined : cry.value.arg })
       else if (poor) out.push({ text: poor, tone: 'neutral' })
       else {
       // нейтральная реплика знает время: ночь, вечер пятницы, поздние дни ожидания
