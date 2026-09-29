@@ -238,21 +238,23 @@ export function migrateLedger(mem: Record<string, unknown>, saved: unknown): Led
     return saved as LedgerState
   }
   const l = freshLedger()
-  const done = new Set<string>()
-  const publishLegacy = (claimKey: string, raw: unknown): void => {
-    if (done.has(claimKey)) return
+  const legacy = new Map<string, { mapped: LedgerPoint; day: number }>()
+  const collectLegacy = (claimKey: string, raw: unknown): void => {
+    if (legacy.has(claimKey)) return
     const mapped = CLAIM_LEDGER[claimKey as ClaimKey]
     const day = legacyDay(raw)
     if (!mapped || day === null) return
-    done.add(claimKey)
-    publishClaim(l, mapped.subject, mapped.value, { source: legacySource(mem, claimKey), day, claimKey: claimKey as ClaimKey })
+    legacy.set(claimKey, { mapped, day })
   }
   // последнее известное saidLast.* — в запись знания без messageId; иначе said.*
   for (const [key, raw] of Object.entries(mem)) {
-    if (key.startsWith(LEGACY_SAID_LAST)) publishLegacy(key.slice(LEGACY_SAID_LAST.length), raw)
+    if (key.startsWith(LEGACY_SAID_LAST)) collectLegacy(key.slice(LEGACY_SAID_LAST.length), raw)
   }
   for (const [key, raw] of Object.entries(mem)) {
-    if (key.startsWith(LEGACY_SAID)) publishLegacy(key.slice(LEGACY_SAID.length), raw)
+    if (key.startsWith(LEGACY_SAID)) collectLegacy(key.slice(LEGACY_SAID.length), raw)
+  }
+  for (const [claimKey, { mapped, day }] of [...legacy].sort((a, b) => a[1].day - b[1].day)) {
+    l.claims.push({ id: l.next++, subject: mapped.subject, value: mapped.value, source: legacySource(mem, claimKey), day, claimKey: claimKey as ClaimKey })
   }
   // незакрытые lie.old/new — в открытый эпизод, если обе стороны существуют и несовместимы
   const oldK = mem[LIE_OLD], newK = mem[LIE_NEW]
