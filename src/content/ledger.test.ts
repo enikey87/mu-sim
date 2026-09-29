@@ -6,7 +6,11 @@ import {
   openEpisodes, currentEpisode, closeEpisode, migrateLedger, CLAIM_LEDGER,
 } from './ledger'
 import { CLAIMS } from './lies'
-import { ARCS } from './arcs'
+import { ARCS, ARC_DONE } from './arcs'
+import { FINALES } from './finales'
+import { LEGENDS } from './legends'
+import { D } from './excuses'
+import type { Said } from './fact'
 import { makeGame, memStorage } from '../test/helpers'
 import { SAVE_KEY, loadState, saveState } from '../engine/state'
 
@@ -55,6 +59,16 @@ describe('операции журнала', () => {
     publishClaim(l, 'grandpa.life', 'alive', { ...meta, day: 2 })
     publishRetraction(l, 'grandpa.life', 'alive', { ...meta, day: 3 })
     expect(l.episodes[0].status).toBe('retracted')
+  })
+  it('отозванная активная версия не спорит со следующим местом, но новая публикация снова спорит', () => {
+    const l = freshLedger()
+    publishClaim(l, 'money.location', 'niva', meta)
+    publishRetraction(l, 'money.location', 'niva', { ...meta, day: 2 })
+    expect(activeClaim(l, 'money.location')).toBeUndefined()
+    publishClaim(l, 'money.location', 'foundation', { ...meta, day: 3 })
+    expect(openEpisodes(l)).toHaveLength(0)
+    publishClaim(l, 'money.location', 'niva', { ...meta, day: 4 })
+    expect(openEpisodes(l)).toHaveLength(1)
   })
   it('пойман — конкретный эпизод; повтор пары новыми сообщениями — новый эпизод', () => {
     const l = freshLedger()
@@ -120,6 +134,127 @@ describe('публикация путём игры', () => {
     expect(game.S.ledger.claims[0]).toMatchObject({ subject: 'beton.mood', value: 'offended' })
     game.S.day += 11
     expect(game.callbackCandidate()?.key).toBe('beton')
+  })
+})
+
+describe('рассказанные переходы и отзывы (#436)', () => {
+  const catchChoice = (game: ReturnType<typeof makeGame>['game']) =>
+    game.buildChoices().some((c) => c.act === 'catchLie')
+
+  it('«Нива» с деньгами возвращается пустой, затем конверт падает в фундамент: кнопки нет', async () => {
+    const { game, storage } = makeGame()
+    for (const ep of ARCS.niva.eps.slice(0, 6)) await game.playEpisode(ep, 'niva')
+    expect(game.S.ledger.claims.some((c) => c.value === 'niva')).toBe(true)
+    expect(game.S.ledger.transitions).toContainEqual(expect.objectContaining({ subject: 'money.location', from: 'niva', to: null }))
+    await game.playEpisode(ARCS.beton.eps[0], 'beton')
+    expect(game.S.ledger.claims.some((c) => c.value === 'foundation')).toBe(true)
+    expect(openEpisodes(game.S.ledger)).toHaveLength(0)
+    expect(catchChoice(game)).toBe(false)
+    game.save()
+    const { game: loaded } = makeGame({ storage })
+    expect(loaded.S.ledger.transitions).toHaveLength(game.S.ledger.transitions.length)
+    expect(catchChoice(loaded)).toBe(false)
+  })
+
+  it('отзыв «деньги в Ниве» сам по себе разрешает следующую версию', async () => {
+    const { game } = makeGame()
+    for (const ep of ARCS.niva.eps.slice(0, 6)) await game.playEpisode(ep, 'niva')
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в сейфе.' }, ['money_safe'])
+    expect(catchChoice(game)).toBe(false)
+    expect(openEpisodes(game.S.ledger)).toHaveLength(0)
+  })
+
+  it('объяснение конверта связывает любую услышанную активную версию с фундаментом', async () => {
+    const { game } = makeGame()
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в сейфе.' }, ['money_safe'])
+    await game.playEpisode(ARCS.beton.eps[0], 'beton')
+    expect(catchChoice(game)).toBe(false)
+    expect(game.S.ledger.transitions).toContainEqual(expect.objectContaining({ subject: 'money.location', from: 'safe', to: 'foundation' }))
+    expect(openEpisodes(game.S.ledger)).toHaveLength(0)
+  })
+
+  it('подписанный акт после «Грант не платит» объясняет оплату', async () => {
+    const { game } = makeGame()
+    await game.playEpisode(ARCS.grant.eps[0], 'grant')
+    await game.playEpisode(ARCS.rubik.eps[7], 'rubik')
+    expect(catchChoice(game)).toBe(false)
+    expect(game.S.ledger.claims.map((c) => c.value)).toContain('owes')
+    expect(game.S.ledger.claims.map((c) => c.value)).toContain('paid')
+    expect(game.S.ledger.transitions).toContainEqual(expect.objectContaining({ subject: 'customer.payment', from: 'owes', to: 'paid' }))
+    expect(openEpisodes(game.S.ledger, 'customer.payment')).toHaveLength(0)
+  })
+
+  it('звонок Гранту о платеже в марте остаётся противоречием без подписанного акта', async () => {
+    const { game } = makeGame()
+    await game.enterNode('customer', 'ask')
+    await game.enterNode('customer', 'call')
+    expect(game.S.ledger.claims.map((c) => c.value)).toEqual(['owes', 'paid'])
+    expect(game.S.ledger.transitions).toHaveLength(0)
+    expect(catchChoice(game)).toBe(true)
+  })
+
+  it('готовая реплика и строка легенды сообщают пустой бардачок после показа', async () => {
+    const { game } = makeGame()
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в «Ниве».' }, ['money_niva'])
+    await game.say([ARC_DONE.niva[0]])
+    expect(game.S.ledger.transitions).toHaveLength(1)
+    const line = game.linePicked('LEG_niva_back', LEGENDS.niva_back.lines, { filter: (s) => s.t.includes('Бардачок проверил') })!
+    await game.say([{ t: line.text, claims: line.spec.claims ?? [] }])
+    expect(game.S.ledger.transitions).toHaveLength(2)
+    expect(game.S.ledger.transitions[1]).toMatchObject({ from: 'niva', to: null })
+  })
+
+  it('системная строка публикует переход с источником и id показанного сообщения', () => {
+    const { game } = makeGame()
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Грант не платит.' }, ['customer_owes'])
+    const text = 'Грант подписал акт и заплатил.'
+    const msg = game.sys(text)
+    game.noteSaidClaims({ t: text, claims: [{ move: { from: 'customer_owes', to: 'customer_paid' } }, 'customer_paid'] }, msg.id, 'grant')
+    expect(game.S.ledger.transitions).toContainEqual(expect.objectContaining({ source: 'grant', msgId: msg.id, from: 'owes', to: 'paid' }))
+    expect(game.S.ledger.claims.at(-1)).toMatchObject({ source: 'grant', msgId: msg.id, value: 'paid' })
+    expect(catchChoice(game)).toBe(false)
+  })
+
+  it('переход разных предметов отвергается как ошибка разметки', () => {
+    const { game } = makeGame()
+    expect(() => game.noteClaims([{ move: { from: 'money_niva', to: 'customer_paid' } }])).toThrow(/разными предметами/)
+    expect(game.S.ledger.transitions).toHaveLength(0)
+  })
+
+  it('частные финалы отзывают версии денег, которые игрок увидел вынутыми или опровергнутыми', async () => {
+    const { game } = makeGame()
+    await game.playEpisode(ARCS.beton.eps[0], 'beton')
+    await game.playFinale('beton', FINALES.beton.find((f) => f.id === 'opened')!)
+    expect(game.S.ledger.transitions).toContainEqual(expect.objectContaining({ from: 'foundation', to: null, source: 'grant' }))
+
+    const { game: nuneGame } = makeGame()
+    await nuneGame.playEpisode(ARCS.beton.eps[0], 'beton')
+    await nuneGame.playFinale('beton', FINALES.beton.find((f) => f.id === 'ledger')!)
+    expect(nuneGame.S.ledger.transitions).toContainEqual(expect.objectContaining({ from: 'foundation', to: null, source: 'nune' }))
+
+    const { game: nivaGame } = makeGame()
+    await nivaGame.playEpisode(ARCS.niva.eps[0], 'niva')
+    await nivaGame.playFinale('niva', FINALES.niva.find((f) => f.id === 'chose')!)
+    expect(nivaGame.S.ledger.transitions).toContainEqual(expect.objectContaining({ from: 'niva', to: null, source: 'alik' }))
+  })
+
+  it('частный финал Рубика тоже объясняет расчёт Гранта', async () => {
+    const { game } = makeGame()
+    await game.playEpisode(ARCS.grant.eps[0], 'grant')
+    await game.playFinale('rubik', FINALES.rubik.find((f) => f.id === 'karine')!)
+    expect(game.S.ledger.claims.some((c) => c.value === 'paid')).toBe(true)
+    expect(game.S.ledger.transitions).toContainEqual(expect.objectContaining({ from: 'owes', to: 'paid' }))
+    expect(catchChoice(game)).toBe(false)
+  })
+
+  it('легендарная отмазка рассказывает, как сейф оказался в стене', async () => {
+    const { game } = makeGame()
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в сейфе.' }, ['money_safe'])
+    const line = (D.LEGENDARY as Said[]).find((x) => typeof x === 'object' && typeof x.t === 'string' && x.t.includes('сейф замуровали'))
+    if (!line) throw new Error('легендарная строка про замурованный сейф отсутствует')
+    await game.say([line])
+    expect(game.S.ledger.transitions).toContainEqual(expect.objectContaining({ from: 'safe', to: 'wall' }))
+    expect(catchChoice(game)).toBe(false)
   })
 })
 

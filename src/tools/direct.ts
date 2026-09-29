@@ -88,7 +88,6 @@ export const DIRECT: Record<string, DirectCase> = {
   Quiet_Blocked_AlikAway: { event: 'AlikAway', setup: (g) => { g.S.mem.blocked = true } },
   Quiet_PhoneKarine_AlikIdle: { event: 'AlikIdle', setup: (g) => { g.rules.applyOps([during('phone.karine', 1)], {}) } },
   Quiet_PhoneKarine_StoryBeat: { event: 'StoryBeat', setup: (g) => { g.rules.applyOps([during('phone.karine', 1)], {}) } },
-  Says_sorry_blocked_boris: { event: 'PlayerSays', facts: { intent: 'sorry' }, setup: (g) => { g.S.mem.blocked = true; g.S.arcs.boris = { i: 4, last: 0 } } },
   // стенд не доходит никогда: окна, которые бот не открывает сам (свободный «спасибо», вендетта, телефон Карине…)
   Quiet_Dead_PeriodLine: { event: 'PeriodLine', setup: dead },
   Quiet_Blocked_PeriodLine: { event: 'PeriodLine', setup: blocked },

@@ -25,9 +25,9 @@ import {
 import { allRules } from '../content/rules'
 import type { GameEvent, Offer } from '../content/rules/events'
 import { CLAIMS, claimByKey, CALLBACK_OPEN, type Claim } from '../content/lies'
-import { CLAIM_LEDGER, claimKeyOf, closeEpisode, currentEpisode, publishClaim } from '../content/ledger'
+import { CLAIM_LEDGER, activeClaim, claimKeyOf, closeEpisode, currentEpisode, publishClaim, publishRetraction, publishTransition } from '../content/ledger'
 import { isWhoId, type ClaimKey } from '../content/ids'
-import { type Claimed, type LineSpec as ContentLineSpec, type Said, saidClaims, saidJoin, saidText } from '../content/fact-types'
+import { type Claimed, type LedgerEvent, type LineSpec as ContentLineSpec, type Said, saidClaims, saidJoin, saidText } from '../content/fact-types'
 import * as memkeys from '../content/memkeys'
 import {
   ENDGAME_CHOICES, ENDGAME_FALLBACK, ENDGAME_FORMALITIES, ENDGAME_GROUP, ENDGAME_INTRO, ENDGAME_JUBILEES,
@@ -99,7 +99,7 @@ export const REVIVED = /встал|встаёт|воскрес|вернулас�
 /** Повод поздравить (иначе «Поздравляю!» на «зуб мудрости растёт» звучит невпопад). */
 export const FESTIVE = /свадьб|крестин|юбилей|обручен|день рождения|отмечаем|обмываем|празд|родился|поступил|выпускн|сватовств|помолвк|открыва|открыли|приехал|вернулся|урожа|отелилась|правнук|первое слово|дочку выдают/
 
-export type SayItem = Said | { w: string; t: string; claims?: ClaimKey[] }
+export type SayItem = Said | { w: string; t: string; claims?: LedgerEvent[] }
 /** Тема эпизода противоречия — выбирает предметный ответ Алика. */
 export type LieKind = 'money' | 'grandpa' | 'customer'
 /** Что пришло, пока игрока не было: виды сообщений пачки непрочитанных. */
@@ -940,7 +940,7 @@ export class Game {
   }
   sys(text: string): Msg { return this.push({ kind: 'sys', text }) }
 
-  alikMsg<M extends NewMsg>(m: M, claims?: readonly ClaimKey[]): Msg {
+  alikMsg<M extends NewMsg>(m: M, claims?: readonly LedgerEvent[]): Msg {
     // персонаж написал сам — он в истории (intro) и игрок его встречал (met, для переклички в День выплаты)
     if (m.kind === 'text' && m.who) { this.S.mem[memkeys.met(m.who)] = true; this.S.mem[memkeys.intro(m.who)] = true }
     this.tick(1 + this.rnd(3))
@@ -951,9 +951,8 @@ export class Game {
     return msg
   }
 
-  /** Что сообщение Алика записывает в мир, каким бы путём ни пришло: день речи, заявления, упоминания, «брат джан».
-   *  `claims` — явная семантика реплики из контента: журнал публикует её, показанный текст (и опечатка в нём) не разбирается. */
-  private noteAlik(msg: Msg, claims?: readonly ClaimKey[]): Msg {
+  /** Что сообщение Алика записывает в мир, каким бы путём ни пришло: день речи, события журнала, упоминания, «брат джан». */
+  private noteAlik(msg: Msg, claims?: readonly LedgerEvent[]): Msg {
     this.S.mem[memkeys.alikDay] = this.S.day
     if (msg.kind === 'text' && /брат джан/i.test(msg.text)) this.unlock('brat')
     if (claims?.length && (msg.kind === 'text' || msg.kind === 'photo')) this.noteClaims(claims, msg.kind === 'text' ? msg.who : undefined, msg.id)
@@ -1968,15 +1967,25 @@ export class Game {
   }
 
   // ---------- бухгалтерия лжи ----------
-  /** Показанная реплика публикует свою явную семантику в журнал знаний (docs/design/lie-ledger.md). */
-  noteClaims(claims: readonly ClaimKey[], who?: string, msgId?: number): void {
+  /** Показанная реплика публикует события журнала по порядку (docs/design/lie-ledger.md). */
+  noteClaims(claims: readonly LedgerEvent[], who?: string, msgId?: number): void {
     const source = who && isWhoId(who) ? who : 'alik'
-    for (const key of claims) {
-      const point = CLAIM_LEDGER[key]
-      publishClaim(this.S.ledger, point.subject, point.value, { source, day: this.S.day, msgId, claimKey: key })
+    for (const event of claims) {
+      if (typeof event === 'string') {
+        const point = CLAIM_LEDGER[event]
+        publishClaim(this.S.ledger, point.subject, point.value, { source, day: this.S.day, msgId, claimKey: event })
+      } else if ('retract' in event) {
+        const point = CLAIM_LEDGER[event.retract]
+        publishRetraction(this.S.ledger, point.subject, point.value, { source, day: this.S.day, msgId })
+      } else {
+        const to = CLAIM_LEDGER[event.move.to]
+        const from = event.move.from === 'active' ? activeClaim(this.S.ledger, to.subject) : CLAIM_LEDGER[event.move.from]
+        if (from && from.subject !== to.subject) throw new Error(`Переход между разными предметами: ${event.move.from} → ${event.move.to}`)
+        if (from && from.value !== to.value) publishTransition(this.S.ledger, to.subject, from.value as typeof to.value, to.value, { source, day: this.S.day, msgId })
+      }
     }
   }
-  /** Явная семантика Said для путей мимо say/noteAlik (sys-строки сцен): публикация в журнал с источником. */
+  /** Семантика Said для sys-строк сцен: публикация в журнал с источником. */
   noteSaidClaims(x: Said, msgId?: number, who?: string): void {
     this.noteClaims(saidClaims(x), who, msgId)
   }
@@ -2552,7 +2561,7 @@ export class Game {
    * false — пул исчерпан, правило промолчало.
    */
   awayMsg(kind: AwayKind): boolean | void {
-    const deliver = (m: NewMsg, claims?: readonly ClaimKey[]) => this.noteAlik(this.push({ from: 'alik', time: fmtTime(this.S.clock), ...m } as NewMsg), claims)
+    const deliver = (m: NewMsg, claims?: readonly LedgerEvent[]) => this.noteAlik(this.push({ from: 'alik', time: fmtTime(this.S.clock), ...m } as NewMsg), claims)
     switch (kind) {
       case 'text': {
         const line = this.addrSaidLine('IDLE', L.IDLE)

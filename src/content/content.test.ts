@@ -204,7 +204,7 @@ describe('rules content', () => {
   })
   it('every intent offered by a choice rule has a reply rule', () => {
     const intents = new Set<string>()
-    for (const m of allSource.matchAll(/act: '(\w+)'/g)) intents.add(m[1])
+    for (const m of allSource.matchAll(/\bact: '(\w+)'/g)) intents.add(m[1])
     const replies = new Set(allRules.filter((r) => r.event === 'PlayerSays').flatMap((r) => r.when.filter((c) => c.key === 'intent').map((c) => String(c.value))))
     for (const i of intents) expect(replies.has(i), `no reply for intent ${i}`).toBe(true)
   })
