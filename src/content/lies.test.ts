@@ -1,12 +1,16 @@
 // Бухгалтерия лжи: явная публикация утверждений, противоречия, «Поймать на лжи», воспоминания.
 import { describe, it, expect } from 'vitest'
 import { CLAIMS, LIE_GRANDPA, LIE_THIRD, LIE_NOCRED, LIE_OPEN } from './lies'
-import { currentEpisode, openEpisodes, publishTransition } from './ledger'
+import { CLAIM_LEDGER, CONFLICTING, currentEpisode, openEpisodes, publishTransition } from './ledger'
 import { makeGame, alikTexts, botTurn } from '../test/helpers'
 import type { Game } from '../engine/game'
 import type { ClaimKey } from './ids'
 import { ARCS } from './arcs'
-import { valueOf } from '../engine/rules'
+import { MEMORY } from './memory'
+import { GRAND } from './payday'
+import { caughtCount, phoneKarine } from './memkeys'
+import { meet } from './world'
+import { spec, test, resolver, valueOf } from '../engine/rules'
 import { loadState, saveState } from '../engine/state'
 import * as arcs from './arcs'
 import * as endgame from './endgame'
@@ -47,6 +51,21 @@ function contentClaims(): Set<string> {
   return out
 }
 
+/** claims каждой реплики по отдельности — не склейка всех ключей контента. */
+function contentClaimSets(): string[][] {
+  const out: string[][] = []
+  const seen = new Set<unknown>()
+  const walk = (v: unknown): void => {
+    if (!v || typeof v !== 'object' || seen.has(v)) return
+    seen.add(v)
+    const claims = (v as { claims?: unknown }).claims
+    if (Array.isArray(claims)) out.push(claims.map(String))
+    for (const x of Object.values(v)) walk(x)
+  }
+  for (const m of [arcs, endgame, excuses, legends, life, misc, rude, scenes, talk, world]) walk({ ...m })
+  return out
+}
+
 describe('утверждения', () => {
   it('каждое утверждение опубликовано хоть одной реальной репликой контента', () => {
     const published = contentClaims()
@@ -66,6 +85,17 @@ describe('утверждения', () => {
     await catchLie(game)
     const legacy = Object.keys(game.S.mem).filter((k) => /^(said|saidLast|by|lie|caught)\./.test(k))
     expect(legacy).toEqual([])
+  })
+  it('одна реплика не публикует несовместимые версии сама с собой (#437)', () => {
+    for (const claims of contentClaimSets()) {
+      const bySubject = new Map<string, string>()
+      for (const k of claims) {
+        const p = CLAIM_LEDGER[k as ClaimKey]
+        if (!p || !CONFLICTING.has(p.subject)) continue
+        expect(bySubject.get(p.subject) ?? p.value, `реплика с claims [${claims.join(', ')}]`).toBe(p.value)
+        bySubject.set(p.subject, p.value)
+      }
+    }
   })
 })
 
@@ -252,6 +282,80 @@ describe('поймать на лжи', () => {
     expect(game.facts().lieAlikOld).toBe(false)
     const text = game.buildChoices().find((c) => c.act === 'catchLie')!.text
     expect(text).not.toMatch(/вы же говорили/)
+  })
+})
+
+describe('пути публикации claims (#437)', () => {
+  it('ход Алика по легенде публикует её claims', async () => {
+    const { game } = makeGame()
+    game.setLegend('safe_nune', 'nune')
+    let heard = false
+    for (let i = 0; i < 60 && !heard; i++) {
+      game.S.stats.sent += 3
+      game.setLegend('safe_nune', 'nune') // серии других сериалов по дороге ставят свои легенды
+      if ((await game.fire('AlikTurn'))?.name === 'Turn_Legend')
+        heard = game.S.ledger.claims.some((c) => c.claimKey === 'money_safe' && c.source === 'alik')
+      game.S.scene = null
+    }
+    expect(heard).toBe(true)
+  })
+  it('бит легенды между ходами тоже публикует claims', async () => {
+    const { game } = makeGame()
+    game.setLegend('safe_nune', 'nune')
+    game.S.arcs.beton = { i: 1, last: game.S.day } // сериал сегодня уже был: биты сериалов молчат, остаётся Beat_Legend
+    let heard = false
+    for (let i = 0; i < 100 && !heard; i++) {
+      game.S.stats.sent += 5 // перерыв Beat_Legend — 5 ходов
+      if ((await game.fire('StoryBeat'))?.name === 'Beat_Legend')
+        heard = game.S.ledger.claims.some((c) => c.claimKey === 'money_safe' && c.source === 'alik')
+    }
+    expect(heard).toBe(true)
+  })
+  it('хор публикует claims со своим источником, а не от имени Алика', async () => {
+    const { game } = makeGame()
+    game.rules.applyOps(meet('nune'), {})
+    game.setLegend('safe_nune', 'nune')
+    let heard = false
+    for (let i = 0; i < 60 && !heard; i++) {
+      game.S.stats.sent += 13 // перерыв хора — 12 ходов
+      if ((await game.fire('Mentioned', {}, { target: 'nune' }))?.name === 'Chorus_nune')
+        heard = game.S.ledger.claims.some((c) => c.claimKey === 'money_safe' && c.source === 'nune')
+    }
+    expect(heard).toBe(true)
+  })
+  it('реплики под heard.money_jar звучат только после услышанной банки', () => {
+    const { game } = makeGame()
+    game.S.mem[caughtCount] = 1 // второе условие реплики памяти
+    const mem = MEMORY.find((l) => spec(l).t.includes('не в банке с огурцами'))!
+    const grand = GRAND.place.find((l) => spec(l).t.includes('банке с огурцами'))!
+    // isOpen смотрит только Gated; условия обычной строки проверяем по одному через резолвер досок
+    const open = (l: (typeof MEMORY)[number]) => {
+      const f = resolver(game.rules.hub, { event: 'line' }, game.facts())
+      return (spec(l).when ?? []).every((c) => test(c, f))
+    }
+    expect(open(mem)).toBe(false)
+    expect(open(grand)).toBe(false)
+    hear(game, ['money_jar'])
+    expect(open(mem)).toBe(true)
+    expect(open(grand)).toBe(true)
+  })
+  it('телефон у Карине и офлайн скрывают кнопку без потери эпизода и возвращают её', () => {
+    const { game } = makeGame()
+    hear(game, ['money_jar'])
+    hear(game, ['money_noah'])
+    expect(game.buildChoices().some((c) => c.act === 'catchLie')).toBe(true)
+    game.S.mem[phoneKarine] = true
+    game.S.choices = null
+    expect(game.buildChoices().some((c) => c.act === 'catchLie')).toBe(false)
+    expect(openEpisodes(game.S.ledger)).toHaveLength(1)
+    delete game.S.mem[phoneKarine]
+    game.S.offlineDays = 3
+    game.S.choices = null
+    expect(game.buildChoices().some((c) => c.act === 'catchLie')).toBe(false)
+    expect(openEpisodes(game.S.ledger)).toHaveLength(1)
+    game.S.offlineDays = 0
+    game.S.choices = null
+    expect(game.buildChoices().some((c) => c.act === 'catchLie')).toBe(true)
   })
 })
 
