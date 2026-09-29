@@ -222,6 +222,70 @@ describe('миграция старых сохранений', () => {
     return storage
   }
 
+  it('три старых местонахождения без lie.* остаются знаниями без кнопки', () => {
+    const storage = legacyStorage({
+      'said.money_niva': 5,
+      'said.money_jar': 150,
+      'said.money_safe': 60,
+    })
+    const { game } = makeGame({ storage })
+    expect(game.S.ledger.claims.map((c) => [c.claimKey, c.day])).toEqual([
+      ['money_niva', 5], ['money_safe', 60], ['money_jar', 150],
+    ])
+    expect(game.S.ledger.episodes).toHaveLength(0)
+    expect(game.buildChoices().some((c) => c.act === 'catchLie')).toBe(false)
+  })
+
+  it('caughtPair без lie.* и нечисловой saidLast не создают эпизод; said остаётся запасным днём', () => {
+    const storage = legacyStorage({
+      'said.money_jar': 12, 'saidLast.money_jar': 'неизвестно',
+      'said.money_dubai': 14,
+      'caught.money_dubai|money_jar': true,
+    })
+    const { game } = makeGame({ storage })
+    expect(game.S.ledger.claims.map((c) => [c.claimKey, c.day])).toEqual([
+      ['money_jar', 12], ['money_dubai', 14],
+    ])
+    expect(game.S.ledger.episodes).toHaveLength(0)
+    expect(game.buildChoices().some((c) => c.act === 'catchLie')).toBe(false)
+  })
+
+  it('незакрытая пара grandpa после загрузки даёт ровно одну кнопку, поимка её закрывает', async () => {
+    const storage = legacyStorage({
+      'said.grandpa_dead': 3, 'said.grandpa_alive': 20,
+      'lie.old': 'grandpa_dead', 'lie.new': 'grandpa_alive',
+    })
+    const { game } = makeGame({ storage })
+    expect(openEpisodes(game.S.ledger)).toHaveLength(1)
+    const choice = game.buildChoices().find((c) => c.act === 'catchLie')
+    expect(choice).toBeDefined()
+    await game.send(choice!)
+    expect(openEpisodes(game.S.ledger)).toHaveLength(0)
+    game.save()
+    const { game: loaded } = makeGame({ storage })
+    expect(loaded.S.ledger.episodes).toHaveLength(1)
+    expect(loaded.buildChoices().some((c) => c.act === 'catchLie')).toBe(false)
+  })
+
+  it('последняя услышанная версия остаётся активной независимо от порядка ключей', () => {
+    const storage = legacyStorage({
+      'said.money_jar': 5, 'saidLast.money_jar': 50,
+      'said.money_dubai': 20,
+      'lie.old': 'money_jar', 'lie.new': 'money_dubai',
+      'caught.money_dubai|money_jar': true,
+    })
+    const { game } = makeGame({ storage })
+    expect(game.S.ledger.claims.map((c) => [c.claimKey, c.day])).toEqual([
+      ['money_dubai', 20], ['money_jar', 50],
+    ])
+    expect(activeClaim(game.S.ledger, 'money.location')?.value).toBe('bank')
+    expect(game.S.ledger.episodes).toHaveLength(1)
+    expect(game.S.ledger.episodes[0].status).toBe('caught')
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в банке.' }, ['money_jar'])
+    expect(openEpisodes(game.S.ledger)).toHaveLength(0)
+    expect(game.buildChoices().some((c) => c.act === 'catchLie')).toBe(false)
+  })
+
   it('saidLast/by переносятся в знания; незакрытый lie — в открытый эпизод', () => {
     const storage = legacyStorage({
       'said.money_jar': 100, 'saidLast.money_jar': 105, 'by.money_jar': 'nune',
@@ -241,6 +305,7 @@ describe('миграция старых сохранений', () => {
     const storage = legacyStorage({
       'said.money_jar': 100, 'saidLast.money_jar': 100,
       'said.money_dubai': 105, 'saidLast.money_dubai': 105,
+      'lie.old': 'money_jar', 'lie.new': 'money_dubai',
       'caught.money_dubai|money_jar': true,
     })
     const l = loadState(storage)!.ledger
@@ -300,5 +365,14 @@ describe('миграция старых сохранений', () => {
     const l = freshLedger()
     publishClaim(l, 'money.location', 'dubai', meta)
     expect(migrateLedger({}, l)).toBe(l)
+    const mem = {
+      'said.money_jar': 2, 'said.money_dubai': 3,
+      'lie.old': 'money_jar', 'lie.new': 'money_dubai',
+    }
+    const storage = legacyStorage(mem)
+    storage.data[SAVE_KEY] = JSON.stringify({ msgs: [], nextId: 1, mem, ledger: l })
+    const { game } = makeGame({ storage })
+    expect(game.S.ledger.claims).toHaveLength(1)
+    expect(game.S.ledger.episodes).toHaveLength(0)
   })
 })
