@@ -133,7 +133,7 @@ export async function ruleCoverage(
   for (const [i, seed] of seeds.entries()) {
     // разные часы и дни недели — чтобы срабатывали утро, обед, вечер, пятница
     const clock = manualClock(Date.parse('2026-09-14T12:00:00Z') + (i % 7) * 864e5)
-    const game = new Game({ storage: null, clock, rng: seededRng(seed), noTimers: true, hour: hours[i % hours.length], strictSilence: true })
+    const game = new Game({ storage: null, clock, rng: seededRng(seed), noTimers: true, hour: hours[i % hours.length], strictSilence: true, strictTurns: true })
     names = game.rules.all.map((r) => r.name)
     weighted = [...new Set(game.rules.all.filter((r) => r.specificity === 0).map((r) => r.event))]
     const minSpec: Record<string, number> = {}

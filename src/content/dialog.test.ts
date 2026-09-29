@@ -8,7 +8,7 @@ import { ENDGAME_RETURNERS } from './endgame'
 import { NOTIF } from './life'
 import { CONDOLE_REVIVED, GREET_A, FLOOR } from './misc'
 import { SPEND } from './life'
-import { WORLD, needs } from './world'
+import { WORLD, needs, meet } from './world'
 import { turnRules } from './rules/turn'
 import { valueOf, type Entry } from '../engine/rules'
 import type { Game } from '../engine/game'
@@ -44,6 +44,15 @@ describe('несостыковки из партии пользователя', 
     for (let i = 0; i < 20; i++) await game.afterTurn()
     expect(game.S.msgs.some((m) => m.kind === 'text' && m.who === 'boris')).toBe(false)
     expect(GROUP.boris.length).toBeGreaterThan(0)
+  })
+  it('коллекторы знакомы, но не завербованы: в групповом чате им есть что сказать, ход не обрывается (#435)', async () => {
+    const { game } = makeGame()
+    game.rules.applyOps(meet('collectors'), {})
+    const n = game.S.msgs.length
+    await game.groupChat() // в свежей партии говорить может только collectors — колода не должна быть пустой
+    const range = game.S.msgs.slice(n)
+    expect(range.some((m) => m.kind === 'text' && m.who === 'collectors')).toBe(true)
+    expect(range.some((m) => m.kind === 'sys' && m.text.includes('удалил вас из группы'))).toBe(true) // ход доигран до конца
   })
   it('«Опять» на отправке номера карты звучит только со второго раза', async () => {
     const { game } = makeGame()

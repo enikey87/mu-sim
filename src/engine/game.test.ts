@@ -171,6 +171,11 @@ describe('Game: начало и ход', () => {
     expect(game.S.stats.sent).toBe(sent + 1)
     errors.mockRestore()
   })
+  it('партия бота (strictTurns): ошибка хода падает, а не восстанавливается молча (#435)', async () => {
+    const { game } = makeGame({ strictTurns: true })
+    game.rules.add({ name: 'Test_Boom', event: 'PlayerMessage', when: [], specificity: 99, respond: () => { throw new Error('boom') } })
+    await expect(game.send('Ну как там?')).rejects.toThrow('boom')
+  })
   it('сломанная сцена не остаётся в состоянии: кнопки собираются, ход принимается', async () => {
     const { game } = makeGame()
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {})

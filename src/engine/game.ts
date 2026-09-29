@@ -87,6 +87,8 @@ export interface GameOptions {
   typos?: boolean
   /** Промолчавшее правило, оставившее след в S, — ошибка (в тестах включено; снимок S на каждое правило стоит времени) */
   strictSilence?: boolean
+  /** Ошибка хода в партии бота — падение (гейт покрытия, плейтест), а не console.error с восстановлением */
+  strictTurns?: boolean
 }
 
 
@@ -149,6 +151,8 @@ export class Game {
   private sleepWaiters = new Set<(err?: GameDisposed) => void>()
   private noTimers: boolean
   private typos: boolean
+  /** Оборванный ошибкой ход — падение партии бота (гейт покрытия, плейтест), а не тихое восстановление. */
+  private strictTurns: boolean
   private hiddenAt = 0
   /** Ход игрока: nextDay уже был (offline / fx.days) — обычный +1…3 в конце не дублируем. */
   private inPlayerTurn = false
@@ -164,6 +168,7 @@ export class Game {
     this.hour = opts.hour ?? null
     this.noTimers = !!opts.noTimers
     this.typos = opts.typos ?? true
+    this.strictTurns = !!opts.strictTurns
     this.S = loadState(this.storage) ?? freshState()
     // колбеки батареи — в узком хосте, а не в публичном интерфейсе Game: game.dead() путался бы со смертью Алика
     this.battery = new Battery(this.S, {
@@ -281,6 +286,8 @@ export class Game {
   /** Ошибка в середине хода: партия не должна умереть вместе с ним. */
   private recoverTurn(e: unknown): void {
     if (e instanceof SilenceBreach) throw e
+    // партия бота: оборванный ход — находка, которая рушит прогон, а не тихий console.error
+    if (this.strictTurns) throw e
     this.ui.busy = false
     this.inPlayerTurn = false
     if (e instanceof GameDisposed) return

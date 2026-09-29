@@ -123,7 +123,7 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
   const style = STYLES[seed % STYLES.length]
   const hour = HOURS[seed % HOURS.length]
   const clock = manualClock(Date.parse('2026-09-14T12:00:00Z') + (seed % 7) * 864e5)
-  const game = new Game({ storage: null, clock, rng: seededRng(seed), noTimers: true, hour })
+  const game = new Game({ storage: null, clock, rng: seededRng(seed), noTimers: true, hour, strictTurns: true })
   const bot = seededRng(seed * 7919 + 17)
   const acts: Act[] = []
   let ending: string | null = null
