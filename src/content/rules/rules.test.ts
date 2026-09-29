@@ -6,6 +6,7 @@ import type { Game } from '../../engine/game'
 import type { Choice, Ctx } from '../../engine/state'
 import { D } from '../excuses'
 import { ARCS, ARC_DONE } from '../arcs'
+import { saidText } from '../fact'
 import { RUDE_AGAIN, SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, SWING } from '../misc'
 
 const rel = { n: 'дядя Самвел', g: 'дяди Самвела' }
@@ -209,7 +210,7 @@ describe('ответы Алика (PlayerSays)', () => {
     const { game } = makeGame()
     game.S.arcs.boris = { i: ARCS.boris.eps.length, last: 0 }
     const t = await reply(game, { text: 'Как там Борис?', tone: 'polite', act: 'arc', arg: 'boris' })
-    expect(oneOf(ARC_DONE.boris.map(frag), t.join(' '))).toBe(true)
+    expect(oneOf(ARC_DONE.boris.map((s) => frag(saidText(s))), t.join(' '))).toBe(true)
   })
   it('сериал не закончился — следующая серия', async () => {
     const { game } = makeGame()

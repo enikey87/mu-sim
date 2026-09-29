@@ -130,7 +130,7 @@ function strings(v: unknown, path: string, known: Criterion[], out: Found[]): Fo
     const own = Array.isArray(o.when) ? [...known, ...sets, ...expand(atoms(o.when as Criterion[]))] : [...known, ...sets]
     const who = typeof o.w === 'string' ? o.w : typeof o.who === 'string' ? o.who : undefined
     if (who && typeof o.t === 'string') { out.push({ path, text: o.t, known: [...own, ...selfIntro(who)], who }); return out }
-    for (const [k, x] of Object.entries(o)) if (!['when', 'orWhen', 'remember'].includes(k)) strings(x, `${path}.${k}`, own, out)
+    for (const [k, x] of Object.entries(o)) if (!['when', 'orWhen', 'remember', 'claims'].includes(k)) strings(x, `${path}.${k}`, own, out)
   }
   return out
 }

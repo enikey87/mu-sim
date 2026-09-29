@@ -6,7 +6,7 @@ import type { Facts } from '../../engine/rules'
 import type { Msg } from '../../engine/state'
 import * as T from '../rude'
 import { HEAT } from '../memkeys'
-import { valueOf, spec, during, isOpen, type Entry } from '../fact'
+import { valueOf, spec, during, isOpen, saidText, type Entry } from '../fact'
 
 const texts = (game: Game, from: number) => game.S.msgs.slice(from).map((m) => (m.kind === 'text' || m.kind === 'sys' ? m.text : m.kind === 'sticker' ? m.e : ''))
 const whos = (game: Game, from: number) => game.S.msgs.slice(from).filter((m): m is Extract<Msg, { kind: 'text' }> => m.kind === 'text').map((m) => m.who ?? 'alik')
@@ -99,7 +99,7 @@ describe('лестница грубости: ступени', () => {
   })
   it('голосовое от Самвела и альтернативный отправитель «Нива» уместны только после знакомства', () => {
     const { game } = makeGame()
-    const open = (pool: readonly Entry<T.Said>[], match: string) => pool.filter((e) => isOpen(e, game.lineFacts())).map(valueOf).some(([, t]) => t.includes(match))
+    const open = (pool: readonly Entry<T.Said>[], match: string) => pool.filter((e) => isOpen(e, game.lineFacts())).map(valueOf).some(([, t]) => saidText(t).includes(match))
     expect(open(T.RUDE_CALLS_VOICE, 'Это Самвел')).toBe(false)
     expect(open(T.RUDE_ALT, 'Пишу с «Нивы»')).toBe(false)
     game.S.mem['intro.samvel'] = true

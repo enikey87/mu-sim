@@ -1,4 +1,4 @@
-import { type Entry, type LineSpec, gate, gte, lte, eq, ne, is, missing, set } from './fact'
+import { type Entry, type LineSpec, type Said, gate, gte, lte, eq, ne, is, missing, set } from './fact'
 import { needs, WORLD } from './world'
 import { bloodGiven, count, endgame, evicted, paydayScene, wedding } from './memkeys'
 import { sold, momHelp } from './credit'
@@ -16,8 +16,8 @@ const moneyOpen = [missing(paydayScene), missing(endgame.active)] as const
 // «Живость»: Алик пишет сам, режим дня, стикеры, пересылки, удаления, правки,
 // опечатки, реакции, уведомления телефона.
 // Алик пишет первым, если игрок молчит
-export const IDLE = [
-  'ты куда пропал?', 'ты обиделся?', 'ты там живой? Я волнуюсь. Денег нет, но волнуюсь.', 'почему молчишь? Я уже почти перевёл.',
+export const IDLE: Entry<Said>[] = [
+  'ты куда пропал?', 'ты обиделся?', { t: 'ты там живой? Я волнуюсь. Денег нет, но волнуюсь.', claims: ['no_money'] }, 'почему молчишь? Я уже почти перевёл.',
   'ты спишь?', 'не молчи, мне страшно.', 'ты с другим подрядчиком, да? Признайся.', 'я тут подумал о тебе. Хорошо подумал.',
   'ты на меня злишься? Не злись, давление.', 'ау. Я тут.', 'ты мне снился. Ты был с деньгами. Моими.', 'а ты знаешь, что молчание — золото? Вот, считай, заплатил.',
   'ты поел? Мама спрашивает.', 'скучно без тебя, брат.', 'я сейчас мимо объекта проезжал, вспомнил тебя. Плитка блестит!',

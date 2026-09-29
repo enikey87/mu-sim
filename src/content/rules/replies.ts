@@ -10,6 +10,7 @@ import { TOPICS, TOPIC_FALLBACK, TOPIC_NAME, TOPIC_OBSESSED, DESPERATE_REPLY } f
 import { D, low, cap } from '../excuses'
 import { GREET_A, WHEN_COND, SWING } from '../misc'
 import { type TalkKind, talkPairs, talkId, TALK_REMEMBER } from '../talk'
+import { saidClaims, saidText, type Said } from '../fact'
 import { ARCS, NO_NEWS_A, NO_NEWS_B, GROUP_SEEN_A, GROUP_SEEN_B, WRONG_A, WRONG_B } from '../arcs'
 import * as L from '../life'
 import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, PROMISE_PENCIL, PROMISE_FAR } from '../misc'
@@ -37,7 +38,7 @@ async function sorry(game: Game, line: string): Promise<void> {
   game.setCtx(null)
 }
 
-const simple = (intent: string, line: (g: Game) => string, after?: (g: Game) => void | Promise<void>): R =>
+const simple = (intent: string, line: (g: Game) => Said, after?: (g: Game) => void | Promise<void>): R =>
   says(intent, { respond: async ({ game }) => { await game.say([line(game)]); game.setCtx(null); await after?.(game) } })
 
 export const replyRules: R[] = [
@@ -85,7 +86,7 @@ export const replyRules: R[] = [
       const id = talkId(kind, sub, Number(i))
       game.lines.mark(id)
       game.rules.applyOps(TALK_REMEMBER[id] ?? [], {})
-      await game.say([kind === 'chorus' ? { w: sub, t: pair[1] } : pair[1]])
+      await game.say([kind === 'chorus' ? { w: sub, t: saidText(pair[1]), claims: saidClaims(pair[1]) } : pair[1]])
     },
   }),
 

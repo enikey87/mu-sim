@@ -3,7 +3,7 @@
 // S0 обида → S1 семья пишет в личку → S2 звонки мамы → S3 блок и чужие номера → S4 семейный суд → S5 вежливость-убийца;
 // сбоку — «Мууу»-дипломатия, встречный иск, ритуал примирения, холодная война, привыкание; финал — вендетта.
 import type { Game } from '../../engine/game'
-import { type Rule, type Line, type Entry, eq, ne, gte, lte, is, add, set, missing, mapEntry, valueOf } from '../fact'
+import { type Rule, type Line, type Entry, eq, ne, gte, lte, is, add, set, missing, mapEntry, valueOf, saidClaims, saidText } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { WORLD, speaks } from '../world'
 import * as T from '../rude'
@@ -19,12 +19,13 @@ const cool: R['trigger'] = [{ event: 'RudeCool', delay: 20 }]
 /** Реплика участника без повторов: пул [кто, текст]. */
 export async function sayFresh(game: Game, key: string, pool: readonly Entry<T.Said>[]): Promise<boolean> {
   const bag = structuredClone(game.S.bags[key])
-  const t = game.seen.pickFresh(() => game.draw(key, pool.map((e) => mapEntry(e, ([, x]) => x))), (x) => x)
+  const x = game.seen.pickFresh(() => game.draw(key, pool.map((e) => mapEntry(e, ([, v]) => v))), (v) => v)
+  const t = saidText(x)
   // свежих нет — ничего не сказано, и колода остаётся там, где была
   if (game.seen.has(t)) { if (bag) game.S.bags[key] = bag; else delete game.S.bags[key]; return false }
   game.seen.mark(t)
-  const who = pool.map(valueOf).find(([, x]) => x === t)![0]
-  await game.say([who === 'alik' ? t : { w: who, t }])
+  const [who, said] = pool.map(valueOf).find(([, v]) => v === x)!
+  await game.say([who === 'alik' ? said : { w: who, t, claims: saidClaims(said) }])
   return true
 }
 /** Остудить ссору на n, не ниже нуля. */
@@ -134,7 +135,7 @@ export const rudeRules: R[] = [
     remember: [add(count.rude), set(vendetta, true)],
     respond: async ({ game }) => {
       await game.sticker({ e: '🗡️', c: 'Вендетта' })
-      for (const [w, t] of T.VENDETTA) await game.say([w === 'alik' ? t : { w, t }])
+      for (const [w, said] of T.VENDETTA) await game.say([w === 'alik' ? said : { w, t: saidText(said), claims: saidClaims(said) }])
       game.unlock('vendetta')
     },
   },
@@ -146,7 +147,7 @@ export const rudeRules: R[] = [
   {
     name: 'Tone_Threat_Hot', event: 'PlayerMessage', when: [eq('tone', 'threat'), gte(HEAT, 2)], bonus: 2, once: true,
     remember: [add(count.threat), set(HEAT, 0)],
-    respond: async ({ game }) => { for (const [w, t] of T.COUNTERSUIT) await game.say([w === 'alik' ? t : { w, t }]); game.unlock('countersuit') },
+    respond: async ({ game }) => { for (const [w, said] of T.COUNTERSUIT) await game.say([w === 'alik' ? said : { w, t: saidText(said), claims: saidClaims(said) }]); game.unlock('countersuit') },
   },
   {
     // встречный иск уже был — теперь апелляции; суд немного остужает
@@ -197,7 +198,12 @@ export const rudeSaysRules: R[] = [
   // «Мууу» игрока: пока ссора горячая — корова мирит, иначе Алик не понимает
   {
     name: 'Says_moo_peace', event: 'PlayerSays', when: [eq('intent', 'moo'), gte(HEAT, 1)],
-    respond: async ({ game }) => { cooldown(game, 2); game.mood(1); await game.say([freshOr(game, 'COW_PEACE', T.COW_PEACE, game.X.cow)]); game.unlock('cowpeace'); game.setCtx(null) },
+    respond: async ({ game }) => {
+      cooldown(game, 2); game.mood(1)
+      const p = game.linePicked('COW_PEACE', T.COW_PEACE)
+      await game.say([p ? { t: p.text, claims: p.spec.claims ?? [] } : game.uniq(game.X.cow)])
+      game.unlock('cowpeace'); game.setCtx(null)
+    },
   },
   { name: 'Says_moo', event: 'PlayerSays', when: [eq('intent', 'moo')], respond: async ({ game }) => { await game.say([freshOr(game, 'MOO_ODD', T.MOO_ODD, game.X.cow)]); game.setCtx(null) } },
   // заблокирован — извинение не доходит; подсказывает посредник: Борис, Карине, иначе мама (Карине и мама — раз за блок)
@@ -220,7 +226,7 @@ export const rudeSaysRules: R[] = [
   // извинение через посредника, которого игрок выбрал (arg)
   ...([['boris', T.VIA_BORIS], ['karine', T.VIA_KARINE], ['mama', T.VIA_MAMA]] as const).map(([who, lines]): R => ({
     name: 'Says_via_' + who, event: 'PlayerSays', when: [eq('intent', 'via'), eq('arg', who)], remember: [set(blocked, false), add(count.sorry)],
-    respond: async ({ game }) => { cooldown(game, 1); for (const [w, t] of lines) await game.say([w === 'alik' ? t : { w, t }]); game.sys('Алик Воздухонесян разблокировал вас'); game.setCtx(null) },
+    respond: async ({ game }) => { cooldown(game, 1); for (const [w, said] of lines) await game.say([w === 'alik' ? said : { w, t: saidText(said), claims: saidClaims(said) }]); game.sys('Алик Воздухонесян разблокировал вас'); game.setCtx(null) },
   })),
   {
     name: 'Says_sorry_ritual', event: 'PlayerSays', when: [eq('intent', 'sorry'), gte(HEAT, 3)], bonus: 3, remember: [add(count.sorry), add(ritualCount)],

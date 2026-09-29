@@ -5,6 +5,7 @@ import {
   ENDGAME_RENAMES, ENDGAME_RETURNER_LINES, ENDGAME_RETURNERS,
 } from './endgame'
 import { valueOf } from '../engine/rules'
+import { saidText } from './fact'
 import { flush } from '../test/helpers'
 import type { Game } from '../engine/game'
 
@@ -144,7 +145,7 @@ describe('бесконечная группа после Дня выплаты',
 
   it('колоды эндгейма большие и без дублей: длинная партия не циклит одни строки', () => {
     const pools: Array<[string, readonly string[], number]> = [
-      ['money', ENDGAME_MONEY, 60],
+      ['money', ENDGAME_MONEY.map(valueOf).map(saidText), 60],
       ['mute', ENDGAME_MUTE, 60],
       ['leave', ENDGAME_LEAVE, 60],
       ['formalities', ENDGAME_FORMALITIES, 150],
@@ -160,7 +161,7 @@ describe('бесконечная группа после Дня выплаты',
   it('одна шутка — один раз: ни одна пара строк не делит общий кусок ≥ 30 символов', () => {
     // общая подстрока такой длины — это та же шутка в новой обёртке («Коллеги, X» / «Итак, X»), а не новая шутка
     const pools: Array<[string, readonly string[]]> = [
-      ['money', ENDGAME_MONEY],
+      ['money', ENDGAME_MONEY.map(valueOf).map(saidText)],
       ['mute', ENDGAME_MUTE],
       ['leave', ENDGAME_LEAVE],
       ['formalities', ENDGAME_FORMALITIES],
