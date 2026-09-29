@@ -2063,7 +2063,6 @@ export class Game {
     await this.playEpisode(ep, id)
   }
   async playEpisode(ep: Episode, arc?: string): Promise<void> {
-    if (ep.remember) this.rules.applyOps(ep.remember, {})
     if (ep.legend !== undefined) this.setLegend(ep.legend, arc)
     // серия без своей легенды возвращает легенду своего сериала: свадьба идёт — значит, деньги «после свадьбы»; гейт клятвы возврат не открывает (#327)
     else if (arc && this.S.mem[memkeys.legendOf(arc)]) this.setLegend(String(this.S.mem[memkeys.legendOf(arc)]), arc, false)
@@ -2079,6 +2078,7 @@ export class Game {
     }
     if (debtFx) (this.S.ctx ??= {}).debtMoved = debtMoved
     const m = this.open(ep.m)
+    if (ep.remember) this.rules.applyOps(ep.remember, {})
     if (this.S.ctx) {
       delete this.S.ctx.debtMoved
       if (!Object.keys(this.S.ctx).length) this.S.ctx = null
