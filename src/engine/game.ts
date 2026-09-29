@@ -177,7 +177,12 @@ export class Game {
     })
     this.decks = new Decks(this.S.bags, this.rng)
     this.seen = new Seen(this.S.seen)
-    this.X = make(<T>(k: string, a: readonly Entry<T>[], nr?: boolean) => (nr ? this.decks.pick(k, a, this.lineFacts(), { noRepeat: true }) as T : this.draw(k, a)), () => this.S.tier, this.rng)
+    this.X = make(<T>(k: string, a: readonly Entry<T>[], nr?: boolean, eligible?: (e: Entry<T>) => boolean) => {
+      if (nr) return this.decks.pick(k, a, this.lineFacts(), { noRepeat: true, eligible }) as T
+      const x = this.decks.pick(k, a, this.lineFacts(), { eligible })
+      if (x === null) throw new Error(`Колода ${k}: ни одного элемента, уместного сейчас`)
+      return x
+    }, () => this.S.tier, this.rng)
     this.scenes = makeScenes(this.X)
     this.S.rules.said ??= {} // старые сохранения
     this.lines = new Lines(this.S.rules.said, this.rng, () => ({ turn: this.S.stats.sent, day: this.S.day }))

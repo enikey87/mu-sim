@@ -4,6 +4,7 @@
 // реплику ключом утверждения (`claims`), CLAIM_LEDGER переводит ключ в предмет и значение;
 // кнопка «Поймать на лжи» читает открытые эпизоды журнала.
 import type { ClaimKey, WhoId } from './ids'
+import type { LedgerEvent } from './fact-types'
 import { isWhoId } from './ids'
 import { pairKey } from './memkeys'
 
@@ -29,7 +30,7 @@ export type LedgerSubject = keyof LedgerValueMap
 type LedgerPoint = { [S in LedgerSubject]: { subject: S; value: LedgerValueMap[S] } }[LedgerSubject]
 
 /** Предметы, у которых два разных известных значения — противоречие. */
-export const CONFLICTING: ReadonlySet<LedgerSubject> = new Set(['money.location', 'grandpa.life', 'customer.payment'])
+const CONFLICTING: ReadonlySet<LedgerSubject> = new Set(['money.location', 'grandpa.life', 'customer.payment'])
 
 export type ClaimSource = 'alik' | WhoId
 
@@ -210,6 +211,39 @@ export const CLAIM_LEDGER: Record<ClaimKey, LedgerPoint> = {
   beton: point('beton.mood', 'offended'),
   crane_wedding: point('crane.where', 'wedding'),
   eagle: point('salary.eagle', 'taken'),
+}
+
+/**
+ * Почему события одного сообщения несовместимы между собой; null — совместимы. Одна реплика не спорит
+ * сама с собой: две версии предмета, переход в ту же версию или в другой предмет, отзыв и утверждение одной версии.
+ */
+export function selfConflict(events: readonly unknown[]): string | null {
+  const isEvent = (x: unknown): x is LedgerEvent =>
+    typeof x === 'string' ? x in CLAIM_LEDGER : !!x && typeof x === 'object' && ('move' in x || 'retract' in x)
+  const bad = events.find((e) => !isEvent(e))
+  if (bad !== undefined) return `не событие журнала: ${JSON.stringify(bad)}`
+  const evs = events as LedgerEvent[]
+  const retracted = new Set<string>()
+  for (const e of evs) {
+    if (typeof e === 'string') continue
+    if ('retract' in e) { retracted.add(e.retract); continue }
+    if (e.move.from === 'active') continue
+    const from = CLAIM_LEDGER[e.move.from], to = CLAIM_LEDGER[e.move.to]
+    if (from.subject !== to.subject) return `переход между предметами: ${e.move.from} → ${e.move.to}`
+    if (from.value === to.value) return `переход в ту же версию: ${e.move.from} → ${e.move.to}`
+  }
+  const state = new Map<LedgerSubject, string>()
+  for (const e of evs) {
+    const key = typeof e === 'string' ? e : 'move' in e ? e.move.to : null
+    if (!key) continue
+    if (retracted.has(key)) return `отзыв и утверждение одной версии: ${key}`
+    const p = CLAIM_LEDGER[key]
+    if (!CONFLICTING.has(p.subject)) continue
+    const was = state.get(p.subject)
+    if (was !== undefined && was !== p.value) return `две версии ${p.subject}: ${was} и ${p.value}`
+    state.set(p.subject, p.value)
+  }
+  return null
 }
 
 // --- миграция старых сохранений (docs/design/lie-ledger.md, раздел «Сохранения»)
