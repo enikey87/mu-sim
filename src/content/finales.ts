@@ -5,7 +5,7 @@
 import { type Criterion, type Entry, is, gte, lte, eq, set, gate, missing } from './fact'
 import type { Episode } from './arcs'
 import { needs, meet } from './world'
-import { HEAT, caughtCount, count, court, garikConcrete, houseOnGarik, intro, nivaAway, nivaPlayer, paydayScene, rubikFined, tileCornerRemoved, vendetta, wedding, endgame } from './memkeys'
+import { HEAT, caughtCount, count, court, garikConcrete, grantPaid, houseOnGarik, intro, nivaAway, nivaPlayer, paydayScene, rubikFined, tileCornerRemoved, vendetta, wedding, endgame } from './memkeys'
 
 export interface Finale extends Episode {
   id: string
@@ -55,7 +55,7 @@ export const FINALES: Record<string, Finale[]> = {
     },
     {
       id: 'ledger', title: 'Нуне сверила выписку', when: [gte(caughtCount, 2)], remember: meet('nune'),
-      m: [{ w: 'nune', t: 'Это Нуне. Я сверила выписки. В тот день Алик снял со счёта 50 рублей.' }, needs('nune')({ w: 'nune', t: 'Конверт был толстый, да. Там квитанции. За хаш. За весь год.', claims: [{ retract: 'money_foundation' }] }), 'Нуне, это коммерческая тайна! Брат, не слушай. Квитанции — тоже деньги. В перспективе.'],
+      m: [{ w: 'nune', t: 'Это Нуне. Я сверила выписки. В тот день Алик снял со счёта 50 рублей.' }, { w: 'nune', t: 'Конверт был толстый, да. Там квитанции. За хаш. За весь год.', claims: [{ retract: 'money_foundation' }] }, 'Нуне, это коммерческая тайна! Брат, не слушай. Квитанции — тоже деньги. В перспективе.'],
       fx: { ach: 'arc_beton' },
       done: [needs('nune')('Нуне теперь каждый конверт при мне взвешивает. Унизительно.'), 'Квитанции в фундаменте — это инвестиция, брат. Бетон их сохранит.'],
     },
@@ -146,8 +146,13 @@ export const FINALES: Record<string, Finale[]> = {
       done: ['Рубик тебя до сих пор ищет. Я сказал, ты в горах. Как я обычно.', 'Штраф помнишь? Я помню. Я всё помню, когда это не мои деньги.'],
     },
     {
-      id: 'karine', title: 'Карине ушла к Рубику', when: [is('ach.wife')], remember: meet('grant'),
-      m: [needs('grant')({ w: 'karine', t: 'Это Карине. Вы мне тогда всё про Алика рассказали. Я подумала — и согласилась. Рубик подписал акт как родственнику.' }), { t: 'Брат… Карине ушла к Рубику. Грант заплатил. Деньги у Карине. Твои тоже.', claims: [{ move: { from: 'customer_owes', to: 'customer_paid' } }, 'customer_paid'] }, 'Спрашивай у неё. Она теперь с инспектором — она всё проверяет.'],
+      id: 'karine', title: 'Карине ушла к Рубику', when: [is('ach.wife')], remember: [...meet('grant'), set(grantPaid, true)],
+      m: [
+        { w: 'karine', t: 'Это Карине. Вы мне тогда всё про Алика рассказали. Я подумала — и согласилась. Рубик подписал акт как родственнику.' },
+        gate(missing(grantPaid))({ t: 'Брат… Карине ушла к Рубику. После акта Грант заплатил. Деньги у Карине. Твои тоже.', claims: [{ move: { from: 'customer_owes', to: 'customer_paid' } }, 'customer_paid'] }),
+        gate(is(grantPaid))({ t: 'Брат… Карине ушла к Рубику. Акт подтвердил: Грант уже рассчитался. Деньги у Карине. Твои тоже.', claims: ['customer_paid'] }),
+        'Спрашивай у неё. Она теперь с инспектором — она всё проверяет.',
+      ],
       fx: { ach: 'arc_rubik' }, sys: 'Трофей: приглашение на свадьбу Карине и Рубика.', item: 'Приглашение Карине и Рубика',
       done: ['Карине счастлива. Я — нет. Ты — не знаю, спроси у неё деньги.', 'Рубик теперь проверяет меня как бывшего. Каждую неделю. Спасибо тебе.'],
     },

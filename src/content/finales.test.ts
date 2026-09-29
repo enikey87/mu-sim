@@ -69,9 +69,11 @@ describe('финалы сериалов: выбор', () => {
       game.S.day = 300
       game.S.mem['asked.alik_death'] = 1 // иначе у похорон «Обиделся»
       toLast(game, id)
+      const expected = fitting(game, ARCS[id].eps.at(-1)!)
+      if (id !== 'alik_death') expect(expected.length, `${id}: нет уместной строки`).toBeGreaterThan(0)
       const from = game.S.msgs.length
       await game.playArc(id)
-      expect(said(game, from), id).toEqual(expect.arrayContaining(fitting(game, ARCS[id].eps.at(-1)!)))
+      expect(said(game, from), id).toEqual(expect.arrayContaining(expected))
       expect(game.S.mem['finale.' + id]).toBe('default')
       expect(game.finaleTitle(id)).toBe(DEFAULT_FINALE[id])
       expect(game.arcDoneLines(id)).toBe(ARC_DONE[id])
@@ -85,10 +87,12 @@ describe('финалы сериалов: выбор', () => {
         game.S.day = 300
         SETUP[`${arc}.${f.id}`](game)
         toLast(game, arc)
+        const expected = fitting(game, f)
         const from = game.S.msgs.length
         await game.playArc(arc)
         expect(game.S.mem['finale.' + arc], `${arc}.${f.id}`).toBe(f.id)
-        expect(said(game, from)).toEqual(expect.arrayContaining(fitting(game, f)))
+        expect(said(game, from).length, `${arc}.${f.id}: финал промолчал`).toBeGreaterThan(0)
+        expect(said(game, from)).toEqual(expect.arrayContaining(expected))
         expect(game.S.ach[`fin_${arc}_${f.id}`]).toBeDefined()
         expect(game.S.ach[f.fx!.ach!]).toBeDefined()
         expect(game.finaleTitle(arc)).toBe(f.title)
