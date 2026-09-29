@@ -131,7 +131,7 @@ describe('лестница грубости: ступени', () => {
     const { r, n } = await fire(game, 'rude')
     expect(r).toBe('Rude_Calls')
     const t = texts(game, n)
-    expect(t[0]).toMatch(/Мама Алика/)
+    expect(t[0]).toMatch(/[Мм]ам[аы] Алика/) // пул: «Мама Алика (n)» и «от мамы Алика: n»
     expect(t.some((x) => all(T.RUDE_CALLS_VOICE).includes(x))).toBe(true)
     expect(t.some((x) => T.RUDE_CALLS_ALIK.includes(x))).toBe(true)
   })

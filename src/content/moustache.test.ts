@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { makeGame } from '../test/helpers'
 import { spec, valueOf } from './fact'
 import { OATH_FORMS } from './misc'
-import { WORLD, meet, PROMISE_MET, PROMISE_SHAVE, PROMISE_SHAVE_KEPT } from './world'
+import { WORLD, meet, PROMISE_MET, PROMISE_SHAVE, PROMISE_SHAVE_ASK, PROMISE_SHAVE_KEPT } from './world'
 import { alikDead, alikShaved, endgame, nuneKeyPassed } from './memkeys'
 import { D, low } from './excuses'
 import { promiseRules } from './rules/world'
@@ -416,7 +416,8 @@ describe('ставка «усы»', () => {
     expect(choice.text).toMatch(/ус/i)
     const from = game.S.msgs.length
     await game.fire('PlayerSays', { intent: 'moustacheAsk' })
-    expect(alik(game, from).some((t) => /ус|отраст|без усов/i.test(t))).toBe(true)
+    // ответ — строка своего пула: в нём есть и строки без слова «усы» («Растут. Медленно…»)
+    expect(alik(game, from).some((t) => PROMISE_SHAVE_ASK.map(valueOf).includes(t))).toBe(true)
     // cooldown: сразу снова не предлагаем
     expect(hasAsk()).toBe(false)
     game.S.day += 5
