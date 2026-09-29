@@ -269,13 +269,13 @@ describe('новые сериалы: фундамент, Рубик, Разми�
     expect(b.S.mem['finale.razmik']).toBe('shift')
     expect(b.S.debt).toBe(debt + 6000)
   })
-  it('«деньги в фундаменте» противоречит «банке с огурцами»', async () => {
+  it('рассказ о конверте объясняет переход из банки в фундамент', async () => {
     const { game } = makeGame()
     game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в банке с огурцами.' }, ['money_jar'])
     await game.playEpisode(ARCS.beton.eps[0], 'beton')
-    expect(game.lie()?.old.key).toBe('money_jar')
-    expect(game.lie()?.new.key).toBe('money_foundation')
-    expect(game.facts().lieOpen).toBe(true)
+    expect(game.S.ledger.transitions).toContainEqual(expect.objectContaining({ subject: 'money.location', from: 'bank', to: 'foundation' }))
+    expect(game.lie()).toBeNull()
+    expect(game.facts().lieOpen).toBe(false)
   })
 })
 

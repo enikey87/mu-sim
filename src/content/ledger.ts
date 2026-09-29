@@ -100,10 +100,11 @@ export function publishClaim<S extends LedgerSubject>(l: LedgerState, subject: S
   return rec
 }
 
-/** Активная версия предмета — последняя опубликованная запись. */
+/** Отзыв последней версии не возвращает в силу ещё более старую. */
 export function activeClaim(l: LedgerState, subject: LedgerSubject): ClaimRec | undefined {
   let best: ClaimRec | undefined
   for (const c of l.claims) if (c.subject === subject && (!best || c.id > best.id)) best = c
+  if (best && l.transitions.some((t) => t.subject === subject && t.to === null && t.from === best.value && t.id > best.id)) return undefined
   return best
 }
 
@@ -115,7 +116,7 @@ export function publishTransition<S extends LedgerSubject>(l: LedgerState, subje
   return rec
 }
 
-/** Опубликовать отзыв версии: открытые эпизоды с этой версией закрываются. */
+/** Опубликовать отзыв версии: открытые эпизоды закрываются, активная версия снимается. */
 export function publishRetraction<S extends LedgerSubject>(l: LedgerState, subject: S, value: LedgerValueMap[S], meta: PublishMeta): TransitionRec {
   const rec: TransitionRec = { id: l.next++, subject, from: value, to: null, ...meta }
   l.transitions.push(rec)
@@ -149,6 +150,7 @@ function maybeConflict(l: LedgerState, rec: ClaimRec): void {
   let active: ClaimRec | undefined
   for (const c of l.claims) if (c.subject === rec.subject && c.id < rec.id && (!active || c.id > active.id)) active = c
   if (!active || active.value === rec.value) return
+  if (l.transitions.some((t) => t.subject === rec.subject && t.to === null && t.from === active.value && t.id > active.id && t.id < rec.id)) return
   if (hasTransition(l, rec.subject, active.value, rec.value)) return
   const pair = pairKey(active.value, rec.value)
   if (l.episodes.some((e) => e.subject === rec.subject && e.status === 'open' && pairKey(e.a, e.b) === pair)) return
