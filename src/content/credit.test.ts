@@ -5,7 +5,7 @@ import { NOTIF } from './life'
 import { moneyPoor } from './memkeys'
 import {
   LOANS, THINGS, MOM_HELPS, creditOffer, creditStage, creditBroke, momDone,
-  sold, momHelp, loanTaken, loanDueAt, loanPayment, allSold,
+  sold, momHelp, momDachaAt, momDachaDays, loanTaken, loanDueAt, loanPayment, allSold,
 } from './credit'
 import { SAVE_KEY, freshState, setCount } from '../engine/state'
 
@@ -141,7 +141,7 @@ describe('кредитная лестница', () => {
     expect(game.S.money).toBe(500)
   })
 
-  it('после продажи дачи мама через месяцы вспоминает её один раз, не сообщает о новой продаже (#447)', () => {
+  it('мама вспоминает дачу через 30 дней после продажи ровно один раз (#447, #460)', async () => {
     const reminder = NOTIF.find((n) => n.app === 'Мама' && n.when?.some((c) => c.key === momHelp('dacha')))
     if (!reminder) throw new Error('Нет уведомления мамы о даче')
     const { game } = makeGame()
@@ -155,16 +155,46 @@ describe('кредитная лестница', () => {
       expect(game.S.mem[momHelp(help.id)]).toBe(true)
     }
     expect(cards(game, 'Мама').filter((c) => c.text.includes('продала дачу'))).toHaveLength(1)
+    const soldAt = Number(game.S.mem[momDachaAt])
+    expect(soldAt).toBe(game.S.day)
+    expect(game.facts()[momDachaDays]).toBe(0)
+    expect(eligible()).toEqual([])
 
-    game.S.day += 60
+    game.S.day = soldAt + 29
+    expect(game.facts()[momDachaDays]).toBe(29)
+    expect(eligible()).toEqual([])
+
+    game.S.day = soldAt + 30
     const picked = game.linePicked('NOTIF', [reminder])
     expect(picked?.text).toBe('Сынок, помнишь, я уже продала дачу, чтобы ты дождался Алика? Помогло?')
     if (!picked) throw new Error('Напоминание не появилось после помощи')
     game.notify(reminder.icon, reminder.app, picked.text, { event: 'life' })
     expect(cards(game, 'Мама').at(-1)?.text).toBe(picked.text)
 
-    game.S.day += 60
+    const reminders = () => cards(game, 'Мама').filter((c) => c.text === picked.text)
+    expect(reminders()).toHaveLength(1)
+    for (let turn = 0; turn < 12; turn++) {
+      await game.send(`Алик, где деньги? ${turn}`)
+      expect(eligible(), `после ${turn + 1} ходов`).toEqual([])
+      expect(reminders()).toHaveLength(1)
+    }
+    expect(game.S.stats.sent).toBeGreaterThanOrEqual(12)
+    expect(game.S.day).toBeGreaterThan(soldAt + 30)
+  })
+
+  it('старое сохранение с проданной дачей начинает отсчёт при загрузке', () => {
+    const state = freshState()
+    state.mem[momHelp('dacha')] = true
+    state.msgs = [{ id: 1, kind: 'text', from: 'alik', text: 'Брат', time: '14:00' }]
+    const storage = memStorage({ [SAVE_KEY]: JSON.stringify(state) })
+    const { game } = makeGame({ storage })
+    const reminder = NOTIF.find((n) => n.app === 'Мама' && n.when?.some((c) => c.key === momHelp('dacha')))
+    if (!reminder) throw new Error('Нет уведомления мамы о даче')
+    const eligible = () => game.lines.eligible('NOTIF', [reminder], game.lineFacts())
+    expect(game.S.mem[momDachaAt]).toBe(state.day)
     expect(eligible()).toEqual([])
+    game.S.day += 30
+    expect(eligible()).toHaveLength(1)
   })
 
   it('в эндгейме лестница молчит', () => {
