@@ -1,5 +1,5 @@
 // Какие ключи фактов игра реально порождает. Точные — реестр memkeys; семейные (`arc.<id>`,
-// `said.<claim>`…) — до конкретного элемента: пространства имён недостаточно, опечатка под
+// `heard.<claim>`…) — до конкретного элемента: пространства имён недостаточно, опечатка под
 // префиксом иначе становится не мёртвым условием, а «всегда разрешено» (число без факта — 0).
 //
 // FactKey — тип для конструкторов условий (#258): опечатка не компилируется. isFactKey — рантайм
@@ -20,7 +20,7 @@ import {
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, threatClaim, nuneKeyPassed, nuneDekretOver, grandpaDying,
   betonSet, cardSent, saidTomorrow, saidFriday, payday, count, endgame, holidayGreeted, lend50,
-  lie, paydayScene, lightOff, netRation, phoneWarn, creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited,
+  paydayScene, lightOff, netRation, phoneWarn, creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited,
   criticalAt, creditOfferSum,
 } from './memkeys'
 import type { LoanId, MomId, ThingId } from './credit'
@@ -58,7 +58,7 @@ export type MemExactKey =
   | typeof creditStage | typeof creditOffer | typeof creditBroke | typeof momDone | typeof creditDeclined | typeof moneyPoor | typeof collectorsRecruited
   | typeof criticalAt | typeof creditOfferSum
   | typeof payday[keyof typeof payday] | typeof count[keyof typeof count]
-  | typeof endgame[keyof typeof endgame] | typeof lend50[keyof typeof lend50] | typeof lie[keyof typeof lie]
+  | typeof endgame[keyof typeof endgame] | typeof lend50[keyof typeof lend50]
 
 /** Ключ факта: опечатка — ошибка typecheck (#258). Динамика — только через builders (intro/said/sold…). */
 export type FactKey =
@@ -68,8 +68,7 @@ export type FactKey =
   | `since.${AchId}`
   | `has.${HasKey}`
   | `ctx.${CtxKey}`
-  | `said.${ClaimKey}` | `saidLast.${ClaimKey}` | `by.${ClaimKey}` | `cb.${ClaimKey}`
-  | `caught.${ClaimKey}|${ClaimKey}`
+  | `heard.${ClaimKey}` | `cb.${ClaimKey}`
   | `met.${WhoId}` | `intro.${WhoId}`
   | `asked.${ArcId}` | `doneAsked.${ArcId}` | `finale.${ArcId}` | `legend.of.${ArcId}`
   | `topic.${TopicId}` | `topicMute.${TopicId}`
@@ -94,8 +93,7 @@ export const FAMILIES: Record<string, (rest: string) => boolean> = {
   'arc.': (r) => arcs(r) || r === 'done',
   'ach.': ach, 'since.': ach,
   'has.': setOf(HAS_KEYS), 'ctx.': setOf(CTX_KEYS),
-  'said.': claims, 'saidLast.': claims, 'by.': claims, 'cb.': claims,
-  'caught.': (r) => r.split('|').length === 2 && r.split('|').every(claims),
+  'heard.': claims, 'cb.': claims,
   'met.': who, 'intro.': who,
   'asked.': arcs, 'doneAsked.': arcs, 'finale.': arcs, 'legend.of.': arcs,
   'topic.': topics, 'topicMute.': topics,

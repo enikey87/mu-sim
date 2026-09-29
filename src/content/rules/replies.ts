@@ -14,8 +14,8 @@ import { saidClaims, saidText, type Said } from '../fact'
 import { ARCS, NO_NEWS_A, NO_NEWS_B, GROUP_SEEN_A, GROUP_SEEN_B, WRONG_A, WRONG_B } from '../arcs'
 import * as L from '../life'
 import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, PROMISE_PENCIL, PROMISE_FAR } from '../misc'
-import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_SENT, LIE_THIRD, LIE_NOCRED } from '../lies'
-import { HEAT, alikShaved, moustacheAskAt, asked, caughtCount, count, doneAsked, finaleOf, lie, nextTransfer, topic, topicMute } from '../memkeys'
+import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_THIRD, LIE_NOCRED } from '../lies'
+import { HEAT, alikShaved, moustacheAskAt, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, topic, topicMute } from '../memkeys'
 import { PROMISE_SHAVE_ASK } from '../world'
 
 type R = Rule<Game, GameEvent, Offer>
@@ -257,9 +257,8 @@ export const replyRules: R[] = [
       return game.caught(game.uniq(() => `${game.draw('LIE_OPEN', LIE_OPEN)} ${game.X.fill(game.draw('LIE_EXPLAIN', LIE_EXPLAIN), map)}`))
     },
   }),
-  says('catchLie', { remember: [add(caughtCount)], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_GRANDPA', LIE_GRANDPA))) }, [eq(lie.kind, 'grandpa')]),
-  says('catchLie', { remember: [add(caughtCount)], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_CUSTOMER', LIE_CUSTOMER))) }, [eq(lie.kind, 'customer')]),
-  says('catchLie', { remember: [add(caughtCount)], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_SENT', LIE_SENT))) }, [eq(lie.kind, 'sent')]),
+  says('catchLie', { remember: [add(caughtCount)], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_GRANDPA', LIE_GRANDPA))) }, [eq('lieKind', 'grandpa')]),
+  says('catchLie', { remember: [add(caughtCount)], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_CUSTOMER', LIE_CUSTOMER))) }, [eq('lieKind', 'customer')]),
   // третий раз пойман — признаётся (по-своему); дальше — Алику уже никто не верит
   { ...says('catchLie', { remember: [add(caughtCount)], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_THIRD', LIE_THIRD))) }, [gte(caughtCount, 2)]), bonus: 1 },
   { ...says('catchLie', { remember: [add(caughtCount)], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_NOCRED', LIE_NOCRED))) }, [gte(caughtCount, 3)]), bonus: 2 },

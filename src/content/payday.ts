@@ -86,7 +86,7 @@ export const GRAND: Record<Slot, Line[]> = {
     { t: 'Эти пятьдесят рублей лежали в сейфе,', when: [exists('finale.nune')], prio: 2 },
     { t: 'Эти пятьдесят рублей лежали в фундаменте, рядом с конвертом,', when: [exists('finale.beton')], prio: 2 },
     needs('niva')({ t: 'Эти пятьдесят рублей были в бардачке «Нивы»,', when: [exists('finale.niva')], prio: 2 }),
-    { t: 'Эти пятьдесят рублей были в банке с огурцами,', when: [exists('said.money_jar')], prio: 2 },
+    { t: 'Эти пятьдесят рублей были в банке с огурцами,', when: [is('heard.money_jar')], prio: 2 },
     { t: 'Эти пятьдесят рублей лежали в кассе шаурмичной дедушки,', when: [exists('finale.grandpa')], prio: 2 },
     { t: 'Эти пятьдесят рублей были в кабине крана, на сорока метрах,', when: [exists('finale.razmik')], prio: 2 },
     { t: 'Эти пятьдесят рублей лежали в мешке лаваша, между сорок первым и сорок вторым,', when: [is('ach.q_crypto')], prio: 2 },

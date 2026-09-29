@@ -98,6 +98,8 @@ export const REVIVED = /встал|встаёт|воскрес|вернулас�
 export const FESTIVE = /свадьб|крестин|юбилей|обручен|день рождения|отмечаем|обмываем|празд|родился|поступил|выпускн|сватовств|помолвк|открыва|открыли|приехал|вернулся|урожа|отелилась|правнук|первое слово|дочку выдают/
 
 export type SayItem = Said | { w: string; t: string; claims?: ClaimKey[] }
+/** Тема эпизода противоречия — выбирает предметный ответ Алика. */
+export type LieKind = 'money' | 'grandpa' | 'customer'
 /** Что пришло, пока игрока не было: виды сообщений пачки непрочитанных. */
 export type AwayKind = 'text' | 'sticker' | 'fwd' | 'deleted' | 'voice' | 'transfer' | 'excuse' | 'formality' | 'coldWar'
 
@@ -163,7 +165,6 @@ export class Game {
     this.noTimers = !!opts.noTimers
     this.typos = opts.typos ?? true
     this.S = loadState(this.storage) ?? freshState()
-    this.syncLieMem()
     // колбеки батареи — в узком хосте, а не в публичном интерфейсе Game: game.dead() путался бы со смертью Алика
     this.battery = new Battery(this.S, {
       low: (level) => this.notify('🪫', 'Система', `Низкий заряд батареи: ${level}%`, { event: 'battery' }),
@@ -932,11 +933,11 @@ export class Game {
   }
   sys(text: string): Msg { return this.push({ kind: 'sys', text }) }
 
-  alikMsg<M extends NewMsg>(m: M, intent?: string, claims?: readonly ClaimKey[]): Msg {
+  alikMsg<M extends NewMsg>(m: M, claims?: readonly ClaimKey[]): Msg {
     // персонаж написал сам — он в истории (intro) и игрок его встречал (met, для переклички в День выплаты)
     if (m.kind === 'text' && m.who) { this.S.mem[memkeys.met(m.who)] = true; this.S.mem[memkeys.intro(m.who)] = true }
     this.tick(1 + this.rnd(3))
-    const msg = this.noteAlik(this.push({ from: 'alik', time: fmtTime(this.S.clock), ...m } as NewMsg), intent, claims)
+    const msg = this.noteAlik(this.push({ from: 'alik', time: fmtTime(this.S.clock), ...m } as NewMsg), claims)
     this.audio.beep()
     this.audio.vibrate(40)
     if (this.chance(this.mooChance())) this.schedule(() => this.moo(), 300 + this.rnd(900))
@@ -944,14 +945,11 @@ export class Game {
   }
 
   /** Что сообщение Алика записывает в мир, каким бы путём ни пришло: день речи, заявления, упоминания, «брат джан».
-   *  `intent` — смысл, который говорящий вложил в реплику: опечатанное сообщение публикует в журнал намеренный
-   *  текст (исправление пузырём повторно не публикует), а старые ключи по-прежнему ищутся в показанной строке.
-   *  `claims` — явная семантика реплики из контента: журнал публикует её структурно, regex-адаптер эти ключи
-   *  повторно не публикует (#426). */
-  private noteAlik(msg: Msg, intent?: string, claims?: readonly ClaimKey[]): Msg {
+   *  `claims` — явная семантика реплики из контента: журнал публикует её, показанный текст (и опечатка в нём) не разбирается. */
+  private noteAlik(msg: Msg, claims?: readonly ClaimKey[]): Msg {
     this.S.mem[memkeys.alikDay] = this.S.day
     if (msg.kind === 'text' && /брат джан/i.test(msg.text)) this.unlock('brat')
-    if (msg.kind === 'text' || msg.kind === 'photo') this.noteClaims(msg.text, msg.kind === 'text' ? msg.who : undefined, msg.id, intent, claims)
+    if (claims?.length && (msg.kind === 'text' || msg.kind === 'photo')) this.noteClaims(claims, msg.kind === 'text' ? msg.who : undefined, msg.id)
     // хор: Алик кого-то упомянул — тот, может быть, вклинится после его ответа
     if (msg.kind === 'text' && !msg.who) {
       for (const [who, re] of Object.entries(MENTION_RE)) if (re.test(msg.text)) this.pending.push({ event: 'Mentioned', target: who })
@@ -991,21 +989,18 @@ export class Game {
       const claims = typeof x === 'string' ? undefined : x.claims
       const from = typeof x === 'string' ? who : 'w' in x ? x.w : who
       let fix: string | null = null
-      let intent: string | undefined
       if (!from && this.typos && this.chance(this.isNight() ? 0.2 : 0.06)) {
         const t = typo(text, this.rng, this.decks)
         if (t) ({ text, fix } = t)
-        // журнал публикует намеренный смысл реплики, а не опечатанную строку (#425)
-        if (fix) intent = typeof x === 'string' ? x : x.t
       }
       await this.typingFor(600 + text.length * 22)
       if (this.disposed) throw new GameDisposed()
-      out.push(this.alikMsg({ kind: 'text', from: 'alik', text, legend, who: from }, intent, claims))
+      out.push(this.alikMsg({ kind: 'text', from: 'alik', text, legend, who: from }, claims))
       if (fix) {
         await this.typingFor(500)
         if (this.disposed) throw new GameDisposed()
-        // пустой intent: смысл уже опубликован исходным пузырём — исправление не создаёт вторую запись
-        this.alikMsg({ kind: 'text', from: 'alik', text: fix }, '')
+        // смысл уже опубликован исходным пузырём — исправление не создаёт вторую запись
+        this.alikMsg({ kind: 'text', from: 'alik', text: fix })
         this.unlock('typo')
       }
       await this.sleep(250)
@@ -1251,6 +1246,8 @@ export class Game {
     for (const id in S.arcs) progress['arc.' + id] = S.arcs[id].i
     for (const k in S.ach) progress['ach.' + k] = true
     for (const k in S.ach) progress['since.' + k] = S.day - S.ach[k]
+    for (const c of S.ledger.claims) if (c.claimKey) progress['heard.' + c.claimKey] = true
+    const lie = this.lie()
     const moneyLv = this.moneyLevel()
     const whenDays = c.whenAt === undefined ? undefined : Math.max(0, c.whenAt - S.day)
     return {
@@ -1297,6 +1294,7 @@ export class Game {
       arcsDone: Object.entries(S.arcs).filter(([id, a]) => !ARCS[id].mechanic && a.i >= ARCS[id].eps.length).length,
       quests: Object.keys(S.ach).filter((k) => k.startsWith('q_')).length,
       callbackReady: !!this.callbackCandidate(),
+      lieOpen: !!lie, lieKind: lie?.kind ?? false, lieAlikOld: lie?.alikOld ?? false,
       arcUnfinished: this.unfinishedArc(),
       deathCanAdvance: !!S.mem[memkeys.alikDead] && this.arcCanAdvance('alik_death', true),
       'ctx.type': c.type, 'ctx.amount': c.amount, 'ctx.s': c.s, 'ctx.shortTimey': c.s ? TIMEY.test(c.s) : false,
@@ -1846,7 +1844,7 @@ export class Game {
   async photo(): Promise<void> {
     await this.typingFor(2500)
     const text = this.uniq(() => saidJoin(this.draw('PHOTOTXT', PHOTO_A), ' ', this.draw('PHOTOTX2', PHOTO_B)))
-    this.alikMsg({ kind: 'photo', from: 'alik', text: saidText(text) }, undefined, saidClaims(text))
+    this.alikMsg({ kind: 'photo', from: 'alik', text: saidText(text) }, saidClaims(text))
     this.S.ctx = { type: 'photo' }
   }
 
@@ -1963,38 +1961,20 @@ export class Game {
   }
 
   // ---------- бухгалтерия лжи ----------
-  /** Запомнить, что Алик «заявил»; если это противоречит сказанному раньше — дать игроку поймать его. */
-  noteClaims(text: string, who?: string, msgId?: number, intent?: string, explicit?: readonly ClaimKey[]): void {
-    const mem = this.S.mem
-    const found = CLAIMS.filter((c) => c.re.test(text))
-    for (const c of found) {
-      if (mem[memkeys.said(c.key)] === undefined) mem[memkeys.said(c.key)] = this.S.day
-      mem[memkeys.saidLast(c.key)] = this.S.day
-      mem[memkeys.byClaim(c.key)] = who ?? 'alik'
-    }
-    // Журнал: явная семантика реплики публикуется структурно; regex-адаптер дублирует только то,
-    // что явно не размечено (#426). Смысл берётся из намеренного текста (intent) — опечатка его не меняет (#425).
+  /** Показанная реплика публикует свою явную семантику в журнал знаний (docs/design/lie-ledger.md). */
+  noteClaims(claims: readonly ClaimKey[], who?: string, msgId?: number): void {
     const source = who && isWhoId(who) ? who : 'alik'
-    const semantic = intent !== undefined ? intent : text
-    const claimed = new Set(explicit ?? [])
-    for (const key of explicit ?? []) {
+    for (const key of claims) {
       const point = CLAIM_LEDGER[key]
       publishClaim(this.S.ledger, point.subject, point.value, { source, day: this.S.day, msgId, claimKey: key })
     }
-    for (const c of CLAIMS.filter((x) => x.re.test(semantic))) {
-      if (claimed.has(c.key)) continue
-      const point = CLAIM_LEDGER[c.key]
-      publishClaim(this.S.ledger, point.subject, point.value, { source, day: this.S.day, msgId, claimKey: c.key })
-    }
-    this.syncLieMem()
   }
   /** Явная семантика Said для путей мимо say/noteAlik (sys-строки сцен): публикация в журнал с источником. */
   noteSaidClaims(x: Said, msgId?: number, who?: string): void {
-    const claims = saidClaims(x)
-    if (!claims.length) return
-    this.noteClaims(saidText(x), who, msgId, undefined, claims)
+    this.noteClaims(saidClaims(x), who, msgId)
   }
-  lie(): { old: Claim; new: Claim } | null {
+  /** Новейший открытый эпизод противоречия: две версии, тема и чья была прошлая. */
+  lie(): { old: Claim; new: Claim; kind: LieKind; alikOld: boolean } | null {
     const ep = currentEpisode(this.S.ledger)
     if (!ep) return null
     const a = this.S.ledger.claims.find((c) => c.id === ep.aClaim)
@@ -2003,34 +1983,14 @@ export class Game {
     const ok = a.claimKey ?? claimKeyOf(a.subject, a.value)
     const nk = b.claimKey ?? claimKeyOf(b.subject, b.value)
     const o = ok ? claimByKey(ok) : undefined, n = nk ? claimByKey(nk) : undefined
-    return o && n ? { old: o, new: n } : null
+    if (!o || !n) return null
+    const kind: LieKind = ep.subject === 'grandpa.life' ? 'grandpa' : ep.subject === 'customer.payment' ? 'customer' : 'money'
+    // «вы же говорили» — только про версию самого Алика; прошлую могла сказать и родня
+    return { old: o, new: n, kind, alikOld: a.source === 'alik' }
   }
-  /** lie.* зеркалят текущий эпизод для правил BuildChoices / catchLie / P_LIE. */
-  syncLieMem(): void {
-    const mem = this.S.mem
-    const ep = currentEpisode(this.S.ledger)
-    const l = this.lie()
-    if (!ep || !l) {
-      delete mem[memkeys.lie.old]
-      delete mem[memkeys.lie.new]
-      delete mem[memkeys.lie.kind]
-      delete mem[memkeys.lie.alikOld]
-      return
-    }
-    mem[memkeys.lie.old] = l.old.key
-    mem[memkeys.lie.new] = l.new.key
-    const a = this.S.ledger.claims.find((c) => c.id === ep.aClaim)
-    mem[memkeys.lie.alikOld] = !a || a.source === 'alik'
-    mem[memkeys.lie.kind] = ep.subject === 'grandpa.life' ? 'grandpa'
-      : ep.subject === 'customer.payment' ? 'customer'
-      : ep.subject === 'money.location' ? 'money'
-      : 'other'
-  }
-  forgetLie(): void { this.syncLieMem() }
   async caught(line: string): Promise<void> {
     const ep = currentEpisode(this.S.ledger)
     if (ep) closeEpisode(this.S.ledger, ep.id, 'caught')
-    this.syncLieMem()
     const n = Number(this.S.mem[memkeys.caughtCount] ?? 0)
     this.unlock('liar')
     if (n >= 3) this.unlock('liar3')
@@ -2038,13 +1998,12 @@ export class Game {
     await this.say([line])
     this.S.ctx = null
   }
-  /** Утверждение, к которому Алик может сам вернуться: сказано 10+ дней назад, ещё не вспоминал. */
+  /** Утверждение, к которому Алик может сам вернуться: сам сказал 10+ дней назад, ещё не вспоминал. */
   callbackCandidate(): Claim | undefined {
-    const mem = this.S.mem
-    // «помнишь, я говорил» — только своё; версию из семейного чата (Гарик) себе не приписывает
-    return CLAIMS.find((c) => c.updates && mem[memkeys.said(c.key)] !== undefined
-      && (mem[memkeys.byClaim(c.key)] === undefined || mem[memkeys.byClaim(c.key)] === 'alik')
-      && this.S.day - Number(mem[memkeys.said(c.key)]) >= 10 && !mem[memkeys.cb(c.key)])
+    // «помнишь, я говорил» — только своё: слова родни и Гранта Алик себе не приписывает
+    const first = new Map<ClaimKey, number>()
+    for (const r of this.S.ledger.claims) if (r.source === 'alik' && r.claimKey && !first.has(r.claimKey)) first.set(r.claimKey, r.day)
+    return CLAIMS.find((c) => c.updates && first.has(c.key) && this.S.day - first.get(c.key)! >= 10 && !this.S.mem[memkeys.cb(c.key)])
   }
   async callback(): Promise<void> {
     const c = this.callbackCandidate()
@@ -2052,7 +2011,7 @@ export class Game {
     const upd = c && this.decks.pick('CB_' + c.key, c.updates!, this.lineFacts())
     if (!c || !upd) return this.excuseTurn()
     this.S.mem[memkeys.cb(c.key)] = this.S.day
-    await this.say([this.uniq(() => `${this.X.g('ADDR')}, ${this.draw('CB_OPEN', CALLBACK_OPEN)} ${c.say}? ${upd}`)])
+    await this.say([{ t: this.uniq(() => `${this.X.g('ADDR')}, ${this.draw('CB_OPEN', CALLBACK_OPEN)} ${c.say}? ${upd}`), claims: [c.key] }])
     this.unlock('memory')
     await this.promiseLine()
   }
@@ -2586,7 +2545,7 @@ export class Game {
    * false — пул исчерпан, правило промолчало.
    */
   awayMsg(kind: AwayKind): boolean | void {
-    const deliver = (m: NewMsg, claims?: readonly ClaimKey[]) => this.noteAlik(this.push({ from: 'alik', time: fmtTime(this.S.clock), ...m } as NewMsg), undefined, claims)
+    const deliver = (m: NewMsg, claims?: readonly ClaimKey[]) => this.noteAlik(this.push({ from: 'alik', time: fmtTime(this.S.clock), ...m } as NewMsg), claims)
     switch (kind) {
       case 'text': {
         const line = this.addrSaidLine('IDLE', L.IDLE)

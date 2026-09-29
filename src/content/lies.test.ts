@@ -1,16 +1,29 @@
-// Бухгалтерия лжи: распознавание утверждений, противоречия, «Поймать на лжи», воспоминания.
+// Бухгалтерия лжи: явная публикация утверждений, противоречия, «Поймать на лжи», воспоминания.
 import { describe, it, expect } from 'vitest'
-import { CLAIMS, conflicts, pairKey, LIE_GRANDPA, LIE_THIRD, LIE_NOCRED, LIE_OPEN } from './lies'
+import { CLAIMS, LIE_GRANDPA, LIE_THIRD, LIE_NOCRED, LIE_OPEN } from './lies'
 import { currentEpisode, openEpisodes, publishTransition } from './ledger'
-import { makeGame, alikTexts } from '../test/helpers'
+import { makeGame, alikTexts, botTurn } from '../test/helpers'
 import type { Game } from '../engine/game'
-import { D } from './excuses'
+import type { ClaimKey } from './ids'
 import { ARCS } from './arcs'
 import { valueOf } from '../engine/rules'
 import { loadState, saveState } from '../engine/state'
+import * as arcs from './arcs'
+import * as endgame from './endgame'
+import * as excuses from './excuses'
+import * as legends from './legends'
+import * as life from './life'
+import * as misc from './misc'
+import * as rude from './rude'
+import * as scenes from './scenes'
+import * as talk from './talk'
+import * as world from './world'
 
 const frag = (s: string) => s.replace(/[.!?…]+$/, '').slice(5, 25)
 const oneOf = (arr: readonly string[], text: string) => arr.some((a) => text.includes(frag(a)))
+/** Реплика с явной семантикой: текст не важен, журнал читает claims. */
+const hear = (game: Game, claims: ClaimKey[], who?: string) =>
+  game.alikMsg({ kind: 'text', from: 'alik', text: `реплика ${claims.join(',')}`, who }, claims)
 async function catchLie(game: Game): Promise<string> {
   const c = game.buildChoices().find((x) => x.act === 'catchLie')!
   expect(c, 'кнопка «Поймать на лжи»').toBeDefined()
@@ -19,29 +32,85 @@ async function catchLie(game: Game): Promise<string> {
   return alikTexts(game.S.msgs.slice(from)).join(' ')
 }
 
+/** Все ключи, которые контент явно публикует у своих реплик. */
+function contentClaims(): Set<string> {
+  const out = new Set<string>()
+  const seen = new Set<unknown>()
+  const walk = (v: unknown): void => {
+    if (!v || typeof v !== 'object' || seen.has(v)) return
+    seen.add(v)
+    const claims = (v as { claims?: unknown }).claims
+    if (Array.isArray(claims)) for (const k of claims) out.add(String(k))
+    for (const x of Object.values(v)) walk(x)
+  }
+  for (const m of [arcs, endgame, excuses, legends, life, misc, rude, scenes, talk, world]) walk({ ...m })
+  return out
+}
+
 describe('утверждения', () => {
-  it('каждое утверждение встречается в реальном контенте игры', () => {
-    const all = JSON.stringify([D, ARCS]) + [
-      'Я Алику всё заплатил ещё в марте.', // реплика Гранта в сцене «заказчик»
-    ].join()
-    for (const c of CLAIMS) expect(c.re.test(all), c.key).toBe(true)
+  it('каждое утверждение опубликовано хоть одной реальной репликой контента', () => {
+    const published = contentClaims()
+    for (const c of CLAIMS) expect(published.has(c.key), c.key).toBe(true)
   })
-  it('противоречия: разные места для денег, явные пары; одно и то же — не противоречие', () => {
-    expect(conflicts('money_jar', 'money_dubai')).toBe(true)
-    expect(conflicts('sent', 'no_money')).toBe(true)
-    expect(conflicts('no_money', 'sent')).toBe(true)
-    expect(conflicts('money_jar', 'money_jar')).toBe(false)
-    expect(conflicts('beton', 'money_jar')).toBe(false)
-    expect(pairKey('b', 'a')).toBe(pairKey('a', 'b'))
+  it('реплика без разметки знания не создаёт, как бы похоже ни звучала', () => {
+    const { game } = makeGame()
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в Дубае.' })
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги у Ноя.' })
+    expect(game.S.ledger.claims).toHaveLength(0)
+    expect(game.buildChoices().some((c) => c.act === 'catchLie')).toBe(false)
+  })
+  it('новая партия не пишет старые ключи бухгалтерии в память', async () => {
+    const { game } = makeGame()
+    hear(game, ['money_jar'])
+    hear(game, ['money_dubai'])
+    await catchLie(game)
+    const legacy = Object.keys(game.S.mem).filter((k) => /^(said|saidLast|by|lie|caught)\./.test(k))
+    expect(legacy).toEqual([])
+  })
+})
+
+describe('реальный контент доходит до поимки', () => {
+  it('серия «деньги в фундаменте» против серии Нуне «ключ от сейфа» — кнопка и ответ', async () => {
+    const { game } = makeGame()
+    await game.playEpisode(ARCS.beton.eps[0], 'beton')
+    await game.playEpisode(ARCS.nune.eps[0], 'nune')
+    const c = game.buildChoices().find((x) => x.act === 'catchLie')
+    expect(c?.text).toMatch(/фундамент/)
+    expect(c?.text).toMatch(/сейф/)
+    await catchLie(game)
+    expect(game.S.mem.caught).toBe(1)
+  })
+  it('опечатка и пузырь исправления не меняют смысл и не дублируют запись', async () => {
+    const { game } = makeGame({ typos: true, hour: 3 })
+    for (let i = 0; i < 40; i++) await game.say([{ t: 'Деньги в Дубае, брат.', claims: ['money_dubai'] }])
+    expect(alikTexts(game.S.msgs).some((t) => t.startsWith('*')), 'хоть одна опечатка с исправлением').toBe(true)
+    expect(game.S.ledger.claims).toHaveLength(40)
+    expect(new Set(game.S.ledger.claims.map((c) => c.value))).toEqual(new Set(['dubai']))
+    await game.say([{ t: 'Дньги у Ноя', claims: ['money_noah'] }])
+    expect(await catchLie(game)).toBeTruthy()
+  })
+})
+
+describe('партия бота', () => {
+  it('бот сам слышит противоречие в контенте, видит постоянную кнопку и ловит Алика', async () => {
+    const { game } = makeGame({ seed: 1 })
+    let caught = 0
+    for (let i = 0; i < 400 && !caught; i++) {
+      const c = await botTurn(game)
+      if (c?.act === 'catchLie') caught++
+    }
+    expect(caught, 'кнопка «Поймать на лжи» за 400 ходов').toBe(1)
+    expect(game.S.ledger.episodes.some((e) => e.status === 'caught')).toBe(true)
+    expect(game.S.ach.liar).toBeDefined()
   })
 })
 
 describe('поймать на лжи', () => {
   it('противоречие → кнопка «Поймать» первой → Алик выкручивается; та же пара новыми сообщениями ловится снова', async () => {
     const { game } = makeGame()
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги лежат в банке. В трёхлитровой, с огурцами.' })
+    hear(game, ['money_jar'])
     expect(game.buildChoices().some((c) => c.act === 'catchLie')).toBe(false) // пока нечему противоречить
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Брат, деньги в Дубае у двоюродного брата.' })
+    hear(game, ['money_dubai'])
     const cs = game.buildChoices()
     expect(cs[0].act).toBe('catchLie')
     expect(cs[0].text).toMatch(/огурц/)
@@ -51,17 +120,25 @@ describe('поймать на лжи', () => {
     expect(game.S.mem.caught).toBe(1)
     expect(game.S.ach.liar).toBeDefined()
     expect(openEpisodes(game.S.ledger)).toHaveLength(0)
+    // ответ Алика пересказывает обе версии, но сам их не публикует — ни новой записи, ни нового эпизода
+    expect(game.S.ledger.claims).toHaveLength(2)
     // та же пара новыми утверждениями — новый эпизод
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги лежат в банке. В трёхлитровой, с огурцами.' })
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в Дубае, я же говорил.' })
+    hear(game, ['money_jar'])
+    hear(game, ['money_dubai'])
     expect(game.buildChoices().some((c) => c.act === 'catchLie')).toBe(true)
+  })
+  it('одинаковые значения — не противоречие', () => {
+    const { game } = makeGame()
+    hear(game, ['money_dubai'])
+    hear(game, ['money_dubai'])
+    expect(game.buildChoices().some((c) => c.act === 'catchLie')).toBe(false)
   })
   it('поймать можно и посреди сцены — это её прерывает', async () => {
     const { game } = makeGame()
     await game.enterNode('card', 'ask')
     expect(game.S.scene).not.toBeNull()
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги лежат в банке. В трёхлитровой, с огурцами.' })
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги у Ноя.' })
+    hear(game, ['money_jar'])
+    hear(game, ['money_noah'])
     const cs = game.buildChoices()
     expect(cs[0].act).toBe('catchLie')
     expect(cs.slice(1).every((c) => c.scene === 'card')).toBe(true)
@@ -71,8 +148,8 @@ describe('поймать на лжи', () => {
   })
   it('обычная реплика не закрывает эпизод — кнопка остаётся', async () => {
     const { game } = makeGame()
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Джан, дедушка перед смертью сказал: не плати.' })
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Дедушка опять не умер.' })
+    hear(game, ['grandpa_dead'])
+    hear(game, ['grandpa_alive'])
     expect(currentEpisode(game.S.ledger)?.subject).toBe('grandpa.life')
     game.S.choices = null
     await game.send({ text: 'Алик, привет', tone: 'neutral' })
@@ -81,12 +158,11 @@ describe('поймать на лжи', () => {
   })
   it('эпизод переживает 15/30/100 дней и сохранение', () => {
     const { game, storage } = makeGame()
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги лежат в банке. В трёхлитровой, с огурцами.' })
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в фундаменте, брат.' })
+    hear(game, ['money_jar'])
+    hear(game, ['money_foundation'])
     const id = currentEpisode(game.S.ledger)!.id
     for (const days of [15, 30, 100]) {
       game.S.day += days
-      game.syncLieMem()
       game.S.choices = null
       expect(game.buildChoices().some((c) => c.act === 'catchLie'), `${days} дней`).toBe(true)
       expect(currentEpisode(game.S.ledger)?.id).toBe(id)
@@ -98,8 +174,8 @@ describe('поймать на лжи', () => {
   })
   it('в блоке и «смерти» кнопка скрыта без потери эпизода и возвращается после', () => {
     const { game } = makeGame()
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги лежат в банке. В трёхлитровой, с огурцами.' })
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги у Ноя.' })
+    hear(game, ['money_jar'])
+    hear(game, ['money_noah'])
     expect(game.buildChoices().some((c) => c.act === 'catchLie')).toBe(true)
     game.S.mem.blocked = true
     game.S.choices = null
@@ -111,16 +187,15 @@ describe('поймать на лжи', () => {
     expect(game.buildChoices().some((c) => c.act === 'catchLie')).toBe(false)
     expect(openEpisodes(game.S.ledger)).toHaveLength(1)
     delete game.S.mem.alik_dead
-    game.syncLieMem()
     game.S.choices = null
     expect(game.buildChoices().some((c) => c.act === 'catchLie')).toBe(true)
   })
   it('два открытых эпизода разбираются по одному без потери второго', async () => {
     const { game } = makeGame()
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги лежат в банке. В трёхлитровой, с огурцами.' })
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в Дубае.' })
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Джан, дедушка перед смертью сказал: не плати.' })
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Дедушка опять не умер.' })
+    hear(game, ['money_jar'])
+    hear(game, ['money_dubai'])
+    hear(game, ['grandpa_dead'])
+    hear(game, ['grandpa_alive'])
     expect(openEpisodes(game.S.ledger)).toHaveLength(2)
     expect(currentEpisode(game.S.ledger)?.subject).toBe('grandpa.life') // новейший первым
     await catchLie(game)
@@ -130,30 +205,30 @@ describe('поймать на лжи', () => {
   })
   it('известный переход закрывает эпизод; смена мира без сообщения — нет', () => {
     const { game } = makeGame()
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги лежат в банке. В трёхлитровой, с огурцами.' })
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в Дубае.' })
+    hear(game, ['money_jar'])
+    hear(game, ['money_dubai'])
     expect(openEpisodes(game.S.ledger)).toHaveLength(1)
     game.setLegend('Деньги после свадьбы', 'samvel')
     expect(openEpisodes(game.S.ledger)).toHaveLength(1)
     publishTransition(game.S.ledger, 'money.location', 'bank', 'dubai', { source: 'alik', day: game.S.day })
-    game.syncLieMem()
     game.S.choices = null
     expect(openEpisodes(game.S.ledger)).toHaveLength(0)
     expect(game.buildChoices().some((c) => c.act === 'catchLie')).toBe(false)
   })
   it('про дедушку — свой ответ', async () => {
     const { game } = makeGame()
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Джан, дедушка перед смертью сказал: не плати.' })
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Дедушка опять не умер. Отмечаем.' })
+    hear(game, ['grandpa_dead'])
+    hear(game, ['grandpa_alive'])
+    expect(game.facts().lieKind).toBe('grandpa')
     expect(oneOf(LIE_GRANDPA, await catchLie(game))).toBe(true)
   })
   it('третий раз — признание, четвёртый — «мне никто не верит»', async () => {
     const { game } = makeGame()
-    const places = ['Деньги в Дубае.', 'Деньги у Ноя.', 'Деньги у жены, жена у мамы.', 'Деньги в криптокошельке.', 'Деньги на пароме в Батуми.']
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги лежат в банке. В трёхлитровой, с огурцами.' })
+    const places: ClaimKey[] = ['money_dubai', 'money_noah', 'money_wife', 'money_crypto']
+    hear(game, ['money_jar'])
     const replies: string[] = []
-    for (const p of places.slice(0, 4)) {
-      game.alikMsg({ kind: 'text', from: 'alik', text: p })
+    for (const p of places) {
+      hear(game, [p])
       game.S.offlineDays = 0
       replies.push(await catchLie(game))
     }
@@ -164,17 +239,17 @@ describe('поймать на лжи', () => {
   })
   it('противоречие от другого персонажа: Грант «всё заплатил»', () => {
     const { game } = makeGame()
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Заказчик Грант мне не платит.' })
-    game.alikMsg({ kind: 'text', from: 'alik', who: 'grant', text: 'Молодой человек, я Алику всё заплатил ещё в марте.' })
-    expect(game.S.mem['lie.kind']).toBe('customer')
-    expect(game.S.mem['lie.alikOld']).toBe(true) // прошлую версию сказал сам Алик — «вы же говорили» уместно
+    hear(game, ['customer_owes'])
+    hear(game, ['customer_paid'], 'grant')
+    expect(game.facts().lieKind).toBe('customer')
+    expect(game.facts().lieAlikOld).toBe(true) // прошлую версию сказал сам Алик — «вы же говорили» уместно
   })
   it('версию сказал не Алик — игрок не приписывает её ему', () => {
     const { game } = makeGame()
-    game.alikMsg({ kind: 'text', from: 'alik', who: 'nune', text: 'Деньги в сейфе, ключ у меня.' })
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в фундаменте, брат.' })
-    expect(game.S.mem['lie.old']).toBeDefined()
-    expect(game.S.mem['lie.alikOld']).toBe(false)
+    hear(game, ['money_safe'], 'nune')
+    hear(game, ['money_foundation'])
+    expect(game.facts().lieOpen).toBe(true)
+    expect(game.facts().lieAlikOld).toBe(false)
     const text = game.buildChoices().find((c) => c.act === 'catchLie')!.text
     expect(text).not.toMatch(/вы же говорили/)
   })
@@ -183,7 +258,7 @@ describe('поймать на лжи', () => {
 describe('Алик сам вспоминает своё враньё', () => {
   it('через 10 дней возвращается к утверждению и продолжает историю', async () => {
     const { game } = makeGame()
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Бетон обиделся и не застывает.' })
+    hear(game, ['beton'])
     expect(game.callbackCandidate()).toBeUndefined()
     game.S.day += 11
     expect(game.callbackCandidate()?.key).toBe('beton')
@@ -197,9 +272,14 @@ describe('Алик сам вспоминает своё враньё', () => {
   })
   it('версию из чата родственника себе не приписывает', () => {
     const { game } = makeGame()
-    game.alikMsg({ kind: 'text', from: 'alik', who: 'garik', text: 'Скажи, что бетон обиделся, — всегда работает 😂' })
-    expect(game.S.mem['said.beton']).toBeDefined()
-    expect(game.S.mem['by.beton']).toBe('garik')
+    hear(game, ['beton'], 'garik')
+    expect(game.S.ledger.claims[0]).toMatchObject({ subject: 'beton.mood', source: 'garik' })
+    game.S.day += 11
+    expect(game.callbackCandidate()).toBeUndefined()
+  })
+  it('неразмеченная строка про бетон воспоминания не заводит', () => {
+    const { game } = makeGame()
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Бетон обиделся и не застывает.' })
     game.S.day += 11
     expect(game.callbackCandidate()).toBeUndefined()
   })

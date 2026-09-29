@@ -1,8 +1,8 @@
 // Бухгалтерия лжи: типизированный журнал знаний игрока (docs/design/lie-ledger.md).
 // Реплика публикует смысл (предмет + значение + источник), а не строка переписки:
-// показанный текст, опечатка и формат сообщения не определяют знание. Пока контент
-// не переехал на явную публикацию (#426), старый regex-путь кормит журнал адаптером
-// (CLAIM_LEDGER); кнопка «Поймать на лжи» читает открытые эпизоды журнала (#427).
+// показанный текст, опечатка и формат сообщения не определяют знание. Контент помечает
+// реплику ключом утверждения (`claims`), CLAIM_LEDGER переводит ключ в предмет и значение;
+// кнопка «Поймать на лжи» читает открытые эпизоды журнала.
 import type { ClaimKey, WhoId } from './ids'
 import { isWhoId } from './ids'
 import { pairKey } from './memkeys'
@@ -43,7 +43,7 @@ export interface ClaimRec {
   day: number
   /** Сообщение ленты, через которое знание появилось; у мигрированного legacy-знания его нет. */
   msgId?: number
-  /** Ключ старого regex-утверждения, если запись пришла из адаптера или миграции. */
+  /** Ключ утверждения контента (или перенесённый из старого сохранения). */
   claimKey?: ClaimKey
 }
 
@@ -173,10 +173,10 @@ function claimOfValue(l: LedgerState, subject: LedgerSubject, value: string): Cl
   return best
 }
 
-// --- временный адаптер: какое типизированное знание публикует старое regex-утверждение.
+// --- какое типизированное знание публикует ключ утверждения контента.
 const point = <S extends LedgerSubject>(subject: S, value: LedgerValueMap[S]): LedgerPoint => ({ subject, value }) as LedgerPoint
 
-/** Regex-ключ утверждения по предмету и значению — текст кнопки и тематические ответы. */
+/** Ключ утверждения по предмету и значению — текст кнопки и тематические ответы. */
 export function claimKeyOf(subject: LedgerSubject, value: string): ClaimKey | undefined {
   for (const [k, p] of Object.entries(CLAIM_LEDGER) as [ClaimKey, LedgerPoint][]) {
     if (p.subject === subject && p.value === value) return k
@@ -279,6 +279,6 @@ export function migrateLedger(mem: Record<string, unknown>, saved: unknown): Led
       if (ca?.claimKey && cb?.claimKey && pairKey(ca.claimKey, cb.claimKey) === pair) e.status = 'caught'
     }
   }
-  // cb.* (воспоминания) остаются в памяти на период совместимости — callbackCandidate ещё читает их.
+  // cb.* (что Алик уже вспоминал) остаются в памяти как есть — callbackCandidate читает их и дальше.
   return l
 }

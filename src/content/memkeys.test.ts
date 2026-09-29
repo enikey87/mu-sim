@@ -4,7 +4,7 @@ import { readdirSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import type { Criterion, Entry } from '../engine/rules'
 import { Gated } from '../engine/rules'
-import { ACTOR_KEYS, MEM_KEYS, caughtPair } from './memkeys'
+import { ACTOR_KEYS, MEM_KEYS } from './memkeys'
 import { isFactKey } from './factkeys'
 
 const flat = (cs: readonly Criterion[]): Criterion[] => cs.flatMap((c) => (c.op === 'all' ? flat(c.all ?? []) : [c]))
@@ -202,6 +202,5 @@ describe('реестр mem-ключей', () => {
       expect(k).not.toMatch(/[\s]/)
     }
     expect(isFactKey('caught')).toBe(true)
-    expect(caughtPair('alik', 'boris')).toBe('caught.alik|boris')
   })
 })
