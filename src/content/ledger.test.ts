@@ -9,6 +9,8 @@ import { CLAIMS } from './lies'
 import { ARCS, ARC_DONE } from './arcs'
 import { FINALES } from './finales'
 import { LEGENDS } from './legends'
+import { D } from './excuses'
+import type { Said } from './fact'
 import { makeGame, memStorage } from '../test/helpers'
 import { SAVE_KEY, loadState, saveState } from '../engine/state'
 
@@ -242,6 +244,16 @@ describe('рассказанные переходы и отзывы (#436)', () 
     await game.playFinale('rubik', FINALES.rubik.find((f) => f.id === 'karine')!)
     expect(game.S.ledger.claims.some((c) => c.value === 'paid')).toBe(true)
     expect(game.S.ledger.transitions).toContainEqual(expect.objectContaining({ from: 'owes', to: 'paid' }))
+    expect(catchChoice(game)).toBe(false)
+  })
+
+  it('легендарная отмазка рассказывает, как сейф оказался в стене', async () => {
+    const { game } = makeGame()
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в сейфе.' }, ['money_safe'])
+    const line = (D.LEGENDARY as Said[]).find((x) => typeof x === 'object' && typeof x.t === 'string' && x.t.includes('сейф замуровали'))
+    if (!line) throw new Error('легендарная строка про замурованный сейф отсутствует')
+    await game.say([line])
+    expect(game.S.ledger.transitions).toContainEqual(expect.objectContaining({ from: 'safe', to: 'wall' }))
     expect(catchChoice(game)).toBe(false)
   })
 })
