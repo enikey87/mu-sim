@@ -38,12 +38,41 @@ describe('операции журнала', () => {
     publishClaim(l, 'grandpa.life', 'alive', { ...meta, day: 4 })
     expect(currentEpisode(l)?.subject).toBe('grandpa.life') // новейшее противоречие первым
   })
-  it('известный переход — отрицательный контроль: обе версии без эпизода', () => {
+  it('известный переход — отрицательный контроль: смена, которую он пересекает, без эпизода', () => {
     const l = freshLedger()
-    publishTransition(l, 'money.location', 'foundation', 'niva', { ...meta, day: 2 })
     publishClaim(l, 'money.location', 'foundation', meta)
+    publishTransition(l, 'money.location', 'foundation', 'niva', { ...meta, day: 2 })
     publishClaim(l, 'money.location', 'niva', { ...meta, day: 5 })
     expect(openEpisodes(l)).toHaveLength(0)
+  })
+  it('переход — один переезд: возврат к прежней версии без объяснения — эпизод', () => {
+    const l = freshLedger()
+    publishClaim(l, 'money.location', 'foundation', meta)
+    publishTransition(l, 'money.location', 'foundation', 'niva', { ...meta, day: 2 })
+    publishClaim(l, 'money.location', 'niva', { ...meta, day: 3 })
+    publishClaim(l, 'money.location', 'foundation', { ...meta, day: 4 })
+    expect(openEpisodes(l).map((e) => [e.a, e.b])).toEqual([['niva', 'foundation']])
+  })
+  it('переход объясняет только своё направление', () => {
+    const l = freshLedger()
+    publishClaim(l, 'money.location', 'niva', meta)
+    publishTransition(l, 'money.location', 'foundation', 'niva', { ...meta, day: 2 })
+    publishClaim(l, 'money.location', 'foundation', { ...meta, day: 3 })
+    expect(openEpisodes(l)).toHaveLength(1)
+  })
+  it('переход, рассказанный до того, как игрок услышал исходную версию, её смену не объясняет', () => {
+    const l = freshLedger()
+    publishTransition(l, 'money.location', 'foundation', 'niva', meta)
+    publishClaim(l, 'money.location', 'foundation', { ...meta, day: 2 })
+    publishClaim(l, 'money.location', 'niva', { ...meta, day: 3 })
+    expect(openEpisodes(l)).toHaveLength(1)
+  })
+  it('переход в обратную сторону не закрывает открытый эпизод', () => {
+    const l = freshLedger()
+    publishClaim(l, 'money.location', 'foundation', meta)
+    publishClaim(l, 'money.location', 'niva', { ...meta, day: 2 })
+    publishTransition(l, 'money.location', 'niva', 'foundation', { ...meta, day: 3 })
+    expect(openEpisodes(l)).toHaveLength(1)
   })
   it('переход, опубликованный после конфликта, закрывает эпизод как объяснённый', () => {
     const l = freshLedger()
