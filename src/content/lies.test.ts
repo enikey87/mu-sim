@@ -6,6 +6,8 @@ import { makeGame, alikTexts, botTurn } from '../test/helpers'
 import type { Game } from '../engine/game'
 import type { ClaimKey } from './ids'
 import { ARCS } from './arcs'
+import { D } from './excuses'
+import type { Entry, Said } from './fact'
 import { MEMORY } from './memory'
 import { GRAND } from './payday'
 import { caughtCount, phoneKarine } from './memkeys'
@@ -45,6 +47,29 @@ describe('утверждения', () => {
 })
 
 describe('реальный контент доходит до поимки', () => {
+  const line = (pool: string, start: string): Said => {
+    const x = (D[pool] as Entry<Said>[]).map(valueOf).find((y) => (typeof y === 'string' ? y : y.t).startsWith(start))
+    expect(x, start).toBeDefined()
+    return x!
+  }
+  const hasCatch = (game: Game) => { game.S.choices = null; return game.buildChoices().some((c) => c.act === 'catchLie') }
+  it('конверт упал в опалубку — переезд из банки объяснён, возврат в банку ловится (#449)', async () => {
+    const { game } = makeGame()
+    const jar = line('ABSURD', 'Деньги лежат в банке')
+    await game.say([jar])
+    await game.playEpisode(ARCS.beton.eps[0], 'beton')
+    expect(hasCatch(game), 'рассказанный переезд').toBe(false)
+    await game.say([jar])
+    expect(hasCatch(game), 'снова банка без объяснения').toBe(true)
+  })
+  it('акт: «не платит» → «рассчитался» объяснено, потом «заказчик сам мне должен» ловится (#449)', async () => {
+    const { game } = makeGame()
+    await game.playEpisode(ARCS.grant.eps[0], 'grant')
+    await game.playEpisode(ARCS.rubik.eps[7], 'rubik')
+    expect(hasCatch(game), 'акт объясняет смену').toBe(false)
+    await game.say([line('ABSURD', 'Заказчик сам мне должен')])
+    expect(hasCatch(game), 'снова «должен» после акта').toBe(true)
+  })
   it('серия «деньги в фундаменте» против серии Нуне «ключ от сейфа» — кнопка и ответ', async () => {
     const { game } = makeGame()
     await game.playEpisode(ARCS.beton.eps[0], 'beton')

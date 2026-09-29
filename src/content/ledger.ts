@@ -109,11 +109,13 @@ export function activeClaim(l: LedgerState, subject: LedgerSubject): ClaimRec | 
   return best
 }
 
-/** Опубликовать переход: известное объяснение, как одно значение сменилось другим. */
+/** Опубликовать переход: известное объяснение, как одно значение сменилось другим — именно в этом направлении. */
 export function publishTransition<S extends LedgerSubject>(l: LedgerState, subject: S, from: LedgerValueMap[S], to: LedgerValueMap[S], meta: PublishMeta): TransitionRec {
   const rec: TransitionRec = { id: l.next++, subject, from, to, ...meta }
   l.transitions.push(rec)
-  closePair(l, subject, from, to, 'explained')
+  for (const e of l.episodes) {
+    if (e.status === 'open' && e.subject === subject && e.a === from && e.b === to) e.status = 'explained'
+  }
   return rec
 }
 
@@ -152,22 +154,15 @@ function maybeConflict(l: LedgerState, rec: ClaimRec): void {
   for (const c of l.claims) if (c.subject === rec.subject && c.id < rec.id && (!active || c.id > active.id)) active = c
   if (!active || active.value === rec.value) return
   if (l.transitions.some((t) => t.subject === rec.subject && t.to === null && t.from === active.value && t.id > active.id && t.id < rec.id)) return
-  if (hasTransition(l, rec.subject, active.value, rec.value)) return
+  if (explained(l, rec.subject, active, rec.value, rec.id)) return
   const pair = pairKey(active.value, rec.value)
   if (l.episodes.some((e) => e.subject === rec.subject && e.status === 'open' && pairKey(e.a, e.b) === pair)) return
   l.episodes.push({ id: l.next++, subject: rec.subject, a: active.value, b: rec.value, aClaim: active.id, bClaim: rec.id, day: rec.day, status: 'open' })
 }
 
-function hasTransition(l: LedgerState, subject: LedgerSubject, x: string, y: string): boolean {
-  const pair = pairKey(x, y)
-  return l.transitions.some((t) => t.subject === subject && t.to !== null && pairKey(t.from, t.to) === pair)
-}
-
-function closePair(l: LedgerState, subject: LedgerSubject, a: string, b: string, how: Exclude<EpisodeStatus, 'open'>): void {
-  const pair = pairKey(a, b)
-  for (const e of l.episodes) {
-    if (e.status === 'open' && e.subject === subject && pairKey(e.a, e.b) === pair) e.status = how
-  }
+/** Смену «услышанная версия → новая» объясняет переход, рассказанный после неё и до новой: переход — один переезд, а не пропуск для пары навсегда. */
+function explained(l: LedgerState, subject: LedgerSubject, heard: ClaimRec, to: string, before: number): boolean {
+  return l.transitions.some((t) => t.subject === subject && t.from === heard.value && t.to === to && t.id > heard.id && t.id < before)
 }
 
 function claimOfValue(l: LedgerState, subject: LedgerSubject, value: string): ClaimRec | undefined {
@@ -296,7 +291,7 @@ export function migrateLedger(mem: Record<string, unknown>, saved: unknown): Led
   const oldK = mem[LIE_OLD], newK = mem[LIE_NEW]
   if (typeof oldK === 'string' && typeof newK === 'string') {
     const o = CLAIM_LEDGER[oldK as ClaimKey], n = CLAIM_LEDGER[newK as ClaimKey]
-    if (o && n && o.subject === n.subject && CONFLICTING.has(o.subject) && o.value !== n.value && !hasTransition(l, o.subject, o.value, n.value)) {
+    if (o && n && o.subject === n.subject && CONFLICTING.has(o.subject) && o.value !== n.value) {
       const pair = pairKey(o.value, n.value)
       if (!l.episodes.some((e) => e.subject === o.subject && e.status === 'open' && pairKey(e.a, e.b) === pair)) {
         const ra = claimOfValue(l, o.subject, o.value), rb = claimOfValue(l, o.subject, n.value)
