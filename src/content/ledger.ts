@@ -29,7 +29,7 @@ export type LedgerSubject = keyof LedgerValueMap
 type LedgerPoint = { [S in LedgerSubject]: { subject: S; value: LedgerValueMap[S] } }[LedgerSubject]
 
 /** Предметы, у которых два разных известных значения — противоречие. */
-const CONFLICTING: ReadonlySet<LedgerSubject> = new Set(['money.location', 'grandpa.life', 'customer.payment'])
+export const CONFLICTING: ReadonlySet<LedgerSubject> = new Set(['money.location', 'grandpa.life', 'customer.payment'])
 
 export type ClaimSource = 'alik' | WhoId
 
