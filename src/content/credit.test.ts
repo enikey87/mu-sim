@@ -141,6 +141,32 @@ describe('кредитная лестница', () => {
     expect(game.S.money).toBe(500)
   })
 
+  it('после продажи дачи мама через месяцы вспоминает её один раз, не сообщает о новой продаже (#447)', () => {
+    const reminder = NOTIF.find((n) => n.app === 'Мама' && n.when?.some((c) => c.key === momHelp('dacha')))
+    if (!reminder) throw new Error('Нет уведомления мамы о даче')
+    const { game } = makeGame()
+    const eligible = () => game.lines.eligible('NOTIF', [reminder], game.lineFacts())
+    expect(eligible()).toEqual([])
+
+    game.S.mem[creditBroke] = true
+    for (const help of MOM_HELPS) {
+      setMoney(game, 500)
+      game.maybeCreditOffer()
+      expect(game.S.mem[momHelp(help.id)]).toBe(true)
+    }
+    expect(cards(game, 'Мама').filter((c) => c.text.includes('продала дачу'))).toHaveLength(1)
+
+    game.S.day += 60
+    const picked = game.linePicked('NOTIF', [reminder])
+    expect(picked?.text).toBe('Сынок, помнишь, я уже продала дачу, чтобы ты дождался Алика? Помогло?')
+    if (!picked) throw new Error('Напоминание не появилось после помощи')
+    game.notify(reminder.icon, reminder.app, picked.text, { event: 'life' })
+    expect(cards(game, 'Мама').at(-1)?.text).toBe(picked.text)
+
+    game.S.day += 60
+    expect(eligible()).toEqual([])
+  })
+
   it('в эндгейме лестница молчит', () => {
     const { game } = makeGame()
     game.S.mem.payday = 'default'
