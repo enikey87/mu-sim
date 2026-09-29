@@ -98,11 +98,6 @@ export const holidayGreeted = 'holiday.greeted'
 /** «Займи 50» в эндгейме: просьба прозвучала и что игрок ответил (docs/design/lend-50.md). */
 export const lend50 = { asked: 'lend50.asked', answer: 'lend50.answer' } as const
 
-export const lie = { old: 'lie.old', new: 'lie.new', alikOld: 'lie.alikOld', kind: 'lie.kind' } as const
-
-export const said = <C extends string>(claim: C): `said.${C}` => `said.${claim}`
-export const saidLast = <C extends string>(claim: C): `saidLast.${C}` => `saidLast.${claim}`
-export const byClaim = <C extends string>(claim: C): `by.${C}` => `by.${claim}`
 export const cb = <C extends string>(claim: C): `cb.${C}` => `cb.${claim}`
 export const met = <W extends string>(who: W): `met.${W}` => `met.${who}`
 export const intro = <W extends string>(who: W): `intro.${W}` => `intro.${who}`
@@ -112,7 +107,6 @@ export const topic = <K extends string>(k: K): `topic.${K}` => `topic.${k}`
 export const topicMute = <K extends string>(k: K): `topicMute.${K}` => `topicMute.${k}`
 export const finaleOf = <A extends string>(arc: A): `finale.${A}` => `finale.${arc}`
 export const legendOf = <A extends string>(arc: A): `legend.of.${A}` => `legend.of.${arc}`
-export const caughtPair = (a: string, b: string): `caught.${string}` => `caught.${pairKey(a, b)}`
 export const wedding = <W extends string>(who: W): `wedding.${W}` => `wedding.${who}`
 /** Активная сцена Дня выплаты (id узла) — факт на доске мира. */
 export const paydayScene = 'payday'
@@ -144,7 +138,7 @@ export const EVENT_KEY_LIST = [
   'moneyNormal', 'moneyLow', 'moneyBottom', 'paymentDueTomorrow',
   'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sorrySwing', 'promiseLive', 'promisePassed', 'promiseStake',
   'period', 'night', 'offline', 'scene', 'sinceAlik', 'lateCount', 'arcAvailable',
-  'arcsStarted', 'arcsDone', 'quests', 'callbackReady', 'arcUnfinished', 'deathCanAdvance', 'collectorsCanAdvance',
+  'arcsStarted', 'arcsDone', 'quests', 'callbackReady', 'lieOpen', 'lieKind', 'lieAlikOld', 'arcUnfinished', 'deathCanAdvance', 'collectorsCanAdvance',
   'intent', 'tone', 'arg', 'category', 'arc', 'argArcDone', 'greet', 'promise', 'somedayCount',
 ] as const
 export type EventKey = (typeof EVENT_KEY_LIST)[number]
@@ -162,5 +156,5 @@ export const MEM_KEYS: ReadonlySet<string> = new Set([
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday,
   lightOff, netRation, phoneWarn, holidayGreeted,
   creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, criticalAt, creditOfferSum,
-  ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lend50), ...Object.values(lie),
+  ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lend50),
 ])

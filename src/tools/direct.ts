@@ -23,10 +23,8 @@ const offended = (g: Game) => { g.S.mem[HEAT] = 1; g.S.ctx = { offended: true } 
 
 export const DIRECT: Record<string, DirectCase> = {
   Tone_Cow: { event: 'PlayerMessage', facts: { tone: 'cow' } },
-  Says_catchLie_liekind_grandpa: { event: 'PlayerSays', facts: { intent: 'catchLie' }, setup: (g) => { g.S.mem['lie.kind'] = 'grandpa' } },
+  Says_catchLie_lieKind_grandpa: { event: 'PlayerSays', facts: { intent: 'catchLie' }, setup: (g) => { g.noteClaims(['grandpa_dead']); g.noteClaims(['grandpa_alive']) } },
   // #426: sys-claim Гранта («всё заплатил») противоречит «заказчик мне не платит» — бот ловит это сам, 34 партии
-  // sent/no_money больше не эпизод журнала (docs/design/lie-ledger.md); ответ LIE_SENT — только прямым случаем
-  Says_catchLie_liekind_sent: { event: 'PlayerSays', facts: { intent: 'catchLie' }, setup: (g) => { g.S.mem['lie.kind'] = 'sent' } },
   Turn_BorisSick: { event: 'AlikTurn', setup: (g) => { g.S.arcs.boris = { i: 2, last: 0 }; g.S.actors.boris = { sick: true } } },
   Opt_Cow: { event: 'BuildChoices', setup: (g) => { g.S.mem.mooAt = g.S.stats.sent } },
   Away_Offline: { event: 'AlikAway', setup: (g) => { g.S.offlineDays = 2 } },
@@ -86,10 +84,6 @@ export const DIRECT: Record<string, DirectCase> = {
   Finale_boris_toyou: { event: 'ArcFinale', facts: { arc: 'boris' }, setup: (g) => { g.S.items.push('баран Борис') } },
   Finale_niva_chose: { event: 'ArcFinale', facts: { arc: 'niva' }, setup: (g) => { g.S.items.push('«Нива» 1987 года') } },
   Payday_lavash: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['payday.caught'] = true; g.S.mem['crypto.hodl'] = true } },
-  // #426: sys-строка Гранта («всё заплатил») теперь публикует claim — бот чаще ловит Алика на этой лжи,
-  // и выборки до экрана концовки до coins уже не дотягиваются
-  Payday_coins: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['payday.caught'] = true } },
-  Ending_payday_coins: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'coins' } },
   Phone_Karine_PlayerMessage: { event: 'PlayerMessage', facts: { tone: 'neutral' }, setup: (g) => { g.rules.applyOps([during('phone.karine', 1)], {}) } },
   Quiet_Blocked_AlikAway: { event: 'AlikAway', setup: (g) => { g.S.mem.blocked = true } },
   Quiet_PhoneKarine_AlikIdle: { event: 'AlikIdle', setup: (g) => { g.rules.applyOps([during('phone.karine', 1)], {}) } },

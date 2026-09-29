@@ -29,7 +29,7 @@ export type Rule<G, E extends string = string, O = unknown> =
 export type LineSpec = Omit<EngineLineSpec, 'when' | 'remember'> & {
   when?: Criterion[]
   remember?: FactOp[]
-  /** Явная семантика реплики: журнал публикует эти утверждения, а не regex по показанному тексту (#426). */
+  /** Явная семантика реплики: журнал знаний публикует эти утверждения, показанный текст не разбирается. */
   claims?: ClaimKey[]
 }
 

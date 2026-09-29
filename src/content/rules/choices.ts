@@ -13,7 +13,7 @@ import { P_LIE } from '../lies'
 import { TOPICS } from '../topics'
 import { WORLD, SPEAKS, needs } from '../world'
 import { fmtDayMonth, fmtDays } from '../../engine/time'
-import { HEAT, alikDead, alikShaved, moustacheAskAt, blocked, court, lie, mourning, phoneKarine } from '../memkeys'
+import { HEAT, alikDead, alikShaved, moustacheAskAt, blocked, court, mourning, phoneKarine } from '../memkeys'
 
 type R = Rule<Game, GameEvent, Offer>
 
@@ -54,7 +54,7 @@ export const choiceRules: R[] = [
   // поймать на лжи — открытый эпизод журнала; в молчании Алика кнопка скрыта, эпизод остаётся
   offer({
     name: 'CatchLie',
-    when: [exists(lie.old), missing(blocked), missing(alikDead), missing(phoneKarine), eq('offline', false)],
+    when: [is('lieOpen'), missing(blocked), missing(alikDead), missing(phoneKarine), eq('offline', false)],
     act: 'catchLie', tone: 'neutral', bonus: 6,
     text: (g) => { const l = g.lie()!; return g.playerLine(() => g.X.fill(g.draw('P_LIE', P_LIE), { old: l.old.say, new: l.new.say })) },
   }),

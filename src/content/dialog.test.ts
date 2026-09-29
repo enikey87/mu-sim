@@ -284,9 +284,9 @@ describe('несостыковки из плейтеста ботами', () => 
   })
   it('где деньги — меняется по сюжету: старое место всё ещё ловится как открытый эпизод', () => {
     const { game } = makeGame()
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в банке с огурцами.' })
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в банке с огурцами.' }, ['money_jar'])
     game.S.day += 60
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в фундаменте, брат.' })
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в фундаменте, брат.' }, ['money_foundation'])
     expect(game.lie()).not.toBeNull()
     expect(game.buildChoices().some((c) => c.act === 'catchLie')).toBe(true)
   })

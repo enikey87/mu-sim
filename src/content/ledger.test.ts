@@ -79,7 +79,7 @@ describe('операции журнала', () => {
     const rec = publishClaim(l, 'customer.payment', 'paid', { source: 'grant', day: 4 })
     expect(rec.source).toBe('grant')
   })
-  it('каждое regex-утверждение имеет типизированный смысл в адаптере', () => {
+  it('каждое утверждение контента имеет типизированный смысл', () => {
     for (const c of CLAIMS) expect(CLAIM_LEDGER[c.key], c.key).toBeDefined()
   })
 })
@@ -88,46 +88,35 @@ describe('публикация путём игры', () => {
   it('показанная реплика публикует утверждение: предмет, значение, источник, день, сообщение', () => {
     const { game } = makeGame()
     expect(game.S.ledger.claims).toHaveLength(0)
-    const msg = game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в Дубае, брат.' })
+    const msg = game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в Дубае, брат.' }, ['money_dubai'])
     expect(game.S.ledger.claims).toHaveLength(1)
     const rec = game.S.ledger.claims[0]
     expect(rec).toMatchObject({ subject: 'money.location', value: 'dubai', source: 'alik', day: game.S.day, msgId: msg.id })
   })
-  it('реплика без утверждения и смена мира без сообщения знания не создают', () => {
+  it('реплика без разметки и смена мира без сообщения знания не создают', () => {
     const { game } = makeGame()
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги с «Нивой» уехали в горы.' }) // перефраз мимо regex
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в Дубае.' }) // похожие слова без claims
     game.setLegend('Деньги после свадьбы', 'samvel') // мир изменился за кадром
     expect(game.S.ledger.claims).toHaveLength(0)
     expect(openEpisodes(game.S.ledger)).toHaveLength(0)
   })
   it('две несовместимые услышанные версии — открытый эпизод', () => {
     const { game } = makeGame()
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в Дубае.' })
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги у Ноя.' })
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в Дубае.' }, ['money_dubai'])
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги у Ноя.' }, ['money_noah'])
     const eps = openEpisodes(game.S.ledger, 'money.location')
     expect(eps).toHaveLength(1)
     expect([eps[0].a, eps[0].b].sort()).toEqual(['dubai', 'noah'])
   })
   it('слова другого персонажа записываются его источником', () => {
     const { game } = makeGame()
-    game.alikMsg({ kind: 'text', from: 'alik', who: 'nune', text: 'Деньги в сейфе, ключ у меня.' })
+    game.alikMsg({ kind: 'text', from: 'alik', who: 'nune', text: 'Деньги в сейфе, ключ у меня.' }, ['money_safe'])
     expect(game.S.ledger.claims[0].source).toBe('nune')
-  })
-  it('опечатка не меняет опубликованный смысл; исправление не создаёт вторую запись', () => {
-    const { game } = makeGame()
-    // то, что say() делает с опечаткой: показан «дыньги», смысл — исходная фраза
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Дыньги в Дубае.' }, 'Деньги в Дубае.')
-    expect(game.S.ledger.claims).toHaveLength(1)
-    expect(game.S.ledger.claims[0]).toMatchObject({ subject: 'money.location', value: 'dubai' })
-    game.alikMsg({ kind: 'text', from: 'alik', text: '*Деньги' }, '') // пузырь исправления
-    expect(game.S.ledger.claims).toHaveLength(1)
-    // видимое поведение по старым ключам не изменилось: regex показанную опечатку не узнал
-    expect(game.S.mem['said.money_dubai']).toBeUndefined()
   })
   it('callback-кандидат появляется только после услышанного утверждения и типизирован в журнале', () => {
     const { game } = makeGame()
     expect(game.callbackCandidate()).toBeUndefined()
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Бетон обиделся и не застывает.' })
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Бетон обиделся и не застывает.' }, ['beton'])
     expect(game.S.ledger.claims[0]).toMatchObject({ subject: 'beton.mood', value: 'offended' })
     game.S.day += 11
     expect(game.callbackCandidate()?.key).toBe('beton')
@@ -137,28 +126,19 @@ describe('публикация путём игры', () => {
 describe('явная семантика контента (#426)', () => {
   it('отмазка с размеченным смыслом публикует его через обычный say — одна запись, предмет и значение из CLAIM_LEDGER', async () => {
     const { game } = makeGame()
-    // T-шаблон с «Без акта денег нет»: constr-строка несёт claims, текст пула матчит regex
+    // T-шаблон с «Без акта денег нет»: constr-строка несёт claims
     await game.say([{ t: 'Сделал бы давно. Без акта денег нет.', claims: ['no_money'] }])
     expect(game.S.ledger.claims).toHaveLength(1)
     expect(game.S.ledger.claims[0]).toMatchObject({ subject: 'money.none', value: 'gone', source: 'alik' })
   })
-  it('regex-адаптер не дублирует явную публикацию того же ключа', async () => {
+  it('один ключ реплики — одна запись; без разметки — ни одной', async () => {
     const { game } = makeGame()
-    // текст матчит regex money_dubai И явные claims содержат money_dubai — публикуется ровно одна запись
     await game.say([{ t: 'Деньги в Дубае, брат.', claims: ['money_dubai'] }])
     expect(game.S.ledger.claims).toHaveLength(1)
     expect(game.S.ledger.claims[0]).toMatchObject({ subject: 'money.location', value: 'dubai' })
-    // контроль: без явных claims адаптер публикует сам, тоже одна запись
     const { game: g2 } = makeGame()
     await g2.say(['Деньги в Дубае, брат.'])
-    expect(g2.S.ledger.claims).toHaveLength(1)
-  })
-  it('явный смысл не зависит от формулировки строки: опечатанный текст публикует тот же смысл без второй записи', () => {
-    const { game } = makeGame()
-    // то, что say() делает с опечаткой: показан «дыньги», смысл — исходная фраза + явные claims
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Дыньги в Дубае.' }, 'Деньги в Дубае.', ['money_dubai'])
-    expect(game.S.ledger.claims).toHaveLength(1)
-    expect(game.S.ledger.claims[0]).toMatchObject({ subject: 'money.location', value: 'dubai' })
+    expect(g2.S.ledger.claims).toHaveLength(0)
   })
   it('другой говорящий публикует своим источником (групповой чат Нуне)', async () => {
     const { game } = makeGame()
@@ -196,12 +176,12 @@ describe('явная семантика контента (#426)', () => {
     if (added.length) expect(added[0]).toMatchObject({ subject: 'money.none', value: 'gone' })
     // детерминированная проверка самой строки пула через прямую доставку
     const { game: g2 } = makeGame()
-    g2.alikMsg({ kind: 'text', from: 'alik', text: 'ты там живой? Я волнуюсь. Денег нет, но волнуюсь.' }, undefined, ['no_money'])
+    g2.alikMsg({ kind: 'text', from: 'alik', text: 'ты там живой? Я волнуюсь. Денег нет, но волнуюсь.' }, ['no_money'])
     expect(g2.S.ledger.claims.at(-1)).toMatchObject({ subject: 'money.none', value: 'gone' })
   })
   it('две формулировки одного значения не конфликтуют; активное значение — последнее', async () => {
     const { game } = makeGame()
-    await game.say(['Деньги в Дубае.'])
+    await game.say([{ t: 'Деньги в Дубае.', claims: ['money_dubai'] }])
     await game.say([{ t: 'Смотри: деньги в Дубае, всё на месте.', claims: ['money_dubai'] }])
     expect(openEpisodes(game.S.ledger, 'money.location')).toHaveLength(0)
     expect(activeClaim(game.S.ledger, 'money.location')?.value).toBe('dubai')
@@ -214,21 +194,20 @@ describe('явная семантика контента (#426)', () => {
     const last = game.S.msgs.at(-1)
     expect(last?.kind === 'sys' ? last.text : '').toMatch(/Заказчик: «Я Алику всё заплатил|заплатил дважды/)
   })
-  it('негативный контроль: убрать claims из явной публикации — дедуп-адаптер публикует лишнюю запись', async () => {
-    // при разметке на месте: текст матчит regex и ключ в explicit — одна запись (проверено выше);
-    // здесь показываем, что запись всё же появляется (явная публикация работает и без regex-матча)
+  it('разметка определяет смысл, а не слова: строка без «денег нет» публикует его явно', async () => {
     const { game } = makeGame()
-    await game.say([{ t: 'Понимаешь, денег просто нет сейчас.', claims: ['no_money'] }])
+    await game.say([{ t: 'Понимаешь, пусто у меня сейчас.', claims: ['no_money'] }])
     expect(game.S.ledger.claims).toHaveLength(1)
     expect(game.S.ledger.claims[0]).toMatchObject({ subject: 'money.none', value: 'gone' })
   })
+
 })
 
 describe('сохранение и загрузка', () => {
   it('журнал переживает сохранение и загрузку без потерь', () => {
     const { game, storage } = makeGame()
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в Дубае.' })
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги у Ноя.' })
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в Дубае.' }, ['money_dubai'])
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги у Ноя.' }, ['money_noah'])
     saveState(storage, game.S)
     const loaded = loadState(storage)!
     expect(JSON.stringify(loaded.ledger)).toBe(JSON.stringify(game.S.ledger))
@@ -295,6 +274,27 @@ describe('миграция старых сохранений', () => {
     const l = loadState(storage)!.ledger
     expect(l.claims.map((c) => c.claimKey).sort()).toEqual(['no_money', 'sent'])
     expect(l.episodes).toHaveLength(0)
+  })
+  it('старая партия продолжается на новом состоянии: поимка, сохранение, повторная загрузка', async () => {
+    const storage = legacyStorage({
+      'said.money_jar': 100, 'saidLast.money_jar': 100,
+      'said.money_dubai': 105, 'saidLast.money_dubai': 105,
+      'lie.old': 'money_jar', 'lie.new': 'money_dubai', 'lie.kind': 'money', 'lie.alikOld': true,
+    })
+    const { game } = makeGame({ storage })
+    game.S.day = 110
+    expect(game.facts()['heard.money_jar']).toBe(true)
+    expect(game.callbackCandidate()?.key).toBe('money_jar') // мигрированное знание кормит воспоминания
+    const c = game.buildChoices().find((x) => x.act === 'catchLie')
+    expect(c?.text).toMatch(/огурц/)
+    await game.send(c!)
+    expect(openEpisodes(game.S.ledger)).toHaveLength(0)
+    game.save()
+    const { game: again } = makeGame({ storage })
+    expect(again.S.ledger.claims).toHaveLength(game.S.ledger.claims.length)
+    expect(openEpisodes(again.S.ledger)).toHaveLength(0)
+    // старые lie.* остались в памяти как есть, но кнопку не возвращают
+    expect(again.buildChoices().some((x) => x.act === 'catchLie')).toBe(false)
   })
   it('migrateLedger на уже мигрированном журнале — тот же объект', () => {
     const l = freshLedger()

@@ -1,6 +1,6 @@
 // Память Алика: реплики с условиями на то, что было в этой партии (как в Hades — требования, приоритет, «уже сказано»).
 // Каждая звучит один раз. Приоритет 1 — конкретное событие партии, 0 — общая «статистика».
-import { type Line, is, eq, ne, gte, lte, exists, sincePast, sinceWithin } from './fact'
+import { type Line, is, eq, ne, gte, lte, sincePast, sinceWithin } from './fact'
 import { needs } from './world'
 import { caughtCount, count, court, courtVerdict, garikConcrete, paydayScene, ritualCut, vendetta } from './memkeys'
 
@@ -32,7 +32,7 @@ export const MEMORY: Line[] = [
   needs('borisWrites')({ t: 'Борис до сих пор пишет тебе с моего телефона? Привык. Не отвечай ему — я ревную.', when: [past('blocked')], prio: 1 }),
   { t: 'Правнук мой вчера родился. Первое слово — «не плати». Вендетта работает.', when: [is(vendetta)], prio: 1 },
   // ложь, прощение, займы, заказчик
-  { t: 'Слушай, я тут подумал: деньги всё-таки не в банке с огурцами. В банке с помидорами. Не путай.', when: [gte(caughtCount, 1), exists('said.money_jar')], prio: 1 },
+  { t: 'Слушай, я тут подумал: деньги всё-таки не в банке с огурцами. В банке с помидорами. Не путай.', when: [gte(caughtCount, 1), is('heard.money_jar')], prio: 1 },
   { t: 'Ты меня ловишь на вранье чаще, чем я вру. Это уже нечестно.', when: [gte(caughtCount, 3)], prio: 1 },
   { t: 'Спасибо, что простил меня тогда, на смертном одре. Я там почти умер. «Почти» — ключевое слово.', when: [past('forgive')], prio: 1 },
   { t: 'Те пять тысяч, что ты мне занял, я помню. Каждый день помню. Это важнее, чем отдать.', when: [past('lend')], prio: 1 },
