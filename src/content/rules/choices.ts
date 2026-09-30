@@ -43,6 +43,11 @@ const fromArr = (game: Game, key: string, arr: readonly Entry<unknown>[]) => {
   requirePlayerPool(key, arr)
   return game.playerLine(() => game.draw(key, arr as readonly Entry<string>[]))
 }
+// пул — в реестре кнопок (#491), но строка — как есть, без украшения обращением: обращаемся к посреднику, а не к Алику (#512)
+const plainFromArr = (game: Game, key: string, arr: readonly Entry<unknown>[]) => {
+  requirePlayerPool(key, arr)
+  return game.draw(key, arr as readonly Entry<string>[])
+}
 const freshFromArr = (game: Game, key: string, arr: readonly Entry<unknown>[]) => {
   requirePlayerPool(key.startsWith('F_') ? `ARCS.${key.slice(2)}.follow` : key, arr)
   return game.freshPlayer(key, arr as readonly Entry<string>[]) ?? ''
@@ -74,9 +79,9 @@ export const choiceRules: R[] = [
   offer({ name: 'Sorry', when: [is('ctx.offended')], act: 'sorry', tone: 'polite', bonus: 5, text: (g) => fromD(g, 'P_SORRY') }),
   // лестница грубости: заблокирован — извиниться можно только через Бориса; ссора горячая — можно мычать
   // посредник — лучший из тех, кто есть: Борис, Карине, мама Алика (один вариант на слот); обращение к посреднику — без «Алик, …»
-  offer({ name: 'Via_boris', slot: 'via', when: [is(blocked), SPEAKS.boris], act: 'via', arg: () => 'boris', tone: 'polite', bonus: 7, text: (g) => fromArr(g, 'P_VIA_BORIS', P_VIA_BORIS) }),
-  offer({ name: 'Via_karine', slot: 'via', when: [is(blocked), WORLD.karineHome, WORLD.karine], act: 'via', arg: () => 'karine', tone: 'polite', bonus: 6, text: (g) => fromArr(g, 'P_VIA_KARINE', P_VIA_KARINE) }),
-  offer({ name: 'Via_mama', slot: 'via', when: [is(blocked)], act: 'via', arg: () => 'mama', tone: 'polite', bonus: 6, text: (g) => fromArr(g, 'P_VIA_MAMA', P_VIA_MAMA) }),
+  offer({ name: 'Via_boris', slot: 'via', when: [is(blocked), SPEAKS.boris], act: 'via', arg: () => 'boris', tone: 'polite', bonus: 7, text: (g) => plainFromArr(g, 'P_VIA_BORIS', P_VIA_BORIS) }),
+  offer({ name: 'Via_karine', slot: 'via', when: [is(blocked), WORLD.karineHome, WORLD.karine], act: 'via', arg: () => 'karine', tone: 'polite', bonus: 6, text: (g) => plainFromArr(g, 'P_VIA_KARINE', P_VIA_KARINE) }),
+  offer({ name: 'Via_mama', slot: 'via', when: [is(blocked)], act: 'via', arg: () => 'mama', tone: 'polite', bonus: 6, text: (g) => plainFromArr(g, 'P_VIA_MAMA', P_VIA_MAMA) }),
   offer({ name: 'Moo', when: [is('ctx.offended'), gte(HEAT, 1)], odds: 0.5, act: 'moo', tone: 'neutral', bonus: 4, text: (g) => fromArr(g, 'P_MOO', P_MOO) }),
 
   // пока усы отрастают — подколоть Алика (#352); не чаще раза в 5 дней после вопроса
