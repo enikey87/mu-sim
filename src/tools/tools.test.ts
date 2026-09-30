@@ -9,6 +9,7 @@ import { is } from '../content/fact'
 import { endgame } from '../content/memkeys'
 import { wallClock } from '../engine/clock'
 import { ruleCoverage } from './coverage'
+import { playtest } from './playtest'
 
 describe('линтер правил', () => {
   it('в игре нет правил, которые никогда не могут победить, и правил без ответа', () => {
@@ -206,10 +207,22 @@ describe('покрытие правил', () => {
 })
 
 describe('strictTurns в покрытии и плейтесте (#468)', () => {
-  it('coverage.ts и playtest.ts передают strictTurns: true', async () => {
-    const { readFileSync } = await import('node:fs')
-    expect(readFileSync('src/tools/coverage.ts', 'utf8')).toMatch(/strictTurns:\s*true/)
-    expect(readFileSync('src/tools/playtest.ts', 'utf8')).toMatch(/strictTurns:\s*true/)
+  // регулярка по исходнику не видела флага, убранного в комментарий; сторож — настоящая партия (#493)
+  it('правило, бросающее в ходе, валит партию плейтеста — не тихий recover (#493)', async () => {
+    const boom = {
+      name: 'Test_PlaytestBoom493',
+      event: 'PlayerMessage' as const,
+      when: [] as [],
+      specificity: 999,
+      respond: () => { throw new Error('boom-playtest-493') },
+    }
+    allRules.push(boom as unknown as (typeof allRules)[number])
+    try {
+      await expect(playtest(1, 4)).rejects.toThrow(/boom-playtest-493/)
+    } finally {
+      const i = allRules.findIndex((r) => r.name === 'Test_PlaytestBoom493')
+      if (i >= 0) allRules.splice(i, 1)
+    }
   })
 
   it('правило, бросающее в ходе, валит ruleCoverage — не тихий recover (#468)', async () => {
