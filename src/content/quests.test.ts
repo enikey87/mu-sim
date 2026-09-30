@@ -39,8 +39,13 @@ describe('мини-квесты', () => {
 })
 
 describe('начало игры и сериалы', () => {
-  it('у каждой завязки есть обещание, ответ и «сколько прошло»', () => {
-    for (const s of STARTS) { expect(s.intro.length).toBeGreaterThan(20); expect(s.gap).toContain('{d}') }
+  it('у каждой завязки есть обещание, короткий vow в intro, ответ и «сколько прошло»', () => {
+    for (const s of STARTS) {
+      expect(s.intro.length).toBeGreaterThan(20)
+      expect(s.vow.length).toBeGreaterThan(3)
+      expect(s.intro.includes(s.vow), `vow «${s.vow}» должен входить в intro`).toBe(true)
+      expect(s.gap).toContain('{d}')
+    }
   })
   it('сюжетный ход запускает первый сериал, даже если игрок только спорит', async () => {
     const { game } = makeGame()

@@ -8,7 +8,7 @@ const findings = []
 const note = (sev, id, detail) => findings.push({ sev, id, detail })
 
 async function fresh(page) {
-  // ?nointro — интро новой партии ~12 с анимации, тех-обход не должен её ждать
+  // ?nointro — интро новой партии ~10 с анимации, тех-обход не должен её ждать
   await page.goto(`${BASE}/?fast&nointro`, { waitUntil: 'domcontentloaded' })
   await page.evaluate(() => localStorage.clear())
   await page.goto(`${BASE}/?fast&nointro`, { waitUntil: 'domcontentloaded' })
