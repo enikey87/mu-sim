@@ -101,7 +101,7 @@ export const FAMILIES: Record<string, (rest: string) => boolean> = {
   'wedding.': (r) => Object.hasOwn(CAST, r) || r === 'anush',
   'bills.': (r) => /^(rent|phone|transit)\.(dueAt|due|unpaid|streak)$/.test(r),
   'sold.': (r) => /^(microwave|guitar|tile|tires)$/.test(r),
-  'mom.': (r) => /^(pension|pickles|dacha|dacha\.at|dacha\.days|done)$/.test(r),
+  'mom.': (r) => /^(pension|pickles|dacha|done)$/.test(r),
   'credit.': (r) => /^(consumer|refi|micro)\.(taken|dueAt|failed)$/.test(r),
 }
 

@@ -144,6 +144,10 @@ describe('кредитная лестница', () => {
   it('мама вспоминает дачу через 30 дней после продажи ровно один раз (#447, #460)', async () => {
     const reminder = NOTIF.find((n) => n.app === 'Мама' && n.when?.some((c) => c.key === momHelp('dacha')))
     if (!reminder) throw new Error('Нет уведомления мамы о даче')
+    // строка одноразовая: без repeat/перерыва отметка «показано» держит её закрытой навсегда,
+    // поэтому «ровно один раз» не зависит от длины перерыва (#466)
+    expect(reminder.repeat).toBeFalsy()
+    expect(reminder.cooldown).toBeUndefined()
     const { game } = makeGame()
     const eligible = () => game.lines.eligible('NOTIF', [reminder], game.lineFacts())
     expect(eligible()).toEqual([])
@@ -165,21 +169,22 @@ describe('кредитная лестница', () => {
     expect(eligible()).toEqual([])
 
     game.S.day = soldAt + 30
-    const picked = game.linePicked('NOTIF', [reminder])
-    expect(picked?.text).toBe('Сынок, помнишь, я уже продала дачу, чтобы ты дождался Алика? Помогло?')
-    if (!picked) throw new Error('Напоминание не появилось после помощи')
-    game.notify(reminder.icon, reminder.app, picked.text, { event: 'life' })
-    expect(cards(game, 'Мама').at(-1)?.text).toBe(picked.text)
-
-    const reminders = () => cards(game, 'Мама').filter((c) => c.text === picked.text)
+    expect(eligible()).toHaveLength(1)
+    // показ — настоящий путь игрока: randomNotif сам выбирает строку из общего пула и метит её
+    const reminders = () => cards(game, 'Мама').filter((c) => c.text === reminder.t)
+    for (let i = 0; i < 300 && reminders().length === 0; i++) game.randomNotif()
     expect(reminders()).toHaveLength(1)
+    expect(eligible(), 'отметка «показано» закрывает строку сразу').toEqual([])
+
+    // сколько бы ни прошло — ходов или дней, — второго раза нет
     for (let turn = 0; turn < 12; turn++) {
       await game.send(`Алик, где деньги? ${turn}`)
-      expect(eligible(), `после ${turn + 1} ходов`).toEqual([])
+      game.S.day = soldAt + 30 + (turn + 1) * 40
+      expect(eligible(), `день ${game.S.day}`).toEqual([])
       expect(reminders()).toHaveLength(1)
     }
-    expect(game.S.stats.sent).toBeGreaterThanOrEqual(12)
-    expect(game.S.day).toBeGreaterThan(soldAt + 30)
+    for (let i = 0; i < 50; i++) game.randomNotif()
+    expect(reminders()).toHaveLength(1)
   })
 
   it('старое сохранение с проданной дачей начинает отсчёт при загрузке', () => {
