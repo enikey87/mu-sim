@@ -149,4 +149,6 @@ export const DIRECT: Record<string, DirectCase> = {
       g.S.promises[0].met = g.S.day
     },
   },
+  // после расширения LEGENDARY бот реже доходит до угроз→сцены (#508)
+  Scene_tax: { event: 'PickScene', setup: (g) => { g.S.mem['count.threat'] = 1 } },
 }

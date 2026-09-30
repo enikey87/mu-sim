@@ -184,6 +184,18 @@ describe('excuse generator', () => {
     expect(legends.length).toBeGreaterThan(50)
     expect(new Set(legends).size).toBe(legends.length)
   })
+  it('«Алик всегда возвращает свои долги» — легендарная, не больше раза за партию (#508)', () => {
+    const LINE = 'Алик всегда возвращает свои долги, ты же знаешь.'
+    expect(D.LEGENDARY).toContain(LINE)
+    expect(D.LEGENDARY.length).toBe(101)
+    const X = api(9)
+    const hits: string[] = []
+    for (let i = 0; i < 12_000; i++) {
+      const e = X.excuse()
+      if (e.legendary && saidText(e.texts[0]) === LINE) hits.push(LINE)
+    }
+    expect(hits.length).toBe(1)
+  })
   it('helper generators produce text', () => {
     const X = api(3)
     for (const f of [X.short, X.offended, X.threat, X.cow, X.back, X.jobYes, X.jobNo, X.photo, X.legendQ, X.sorry]) {
