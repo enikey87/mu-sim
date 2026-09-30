@@ -1485,15 +1485,16 @@ export class Game {
       // бедность — своими словами: пул уровня без повторов, исчерпанный звучит редко (#184)
       const poor = money && this.chance(level === 'bottom' ? 0.7 : 0.4) ? this.poorChoice(`P_MONEY_${level}_POL`, money.polite) : null
       const arg = poor && typeof poor.value !== 'string' ? poor.value.arg : undefined
-      out.push({ text: poor?.text ?? P2('P_POL_A', 'P_POL_B'), tone: 'polite', ...(arg ? { act: 'desperate', arg } : {}) })
+      // любая реплика о своих деньгах несёт намерение: ответ на неё — раньше фоновых последствий (#459)
+      out.push({ text: poor?.text ?? P2('P_POL_A', 'P_POL_B'), tone: 'polite', ...(poor ? { act: 'desperate', arg } : {}) })
     }
     if (out.length < 3) {
       const period = this.period()
       // отчаяние — своё намерение, чаще на дне; вежливый вариант выше остаётся при любом уровне
       const cry = money && level && this.chance(level === 'bottom' ? 0.6 : 0.3) ? this.poorChoice(`P_DESPERATE_${level}`, P_DESPERATE[level], { act: true }) : null
-      const poor = !cry && money && this.chance(0.5) ? this.poorLine(`P_MONEY_${level}_NEU`, money.neutral) : null
+      const poor = !cry && money && this.chance(0.5) ? this.poorChoice<PoorText>(`P_MONEY_${level}_NEU`, money.neutral) : null
       if (cry) out.push({ text: cry.text, tone: 'neutral', act: 'desperate', arg: typeof cry.value === 'string' ? undefined : cry.value.arg })
-      else if (poor) out.push({ text: poor, tone: 'neutral' })
+      else if (poor) out.push({ text: poor.text, tone: 'neutral', act: 'desperate', arg: typeof poor.value === 'string' ? undefined : poor.value.arg })
       else {
       // нейтральная реплика знает время: ночь, вечер пятницы, поздние дни ожидания
       const tail = period === 'night' && this.chance(0.5) ? this.freshPlayer('P_NIGHT', P_NIGHT)

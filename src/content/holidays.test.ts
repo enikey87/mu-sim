@@ -121,7 +121,7 @@ describe('праздники', () => {
     const holiday = HOLIDAY_EXCUSES.map((l) => spec(l).t)
     const said = () => game.S.msgs.flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : []))
     const count = () => said().filter((t) => holiday.includes(t)).length
-    game.S.day = 289
+    game.S.day = 288 // 31.12: окно открыто; +1…3 дня за ход не выходят из окна (#328)
     await game.send({ text: 'Спасибо!', tone: 'polite' })
     expect(count()).toBe(1)
     const key = game.S.mem['holiday.greeted']
@@ -156,7 +156,7 @@ describe('праздники', () => {
     const { game } = makeGame({ seed: 3 })
     const holiday = HOLIDAY_EXCUSES.map((l) => spec(l).t)
     const count = () => game.S.msgs.flatMap((m) => (m.kind === 'text' && m.from === 'alik' && holiday.includes(m.text) ? [m.text] : [])).length
-    game.S.day = 289
+    game.S.day = 288 // 31.12: окно открыто; +1…3 дня за ход не выходят из окна (#328)
     await game.send({ text: 'Спасибо!', tone: 'polite' })
     expect(count()).toBe(1)
     delete game.S.mem['holiday.greeted']
