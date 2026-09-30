@@ -8,6 +8,7 @@ import type { Choice } from '../engine/state'
 import { P_MONEY, P_DESPERATE, DESPERATE_PAIRS, DESPERATE_REPLY, MONEY_REPLY_POLITE, MONEY_REPLY_NEUTRAL, MONEY_REPLY_REGIMENT } from './topics'
 import { sold } from './credit'
 import { billDueAt } from './bills'
+import { Gated } from '../engine/rules'
 
 const rebuilds = (g: Game, n: number): Choice[][] => Array.from({ length: n }, () => { g.S.choices = null; return g.buildChoices() })
 const fromPool = (text: string, pool: readonly unknown[]) => pool.some((p) => {
@@ -23,7 +24,18 @@ const fromDesperatePool = (c: Choice) => fromPool(c.text, P_DESPERATE.low) || fr
 const SELL_TILE = 'ПРОДАМ ПЛИТКУ'
 const SOLD_TILE = 'УЖЕ ПРОДАЛ ПЛИТКУ'
 const DUE_TOMORROW = 'Списание завтра'
-const BOTTOM_REPLIES = DESPERATE_REPLY.filter((r) => typeof r !== 'string').map(valueOf)
+/** Все пулы общего ответа на деньги — сторож «дна» видит каждый (#495). */
+const MONEY_REPLY_POOLS = [
+  ['DESPERATE_REPLY', DESPERATE_REPLY],
+  ['MONEY_REPLY_POLITE', MONEY_REPLY_POLITE],
+  ['MONEY_REPLY_NEUTRAL', MONEY_REPLY_NEUTRAL],
+  ['MONEY_REPLY_REGIMENT', MONEY_REPLY_REGIMENT],
+] as const
+const hasMoneyBottom = (e: unknown): e is Gated<string> =>
+  e instanceof Gated && e.when.some((c) => c.key === 'moneyBottom' && c.op === '==' && c.value === true)
+const bottomReplies = (pool: readonly unknown[]): string[] =>
+  pool.filter(hasMoneyBottom).map((e) => valueOf(e))
+const BOTTOM_REPLIES = MONEY_REPLY_POOLS.flatMap(([, pool]) => bottomReplies(pool))
 const choiceWith = (game: Game, text: string): Choice => {
   for (let i = 0; i < 160; i++) {
     game.S.choices = null
@@ -314,7 +326,13 @@ describe('отчаяние от бедности', () => {
     expect(rebuilds(game, 100).flat().some((c) => c.text.includes(SELL_TILE))).toBe(true)
   })
 
-  it('ответы про «дно» — только на moneyBottom; на «мало» их нет (#187)', async () => {
+  it('ответы про «дно» — только на moneyBottom; на «мало» их нет (#187/#495)', async () => {
+    // каждый пул общего ответа держит ≥1 гейт moneyBottom — снять гейт с любого → красный
+    for (const [name, pool] of MONEY_REPLY_POOLS) {
+      expect(bottomReplies(pool).length, name).toBeGreaterThan(0)
+    }
+    expect(BOTTOM_REPLIES.length).toBeGreaterThanOrEqual(MONEY_REPLY_POOLS.length)
+
     const low = makeGame({ seed: 3 }).game
     setMoney(low, Game.MONEY_LOW)
     for (let i = 0; i < 40; i++) {
@@ -324,21 +342,31 @@ describe('отчаяние от бедности', () => {
       if (!c) continue
       const from = low.S.msgs.length
       await low.send(c)
-      const first = low.S.msgs.slice(from).find((m) => m.kind === 'text' && m.from === 'alik')
-      expect(BOTTOM_REPLIES.includes((first as { text: string }).text), (first as { text: string })?.text).toBe(false)
+      const first = firstReply(low, from)
+      expect(BOTTOM_REPLIES.includes(first!), first).toBe(false)
     }
-    // после #480 общий ответ идёт по тону, и строки про «дно» несёт пул крика: гоняем его маршрут настоящими send
-    // пул одноразовый — по партии на попытку
-    let hit = false
-    for (let seed = 1; seed <= 20 && !hit; seed++) {
-      const bottom = makeGame({ seed }).game
-      setMoney(bottom, Game.MONEY_BOTTOM)
-      const from = bottom.S.msgs.length
-      await bottom.send({ text: 'Алик, у меня на карте ДНО. Не метафора. Дно.', tone: 'neutral', act: 'desperate', arg: 'shout' })
-      const first = bottom.S.msgs.slice(from).find((m) => m.kind === 'text' && m.from === 'alik')
-      if (first && first.kind === 'text' && BOTTOM_REPLIES.includes(first.text)) hit = true
+    // на дне — путём игрока (buildChoices→send) доезжаем до gated-строк каждого пула
+    const routes: { ask: string; polite?: boolean }[] = [
+      { ask: 'на карте ДНО' }, // DESPERATE_REPLY (крик)
+      { ask: 'всё ещё вежливый' }, // MONEY_REPLY_POLITE
+      { ask: 'Ниже только фундамент' }, // MONEY_REPLY_NEUTRAL
+      { ask: 'всё ещё вежливый', polite: true }, // MONEY_REPLY_REGIMENT
+    ]
+    for (const route of routes) {
+      let hit = false
+      for (let seed = 1; seed <= 24 && !hit; seed++) {
+        const bottom = makeGame({ seed }).game
+        setMoney(bottom, Game.MONEY_BOTTOM)
+        if (route.polite) bottom.S.mem.polite = true
+        const c = choiceWith(bottom, route.ask)
+        expect(c.act, route.ask).toBe('desperate')
+        const from = bottom.S.msgs.length
+        await bottom.send(c)
+        const first = firstReply(bottom, from)
+        if (first && BOTTOM_REPLIES.includes(first)) hit = true
+      }
+      expect(hit, `дно-ответ для «${route.ask}»${route.polite ? ' (регламент)' : ''}`).toBe(true)
     }
-    expect(hit).toBe(true)
   })
 
   it('в пуле отчаяния нет голода и табу money.md (#187)', () => {
