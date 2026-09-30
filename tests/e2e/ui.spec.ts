@@ -218,3 +218,39 @@ test('сброс во время ответа Алика: старая парт�
   await expect(page.locator('.msg')).toHaveCount(introCount)
   await expect(page.locator('#debt')).toHaveText(/240\s000 ₽/)
 })
+
+test('интро: строка гаснет, не обрывается; двух видимых нет (#500)', async ({ page }) => {
+  await page.addInitScript(() => localStorage.clear())
+  await page.goto('/?fast')
+  const intro = page.locator('.intro')
+  await expect(intro).toBeVisible({ timeout: 10_000 })
+  const hint = page.getByText('Коснитесь, чтобы начать')
+  if (await hint.isVisible()) await intro.click()
+  await expect(page.locator('.intro-line.on')).toBeVisible()
+
+  const probe = await page.evaluate(async () => {
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+    const opacities: number[] = []
+    let maxVisible = 0
+    const start = performance.now()
+    while (performance.now() - start < 9000) {
+      const lines = [...document.querySelectorAll('.intro-line')] as HTMLElement[]
+      let visible = 0
+      for (const el of lines) {
+        const o = parseFloat(getComputedStyle(el).opacity)
+        if (!Number.isFinite(o)) continue
+        opacities.push(o)
+        if (o > 0.08) visible++
+      }
+      maxVisible = Math.max(maxVisible, visible)
+      if (!document.querySelector('.intro')) break
+      await sleep(40)
+    }
+    const midFade = opacities.filter((o) => o > 0.12 && o < 0.88).length
+    return { maxVisible, midFade, samples: opacities.length }
+  })
+
+  expect(probe.samples).toBeGreaterThan(20)
+  expect(probe.maxVisible, 'две строки одновременно').toBeLessThanOrEqual(1)
+  expect(probe.midFade, 'затухание/появление, а не обрыв').toBeGreaterThan(0)
+})

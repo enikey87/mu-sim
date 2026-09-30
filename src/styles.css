@@ -443,10 +443,12 @@ body {
   text-align: center; font-weight: 700; font-size: 28px; line-height: 1.2;
   text-shadow: 0 2px 12px rgba(0,0,0,.55);
   pointer-events: none;
-  animation: intro-line-in .28s ease both;
+  opacity: 0;
 }
-.intro-line.on { opacity: 1; }
+.intro-line.on { animation: intro-line-in .28s ease both; }
+.intro-line.out { animation: intro-line-out .28s ease both; }
 @keyframes intro-line-in { from { opacity: 0 } to { opacity: 1 } }
+@keyframes intro-line-out { from { opacity: 1 } to { opacity: 0 } }
 .intro-hint { position: absolute; bottom: 22px; left: 0; right: 0; text-align: center; font-size: 13px; opacity: .85; animation: intro-pulse 1.6s ease-in-out infinite; }
 @keyframes intro-pulse { 50% { opacity: .35 } }
 .intro-title {
@@ -463,10 +465,14 @@ body {
 @keyframes intro-moo { 0% { opacity: 0; transform: scale(.6) } 20% { opacity: 1; transform: scale(1.1) } 100% { opacity: 1; transform: scale(1) } }
 /* reduced: те же карточки по очереди, без появления, затухания и уезда */
 .intro-reduced .intro-line, .intro-reduced .intro-title { transition: none; animation: none; }
+.intro-reduced .intro-line.on { opacity: 1; }
+.intro-reduced .intro-line.out { opacity: 0; }
 .intro-reduced .intro-moo, .intro-reduced .intro-hint { animation: none; }
 .intro-reduced .intro-moo { opacity: 1; }
 @media (prefers-reduced-motion: reduce) {
   .intro-line, .intro-title { transition: none; animation: none; }
+  .intro-line.on { opacity: 1; }
+  .intro-line.out { opacity: 0; }
   .intro-moo, .intro-hint { animation: none; }
   .intro-leave { transition: none; }
 }
