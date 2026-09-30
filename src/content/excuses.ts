@@ -1,15 +1,18 @@
 // Словари и генератор отмазок Алика Воздухонесяна.
 import { type Rng, mathRng } from '../engine/rng'
 import type { Due } from '../engine/time'
-import { type Entry, type Said, saidJoin, saidMap, gate, eq, gte, lt, lte, matches, missing, exists, is, of } from './fact'
+import { type Entry, type Said, saidClaims, saidJoin, saidMap, valueOf, gate, eq, gte, lt, lte, matches, missing, exists, is, of } from './fact'
 import type { LegalClaim } from '../engine/input'
 import type { HolidayRef } from './holidays'
 import { isWhoId, type WhoId } from './ids'
 import { needs, WORLD } from './world'
+import { selfConflict } from './ledger'
+import { sold } from './credit'
+import type { LedgerEvent } from './fact-types'
 import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, collectorsRecruited, count, evicted, finaleOf, grantPaid, met, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, sick, taxThawed, threatClaim, tileCornerRemoved } from './memkeys'
 
 // draw(key, arr) выдаёт уместный сейчас элемент «из колоды» (без повторов до конца колоды); noRefill — после исчерпания null
-export type DrawFn = <T = unknown>(key: string, arr: readonly Entry<T>[], noRefill?: boolean) => T
+export type DrawFn = <T = unknown>(key: string, arr: readonly Entry<T>[], noRefill?: boolean, eligible?: (e: Entry<T>) => boolean) => T
 /** n — кто, g — кого; you — как его назовёт игрок, если Алик сказал «мой»/«я». */
 /** id — кто это из CAST, если отмазка называет его роль: такая реплика знакомит с персонажем. */
 export interface Rel { n: string; g: string; you?: string; id?: WhoId }
@@ -611,7 +614,7 @@ D.PREV_B = [
 // реплики игрока: A + B
 D.P_POL_A = [
   gate(matches('period', /^(day|lunch)$/))('Алик, добрый день!'), 'Алик, здравствуйте!', gate(eq('period', 'morning'))('Доброе утро, Алик!'), gate(matches('period', /^(evening|friday)$/))('Добрый вечер, Алик!'), 'Алик-джан, как здоровье?',
-  'Уважаемый Алик!', 'Алик, извините, что беспокою.', 'Алик, простите, что снова пишу.', 'Алик, надеюсь, у вас всё хорошо.',
+  'Уважаемый Алик!', 'Алик, извините, что беспокою.', gate(gte('sent', 1))('Алик, простите, что снова пишу.'), 'Алик, надеюсь, у вас всё хорошо.',
   'Алик, поздравляю с праздником! С каким бы ни было.', 'Алик, передавайте привет семье.', 'Алик, желаю вам здоровья.',
   'Алик, извините за настойчивость.', 'Алик, спасибо, что терпите меня.', 'Здравствуйте, Алик-джан!',
 ];
@@ -627,13 +630,13 @@ D.P_POL_B = [
   'Мой шов на вашем объекте идеальный. Как и моё терпение. Было.', 'Мне бы до зарплаты дотянуть. До вашей.',
   'Если удобно — можно сегодня. Если неудобно — тоже сегодня.', 'Я тут подумал: а вдруг сегодня тот самый день?',
 ];
-D.P_NEU_A = ['Алик.', 'Алик, это опять я.', 'Ау.', 'Алик, привет.', 'Алик, я серьёзно.', 'Это снова я.', 'Алик, есть минутка?', 'Ну что там?'];
+D.P_NEU_A = ['Алик.', gate(gte('sent', 1))('Алик, это опять я.'), 'Ау.', 'Алик, привет.', 'Алик, я серьёзно.', gate(gte('sent', 1))('Это снова я.'), 'Алик, есть минутка?', 'Ну что там?'];
 D.P_NEU_B = [
   'Когда деньги?', 'По оплате что?', 'Напоминаю про долг.', 'Ты обещал.', gate(missing(evicted))('Мне нечем платить за квартиру.'),
   'У меня кредит.', needs('saidTomorrow')('«Завтра» — это какой день недели?'), 'Есть новости?', 'Мне другие подрядчики уже платят.',
-  'Я ем гречку. Какую неделю — уже не считаю.', 'Я тут посчитал проценты.', 'Давай хоть график составим.', 'Сколько ещё ждать, примерно?',
+  gate(eq('moneyNormal', false))('Я ем гречку. Какую неделю — уже не считаю.'), 'Я тут посчитал проценты.', 'Давай хоть график составим.', 'Сколько ещё ждать, примерно?',
   'Мне к стоматологу надо.', 'Сколько можно?', 'Я не могу больше ждать.',
-  'У меня таблица. В ней одна строка — вы.', 'Кот спрашивает, когда корм.', gate(is('moneyBottom'))('Велосипед я уже продал. Что продавать дальше?'),
+  'У меня таблица. В ней одна строка — вы.', 'Кот спрашивает, когда корм.', gate(is(sold('microwave')))('Микроволновку я уже продал. Что продавать дальше?'), gate(is(sold('guitar')))('Гитару я уже продал. Что продавать дальше?'), gate(is(sold('tires')))('Зимнюю резину я уже продал. Что продавать дальше?'),
   'Сегодня хороший день, чтобы заплатить.', 'Мне банк звонит чаще, чем вы пишете.', 'Я выучил все ваши отмазки. Хочу новую — «перевёл».',
   gate(missing(evicted))('Мой хозяин квартиры тоже из Еревана. Скучает по деньгам.'), 'Давайте без легенд. Просто цифру.',
 ];
@@ -656,7 +659,7 @@ D.P_WHEN_OK = ['Запомнил: «{t}» — {date}. Не подведите.',
 D.P_WHEN_OK_EVENT = ['Запомнил: «{t}». Не подведите.', '«{T}» — жду. Как случится — напишите.', 'Записал: «{t}». Жду.'];
 D.P_WHEN_PENCIL = ['«{T}» — это {days}, Алик. Записываю. Карандашом.', 'Хорошо, «{t}». Это {days}, но я запишу. Карандашом.', '«{T}» — {days} ждать. Записал. Аккуратно, стирается.'];
 D.P_WHEN_FAR = ['«{T}»? Это {days}, Алик.', 'Алик, «{t}» — это {days}. Вы сами в это верите?', '«{T}» — {days}. Я столько долгов не помню, Алик.'];
-D.P_WHEN_NEVER = ['«{T}» — по-русски это «никогда», Алик.', 'Записал «{t}» в «когда-нибудь». Там уже тесно.', 'Алик, «{t}» — это не срок. Это ответ.', '«{T}»… Алик, вы календарь видели?'];
+D.P_WHEN_NEVER = ['«{T}» — по-русски это «никогда», Алик.', gate(gte('somedayCount', 2))('Записал «{t}» в «когда-нибудь». Там уже тесно.'), 'Алик, «{t}» — это не срок. Это ответ.', '«{T}»… Алик, вы календарь видели?'];
 D.PROMISE_OK = ['Не подведу, брат.', 'Вот и договорились.', 'Записывай, записывай. Я тоже записал.', 'Жди. Ожидание — это тоже работа.', 'Правильно. Главное — верить.'];
 D.P_WHY_REL = ['А при чём тут {n}?', 'Алик, а {n} тут каким боком?', 'Ну а я тут при чём, если {n}?', 'Алик, при чём тут {n}? Должны мне вы.'];
 // соболезнуют умершему: дедушка только «умирает», а траур у него — тоже
@@ -695,16 +698,25 @@ export function make(draw: DrawFn, getTier: () => number = () => 0, rng: Rng = m
     return { text, ...w };
   };
   // ESC на месте «стройки» — не стройка: «Я сам там работал» к санкциям не подходит
+  // части одной реплики не спорят между собой: слот сборки не берёт строку, несовместимую с уже выбранными (#451)
+  let drawn: LedgerEvent[] | null = null
+  const slot = (k: string): Said => {
+    const got = drawn
+    const x = draw<Said>(k, D[k], false, got ? (e) => !selfConflict([...got, ...saidClaims(valueOf(e))]) : undefined)
+    if (drawn) drawn = [...drawn, ...saidClaims(x)]
+    return x
+  }
+  const assembly = <R>(f: () => R): R => { drawn = []; try { return f() } finally { drawn = null } }
   let constrHits = 0, constrReal = 0
   const constr = (): Said => {
     constrHits++
     const t = escTier()
-    if (t) return g('ESC' + t)
+    if (t) return slot('ESC' + t)
     constrReal++
-    return g('CONSTR')
+    return slot('CONSTR')
   }
-  const absurd = (): Said => { const t = escTier(); return t ? g('ESC' + t) : g('ABSURD'); };
-  const reason = (): Said => { const t = escTier(); if (t) return g('ESC' + t); const k = draw('RSRC', [0, 1, 1, 2]); return k === 2 ? g('GROT') : k ? g('CONSTR') : g('ABSURD'); };
+  const absurd = (): Said => { const t = escTier(); return t ? slot('ESC' + t) : slot('ABSURD'); };
+  const reason = (): Said => { const t = escTier(); if (t) return slot('ESC' + t); const k = draw('RSRC', [0, 1, 1, 2]); return k === 2 ? slot('GROT') : k ? slot('CONSTR') : slot('ABSURD'); };
   // строки с явной семантикой (claims) склеиваются saidJoin: семантика частей не теряется (#426)
   const lowSaid = (x: Said): Said => saidMap(x, low)
 
@@ -749,7 +761,7 @@ export function make(draw: DrawFn, getTier: () => number = () => 0, rng: Rng = m
     lastEv = null
     constrHits = 0
     constrReal = 0
-    const parts = tpl()
+    const parts = assembly(tpl)
     return {
       ...parts,
       constr: !!(parts.constr && constrHits > 0 && constrReal === constrHits),
@@ -770,9 +782,9 @@ export function make(draw: DrawFn, getTier: () => number = () => 0, rng: Rng = m
     jobYes: () => `${g('JOB_YES_A')} ${g('JOB_YES_B')}`,
     jobNo: () => `${g('JOB_NO_A')} ${g('JOB_NO_B')}`,
     promiseCheck: (t: string) => { const v = g('VERB'); return `${g('OATH')}! ${cap(t)} — ${v}. ${g('PC_TAIL')}`; },
-    whyRel: (r: Rel) => { const p = promise(); return { text: saidJoin(`Как при чём? ${cap(r.n)} — ${g('REL_ROLE')}! `, reason(), `. ${cap(p.text)}.`), p }; },
+    whyRel: (r: Rel) => assembly(() => { const p = promise(); return { text: saidJoin(`Как при чём? ${cap(r.n)} — ${g('REL_ROLE')}! `, reason(), `. ${cap(p.text)}.`), p }; }),
     congrats: (r: Rel) => `Спасибо, ${low(g('ADDR'))}! ${cap(r.n)} тебя тоже помнит, говорит: ${g('COMPLIMENT')}.`,
-    defend: () => { const o = g('DEFEND'), c = constr(), p = promise(); return { text: saidJoin(`${g('ADDR')}, ${o} `, o.endsWith(':') ? lowSaid(c) : c, `. ${cap(p.text)}.`), p }; },
+    defend: () => assembly(() => { const o = g('DEFEND'), c = constr(), p = promise(); return { text: saidJoin(`${g('ADDR')}, ${o} `, o.endsWith(':') ? lowSaid(c) : c, `. ${cap(p.text)}.`), p }; }),
     photo: (): Said => saidJoin(g('PHOTO_A'), ' ', g('PHOTO_B')),
     transferQ: (): TransferReply => {
       const opening = g('TRQ_A')

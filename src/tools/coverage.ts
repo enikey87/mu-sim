@@ -89,6 +89,10 @@ export const endgameOnly = (r: Pick<Rule<unknown>, 'when'>): boolean => (r.when 
  */
 export const DIRECT_MIN_GAMES = 7
 
+const kindsFor = (r: Pick<Rule<unknown>, 'when'>): readonly SampleKind[] => (endgameOnly(r) ? ['full', 'main'] : ['main'])
+const gamesPlayed = (samples: ReadonlyArray<Pick<SampleReport, 'kind' | 'games'>>, name: string, kinds: readonly SampleKind[]): number =>
+  samples.reduce((count, sample) => count + (kinds.includes(sample.kind) ? (sample.games[name] ?? 0) : 0), 0)
+
 /**
  * Нарушения гейта. Не освобождённое правило, которое ни разу не сработало — в выборках «до концовки», если
  * это правило основной игры (эндгейм не прячет его пропажу), или во всех выборках, если правило эндгейма.
@@ -99,12 +103,9 @@ export function gateIssues(
   rules: ReadonlyArray<Pick<Rule<unknown>, 'name' | 'when'>>,
   direct: Readonly<Record<string, unknown>> = DIRECT,
 ): string[] {
-  const kindsFor = (r: Pick<Rule<unknown>, 'when'>): readonly SampleKind[] => (endgameOnly(r) ? ['full', 'main'] : ['main'])
-  const games = (name: string, kinds: readonly SampleKind[]) =>
-    samples.reduce((acc, s) => acc + (kinds.includes(s.kind) ? (s.games[name] ?? 0) : 0), 0)
   return rules.flatMap((r) => {
     const kinds = kindsFor(r)
-    const played = games(r.name, kinds)
+    const played = gamesPlayed(samples, r.name, kinds)
     if (r.name in direct) {
       return played >= DIRECT_MIN_GAMES
         ? [`${r.name}: сработало в ${played} партиях (порог ${DIRECT_MIN_GAMES}) — снять из DIRECT, гейт его видит`]
@@ -112,6 +113,29 @@ export function gateIssues(
     }
     if (played > 0) return []
     return [`${r.name}: ${kinds.length > 1 ? 'правило эндгейма ни разу не сработало' : 'ни разу до экрана концовки'} — прямой случай в direct.ts или удалить`]
+  })
+}
+
+/** Один вердикт по всем чужим семействам: ноль опасен в любом, DIRECT устарел только при частоте во всех. */
+export function stableGateIssues(
+  families: ReadonlyArray<{ shift: number; samples: ReadonlyArray<Pick<SampleReport, 'kind' | 'games'>> }>,
+  rules: ReadonlyArray<Pick<Rule<unknown>, 'name' | 'when'>>,
+  direct: Readonly<Record<string, unknown>> = DIRECT,
+): string[] {
+  if (!families.length || families.some(({ samples }) =>
+    !samples.some((s) => s.kind === 'main') || !samples.some((s) => s.kind === 'full')))
+    return ['нет семейств покрытия с main и full выборками']
+  return rules.flatMap((r) => {
+    const counts = families.map(({ samples }) => gamesPlayed(samples, r.name, kindsFor(r)))
+    const summary = families.map(({ shift }, i) => `+${shift}: ${counts[i]}`).join(', ')
+    if (r.name in direct) {
+      return counts.every((count) => count >= DIRECT_MIN_GAMES)
+        ? [`${r.name}: ${summary} — снять из DIRECT, гейт видит правило во всех семействах`]
+        : []
+    }
+    return counts.some((count) => count === 0)
+      ? [`${r.name}: ${summary} — прямой случай в direct.ts или удалить`]
+      : []
   })
 }
 

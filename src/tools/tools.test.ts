@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest'
 import { lintRules, type Rule } from '../engine/rules'
 import { allRules } from '../content/rules'
 import { isFactKey } from '../content/factkeys'
-import { multiSampleCoverage, runCoverageJobs, formatCoverage, neverClass, neverInAllSamples, gateIssues, endgameOnly, COVERAGE_SAMPLES, DIRECT_MIN_GAMES, type SampleReport, type SampleSpec } from './coverage'
+import { multiSampleCoverage, runCoverageJobs, formatCoverage, neverClass, neverInAllSamples, gateIssues, stableGateIssues, endgameOnly, COVERAGE_SAMPLES, DIRECT_MIN_GAMES, type SampleReport, type SampleSpec } from './coverage'
 import { DIRECT } from './direct'
 import { is } from '../content/fact'
 import { endgame } from '../content/memkeys'
@@ -123,6 +123,49 @@ describe('гейт: DIRECT освобождает только редкие пр
   })
   it('частые правила основной игры не в DIRECT: гейт видит их сам — контроль с light.off краснеет', () => {
     expect(['Bill_Due', 'Credit_Due', 'Turn_LightOff'].filter((n) => n in DIRECT)).toEqual([])
+  })
+})
+
+describe('гейт на чужих семействах сидов (#434)', () => {
+  const rule = (name: string, late = false) => ({ name, when: late ? [is(endgame.active)] : [] })
+  const family = (shift: number, main: Record<string, number>, full: Record<string, number> = {}) => ({
+    shift,
+    samples: [{ kind: 'main' as const, games: main }, { kind: 'full' as const, games: full }],
+  })
+
+  it('0/8/4 требует прямой случай; с ним вердикт один и зелёный', () => {
+    const families = [family(2000, {}), family(4000, { Rare: 8 }), family(6000, { Rare: 4 })]
+    expect(stableGateIssues(families, [rule('Rare')], {})).toEqual([
+      expect.stringMatching(/^Rare: .*\+2000: 0.*\+4000: 8.*\+6000: 4.*прямой случай/),
+    ])
+    expect(stableGateIssues(families, [rule('Rare')], { Rare: {} })).toEqual([])
+  })
+
+  it('9/9/9 снимает DIRECT; 6/7/9 оставляет его', () => {
+    const hot = [2000, 4000, 6000].map((shift) => family(shift, { Hot: 9 }))
+    expect(stableGateIssues(hot, [rule('Hot')], { Hot: {} })).toEqual([
+      expect.stringMatching(/^Hot: .*\+2000: 9.*\+4000: 9.*\+6000: 9.*снять из DIRECT/),
+    ])
+    const threshold = [2000, 4000, 6000].map((shift) => family(shift, { Hot: DIRECT_MIN_GAMES }))
+    expect(stableGateIssues(threshold, [rule('Hot')], { Hot: {} })).toHaveLength(1)
+    const mixed = [family(2000, { Hot: 6 }), family(4000, { Hot: 7 }), family(6000, { Hot: 9 })]
+    expect(stableGateIssues(mixed, [rule('Hot')], { Hot: {} })).toEqual([])
+  })
+
+  it('0/0/0 без DIRECT красный; эндгейм считает и полные выборки', () => {
+    const families = [family(2000, {}, { Late: 1 }), family(4000, {}, { Late: 8 }), family(6000, {}, { Late: 4 })]
+    expect(stableGateIssues(families, [rule('Dead')], {})).toEqual([
+      expect.stringMatching(/^Dead: .*прямой случай/),
+    ])
+    expect(stableGateIssues(families, [rule('Late', true)], {})).toEqual([])
+    expect(stableGateIssues(families, [rule('Late')], {})).toEqual([
+      expect.stringMatching(/^Late: .*прямой случай/),
+    ])
+    expect(stableGateIssues([], [rule('Dead')], {})).toEqual([
+      expect.stringMatching(/нет семейств/),
+    ])
+    expect(stableGateIssues([{ shift: 2000, samples: [{ kind: 'main', games: {} }] }], [rule('Dead')], {}))
+      .toEqual([expect.stringMatching(/main и full/)])
   })
 })
 

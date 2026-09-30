@@ -13,6 +13,7 @@ import { D } from './excuses'
 import type { Said } from './fact'
 import { makeGame, memStorage } from '../test/helpers'
 import { SAVE_KEY, loadState, saveState } from '../engine/state'
+import { grantPaid } from './memkeys'
 
 const meta = { source: 'alik' as const, day: 1 }
 
@@ -37,12 +38,41 @@ describe('операции журнала', () => {
     publishClaim(l, 'grandpa.life', 'alive', { ...meta, day: 4 })
     expect(currentEpisode(l)?.subject).toBe('grandpa.life') // новейшее противоречие первым
   })
-  it('известный переход — отрицательный контроль: обе версии без эпизода', () => {
+  it('известный переход — отрицательный контроль: смена, которую он пересекает, без эпизода', () => {
     const l = freshLedger()
-    publishTransition(l, 'money.location', 'foundation', 'niva', { ...meta, day: 2 })
     publishClaim(l, 'money.location', 'foundation', meta)
+    publishTransition(l, 'money.location', 'foundation', 'niva', { ...meta, day: 2 })
     publishClaim(l, 'money.location', 'niva', { ...meta, day: 5 })
     expect(openEpisodes(l)).toHaveLength(0)
+  })
+  it('переход — один переезд: возврат к прежней версии без объяснения — эпизод', () => {
+    const l = freshLedger()
+    publishClaim(l, 'money.location', 'foundation', meta)
+    publishTransition(l, 'money.location', 'foundation', 'niva', { ...meta, day: 2 })
+    publishClaim(l, 'money.location', 'niva', { ...meta, day: 3 })
+    publishClaim(l, 'money.location', 'foundation', { ...meta, day: 4 })
+    expect(openEpisodes(l).map((e) => [e.a, e.b])).toEqual([['niva', 'foundation']])
+  })
+  it('переход объясняет только своё направление', () => {
+    const l = freshLedger()
+    publishClaim(l, 'money.location', 'niva', meta)
+    publishTransition(l, 'money.location', 'foundation', 'niva', { ...meta, day: 2 })
+    publishClaim(l, 'money.location', 'foundation', { ...meta, day: 3 })
+    expect(openEpisodes(l)).toHaveLength(1)
+  })
+  it('переход, рассказанный до того, как игрок услышал исходную версию, её смену не объясняет', () => {
+    const l = freshLedger()
+    publishTransition(l, 'money.location', 'foundation', 'niva', meta)
+    publishClaim(l, 'money.location', 'foundation', { ...meta, day: 2 })
+    publishClaim(l, 'money.location', 'niva', { ...meta, day: 3 })
+    expect(openEpisodes(l)).toHaveLength(1)
+  })
+  it('переход в обратную сторону не закрывает открытый эпизод', () => {
+    const l = freshLedger()
+    publishClaim(l, 'money.location', 'foundation', meta)
+    publishClaim(l, 'money.location', 'niva', { ...meta, day: 2 })
+    publishTransition(l, 'money.location', 'niva', 'foundation', { ...meta, day: 3 })
+    expect(openEpisodes(l)).toHaveLength(1)
   })
   it('переход, опубликованный после конфликта, закрывает эпизод как объяснённый', () => {
     const l = freshLedger()
@@ -182,6 +212,51 @@ describe('рассказанные переходы и отзывы (#436)', () 
     expect(game.S.ledger.claims.map((c) => c.value)).toContain('paid')
     expect(game.S.ledger.transitions).toContainEqual(expect.objectContaining({ subject: 'customer.payment', from: 'owes', to: 'paid' }))
     expect(openEpisodes(game.S.ledger, 'customer.payment')).toHaveLength(0)
+  })
+
+  it('акт подтверждает мартовскую оплату, не закрывая уже раскрытую ложь (#450)', async () => {
+    const { game } = makeGame()
+    await game.playEpisode(ARCS.grant.eps[0], 'grant')
+    await game.enterNode('customer', 'ask')
+    expect(game.S.mem[grantPaid]).toBeUndefined()
+    await game.enterNode('customer', 'call')
+    const episode = openEpisodes(game.S.ledger, 'customer.payment')[0]
+    expect(episode).toBeDefined()
+    expect(catchChoice(game)).toBe(true)
+    expect(game.S.mem[grantPaid]).toBe(true)
+    const from = game.S.msgs.length
+    await game.playEpisode(ARCS.rubik.eps[7], 'rubik')
+    expect(game.S.msgs.slice(from).some((m) => m.kind === 'text' && m.text.includes('Теперь и бумага'))).toBe(true)
+    expect(game.S.ledger.transitions.filter((t) => t.subject === 'customer.payment')).toHaveLength(0)
+    expect(openEpisodes(game.S.ledger, 'customer.payment').map((e) => e.id)).toContain(episode.id)
+    expect(catchChoice(game)).toBe(true)
+  })
+
+  it('частный финал акта тоже не закрывает мартовское противоречие (#450)', async () => {
+    const { game } = makeGame()
+    await game.playEpisode(ARCS.grant.eps[0], 'grant')
+    await game.enterNode('customer', 'ask')
+    await game.enterNode('customer', 'call')
+    game.S.ach.wife = game.S.day
+    const episode = openEpisodes(game.S.ledger, 'customer.payment')[0]
+    expect(episode).toBeDefined()
+
+    await game.playFinale('rubik', FINALES.rubik.find((f) => f.id === 'karine')!)
+    expect(game.S.ledger.transitions.filter((t) => t.subject === 'customer.payment')).toHaveLength(0)
+    expect(openEpisodes(game.S.ledger, 'customer.payment').map((e) => e.id)).toContain(episode.id)
+    expect(catchChoice(game)).toBe(true)
+  })
+
+  it('частный финал сообщает новую оплату как переход и запоминает её (#450)', async () => {
+    const { game } = makeGame()
+    await game.playEpisode(ARCS.grant.eps[0], 'grant')
+    game.S.ach.wife = game.S.day
+    expect(game.S.mem[grantPaid]).toBeUndefined()
+
+    await game.playFinale('rubik', FINALES.rubik.find((f) => f.id === 'karine')!)
+    expect(game.S.ledger.transitions).toContainEqual(expect.objectContaining({ subject: 'customer.payment', from: 'owes', to: 'paid' }))
+    expect(openEpisodes(game.S.ledger, 'customer.payment')).toHaveLength(0)
+    expect(game.S.mem[grantPaid]).toBe(true)
   })
 
   it('звонок Гранту о платеже в марте остаётся противоречием без подписанного акта', async () => {

@@ -9,7 +9,7 @@ import { saidJoin, saidMap } from './fact'
 import { needs, WORLD } from './world'
 import { QUESTS, COURT_SCENE } from './quests'
 import { PAYDAY_SCENE } from './payday'
-import { HEAT, bathAsked, blocked, cardSent, intro, polite, ritualCount, ritualCut } from './memkeys'
+import { HEAT, bathAsked, blocked, cardSent, grantPaid, intro, polite, ritualCount, ritualCut } from './memkeys'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- форма переменных задаётся сценой
 export type Vars = Record<string, any>
@@ -261,7 +261,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
           ],
         },
         call: {
-          fx: { ach: 'customer' },
+          fx: { ach: 'customer', set: { [grantPaid]: true } },
           claimsWho: 'grant',
           sys: [{ t: 'Вы звоните заказчику… Заказчик: «Я Алику всё заплатил ещё в марте. Наличными. В мешке. При свидетелях».', claims: ['customer_paid'] }, { t: 'Вы звоните заказчику… Заказчик: «Алик? Я ему заплатил дважды, второй раз — за то, чтобы он больше не звонил».', claims: ['customer_paid'] }],
           opts: [{ t: 'Алик, заказчик говорит, что всё заплатил!', go: 'confront' }],

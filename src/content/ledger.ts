@@ -4,6 +4,7 @@
 // реплику ключом утверждения (`claims`), CLAIM_LEDGER переводит ключ в предмет и значение;
 // кнопка «Поймать на лжи» читает открытые эпизоды журнала.
 import type { ClaimKey, WhoId } from './ids'
+import type { LedgerEvent } from './fact-types'
 import { isWhoId } from './ids'
 import { pairKey } from './memkeys'
 
@@ -29,7 +30,7 @@ export type LedgerSubject = keyof LedgerValueMap
 type LedgerPoint = { [S in LedgerSubject]: { subject: S; value: LedgerValueMap[S] } }[LedgerSubject]
 
 /** Предметы, у которых два разных известных значения — противоречие. */
-export const CONFLICTING: ReadonlySet<LedgerSubject> = new Set(['money.location', 'grandpa.life', 'customer.payment'])
+const CONFLICTING: ReadonlySet<LedgerSubject> = new Set(['money.location', 'grandpa.life', 'customer.payment'])
 
 export type ClaimSource = 'alik' | WhoId
 
@@ -108,11 +109,13 @@ export function activeClaim(l: LedgerState, subject: LedgerSubject): ClaimRec | 
   return best
 }
 
-/** Опубликовать переход: известное объяснение, как одно значение сменилось другим. */
+/** Опубликовать переход: известное объяснение, как одно значение сменилось другим — именно в этом направлении. */
 export function publishTransition<S extends LedgerSubject>(l: LedgerState, subject: S, from: LedgerValueMap[S], to: LedgerValueMap[S], meta: PublishMeta): TransitionRec {
   const rec: TransitionRec = { id: l.next++, subject, from, to, ...meta }
   l.transitions.push(rec)
-  closePair(l, subject, from, to, 'explained')
+  for (const e of l.episodes) {
+    if (e.status === 'open' && e.subject === subject && e.a === from && e.b === to) e.status = 'explained'
+  }
   return rec
 }
 
@@ -151,22 +154,15 @@ function maybeConflict(l: LedgerState, rec: ClaimRec): void {
   for (const c of l.claims) if (c.subject === rec.subject && c.id < rec.id && (!active || c.id > active.id)) active = c
   if (!active || active.value === rec.value) return
   if (l.transitions.some((t) => t.subject === rec.subject && t.to === null && t.from === active.value && t.id > active.id && t.id < rec.id)) return
-  if (hasTransition(l, rec.subject, active.value, rec.value)) return
+  if (explained(l, rec.subject, active, rec.value, rec.id)) return
   const pair = pairKey(active.value, rec.value)
   if (l.episodes.some((e) => e.subject === rec.subject && e.status === 'open' && pairKey(e.a, e.b) === pair)) return
   l.episodes.push({ id: l.next++, subject: rec.subject, a: active.value, b: rec.value, aClaim: active.id, bClaim: rec.id, day: rec.day, status: 'open' })
 }
 
-function hasTransition(l: LedgerState, subject: LedgerSubject, x: string, y: string): boolean {
-  const pair = pairKey(x, y)
-  return l.transitions.some((t) => t.subject === subject && t.to !== null && pairKey(t.from, t.to) === pair)
-}
-
-function closePair(l: LedgerState, subject: LedgerSubject, a: string, b: string, how: Exclude<EpisodeStatus, 'open'>): void {
-  const pair = pairKey(a, b)
-  for (const e of l.episodes) {
-    if (e.status === 'open' && e.subject === subject && pairKey(e.a, e.b) === pair) e.status = how
-  }
+/** Смену «услышанная версия → новая» объясняет переход, рассказанный после неё и до новой: переход — один переезд, а не пропуск для пары навсегда. */
+function explained(l: LedgerState, subject: LedgerSubject, heard: ClaimRec, to: string, before: number): boolean {
+  return l.transitions.some((t) => t.subject === subject && t.from === heard.value && t.to === to && t.id > heard.id && t.id < before)
 }
 
 function claimOfValue(l: LedgerState, subject: LedgerSubject, value: string): ClaimRec | undefined {
@@ -210,6 +206,39 @@ export const CLAIM_LEDGER: Record<ClaimKey, LedgerPoint> = {
   beton: point('beton.mood', 'offended'),
   crane_wedding: point('crane.where', 'wedding'),
   eagle: point('salary.eagle', 'taken'),
+}
+
+/**
+ * Почему события одного сообщения несовместимы между собой; null — совместимы. Одна реплика не спорит
+ * сама с собой: две версии предмета, переход в ту же версию или в другой предмет, отзыв и утверждение одной версии.
+ */
+export function selfConflict(events: readonly unknown[]): string | null {
+  const isEvent = (x: unknown): x is LedgerEvent =>
+    typeof x === 'string' ? x in CLAIM_LEDGER : !!x && typeof x === 'object' && ('move' in x || 'retract' in x)
+  const bad = events.find((e) => !isEvent(e))
+  if (bad !== undefined) return `не событие журнала: ${JSON.stringify(bad)}`
+  const evs = events as LedgerEvent[]
+  const retracted = new Set<string>()
+  for (const e of evs) {
+    if (typeof e === 'string') continue
+    if ('retract' in e) { retracted.add(e.retract); continue }
+    if (e.move.from === 'active') continue
+    const from = CLAIM_LEDGER[e.move.from], to = CLAIM_LEDGER[e.move.to]
+    if (from.subject !== to.subject) return `переход между предметами: ${e.move.from} → ${e.move.to}`
+    if (from.value === to.value) return `переход в ту же версию: ${e.move.from} → ${e.move.to}`
+  }
+  const state = new Map<LedgerSubject, string>()
+  for (const e of evs) {
+    const key = typeof e === 'string' ? e : 'move' in e ? e.move.to : null
+    if (!key) continue
+    if (retracted.has(key)) return `отзыв и утверждение одной версии: ${key}`
+    const p = CLAIM_LEDGER[key]
+    if (!CONFLICTING.has(p.subject)) continue
+    const was = state.get(p.subject)
+    if (was !== undefined && was !== p.value) return `две версии ${p.subject}: ${was} и ${p.value}`
+    state.set(p.subject, p.value)
+  }
+  return null
 }
 
 // --- миграция старых сохранений (docs/design/lie-ledger.md, раздел «Сохранения»)
@@ -262,7 +291,7 @@ export function migrateLedger(mem: Record<string, unknown>, saved: unknown): Led
   const oldK = mem[LIE_OLD], newK = mem[LIE_NEW]
   if (typeof oldK === 'string' && typeof newK === 'string') {
     const o = CLAIM_LEDGER[oldK as ClaimKey], n = CLAIM_LEDGER[newK as ClaimKey]
-    if (o && n && o.subject === n.subject && CONFLICTING.has(o.subject) && o.value !== n.value && !hasTransition(l, o.subject, o.value, n.value)) {
+    if (o && n && o.subject === n.subject && CONFLICTING.has(o.subject) && o.value !== n.value) {
       const pair = pairKey(o.value, n.value)
       if (!l.episodes.some((e) => e.subject === o.subject && e.status === 'open' && pairKey(e.a, e.b) === pair)) {
         const ra = claimOfValue(l, o.subject, o.value), rb = claimOfValue(l, o.subject, n.value)
