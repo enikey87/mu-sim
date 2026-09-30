@@ -3,13 +3,12 @@ import { describe, it, expect } from 'vitest'
 import { CLAIM_LEDGER, selfConflict } from './ledger'
 import { CLAIMS } from './lies'
 import { D, make } from './excuses'
-import { makeScenes, type Line, type Vars } from './scenes'
 import { saidClaims, saidJoin, type LedgerEvent, type Said } from './fact-types'
 import type { Entry } from './fact'
 import { valueOf } from '../engine/rules'
 import type { ClaimKey } from './ids'
 import { makeGame } from '../test/helpers'
-import { seededRng } from '../engine/rng'
+import { forEachSceneLine } from './scene-walk'
 
 const mods = import.meta.glob(['./**/*.ts', '!./**/*.test.ts'], { eager: true }) as Record<string, Record<string, unknown>>
 
@@ -37,48 +36,11 @@ function lineClaims(): unknown[][] {
  * (разные сиды open-пула). Объекты внутри makeScenes не видны glob-обходу модуля — только этот путь.
  */
 function sceneFnClaims(): unknown[][] {
-  const { game } = makeGame({ seed: 1 })
-  const scenes = makeScenes(game.X)
   const out: unknown[][] = []
-  const base: Vars = { v: 1, n: 'баран', p: 'x', rows: [['a', 1]], total: 1, r: ['a', 'b', 'c'] }
-  const openAll = <T,>(arr: readonly Entry<T>[]) => arr.map(valueOf)
   const pushClaims = (said: string | { t: string; claims?: unknown }) => {
     if (said && typeof said === 'object' && Array.isArray(said.claims)) out.push(said.claims)
   }
-  const evalLine = (l: Line, vars: Vars) => {
-    const r = typeof l === 'function' ? l(vars) : l
-    pushClaims(r)
-  }
-  for (const sc of Object.values(scenes)) {
-    const varSets: Vars[] = []
-    if (sc.init) {
-      for (let seed = 1; seed <= 24; seed++) {
-        varSets.push({ ...base, ...sc.init(seededRng(seed), openAll, 200) })
-      }
-    } else {
-      varSets.push(base)
-    }
-    const uniq = new Map(varSets.map((v) => [JSON.stringify(v), v]))
-    for (const vars of uniq.values()) {
-      for (const n of Object.values(sc.nodes)) {
-        for (const e of [...(n.a ?? []), ...(n.a2 ?? [])]) {
-          try { evalLine(valueOf(e), vars) } catch { /* vars узла не покрывают эту ветку */ }
-        }
-        for (const s of [n.sys, n.sys2]) {
-          if (!s) continue
-          const arr = Array.isArray(s) ? s : [s]
-          for (const e of arr) {
-            try { evalLine(valueOf(e as Entry<Line>), vars) } catch { /* */ }
-          }
-        }
-        for (const o of n.opts ?? []) {
-          if (typeof o.t === 'function') {
-            try { evalLine(o.t, vars) } catch { /* */ }
-          }
-        }
-      }
-    }
-  }
+  forEachSceneLine(pushClaims, 24)
   return out
 }
 

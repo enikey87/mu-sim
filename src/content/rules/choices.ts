@@ -11,9 +11,13 @@ import * as L from '../life'
 import { GROUP_Q } from '../misc'
 import { P_LIE } from '../lies'
 import { TOPICS } from '../topics'
-import { WORLD, SPEAKS, needs } from '../world'
+import { WORLD, SPEAKS } from '../world'
 import { fmtDayMonth, fmtDays } from '../../engine/time'
 import { HEAT, alikDead, alikShaved, moustacheAskAt, blocked, court, mourning, phoneKarine } from '../memkeys'
+import { requirePlayerPool } from '../player-pools'
+import {
+  P_VIA_BORIS, P_VIA_KARINE, P_VIA_MAMA, P_MOO, P_MOUSTACHE, P_COURT,
+} from './player-choice-pools'
 
 type R = Rule<Game, GameEvent, Offer>
 
@@ -31,10 +35,18 @@ interface OfferSpec {
   odds?: number
 }
 
-const fromD = (game: Game, key: string, map: Record<string, string> = {}) =>
-  game.playerLine(() => game.X.fill(game.draw(key, D[key]), map))
-const fromArr = (game: Game, key: string, arr: readonly Entry<string>[]) => game.playerLine(() => game.draw(key, arr))
-const freshFromArr = (game: Game, key: string, arr: readonly Entry<string>[]) => game.freshPlayer(key, arr) ?? ''
+const fromD = (game: Game, key: string, map: Record<string, string> = {}) => {
+  requirePlayerPool(`D.${key}`, D[key])
+  return game.playerLine(() => game.X.fill(game.draw(key, D[key]), map))
+}
+const fromArr = (game: Game, key: string, arr: readonly Entry<unknown>[]) => {
+  requirePlayerPool(key, arr)
+  return game.playerLine(() => game.draw(key, arr as readonly Entry<string>[]))
+}
+const freshFromArr = (game: Game, key: string, arr: readonly Entry<unknown>[]) => {
+  requirePlayerPool(key.startsWith('F_') ? `ARCS.${key.slice(2)}.follow` : key, arr)
+  return game.freshPlayer(key, arr as readonly Entry<string>[]) ?? ''
+}
 
 
 const offer = (o: OfferSpec): R => ({
@@ -62,10 +74,10 @@ export const choiceRules: R[] = [
   offer({ name: 'Sorry', when: [is('ctx.offended')], act: 'sorry', tone: 'polite', bonus: 5, text: (g) => fromD(g, 'P_SORRY') }),
   // лестница грубости: заблокирован — извиниться можно только через Бориса; ссора горячая — можно мычать
   // посредник — лучший из тех, кто есть: Борис, Карине, мама Алика (один вариант на слот); обращение к посреднику — без «Алик, …»
-  offer({ name: 'Via_boris', slot: 'via', when: [is(blocked), SPEAKS.boris], act: 'via', arg: () => 'boris', tone: 'polite', bonus: 7, text: (g) => g.draw('P_VIA_BORIS', ['Борис, передай Алику: прости меня', 'Попросить Бориса передать извинения', 'Борис, скажи ему «бее» от меня. Мирное']) }),
-  offer({ name: 'Via_karine', slot: 'via', when: [is(blocked), WORLD.karineHome, WORLD.karine], act: 'via', arg: () => 'karine', tone: 'polite', bonus: 6, text: (g) => g.draw('P_VIA_KARINE', ['Карине, передайте Алику: я извиняюсь', 'Попросить Карине передать извинения']) }),
-  offer({ name: 'Via_mama', slot: 'via', when: [is(blocked)], act: 'via', arg: () => 'mama', tone: 'polite', bonus: 6, text: (g) => g.draw('P_VIA_MAMA', ['Попросить маму Алика передать извинения']) }),
-  offer({ name: 'Moo', when: [is('ctx.offended'), gte(HEAT, 1)], odds: 0.5, act: 'moo', tone: 'neutral', bonus: 4, text: (g) => fromArr(g, 'P_MOO', ['Мууу.', 'Мууууу 🐄', 'Му. (Это значит «мир».)']) }),
+  offer({ name: 'Via_boris', slot: 'via', when: [is(blocked), SPEAKS.boris], act: 'via', arg: () => 'boris', tone: 'polite', bonus: 7, text: (g) => fromArr(g, 'P_VIA_BORIS', P_VIA_BORIS) }),
+  offer({ name: 'Via_karine', slot: 'via', when: [is(blocked), WORLD.karineHome, WORLD.karine], act: 'via', arg: () => 'karine', tone: 'polite', bonus: 6, text: (g) => fromArr(g, 'P_VIA_KARINE', P_VIA_KARINE) }),
+  offer({ name: 'Via_mama', slot: 'via', when: [is(blocked)], act: 'via', arg: () => 'mama', tone: 'polite', bonus: 6, text: (g) => fromArr(g, 'P_VIA_MAMA', P_VIA_MAMA) }),
+  offer({ name: 'Moo', when: [is('ctx.offended'), gte(HEAT, 1)], odds: 0.5, act: 'moo', tone: 'neutral', bonus: 4, text: (g) => fromArr(g, 'P_MOO', P_MOO) }),
 
   // пока усы отрастают — подколоть Алика (#352); не чаще раза в 5 дней после вопроса
   {
@@ -73,11 +85,7 @@ export const choiceRules: R[] = [
     slot: 'moustache',
     offer: ({ game }) => {
       if (game.S.day - Number(game.S.mem[moustacheAskAt] ?? -99) < 5) return null
-      const text = freshFromArr(game, 'P_MOUSTACHE', [
-        'Алик, как усы?',
-        'Алик, усы отрастают?',
-        'Ну что, усы?',
-      ])
+      const text = freshFromArr(game, 'P_MOUSTACHE', P_MOUSTACHE)
       return text ? { text, tone: 'neutral' as const, act: 'moustacheAsk' } : null
     },
   },
@@ -171,7 +179,7 @@ export const choiceRules: R[] = [
   // дело в суде открыто — игрок может его продолжить (угроза двигает линию суда)
   offer({
     name: 'Court', when: [gte(court, 1), lte(court, 6)], odds: 0.35, tone: 'threat',
-    text: (g) => fromArr(g, 'P_COURT', ['Увидимся в суде, Алик.', 'Я подаю в суд. Серьёзно.', 'Мой адвокат с вами свяжется.', 'Жду повестку, Алик.', 'До встречи в зале суда.', 'Суд всё решит.', needs('arsen')('Передайте Арсену: я готов.'), 'Я иду до конца. До самого Страсбурга.', 'Готовьте документы, Алик.', 'Суд — не застолье, там не отмажешься.', 'Я нашёл юриста. Настоящего, с дипломом.', 'Иск готов. Осталось распечатать.']),
+    text: (g) => fromArr(g, 'P_COURT', P_COURT),
   }),
   // «Это корова?» — только сразу после «Мууу», а не всю игру
   // ответить на то, что только что прозвучало: реплику легенды денег, вмешавшегося персонажа, воспоминание Алика
