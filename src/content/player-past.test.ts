@@ -1,7 +1,7 @@
 // Реплика игрока о его прошлом («уже», «снова», «третий раз», «продал») опирается на факт партии (#419, #445).
 import { describe, it, expect } from 'vitest'
 import { D } from './excuses'
-import { TOPICS, P_DESPERATE } from './topics'
+import { TOPICS, P_DESPERATE, P_MONEY } from './topics'
 import { P_LIE } from './lies'
 import { ARCS } from './arcs'
 import { CHORUS_TALK, MEMORY_TALK } from './talk'
@@ -50,6 +50,8 @@ const PAST: Record<string, { fact: string } | { why: string }> = {
   'Скинуть номер карты ещё раз': { fact: 'card.sent' },
   'Я его уже сорок раз отправлял!': { fact: 'card.sent' },
   'Банкомат посмотрел на меня. И ОТВЕРНУЛСЯ. ВЧЕРА.': { why: 'абсурд о банкомате; пул звучит только на дне' },
+  'Алик, банк уже спрашивает про вас. По имени.': { why: 'настоящее время: банк спрашивает сейчас; пул звучит только при нехватке денег' },
+  'Алик, очень прошу. Карта уже не берёт трубку.': { why: 'о настоящем состоянии карты; пул звучит только на дне' },
   'Было не так, Алик': { why: 'ответ на воспоминание, которое Алик только что рассказал' },
   'Давайте ещё раз договоримся': { why: 'завязка: договорённость об оплате была до игры' },
   'Я уже заплатил за ваш столик…': { why: 'сцена: официант только что попросил оплатить столик Алика' },
@@ -93,6 +95,10 @@ function corpus(): Item[] {
   for (const [k, t] of Object.entries(TOPICS)) { list(`TOPICS.${k}.p`, t.p); list(`TOPICS.${k}.r`, (t as { r?: unknown }).r) }
   list('P_DESPERATE.low', P_DESPERATE.low)
   list('P_DESPERATE.bottom', P_DESPERATE.bottom)
+  list('P_MONEY.low.polite', P_MONEY.low.polite)
+  list('P_MONEY.low.neutral', P_MONEY.low.neutral)
+  list('P_MONEY.bottom.polite', P_MONEY.bottom.polite)
+  list('P_MONEY.bottom.neutral', P_MONEY.bottom.neutral)
   list('P_LIE', P_LIE)
   for (const [k, a] of Object.entries(ARCS)) list(`ARCS.${k}.follow`, a.follow)
   const pair = (where: string, e: unknown) => { const v = valueOf(e as never) as unknown; if (Array.isArray(v)) add(where, e instanceof Gated ? new Gated(e.when, v[0]) : v[0]) }

@@ -5,7 +5,7 @@ import { makeGame, setMoney } from '../test/helpers'
 import { Game } from '../engine/game'
 import { valueOf, test as holds, missing } from './fact'
 import type { Choice } from '../engine/state'
-import { P_MONEY, P_DESPERATE, DESPERATE_PAIRS, DESPERATE_REPLY } from './topics'
+import { P_MONEY, P_DESPERATE, DESPERATE_PAIRS, DESPERATE_REPLY, MONEY_REPLY_POLITE, MONEY_REPLY_NEUTRAL, MONEY_REPLY_REGIMENT } from './topics'
 import { sold } from './credit'
 import { billDueAt } from './bills'
 
@@ -163,20 +163,21 @@ describe('отчаяние от бедности', () => {
     expect(game.S.rules.once.Turn_LightOff).toBe(true)
   })
 
-  it('любая реплика P_MONEY получает ответ раньше фоновых последствий (#459)', async () => {
-    const generic = new Set(DESPERATE_REPLY.map(valueOf))
+  it('любая реплика P_MONEY получает ответ раньше фоновых последствий (#459), общий ответ — в её тоне (#480)', async () => {
+    const pol = new Set(MONEY_REPLY_POLITE.map(valueOf))
+    const neu = new Set(MONEY_REPLY_NEUTRAL.map(valueOf))
     const cases = [
-      { level: 'low', ask: 'я не давлю. Но банк давит' },
+      { level: 'low', ask: 'я не давлю. Но банк давит', pool: pol },
       { level: 'low', ask: 'банк уже спрашивает про вас', reply: /банк.*имени/i },
-      { level: 'low', ask: 'до списания. Оно не ждёт' },
-      { level: 'low', ask: 'карта худеет' },
-      { level: 'low', ask: 'низкий остаток' },
-      { level: 'low', ask: 'у меня мало' },
-      { level: 'bottom', ask: 'всё ещё вежливый' },
-      { level: 'bottom', ask: 'не берёт трубку' },
-      { level: 'bottom', ask: 'до конца недели' },
-      { level: 'bottom', ask: 'Ниже только фундамент' },
-      { level: 'bottom', ask: 'платил улыбкой' },
+      { level: 'low', ask: 'до списания. Оно не ждёт', pool: pol },
+      { level: 'low', ask: 'карта худеет', pool: neu },
+      { level: 'low', ask: 'низкий остаток', pool: neu },
+      { level: 'low', ask: 'у меня мало', pool: neu },
+      { level: 'bottom', ask: 'всё ещё вежливый', pool: pol },
+      { level: 'bottom', ask: 'не берёт трубку', pool: pol },
+      { level: 'bottom', ask: 'до конца недели', pool: pol },
+      { level: 'bottom', ask: 'Ниже только фундамент', pool: neu },
+      { level: 'bottom', ask: 'платил улыбкой', pool: neu },
     ] as const
     for (const c of cases) {
       const { game } = makeGame({ seed: 7 })
@@ -188,7 +189,7 @@ describe('отчаяние от бедности', () => {
       await game.send(choice)
       const first = firstReply(game, from)
       if ('reply' in c) expect(first, c.ask).toMatch(c.reply)
-      else expect(generic.has(first!), `${c.ask} → ${first ?? 'молчание'}`).toBe(true)
+      else expect(c.pool.has(first!), `${c.ask} → ${first ?? 'молчание'}`).toBe(true)
       expect(game.S.msgs.slice(from).some((m) => m.kind === 'text' && /Свет отключили/.test(m.text)), c.ask).toBe(false)
       expect(game.S.rules.once.Turn_LightOff, c.ask).toBeUndefined()
     }
@@ -203,6 +204,60 @@ describe('отчаяние от бедности', () => {
       if ((await game.fire('AlikTurn'))?.name === 'Turn_LightOff') light = firstReply(game, later)
     }
     expect(light).toMatch(/Свет отключили/)
+  })
+
+  it('общий ответ на реплику о деньгах звучит в её тоне, не голосом крика (#480)', async () => {
+    const shout = new Set(DESPERATE_REPLY.map(valueOf))
+    const pol = new Set(MONEY_REPLY_POLITE.map(valueOf))
+    const neu = new Set(MONEY_REPLY_NEUTRAL.map(valueOf))
+    // вежливая реплика на дне — вежливый ответ
+    const p = makeGame({ seed: 7 }).game
+    setMoney(p, Game.MONEY_BOTTOM)
+    const pc = choiceWith(p, 'всё ещё вежливый')
+    const pFrom = p.S.msgs.length
+    await p.send(pc)
+    const pFirst = firstReply(p, pFrom)!
+    expect(pol.has(pFirst), pFirst).toBe(true)
+    expect(shout.has(pFirst), pFirst).toBe(false)
+    // спокойная реплика — спокойный ответ
+    const n = makeGame({ seed: 7 }).game
+    setMoney(n, Game.MONEY_LOW)
+    const nc = choiceWith(n, 'карта худеет')
+    const nFrom = n.S.msgs.length
+    await n.send(nc)
+    const nFirst = firstReply(n, nFrom)!
+    expect(neu.has(nFirst), nFirst).toBe(true)
+    expect(shout.has(nFirst), nFirst).toBe(false)
+    // крик капсом по-прежнему получает пул крика
+    const s = makeGame({ seed: 7 }).game
+    setMoney(s, Game.MONEY_BOTTOM)
+    const sc = choiceWith(s, 'на карте ДНО')
+    const sFrom = s.S.msgs.length
+    await s.send(sc)
+    expect(shout.has(firstReply(s, sFrom)!)).toBe(true)
+  })
+
+  it('вежливый режим Алика отвечает на деньги голосом регламента (#480)', async () => {
+    const regiment = new Set(MONEY_REPLY_REGIMENT.map(valueOf))
+    const shout = new Set(DESPERATE_REPLY.map(valueOf))
+    const game = makeGame({ seed: 7 }).game
+    setMoney(game, Game.MONEY_BOTTOM)
+    game.S.mem.polite = true
+    const c = choiceWith(game, 'всё ещё вежливый')
+    expect(c.act).toBe('desperate')
+    const from = game.S.msgs.length
+    await game.send(c)
+    const first = firstReply(game, from)!
+    expect(regiment.has(first), first).toBe(true)
+    expect(shout.has(first), first).toBe(false)
+    // и спокойная реплика о деньгах — тем же голосом режима
+    const n = makeGame({ seed: 7 }).game
+    setMoney(n, Game.MONEY_LOW)
+    n.S.mem.polite = true
+    const nc = choiceWith(n, 'карта худеет')
+    const nFrom = n.S.msgs.length
+    await n.send(nc)
+    expect(regiment.has(firstReply(n, nFrom)!)).toBe(true)
   })
 
   it('деньги вернулись к норме — отчаяние уходит сразу', () => {
@@ -266,15 +321,14 @@ describe('отчаяние от бедности', () => {
       const first = low.S.msgs.slice(from).find((m) => m.kind === 'text' && m.from === 'alik')
       expect(BOTTOM_REPLIES.includes((first as { text: string }).text), (first as { text: string })?.text).toBe(false)
     }
-    const bottom = makeGame({ seed: 3 }).game
-    setMoney(bottom, Game.MONEY_BOTTOM)
+    // после #480 общий ответ идёт по тону, и строки про «дно» несёт пул крика: гоняем его маршрут настоящими send
+    // пул одноразовый — по партии на попытку
     let hit = false
-    for (let i = 0; i < 60 && !hit; i++) {
-      bottom.S.choices = null
-      const c = bottom.buildChoices().find((x) => x.act === 'desperate')
-      if (!c) continue
+    for (let seed = 1; seed <= 20 && !hit; seed++) {
+      const bottom = makeGame({ seed }).game
+      setMoney(bottom, Game.MONEY_BOTTOM)
       const from = bottom.S.msgs.length
-      await bottom.send(c)
+      await bottom.send({ text: 'Алик, у меня на карте ДНО. Не метафора. Дно.', tone: 'neutral', act: 'desperate', arg: 'shout' })
       const first = bottom.S.msgs.slice(from).find((m) => m.kind === 'text' && m.from === 'alik')
       if (first && first.kind === 'text' && BOTTOM_REPLIES.includes(first.text)) hit = true
     }
