@@ -5,9 +5,11 @@ import type { IntroView } from './view'
 
 /** Карточки 0–3 — строки ~1,8 с; 4 — титул ~2,5 с. */
 type Card = 0 | 1 | 2 | 3 | 4
+type LinePhase = 'in' | 'out'
 
-const LINE_MS = 1800
-const TITLE_MS = 2500
+export const LINE_MS = 1800
+export const FADE_MS = 280
+export const TITLE_MS = 2500
 
 const reducedMotion = (): boolean =>
   typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -24,6 +26,7 @@ export function Intro({ data, gate, onDone }: { data: IntroView; gate: boolean; 
   const game = useGameApi()
   const [started, setStarted] = useState(!gate)
   const [card, setCard] = useState<Card>(0)
+  const [linePhase, setLinePhase] = useState<LinePhase>('in')
   const [leaving, setLeaving] = useState(false)
   const timers = useRef<number[]>([])
   const reduced = useRef(reducedMotion()).current
@@ -43,17 +46,18 @@ export function Intro({ data, gate, onDone }: { data: IntroView; gate: boolean; 
   const finishRef = useRef(finish)
   finishRef.current = finish
 
-  // Цепочка карточек — настенные часы: анимация для человека, не игровой темп.
+  // Цепочка: удержание → затухание → следующая (без наложения). Reduced — мгновенная смена.
   useEffect(() => {
     if (!started) return
     const T = (ms: number, f: () => void) => timers.current.push(window.setTimeout(f, ms))
-    T(LINE_MS, () => setCard(1))
-    T(LINE_MS * 2, () => setCard(2))
-    T(LINE_MS * 3, () => setCard(3))
-    T(LINE_MS * 4, () => {
-      setCard(4)
-      game.mooSound()
-    })
+    for (let i = 1; i <= 4; i++) {
+      if (!reduced) T(LINE_MS * i - FADE_MS, () => setLinePhase('out'))
+      T(LINE_MS * i, () => {
+        setCard(i as Card)
+        setLinePhase('in')
+        if (i === 4) game.mooSound()
+      })
+    }
     T(LINE_MS * 4 + TITLE_MS, () => finishRef.current(!reduced))
     return () => { for (const t of timers.current) clearTimeout(t) }
   }, [started, game, reduced])
@@ -83,9 +87,15 @@ export function Intro({ data, gate, onDone }: { data: IntroView; gate: boolean; 
         <div className="intro-date">{data.date}</div>
         <div className="intro-time">{game.clockText}</div>
       </div>
-      {/* одна строка в DOM — без наложения при смене (#492) */}
+      {/* одна строка: .on появляется, .out гаснет; одновременно не две (#500) */}
       {started && card < 4 && (
-        <div key={card} className="intro-line on">{lines[card]}</div>
+        <div
+          key={card}
+          className={`intro-line ${linePhase === 'out' ? 'out' : 'on'}`}
+          data-phase={linePhase}
+        >
+          {lines[card]}
+        </div>
       )}
       {started && (
         <div className={`intro-title${card === 4 ? ' on' : ''}`}>

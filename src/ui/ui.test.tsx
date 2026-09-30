@@ -9,7 +9,7 @@ import { SAVE_KEY, loadState } from '../engine/state'
 import { fmtDate } from '../engine/time'
 import type { Game } from '../engine/game'
 import { introOf, uiOf } from './view'
-import { Intro, introDateLine, introVowLine } from './Intro'
+import { introDateLine, introVowLine, LINE_MS, FADE_MS } from './Intro'
 
 function renderApp(game: Game, onReset = vi.fn()) {
   const utils = render(<App game={game} onReset={onReset} />)
@@ -716,8 +716,16 @@ describe('интро новой партии', () => {
     return { alik: alik.kind === 'text' ? alik.text : '', gap: sys.kind === 'sys' ? sys.text : '' }
   }
 
-  /** Текст видимой карточки из DOM (не собранный в тесте). */
-  const visibleLine = (intro: Element) => intro.querySelector('.intro-line.on')?.textContent ?? ''
+  /** Текст видимой строки интро (не собранный в тесте). */
+  const visibleLine = (intro: Element) =>
+    intro.querySelector('.intro-line.on, .intro-line.out')?.textContent ?? ''
+
+  /** Видимые «для игрока» строки: .on или .out (затухание ещё на экране). */
+  const visibleLineEls = (intro: Element) =>
+    [...intro.querySelectorAll('.intro-line.on, .intro-line.out')]
+
+  /** Весь текст интро на текущей карточке — часы, строка, титул (#500). */
+  const introAllText = (intro: Element) => (intro.textContent ?? '').replace(/\s+/g, ' ').trim()
 
   it('по умолчанию без интро: обычный рендер App его не включает', () => {
     const { game } = makeGame()
@@ -734,20 +742,25 @@ describe('интро новой партии', () => {
     const intro = document.querySelector('.intro')!
     expect(intro.className).toMatch(/card-0/)
     expect(visibleLine(intro)).toBe('Вы положили плитку на объекте Алика.')
-    expect(intro.querySelectorAll('.intro-line')).toHaveLength(1)
-    act(() => { vi.advanceTimersByTime(1800) })
+    expect(visibleLineEls(intro)).toHaveLength(1)
+    // перед сменой — затухание, одна строка .out; затем новая .on (#500)
+    act(() => { vi.advanceTimersByTime(LINE_MS - FADE_MS) })
+    expect(intro.querySelector('.intro-line.out')).not.toBeNull()
+    expect(intro.querySelector('.intro-line.on')).toBeNull()
+    expect(visibleLineEls(intro)).toHaveLength(1)
+    act(() => { vi.advanceTimersByTime(FADE_MS) })
     expect(intro.className).toMatch(/card-1/)
     expect(visibleLine(intro)).toBe(introDateLine(view.date))
     expect(visibleLine(intro)).not.toMatch(/\.\.$/)
-    expect(intro.querySelectorAll('.intro-line')).toHaveLength(1)
-    act(() => { vi.advanceTimersByTime(1800) })
+    expect(visibleLineEls(intro)).toHaveLength(1)
+    act(() => { vi.advanceTimersByTime(LINE_MS) })
     expect(intro.className).toMatch(/card-2/)
     expect(visibleLine(intro)).toBe(introVowLine(view.vow))
     expect(p.alik.includes(view.vow)).toBe(true)
-    act(() => { vi.advanceTimersByTime(1800) })
+    act(() => { vi.advanceTimersByTime(LINE_MS) })
     expect(intro.className).toMatch(/card-3/)
     expect(visibleLine(intro)).toBe(p.gap)
-    act(() => { vi.advanceTimersByTime(1800) })
+    act(() => { vi.advanceTimersByTime(LINE_MS) })
     expect(intro.className).toMatch(/card-4/)
     expect(intro.querySelector('.intro-line')).toBeNull()
     expect(intro.querySelector('.intro-title-big')!.textContent).toContain('Алик,')
@@ -759,6 +772,16 @@ describe('интро новой партии', () => {
     expect(screen.getByText(p.gap)).toBeInTheDocument()
   })
 
+  it('NC: без фазы out строка обрывается — сторож затухания красный (#500)', async () => {
+    const { readFileSync } = await import('node:fs')
+    const css = readFileSync('src/styles.css', 'utf8')
+    expect(css).toMatch(/@keyframes intro-line-out/)
+    expect(css).toMatch(/\.intro-line\.out/)
+    const src = readFileSync('src/ui/Intro.tsx', 'utf8')
+    expect(src).toMatch(/setLinePhase\('out'\)/)
+    expect(src).toMatch(/LINE_MS \* i - FADE_MS/)
+  })
+
   it('дата на карточке 2 — без двойной точки при любом конце fmtDate (#492)', () => {
     expect(introDateLine('18 марта 2026 г.')).toBe('Объект сдан 18 марта 2026 г.')
     expect(introDateLine('18 марта 2026 г.')).not.toMatch(/\.\.$/)
@@ -766,7 +789,7 @@ describe('интро новой партии', () => {
     vi.useFakeTimers()
     const { game } = makeGame({ seed: 1 })
     renderIntro(game)
-    act(() => { vi.advanceTimersByTime(1800) })
+    act(() => { vi.advanceTimersByTime(LINE_MS) })
     const shown = visibleLine(document.querySelector('.intro')!)
     expect(shown).toMatch(/^Объект сдан .+[^.]\.$|^Объект сдан .+г\.$/)
     expect(shown).not.toMatch(/\.\.$/)
@@ -834,16 +857,16 @@ describe('интро новой партии', () => {
     expect(intro.className).toMatch(/intro-reduced/)
     expect(intro.className).toMatch(/card-0/)
     expect(visibleLine(intro)).toBe('Вы положили плитку на объекте Алика.')
-    act(() => { vi.advanceTimersByTime(1800) })
+    act(() => { vi.advanceTimersByTime(LINE_MS) })
     expect(intro.className).toMatch(/card-1/)
     expect(visibleLine(intro)).toBe(introDateLine(view.date))
-    act(() => { vi.advanceTimersByTime(1800) })
+    act(() => { vi.advanceTimersByTime(LINE_MS) })
     expect(intro.className).toMatch(/card-2/)
     expect(visibleLine(intro)).toBe(introVowLine(view.vow))
-    act(() => { vi.advanceTimersByTime(1800) })
+    act(() => { vi.advanceTimersByTime(LINE_MS) })
     expect(intro.className).toMatch(/card-3/)
     expect(visibleLine(intro)).toBe(p.gap)
-    act(() => { vi.advanceTimersByTime(1800) })
+    act(() => { vi.advanceTimersByTime(LINE_MS) })
     expect(intro.className).toMatch(/card-4/)
     expect(intro.querySelector('.intro-title-big')!.textContent).toContain('Алик,')
     expect(within(intro).getByText('Мууууу')).toBeInTheDocument()
@@ -866,7 +889,7 @@ describe('интро новой партии', () => {
       expect(view.gap).toContain(String(game.S.day))
       vi.useFakeTimers()
       const { unmount } = renderIntro(game)
-      act(() => { vi.advanceTimersByTime(1800 * 2) })
+      act(() => { vi.advanceTimersByTime(LINE_MS * 2) })
       expect(visibleLine(document.querySelector('.intro')!)).toBe(introVowLine(start.vow))
       unmount()
       vi.useRealTimers()
@@ -884,7 +907,7 @@ describe('интро новой партии', () => {
       expect(p.alik.includes(view.vow)).toBe(false) // пролог не содержит чужой vow
       vi.useFakeTimers()
       const { unmount } = renderIntro(game)
-      act(() => { vi.advanceTimersByTime(1800 * 2) })
+      act(() => { vi.advanceTimersByTime(LINE_MS * 2) })
       expect(visibleLine(document.querySelector('.intro')!)).toBe(introVowLine(other.vow))
       expect(visibleLine(document.querySelector('.intro')!)).not.toBe(introVowLine(real))
       unmount()
@@ -897,14 +920,14 @@ describe('интро новой партии', () => {
     const again = makeGame({ seed: 2 }).game
     renderIntro(again)
     const intro = document.querySelector('.intro')!
-    act(() => { vi.advanceTimersByTime(1800 * 3) })
+    act(() => { vi.advanceTimersByTime(LINE_MS * 3) })
     expect(within(intro as HTMLElement).queryByText('Мууууу')).toBeNull()
-    act(() => { vi.advanceTimersByTime(1800) })
+    act(() => { vi.advanceTimersByTime(LINE_MS) })
     expect(intro.className).toMatch(/card-4/)
     expect(within(intro as HTMLElement).getByText('Мууууу')).toBeInTheDocument()
   })
 
-  it('интро не называет незнакомых — по тексту DOM Intro (#492)', async () => {
+  it('интро не называет незнакомых — весь текст карточки, включая титул (#500)', async () => {
     const { CAST } = await import('../content/arcs')
     const { STARTS } = await import('../content/quests')
     const escRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -920,28 +943,24 @@ describe('интро новой партии', () => {
       const { unmount } = renderIntro(game)
       const intro = document.querySelector('.intro')!
       const seen: string[] = []
-      for (let c = 0; c < 4; c++) {
-        if (c > 0) act(() => { vi.advanceTimersByTime(1800) })
-        seen.push(visibleLine(intro))
-        expect(intro.querySelectorAll('.intro-line')).toHaveLength(1)
+      for (let c = 0; c < 5; c++) {
+        if (c > 0) act(() => { vi.advanceTimersByTime(LINE_MS) })
+        seen.push(introAllText(intro))
+        expect(visibleLineEls(intro).length, `seed ${seed} card ${c}`).toBeLessThanOrEqual(1)
       }
       expect(stray(seen), `seed ${seed}: ${stray(seen).join(' | ')}`).toEqual([])
       unmount()
     }
     expect(stray(STARTS.flatMap((s) => [s.intro, s.vow, s.reply]))).toEqual([])
-    // NC: чужое имя в отрисованной строке Intro — красный
-    const { game } = makeGame({ seed: 1 })
-    const view = introOf(uiOf(game))!
-    const { GameContext } = await import('./useGame')
+    // NC: чужое имя на титуле — сторож ловит (#500)
     render(
-      <GameContext.Provider value={uiOf(game)}>
-        <div className="intro">
-          <Intro data={{ ...view, vow: 'Деньги Борису завтра' }} gate={false} onDone={() => {}} />
+      <div className="intro card-4">
+        <div className="intro-title on">
+          <div className="intro-title-big">Карине,<br />где деньги?</div>
         </div>
-      </GameContext.Provider>,
+      </div>,
     )
-    act(() => { vi.advanceTimersByTime(1800 * 2) })
-    expect(stray([visibleLine(document.querySelector('.intro')!)]).some((t) => t.includes('Борису'))).toBe(true)
+    expect(stray([introAllText(document.querySelector('.intro')!)]).some((t) => /Карине/.test(t))).toBe(true)
   })
 
   it('старое сохранение без introShown — интро не показывает (#249)', () => {
@@ -963,9 +982,9 @@ describe('интро новой партии', () => {
     const view = introOf(uiOf(game))!
     const moo = vi.spyOn(game.audio, 'moo')
     renderIntro(game)
-    act(() => { vi.advanceTimersByTime(1800 * 3 + 100) })
+    act(() => { vi.advanceTimersByTime(LINE_MS * 3 + 100) })
     expect(moo).not.toHaveBeenCalled()
-    act(() => { vi.advanceTimersByTime(1800) })
+    act(() => { vi.advanceTimersByTime(LINE_MS) })
     expect(moo).toHaveBeenCalled()
     const intro = document.querySelector('.intro')!
     expect(intro.className).toMatch(/card-4/)
