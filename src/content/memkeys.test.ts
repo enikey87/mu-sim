@@ -7,14 +7,12 @@ import { Gated } from '../engine/rules'
 import { ACTOR_KEYS, MEM_KEYS } from './memkeys'
 import { isFactKey } from './factkeys'
 import { momDachaAt, momDachaDays } from './credit'
+import { daySinceEvent } from '../engine/rules/days-since'
 
 const flat = (cs: readonly Criterion[]): Criterion[] => cs.flatMap((c) => (c.op === 'all' ? flat(c.all ?? []) : [c]))
-/** Ключ счётчика «дней с события» → ключ самого события: since.* знает сторож изначально,
- *  вычисляемый mom.dacha.days — с #473 (без события факт — 0, и «не позже n дней» истинно всегда). */
-const eventOfCounter = (key: string): string | null =>
-  key.startsWith('since.') ? 'ach.' + key.slice('since.'.length) : key === momDachaDays ? momDachaAt : null
-/** «Не позже n дней после события» без «событие было»: нет факта — число 0, и условие всегда истинно.
- *  `gte(since.x, 0)` нижней границей не считается: без факта оно тоже всегда истинно. */
+/** Ключ счётчика «дней с события» → ключ самого события: реестр registerDaysSince + since.* (#496). */
+const eventOfCounter = (key: string): string | null => daySinceEvent(key)
+/** «Не позже n дней после события» без «событие было»: нет факта — нет значения, и условие ложно. */
 const sinceGuarded = (where: string, cs: readonly Criterion[], bad: string[]) => {
   const all = flat(cs)
   for (const c of all) {
@@ -194,34 +192,48 @@ describe('реестр mem-ключей', () => {
     ])
   })
 
-  it('сторож знает счётчик mom.dacha.days: без события факт — 0, и верхняя граница истинна всегда (#473)', async () => {
+  it('счётчик дней без события — нет значения; верхняя граница ложна (#496)', async () => {
     const { makeGame } = await import('../test/helpers')
     const { test: holds } = await import('./fact')
-    // гипотеза аудита подтверждена: дачи не было, а «не позже 40 дней после продажи» истинно
     const { game } = makeGame()
-    expect(game.facts()[momDachaDays]).toBe(0)
-    expect(holds({ key: momDachaDays, op: '<=', value: 40 }, game.lineFacts())).toBe(true)
+    delete game.S.mem[momDachaAt]
+    expect(game.facts()[momDachaDays]).toBeUndefined()
+    expect(holds({ key: momDachaDays, op: '<=', value: 40 }, game.lineFacts())).toBe(false)
+    delete game.S.mem['alik.day']
+    expect(game.facts().sinceAlik).toBeUndefined()
+    expect(holds({ key: 'sinceAlik', op: '<=', value: 3 }, game.lineFacts())).toBe(false)
     const bad: string[] = []
     sinceGuarded('dacha', [{ key: momDachaDays, op: '<=', value: 40 }], bad)
     sinceGuarded('dachaOk', [{ key: momDachaAt, op: 'exist' }, { key: momDachaDays, op: '<=', value: 40 }], bad)
-    expect(bad).toEqual(['dacha: mom.dacha.days <= 40 без нижней границы'])
+    sinceGuarded('alik', [{ key: 'sinceAlik', op: '<=', value: 3 }], bad)
+    expect(bad).toEqual([
+      'dacha: mom.dacha.days <= 40 без нижней границы',
+      'alik: sinceAlik <= 3 без нижней границы',
+    ])
   })
 
-  it('движок пишет и читает только ключи памяти из реестра (#473)', async () => {
+  it('движок пишет и читает только ключи памяти из реестра (#473/#496)', async () => {
     const { botTurn } = await import('../tools/bot')
     const { makeGame } = await import('../test/helpers')
+    const { watchFactKeys, test: holds } = await import('../engine/rules')
     const keys = new Set<string>()
+    watchFactKeys((k) => keys.add(k))
     for (const seed of [1, 2, 3, 5, 8]) {
       const { game } = makeGame({ seed })
       game.S.mem = new Proxy(game.S.mem, {
-        // toJSON — не ключ памяти: JSON.stringify при сохранении спрашивает его у объекта
         get: (t, p) => { if (typeof p === 'string' && p !== 'toJSON') keys.add(p); return Reflect.get(t, p) as unknown },
         set: (t, p, v: unknown) => { if (typeof p === 'string' && p !== 'toJSON') keys.add(p); return Reflect.set(t, p, v) },
       })
+      // хаб держит исходный mem — переподключим, иначе чтения через holds не видны Proxy (#496)
+      ;(game as { rules: { hub: { world: typeof game.S.mem } } }).rules.hub.world = game.S.mem
       for (let i = 0; i < 150; i++) await botTurn(game)
     }
-    expect([...keys].filter((k) => !isFactKey(k)), 'ключ памяти, которого реестр не знает').toEqual([])
-    expect(keys.size).toBeGreaterThan(50) // корпус не пуст: партии реально трогают память
+    // NC: holds незарегистрированного ключа попадает в сверку
+    holds({ key: 'probe.read', op: 'exist' }, {})
+    expect(keys.has('probe.read')).toBe(true)
+    watchFactKeys(null)
+    expect([...keys].filter((k) => k !== 'probe.read' && !isFactKey(k)), 'ключ памяти, которого реестр не знает').toEqual([])
+    expect(keys.size).toBeGreaterThan(50)
   }, 60_000)
 
   it('since.* в контенте — с настоящей нижней границей', async () => {

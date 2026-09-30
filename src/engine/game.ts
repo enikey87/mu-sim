@@ -39,7 +39,7 @@ import { Decks } from './deck'
 import { Battery } from './battery'
 import { Seen, type Keyed } from './uniq'
 import {
-  RuleSet, makeHub, Lines, resolver, test, isOpen, valueOf, set, spec,
+  RuleSet, makeHub, Lines, resolver, test, isOpen, valueOf, set, spec, daysSince,
   type Criterion, type Entry, type Facts, type Resolver, type Rule, type Query, type Priority, type Line as PoolLine, type LineOpts, type Picked,
 } from './rules'
 import { MENTION_RE, WORLD } from '../content/world'
@@ -1293,7 +1293,10 @@ export class Game {
     const progress: Facts = {}
     for (const id in S.arcs) progress['arc.' + id] = S.arcs[id].i
     for (const k in S.ach) progress['ach.' + k] = true
-    for (const k in S.ach) progress['since.' + k] = S.day - S.ach[k]
+    for (const k in S.ach) {
+      const n = daysSince(S.day, S.ach[k])
+      if (n !== undefined) progress['since.' + k] = n
+    }
     for (const c of S.ledger.claims) if (c.claimKey) progress['heard.' + c.claimKey] = true
     const lie = this.lie()
     const moneyLv = this.moneyLevel()
@@ -1310,7 +1313,7 @@ export class Game {
         return false
       })(),
       dow: date.getDay(), month: date.getMonth() + 1, dom: date.getDate(),
-      [momDachaDays]: S.mem[momDachaAt] == null ? 0 : S.day - Number(S.mem[momDachaAt]),
+      [momDachaDays]: daysSince(S.day, S.mem[momDachaAt]),
       holiday: holidayOf(S.day) ?? false,
       ...progress,
       items: S.items.length,
@@ -1332,7 +1335,7 @@ export class Game {
       promisePassed: !!pr && (pr.condition ? pr.met !== undefined : pr.due != null && pr.due <= S.day),
       promiseStake: pr?.stake ?? false,
       period: this.period(), night: this.isNight(), offline: S.offlineDays > 0, scene: S.scene?.id,
-      sinceAlik: S.day - Number(S.mem[memkeys.alikDay] ?? S.day),
+      sinceAlik: daysSince(S.day, S.mem[memkeys.alikDay]),
       lateCount: this.lateCount(),
       somedayCount: S.promises.filter((p) => p.due == null && !p.condition).length,
       // сама — не больше одной серии в день: три легенды денег за день — уже не сюжет, а шум
