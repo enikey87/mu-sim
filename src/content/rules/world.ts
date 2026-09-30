@@ -157,7 +157,7 @@ const fedUp = (who: string): R => ({
   remember: [add(interjections, 1, { scope: 'target' })],
   // по порядку и один раз: нарастание, а не случайная реплика
   respond: async ({ game }) => {
-    const t = game.decks.next('FED_' + who, CHORUS_FED_UP[who], { mode: 'sequential', noRepeat: true })
+    const t = game.decks.pick('FED_' + who, CHORUS_FED_UP[who], game.lineFacts(), { mode: 'sequential', noRepeat: true })
     if (!t) return false
     await game.say([{ w: who, t }])
   },
