@@ -7,7 +7,7 @@ import { MIRROR, MIRROR_AGAIN, MIRROR_OPEN, MIRROR_REPLY, type Mirror } from '..
 import { PAYDAY_HOOKS } from '../content/rules/payday'
 import { QUEST_WHEN } from '../content/rules/world'
 import { LEGENDS } from '../content/legends'
-import { TOPICS, P_NEU_B_LATE, P_RUDE_BLOCKED, P_RUDE_POLITE, P_POL_POLITE, P_NIGHT, P_FRIDAY, P_MONEY, P_DESPERATE } from '../content/topics'
+import { TOPICS, P_NEU_B_LATE, P_RUDE_BLOCKED, P_RUDE_POLITE, P_POL_POLITE, P_NIGHT, P_FRIDAY, P_MONEY, P_DESPERATE, DESPERATE_REPLY, MONEY_REPLY_POLITE, MONEY_REPLY_NEUTRAL, MONEY_REPLY_REGIMENT } from '../content/topics'
 import { FINALES, ENDINGS, DEFAULT_FINALE, type Finale } from '../content/finales'
 import { ARCS, ARC_DONE, CAST, type Episode, GROUP, GROUP_OOPS, WRONG_TO, WRONG_WHAT, WRONG_OOPS } from '../content/arcs'
 import * as L from '../content/life'
@@ -39,7 +39,7 @@ import { Decks } from './deck'
 import { Battery } from './battery'
 import { Seen, type Keyed } from './uniq'
 import {
-  RuleSet, makeHub, Lines, resolver, test, isOpen, valueOf, set,
+  RuleSet, makeHub, Lines, resolver, test, isOpen, valueOf, set, spec,
   type Criterion, type Entry, type Facts, type Resolver, type Rule, type Query, type Priority, type Line as PoolLine, type LineOpts, type Picked,
 } from './rules'
 import { MENTION_RE, WORLD } from '../content/world'
@@ -397,6 +397,21 @@ export class Game {
     this.seen.mark(p.text)
     if (p.spec.remember) this.rules.applyOps(p.spec.remember, {})
     return p
+  }
+  /**
+   * Общий ответ на реплику игрока о деньгах — в тоне этой реплики (#480): крик капсом — свой пул,
+   * вежливая и спокойная — свои. Вежливый режим (S5) на деньги отвечает голосом регламента, как на всё остальное.
+   * Пулы одноразовые (до эндгейма дословных повторов быть не должно); исчерпанный пул перефразируется fallback'ом.
+   */
+  moneyReply(tone: string, shout = false): string {
+    const [key, pool]: [string, readonly PoolLine[]] = this.S.mem[memkeys.polite]
+      ? ['MONEY_REPLY_REGIMENT', MONEY_REPLY_REGIMENT]
+      : shout
+        ? ['DESPERATE_REPLY', DESPERATE_REPLY]
+        : tone === 'polite' ? ['MONEY_REPLY_POLITE', MONEY_REPLY_POLITE] : ['MONEY_REPLY_NEUTRAL', MONEY_REPLY_NEUTRAL]
+    const s = this.line(key, pool, { fallback: () => spec(this.draw(key + '_FB', pool)).t })
+    if (s) return s
+    return this.uniq(() => spec(this.draw(key + '_FB', pool)).t)
   }
   rnd = (n: number): number => rndInt(this.rng, n)
   chance = (p: number): boolean => chance(this.rng, p)
@@ -1493,7 +1508,7 @@ export class Game {
       // отчаяние — своё намерение, чаще на дне; вежливый вариант выше остаётся при любом уровне
       const cry = money && level && this.chance(level === 'bottom' ? 0.6 : 0.3) ? this.poorChoice(`P_DESPERATE_${level}`, P_DESPERATE[level], { act: true }) : null
       const poor = !cry && money && this.chance(0.5) ? this.poorChoice<PoorText>(`P_MONEY_${level}_NEU`, money.neutral) : null
-      if (cry) out.push({ text: cry.text, tone: 'neutral', act: 'desperate', arg: typeof cry.value === 'string' ? undefined : cry.value.arg })
+      if (cry) out.push({ text: cry.text, tone: 'neutral', act: 'desperate', arg: typeof cry.value === 'string' ? 'shout' : cry.value.arg })
       else if (poor) out.push({ text: poor.text, tone: 'neutral', act: 'desperate', arg: typeof poor.value === 'string' ? undefined : poor.value.arg })
       else {
       // нейтральная реплика знает время: ночь, вечер пятницы, поздние дни ожидания
