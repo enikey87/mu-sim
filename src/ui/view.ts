@@ -150,8 +150,6 @@ export type IntroView = {
   vow: string
   /** Системная строка завязки («…прошло 184 дня…») — та же, что в чате. */
   gap: string
-  /** Дней после сдачи из состояния партии. */
-  day: number
   /** Дата сдачи (день 0) — той же функцией, что разделители чата. */
   date: string
 }
@@ -165,5 +163,5 @@ export const introOf = (u: GameUi): IntroView | null => {
   if (!alik || !sys) return null
   const start = STARTS.find((s) => s.intro === alik.text)
   if (!start) return null
-  return { vow: start.vow, gap: sys.text, day: S.day, date: fmtDate(0) }
+  return { vow: start.vow, gap: sys.text, date: fmtDate(0) }
 }
