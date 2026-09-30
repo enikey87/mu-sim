@@ -108,7 +108,7 @@ export const VOICE = [
 
 // Уведомления телефона — реплики пула, как у Hades: каждое один раз, если не repeat; у событий — условия и последствия
 // (выселили — хозяин больше не спрашивает про квартиру). spend — трата с карты: {spend}, {what}, {money}.
-export interface Notif extends LineSpec { icon: string; app: string; spend?: true }
+export interface Notif extends LineSpec { icon: string; app: string; spend?: true; /** Уже случившееся списание: сумма уходит с карты при показе. */ charge?: number }
 const often = { repeat: true, cooldown: { turns: 40 } }
 export const NOTIF: Notif[] = [
   { icon: '🏦', app: 'Банк', t: 'Списание {spend} ₽. {what}. Баланс: {money} ₽', spend: true, when: [...moneyOpen], repeat: true, cooldown: { turns: 8 } },
@@ -122,7 +122,7 @@ export const NOTIF: Notif[] = [
   { icon: '🛒', app: 'Авито', t: 'Отзывы об «Алик Стройка под ключ» скрыты по жалобе владельца. Всех 48.' },
   { icon: '🛒', app: 'Авито', t: 'Алик Воздухонесян оставил вам отзыв: «Хороший парень, терпеливый» ⭐⭐⭐⭐⭐' },
   { icon: '🛒', app: 'Авито', t: 'Новое объявление рядом: «Продаю барана Бориса, торг, умеет писать».', when: [WORLD.baran, gte('arc.boris', 4)] },
-  { icon: '🏛', app: 'Госуслуги', t: 'Штраф 500 ₽: парковка у объекта Алика.' },
+  { icon: '🏛', app: 'Госуслуги', t: 'Штраф 500 ₽: парковка у объекта Алика.', charge: 500, when: [missing(sold('tires')), ...moneyOpen] },
   { icon: '🏛', app: 'Госуслуги', t: 'Ваша угроза зарегистрирована как заявление «Алик не платит». Срок рассмотрения — 1473 дня.', when: [gte(count.threat, 1)] },
   { icon: '🌤', app: 'Погода', t: 'Ереван +32°. Идеальная погода, чтобы бетон застыл. Не застынет.', when: [gte('month', 6), lte('month', 8)] },
   { icon: '🌤', app: 'Погода', t: '+3° и дождь. Хорошая погода, чтобы ждать.', when: [gte('month', 10)] },
