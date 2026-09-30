@@ -8,6 +8,7 @@ import { NOTIF } from './life'
 import { GROUP } from './arcs'
 import { meet } from './world'
 import { isOpen, test, valueOf, type Entry, type Facts } from '../engine/rules'
+import { playtest } from '../tools/playtest'
 
 const texts = (g: ReturnType<typeof makeGame>['game'], from = 0) =>
   g.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' || m.kind === 'sys' ? [m.text] : []))
@@ -190,6 +191,24 @@ describe('коллекторы (#128)', () => {
       expect(isOpen(e, { [collectorsRecruited]: true })).toBe(true)
     }
   })
+
+  it('в партиях ботом завербованные коллекторы в групповом чате долг не требуют (#493)', async () => {
+    const debtRe = /задолженност|Долг — он и в чате/
+    const after: string[] = []
+    for (const seed of [65001, 65002, 65003]) {
+      const { game } = await playtest(seed, 300)
+      // реплики коллекторов внутри группового чата — после факта вербовки, который поставила серия
+      let inGroup = false, recruitedAt = Infinity
+      for (const [i, m] of game.S.msgs.entries()) {
+        if (m.kind === 'sys' && /добавил вас в группу/.test(m.text)) inGroup = true
+        if (m.kind === 'sys' && /удалил вас из группы/.test(m.text)) inGroup = false
+        if (m.kind === 'text' && m.who === 'collectors' && /С вас больше не требуем/.test(m.text)) recruitedAt = Math.min(recruitedAt, i)
+        if (inGroup && i > recruitedAt && m.kind === 'text' && m.who === 'collectors') after.push(m.text)
+      }
+    }
+    expect(after.length, 'в выборке нет групповых реплик завербованных коллекторов — проверка была бы пустой').toBeGreaterThan(0)
+    expect(after.filter((t) => debtRe.test(t))).toEqual([])
+  }, 600_000)
 
   it('групповой чат ходом партии: до вербовки требуют долг, после — нет (#468)', async () => {
     const debtRe = /задолженност|Долг — он и в чате/
