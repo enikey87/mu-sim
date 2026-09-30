@@ -1,5 +1,6 @@
 // Условия правил: конструкторы, проверка, описание, именованные условия.
 import type { Criterion, Facts, Scope, Value, FactOp, WriteScope } from './types'
+import { isDaySinceCounter } from './days-since'
 
 /** Сторож: зовётся из каждого конструктора условия/записи. Движок ключей не знает — проверку ставит контент. */
 let keySink: ((key: string) => void) | null = null
@@ -43,6 +44,7 @@ export const of = (actor: string, c: Criterion): Criterion => ({ ...c, actor })
 /** Проверить условие. facts — плоский объект фактов или функция поиска по доскам. */
 export function test(c: Criterion, facts: Facts | Resolver): boolean {
   if (c.op === 'all') return (c.all ?? []).every((x) => test(x, facts))
+  note(c.key)
   const v = typeof facts === 'function' ? facts(c.key, c.scope, c.actor) : facts[c.key]
   switch (c.op) {
     case 'exist': return v !== undefined && v !== null && v !== false && v !== ''
@@ -51,6 +53,8 @@ export function test(c: Criterion, facts: Facts | Resolver): boolean {
     case '!=': return v !== c.value
     case 'match': return typeof v === 'string' && (c.value as RegExp).test(v)
   }
+  // счётчик «дней с события» без события — нет значения, не 0 (#496)
+  if ((v === undefined || v === null) && isDaySinceCounter(c.key)) return false
   const n = typeof v === 'number' ? v : Number(v ?? 0)
   const x = c.value as number
   switch (c.op) {
