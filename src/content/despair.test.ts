@@ -16,7 +16,7 @@ const fromPool = (text: string, pool: readonly unknown[]) => pool.some((p) => {
 })
 const LOW = [...P_MONEY.low.polite, ...P_MONEY.low.neutral, ...P_DESPERATE.low]
 const BOTTOM = [...P_MONEY.bottom.polite, ...P_MONEY.bottom.neutral, ...P_DESPERATE.bottom]
-const desperate = (sets: Choice[][]) => sets.flat().filter((c) => c.act === 'desperate' && c.tone === 'neutral')
+const desperate = (sets: Choice[][]) => sets.flat().filter((c) => c.act === 'desperate' && c.tone === 'neutral' && (fromPool(c.text, P_DESPERATE.low) || fromPool(c.text, P_DESPERATE.bottom)))
 const SELL_TILE = 'ПРОДАМ ПЛИТКУ'
 const SOLD_TILE = 'УЖЕ ПРОДАЛ ПЛИТКУ'
 const DUE_TOMORROW = 'Списание завтра'
@@ -47,7 +47,7 @@ describe('отчаяние от бедности', () => {
     const sets = rebuilds(game, 60)
     expect(desperate(sets).length).toBeGreaterThan(0)
     for (const c of desperate(sets)) { expect(c.tone).toBe('neutral'); expect(fromPool(c.text, P_DESPERATE.low), c.text).toBe(true) }
-    for (const set of sets) expect(set.some((c) => c.tone === 'polite' && (!c.act || (c.act === 'desperate' && c.arg === 'bankAsk')))).toBe(true)
+    for (const set of sets) expect(set.some((c) => c.tone === 'polite' && (!c.act || c.act === 'desperate'))).toBe(true)
     expect(sets.flat().some((c) => fromPool(c.text, P_MONEY.low.polite))).toBe(true)
     expect(sets.flat().filter((c) => fromPool(c.text, BOTTOM))).toEqual([])
   })
@@ -60,7 +60,7 @@ describe('отчаяние от бедности', () => {
     const lowSets = rebuilds(low, 120)
     const bottomSets = rebuilds(bottom, 120)
     expect(desperate(bottomSets).length).toBeGreaterThan(desperate(lowSets).length)
-    for (const set of bottomSets) expect(set.some((c) => c.tone === 'polite' && !c.act), 'вежливый вариант на дне').toBe(true)
+    for (const set of bottomSets) expect(set.some((c) => c.tone === 'polite' && (!c.act || c.act === 'desperate')), 'вежливый вариант на дне').toBe(true)
     for (const c of desperate(bottomSets)) expect(fromPool(c.text, P_DESPERATE.bottom), c.text).toBe(true)
     expect(bottomSets.flat().filter((c) => fromPool(c.text, LOW))).toEqual([])
   })
@@ -163,6 +163,48 @@ describe('отчаяние от бедности', () => {
     expect(game.S.rules.once.Turn_LightOff).toBe(true)
   })
 
+  it('любая реплика P_MONEY получает ответ раньше фоновых последствий (#459)', async () => {
+    const generic = new Set(DESPERATE_REPLY.map(valueOf))
+    const cases = [
+      { level: 'low', ask: 'я не давлю. Но банк давит' },
+      { level: 'low', ask: 'банк уже спрашивает про вас', reply: /банк.*имени/i },
+      { level: 'low', ask: 'до списания. Оно не ждёт' },
+      { level: 'low', ask: 'карта худеет' },
+      { level: 'low', ask: 'низкий остаток' },
+      { level: 'low', ask: 'у меня мало' },
+      { level: 'bottom', ask: 'всё ещё вежливый' },
+      { level: 'bottom', ask: 'не берёт трубку' },
+      { level: 'bottom', ask: 'до конца недели' },
+      { level: 'bottom', ask: 'Ниже только фундамент' },
+      { level: 'bottom', ask: 'платил улыбкой' },
+    ] as const
+    for (const c of cases) {
+      const { game } = makeGame({ seed: 7 })
+      setMoney(game, c.level === 'low' ? Game.MONEY_LOW : Game.MONEY_BOTTOM)
+      game.S.mem['light.off'] = true
+      const choice = choiceWith(game, c.ask)
+      expect(choice.act, c.ask).toBe('desperate')
+      const from = game.S.msgs.length
+      await game.send(choice)
+      const first = firstReply(game, from)
+      if ('reply' in c) expect(first, c.ask).toMatch(c.reply)
+      else expect(generic.has(first!), `${c.ask} → ${first ?? 'молчание'}`).toBe(true)
+      expect(game.S.msgs.slice(from).some((m) => m.kind === 'text' && /Свет отключили/.test(m.text)), c.ask).toBe(false)
+      expect(game.S.rules.once.Turn_LightOff, c.ask).toBeUndefined()
+    }
+    // свет звучит, но позже — своим ходом
+    const { game } = makeGame({ seed: 7 })
+    setMoney(game, Game.MONEY_LOW)
+    game.S.mem['light.off'] = true
+    await game.send(choiceWith(game, 'карта худеет'))
+    let light: string | undefined
+    for (let i = 0; i < 40 && !light; i++) {
+      const later = game.S.msgs.length
+      if ((await game.fire('AlikTurn'))?.name === 'Turn_LightOff') light = firstReply(game, later)
+    }
+    expect(light).toMatch(/Свет отключили/)
+  })
+
   it('деньги вернулись к норме — отчаяние уходит сразу', () => {
     const { game } = makeGame()
     setMoney(game, Game.MONEY_BOTTOM)
@@ -228,8 +270,11 @@ describe('отчаяние от бедности', () => {
     setMoney(bottom, Game.MONEY_BOTTOM)
     let hit = false
     for (let i = 0; i < 60 && !hit; i++) {
+      bottom.S.choices = null
+      const c = bottom.buildChoices().find((x) => x.act === 'desperate')
+      if (!c) continue
       const from = bottom.S.msgs.length
-      await bottom.fire('PlayerSays', { intent: 'desperate' })
+      await bottom.send(c)
       const first = bottom.S.msgs.slice(from).find((m) => m.kind === 'text' && m.from === 'alik')
       if (first && first.kind === 'text' && BOTTOM_REPLIES.includes(first.text)) hit = true
     }
