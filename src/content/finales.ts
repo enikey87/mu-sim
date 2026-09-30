@@ -5,7 +5,7 @@
 import { type Criterion, type Entry, is, gte, lte, eq, set, gate, missing } from './fact'
 import type { Episode } from './arcs'
 import { needs, meet } from './world'
-import { HEAT, caughtCount, count, court, garikConcrete, grantPaid, houseOnGarik, intro, nivaAway, nivaPlayer, paydayScene, rubikFined, tileCornerRemoved, vendetta, wedding, endgame } from './memkeys'
+import { HEAT, caughtCount, count, court, garikConcrete, grantPaid, houseOnGarik, intro, karineKnowsDebt, nivaAway, nivaPlayer, paydayScene, rubikFined, tileCornerRemoved, vendetta, wedding, endgame } from './memkeys'
 
 export interface Finale extends Episode {
   id: string
@@ -102,7 +102,8 @@ export const FINALES: Record<string, Finale[]> = {
     {
       id: 'will', title: 'Завещание', when: [is('ach.forgive')],
       m: [
-        gate(is('ctx.debtMoved'))(needs('karineHome')({ w: 'karine', t: 'На поминках зачитали завещание Алика. Вы же его простили на смертном одре? Он всё вам оставил.' })),
+        gate(is('ctx.debtMoved'))(needs('karineHome', 'karineKnowsDebt')({ w: 'karine', t: 'На поминках зачитали завещание Алика. Вы же его простили на смертном одре? Он всё вам оставил.' })),
+        gate(is('ctx.debtMoved'), missing(karineKnowsDebt))(needs('karineHome')({ w: 'karine', t: 'На поминках зачитали завещание Алика. Он всё вам оставил.' })),
         gate(is('ctx.debtMoved'))(needs('karineGone')({ w: 'mama', t: 'На поминках зачитали завещание Алика. Ты же его простил на смертном одре, сынок? Он всё тебе оставил.' })), gate(is('ctx.debtMoved'))('Брат! Я всё оставил тебе! Мой кредит в банке. Ты единственный, кто меня простил. Я жив, но завещание в силе. Юридически всё чисто.')],
       fx: { ach: 'arc_death', debt: -20000 }, sys: 'По завещанию тебе перешёл кредит Алика: 20 000 ₽. Долг Алика «уменьшился» на эту сумму.',
       done: ['Кредит платишь? Банк мне звонил, я сказал: это наследник, звоните ему.', 'Я жив, брат. А завещание — живее меня.'],

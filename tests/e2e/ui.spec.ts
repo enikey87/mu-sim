@@ -219,7 +219,7 @@ test('сброс во время ответа Алика: старая парт�
   await expect(page.locator('#debt')).toHaveText(/240\s000 ₽/)
 })
 
-test('интро: строка гаснет, не обрывается; двух видимых нет (#500)', async ({ page }) => {
+test('интро: строки затухают без обрыва и не накладываются на титул (#517)', async ({ page }) => {
   await page.addInitScript(() => localStorage.clear())
   await page.goto('/?fast')
   const intro = page.locator('.intro')
@@ -229,28 +229,45 @@ test('интро: строка гаснет, не обрывается; двух
   await expect(page.locator('.intro-line.on')).toBeVisible()
 
   const probe = await page.evaluate(async () => {
-    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
-    const opacities: number[] = []
+    const previous = new WeakMap<HTMLElement, number>()
+    const outgoing = new Set<string>()
     let maxVisible = 0
+    let maxOutDrop = 0
+    let outSamples = 0
+    let titleFrames = 0
+    let frames = 0
     const start = performance.now()
-    while (performance.now() - start < 9000) {
+    while (performance.now() - start < 11_000) {
       const lines = [...document.querySelectorAll('.intro-line')] as HTMLElement[]
       let visible = 0
       for (const el of lines) {
         const o = parseFloat(getComputedStyle(el).opacity)
         if (!Number.isFinite(o)) continue
-        opacities.push(o)
         if (o > 0.08) visible++
+        if (el.dataset.phase === 'out') {
+          outgoing.add(el.textContent ?? '')
+          const before = previous.get(el)
+          if (before !== undefined) {
+            maxOutDrop = Math.max(maxOutDrop, before - o)
+            outSamples++
+          }
+        }
+        previous.set(el, o)
       }
+      const title = document.querySelector('.intro-title') as HTMLElement | null
+      if (title && parseFloat(getComputedStyle(title).opacity) > 0.08) { visible++; titleFrames++ }
       maxVisible = Math.max(maxVisible, visible)
+      frames++
       if (!document.querySelector('.intro')) break
-      await sleep(40)
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
     }
-    const midFade = opacities.filter((o) => o > 0.12 && o < 0.88).length
-    return { maxVisible, midFade, samples: opacities.length }
+    return { maxVisible, maxOutDrop, outSamples, outgoing: outgoing.size, titleFrames, frames }
   })
 
-  expect(probe.samples).toBeGreaterThan(20)
-  expect(probe.maxVisible, 'две строки одновременно').toBeLessThanOrEqual(1)
-  expect(probe.midFade, 'затухание/появление, а не обрыв').toBeGreaterThan(0)
+  expect(probe.frames).toBeGreaterThan(100)
+  expect(probe.outgoing).toBe(4)
+  expect(probe.outSamples).toBeGreaterThan(20)
+  expect(probe.titleFrames).toBeGreaterThan(5)
+  expect(probe.maxOutDrop, 'резкий обрыв уходящей строки').toBeLessThan(0.75)
+  expect(probe.maxVisible, 'строка поверх строки или титула').toBeLessThanOrEqual(1)
 })

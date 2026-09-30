@@ -9,7 +9,7 @@ import { needs, WORLD } from './world'
 import { selfConflict } from './ledger'
 import { sold } from './credit'
 import type { LedgerEvent } from './fact-types'
-import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, collectorsRecruited, count, evicted, finaleOf, grantPaid, met, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, sick, taxThawed, threatClaim, tileCornerRemoved } from './memkeys'
+import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, collectorsRecruited, count, evicted, finaleOf, grantPaid, met, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, sick, taxThawed, threatClaim, tileCornerRemoved, wedding } from './memkeys'
 
 // draw(key, arr) выдаёт уместный сейчас элемент «из колоды» (без повторов до конца колоды); noRefill — после исчерпания null
 export type DrawFn = <T = unknown>(key: string, arr: readonly Entry<T>[], noRefill?: boolean, eligible?: (e: Entry<T>) => boolean) => T
@@ -379,7 +379,7 @@ D.LEGENDARY = [
   needs('baran')('Джан, отдал твою зарплату за барана. Баран оказался козлом. Суд идёт, брат.'),
   'Дорогой, я могу заплатить прямо сейчас, но тогда ты перестанешь мне писать. А я привык, мне приятно.',
   'Брат, звонил твой дедушка. Сказал, тебе рано большие деньги. Я уважаю старших.',
-  needs('samvel')('Ахпер, всё готово: деньги, конверт, марка. Нет только почтальона. Он на свадьбе у дяди Самвела. Как и все.'),
+  gate(is(wedding('samvel')))(needs('samvel')('Ахпер, всё готово: деньги, конверт, марка. Нет только почтальона. Он на свадьбе у дяди Самвела. Как и все.')),
   'Слушай, давай так: сейчас ничего не плачу, а потом сразу всё и ещё сверху ничего. Выгодно же!',
   'Брат, твою плитку заказчик назвал шедевром. А шедевры, сам знаешь, при жизни не оплачиваются.',
   'Джан, я залил фундамент, а в фундамент — твои деньги. Теперь дом стоит на твоей зарплате. Гордись!',

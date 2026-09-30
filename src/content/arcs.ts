@@ -4,7 +4,7 @@ import { type Entry, type FactOp, type Criterion, type FactKey, type Said, set, 
 import { type ClaimKey } from './ids'
 import type { LedgerEvent } from './fact-types'
 import { needs, meet, WORLD } from './world'
-import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, collectorsRecruited, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantPaid, houseOnGarik, intro, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, sick, taxFrozen, wedding } from './memkeys'
+import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, collectorsRecruited, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantPaid, houseOnGarik, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, sick, taxFrozen, wedding } from './memkeys'
 
 export type ArcMsg = Said | { w: string; t: string; claims?: LedgerEvent[] }
 export interface Episode {
@@ -202,7 +202,9 @@ export const ARCS: Record<string, Arc> = {
       { m: [needs('samvel')('Кстати, поминки мои тогда плавно перешли в свадьбу. Самвел сделал предложение вдове. Моей. До сих пор разбираемся.'), gate(missing(intro('samvel')))('Кстати, поминки мои тогда плавно перешли в свадьбу. Чью — до сих пор выясняем.')], then: 'promise' },
       {
         m: [
-          needs('karineHome')(needs('karine')({ w: 'karine', t: 'Подтверждаю: жив. К сожалению. Ваш долг — тоже жив.' })), needs('karineHome', 'karine')('Видишь, Карине подтверждает: я живой! Значит, отдам. Живые отдают. Когда-нибудь.'),
+          needs('karineHome', 'karine', 'karineKnowsDebt')({ w: 'karine', t: 'Подтверждаю: жив. К сожалению. Ваш долг — тоже жив.' }),
+          gate(missing(karineKnowsDebt))(needs('karineHome', 'karine')({ w: 'karine', t: 'Подтверждаю: жив. К сожалению.' })),
+          needs('karineHome', 'karine')('Видишь, Карине подтверждает: я живой! Значит, отдам. Живые отдают. Когда-нибудь.'),
           needs('karineGone')({ w: 'mama', t: 'Подтверждаю, сынок: жив, слава богу. Ваш долг — тоже.' }), needs('karineGone')('Видишь, мама подтверждает: я живой! Значит, отдам. Живые отдают. Когда-нибудь.'),
         ],
         fx: { ach: 'arc_death' },
