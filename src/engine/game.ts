@@ -852,9 +852,10 @@ export class Game {
     // продажа могла не вытащить со дна — снова предложить, с этой причиной (ход игрока, не падение — без перерыва)
     if (this.moneyLevel() === 'bottom') this.maybeCreditOffer('Продано, а остаток всё ещё критический')
   }
-  /** Итог продажи: сезон — из даты партии, не из шутки «всегда лето». */
+  /** Итог продажи: сезон — из даты партии, не из шутки «всегда лето»; машина — по факту `has.car` (#515). */
   thingDone(thing: { id: string; done: string }): string {
     if (thing.id === 'tires') {
+      if (this.S.mem[memkeys.nivaPlayer] === true) return 'Зимнюю резину продали. «Нива» у вас есть — доедет и на летней'
       const month = dateOf(this.S.day).getMonth() + 1
       if (month >= 6 && month <= 8) return 'Зимнюю резину продали. Летом. Машины у вас нет'
     }
@@ -1329,6 +1330,8 @@ export class Game {
       [memkeys.HEAT]: Math.max(0, Number(S.mem[memkeys.HEAT] ?? 0)),
       'has.boris': S.items.some((n) => /Борис/.test(n)),
       'has.niva': S.items.some((n) => /Нива/.test(n)),
+      // Машина игрока — один факт (#515): есть, пока не продана резина, и всегда, когда «Нива» у игрока
+      'has.car': S.mem[memkeys.nivaPlayer] === true || S.mem[sold('tires')] === undefined,
       // Календарное обещание живо в день срока; событийное — в ход, когда его факт стал истиной.
       promiseLive: !!pr && (pr.condition ? pr.met === S.day : pr.due === S.day),
       // срок вышел: advanceTurnDay идёт раньше события срока и может перескочить день срока

@@ -1,8 +1,10 @@
 // Карточки ленты: названная сумма — движение денег; машина/сезон — по фактам партии (#488).
 import { describe, it, expect } from 'vitest'
 import { makeGame } from '../test/helpers'
-import { NOTIF } from './life'
+import { NOTIF, SPEND } from './life'
 import { THINGS, sold } from './credit'
+import { nivaPlayer } from './memkeys'
+import { is } from './fact'
 import { dateOf } from '../engine/time'
 
 /** Сумма в тексте как уже случившийся платёж (не вакансия и не оффер). */
@@ -68,5 +70,68 @@ describe('карточки ленты и суммы (#488)', () => {
     autumn.S.day = 200 // ~октябрь
     expect(dateOf(autumn.S.day).getMonth() + 1).toBeGreaterThan(8)
     expect(autumn.thingDone(tires)).not.toMatch(/Летом/)
+  })
+})
+
+// Машина игрока — один факт `has.car`: есть, пока не продана резина, и всегда, пока «Нива» у игрока (#515).
+describe('машина игрока — один факт (#515)', () => {
+  const fine = NOTIF.find((n) => n.charge === 500)!
+  const shop = NOTIF.find((n) => n.app === 'Шиномонтаж')!
+  const tires = THINGS.find((t) => t.id === 'tires')!
+
+  it('порядок «продажа резины → карточки»: без «Нивы» машины нет — штраф и шиномонтаж молчат', () => {
+    const { game } = makeGame({ seed: 3 })
+    expect(game.holds(is('has.car')), 'до продажи машина есть').toBe(true)
+    expect(game.linePicked('CAR_A_FINE', [fine])).not.toBeNull()
+    game.S.mem[sold('tires')] = true
+    expect(game.holds(is('has.car'))).toBe(false)
+    expect(game.linePicked('CAR_A_FINE_SOLD', [fine])).toBeNull()
+    expect(game.linePicked('CAR_A_SHOP', [shop]), '«где машина» без машины не спрашивают').toBeNull()
+    expect(game.thingDone(tires)).toContain('Машины у вас нет')
+  })
+
+  it('порядок «Нива у игрока → продажа резины»: машина остаётся, тексты не врут', () => {
+    const { game } = makeGame({ seed: 3 })
+    game.S.mem[nivaPlayer] = true
+    game.S.mem[sold('tires')] = true
+    expect(game.holds(is('has.car')), '«Нива» у игрока — машина есть даже без резины').toBe(true)
+    expect(game.linePicked('CAR_B_FINE', [fine])).not.toBeNull()
+    expect(game.linePicked('CAR_B_SHOP', [shop])).not.toBeNull()
+    expect(game.thingDone(tires)).toContain('«Нива»')
+    expect(game.thingDone(tires)).not.toContain('Машины у вас нет')
+  })
+
+  it('порядок «продажа резины → Нива у игрока»: факт восстанавливается', () => {
+    const { game } = makeGame({ seed: 3 })
+    game.S.mem[sold('tires')] = true
+    expect(game.holds(is('has.car'))).toBe(false)
+    game.S.mem[nivaPlayer] = true
+    expect(game.holds(is('has.car'))).toBe(true)
+    expect(game.linePicked('CAR_C_SHOP', [shop])).not.toBeNull()
+    expect(game.linePicked('CAR_C_FINE', [fine])).not.toBeNull()
+  })
+
+  it('бензин списывается, только пока есть машина', () => {
+    const withCar = makeGame({ seed: 3 }).game
+    const spends = Array.from({ length: 200 }, () => withCar.draw('SPEND', SPEND))
+    expect(spends).toContain('Бензин до объекта')
+
+    const noCar = makeGame({ seed: 3 }).game
+    noCar.S.mem[sold('tires')] = true
+    const spendsNoCar = Array.from({ length: 200 }, () => noCar.draw('SPEND', SPEND))
+    expect(spendsNoCar).not.toContain('Бензин до объекта')
+    expect(new Set(spendsNoCar).size).toBeGreaterThan(3)
+  })
+
+  it('NC: снять гейт has.car со штрафа — противоречие возвращается', () => {
+    const saved = fine.when
+    try {
+      fine.when = fine.when!.filter((c) => c.key !== 'has.car')
+      const { game } = makeGame({ seed: 3 })
+      game.S.mem[sold('tires')] = true
+      expect(game.linePicked('CAR_NC_FINE', [fine]), 'без гейта штраф открыт после продажи — тест обязан быть красным').not.toBeNull()
+    } finally {
+      fine.when = saved
+    }
   })
 })
