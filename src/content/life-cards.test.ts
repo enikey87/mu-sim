@@ -1,6 +1,7 @@
 // Карточки ленты: названная сумма — движение денег; машина/сезон — по фактам партии (#488).
-import { describe, it, expect } from 'vitest'
-import { makeGame } from '../test/helpers'
+import { describe, it, expect, vi } from 'vitest'
+import { makeGame, cards } from '../test/helpers'
+import type { Game } from '../engine/game'
 import { NOTIF, SPEND } from './life'
 import { THINGS, sold } from './credit'
 import { nivaPlayer } from './memkeys'
@@ -36,20 +37,27 @@ describe('карточки ленты и суммы (#488)', () => {
   })
 
   it('путём игрока: штраф списывает названные 500 ₽; после продажи резины — не приходит', () => {
-    const { game } = makeGame({ seed: 3 })
     const fine = NOTIF.find((n) => n.charge === 500)!
-    const before = game.S.money
-    const p = game.linePicked('NOTIF_FINE_TEST', [fine])
-    expect(p, 'штраф открыт до продажи резины').not.toBeNull()
-    // тот же путь, что randomNotif: mark + charge + notify
-    game.lines.mark(p!.id)
-    if (fine.charge != null && !game.moneySealed()) game.adjustMoney(-fine.charge, fine.app, { group: fine.app })
-    game.notify(fine.icon, fine.app, p!.text, { event: 'life' })
-    expect(game.S.money).toBe(before - 500)
-    expect(game.S.msgs.some((m) => m.kind === 'card' && m.text.includes('Штраф 500'))).toBe(true)
+    const showFine = (game: Game) => {
+      const pick = game.lines.pick.bind(game.lines)
+      const stub = vi.spyOn(game.lines, 'pick').mockImplementation((key, pool, facts, opts) =>
+        pick(key, key === 'NOTIF' ? [fine] : pool, facts, opts))
+      try { game.randomNotif() } finally { stub.mockRestore() }
+    }
 
-    game.S.mem[sold('tires')] = true
-    expect(game.linePicked('NOTIF_FINE_GONE', [fine])).toBeNull()
+    const { game } = makeGame({ seed: 3 })
+    const before = game.S.money
+    showFine(game)
+    const card = cards(game, 'Госуслуги').find((m) => PAID_IN_TEXT.test(m.text))
+    expect(card, 'штраф показан до продажи резины').toBeDefined()
+    expect(game.S.money).toBe(before - parseRub(card!.text.match(PAID_IN_TEXT)![1]!))
+
+    const soldGame = makeGame({ seed: 3 }).game
+    soldGame.S.mem[sold('tires')] = true
+    const beforeSold = soldGame.S.money
+    showFine(soldGame)
+    expect(cards(soldGame, 'Госуслуги').some((m) => PAID_IN_TEXT.test(m.text))).toBe(false)
+    expect(soldGame.S.money).toBe(beforeSold)
   })
 
   it('продажа резины: «Летом» только в июне–августе', () => {
