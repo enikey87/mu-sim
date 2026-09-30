@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest'
 import type { GameEvent } from './rules/events'
 import { makeGame , setMoney} from '../test/helpers'
 import { ARCS, GROUP } from './arcs'
-import { D } from './excuses'
+import { D, make } from './excuses'
 import { ENDGAME_RETURNERS } from './endgame'
 import { NOTIF } from './life'
 import { CONDOLE_REVIVED, GREET_A, FLOOR } from './misc'
@@ -11,6 +11,8 @@ import { SPEND } from './life'
 import { WORLD, needs, meet } from './world'
 import { turnRules } from './rules/turn'
 import { valueOf, type Entry } from '../engine/rules'
+import { wedding } from './memkeys'
+import { is, saidText, type Said } from './fact'
 import type { Game } from '../engine/game'
 
 const texts = (g: Game, n = 0) => g.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' ? [m.text] : []))
@@ -439,13 +441,40 @@ describe('несостыковки из плейтеста ботами, рау�
     const { game } = makeGame()
     await game.playArc('grandpa')
     for (const id of ['goar', 'mkrtich', 'gagik', 'samvel', 'garik']) game.S.mem['intro.' + id] = true
-    // герой сериала — субъект свадьбы/похорон (не клятва «дяди X» рядом с общим «после свадьбы» в сроке)
-    const own = /(свадьб|похорон|поминк|умер|женил|крестин|юбилей|обручен|родила|роды)[^.!?]*?(Самвела(?!-)|Гарика|Гоар|Мкртича|Гагика|Грачика)|(Самвела(?!-)|Гарика|Гоар|Мкртича|Гагика|Грачика)[^.!?]*?(похорон|поминк|умер|женил|крестин|юбилей|обручен|родила|роды)/i
+    const own = /(свадьб|похорон|поминк|умер|женил|крестин|юбилей|обручен|родила|роды)[^.!?]*?(Самвела(?!-)|Гарика|Гоар|Мкртича|Гагика|Грачика)|(Самвела(?!-)|Гарика|Гоар|Мкртича|Гагика|Грачика)[^.!?]*?(свадьб|похорон|поминк|умер|женил|крестин|юбилей|обручен|родила|роды)/i
+    const invented = (t: string) => own.test(t.replaceAll('Здоровьем дяди Самвела клянусь', ''))
+    expect(invented('У дяди Самвела свадьба.')).toBe(true)
+    expect(invented('Похороны Гарика перенесли.')).toBe(true)
+    expect(invented('Здоровьем дяди Самвела клянусь, верну после свадьбы.')).toBe(false)
     const said: string[] = []
-    for (let i = 0; i < 600; i++) said.push(game.X.excuse({}).texts.join(' '))
-    expect(said.filter((t) => own.test(t))).toEqual([])
+    for (let i = 0; i < 600; i++) said.push(game.X.excuse({}).texts.map(saidText).join(' '))
+    expect(said.filter(invented)).toEqual([])
     expect(said.some((t) => /Самвела|Гарика|Гоар|Мкртича|Гагика|Грачика/.test(t))).toBe(true)
   }, 60_000) // 600 отмазок генератора: время растёт с корпусом
+  it('генератор пропускает свадебное событие у героя сериала, но не обычный повод', () => {
+    let events = 0
+    const X = make(<T,>(key: string, entries: readonly Entry<T>[]): T => {
+      if (key === 'LEGROLL') return 1 as T
+      if (key === 'EVENT') return (events++ === 0 ? 'свадьба' : 'ремонт') as T
+      return valueOf(entries[0])
+    })
+    const excuse = X.excuse()
+    expect(excuse.texts.map(saidText).join(' ')).toContain('у дяди Самвела ремонт')
+    expect(events).toBe(2)
+  })
+  it('легендарная отмазка про свадьбу Самвела доступна только во время свадьбы', async () => {
+    const { game } = makeGame()
+    const line = 'Он на свадьбе у дяди Самвела.'
+    const available = () => game.open(D.LEGENDARY as Entry<Said>[]).some((t) => saidText(t).includes(line))
+    expect(available()).toBe(false)
+    game.S.mem['intro.samvel'] = true
+    expect(available()).toBe(false)
+    await game.playArc('samvel')
+    expect(game.holds(is(wedding('samvel')))).toBe(true)
+    expect(available()).toBe(true)
+    game.nextDay(9)
+    expect(available()).toBe(false)
+  })
   it('пока в семье прощаются, застолья и смертного одра не бывает', async () => {
     const { game } = makeGame()
     game.S.day = 250
