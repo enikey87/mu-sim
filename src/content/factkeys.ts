@@ -33,7 +33,7 @@ export const CTX_KEYS = [
   'group', 'wrong', 'deleted', 'offended',
 ] as const
 export type CtxKey = (typeof CTX_KEYS)[number]
-export const HAS_KEYS = ['boris', 'niva'] as const
+export const HAS_KEYS = ['boris', 'niva', 'car'] as const
 export type HasKey = (typeof HAS_KEYS)[number]
 
 export type { WhoId }
