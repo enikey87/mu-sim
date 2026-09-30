@@ -17,10 +17,8 @@ const fromPool = (text: string, pool: readonly unknown[]) => pool.some((p) => {
 })
 const LOW = [...P_MONEY.low.polite, ...P_MONEY.low.neutral, ...P_DESPERATE.low]
 const BOTTOM = [...P_MONEY.bottom.polite, ...P_MONEY.bottom.neutral, ...P_DESPERATE.bottom]
-/** Любой нейтральный вариант с намерением desperate — без фильтра по пулу (норму денег ловит и P_MONEY). */
-const desperate = (sets: Choice[][]) => sets.flat().filter((c) => c.act === 'desperate' && c.tone === 'neutral')
-/** Строки именно пула P_DESPERATE — для тестов уровней «мало»/«дно», где пулы различают. */
-const fromDesperatePool = (c: Choice) => fromPool(c.text, P_DESPERATE.low) || fromPool(c.text, P_DESPERATE.bottom)
+/** Любой вариант с намерением desperate — любого тона (#494). */
+const desperate = (sets: Choice[][]) => sets.flat().filter((c) => c.act === 'desperate')
 const SELL_TILE = 'ПРОДАМ ПЛИТКУ'
 const SOLD_TILE = 'УЖЕ ПРОДАЛ ПЛИТКУ'
 const DUE_TOMORROW = 'Списание завтра'
@@ -60,9 +58,10 @@ describe('отчаяние от бедности', () => {
     const { game } = makeGame()
     setMoney(game, Game.MONEY_LOW)
     const sets = rebuilds(game, 60)
-    const pool = desperate(sets).filter(fromDesperatePool)
-    expect(pool.length).toBeGreaterThan(0)
-    for (const c of pool) { expect(c.tone).toBe('neutral'); expect(fromPool(c.text, P_DESPERATE.low), c.text).toBe(true) }
+    const all = desperate(sets)
+    expect(all.length).toBeGreaterThan(0)
+    for (const c of all) expect(fromPool(c.text, LOW), c.text).toBe(true)
+    expect(all.some((c) => fromPool(c.text, P_DESPERATE.low))).toBe(true)
     for (const set of sets) expect(set.some((c) => c.tone === 'polite' && (!c.act || c.act === 'desperate'))).toBe(true)
     expect(sets.flat().some((c) => fromPool(c.text, P_MONEY.low.polite))).toBe(true)
     expect(sets.flat().filter((c) => fromPool(c.text, BOTTOM))).toEqual([])
@@ -75,11 +74,13 @@ describe('отчаяние от бедности', () => {
     setMoney(bottom, Game.MONEY_BOTTOM)
     const lowSets = rebuilds(low, 120)
     const bottomSets = rebuilds(bottom, 120)
-    const lowPool = desperate(lowSets).filter(fromDesperatePool)
-    const bottomPool = desperate(bottomSets).filter(fromDesperatePool)
-    expect(bottomPool.length).toBeGreaterThan(lowPool.length)
+    const lowAll = desperate(lowSets)
+    const bottomAll = desperate(bottomSets)
+    expect(bottomAll.length).toBeGreaterThan(lowAll.length)
     for (const set of bottomSets) expect(set.some((c) => c.tone === 'polite' && (!c.act || c.act === 'desperate')), 'вежливый вариант на дне').toBe(true)
-    for (const c of bottomPool) expect(fromPool(c.text, P_DESPERATE.bottom), c.text).toBe(true)
+    for (const c of lowAll) expect(fromPool(c.text, LOW), c.text).toBe(true)
+    for (const c of bottomAll) expect(fromPool(c.text, BOTTOM), c.text).toBe(true)
+    expect(bottomAll.some((c) => fromPool(c.text, P_DESPERATE.bottom))).toBe(true)
     expect(bottomSets.flat().filter((c) => fromPool(c.text, LOW))).toEqual([])
   })
 
