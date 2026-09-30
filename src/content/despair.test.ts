@@ -19,6 +19,19 @@ const LOW = [...P_MONEY.low.polite, ...P_MONEY.low.neutral, ...P_DESPERATE.low]
 const BOTTOM = [...P_MONEY.bottom.polite, ...P_MONEY.bottom.neutral, ...P_DESPERATE.bottom]
 /** Любой вариант с намерением desperate — любого тона (#494). */
 const desperate = (sets: Choice[][]) => sets.flat().filter((c) => c.act === 'desperate')
+const expectPoolTones = (choices: Choice[], level: 'low' | 'bottom') => {
+  const pools = [
+    { lines: P_DESPERATE[level], tone: 'neutral' },
+    { lines: P_MONEY[level].polite, tone: 'polite' },
+    { lines: P_MONEY[level].neutral, tone: 'neutral' },
+  ] as const
+  for (const c of choices) {
+    const matches = pools.filter((pool) => fromPool(c.text, pool.lines))
+    expect(matches.length, c.text).toBe(1)
+    expect(c.tone, c.text).toBe(matches[0].tone)
+  }
+  for (const pool of pools) expect(choices.some((c) => fromPool(c.text, pool.lines)), level).toBe(true)
+}
 const SELL_TILE = 'ПРОДАМ ПЛИТКУ'
 const SOLD_TILE = 'УЖЕ ПРОДАЛ ПЛИТКУ'
 const DUE_TOMORROW = 'Списание завтра'
@@ -61,6 +74,7 @@ describe('отчаяние от бедности', () => {
     const all = desperate(sets)
     expect(all.length).toBeGreaterThan(0)
     for (const c of all) expect(fromPool(c.text, LOW), c.text).toBe(true)
+    expectPoolTones(all, 'low')
     expect(all.some((c) => fromPool(c.text, P_DESPERATE.low))).toBe(true)
     for (const set of sets) expect(set.some((c) => c.tone === 'polite' && (!c.act || c.act === 'desperate'))).toBe(true)
     expect(sets.flat().some((c) => fromPool(c.text, P_MONEY.low.polite))).toBe(true)
@@ -80,6 +94,7 @@ describe('отчаяние от бедности', () => {
     for (const set of bottomSets) expect(set.some((c) => c.tone === 'polite' && (!c.act || c.act === 'desperate')), 'вежливый вариант на дне').toBe(true)
     for (const c of lowAll) expect(fromPool(c.text, LOW), c.text).toBe(true)
     for (const c of bottomAll) expect(fromPool(c.text, BOTTOM), c.text).toBe(true)
+    expectPoolTones(bottomAll, 'bottom')
     expect(bottomAll.some((c) => fromPool(c.text, P_DESPERATE.bottom))).toBe(true)
     expect(bottomSets.flat().filter((c) => fromPool(c.text, LOW))).toEqual([])
   })
