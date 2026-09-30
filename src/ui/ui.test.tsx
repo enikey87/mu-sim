@@ -5,11 +5,10 @@ import { App } from './App'
 import { messageRenderStats } from './Message'
 import { messageListRenderStats, messageListBuildStats } from './Chat'
 import { makeGame, setMoney, memStorage } from '../test/helpers'
-import { SAVE_KEY, loadState, START_MONEY } from '../engine/state'
+import { SAVE_KEY, loadState } from '../engine/state'
 import { fmtDate } from '../engine/time'
 import type { Game } from '../engine/game'
 import { introOf, uiOf } from './view'
-import { browserAudio } from '../engine/audio'
 
 function renderApp(game: Game, onReset = vi.fn()) {
   const utils = render(<App game={game} onReset={onReset} />)
@@ -722,19 +721,33 @@ describe('интро новой партии', () => {
     expect(document.querySelector('.intro')).toBeNull()
   })
 
-  it('новая партия: интро показывает тот же пролог, что в чате, и само уходит в чат с отметкой', () => {
+  it('новая партия: пять карточек из той же завязки, что в чате; само уходит с отметкой', () => {
     vi.useFakeTimers()
     const { game } = makeGame({ seed: 1 })
     const p = prologue(game)
+    const view = introOf(uiOf(game))!
     renderIntro(game)
     const intro = document.querySelector('.intro')!
-    act(() => { vi.advanceTimersByTime(400) })
-    expect(within(intro as HTMLElement).getByText(p.alik)).toBeInTheDocument()
-    act(() => { vi.advanceTimersByTime(12200) })
+    expect(intro.className).toMatch(/card-0/)
+    expect(within(intro as HTMLElement).getByText('Вы положили плитку на объекте Алика.')).toBeInTheDocument()
+    act(() => { vi.advanceTimersByTime(1800) })
+    expect(intro.className).toMatch(/card-1/)
+    expect(within(intro as HTMLElement).getByText(`Объект сдан ${view.date}.`)).toBeInTheDocument()
+    act(() => { vi.advanceTimersByTime(1800) })
+    expect(intro.className).toMatch(/card-2/)
+    expect(within(intro as HTMLElement).getByText(`Алик: «${view.vow}»`)).toBeInTheDocument()
+    expect(p.alik.includes(view.vow)).toBe(true)
+    act(() => { vi.advanceTimersByTime(1800) })
+    expect(intro.className).toMatch(/card-3/)
+    expect(within(intro as HTMLElement).getByText(p.gap)).toBeInTheDocument()
+    act(() => { vi.advanceTimersByTime(1800) })
+    expect(intro.className).toMatch(/card-4/)
+    expect(intro.querySelector('.intro-title-big')!.textContent).toContain('Алик,')
+    expect(within(intro as HTMLElement).getByText('Мууууу')).toBeInTheDocument()
+    act(() => { vi.advanceTimersByTime(3000) })
     expect(game.S.introShown).toBe(true)
     expect(document.querySelector('.intro')).toBeNull()
     expect(within(document.getElementById('chat')! as HTMLElement).getByText(p.alik)).toBeInTheDocument()
-    expect(document.querySelector('.intro-gap')).toBeNull()
     expect(screen.getByText(p.gap)).toBeInTheDocument()
   })
 
@@ -778,83 +791,105 @@ describe('интро новой партии', () => {
     renderIntro(game, true)
     expect(screen.getByText('Коснитесь, чтобы начать')).toBeInTheDocument()
     act(() => { vi.advanceTimersByTime(3000) })
-    expect(document.querySelector('.intro-note')).toBeNull()
+    expect(document.querySelector('.intro-line')).toBeNull()
     act(() => { fireEvent.click(document.querySelector('.intro')!) })
-    act(() => { vi.advanceTimersByTime(500) })
-    expect(document.querySelector('.intro-note')).not.toBeNull()
+    act(() => { vi.advanceTimersByTime(100) })
+    expect(document.querySelector('.intro-line.on')).not.toBeNull()
   })
 
-  it('prefers-reduced-motion: три фазы без наложений стопки и строки (#321)', async () => {
+  it('prefers-reduced-motion: пять карточек по очереди без анимации уезда (#477)', async () => {
     vi.useFakeTimers()
     vi.stubGlobal('matchMedia', () => ({ matches: true }))
     const { readFileSync } = await import('node:fs')
     const css = readFileSync('src/styles.css', 'utf8')
-    expect(css).toMatch(/\.intro-reduced\.phase-play[\s\S]*?\.intro-gap[\s\S]*?opacity:\s*0/)
-    expect(css).toMatch(/\.intro-reduced\.phase-gap[\s\S]*?\.intro-stack[\s\S]*?opacity:\s*0/)
-    expect(css).toMatch(/\.intro-reduced\.phase-title[\s\S]*?\.intro-gap[\s\S]*?opacity:\s*0/)
+    expect(css).toMatch(/\.intro-reduced[\s\S]*?\.intro-line[\s\S]*?transition:\s*none/)
+    expect(css).toMatch(/\.intro-reduced[\s\S]*?\.intro-title[\s\S]*?transition:\s*none/)
     const { game } = makeGame()
     const p = prologue(game)
+    const view = introOf(uiOf(game))!
     renderIntro(game)
     const intro = document.querySelector('.intro') as HTMLElement
     expect(intro.className).toMatch(/intro-reduced/)
-    expect(intro.className).toMatch(/phase-play/)
-    expect(intro.className).not.toMatch(/phase-gap|phase-title/)
-    expect(within(intro).getByText(p.alik)).toBeInTheDocument()
-    act(() => { vi.advanceTimersByTime(1600) })
-    expect(intro.className).toMatch(/phase-gap/)
-    expect(intro.className).not.toMatch(/phase-play|phase-title/)
+    expect(intro.className).toMatch(/card-0/)
+    expect(within(intro).getByText('Вы положили плитку на объекте Алика.')).toBeInTheDocument()
+    act(() => { vi.advanceTimersByTime(1800) })
+    expect(intro.className).toMatch(/card-1/)
+    expect(within(intro).getByText(`Объект сдан ${view.date}.`)).toBeInTheDocument()
+    act(() => { vi.advanceTimersByTime(1800) })
+    expect(intro.className).toMatch(/card-2/)
+    expect(within(intro).getByText(`Алик: «${view.vow}»`)).toBeInTheDocument()
+    act(() => { vi.advanceTimersByTime(1800) })
+    expect(intro.className).toMatch(/card-3/)
     expect(within(intro).getByText(p.gap)).toBeInTheDocument()
-    act(() => { vi.advanceTimersByTime(1600) })
-    expect(intro.className).toMatch(/phase-title/)
-    expect(intro.className).not.toMatch(/phase-play|phase-gap/)
+    act(() => { vi.advanceTimersByTime(1800) })
+    expect(intro.className).toMatch(/card-4/)
     expect(intro.querySelector('.intro-title-big')!.textContent).toContain('Алик,')
-    act(() => { vi.advanceTimersByTime(2000) })
+    expect(within(intro).getByText('Мууууу')).toBeInTheDocument()
+    act(() => { vi.advanceTimersByTime(3000) })
     expect(document.querySelector('.intro')).toBeNull()
     expect(game.S.introShown).toBe(true)
   })
 
-  it('промежуточные уведомления — из пулов, баланс = старт партии, без незнакомых (#249/#321)', async () => {
-    const { introMidNotes } = await import('./view')
-    const a = introOf(uiOf(makeGame({ seed: 1 }).game))!
-    expect(a.notes.length).toBe(6)
-    expect(a.notes.some((n) => n.app === 'Банк' && /Списание/.test(n.text))).toBe(true)
-    expect(a.notes.some((n) => n.app === 'Алик' && n.text.includes('🏗️'))).toBe(true)
-    expect(a.notes.every((n) => n.app === 'Алик' || n.app === 'Банк')).toBe(true)
-    expect(a.notes.some((n) => /Мама|Авито|Карине|Гарик/i.test(n.app + n.text))).toBe(false)
-    const bal = a.notes.find((n) => n.app === 'Банк')!.text.match(/Баланс: ([\d\s\u00a0]+) ₽/)![1].replace(/\s/g, '')
-    expect(Number(bal)).toBe(START_MONEY - 340)
-    expect(introMidNotes(START_MONEY, 1).map((n) => n.text).join('|'))
-      .not.toBe(introMidNotes(START_MONEY, 2).map((n) => n.text).join('|'))
+  it('NC: карточка 3 — vow своей завязки; дата и дни из состояния; «Мууу» на титуле (#477)', async () => {
+    const { STARTS } = await import('../content/quests')
+    for (let seed = 1; seed <= 16; seed++) {
+      const { game } = makeGame({ seed })
+      const view = introOf(uiOf(game))!
+      const p = prologue(game)
+      const start = STARTS.find((s) => s.intro === p.alik)!
+      expect(view.vow).toBe(start.vow)
+      expect(p.alik.includes(view.vow)).toBe(true)
+      expect(view.date).toBe(fmtDate(0))
+      expect(view.day).toBe(game.S.day)
+      expect(view.gap).toBe(p.gap)
+      expect(view.gap).toContain(String(game.S.day))
+    }
+    // чужая завязка в vow — красный
+    const { game } = makeGame({ seed: 1 })
+    const view = introOf(uiOf(game))!
+    const other = STARTS.find((s) => s.vow !== view.vow)!
+    expect(view.vow).not.toBe(other.vow)
+    // «Мууу» только на титуле
+    vi.useFakeTimers()
+    renderIntro(game)
+    const intro = document.querySelector('.intro')!
+    act(() => { vi.advanceTimersByTime(1800 * 3) })
+    expect(within(intro as HTMLElement).queryByText('Мууууу')).toBeNull()
+    act(() => { vi.advanceTimersByTime(1800) })
+    expect(intro.className).toMatch(/card-4/)
+    expect(within(intro as HTMLElement).getByText('Мууууу')).toBeInTheDocument()
   })
 
-  it('NC: уведомления интро не знакомят с чужими — проверка по настоящему выводу (#367)', async () => {
-    const { introMidNotes } = await import('./view')
+  it('интро не называет незнакомых персонажей — карточки из introOf (#249/#477)', async () => {
     const { CAST } = await import('../content/arcs')
     const { STARTS } = await import('../content/quests')
-    const { SPEND } = await import('../content/life')
     const escRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    // имя персонажа — последнее слово с заглавной из CAST: роли («Заказчик», «Дядя», «Прораб») отпадают сами.
-    // Эвристика молча теряет двоих — маму (в тексте «мама», не «Алика») и коллекторов (#377): формы перечислены.
+    // Алик — контрагент с первой карточки, не «незнакомый»; из CAST «Мама Алика» иначе даёт ложное «Алика».
     const names = Object.values(CAST)
-      .map((c) => escRe(c.name.replace(/[^А-Яа-яЁё\s]/g, '').trim().split(/\s+/).filter((w) => /^[А-ЯЁ]/.test(w) && w.length > 3).at(-1)!))
+      .map((c) => c.name.replace(/[^А-Яа-яЁё\s]/g, '').trim().split(/\s+/).filter((w) => /^[А-ЯЁ]/.test(w) && w.length > 3 && !/^Алик/.test(w)).at(-1))
+      .filter((w): w is string => !!w)
+      .map(escRe)
     const re = new RegExp([...names, 'мам[аеуы]', 'коллектор'].join('|'), 'i')
     const stray = (texts: string[]) => texts.filter((t) => re.test(t))
-    // настоящий путь: ни одно уведомление ни при одном сиде и ни один пролог завязки не называют чужего
-    for (let seed = 0; seed < 40; seed++) {
-      const texts = introMidNotes(START_MONEY, seed).map((n) => n.text)
+    for (let seed = 1; seed <= 40; seed++) {
+      const { game } = makeGame({ seed })
+      const v = introOf(uiOf(game))!
+      const texts = [
+        'Вы положили плитку на объекте Алика.',
+        `Объект сдан ${v.date}.`,
+        `Алик: «${v.vow}»`,
+        v.gap,
+      ]
       expect(stray(texts), `seed ${seed}: ${stray(texts).join(' | ')}`).toEqual([])
     }
-    expect(stray(STARTS.flatMap((s) => [s.intro, s.reply]))).toEqual([])
-    // контроль: строки с именем — Борисом, мамой, коллекторами — подложенные в пул, ловятся
-    const allTexts = () => Array.from({ length: 60 }, (_, seed) => introMidNotes(START_MONEY, seed).map((n) => n.text)).flat()
-    SPEND.push('Перевод Борису на закатки', 'Перевод маме на закатки', 'Оплата коллекторам')
+    expect(stray(STARTS.flatMap((s) => [s.intro, s.vow, s.reply]))).toEqual([])
+    // контроль: подложенное имя в vow ловится
+    const decoy = STARTS[0]!
+    STARTS[0] = { ...decoy, vow: 'Деньги Борису завтра', intro: decoy.intro + ' Борису' }
     try {
-      // каждый декой с именем должен быть отловлен где-то по диапазону сидов
-      for (const decoy of ['Борис', 'маме', 'коллекторам']) {
-        expect(stray(allTexts()).some((t) => t.includes(decoy)), `декой «${decoy}» должен краснеть`).toBe(true)
-      }
+      expect(stray([`Алик: «${STARTS[0]!.vow}»`]).some((t) => t.includes('Борису'))).toBe(true)
     } finally {
-      SPEND.pop(); SPEND.pop(); SPEND.pop()
+      STARTS[0] = decoy
     }
   })
 
@@ -871,65 +906,20 @@ describe('интро новой партии', () => {
     expect(document.querySelector('.intro')).toBeNull()
   })
 
-  it('строка завязки одна на экране в фазе gap; «Мууу» звучит; ответ — игрока (#249)', () => {
+  it('«Мууу» звучит на титуле; vow входит в первое сообщение чата (#477)', () => {
     vi.useFakeTimers()
     const { game } = makeGame({ seed: 2 })
-    const p = prologue(game)
+    const view = introOf(uiOf(game))!
     const moo = vi.spyOn(game.audio, 'moo')
     renderIntro(game)
-    const intro = document.querySelector('.intro')!
-    act(() => { vi.advanceTimersByTime(1200) })
-    expect(within(intro as HTMLElement).getByText(p.alik)).toBeInTheDocument()
-    const me = game.S.msgs.find((m) => m.kind === 'text' && m.from === 'me')!
-    expect(within(intro as HTMLElement).getByText(me.kind === 'text' ? me.text : '')).toBeInTheDocument()
-    act(() => { vi.advanceTimersByTime(4000) })
+    act(() => { vi.advanceTimersByTime(1800 * 3 + 100) })
+    expect(moo).not.toHaveBeenCalled()
+    act(() => { vi.advanceTimersByTime(1800) })
     expect(moo).toHaveBeenCalled()
-    act(() => { vi.advanceTimersByTime(1500) })
-    expect(intro.className).toMatch(/phase-gap/)
-    expect(intro.className).not.toMatch(/phase-title/)
-    expect(within(intro as HTMLElement).getByText(p.gap)).toBeInTheDocument()
-  })
-})
-
-describe('интро: вибрация на уведомлениях (#351)', () => {
-  afterEach(() => {
-    vi.useRealTimers()
-    vi.unstubAllGlobals()
-  })
-
-  const vibrateGame = (muted = false) => {
-    const vibrate = vi.fn()
-    vi.stubGlobal('navigator', { vibrate })
-    const audio = browserAudio()
-    const { game } = makeGame({ audio })
-    game.gesture() // касание страницы было — иначе гейт жеста audio срежет вибрацию
-    if (muted) game.toggleMute()
-    return { game, vibrate }
-  }
-
-  it('на каждое уведомление — встряска: обещание, ответ и 6 из пула', () => {
-    vi.useFakeTimers()
-    const { game, vibrate } = vibrateGame()
-    render(<App game={game} onReset={vi.fn()} intro />)
-    act(() => { vi.advanceTimersByTime(7000) })
-    expect(vibrate).toHaveBeenCalledTimes(8)
-  })
-
-  it('выключенный звук — без вибраций: гейт живёт в audio, интро его не обходит', () => {
-    vi.useFakeTimers()
-    const { game, vibrate } = vibrateGame(true)
-    render(<App game={game} onReset={vi.fn()} intro />)
-    act(() => { vi.advanceTimersByTime(7000) })
-    expect(vibrate).not.toHaveBeenCalled()
-  })
-
-  it('prefers-reduced-motion — статика без вибраций', () => {
-    vi.useFakeTimers()
-    vi.stubGlobal('matchMedia', () => ({ matches: true }))
-    const { game, vibrate } = vibrateGame()
-    render(<App game={game} onReset={vi.fn()} intro />)
-    act(() => { vi.advanceTimersByTime(6000) })
-    expect(vibrate).not.toHaveBeenCalled()
+    const intro = document.querySelector('.intro')!
+    expect(intro.className).toMatch(/card-4/)
+    expect(within(intro as HTMLElement).getByText('Мууууу')).toBeInTheDocument()
+    expect(prologue(game).alik.includes(view.vow)).toBe(true)
   })
 })
 

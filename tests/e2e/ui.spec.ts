@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
-  // ?nointro — интро новой партии ~12 с анимации, e2e не должны её ждать
+  // ?nointro — интро новой партии ~10 с анимации, e2e не должны её ждать
   await page.goto('/?fast&nointro')
   await expect(page.locator('.chat-head .name')).toHaveText('Алик Воздухонесян')
 })
