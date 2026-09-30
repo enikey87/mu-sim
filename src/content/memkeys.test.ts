@@ -6,18 +6,24 @@ import type { Criterion, Entry } from '../engine/rules'
 import { Gated } from '../engine/rules'
 import { ACTOR_KEYS, MEM_KEYS } from './memkeys'
 import { isFactKey } from './factkeys'
+import { momDachaAt, momDachaDays } from './credit'
 
 const flat = (cs: readonly Criterion[]): Criterion[] => cs.flatMap((c) => (c.op === 'all' ? flat(c.all ?? []) : [c]))
+/** Ключ счётчика «дней с события» → ключ самого события: since.* знает сторож изначально,
+ *  вычисляемый mom.dacha.days — с #473 (без события факт — 0, и «не позже n дней» истинно всегда). */
+const eventOfCounter = (key: string): string | null =>
+  key.startsWith('since.') ? 'ach.' + key.slice('since.'.length) : key === momDachaDays ? momDachaAt : null
 /** «Не позже n дней после события» без «событие было»: нет факта — число 0, и условие всегда истинно.
  *  `gte(since.x, 0)` нижней границей не считается: без факта оно тоже всегда истинно. */
 const sinceGuarded = (where: string, cs: readonly Criterion[], bad: string[]) => {
   const all = flat(cs)
   for (const c of all) {
-    if (!(c.op === '<' || c.op === '<=') || !c.key.startsWith('since.')) continue
-    const ach = 'ach.' + c.key.slice('since.'.length)
+    if (!(c.op === '<' || c.op === '<=')) continue
+    const event = eventOfCounter(c.key)
+    if (!event) continue
     const lower = all.some((o) =>
       (o.key === c.key && (o.op === '>' || (o.op === '>=' && Number(o.value) > 0)))
-      || (o.key === ach && (o.op === 'exist' || (o.op === '==' && o.value === true))))
+      || (o.key === event && (o.op === 'exist' || (o.op === '==' && o.value === true))))
     if (!lower) bad.push(`${where}: ${c.key} ${c.op} ${String(c.value)} без нижней границы`)
   }
 }
@@ -187,6 +193,36 @@ describe('реестр mem-ключей', () => {
       'zero: since.dead <= 3 без нижней границы',
     ])
   })
+
+  it('сторож знает счётчик mom.dacha.days: без события факт — 0, и верхняя граница истинна всегда (#473)', async () => {
+    const { makeGame } = await import('../test/helpers')
+    const { test: holds } = await import('./fact')
+    // гипотеза аудита подтверждена: дачи не было, а «не позже 40 дней после продажи» истинно
+    const { game } = makeGame()
+    expect(game.facts()[momDachaDays]).toBe(0)
+    expect(holds({ key: momDachaDays, op: '<=', value: 40 }, game.lineFacts())).toBe(true)
+    const bad: string[] = []
+    sinceGuarded('dacha', [{ key: momDachaDays, op: '<=', value: 40 }], bad)
+    sinceGuarded('dachaOk', [{ key: momDachaAt, op: 'exist' }, { key: momDachaDays, op: '<=', value: 40 }], bad)
+    expect(bad).toEqual(['dacha: mom.dacha.days <= 40 без нижней границы'])
+  })
+
+  it('движок пишет и читает только ключи памяти из реестра (#473)', async () => {
+    const { botTurn } = await import('../tools/bot')
+    const { makeGame } = await import('../test/helpers')
+    const keys = new Set<string>()
+    for (const seed of [1, 2, 3, 5, 8]) {
+      const { game } = makeGame({ seed })
+      game.S.mem = new Proxy(game.S.mem, {
+        // toJSON — не ключ памяти: JSON.stringify при сохранении спрашивает его у объекта
+        get: (t, p) => { if (typeof p === 'string' && p !== 'toJSON') keys.add(p); return Reflect.get(t, p) as unknown },
+        set: (t, p, v: unknown) => { if (typeof p === 'string' && p !== 'toJSON') keys.add(p); return Reflect.set(t, p, v) },
+      })
+      for (let i = 0; i < 150; i++) await botTurn(game)
+    }
+    expect([...keys].filter((k) => !isFactKey(k)), 'ключ памяти, которого реестр не знает').toEqual([])
+    expect(keys.size).toBeGreaterThan(50) // корпус не пуст: партии реально трогают память
+  }, 60_000)
 
   it('since.* в контенте — с настоящей нижней границей', async () => {
     const bad: string[] = []

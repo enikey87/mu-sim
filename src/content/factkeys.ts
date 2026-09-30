@@ -75,7 +75,7 @@ export type FactKey =
   | `wedding.${WeddingId}`
   | `bills.${BillPart}.${BillField}`
   | `sold.${ThingId}` | `mom.${MomId}` | `mom.done` | typeof momDachaAt | typeof momDachaDays
-  | `credit.${LoanId}.taken` | `credit.${LoanId}.dueAt` | `credit.${LoanId}.failed`
+  | `credit.${LoanId}.taken` | `credit.${LoanId}.dueAt` | `credit.${LoanId}.failed` | `credit.${LoanId}.payment`
   | `inv.${string}` // позиции акта — русские названия из invoiceItems; рантайм-сторож в isFactKey
 
 export type SinceKey = `since.${AchId}`
@@ -102,7 +102,7 @@ export const FAMILIES: Record<string, (rest: string) => boolean> = {
   'bills.': (r) => /^(rent|phone|transit)\.(dueAt|due|unpaid|streak)$/.test(r),
   'sold.': (r) => /^(microwave|guitar|tile|tires)$/.test(r),
   'mom.': (r) => /^(pension|pickles|dacha|done)$/.test(r),
-  'credit.': (r) => /^(consumer|refi|micro)\.(taken|dueAt|failed)$/.test(r),
+  'credit.': (r) => /^(consumer|refi|micro)\.(taken|dueAt|failed|payment)$/.test(r),
 }
 
 /** Известный ли ключ факта: точный — из реестра, семейный — до элемента. Точное совпадение — раньше семейств. */
