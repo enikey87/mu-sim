@@ -852,6 +852,14 @@ export class Game {
     // продажа могла не вытащить со дна — снова предложить, с этой причиной (ход игрока, не падение — без перерыва)
     if (this.moneyLevel() === 'bottom') this.maybeCreditOffer('Продано, а остаток всё ещё критический')
   }
+  /** Итог продажи: сезон — из даты партии, не из шутки «всегда лето». */
+  thingDone(thing: { id: string; done: string }): string {
+    if (thing.id === 'tires') {
+      const month = dateOf(this.S.day).getMonth() + 1
+      if (month >= 6 && month <= 8) return 'Зимнюю резину продали. Летом. Машины у вас нет'
+    }
+    return thing.done
+  }
   /** Кнопка карточки банка: выбор пишется в мир, Алику не уходит (#287). */
   answerCard(id: number, pick: 'take' | 'sell' | 'later'): void {
     const m = this.S.msgs.find((x) => x.id === id)
@@ -871,7 +879,7 @@ export class Game {
         const before = this.S.money
         this.sellThing(thing.id)
         if (!this.S.mem[sold(thing.id)]) return
-        result = `${thing.done}. +${this.rub(this.S.money - before)}. Баланс: ${this.rub(this.S.money)}`
+        result = `${this.thingDone(thing)}. +${this.rub(this.S.money - before)}. Баланс: ${this.rub(this.S.money)}`
       } else if (pick === 'later') {
         this.rules.applyOps([set(creditOffer, false), set(creditDeclined, true)], {})
         delete this.S.mem[memkeys.creditOfferSum]
@@ -1199,6 +1207,10 @@ export class Game {
         if (!this.adjustMoney(-spend, why, { group: 'По мелочи' })) this.bankLine('По мелочи', -spend, true)
       }
     } else {
+      // сумма в тексте как уже случившийся платёж — двигает баланс (#488)
+      if (n.charge != null && !this.moneySealed()) {
+        if (!this.adjustMoney(-n.charge, n.app, { group: n.app })) this.bankLine(n.app, -n.charge, true)
+      }
       this.notify(n.icon, n.app, p.text, { event: 'life' })
     }
     if (p.spec.remember) this.rules.applyOps(p.spec.remember, {})
