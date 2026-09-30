@@ -1,9 +1,13 @@
-// Интро новой партии: экран блокировки с обещанием завязки, 184 дня, «Мууу», титул — и само уезжает в чат.
+// Интро v2: пять строк-титров на экране блокировки, по одной; титул — последняя; уезд в чат.
 import { useEffect, useRef, useState } from 'react'
 import { useGameApi } from './useGame'
 import type { IntroView } from './view'
 
-type Phase = 'play' | 'gap' | 'title'
+/** Карточки 0–3 — строки ~1,8 с; 4 — титул ~2,5 с. */
+type Card = 0 | 1 | 2 | 3 | 4
+
+const LINE_MS = 1800
+const TITLE_MS = 2500
 
 const reducedMotion = (): boolean =>
   typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -11,10 +15,7 @@ const reducedMotion = (): boolean =>
 export function Intro({ data, gate, onDone }: { data: IntroView; gate: boolean; onDone: () => void }) {
   const game = useGameApi()
   const [started, setStarted] = useState(!gate)
-  const [phase, setPhase] = useState<Phase>('play')
-  const [notes, setNotes] = useState<IntroView['notes']>([])
-  const [days, setDays] = useState(0)
-  const [mooKey, setMooKey] = useState(0)
+  const [card, setCard] = useState<Card>(0)
   const [leaving, setLeaving] = useState(false)
   const timers = useRef<number[]>([])
   const reduced = useRef(reducedMotion()).current
@@ -34,49 +35,36 @@ export function Intro({ data, gate, onDone }: { data: IntroView; gate: boolean; 
   const finishRef = useRef(finish)
   finishRef.current = finish
 
-  // Цепочка таймеров интро — настенные часы: это анимация для человека, а не игровой темп.
+  // Цепочка карточек — настенные часы: анимация для человека, не игровой темп.
   useEffect(() => {
     if (!started) return
     const T = (ms: number, f: () => void) => timers.current.push(window.setTimeout(f, ms))
-    // уведомление — со встряхой; reduced-ветка их не зовёт: статика без вибраций
-    const note = (ms: number, f: () => void) => T(ms, () => { game.vibrate(30); f() })
-    if (reduced) {
-      // три фазы подряд: обещание → завязка → титул — без наложений (#321)
-      setNotes([{ icon: '💬', app: 'Алик', text: data.intro }, { icon: '💬', app: 'Вы', text: data.reply, me: true }])
-      setDays(data.day)
-      setPhase('play')
-      T(1500, () => setPhase('gap'))
-      T(3000, () => setPhase('title'))
-      T(4500, () => finishRef.current(false))
-      return () => { for (const t of timers.current) clearTimeout(t) }
-    }
-    note(300, () => setNotes((n) => [{ icon: '💬', app: 'Алик', text: data.intro }, ...n]))
-    note(1100, () => setNotes((n) => [{ icon: '💬', app: 'Вы', text: data.reply, me: true }, ...n]))
-    T(1800, () => {
-      let k = 0
-      const tick = () => {
-        k = Math.min(1, k + 70 / 4200)
-        setDays(Math.round(data.day * k * k * (3 - 2 * k)))
-        if (k < 1 && !done.current) T(70, tick)
-      }
-      tick()
+    T(LINE_MS, () => setCard(1))
+    T(LINE_MS * 2, () => setCard(2))
+    T(LINE_MS * 3, () => setCard(3))
+    T(LINE_MS * 4, () => {
+      setCard(4)
+      game.mooSound()
     })
-    data.notes.forEach((n, i) => note(2100 + i * 650, () => setNotes((prev) => [n, ...prev].slice(0, 6))))
-    T(5000, () => { setMooKey((k) => k + 1); game.mooSound() })
-    T(6300, () => setPhase('gap'))
-    T(9300, () => setPhase('title'))
-    T(11800, () => finishRef.current(true))
+    T(LINE_MS * 4 + TITLE_MS, () => finishRef.current(!reduced))
     return () => { for (const t of timers.current) clearTimeout(t) }
-  }, [started, data, game, reduced])
+  }, [started, game, reduced])
 
   const tap = () => {
     if (!started) setStarted(true)
     else finishRef.current(false)
   }
 
+  const lines = [
+    'Вы положили плитку на объекте Алика.',
+    `Объект сдан ${data.date}.`,
+    `Алик: «${data.vow}»`,
+    data.gap,
+  ]
+
   return (
     <div
-      className={`intro phase-${phase}${leaving ? ' intro-leave' : ''}${reduced ? ' intro-reduced' : ''}`}
+      className={`intro card-${card}${leaving ? ' intro-leave' : ''}${reduced ? ' intro-reduced' : ''}`}
       role="button"
       tabIndex={0}
       aria-label="Интро: коснитесь, чтобы пропустить"
@@ -84,21 +72,18 @@ export function Intro({ data, gate, onDone }: { data: IntroView; gate: boolean; 
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tap() } }}
     >
       <div className="intro-clock">
-        <div className="intro-date">{data.dateAt(days)}</div>
+        <div className="intro-date">{data.date}</div>
         <div className="intro-time">{game.clockText}</div>
       </div>
-      {started && !reduced && <div className="intro-count">Дней после сдачи: <b>{days}</b></div>}
-      <div className="intro-stack">
-        {notes.map((n) => (
-          <div className={`intro-note${n.me ? ' me' : ''}`} key={`${n.app}:${n.text}`}>
-            <div className="intro-note-h"><span>{n.icon} {n.app}</span><span>сейчас</span></div>
-            {n.text}
-          </div>
-        ))}
-      </div>
-      {mooKey > 0 && <div className="intro-moo" key={mooKey}>Мууууу</div>}
-      <div className="intro-gap">{data.gap}</div>
-      <div className="intro-title"><div className="intro-title-big">Алик,<br />где деньги?</div></div>
+      {started && lines.map((text, i) => (
+        <div key={i} className={`intro-line${card === i ? ' on' : ''}`}>{text}</div>
+      ))}
+      {started && (
+        <div className={`intro-title${card === 4 ? ' on' : ''}`}>
+          <div className="intro-title-big">Алик,<br />где деньги?</div>
+          {card === 4 && <div className="intro-moo">Мууууу</div>}
+        </div>
+      )}
       {!started && <div className="intro-hint">Коснитесь, чтобы начать</div>}
     </div>
   )

@@ -204,3 +204,28 @@ describe('покрытие правил', () => {
     expect(pending.size, 'таймер баннера остался живым после прогона').toBe(0)
   }, 300_000)
 })
+
+describe('strictTurns в покрытии и плейтесте (#468)', () => {
+  it('coverage.ts и playtest.ts передают strictTurns: true', async () => {
+    const { readFileSync } = await import('node:fs')
+    expect(readFileSync('src/tools/coverage.ts', 'utf8')).toMatch(/strictTurns:\s*true/)
+    expect(readFileSync('src/tools/playtest.ts', 'utf8')).toMatch(/strictTurns:\s*true/)
+  })
+
+  it('правило, бросающее в ходе, валит ruleCoverage — не тихий recover (#468)', async () => {
+    const boom = {
+      name: 'Test_CoverageBoom468',
+      event: 'PlayerMessage' as const,
+      when: [] as [],
+      specificity: 999,
+      respond: () => { throw new Error('boom-coverage-468') },
+    }
+    allRules.push(boom as unknown as (typeof allRules)[number])
+    try {
+      await expect(ruleCoverage([1], 4, undefined, 0, { freeText: 0 })).rejects.toThrow(/boom-coverage-468/)
+    } finally {
+      const i = allRules.findIndex((r) => r.name === 'Test_CoverageBoom468')
+      if (i >= 0) allRules.splice(i, 1)
+    }
+  })
+})
