@@ -442,10 +442,11 @@ body {
   position: absolute; left: 22px; right: 22px; top: 42%; transform: translateY(-50%);
   text-align: center; font-weight: 700; font-size: 28px; line-height: 1.2;
   text-shadow: 0 2px 12px rgba(0,0,0,.55);
-  opacity: 0; pointer-events: none;
-  transition: opacity .28s ease;
+  pointer-events: none;
+  animation: intro-line-in .28s ease both;
 }
 .intro-line.on { opacity: 1; }
+@keyframes intro-line-in { from { opacity: 0 } to { opacity: 1 } }
 .intro-hint { position: absolute; bottom: 22px; left: 0; right: 0; text-align: center; font-size: 13px; opacity: .85; animation: intro-pulse 1.6s ease-in-out infinite; }
 @keyframes intro-pulse { 50% { opacity: .35 } }
 .intro-title {
@@ -461,11 +462,11 @@ body {
 }
 @keyframes intro-moo { 0% { opacity: 0; transform: scale(.6) } 20% { opacity: 1; transform: scale(1.1) } 100% { opacity: 1; transform: scale(1) } }
 /* reduced: те же карточки по очереди, без появления, затухания и уезда */
-.intro-reduced .intro-line, .intro-reduced .intro-title { transition: none; }
+.intro-reduced .intro-line, .intro-reduced .intro-title { transition: none; animation: none; }
 .intro-reduced .intro-moo, .intro-reduced .intro-hint { animation: none; }
 .intro-reduced .intro-moo { opacity: 1; }
 @media (prefers-reduced-motion: reduce) {
-  .intro-line, .intro-title { transition: none; }
+  .intro-line, .intro-title { transition: none; animation: none; }
   .intro-moo, .intro-hint { animation: none; }
   .intro-leave { transition: none; }
 }

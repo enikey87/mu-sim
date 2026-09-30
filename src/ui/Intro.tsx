@@ -12,6 +12,14 @@ const TITLE_MS = 2500
 const reducedMotion = (): boolean =>
   typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
+/** fmtDate уже с «г.» — не клеим вторую точку. */
+export const introDateLine = (date: string): string =>
+  `Объект сдан ${date.replace(/\.$/, '')}.`
+
+/** Обещание на карточке — как реплика, с заглавной (в STARTS.vow может быть обрывок со строчной). */
+export const introVowLine = (vow: string): string =>
+  `Алик: «${vow.charAt(0).toUpperCase()}${vow.slice(1)}»`
+
 export function Intro({ data, gate, onDone }: { data: IntroView; gate: boolean; onDone: () => void }) {
   const game = useGameApi()
   const [started, setStarted] = useState(!gate)
@@ -57,8 +65,8 @@ export function Intro({ data, gate, onDone }: { data: IntroView; gate: boolean; 
 
   const lines = [
     'Вы положили плитку на объекте Алика.',
-    `Объект сдан ${data.date}.`,
-    `Алик: «${data.vow}»`,
+    introDateLine(data.date),
+    introVowLine(data.vow),
     data.gap,
   ]
 
@@ -75,9 +83,10 @@ export function Intro({ data, gate, onDone }: { data: IntroView; gate: boolean; 
         <div className="intro-date">{data.date}</div>
         <div className="intro-time">{game.clockText}</div>
       </div>
-      {started && lines.map((text, i) => (
-        <div key={i} className={`intro-line${card === i ? ' on' : ''}`}>{text}</div>
-      ))}
+      {/* одна строка в DOM — без наложения при смене (#492) */}
+      {started && card < 4 && (
+        <div key={card} className="intro-line on">{lines[card]}</div>
+      )}
       {started && (
         <div className={`intro-title${card === 4 ? ' on' : ''}`}>
           <div className="intro-title-big">Алик,<br />где деньги?</div>

@@ -9,6 +9,7 @@ import { SAVE_KEY, loadState } from '../engine/state'
 import { fmtDate } from '../engine/time'
 import type { Game } from '../engine/game'
 import { introOf, uiOf } from './view'
+import { Intro, introDateLine, introVowLine } from './Intro'
 
 function renderApp(game: Game, onReset = vi.fn()) {
   const utils = render(<App game={game} onReset={onReset} />)
@@ -715,6 +716,9 @@ describe('интро новой партии', () => {
     return { alik: alik.kind === 'text' ? alik.text : '', gap: sys.kind === 'sys' ? sys.text : '' }
   }
 
+  /** Текст видимой карточки из DOM (не собранный в тесте). */
+  const visibleLine = (intro: Element) => intro.querySelector('.intro-line.on')?.textContent ?? ''
+
   it('по умолчанию без интро: обычный рендер App его не включает', () => {
     const { game } = makeGame()
     renderApp(game)
@@ -729,19 +733,23 @@ describe('интро новой партии', () => {
     renderIntro(game)
     const intro = document.querySelector('.intro')!
     expect(intro.className).toMatch(/card-0/)
-    expect(within(intro as HTMLElement).getByText('Вы положили плитку на объекте Алика.')).toBeInTheDocument()
+    expect(visibleLine(intro)).toBe('Вы положили плитку на объекте Алика.')
+    expect(intro.querySelectorAll('.intro-line')).toHaveLength(1)
     act(() => { vi.advanceTimersByTime(1800) })
     expect(intro.className).toMatch(/card-1/)
-    expect(within(intro as HTMLElement).getByText(`Объект сдан ${view.date}.`)).toBeInTheDocument()
+    expect(visibleLine(intro)).toBe(introDateLine(view.date))
+    expect(visibleLine(intro)).not.toMatch(/\.\.$/)
+    expect(intro.querySelectorAll('.intro-line')).toHaveLength(1)
     act(() => { vi.advanceTimersByTime(1800) })
     expect(intro.className).toMatch(/card-2/)
-    expect(within(intro as HTMLElement).getByText(`Алик: «${view.vow}»`)).toBeInTheDocument()
+    expect(visibleLine(intro)).toBe(introVowLine(view.vow))
     expect(p.alik.includes(view.vow)).toBe(true)
     act(() => { vi.advanceTimersByTime(1800) })
     expect(intro.className).toMatch(/card-3/)
-    expect(within(intro as HTMLElement).getByText(p.gap)).toBeInTheDocument()
+    expect(visibleLine(intro)).toBe(p.gap)
     act(() => { vi.advanceTimersByTime(1800) })
     expect(intro.className).toMatch(/card-4/)
+    expect(intro.querySelector('.intro-line')).toBeNull()
     expect(intro.querySelector('.intro-title-big')!.textContent).toContain('Алик,')
     expect(within(intro as HTMLElement).getByText('Мууууу')).toBeInTheDocument()
     act(() => { vi.advanceTimersByTime(3000) })
@@ -749,6 +757,20 @@ describe('интро новой партии', () => {
     expect(document.querySelector('.intro')).toBeNull()
     expect(within(document.getElementById('chat')! as HTMLElement).getByText(p.alik)).toBeInTheDocument()
     expect(screen.getByText(p.gap)).toBeInTheDocument()
+  })
+
+  it('дата на карточке 2 — без двойной точки при любом конце fmtDate (#492)', () => {
+    expect(introDateLine('18 марта 2026 г.')).toBe('Объект сдан 18 марта 2026 г.')
+    expect(introDateLine('18 марта 2026 г.')).not.toMatch(/\.\.$/)
+    expect(introDateLine('12 апреля')).toBe('Объект сдан 12 апреля.')
+    vi.useFakeTimers()
+    const { game } = makeGame({ seed: 1 })
+    renderIntro(game)
+    act(() => { vi.advanceTimersByTime(1800) })
+    const shown = visibleLine(document.querySelector('.intro')!)
+    expect(shown).toMatch(/^Объект сдан .+[^.]\.$|^Объект сдан .+г\.$/)
+    expect(shown).not.toMatch(/\.\.$/)
+    expect(shown).toBe(introDateLine(fmtDate(0)))
   })
 
   it('перезагрузка посреди партии: отметка в сохранении — интро не показывает (#321)', () => {
@@ -802,8 +824,8 @@ describe('интро новой партии', () => {
     vi.stubGlobal('matchMedia', () => ({ matches: true }))
     const { readFileSync } = await import('node:fs')
     const css = readFileSync('src/styles.css', 'utf8')
-    expect(css).toMatch(/\.intro-reduced[\s\S]*?\.intro-line[\s\S]*?transition:\s*none/)
-    expect(css).toMatch(/\.intro-reduced[\s\S]*?\.intro-title[\s\S]*?transition:\s*none/)
+    expect(css).toMatch(/\.intro-reduced[\s\S]*?\.intro-line[\s\S]*?animation:\s*none/)
+    expect(css).toMatch(/\.intro-reduced[\s\S]*?\.intro-title[\s\S]*?animation:\s*none/)
     const { game } = makeGame()
     const p = prologue(game)
     const view = introOf(uiOf(game))!
@@ -811,16 +833,16 @@ describe('интро новой партии', () => {
     const intro = document.querySelector('.intro') as HTMLElement
     expect(intro.className).toMatch(/intro-reduced/)
     expect(intro.className).toMatch(/card-0/)
-    expect(within(intro).getByText('Вы положили плитку на объекте Алика.')).toBeInTheDocument()
+    expect(visibleLine(intro)).toBe('Вы положили плитку на объекте Алика.')
     act(() => { vi.advanceTimersByTime(1800) })
     expect(intro.className).toMatch(/card-1/)
-    expect(within(intro).getByText(`Объект сдан ${view.date}.`)).toBeInTheDocument()
+    expect(visibleLine(intro)).toBe(introDateLine(view.date))
     act(() => { vi.advanceTimersByTime(1800) })
     expect(intro.className).toMatch(/card-2/)
-    expect(within(intro).getByText(`Алик: «${view.vow}»`)).toBeInTheDocument()
+    expect(visibleLine(intro)).toBe(introVowLine(view.vow))
     act(() => { vi.advanceTimersByTime(1800) })
     expect(intro.className).toMatch(/card-3/)
-    expect(within(intro).getByText(p.gap)).toBeInTheDocument()
+    expect(visibleLine(intro)).toBe(p.gap)
     act(() => { vi.advanceTimersByTime(1800) })
     expect(intro.className).toMatch(/card-4/)
     expect(intro.querySelector('.intro-title-big')!.textContent).toContain('Алик,')
@@ -830,28 +852,50 @@ describe('интро новой партии', () => {
     expect(game.S.introShown).toBe(true)
   })
 
-  it('NC: карточка 3 — vow своей завязки; дата и дни из состояния; «Мууу» на титуле (#477)', async () => {
+  it('карточка 3 — vow своей завязки в DOM; чужой vow в introOf краснеет; «Мууу» на титуле (#492)', async () => {
     const { STARTS } = await import('../content/quests')
     for (let seed = 1; seed <= 16; seed++) {
       const { game } = makeGame({ seed })
-      const view = introOf(uiOf(game))!
       const p = prologue(game)
       const start = STARTS.find((s) => s.intro === p.alik)!
+      const view = introOf(uiOf(game))!
       expect(view.vow).toBe(start.vow)
       expect(p.alik.includes(view.vow)).toBe(true)
       expect(view.date).toBe(fmtDate(0))
-      expect(view.day).toBe(game.S.day)
       expect(view.gap).toBe(p.gap)
       expect(view.gap).toContain(String(game.S.day))
+      vi.useFakeTimers()
+      const { unmount } = renderIntro(game)
+      act(() => { vi.advanceTimersByTime(1800 * 2) })
+      expect(visibleLine(document.querySelector('.intro')!)).toBe(introVowLine(start.vow))
+      unmount()
+      vi.useRealTimers()
     }
-    // чужая завязка в vow — красный
+    // чужая завязка: vow от другой STARTS при том же intro текста — DOM не совпадёт с прологом
     const { game } = makeGame({ seed: 1 })
-    const view = introOf(uiOf(game))!
-    const other = STARTS.find((s) => s.vow !== view.vow)!
-    expect(view.vow).not.toBe(other.vow)
+    const p = prologue(game)
+    const start = STARTS.find((s) => s.intro === p.alik)!
+    const other = STARTS.find((s) => s.vow !== start.vow)!
+    const real = start.vow
+    start.vow = other.vow
+    try {
+      const view = introOf(uiOf(game))!
+      expect(view.vow).toBe(other.vow)
+      expect(p.alik.includes(view.vow)).toBe(false) // пролог не содержит чужой vow
+      vi.useFakeTimers()
+      const { unmount } = renderIntro(game)
+      act(() => { vi.advanceTimersByTime(1800 * 2) })
+      expect(visibleLine(document.querySelector('.intro')!)).toBe(introVowLine(other.vow))
+      expect(visibleLine(document.querySelector('.intro')!)).not.toBe(introVowLine(real))
+      unmount()
+      vi.useRealTimers()
+    } finally {
+      start.vow = real
+    }
     // «Мууу» только на титуле
     vi.useFakeTimers()
-    renderIntro(game)
+    const again = makeGame({ seed: 2 }).game
+    renderIntro(again)
     const intro = document.querySelector('.intro')!
     act(() => { vi.advanceTimersByTime(1800 * 3) })
     expect(within(intro as HTMLElement).queryByText('Мууууу')).toBeNull()
@@ -860,37 +904,44 @@ describe('интро новой партии', () => {
     expect(within(intro as HTMLElement).getByText('Мууууу')).toBeInTheDocument()
   })
 
-  it('интро не называет незнакомых персонажей — карточки из introOf (#249/#477)', async () => {
+  it('интро не называет незнакомых — по тексту DOM Intro (#492)', async () => {
     const { CAST } = await import('../content/arcs')
     const { STARTS } = await import('../content/quests')
     const escRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    // Алик — контрагент с первой карточки, не «незнакомый»; из CAST «Мама Алика» иначе даёт ложное «Алика».
     const names = Object.values(CAST)
       .map((c) => c.name.replace(/[^А-Яа-яЁё\s]/g, '').trim().split(/\s+/).filter((w) => /^[А-ЯЁ]/.test(w) && w.length > 3 && !/^Алик/.test(w)).at(-1))
       .filter((w): w is string => !!w)
       .map(escRe)
     const re = new RegExp([...names, 'мам[аеуы]', 'коллектор'].join('|'), 'i')
     const stray = (texts: string[]) => texts.filter((t) => re.test(t))
+    vi.useFakeTimers()
     for (let seed = 1; seed <= 40; seed++) {
       const { game } = makeGame({ seed })
-      const v = introOf(uiOf(game))!
-      const texts = [
-        'Вы положили плитку на объекте Алика.',
-        `Объект сдан ${v.date}.`,
-        `Алик: «${v.vow}»`,
-        v.gap,
-      ]
-      expect(stray(texts), `seed ${seed}: ${stray(texts).join(' | ')}`).toEqual([])
+      const { unmount } = renderIntro(game)
+      const intro = document.querySelector('.intro')!
+      const seen: string[] = []
+      for (let c = 0; c < 4; c++) {
+        if (c > 0) act(() => { vi.advanceTimersByTime(1800) })
+        seen.push(visibleLine(intro))
+        expect(intro.querySelectorAll('.intro-line')).toHaveLength(1)
+      }
+      expect(stray(seen), `seed ${seed}: ${stray(seen).join(' | ')}`).toEqual([])
+      unmount()
     }
     expect(stray(STARTS.flatMap((s) => [s.intro, s.vow, s.reply]))).toEqual([])
-    // контроль: подложенное имя в vow ловится
-    const decoy = STARTS[0]!
-    STARTS[0] = { ...decoy, vow: 'Деньги Борису завтра', intro: decoy.intro + ' Борису' }
-    try {
-      expect(stray([`Алик: «${STARTS[0]!.vow}»`]).some((t) => t.includes('Борису'))).toBe(true)
-    } finally {
-      STARTS[0] = decoy
-    }
+    // NC: чужое имя в отрисованной строке Intro — красный
+    const { game } = makeGame({ seed: 1 })
+    const view = introOf(uiOf(game))!
+    const { GameContext } = await import('./useGame')
+    render(
+      <GameContext.Provider value={uiOf(game)}>
+        <div className="intro">
+          <Intro data={{ ...view, vow: 'Деньги Борису завтра' }} gate={false} onDone={() => {}} />
+        </div>
+      </GameContext.Provider>,
+    )
+    act(() => { vi.advanceTimersByTime(1800 * 2) })
+    expect(stray([visibleLine(document.querySelector('.intro')!)]).some((t) => t.includes('Борису'))).toBe(true)
   })
 
   it('старое сохранение без introShown — интро не показывает (#249)', () => {
