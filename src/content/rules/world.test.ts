@@ -275,6 +275,42 @@ describe('хор: упомянутый персонаж вклинивается
     const afterTell = await chorusTexts(told)
     expect(afterTell.some((t) => debtSaid.test(t)), afterTell.join(' | ')).toBe(true)
   })
+  it('после «ошибся номером» посредник Карине не говорит «плиточник»; «надоело» не с «Я предупреждала» (#514)', async () => {
+    const { game } = makeGame({ seed: 11 })
+    await game.enterNode('wife', 'start')
+    game.S.choices = null
+    const wrong = game.choices.find((c) => c.go === 'wrong')
+    expect(wrong).toBeDefined()
+    await game.send(wrong!)
+    expect(game.S.mem['karine.thinksTax']).toBe(true)
+    expect(game.S.mem['karine.knowsDebt']).toBeUndefined()
+
+    // блок → кнопка Карине → ответ без «плиточник»
+    game.S.mem.blocked = true
+    game.S.mem['intro.karine'] = true
+    game.S.choices = null
+    const via = game.choices.find((c) => c.act === 'via' && c.arg === 'karine')
+    expect(via).toBeDefined()
+    const from = game.S.msgs.length
+    await game.send(via!)
+    const said = game.S.msgs.slice(from).filter((m) => m.kind === 'text').map((m) => (m.kind === 'text' ? m.text : ''))
+    expect(said.some((t) => /плиточник/i.test(t)), said.join(' | ')).toBe(false)
+    expect(said.some((t) => /извиняет/i.test(t))).toBe(true)
+
+    // хор «надоело»: без знания о долге «Я предупреждала» закрыта
+    expect(isOpen(CHORUS_FED_UP.karine[1]!, game.lineFacts())).toBe(false)
+    const fed: string[] = []
+    game.S.actors.karine = { ...(game.S.actors.karine ?? {}), interjections: 3 }
+    for (let i = 0; i < 40; i++) {
+      game.S.stats.sent += 20
+      const before = game.S.msgs.length
+      await game.fire('Mentioned', {}, { target: 'karine' })
+      for (const m of game.S.msgs.slice(before)) {
+        if (m.kind === 'text' && m.who === 'karine') fed.push(m.text)
+      }
+    }
+    expect(fed.some((t) => t.includes('предупреждала')), fed.join(' | ')).toBe(false)
+  })
   it('у каждого персонажа хора есть реплики', () => {
     for (const [who, arr] of Object.entries(CHORUS)) expect(arr.length, who).toBeGreaterThan(2)
   })
