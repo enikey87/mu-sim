@@ -4,6 +4,7 @@
 // сторожат линтер правил (tools.test.ts) и memkeys.test.ts.
 
 import { momDachaAt, momDachaDays } from './credit'
+import { registerDaysSince } from '../engine/rules/days-since'
 
 /** Ключ пары утверждений «пойманы на противоречии»; канонический формат — здесь, lies.ts реэкспортирует. */
 export const pairKey = (a: string, b: string): string => [a, b].sort().join('|')
@@ -38,6 +39,9 @@ export const alikShaved = 'alik.shaved'
 /** День, когда игрок спросил «как усы?» — перерыв между показами кнопки (#352). */
 export const moustacheAskAt = 'moustache.askAt'
 export const alikDay = 'alik.day'
+/** Дней с последнего сообщения Алика — без события нет значения (#496). */
+registerDaysSince('sinceAlik', alikDay)
+
 export const mooAt = 'mooAt'
 export const sorryAt = 'sorryAt'
 export const rudeAt = 'rudeAt'
