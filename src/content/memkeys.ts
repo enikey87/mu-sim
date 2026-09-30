@@ -29,6 +29,10 @@ export const cryptoHodl = 'crypto.hodl'
 export const bathAsked = 'bath.asked'
 export const mamaCalls = 'mama.calls'
 export const phoneKarine = 'phone.karine'
+/** Игрок сказал Карине, что Алик ему должен (сцена жены, ветка tell). */
+export const karineKnowsDebt = 'karine.knowsDebt'
+/** Карине считает игрока налоговой (сцена жены, ветка wrong). */
+export const karineThinksTax = 'karine.thinksTax'
 /** Алик сбрил усы по ставке — живёт ~40 дней (`during`), пока отрастут. */
 export const alikShaved = 'alik.shaved'
 /** День, когда игрок спросил «как усы?» — перерыв между показами кнопки (#352). */
@@ -152,7 +156,7 @@ export const ACTOR_KEYS: ReadonlySet<string> = new Set(ACTOR_KEY_LIST)
 
 export const MEM_KEYS: ReadonlySet<string> = new Set([
   HEAT, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, evicted, vendetta, court, courtVerdict,
-  ritualCount, ritualCut, caughtCount, cryptoHodl, bathAsked, mamaCalls, phoneKarine, alikShaved, moustacheAskAt, alikDay, mooAt, sorryAt, courtReferral,
+  ritualCount, ritualCut, caughtCount, cryptoHodl, bathAsked, mamaCalls, phoneKarine, karineKnowsDebt, karineThinksTax, alikShaved, moustacheAskAt, alikDay, mooAt, sorryAt, courtReferral,
   rudeAt, thanksAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway, nivaPlayer,
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday,

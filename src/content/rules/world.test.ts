@@ -10,7 +10,7 @@ import { LEGENDS, CHORUS_LEGEND } from '../legends'
 import { TALK_REMEMBER } from '../talk'
 import type { Game } from '../../engine/game'
 import type { Msg } from '../../engine/state'
-import { valueOf, spec, lineId, type Entry } from '../../engine/rules'
+import { valueOf, spec, lineId, isOpen, type Entry } from '../../engine/rules'
 import { chorusRules, QUEST_WHEN, questRules } from './world'
 import { TOPICS } from '../topics'
 import { deathGated } from '../../tools/playtest'
@@ -226,9 +226,54 @@ describe('хор: упомянутый персонаж вклинивается
       game.alikMsg({ kind: 'text', from: 'alik', text: 'Это Гарик виноват.' })
       const from = game.S.msgs.length
       await game.afterTurn()
-      for (const m of game.S.msgs.slice(from)) if (m.kind === 'text' && m.who === 'garik' && CHORUS_FED_UP.garik.includes(m.text)) lines.push(m.text)
+      for (const m of game.S.msgs.slice(from)) if (m.kind === 'text' && m.who === 'garik' && CHORUS_FED_UP.garik.map(valueOf).includes(m.text)) lines.push(m.text)
     }
-    expect(lines).toEqual(CHORUS_FED_UP.garik)
+    expect(lines).toEqual(CHORUS_FED_UP.garik.map(valueOf))
+  })
+  it('хор Карине про долг — только после tell; после wrong — нет (#489)', async () => {
+    const debtSaid = /заплати человеку|сама ему заплачу/
+    const taxSaid = /налоговая/
+    const choose = async (g: Game, go: string) => {
+      g.S.choices = null
+      const c = g.choices.find((x) => x.go === go)
+      expect(c, go).toBeDefined()
+      await g.send(c!)
+    }
+    const debtOpen = (g: Game) =>
+      [...CHORUS.karine, ...CHORUS_FED_UP.karine]
+        .filter((l) => debtSaid.test(String(valueOf(l))))
+        .filter((l) => isOpen(l, g.lineFacts()))
+        .map((l) => String(valueOf(l)))
+    const chorusTexts = async (g: Game) => {
+      const out: string[] = []
+      for (let i = 0; i < 60; i++) {
+        g.S.stats.sent += 20
+        const before = g.S.msgs.length
+        await g.fire('Mentioned', {}, { target: 'karine' })
+        for (const m of g.S.msgs.slice(before)) if (m.kind === 'text' && m.who === 'karine') out.push(m.text)
+      }
+      return out
+    }
+
+    const wrong = makeGame({ seed: 7 }).game
+    await wrong.enterNode('wife', 'start')
+    await choose(wrong, 'wrong')
+    expect(wrong.S.mem['karine.thinksTax']).toBe(true)
+    expect(wrong.S.mem['karine.knowsDebt']).toBeUndefined()
+    expect(debtOpen(wrong)).toEqual([])
+    const afterWrong = await chorusTexts(wrong)
+    expect(afterWrong.some((t) => debtSaid.test(t)), afterWrong.join(' | ')).toBe(false)
+    expect(afterWrong.some((t) => taxSaid.test(t)), afterWrong.join(' | ')).toBe(true)
+
+    const told = makeGame({ seed: 7 }).game
+    await told.enterNode('wife', 'start')
+    await choose(told, 'tell')
+    expect(told.S.mem['karine.knowsDebt']).toBe(true)
+    expect(told.S.mem['karine.thinksTax']).toBeUndefined()
+    await choose(told, 'tell2') // сцена закрылась — хор снова chatter
+    expect(debtOpen(told).length).toBeGreaterThan(0)
+    const afterTell = await chorusTexts(told)
+    expect(afterTell.some((t) => debtSaid.test(t)), afterTell.join(' | ')).toBe(true)
   })
   it('у каждого персонажа хора есть реплики', () => {
     for (const [who, arr] of Object.entries(CHORUS)) expect(arr.length, who).toBeGreaterThan(2)

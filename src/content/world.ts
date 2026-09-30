@@ -1,7 +1,7 @@
 // Тексты для новых возможностей системы правил: обещания, которые наступают, хор персонажей,
 // состояния мира со сроком (свадьба, болезнь Бориса, «Алик умер»).
-import { type Criterion, type Line, named, exists, is, eq, gte, ne, missing, set, gate } from './fact'
-import { cryptoHodl, garikConcrete, garikCut, grandpaDying, grantPaid, intro, met, mourning, nivaAway, nivaPlayer, nuneDekretOver, payday, saidFriday, saidTomorrow, alikShaved, wedding, collectorsRecruited } from './memkeys'
+import { type Criterion, type Line, type Entry, named, exists, is, eq, gte, ne, missing, set, gate } from './fact'
+import { cryptoHodl, garikConcrete, garikCut, grandpaDying, grantPaid, intro, karineKnowsDebt, karineThinksTax, met, mourning, nivaAway, nivaPlayer, nuneDekretOver, payday, saidFriday, saidTomorrow, alikShaved, wedding, collectorsRecruited } from './memkeys'
 import type { WhoId } from './ids'
 
 // Мир последователен: кто и что есть в истории и в каком оно положении — факты, их ставит серия (remember), ступень суда
@@ -67,6 +67,10 @@ export const WORLD = {
   karineKnown: named('karineKnown', is(met('karine')), ne('finale.rubik', 'karine')),
   /** Карине вошла в историю (сама или Алик представил) и не ушла — можно писать самой, без требования, что именно она писала лично. */
   karineSpeaks: named('karineSpeaks', is(intro('karine')), ne('finale.rubik', 'karine')),
+  /** Игрок сказал Карине про долг (сцена жены, ветка «я работал на Алика»). */
+  karineKnowsDebt: named('karineKnowsDebt', is(karineKnowsDebt)),
+  /** Карине считает игрока налоговой (сцена жены, ветка «ошибся номером»). */
+  karineThinksTax: named('karineThinksTax', is(karineThinksTax)),
   /** Гарик вошёл в историю и сейчас не в фундаменте без связи — можно писать самому. */
   garikKnown: named('garikKnown', is(intro('garik')), missing(garikCut)),
   razmikUp: named('razmikUp', exists('arc.razmik'), missing('finale.razmik')),
@@ -162,7 +166,13 @@ export const MENTION_RE: Record<string, RegExp> = {
 }
 export const CHORUS: Record<string, Line[]> = {
   garik: [needs('garikFree')('Я вообще-то рядом стою. Алик, скажи ему правду.'), 'Алик, опять ты про меня? Я даже не знаю, о чём речь.', needs('garikFree')('Привет. Я ничего не брал. Если что — я на свадьбе.'), 'Брат, не верь ему про меня. Верь про других.'],
-  karine: ['Алик, с кем ты опять переписываешься?', 'Не слушайте его. Что бы он ни сказал про меня.', 'Я жена. Я сказала: «заплати человеку». Он кивнул. У него это значит «нет».', 'Алик, ужин остывает. И совесть тоже.'],
+  karine: [
+    'Алик, с кем ты опять переписываешься?',
+    'Не слушайте его. Что бы он ни сказал про меня.',
+    needs('karineKnowsDebt')('Я жена. Я сказала: «заплати человеку». Он кивнул. У него это значит «нет».'),
+    needs('karineThinksTax')('Алик, это снова «налоговая»? Я говорила — не отвечай.'),
+    'Алик, ужин остывает. И совесть тоже.',
+  ],
   boris: ['Бе-е-е?', 'Бееее…', 'Бе. Бе-бе.', 'Бее! (возмущённо)'],
   samvel: ['Кто меня звал? Я за столом, но слушаю.', 'Алик, не впутывай меня, я хозяин свадьбы, а не бухгалтер.', 'Мальчик, ты хороший. А Алик — Алик.'],
   nune: [needs('dekretNow')({ t: 'Я в декрете, но всё слышу. Денег нет.', claims: ['no_money'] }), needs('dekret', 'nuneBaby')('Не упоминайте меня, у меня ребёнок спит.'), 'По бумагам вы Алику должны. Шучу. Или нет.'],
@@ -177,9 +187,12 @@ export const CHORUS: Record<string, Line[]> = {
   ],
 }
 // упомянули много раз — персонажу надоело (по порядку, как нарастание)
-export const CHORUS_FED_UP: Record<string, string[]> = {
+export const CHORUS_FED_UP: Record<string, Entry<string>[]> = {
   garik: ['Алик, ты меня упомянул уже раз пять. Я требую долю.', 'Всё, я выхожу из этой истории. Разбирайтесь без меня.'],
-  karine: ['Алик, ещё раз меня приплетёшь — я сама ему заплачу. Из твоих.', 'Я предупреждала.'],
+  karine: [
+    needs('karineKnowsDebt')('Алик, ещё раз меня приплетёшь — я сама ему заплачу. Из твоих.'),
+    'Я предупреждала.',
+  ],
   boris: ['Бе. (устало)', '…'],
 }
 
