@@ -1395,8 +1395,11 @@ export class Game {
     }
   }
   /** Реплики, за тему которых игрок может зацепиться (отмазка, серия, ответ по теме) — не реакции на крик и извинения. */
-  markTopical(msgs: Msg[]): void {
-    for (const m of msgs) if (m.kind === 'text') m.topical = true
+  markTopical(msgs: Msg[], topicTexts?: string[]): void {
+    for (const [i, m] of msgs.entries()) if (m.kind === 'text') {
+      m.topical = true
+      if (topicTexts?.[i] !== undefined) m.topicText = topicTexts[i]
+    }
   }
   /** Тема последней реплики самого Алика (после сообщения игрока): бетон, «Нива», свадьба… */
   topicOfLast(): string | undefined {
@@ -1407,7 +1410,7 @@ export class Game {
       if (m.who || m.deleted || !m.topical) continue
       // клятвы и сроки («Клянусь лавашом», «как бетон застынет») — не тема разговора
       if ((D.OATH as Entry<string>[]).some((o) => m.text.startsWith(valueOf(o)))) continue
-      let text = m.text
+      let text = m.topicText ?? m.text
       // срок в сообщении — не тема: «После обеда…» иначе цепляет еду; регистр и точка в конце не мешают
       for (const p of this.S.promises) text = text.replace(literalRe(p.t), '')
       text = text.replace(/^[.\s,;:!?…—–-]+|[.\s,;:!?…—–-]+$/g, '').trim()
@@ -1875,7 +1878,7 @@ export class Game {
     this.meetRel(ex.r)
     this.recordPromise(ex.p)
     const msgs = await this.say(ex.texts, ex.legendary)
-    this.markTopical(msgs)
+    this.markTopical(msgs, ex.topicTexts)
     this.S.ctx = {
       ...this.ctxFromPromise(ex.p), rel: ex.r, constr: ex.constr, legendary: ex.legendary,
       sad: SAD.test(ex.ev ?? ''), revived: REVIVED.test(ex.ev ?? ''), festive: !SAD.test(ex.ev ?? '') && FESTIVE.test(ex.ev ?? ''),

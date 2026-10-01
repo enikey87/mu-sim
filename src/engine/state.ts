@@ -24,7 +24,7 @@ interface MsgBase { id: number; time?: string }
 export type Msg =
   | (MsgBase & { kind: 'sep'; text: string })
   | (MsgBase & { kind: 'sys'; text: string; unread?: boolean })
-  | (MsgBase & { kind: 'text'; from: 'me' | 'alik'; text: string; who?: string; legend?: boolean; deleted?: boolean; edited?: boolean; react?: string; topical?: boolean })
+  | (MsgBase & { kind: 'text'; from: 'me' | 'alik'; text: string; who?: string; legend?: boolean; deleted?: boolean; edited?: boolean; react?: string; topical?: boolean; topicText?: string })
   | (MsgBase & { kind: 'transfer'; from: 'alik'; text: string; amount?: number })
   | (MsgBase & { kind: 'voice'; from: 'alik'; len: number; feast?: boolean })
   | (MsgBase & { kind: 'photo'; from: 'alik'; text: string })

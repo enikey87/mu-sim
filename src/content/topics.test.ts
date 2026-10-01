@@ -4,7 +4,7 @@ import { makeGame } from '../test/helpers'
 import { valueOf } from '../engine/rules'
 import { needs } from './world'
 import { TOPICS, P_RUDE_BLOCKED, P_RUDE_POLITE, TOPIC_OBSESSED, P_NIGHT } from './topics'
-import { D } from './excuses'
+import { D, make, type DrawFn } from './excuses'
 import type { Game } from '../engine/game'
 
 const fresh = (game: Game) => { game.S.choices = null; return game.choices }
@@ -112,6 +112,27 @@ describe('ответ по теме', () => {
     game.recordPromise({ text: 'как бетон застынет', d: null })
     game.alikMsg({ kind: 'text', from: 'alik', text: 'Клянусь лавашом, как бетон застынет — всё отдам.', topical: true })
     expect(game.topicOfLast()).toBeUndefined()
+  })
+  it('клятва «хаш» внутри собранной отмазки не предлагает тему еды', async () => {
+    const { game } = makeGame()
+    let reasonHasFood = false
+    const draw: DrawFn = (key, arr) => {
+      if (key === 'LEGROLL') return 1 as never
+      if (key === 'TPL') return valueOf(arr[2])
+      if (key === 'OATH') return 'Чтоб мне хаш не есть' as never
+      if (key === 'ABSURD' && reasonHasFood) return 'Телефон упал в хаш' as never
+      return valueOf(arr[0])
+    }
+    game.X.excuse = make(draw).excuse
+    await game.excuseTurn()
+    expect(game.S.msgs.some((m) => m.kind === 'text' && m.from === 'alik' && m.text.includes('Чтоб мне хаш не есть'))).toBe(true)
+    expect(game.topicOfLast()).toBeUndefined()
+    expect(offered(game, (c) => c.act === 'topic' && String(c.arg).startsWith('food:'))).toBe(false)
+    reasonHasFood = true
+    const foodGame = makeGame().game
+    foodGame.X.excuse = make(draw).excuse
+    await foodGame.excuseTurn()
+    expect(foodGame.topicOfLast()).toBe('food')
   })
   it('срок целиком — не тема: «После обеда…» не предлагает поесть', () => {
     const { game } = makeGame()
