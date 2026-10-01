@@ -60,6 +60,8 @@ export const nivaAway = 'niva.away'
 export const nivaBack = 'niva.back'
 /** «Нива» у игрока после финала «Нива выбрала тебя» (#256). */
 export const nivaPlayer = 'niva.player'
+/** Машина ушла с продажей зимней резины (покупатель забрал комплектом): продажа машину убирает, а не отрицает (#530). */
+export const carGone = 'car.gone'
 export const garikConcrete = 'garik.concrete'
 export const garikCut = 'garik.cut'
 export const houseOnGarik = 'house.onGarik'
@@ -161,7 +163,7 @@ export const ACTOR_KEYS: ReadonlySet<string> = new Set(ACTOR_KEY_LIST)
 export const MEM_KEYS: ReadonlySet<string> = new Set([
   HEAT, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, evicted, vendetta, court, courtVerdict,
   ritualCount, ritualCut, caughtCount, cryptoHodl, bathAsked, mamaCalls, phoneKarine, karineKnowsDebt, karineThinksTax, alikShaved, moustacheAskAt, alikDay, mooAt, sorryAt, courtReferral,
-  rudeAt, thanksAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway, nivaPlayer,
+  rudeAt, thanksAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway, nivaPlayer, carGone,
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday,
   lightOff, netRation, phoneWarn, holidayGreeted,
