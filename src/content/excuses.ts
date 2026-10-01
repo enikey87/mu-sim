@@ -1,7 +1,7 @@
 // Словари и генератор отмазок Алика Воздухонесяна.
 import { type Rng, mathRng } from '../engine/rng'
 import type { Due } from '../engine/time'
-import { type Entry, type Said, saidClaims, saidJoin, saidMap, valueOf, gate, eq, gte, lt, lte, matches, missing, exists, is, of } from './fact'
+import { type Entry, type Said, saidClaims, saidJoin, saidMap, saidText, valueOf, gate, eq, gte, lt, lte, matches, missing, exists, is, of } from './fact'
 import type { LegalClaim } from '../engine/input'
 import type { HolidayRef } from './holidays'
 import { isWhoId, type WhoId } from './ids'
@@ -42,7 +42,7 @@ export interface When {
 }
 export interface Promise3 extends When { text: string }
 export interface TransferReply { text: string; nextTransfer?: number }
-export interface ExcuseParts { texts: Said[]; p?: Promise3; r?: Rel; constr?: boolean }
+export interface ExcuseParts { texts: Said[]; topicTexts?: string[]; p?: Promise3; r?: Rel; constr?: boolean }
 export interface Excuse extends ExcuseParts { ev?: string | null; legendary: boolean }
 /** События, которые персонажу с собственной линией устраивает его сериал, а не генератор. */
 const OWN_STORY = /похорон|поминк|умер|свадьб|женил|крестин|юбилей|обручен|родила|роды/i
@@ -720,6 +720,8 @@ export function make(draw: DrawFn, getTier: () => number = () => 0, rng: Rng = m
   const reason = (): Said => { const t = escTier(); if (t) return slot('ESC' + t); const k = draw('RSRC', [0, 1, 1, 2]); return k === 2 ? slot('GROT') : k ? slot('CONSTR') : slot('ABSURD'); };
   // строки с явной семантикой (claims) склеиваются saidJoin: семантика частей не теряется (#426)
   const lowSaid = (x: Said): Said => saidMap(x, low)
+  const oath = (): string => `\uE000${g('OATH')}\uE001`
+  const oathSlot = /\uE000([^\uE001]*)\uE001/g
 
   // каждый шаблон: () => { texts, promise, rel, constr }
   let lastEv: string | null = null;
@@ -730,25 +732,25 @@ export function make(draw: DrawFn, getTier: () => number = () => 0, rng: Rng = m
     return e;
   };
   const T: Array<Entry<() => ExcuseParts>> = [
-    () => { const r = rel(), p = promise(), c = reason(); return { texts: [saidJoin(`${g('ADDR')}, у ${r.g} ${evFor(r)}. `, c, `. ${g('OATH')}, ${p.text}.`)], p, r }; },
+    () => { const r = rel(), p = promise(), c = reason(); return { texts: [saidJoin(`${g('ADDR')}, у ${r.g} ${evFor(r)}. `, c, `. ${oath()}, ${p.text}.`)], p, r }; },
     () => { const p = promise(), c = constr(); return { texts: [saidJoin(`${g('ADDR')}! `, c, `. ${cap(p.text)}.`)], p, constr: true }; },
-    () => ({ texts: [saidJoin(reason(), `. ${g('OATH')}.`)] }),
+    () => ({ texts: [saidJoin(reason(), `. ${oath()}.`)] }),
     () => { const r = rel(), p = promise(); return { texts: [`${g('ADDR')}, ты же знаешь, я тебя как сына люблю. Но у ${r.g} ${evFor(r)}. ${cap(p.text)}.`], p, r }; },
-    () => { const r = rel(), p = promise(); return { texts: [`${g('ADDR')}, ${g('INTRO')}`, `У ${r.g} ${evFor(r)}.`, saidJoin(constr(), '.'), `${g('OATH')}. ${cap(p.text)}.`], p, r, constr: true }; },
+    () => { const r = rel(), p = promise(); return { texts: [`${g('ADDR')}, ${g('INTRO')}`, `У ${r.g} ${evFor(r)}.`, saidJoin(constr(), '.'), `${oath()}. ${cap(p.text)}.`], p, r, constr: true }; },
     () => { const p = promise(); return { texts: [saidJoin(`${g('ADDR')}, я за рулём, коротко: `, lowSaid(reason()), `. ${cap(p.text)}.`)], p }; },
     // после своих же сообщений «Кто это?» нелепо
     gate(gte('sinceAlik', 1))(() => { const r = rel(), p = promise(); return { texts: [`Кто это? А, ${low(g('ADDR'))}! У ${r.g} ${evFor(r)}. ${cap(p.text)}.`], p, r }; }),
-    () => { const r = rel(), p = promise(); return { texts: [`${g('ADDR')}, не пиши сейчас, у ${r.g} ${evFor(r)}. ${g('OATH')}, ${p.text}.`], p, r }; },
+    () => { const r = rel(), p = promise(); return { texts: [`${g('ADDR')}, не пиши сейчас, у ${r.g} ${evFor(r)}. ${oath()}, ${p.text}.`], p, r }; },
     () => { const r = rel(), p = promise(); return { texts: [`${g('ADDR')}, деньги — это пыль. А у ${r.g} ${evFor(r)} — вот это жизнь.`, `${cap(p.text)}.`], p, r }; },
-    () => { const r = rel(), p = promise(); return { texts: [saidJoin(`${g('ADDR')}, `, lowSaid(constr()), '.'), `${g('WOW')} А ещё у ${r.g} ${evFor(r)}.`, `${g('OATH')}, ${p.text}.`], p, r, constr: true }; },
+    () => { const r = rel(), p = promise(); return { texts: [saidJoin(`${g('ADDR')}, `, lowSaid(constr()), '.'), `${g('WOW')} А ещё у ${r.g} ${evFor(r)}.`, `${oath()}, ${p.text}.`], p, r, constr: true }; },
     () => { const p = promise(); return { texts: [saidJoin(`${g('ADDR')}, я уже в банке стою. `, absurd(), `. ${cap(p.text)}.`)], p }; },
-    () => { const r = rel(), p = promise(); return { texts: [saidJoin(`Ара, как раз хотел тебе писать! `, reason(), `. Плюс у ${r.g} ${evFor(r)}. ${g('OATH')}, ${p.text}.`)], p, r }; },
+    () => { const r = rel(), p = promise(); return { texts: [saidJoin(`Ара, как раз хотел тебе писать! `, reason(), `. Плюс у ${r.g} ${evFor(r)}. ${oath()}, ${p.text}.`)], p, r }; },
     () => { const p = promise(); return { texts: [saidJoin(`${g('ADDR')}, я на объекте. `, constr(), '. ', constr(), '. Вот так живём.'), `${cap(p.text)}.`], p, constr: true }; },
     gate(missing(actSigned))(() => { const p = promise(); return { texts: [saidJoin(`${g('ADDR')}, прораб звонил: `, lowSaid(constr()), { t: `. Без акта денег нет. ${cap(p.text)}.`, claims: ['no_money'] })], p, constr: true }; }),
-    () => { const p = promise(); return { texts: [saidJoin(`Сначала хорошая новость: `, lowSaid(constr()), `. Плохая: `, lowSaid(absurd()), '.'), `${g('OATH')}, ${p.text}.`], p, constr: true }; },
+    () => { const p = promise(); return { texts: [saidJoin(`Сначала хорошая новость: `, lowSaid(constr()), `. Плохая: `, lowSaid(absurd()), '.'), `${oath()}, ${p.text}.`], p, constr: true }; },
     () => { const r = rel(), p = promise(); return { texts: [saidJoin(`${g('ADDR')}, ${r.n} передаёт: «`, constr(), `». Я верю. ${cap(p.text)}.`)], p, r, constr: true }; },
     () => { const p = promise(); return { texts: [saidJoin(`${g('ADDR')}, три причины. Первая: `, lowSaid(constr()), `. Вторая: `, lowSaid(absurd()), `. Третья — ты сам знаешь.`), `${cap(p.text)}.`], p, constr: true }; },
-    () => { const r = rel(), p = promise(); return { texts: [`Смотри, ${low(g('ADDR'))}. ${cap(r.n)} — ${g('REL_ROLE')}. А там ${ev()}. Сам понимаешь.`, `${g('OATH')}, ${p.text}.`], p, r }; },
+    () => { const r = rel(), p = promise(); return { texts: [`Смотри, ${low(g('ADDR'))}. ${cap(r.n)} — ${g('REL_ROLE')}. А там ${ev()}. Сам понимаешь.`, `${oath()}, ${p.text}.`], p, r }; },
     () => { const p = promise(); return { texts: [saidJoin(`${g('ADDR')}, не поверишь: `, lowSaid(constr()), '.'), `${g('ADDR')}, ${g('SHOCK')} ${cap(p.text)}.`], p, constr: true }; },
     () => { const p = promise(); return { texts: [saidJoin(`${g('ADDR')}, по деньгам всё хорошо, кроме одного: `, lowSaid(absurd()), `. ${cap(p.text)}.`)], p }; },
   ];
@@ -765,6 +767,8 @@ export function make(draw: DrawFn, getTier: () => number = () => 0, rng: Rng = m
     const parts = assembly(tpl)
     return {
       ...parts,
+      texts: parts.texts.map((text) => saidMap(text, (s) => s.replace(oathSlot, '$1'))),
+      topicTexts: parts.texts.map((text) => saidText(text).replace(oathSlot, '')),
       constr: !!(parts.constr && constrHits > 0 && constrReal === constrHits),
       ev: lastEv,
       legendary: false,
