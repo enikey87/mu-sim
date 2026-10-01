@@ -34,15 +34,15 @@ export const billRules: R[] = [
       game.chargeBill(id)
     },
   },
-  // комедия: Алик замечает последствия, только если факт есть
+  // фоновые последствия — AlikIdle, не ответ игроку (#533)
   {
-    name: 'Turn_LightOff', event: 'AlikTurn', when: [is(lightOff)], once: true, priority: 'chatter',
+    name: 'Idle_LightOff', event: 'AlikIdle', when: [is(lightOff)], once: true, priority: 'chatter',
     respond: async ({ game }) => {
       await game.say(['Свет отключили? Брат, это знак — экономь. Я тоже экономлю: не плачу.'])
     },
   },
   {
-    name: 'Turn_NetRation', event: 'AlikTurn', when: [is(netRation)], once: true, priority: 'chatter',
+    name: 'Idle_NetRation', event: 'AlikIdle', when: [is(netRation)], once: true, priority: 'chatter',
     respond: async ({ game }) => {
       await game.say(['Интернет по талонам? Пиши короче. «Мууу» — один талон.'])
     },

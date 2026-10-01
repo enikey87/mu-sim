@@ -185,16 +185,16 @@ describe('отчаяние от бедности', () => {
     await game.send(choice)
     expect(firstReply(game, from)).toMatch(/банк.*имени/i)
     expect(game.S.msgs.slice(from).some((m) => m.kind === 'text' && /Свет отключили/.test(m.text))).toBe(false)
-    expect(game.S.rules.once.Turn_LightOff).toBeUndefined()
+    expect(game.S.rules.once.Idle_LightOff).toBeUndefined()
 
-    expect(game.rules.collect({ event: 'AlikTurn' }, game.facts()).some((r) => r.name === 'Turn_LightOff')).toBe(true)
+    expect(game.rules.collect({ event: 'AlikIdle' }, game.facts()).some((r) => r.name === 'Idle_LightOff')).toBe(true)
     let lightReply: string | undefined
     for (let i = 0; i < 40 && !lightReply; i++) {
       const later = game.S.msgs.length
-      if ((await game.fire('AlikTurn'))?.name === 'Turn_LightOff') lightReply = firstReply(game, later)
+      if ((await game.fire('AlikIdle'))?.name === 'Idle_LightOff') lightReply = firstReply(game, later)
     }
     expect(lightReply).toMatch(/Свет отключили/)
-    expect(game.S.rules.once.Turn_LightOff).toBe(true)
+    expect(game.S.rules.once.Idle_LightOff).toBe(true)
   })
 
   it('любая реплика P_MONEY получает ответ раньше фоновых последствий (#459), общий ответ — в её тоне (#480)', async () => {
@@ -225,9 +225,9 @@ describe('отчаяние от бедности', () => {
       if ('reply' in c) expect(first, c.ask).toMatch(c.reply)
       else expect(c.pool.has(first!), `${c.ask} → ${first ?? 'молчание'}`).toBe(true)
       expect(game.S.msgs.slice(from).some((m) => m.kind === 'text' && /Свет отключили/.test(m.text)), c.ask).toBe(false)
-      expect(game.S.rules.once.Turn_LightOff, c.ask).toBeUndefined()
+      expect(game.S.rules.once.Idle_LightOff, c.ask).toBeUndefined()
     }
-    // свет звучит, но позже — своим ходом
+    // свет звучит, но позже — своей инициативой
     const { game } = makeGame({ seed: 7 })
     setMoney(game, Game.MONEY_LOW)
     game.S.mem['light.off'] = true
@@ -235,7 +235,7 @@ describe('отчаяние от бедности', () => {
     let light: string | undefined
     for (let i = 0; i < 40 && !light; i++) {
       const later = game.S.msgs.length
-      if ((await game.fire('AlikTurn'))?.name === 'Turn_LightOff') light = firstReply(game, later)
+      if ((await game.fire('AlikIdle'))?.name === 'Idle_LightOff') light = firstReply(game, later)
     }
     expect(light).toMatch(/Свет отключили/)
   })
