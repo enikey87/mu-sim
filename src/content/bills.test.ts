@@ -173,10 +173,10 @@ describe('платежи по календарю', () => {
   })
   it('реплика про свет — только при light.off', () => {
     const { game } = makeGame()
-    const names = (g: typeof game) => g.rules.collect({ event: 'AlikIdle' }, g.facts()).map((r) => r.name)
-    expect(names(game)).not.toContain('Idle_LightOff')
+    const names = (g: typeof game) => g.rules.collect({ event: 'StoryBeat' }, g.facts()).map((r) => r.name)
+    expect(names(game)).not.toContain('Beat_LightOff')
     game.S.mem[lightOff] = true
-    expect(names(game)).toContain('Idle_LightOff')
+    expect(names(game)).toContain('Beat_LightOff')
   })
   it('BillWarn ставит due и шлёт СМС', async () => {
     const { game } = makeGame()

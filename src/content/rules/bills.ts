@@ -34,21 +34,21 @@ export const billRules: R[] = [
       game.chargeBill(id)
     },
   },
-  // фоновые последствия — AlikIdle, не ответ игроку (#533)
+  // фоновые последствия — StoryBeat (свой сюжетный ход), не ответ на AlikTurn (#533)
   {
-    name: 'Idle_LightOff', event: 'AlikIdle', when: [is(lightOff)], once: true, priority: 'chatter',
+    name: 'Beat_LightOff', event: 'StoryBeat', when: [is(lightOff)], once: true, priority: 'chatter',
     respond: async ({ game }) => {
       await game.say(['Свет отключили? Брат, это знак — экономь. Я тоже экономлю: не плачу.'])
     },
   },
   {
-    name: 'Idle_NetRation', event: 'AlikIdle', when: [is(netRation)], once: true, priority: 'chatter',
+    name: 'Beat_NetRation', event: 'StoryBeat', when: [is(netRation)], once: true, priority: 'chatter',
     respond: async ({ game }) => {
       await game.say(['Интернет по талонам? Пиши короче. «Мууу» — один талон.'])
     },
   },
   {
-    name: 'Idle_PhoneWarn', event: 'AlikIdle', when: [is(phoneWarn)], once: true, priority: 'chatter',
+    name: 'Beat_PhoneWarn', event: 'StoryBeat', when: [is(phoneWarn)], once: true, priority: 'chatter',
     respond: async ({ game }) => {
       await game.say(['Оператор пишет, что ты ему должен. Знакомое чувство.'])
     },
