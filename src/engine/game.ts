@@ -846,16 +846,24 @@ export class Game {
     if (!thing || this.S.mem[sold(thing.id)]) return
     const got = this.relief(thing.amount)
     if (got === 0) return
-    this.rules.applyOps([set(creditOffer, false), set(sold(thing.id), true)], {})
+    // без «Нивы» продажа резины убирает и машину (has.car гаснет): факт — там же, где это происходит (#530)
+    const ops = [set(creditOffer, false), set(sold(thing.id), true)]
+    if (thing.id === 'tires' && !this.nivaAtPlayer()) ops.push(set(memkeys.carGone, true))
+    this.rules.applyOps(ops, {})
     delete this.S.mem[memkeys.creditOfferSum]
     this.adjustMoney(got, 'Авито')
     // продажа могла не вытащить со дна — снова предложить, с этой причиной (ход игрока, не падение — без перерыва)
     if (this.moneyLevel() === 'bottom') this.maybeCreditOffer('Продано, а остаток всё ещё критический')
   }
-  /** Итог продажи: сезон — из даты партии, не из шутки «всегда лето»; машина — по факту `has.car` (#515). */
+  /** «Нива» у игрока: финал «Нива выбрала тебя» (#256) или бартер (#530) — предмет в инвентаре. */
+  private nivaAtPlayer(): boolean {
+    return this.S.mem[memkeys.nivaPlayer] === true || this.S.items.some((n) => /Нива/.test(n))
+  }
+  /** Итог продажи: сезон — из даты партии, не из шутки «всегда лето»; машина — по фактам: «Нива» у игрока (#515) или ушла с продажей (#530), а не «машины нет» вопреки показанному штрафу. */
   thingDone(thing: { id: string; done: string }): string {
     if (thing.id === 'tires') {
-      if (this.S.mem[memkeys.nivaPlayer] === true) return 'Зимнюю резину продали. «Нива» у вас есть — доедет и на летней'
+      if (this.nivaAtPlayer()) return 'Зимнюю резину продали. «Нива» у вас есть — доедет и на летней'
+      if (this.S.mem[memkeys.carGone] === true) return 'Зимнюю резину продали. Машину забрали вместе с ней — покупатель сказал, они комплектом идут'
       const month = dateOf(this.S.day).getMonth() + 1
       if (month >= 6 && month <= 8) return 'Зимнюю резину продали. Летом. Машины у вас нет'
     }
@@ -1330,8 +1338,8 @@ export class Game {
       [memkeys.HEAT]: Math.max(0, Number(S.mem[memkeys.HEAT] ?? 0)),
       'has.boris': S.items.some((n) => /Борис/.test(n)),
       'has.niva': S.items.some((n) => /Нива/.test(n)),
-      // Машина игрока — один факт (#515): есть, пока не продана резина, и всегда, когда «Нива» у игрока
-      'has.car': S.mem[memkeys.nivaPlayer] === true || S.mem[sold('tires')] === undefined,
+      // Машина игрока — один факт (#515): есть, пока не продана резина, и всегда, когда «Нива» у игрока (финал или бартер, #530)
+      'has.car': this.nivaAtPlayer() || S.mem[sold('tires')] === undefined,
       // Календарное обещание живо в день срока; событийное — в ход, когда его факт стал истиной.
       promiseLive: !!pr && (pr.condition ? pr.met === S.day : pr.due === S.day),
       // срок вышел: advanceTurnDay идёт раньше события срока и может перескочить день срока
@@ -1387,8 +1395,11 @@ export class Game {
     }
   }
   /** Реплики, за тему которых игрок может зацепиться (отмазка, серия, ответ по теме) — не реакции на крик и извинения. */
-  markTopical(msgs: Msg[]): void {
-    for (const m of msgs) if (m.kind === 'text') m.topical = true
+  markTopical(msgs: Msg[], topicTexts?: string[]): void {
+    for (const [i, m] of msgs.entries()) if (m.kind === 'text') {
+      m.topical = true
+      if (topicTexts?.[i] !== undefined) m.topicText = topicTexts[i]
+    }
   }
   /** Тема последней реплики самого Алика (после сообщения игрока): бетон, «Нива», свадьба… */
   topicOfLast(): string | undefined {
@@ -1399,7 +1410,7 @@ export class Game {
       if (m.who || m.deleted || !m.topical) continue
       // клятвы и сроки («Клянусь лавашом», «как бетон застынет») — не тема разговора
       if ((D.OATH as Entry<string>[]).some((o) => m.text.startsWith(valueOf(o)))) continue
-      let text = m.text
+      let text = m.topicText ?? m.text
       // срок в сообщении — не тема: «После обеда…» иначе цепляет еду; регистр и точка в конце не мешают
       for (const p of this.S.promises) text = text.replace(literalRe(p.t), '')
       text = text.replace(/^[.\s,;:!?…—–-]+|[.\s,;:!?…—–-]+$/g, '').trim()
@@ -1867,7 +1878,7 @@ export class Game {
     this.meetRel(ex.r)
     this.recordPromise(ex.p)
     const msgs = await this.say(ex.texts, ex.legendary)
-    this.markTopical(msgs)
+    this.markTopical(msgs, ex.topicTexts)
     this.S.ctx = {
       ...this.ctxFromPromise(ex.p), rel: ex.r, constr: ex.constr, legendary: ex.legendary,
       sad: SAD.test(ex.ev ?? ''), revived: REVIVED.test(ex.ev ?? ''), festive: !SAD.test(ex.ev ?? '') && FESTIVE.test(ex.ev ?? ''),
