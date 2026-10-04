@@ -123,7 +123,7 @@ describe('гейт: DIRECT освобождает только редкие пр
       .toEqual([expect.stringMatching(/^Late: сработало в/)])
   })
   it('частые правила основной игры не в DIRECT: гейт видит их сам — контроль с light.off краснеет', () => {
-    expect(['Bill_Due', 'Credit_Due', 'Turn_LightOff'].filter((n) => n in DIRECT)).toEqual([])
+    expect(['Bill_Due', 'Credit_Due', 'Beat_LightOff'].filter((n) => n in DIRECT)).toEqual([])
   })
 })
 

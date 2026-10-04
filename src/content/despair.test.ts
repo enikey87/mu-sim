@@ -184,17 +184,18 @@ describe('отчаяние от бедности', () => {
     const from = game.S.msgs.length
     await game.send(choice)
     expect(firstReply(game, from)).toMatch(/банк.*имени/i)
-    expect(game.S.msgs.slice(from).some((m) => m.kind === 'text' && /Свет отключили/.test(m.text))).toBe(false)
-    expect(game.S.rules.once.Turn_LightOff).toBeUndefined()
-
-    expect(game.rules.collect({ event: 'AlikTurn' }, game.facts()).some((r) => r.name === 'Turn_LightOff')).toBe(true)
-    let lightReply: string | undefined
-    for (let i = 0; i < 40 && !lightReply; i++) {
-      const later = game.S.msgs.length
-      if ((await game.fire('AlikTurn'))?.name === 'Turn_LightOff') lightReply = firstReply(game, later)
+    expect(firstReply(game, from)).not.toMatch(/Свет отключили/)
+    // свет — сюжетным ходом (StoryBeat), не вместо ответа; в том же send может догнать вторым
+    if (!game.S.rules.once.Beat_LightOff) {
+      expect(game.rules.collect({ event: 'StoryBeat' }, game.facts()).some((r) => r.name === 'Beat_LightOff')).toBe(true)
+      let lightReply: string | undefined
+      for (let i = 0; i < 40 && !lightReply; i++) {
+        const later = game.S.msgs.length
+        if ((await game.fire('StoryBeat'))?.name === 'Beat_LightOff') lightReply = firstReply(game, later)
+      }
+      expect(lightReply).toMatch(/Свет отключили/)
     }
-    expect(lightReply).toMatch(/Свет отключили/)
-    expect(game.S.rules.once.Turn_LightOff).toBe(true)
+    expect(game.S.rules.once.Beat_LightOff).toBe(true)
   })
 
   it('любая реплика P_MONEY получает ответ раньше фоновых последствий (#459), общий ответ — в её тоне (#480)', async () => {
@@ -224,20 +225,24 @@ describe('отчаяние от бедности', () => {
       const first = firstReply(game, from)
       if ('reply' in c) expect(first, c.ask).toMatch(c.reply)
       else expect(c.pool.has(first!), `${c.ask} → ${first ?? 'молчание'}`).toBe(true)
-      expect(game.S.msgs.slice(from).some((m) => m.kind === 'text' && /Свет отключили/.test(m.text)), c.ask).toBe(false)
-      expect(game.S.rules.once.Turn_LightOff, c.ask).toBeUndefined()
+      expect(first, c.ask).not.toMatch(/Свет отключили/)
     }
-    // свет звучит, но позже — своим ходом
+    // свет звучит сюжетным ходом (StoryBeat), не вместо ответа
     const { game } = makeGame({ seed: 7 })
     setMoney(game, Game.MONEY_LOW)
     game.S.mem['light.off'] = true
+    const from = game.S.msgs.length
     await game.send(choiceWith(game, 'карта худеет'))
-    let light: string | undefined
-    for (let i = 0; i < 40 && !light; i++) {
-      const later = game.S.msgs.length
-      if ((await game.fire('AlikTurn'))?.name === 'Turn_LightOff') light = firstReply(game, later)
+    expect(firstReply(game, from)).not.toMatch(/Свет отключили/)
+    if (!game.S.rules.once.Beat_LightOff) {
+      let light: string | undefined
+      for (let i = 0; i < 40 && !light; i++) {
+        const later = game.S.msgs.length
+        if ((await game.fire('StoryBeat'))?.name === 'Beat_LightOff') light = firstReply(game, later)
+      }
+      expect(light).toMatch(/Свет отключили/)
     }
-    expect(light).toMatch(/Свет отключили/)
+    expect(game.S.rules.once.Beat_LightOff).toBe(true)
   })
 
   it('общий ответ на реплику о деньгах звучит в её тоне, не голосом крика (#480)', async () => {
