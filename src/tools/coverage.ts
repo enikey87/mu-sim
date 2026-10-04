@@ -16,6 +16,8 @@ import { endgame } from '../content/memkeys'
 import { DIRECT } from './direct'
 import { botTurn } from './bot'
 import { requiresKey } from './playtest'
+import { Worker } from 'node:worker_threads'
+import { resolve } from 'node:path'
 
 /** Почему правило не сработало в симуляции: `direct` — у него прямой случай (direct.ts), иначе гейт падает. */
 export type NeverClass = 'direct' | 'unexplained'
@@ -87,6 +89,10 @@ export const endgameOnly = (r: Pick<Rule<unknown>, 'when'>): boolean => (r.when 
  */
 export const DIRECT_MIN_GAMES = 7
 
+const kindsFor = (r: Pick<Rule<unknown>, 'when'>): readonly SampleKind[] => (endgameOnly(r) ? ['full', 'main'] : ['main'])
+const gamesPlayed = (samples: ReadonlyArray<Pick<SampleReport, 'kind' | 'games'>>, name: string, kinds: readonly SampleKind[]): number =>
+  samples.reduce((count, sample) => count + (kinds.includes(sample.kind) ? (sample.games[name] ?? 0) : 0), 0)
+
 /**
  * Нарушения гейта. Не освобождённое правило, которое ни разу не сработало — в выборках «до концовки», если
  * это правило основной игры (эндгейм не прячет его пропажу), или во всех выборках, если правило эндгейма.
@@ -97,12 +103,9 @@ export function gateIssues(
   rules: ReadonlyArray<Pick<Rule<unknown>, 'name' | 'when'>>,
   direct: Readonly<Record<string, unknown>> = DIRECT,
 ): string[] {
-  const kindsFor = (r: Pick<Rule<unknown>, 'when'>): readonly SampleKind[] => (endgameOnly(r) ? ['full', 'main'] : ['main'])
-  const games = (name: string, kinds: readonly SampleKind[]) =>
-    samples.reduce((acc, s) => acc + (kinds.includes(s.kind) ? (s.games[name] ?? 0) : 0), 0)
   return rules.flatMap((r) => {
     const kinds = kindsFor(r)
-    const played = games(r.name, kinds)
+    const played = gamesPlayed(samples, r.name, kinds)
     if (r.name in direct) {
       return played >= DIRECT_MIN_GAMES
         ? [`${r.name}: сработало в ${played} партиях (порог ${DIRECT_MIN_GAMES}) — снять из DIRECT, гейт его видит`]
@@ -110,6 +113,29 @@ export function gateIssues(
     }
     if (played > 0) return []
     return [`${r.name}: ${kinds.length > 1 ? 'правило эндгейма ни разу не сработало' : 'ни разу до экрана концовки'} — прямой случай в direct.ts или удалить`]
+  })
+}
+
+/** Один вердикт по всем чужим семействам: ноль опасен в любом, DIRECT устарел только при частоте во всех. */
+export function stableGateIssues(
+  families: ReadonlyArray<{ shift: number; samples: ReadonlyArray<Pick<SampleReport, 'kind' | 'games'>> }>,
+  rules: ReadonlyArray<Pick<Rule<unknown>, 'name' | 'when'>>,
+  direct: Readonly<Record<string, unknown>> = DIRECT,
+): string[] {
+  if (!families.length || families.some(({ samples }) =>
+    !samples.some((s) => s.kind === 'main') || !samples.some((s) => s.kind === 'full')))
+    return ['нет семейств покрытия с main и full выборками']
+  return rules.flatMap((r) => {
+    const counts = families.map(({ samples }) => gamesPlayed(samples, r.name, kindsFor(r)))
+    const summary = families.map(({ shift }, i) => `+${shift}: ${counts[i]}`).join(', ')
+    if (r.name in direct) {
+      return counts.every((count) => count >= DIRECT_MIN_GAMES)
+        ? [`${r.name}: ${summary} — снять из DIRECT, гейт видит правило во всех семействах`]
+        : []
+    }
+    return counts.some((count) => count === 0)
+      ? [`${r.name}: ${summary} — прямой случай в direct.ts или удалить`]
+      : []
   })
 }
 
@@ -131,7 +157,7 @@ export async function ruleCoverage(
   for (const [i, seed] of seeds.entries()) {
     // разные часы и дни недели — чтобы срабатывали утро, обед, вечер, пятница
     const clock = manualClock(Date.parse('2026-09-14T12:00:00Z') + (i % 7) * 864e5)
-    const game = new Game({ storage: null, clock, rng: seededRng(seed), noTimers: true, hour: hours[i % hours.length], strictSilence: true })
+    const game = new Game({ storage: null, clock, rng: seededRng(seed), noTimers: true, hour: hours[i % hours.length], strictSilence: true, strictTurns: true })
     names = game.rules.all.map((r) => r.name)
     weighted = [...new Set(game.rules.all.filter((r) => r.specificity === 0).map((r) => r.event))]
     const minSpec: Record<string, number> = {}
@@ -164,17 +190,65 @@ export async function ruleCoverage(
 }
 
 /** Несколько выборок → достижимость по объединению. */
+export function runCoverageJobs(
+  samples: readonly SampleSpec[],
+  run: (sample: SampleSpec) => Promise<SampleReport>,
+): Promise<MultiCoverage> {
+  if (!samples.length) return Promise.reject(new Error('Нет выборок покрытия'))
+  return Promise.all(samples.map(async (sample) => {
+    const report = await run(sample)
+    if (!report || report.kind !== sample.kind) throw new Error('Выборка покрытия не вернула отчёт своего рода')
+    return report
+  })).then((reports) => ({ samples: reports, never: neverInAllSamples(reports.map((r) => r.never)) }))
+}
+
+async function coverageWorkerCode(): Promise<string> {
+  const { build } = await import('vite')
+  const output = await build({
+    configFile: false,
+    logLevel: 'silent',
+    build: {
+      ssr: resolve(process.cwd(), 'src/tools/coverage-worker.ts'),
+      write: false,
+      rolldownOptions: { output: { format: 'cjs', codeSplitting: false } },
+    },
+  })
+  if (Array.isArray(output) || !('output' in output)) throw new Error('Не удалось собрать воркер покрытия')
+  const code = output.output.find((entry) => entry.type === 'chunk')
+  if (!code || code.type !== 'chunk') throw new Error('Пустая сборка воркера покрытия')
+  return code.code
+}
+
+function coverageInWorker(code: string, sample: SampleSpec, freeText: number): Promise<SampleReport> {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(code, { eval: true, execArgv: [], workerData: { sample, freeText } })
+    let settled = false
+    const fail = (error: Error) => {
+      if (settled) return
+      settled = true
+      reject(error)
+      void worker.terminate()
+    }
+    worker.once('message', (message: SampleReport | { error: string }) => {
+      if (!message || 'error' in message) return fail(new Error(message?.error ?? 'Воркер вернул пустой отчёт'))
+      settled = true
+      resolve(message)
+      void worker.terminate()
+    })
+    worker.once('error', fail)
+    worker.once('exit', (exitCode) => {
+      if (!settled) fail(new Error(`Воркер покрытия завершился до отчёта: ${exitCode}`))
+    })
+  })
+}
+
 export async function multiSampleCoverage(
   samples = COVERAGE_SAMPLES,
   opts: { freeText?: number } = { freeText: 0.15 },
 ): Promise<MultiCoverage> {
-  const reports: SampleReport[] = []
-  for (const s of samples) {
-    const r = await ruleCoverage(s.seeds, s.turns, undefined, s.grumpy, { ...opts, untilEnding: s.kind === 'main' })
-    reports.push({ ...r, kind: s.kind })
-  }
-  const never = neverInAllSamples(reports.map((r) => r.never))
-  return { samples: reports, never }
+  if (!samples.length) throw new Error('Нет выборок покрытия')
+  const code = await coverageWorkerCode()
+  return runCoverageJobs(samples, (sample) => coverageInWorker(code, sample, opts.freeText ?? 0))
 }
 
 export function formatCoverage(r: CoverageReport): string {

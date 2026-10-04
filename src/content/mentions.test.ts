@@ -130,7 +130,7 @@ function strings(v: unknown, path: string, known: Criterion[], out: Found[]): Fo
     const own = Array.isArray(o.when) ? [...known, ...sets, ...expand(atoms(o.when as Criterion[]))] : [...known, ...sets]
     const who = typeof o.w === 'string' ? o.w : typeof o.who === 'string' ? o.who : undefined
     if (who && typeof o.t === 'string') { out.push({ path, text: o.t, known: [...own, ...selfIntro(who)], who }); return out }
-    for (const [k, x] of Object.entries(o)) if (!['when', 'orWhen', 'remember'].includes(k)) strings(x, `${path}.${k}`, own, out)
+    for (const [k, x] of Object.entries(o)) if (!['when', 'orWhen', 'remember', 'claims'].includes(k)) strings(x, `${path}.${k}`, own, out)
   }
   return out
 }
@@ -166,6 +166,8 @@ function corpus(): Found[] {
         'achievements.ACH', 'arcs.CAST', 'finales.ENDINGS', 'finales.DEFAULT_FINALE', 'topics.TOPIC_NAME', 'world.WORLD', 'world.SPEAKS', 'world.MENTION_RE',
         // реестры ключей фактов: не реплики
         'world.EXTRAS', 'factkeys.CTX_KEYS', 'factkeys.HAS_KEYS', 'factkeys.FAMILIES',
+        // реестр пулов кнопок: дублирует legends/talk/topics с пустыми known (#491)
+        'player-pools.PLAYER_CHOICE_POOLS', 'player-pools.PLAYER_PAIR_POOLS',
         // правят или сверяют уже сказанное: автозамена, противоречия Дня выплаты (звено звучит, только если было событие)
         'life.AUTO', 'payday.MORNING_CONTRA', 'payday.CONTRADICTIONS',
       ].includes(at)) continue

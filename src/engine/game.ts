@@ -7,7 +7,7 @@ import { MIRROR, MIRROR_AGAIN, MIRROR_OPEN, MIRROR_REPLY, type Mirror } from '..
 import { PAYDAY_HOOKS } from '../content/rules/payday'
 import { QUEST_WHEN } from '../content/rules/world'
 import { LEGENDS } from '../content/legends'
-import { TOPICS, P_NEU_B_LATE, P_RUDE_BLOCKED, P_RUDE_POLITE, P_POL_POLITE, P_NIGHT, P_FRIDAY, P_MONEY, P_DESPERATE } from '../content/topics'
+import { TOPICS, P_NEU_B_LATE, P_RUDE_BLOCKED, P_RUDE_POLITE, P_POL_POLITE, P_NIGHT, P_FRIDAY, P_MONEY, P_DESPERATE, DESPERATE_REPLY, MONEY_REPLY_POLITE, MONEY_REPLY_NEUTRAL, MONEY_REPLY_REGIMENT } from '../content/topics'
 import { FINALES, ENDINGS, DEFAULT_FINALE, type Finale } from '../content/finales'
 import { ARCS, ARC_DONE, CAST, type Episode, GROUP, GROUP_OOPS, WRONG_TO, WRONG_WHAT, WRONG_OOPS } from '../content/arcs'
 import * as L from '../content/life'
@@ -19,12 +19,15 @@ import { BILLS, billDue, billDueAt, billStreak, billUnpaid, lightOff, netRation,
 import {
   LOANS, THINGS, MOM_DONE_TEXT,
   creditStage, creditOffer, creditBroke, momDone, creditDeclined,
-  sold, momHelp, loanTaken, loanDueAt, loanPayment, loanFailed, nextLoan, nextThing, allSold, nextMom,
+  sold, momHelp, momDachaAt, momDachaDays, loanTaken, loanDueAt, loanPayment, loanFailed, nextLoan, nextThing, allSold, nextMom,
   type LoanId, type ThingId, type Loan,
 } from '../content/credit'
 import { allRules } from '../content/rules'
 import type { GameEvent, Offer } from '../content/rules/events'
-import { CLAIMS, claimByKey, conflicts, CALLBACK_OPEN, type Claim } from '../content/lies'
+import { CLAIMS, claimByKey, CALLBACK_OPEN, type Claim } from '../content/lies'
+import { CLAIM_LEDGER, activeClaim, claimKeyOf, closeEpisode, currentEpisode, publishClaim, publishRetraction, publishTransition } from '../content/ledger'
+import { isWhoId, type ClaimKey } from '../content/ids'
+import { type Claimed, type LedgerEvent, type LineSpec as ContentLineSpec, type Said, saidClaims, saidJoin, saidText } from '../content/fact-types'
 import * as memkeys from '../content/memkeys'
 import {
   ENDGAME_CHOICES, ENDGAME_FALLBACK, ENDGAME_FORMALITIES, ENDGAME_GROUP, ENDGAME_INTRO, ENDGAME_JUBILEES,
@@ -36,7 +39,7 @@ import { Decks } from './deck'
 import { Battery } from './battery'
 import { Seen, type Keyed } from './uniq'
 import {
-  RuleSet, makeHub, Lines, resolver, test, isOpen, valueOf, set,
+  RuleSet, makeHub, Lines, resolver, test, isOpen, valueOf, set, spec, daysSince,
   type Criterion, type Entry, type Facts, type Resolver, type Rule, type Query, type Priority, type Line as PoolLine, type LineOpts, type Picked,
 } from './rules'
 import { MENTION_RE, WORLD } from '../content/world'
@@ -67,6 +70,9 @@ export class GameDisposed extends Error {
   constructor() { super('Game disposed') }
 }
 
+type PoorText = string | { t: string; arg?: string }
+const poorText = (item: PoorText): string => typeof item === 'string' ? item : item.t
+
 export interface GameOptions {
   storage?: Storage | null
   rng?: Rng
@@ -84,6 +90,8 @@ export interface GameOptions {
   typos?: boolean
   /** Промолчавшее правило, оставившее след в S, — ошибка (в тестах включено; снимок S на каждое правило стоит времени) */
   strictSilence?: boolean
+  /** Ошибка хода в партии бота — падение (гейт покрытия, плейтест), а не console.error с восстановлением */
+  strictTurns?: boolean
 }
 
 
@@ -94,7 +102,9 @@ export const REVIVED = /встал|встаёт|воскрес|вернулас�
 /** Повод поздравить (иначе «Поздравляю!» на «зуб мудрости растёт» звучит невпопад). */
 export const FESTIVE = /свадьб|крестин|юбилей|обручен|день рождения|отмечаем|обмываем|празд|родился|поступил|выпускн|сватовств|помолвк|открыва|открыли|приехал|вернулся|урожа|отелилась|правнук|первое слово|дочку выдают/
 
-export type SayItem = string | { w: string; t: string }
+export type SayItem = Said | { w: string; t: string; claims?: LedgerEvent[] }
+/** Тема эпизода противоречия — выбирает предметный ответ Алика. */
+export type LieKind = 'money' | 'grandpa' | 'customer'
 /** Что пришло, пока игрока не было: виды сообщений пачки непрочитанных. */
 export type AwayKind = 'text' | 'sticker' | 'fwd' | 'deleted' | 'voice' | 'transfer' | 'excuse' | 'formality' | 'coldWar'
 
@@ -144,6 +154,8 @@ export class Game {
   private sleepWaiters = new Set<(err?: GameDisposed) => void>()
   private noTimers: boolean
   private typos: boolean
+  /** Оборванный ошибкой ход — падение партии бота (гейт покрытия, плейтест), а не тихое восстановление. */
+  private strictTurns: boolean
   private hiddenAt = 0
   /** Ход игрока: nextDay уже был (offline / fx.days) — обычный +1…3 в конце не дублируем. */
   private inPlayerTurn = false
@@ -159,7 +171,9 @@ export class Game {
     this.hour = opts.hour ?? null
     this.noTimers = !!opts.noTimers
     this.typos = opts.typos ?? true
+    this.strictTurns = !!opts.strictTurns
     this.S = loadState(this.storage) ?? freshState()
+    if (this.S.mem[momHelp('dacha')] && this.S.mem[momDachaAt] == null) this.S.mem[momDachaAt] = this.S.day
     // колбеки батареи — в узком хосте, а не в публичном интерфейсе Game: game.dead() путался бы со смертью Алика
     this.battery = new Battery(this.S, {
       low: (level) => this.notify('🪫', 'Система', `Низкий заряд батареи: ${level}%`, { event: 'battery' }),
@@ -172,7 +186,12 @@ export class Game {
     })
     this.decks = new Decks(this.S.bags, this.rng)
     this.seen = new Seen(this.S.seen)
-    this.X = make(<T>(k: string, a: readonly Entry<T>[], nr?: boolean) => (nr ? this.decks.pick(k, a, this.lineFacts(), { noRepeat: true }) as T : this.draw(k, a)), () => this.S.tier, this.rng)
+    this.X = make(<T>(k: string, a: readonly Entry<T>[], nr?: boolean, eligible?: (e: Entry<T>) => boolean) => {
+      if (nr) return this.decks.pick(k, a, this.lineFacts(), { noRepeat: true, eligible }) as T
+      const x = this.decks.pick(k, a, this.lineFacts(), { eligible })
+      if (x === null) throw new Error(`Колода ${k}: ни одного элемента, уместного сейчас`)
+      return x
+    }, () => this.S.tier, this.rng)
     this.scenes = makeScenes(this.X)
     this.S.rules.said ??= {} // старые сохранения
     this.lines = new Lines(this.S.rules.said, this.rng, () => ({ turn: this.S.stats.sent, day: this.S.day }))
@@ -276,6 +295,8 @@ export class Game {
   /** Ошибка в середине хода: партия не должна умереть вместе с ним. */
   private recoverTurn(e: unknown): void {
     if (e instanceof SilenceBreach) throw e
+    // партия бота: оборванный ход — находка, которая рушит прогон, а не тихий console.error
+    if (this.strictTurns) throw e
     this.ui.busy = false
     this.inPlayerTurn = false
     if (e instanceof GameDisposed) return
@@ -368,14 +389,29 @@ export class Game {
     if (!p) return o.fallback ? this.uniq(o.fallback) : null
     return p.text
   }
-  /** То же, но с самой репликой (её поля: сумма в День выплаты, кто говорит). */
-  linePicked(key: string, pool: readonly PoolLine[], o: LineOpts = {}): Picked | null {
-    const p = this.lines.pick(key, pool, this.lineFacts(), o)
+  /** То же, но с самой репликой (её поля: сумма в День выплаты, кто говорит, явная семантика). */
+  linePicked(key: string, pool: readonly PoolLine[], o: LineOpts = {}): (Picked & { spec: ContentLineSpec }) | null {
+    const p = this.lines.pick(key, pool, this.lineFacts(), o) as (Picked & { spec: ContentLineSpec }) | null
     if (!p) return null
     this.lines.mark(p.id)
     this.seen.mark(p.text)
     if (p.spec.remember) this.rules.applyOps(p.spec.remember, {})
     return p
+  }
+  /**
+   * Общий ответ на реплику игрока о деньгах — в тоне этой реплики (#480): крик капсом — свой пул,
+   * вежливая и спокойная — свои. Вежливый режим (S5) на деньги отвечает голосом регламента, как на всё остальное.
+   * Пулы одноразовые (до эндгейма дословных повторов быть не должно); исчерпанный пул перефразируется fallback'ом.
+   */
+  moneyReply(tone: string, shout = false): string {
+    const [key, pool]: [string, readonly PoolLine[]] = this.S.mem[memkeys.polite]
+      ? ['MONEY_REPLY_REGIMENT', MONEY_REPLY_REGIMENT]
+      : shout
+        ? ['DESPERATE_REPLY', DESPERATE_REPLY]
+        : tone === 'polite' ? ['MONEY_REPLY_POLITE', MONEY_REPLY_POLITE] : ['MONEY_REPLY_NEUTRAL', MONEY_REPLY_NEUTRAL]
+    const s = this.line(key, pool, { fallback: () => spec(this.draw(key + '_FB', pool)).t })
+    if (s) return s
+    return this.uniq(() => spec(this.draw(key + '_FB', pool)).t)
   }
   rnd = (n: number): number => rndInt(this.rng, n)
   chance = (p: number): boolean => chance(this.rng, p)
@@ -405,8 +441,14 @@ export class Game {
   alikDecor = <T extends Keyed>(t: T): T => {
     const f = (s: string) => `${this.X.g('ADDR')}, ${low(s)}`
     if (typeof t === 'string') return f(t) as T
-    if (t.texts) return { ...(t as object), texts: [f(t.texts[0]), ...t.texts.slice(1)] } as T
-    return { ...(t as object), text: f(t.text ?? '') } as T
+    const said = (x: string | { t: string }): string | { t: string } =>
+      typeof x === 'string' ? f(x) : { ...x, t: f(x.t) } // Said сохраняет свою семантику
+    if (t.texts) {
+      const [first, ...rest] = t.texts
+      return { ...(t as object), texts: [said(first!), ...rest] } as T
+    }
+    if (t.t) return { ...(t as object), t: said(t.t) } as T
+    return { ...(t as object), text: t.text ? said(t.text) : '' } as T
   }
   playerDecor = (t: string): string => {
     if (/^Алик/.test(t)) return t + this.draw('PSUF', PLAYER_SUFFIX)
@@ -447,31 +489,39 @@ export class Game {
    * а отпущенную перефразирует — сказанное слово в слово не возвращается (#184/#240).
    * `act` — строка несёт намерение игрока: пул не молчит, даже когда окно не отпустило ни одной (#167).
    */
-  poorLine(key: string, arr: readonly Entry<string>[], opts?: { act?: boolean }): string | null {
-    const fresh = this.freshPlayer(key, arr)
+  poorChoice<T extends PoorText>(key: string, arr: readonly Entry<T>[], opts?: { act?: boolean }): { value: T; text: string } | null {
+    const fresh = this.decks.pick(key, arr, this.lineFacts(), { eligible: (e) => !this.shown.has(poorText(valueOf(e))) && !this.seen.has(poorText(valueOf(e))) })
     if (fresh !== null) {
-      this.S.poorSaid[fresh] = this.S.day
-      return fresh
+      const text = poorText(fresh)
+      this.shown.add(text)
+      if (this.shown.size > 60) this.shown.delete(this.shown.values().next().value!)
+      this.S.poorSaid[text] = this.S.day
+      return { value: fresh, text }
     }
     const said = (t: string): number => this.S.poorSaid[t] ?? -POOR_REPEAT_DAYS
     const open = arr.filter((e) => isOpen(e, this.lineFacts())).map(valueOf)
     if (!open.length) return null
-    const ready = open.filter((t) => this.S.day - said(t) >= POOR_REPEAT_DAYS)
+    const ready = open.filter((t) => this.S.day - said(poorText(t)) >= POOR_REPEAT_DAYS)
     if (!ready.length && !opts?.act) return null
-    const raw = ready.length ? ready.reduce((a, b) => (said(b) < said(a) ? b : a))
+    const raw = ready.length ? ready.reduce((a, b) => (said(poorText(b)) < said(poorText(a)) ? b : a))
       : open[Math.floor(this.S.day / POOR_REPEAT_DAYS) % open.length]!
     // отметка на исходной строке тоже: иначе самая старая так и остаётся самой старой, и пул
     // перефразирует её одну, а не идёт по кругу
-    this.S.poorSaid[raw] = this.S.day
+    this.S.poorSaid[poorText(raw)] = this.S.day
     // суффикс, а не префикс: строка обязана остаться узнаваемой как реплика своего пула
     const rephrase = (x: string): string => x + this.draw('PSUF', PLAYER_SUFFIX)
-    const t = this.seen.pickFresh(() => rephrase(raw), rephrase)
+    const t = this.seen.pickFresh(() => rephrase(poorText(raw)), rephrase)
     this.S.poorSaid[t] = this.S.day
-    return t
+    return { value: raw, text: t }
+  }
+  poorLine(key: string, arr: readonly Entry<PoorText>[], opts?: { act?: boolean }): string | null {
+    return this.poorChoice(key, arr, opts)?.text ?? null
   }
   pair = (ka: string, a: readonly Entry<string>[], kb: string, b: readonly Entry<string>[]): string =>
     this.uniq(() => `${this.draw(ka, a)} ${this.draw(kb, b)}`)
   addrLine = (key: string, arr: readonly Entry<string>[]): string => this.uniq(() => `${this.X.g('ADDR')}, ${this.draw(key, arr)}`)
+  /** Как addrLine, но сохраняет явную семантику строк пула (#426). */
+  addrSaidLine = (key: string, arr: readonly Entry<Said>[]): Said => this.uniq(() => saidJoin(`${this.X.g('ADDR')}, `, this.draw(key, arr)))
 
   /** Подставить состояние в текст: {debt} и {money} — деньги, {night} — который час по часам переписки. */
   fillMoney = (t: string): string =>
@@ -796,11 +846,28 @@ export class Game {
     if (!thing || this.S.mem[sold(thing.id)]) return
     const got = this.relief(thing.amount)
     if (got === 0) return
-    this.rules.applyOps([set(creditOffer, false), set(sold(thing.id), true)], {})
+    // без «Нивы» продажа резины убирает и машину (has.car гаснет): факт — там же, где это происходит (#530)
+    const ops = [set(creditOffer, false), set(sold(thing.id), true)]
+    if (thing.id === 'tires' && !this.nivaAtPlayer()) ops.push(set(memkeys.carGone, true))
+    this.rules.applyOps(ops, {})
     delete this.S.mem[memkeys.creditOfferSum]
     this.adjustMoney(got, 'Авито')
     // продажа могла не вытащить со дна — снова предложить, с этой причиной (ход игрока, не падение — без перерыва)
     if (this.moneyLevel() === 'bottom') this.maybeCreditOffer('Продано, а остаток всё ещё критический')
+  }
+  /** «Нива» у игрока: финал «Нива выбрала тебя» (#256) или бартер (#530) — предмет в инвентаре. */
+  private nivaAtPlayer(): boolean {
+    return this.S.mem[memkeys.nivaPlayer] === true || this.S.items.some((n) => /Нива/.test(n))
+  }
+  /** Итог продажи: сезон — из даты партии, не из шутки «всегда лето»; машина — по фактам: «Нива» у игрока (#515) или ушла с продажей (#530), а не «машины нет» вопреки показанному штрафу. */
+  thingDone(thing: { id: string; done: string }): string {
+    if (thing.id === 'tires') {
+      if (this.nivaAtPlayer()) return 'Зимнюю резину продали. «Нива» у вас есть — доедет и на летней'
+      if (this.S.mem[memkeys.carGone] === true) return 'Зимнюю резину продали. Машину забрали вместе с ней — покупатель сказал, они комплектом идут'
+      const month = dateOf(this.S.day).getMonth() + 1
+      if (month >= 6 && month <= 8) return 'Зимнюю резину продали. Летом. Машины у вас нет'
+    }
+    return thing.done
   }
   /** Кнопка карточки банка: выбор пишется в мир, Алику не уходит (#287). */
   answerCard(id: number, pick: 'take' | 'sell' | 'later'): void {
@@ -821,7 +888,7 @@ export class Game {
         const before = this.S.money
         this.sellThing(thing.id)
         if (!this.S.mem[sold(thing.id)]) return
-        result = `${thing.done}. +${this.rub(this.S.money - before)}. Баланс: ${this.rub(this.S.money)}`
+        result = `${this.thingDone(thing)}. +${this.rub(this.S.money - before)}. Баланс: ${this.rub(this.S.money)}`
       } else if (pick === 'later') {
         this.rules.applyOps([set(creditOffer, false), set(creditDeclined, true)], {})
         delete this.S.mem[memkeys.creditOfferSum]
@@ -845,7 +912,7 @@ export class Game {
     }
     const got = this.relief(help.amount)
     if (got === 0) return
-    this.rules.applyOps([set(momHelp(help.id), true)], {})
+    this.rules.applyOps([set(momHelp(help.id), true), ...(help.id === 'dacha' ? [set(momDachaAt, this.S.day)] : [])], {})
     this.adjustMoney(got, 'Мама')
     const done = !nextMom(this.S.mem)
     if (done) this.rules.applyOps([set(momDone, true)], {})
@@ -920,22 +987,22 @@ export class Game {
   }
   sys(text: string): Msg { return this.push({ kind: 'sys', text }) }
 
-  alikMsg<M extends NewMsg>(m: M): Msg {
+  alikMsg<M extends NewMsg>(m: M, claims?: readonly LedgerEvent[]): Msg {
     // персонаж написал сам — он в истории (intro) и игрок его встречал (met, для переклички в День выплаты)
     if (m.kind === 'text' && m.who) { this.S.mem[memkeys.met(m.who)] = true; this.S.mem[memkeys.intro(m.who)] = true }
     this.tick(1 + this.rnd(3))
-    const msg = this.noteAlik(this.push({ from: 'alik', time: fmtTime(this.S.clock), ...m } as NewMsg))
+    const msg = this.noteAlik(this.push({ from: 'alik', time: fmtTime(this.S.clock), ...m } as NewMsg), claims)
     this.audio.beep()
     this.audio.vibrate(40)
     if (this.chance(this.mooChance())) this.schedule(() => this.moo(), 300 + this.rnd(900))
     return msg
   }
 
-  /** Что сообщение Алика записывает в мир, каким бы путём ни пришло: день речи, заявления, упоминания, «брат джан». */
-  private noteAlik(msg: Msg): Msg {
+  /** Что сообщение Алика записывает в мир, каким бы путём ни пришло: день речи, события журнала, упоминания, «брат джан». */
+  private noteAlik(msg: Msg, claims?: readonly LedgerEvent[]): Msg {
     this.S.mem[memkeys.alikDay] = this.S.day
     if (msg.kind === 'text' && /брат джан/i.test(msg.text)) this.unlock('brat')
-    if (msg.kind === 'text' || msg.kind === 'photo') this.noteClaims(msg.text, msg.kind === 'text' ? msg.who : undefined)
+    if (claims?.length && (msg.kind === 'text' || msg.kind === 'photo')) this.noteClaims(claims, msg.kind === 'text' ? msg.who : undefined, msg.id)
     // хор: Алик кого-то упомянул — тот, может быть, вклинится после его ответа
     if (msg.kind === 'text' && !msg.who) {
       for (const [who, re] of Object.entries(MENTION_RE)) if (re.test(msg.text)) this.pending.push({ event: 'Mentioned', target: who })
@@ -972,7 +1039,8 @@ export class Game {
     const out: Msg[] = []
     for (const x of items) {
       let text = typeof x === 'string' ? x : x.t
-      const from = typeof x === 'string' ? who : x.w
+      const claims = typeof x === 'string' ? undefined : x.claims
+      const from = typeof x === 'string' ? who : 'w' in x ? x.w : who
       let fix: string | null = null
       if (!from && this.typos && this.chance(this.isNight() ? 0.2 : 0.06)) {
         const t = typo(text, this.rng, this.decks)
@@ -980,10 +1048,11 @@ export class Game {
       }
       await this.typingFor(600 + text.length * 22)
       if (this.disposed) throw new GameDisposed()
-      out.push(this.alikMsg({ kind: 'text', from: 'alik', text, legend, who: from }))
+      out.push(this.alikMsg({ kind: 'text', from: 'alik', text, legend, who: from }, claims))
       if (fix) {
         await this.typingFor(500)
         if (this.disposed) throw new GameDisposed()
+        // смысл уже опубликован исходным пузырём — исправление не создаёт вторую запись
         this.alikMsg({ kind: 'text', from: 'alik', text: fix })
         this.unlock('typo')
       }
@@ -1147,6 +1216,10 @@ export class Game {
         if (!this.adjustMoney(-spend, why, { group: 'По мелочи' })) this.bankLine('По мелочи', -spend, true)
       }
     } else {
+      // сумма в тексте как уже случившийся платёж — двигает баланс (#488)
+      if (n.charge != null && !this.moneySealed()) {
+        if (!this.adjustMoney(-n.charge, n.app, { group: n.app })) this.bankLine(n.app, -n.charge, true)
+      }
       this.notify(n.icon, n.app, p.text, { event: 'life' })
     }
     if (p.spec.remember) this.rules.applyOps(p.spec.remember, {})
@@ -1169,13 +1242,14 @@ export class Game {
   // ---------- факты для правил ----------
   availableArcs(): string[] {
     // when проверяем по mem+day, не через facts(): там arcAvailable → availableArcs
-    const slim = { ...this.S.mem, day: this.S.day }
+    const { mem, day } = this.S
+    const fact = (key: string) => key === 'day' ? day : Object.prototype.propertyIsEnumerable.call(mem, key) ? mem[key] : undefined
     return Object.keys(ARCS).filter((id) => {
       const a = ARCS[id]
       const st = this.S.arcs[id]
       if (st) return st.i < a.eps.length && this.S.day - st.last >= 3
       if (this.S.day < (a.minDay ?? 0)) return false
-      if (a.when?.length && !a.when.every((c) => test(c, slim))) return false
+      if (a.when?.length && !a.when.every((c) => test(c, fact))) return false
       return true
     })
   }
@@ -1228,7 +1302,12 @@ export class Game {
     const progress: Facts = {}
     for (const id in S.arcs) progress['arc.' + id] = S.arcs[id].i
     for (const k in S.ach) progress['ach.' + k] = true
-    for (const k in S.ach) progress['since.' + k] = S.day - S.ach[k]
+    for (const k in S.ach) {
+      const n = daysSince(S.day, S.ach[k])
+      if (n !== undefined) progress['since.' + k] = n
+    }
+    for (const c of S.ledger.claims) if (c.claimKey) progress['heard.' + c.claimKey] = true
+    const lie = this.lie()
     const moneyLv = this.moneyLevel()
     const whenDays = c.whenAt === undefined ? undefined : Math.max(0, c.whenAt - S.day)
     return {
@@ -1243,6 +1322,7 @@ export class Game {
         return false
       })(),
       dow: date.getDay(), month: date.getMonth() + 1, dom: date.getDate(),
+      [momDachaDays]: daysSince(S.day, S.mem[momDachaAt]),
       holiday: holidayOf(S.day) ?? false,
       ...progress,
       items: S.items.length,
@@ -1258,13 +1338,15 @@ export class Game {
       [memkeys.HEAT]: Math.max(0, Number(S.mem[memkeys.HEAT] ?? 0)),
       'has.boris': S.items.some((n) => /Борис/.test(n)),
       'has.niva': S.items.some((n) => /Нива/.test(n)),
+      // Машина игрока — один факт (#515): есть, пока не продана резина, и всегда, когда «Нива» у игрока (финал или бартер, #530)
+      'has.car': this.nivaAtPlayer() || S.mem[sold('tires')] === undefined,
       // Календарное обещание живо в день срока; событийное — в ход, когда его факт стал истиной.
       promiseLive: !!pr && (pr.condition ? pr.met === S.day : pr.due === S.day),
       // срок вышел: advanceTurnDay идёт раньше события срока и может перескочить день срока
       promisePassed: !!pr && (pr.condition ? pr.met !== undefined : pr.due != null && pr.due <= S.day),
       promiseStake: pr?.stake ?? false,
       period: this.period(), night: this.isNight(), offline: S.offlineDays > 0, scene: S.scene?.id,
-      sinceAlik: S.day - Number(S.mem[memkeys.alikDay] ?? S.day),
+      sinceAlik: daysSince(S.day, S.mem[memkeys.alikDay]),
       lateCount: this.lateCount(),
       somedayCount: S.promises.filter((p) => p.due == null && !p.condition).length,
       // сама — не больше одной серии в день: три легенды денег за день — уже не сюжет, а шум
@@ -1275,6 +1357,7 @@ export class Game {
       arcsDone: Object.entries(S.arcs).filter(([id, a]) => !ARCS[id].mechanic && a.i >= ARCS[id].eps.length).length,
       quests: Object.keys(S.ach).filter((k) => k.startsWith('q_')).length,
       callbackReady: !!this.callbackCandidate(),
+      lieOpen: !!lie, lieKind: lie?.kind ?? false, lieAlikOld: lie?.alikOld ?? false,
       arcUnfinished: this.unfinishedArc(),
       deathCanAdvance: !!S.mem[memkeys.alikDead] && this.arcCanAdvance('alik_death', true),
       'ctx.type': c.type, 'ctx.amount': c.amount, 'ctx.s': c.s, 'ctx.shortTimey': c.s ? TIMEY.test(c.s) : false,
@@ -1312,8 +1395,11 @@ export class Game {
     }
   }
   /** Реплики, за тему которых игрок может зацепиться (отмазка, серия, ответ по теме) — не реакции на крик и извинения. */
-  markTopical(msgs: Msg[]): void {
-    for (const m of msgs) if (m.kind === 'text') m.topical = true
+  markTopical(msgs: Msg[], topicTexts?: string[]): void {
+    for (const [i, m] of msgs.entries()) if (m.kind === 'text') {
+      m.topical = true
+      if (topicTexts?.[i] !== undefined) m.topicText = topicTexts[i]
+    }
   }
   /** Тема последней реплики самого Алика (после сообщения игрока): бетон, «Нива», свадьба… */
   topicOfLast(): string | undefined {
@@ -1324,7 +1410,7 @@ export class Game {
       if (m.who || m.deleted || !m.topical) continue
       // клятвы и сроки («Клянусь лавашом», «как бетон застынет») — не тема разговора
       if ((D.OATH as Entry<string>[]).some((o) => m.text.startsWith(valueOf(o)))) continue
-      let text = m.text
+      let text = m.topicText ?? m.text
       // срок в сообщении — не тема: «После обеда…» иначе цепляет еду; регистр и точка в конце не мешают
       for (const p of this.S.promises) text = text.replace(literalRe(p.t), '')
       text = text.replace(/^[.\s,;:!?…—–-]+|[.\s,;:!?…—–-]+$/g, '').trim()
@@ -1416,7 +1502,10 @@ export class Game {
       const lie = catchLie?.offer?.(this.rules.ctx(this, catchLie, { event: 'BuildChoices' }, this.facts()))
       const lieOpt = lie ? [lie] : []
       return [...lieOpt, ...(n.opts ?? []).map((o, i) => {
-        const gen = (): string => this.fillMoney(typeof o.t === 'function' ? o.t(S.scene!.vars) : Array.isArray(o.t) ? this.draw<string>(`${S.scene!.id}.${S.scene!.node}.o${i}`, o.t) : o.t)
+        const gen = (): string => {
+          const raw: string | Claimed = typeof o.t === 'function' ? o.t(S.scene!.vars) : Array.isArray(o.t) ? this.draw<string>(`${S.scene!.id}.${S.scene!.node}.o${i}`, o.t) : o.t
+          return this.fillMoney(typeof raw === 'string' ? raw : raw.t)
+        }
         const t = gen().length > 8 ? this.playerLine(gen) : gen()
         return { text: t, tone: o.tone ?? 'polite', scene: S.scene!.id, go: o.go } as Choice
       })]
@@ -1438,16 +1527,18 @@ export class Game {
     if (S.mem[memkeys.polite] && this.chance(0.6)) out.push({ text: one('P_POL_POLITE', P_POL_POLITE), tone: 'polite' })
     else {
       // бедность — своими словами: пул уровня без повторов, исчерпанный звучит редко (#184)
-      const poor = money && this.chance(level === 'bottom' ? 0.7 : 0.4) ? this.poorLine(`P_MONEY_${level}_POL`, money.polite) : null
-      out.push({ text: poor ?? P2('P_POL_A', 'P_POL_B'), tone: 'polite' })
+      const poor = money && this.chance(level === 'bottom' ? 0.7 : 0.4) ? this.poorChoice(`P_MONEY_${level}_POL`, money.polite) : null
+      const arg = poor && typeof poor.value !== 'string' ? poor.value.arg : undefined
+      // любая реплика о своих деньгах несёт намерение: ответ на неё — раньше фоновых последствий (#459)
+      out.push({ text: poor?.text ?? P2('P_POL_A', 'P_POL_B'), tone: 'polite', ...(poor ? { act: 'desperate', arg } : {}) })
     }
     if (out.length < 3) {
       const period = this.period()
       // отчаяние — своё намерение, чаще на дне; вежливый вариант выше остаётся при любом уровне
-      const cry = money && level && this.chance(level === 'bottom' ? 0.6 : 0.3) ? this.poorLine(`P_DESPERATE_${level}`, P_DESPERATE[level], { act: true }) : null
-      const poor = !cry && money && this.chance(0.5) ? this.poorLine(`P_MONEY_${level}_NEU`, money.neutral) : null
-      if (cry) out.push({ text: cry, tone: 'neutral', act: 'desperate' })
-      else if (poor) out.push({ text: poor, tone: 'neutral' })
+      const cry = money && level && this.chance(level === 'bottom' ? 0.6 : 0.3) ? this.poorChoice(`P_DESPERATE_${level}`, P_DESPERATE[level], { act: true }) : null
+      const poor = !cry && money && this.chance(0.5) ? this.poorChoice<PoorText>(`P_MONEY_${level}_NEU`, money.neutral) : null
+      if (cry) out.push({ text: cry.text, tone: 'neutral', act: 'desperate', arg: typeof cry.value === 'string' ? 'shout' : cry.value.arg })
+      else if (poor) out.push({ text: poor.text, tone: 'neutral', act: 'desperate', arg: typeof poor.value === 'string' ? undefined : poor.value.arg })
       else {
       // нейтральная реплика знает время: ночь, вечер пятницы, поздние дни ожидания
       const tail = period === 'night' && this.chance(0.5) ? this.freshPlayer('P_NIGHT', P_NIGHT)
@@ -1512,7 +1603,6 @@ export class Game {
     this.clearSchedule(this.idleT)
     this.idleCount = 0
     this.clearUnread()
-    if (o.act !== 'catchLie') this.forgetLie() // не поймал сразу — момент упущен
     let tone = o.tone
     // Готовая кнопка может быть помечена как rude, но текст с судом всё равно двигает ветку угроз.
     if (tone === 'rude' && !o.scene && this.classifyInput(o.text).category === 'threat') tone = 'threat'
@@ -1788,7 +1878,7 @@ export class Game {
     this.meetRel(ex.r)
     this.recordPromise(ex.p)
     const msgs = await this.say(ex.texts, ex.legendary)
-    this.markTopical(msgs)
+    this.markTopical(msgs, ex.topicTexts)
     this.S.ctx = {
       ...this.ctxFromPromise(ex.p), rel: ex.r, constr: ex.constr, legendary: ex.legendary,
       sad: SAD.test(ex.ev ?? ''), revived: REVIVED.test(ex.ev ?? ''), festive: !SAD.test(ex.ev ?? '') && FESTIVE.test(ex.ev ?? ''),
@@ -1821,7 +1911,8 @@ export class Game {
 
   async photo(): Promise<void> {
     await this.typingFor(2500)
-    this.alikMsg({ kind: 'photo', from: 'alik', text: this.uniq(() => `${this.draw('PHOTOTXT', PHOTO_A)} ${this.draw('PHOTOTX2', PHOTO_B)}`) })
+    const text = this.uniq(() => saidJoin(this.draw('PHOTOTXT', PHOTO_A), ' ', this.draw('PHOTOTX2', PHOTO_B)))
+    this.alikMsg({ kind: 'photo', from: 'alik', text: saidText(text) }, saidClaims(text))
     this.S.ctx = { type: 'photo' }
   }
 
@@ -1909,11 +2000,12 @@ export class Game {
     const members = shuffle(this.rng, Object.keys(GROUP).filter((w) => this.canSpeak(w))).slice(0, 4 + this.rnd(3))
     const said: string[] = []
     for (const w of members) {
-      const t = this.seen.pickFresh(() => this.draw('G_' + w, GROUP[w]), (x) => x)
+      const x = this.seen.pickFresh(() => this.draw('G_' + w, GROUP[w]), (y) => y)
+      const t = saidText(x)
       if (this.seen.has(t)) continue // у участника кончились новые фразы — в этот раз молчит
       this.seen.mark(t)
       said.push(t)
-      await this.say([{ w, t }])
+      await this.say([{ w, t, claims: saidClaims(x) }])
     }
     await this.say([this.uniq(() => this.draw('GOOPS', GROUP_OOPS))])
     this.sys('Алик удалил вас из группы')
@@ -1923,7 +2015,7 @@ export class Game {
   }
 
   async wrongChat(): Promise<void> {
-    await this.say([this.uniq(() => `${this.draw('WTO', WRONG_TO)}, ${this.draw('WWHAT', WRONG_WHAT)}.`)])
+    await this.say([this.uniq(() => saidJoin(this.draw('WTO', WRONG_TO), ', ', this.draw('WWHAT', WRONG_WHAT), '.'))])
     await this.sleep(900)
     await this.say([this.uniq(() => this.draw('WOOPS', WRONG_OOPS))])
     this.unlock('wrong')
@@ -1937,42 +2029,46 @@ export class Game {
   }
 
   // ---------- бухгалтерия лжи ----------
-  /** Запомнить, что Алик «заявил»; если это противоречит сказанному раньше — дать игроку поймать его. */
-  noteClaims(text: string, who?: string): void {
-    const mem = this.S.mem
-    const found = CLAIMS.filter((c) => c.re.test(text))
-    for (const c of found) {
-      // где деньги — меняется по сюжету: противоречие ловится, только если старое место звучало недавно (не «Нива» полгода назад)
-      const fresh = (o: Claim) => o.group !== 'money' || this.S.day - Number(mem[memkeys.saidLast(o.key)] ?? mem[memkeys.said(o.key)]) <= 14
-      const old = CLAIMS.find((o) => mem[memkeys.said(o.key)] !== undefined && conflicts(o.key, c.key) && !mem[memkeys.caughtPair(o.key, c.key)] && fresh(o))
-      if (old) {
-        mem[memkeys.lie.old] = old.key
-        mem[memkeys.lie.new] = c.key
-        // «вы же говорили» — только если прошлую версию сказал сам Алик, а не родня в семейном чате
-        mem[memkeys.lie.alikOld] = mem[memkeys.byClaim(old.key)] === undefined || mem[memkeys.byClaim(old.key)] === 'alik'
-        mem[memkeys.lie.kind] = old.group === 'money' ? 'money' : ({ grandpa_dead: 'grandpa', grandpa_alive: 'grandpa', customer_owes: 'customer', customer_paid: 'customer', sent: 'sent', no_money: 'sent' } as Record<string, string>)[c.key] ?? 'other'
+  /** Показанная реплика публикует события журнала по порядку (docs/design/lie-ledger.md). */
+  noteClaims(claims: readonly LedgerEvent[], who?: string, msgId?: number): void {
+    const source = who && isWhoId(who) ? who : 'alik'
+    for (const event of claims) {
+      if (typeof event === 'string') {
+        const point = CLAIM_LEDGER[event]
+        publishClaim(this.S.ledger, point.subject, point.value, { source, day: this.S.day, msgId, claimKey: event })
+      } else if ('retract' in event) {
+        const point = CLAIM_LEDGER[event.retract]
+        publishRetraction(this.S.ledger, point.subject, point.value, { source, day: this.S.day, msgId })
+      } else {
+        const to = CLAIM_LEDGER[event.move.to]
+        const from = event.move.from === 'active' ? activeClaim(this.S.ledger, to.subject) : CLAIM_LEDGER[event.move.from]
+        if (from && from.subject !== to.subject) throw new Error(`Переход между разными предметами: ${event.move.from} → ${event.move.to}`)
+        if (from && from.value !== to.value) publishTransition(this.S.ledger, to.subject, from.value as typeof to.value, to.value, { source, day: this.S.day, msgId })
       }
     }
-    for (const c of found) {
-      if (mem[memkeys.said(c.key)] === undefined) mem[memkeys.said(c.key)] = this.S.day
-      mem[memkeys.saidLast(c.key)] = this.S.day
-      mem[memkeys.byClaim(c.key)] = who ?? 'alik'
-    }
   }
-  lie(): { old: Claim; new: Claim } | null {
-    const o = claimByKey(String(this.S.mem[memkeys.lie.old] ?? '')), n = claimByKey(String(this.S.mem[memkeys.lie.new] ?? ''))
-    return o && n ? { old: o, new: n } : null
+  /** Семантика Said для sys-строк сцен: публикация в журнал с источником. */
+  noteSaidClaims(x: Said, msgId?: number, who?: string): void {
+    this.noteClaims(saidClaims(x), who, msgId)
   }
-  forgetLie(): void {
-    delete this.S.mem[memkeys.lie.old]
-    delete this.S.mem[memkeys.lie.new]
-    delete this.S.mem[memkeys.lie.kind]
+  /** Новейший открытый эпизод противоречия: две версии, тема и чья была прошлая. */
+  lie(): { old: Claim; new: Claim; kind: LieKind; alikOld: boolean } | null {
+    const ep = currentEpisode(this.S.ledger)
+    if (!ep) return null
+    const a = this.S.ledger.claims.find((c) => c.id === ep.aClaim)
+    const b = this.S.ledger.claims.find((c) => c.id === ep.bClaim)
+    if (!a || !b) return null
+    const ok = a.claimKey ?? claimKeyOf(a.subject, a.value)
+    const nk = b.claimKey ?? claimKeyOf(b.subject, b.value)
+    const o = ok ? claimByKey(ok) : undefined, n = nk ? claimByKey(nk) : undefined
+    if (!o || !n) return null
+    const kind: LieKind = ep.subject === 'grandpa.life' ? 'grandpa' : ep.subject === 'customer.payment' ? 'customer' : 'money'
+    // «вы же говорили» — только про версию самого Алика; прошлую могла сказать и родня
+    return { old: o, new: n, kind, alikOld: a.source === 'alik' }
   }
-  /** Алик пойман: запомнить пару, отдать реплику, счётчик растёт. */
   async caught(line: string): Promise<void> {
-    const l = this.lie()
-    if (l) this.S.mem[memkeys.caughtPair(l.old.key, l.new.key)] = true
-    this.forgetLie()
+    const ep = currentEpisode(this.S.ledger)
+    if (ep) closeEpisode(this.S.ledger, ep.id, 'caught')
     const n = Number(this.S.mem[memkeys.caughtCount] ?? 0)
     this.unlock('liar')
     if (n >= 3) this.unlock('liar3')
@@ -1980,13 +2076,12 @@ export class Game {
     await this.say([line])
     this.S.ctx = null
   }
-  /** Утверждение, к которому Алик может сам вернуться: сказано 10+ дней назад, ещё не вспоминал. */
+  /** Утверждение, к которому Алик может сам вернуться: сам сказал 10+ дней назад, ещё не вспоминал. */
   callbackCandidate(): Claim | undefined {
-    const mem = this.S.mem
-    // «помнишь, я говорил» — только своё; версию из семейного чата (Гарик) себе не приписывает
-    return CLAIMS.find((c) => c.updates && mem[memkeys.said(c.key)] !== undefined
-      && (mem[memkeys.byClaim(c.key)] === undefined || mem[memkeys.byClaim(c.key)] === 'alik')
-      && this.S.day - Number(mem[memkeys.said(c.key)]) >= 10 && !mem[memkeys.cb(c.key)])
+    // «помнишь, я говорил» — только своё: слова родни и Гранта Алик себе не приписывает
+    const first = new Map<ClaimKey, number>()
+    for (const r of this.S.ledger.claims) if (r.source === 'alik' && r.claimKey && !first.has(r.claimKey)) first.set(r.claimKey, r.day)
+    return CLAIMS.find((c) => c.updates && first.has(c.key) && this.S.day - first.get(c.key)! >= 10 && !this.S.mem[memkeys.cb(c.key)])
   }
   async callback(): Promise<void> {
     const c = this.callbackCandidate()
@@ -1994,7 +2089,7 @@ export class Game {
     const upd = c && this.decks.pick('CB_' + c.key, c.updates!, this.lineFacts())
     if (!c || !upd) return this.excuseTurn()
     this.S.mem[memkeys.cb(c.key)] = this.S.day
-    await this.say([this.uniq(() => `${this.X.g('ADDR')}, ${this.draw('CB_OPEN', CALLBACK_OPEN)} ${c.say}? ${upd}`)])
+    await this.say([{ t: this.uniq(() => `${this.X.g('ADDR')}, ${this.draw('CB_OPEN', CALLBACK_OPEN)} ${c.say}? ${upd}`), claims: [c.key] }])
     this.unlock('memory')
     await this.promiseLine()
   }
@@ -2022,7 +2117,6 @@ export class Game {
     await this.playEpisode(ep, id)
   }
   async playEpisode(ep: Episode, arc?: string): Promise<void> {
-    if (ep.remember) this.rules.applyOps(ep.remember, {})
     if (ep.legend !== undefined) this.setLegend(ep.legend, arc)
     // серия без своей легенды возвращает легенду своего сериала: свадьба идёт — значит, деньги «после свадьбы»; гейт клятвы возврат не открывает (#327)
     else if (arc && this.S.mem[memkeys.legendOf(arc)]) this.setLegend(String(this.S.mem[memkeys.legendOf(arc)]), arc, false)
@@ -2038,6 +2132,7 @@ export class Game {
     }
     if (debtFx) (this.S.ctx ??= {}).debtMoved = debtMoved
     const m = this.open(ep.m)
+    if (ep.remember) this.rules.applyOps(ep.remember, {})
     if (this.S.ctx) {
       delete this.S.ctx.debtMoved
       if (!Object.keys(this.S.ctx).length) this.S.ctx = null
@@ -2098,7 +2193,7 @@ export class Game {
     return this.finaleOf(id)?.title ?? DEFAULT_FINALE[id]
   }
   /** Ответы на «Как там…?» после финала — свои у каждого финала. */
-  arcDoneLines(id: string): readonly Entry<string>[] {
+  arcDoneLines(id: string): readonly Entry<Said>[] {
     return this.finaleOf(id)?.done ?? ARC_DONE[id]
   }
 
@@ -2107,7 +2202,7 @@ export class Game {
   async tribunal(): Promise<void> {
     await this.sleep(600)
     this.sys('Дядя Самвел добавил вас в группу «Стройка под ключ 🏗️ Семья». Тема: «Дело №1. Плиточник против уважения»')
-    for (const [w, t] of this.open(TRIBUNAL)) await this.say([{ w, t }])
+    for (const [w, said] of this.open(TRIBUNAL)) await this.say([{ w, t: saidText(said), claims: saidClaims(said) }])
     const yes = this.holds(WORLD.garik) ? '1 (Гарик)' : '1 (кто-то из родни)'
     this.sys(`Голосование «Простить плиточника?» — Да: ${yes}. Нет: ${5 + this.rnd(4)}.${this.canSpeak('boris') ? ' Бее: 1.' : ''}`)
     await this.enterNode('tribunal', 'verdict')
@@ -2315,7 +2410,7 @@ export class Game {
   }
 
   /** Очередной закрывающий акт (на круглом счёте — и юбилей); счёт актов растёт здесь. */
-  formalityLines(): string[] {
+  formalityLines(): Said[] {
     const n = Number(this.S.mem[memkeys.endgame.forms] ?? 0) + 1
     this.S.mem[memkeys.endgame.forms] = n
     const jubilee = ENDGAME_JUBILEES[n]
@@ -2345,8 +2440,11 @@ export class Game {
     S.scene.node = nid
     const n = sc.nodes[nid]
     const v = S.scene.vars
-    const res = (x: Line) => this.fillMoney(typeof x === 'function' ? x(v) : x)
-    const gen = (key: string, arr: Line | Entry<Line>[]) => () => res(Array.isArray(arr) ? this.draw(`${sid}.${nid}.${key}`, arr) : arr)
+    const res = (x: Line): Said => {
+      const r = typeof x === 'function' ? x(v) : x
+      return typeof r === 'string' ? this.fillMoney(r) : { ...r, t: this.fillMoney(r.t) }
+    }
+    const gen = (key: string, arr: Line | Entry<Line>[]): (() => Said) => () => res(Array.isArray(arr) ? this.draw(`${sid}.${nid}.${key}`, arr) : arr)
     const variant = (key: string, arr: Entry<Line>[]) => this.uniq(gen(key, arr))
 
     const fx = n.fx ?? {}
@@ -2372,7 +2470,12 @@ export class Game {
     if (fx.legend !== undefined) this.setLegend(fx.legend)
     if (fx.set) this.rules.applyOps(Object.entries(fx.set).map(([key, value]) => ({ key, op: '=' as const, value })), {})
     if (fx.during) this.rules.applyOps([{ key: fx.during.key, op: '=', value: true, forDays: fx.during.days }], {})
-    if (n.sys && (!debtFx || debtMoved)) { await this.sleep(700); this.sys(gen('sys', n.sys)()) }
+    if (n.sys && (!debtFx || debtMoved)) {
+      await this.sleep(700)
+      const s = gen('sys', n.sys)()
+      const m = this.sys(saidText(s))
+      this.noteSaidClaims(s, m.id, n.claimsWho)
+    }
     // перевод не прошёл или долг запечатан — Алик не объявляет счёт, которого не было (#252, #266)
     if (n.a && (!pays || paid) && (!debtFx || debtMoved)) await this.say([n.who ? gen('a', n.a)() : variant('a', n.a)], false, n.who)
     if (n.doc) {
@@ -2384,7 +2487,12 @@ export class Game {
       if (invoiced) this.sys(`Алик вычел из долга ${v.total.toLocaleString('ru-RU')} ₽ по акту.`)
     }
     if (n.a2) await this.say([n.who2 ? gen('a2', n.a2)() : variant('a2', n.a2)], false, n.who2)
-    if (n.sys2) { await this.sleep(700); this.sys(gen('sys2', n.sys2)()) }
+    if (n.sys2) {
+      await this.sleep(700)
+      const s = gen('sys2', n.sys2)()
+      const m = this.sys(saidText(s))
+      this.noteSaidClaims(s, m.id, n.claimsWho)
+    }
     // шаг, собранный на лету (День выплаты); если шаг перевёл сцену в другой узел — дальше управляет он
     if (n.hook) { await PAYDAY_HOOKS[n.hook]?.(this); if (S.scene?.id !== sid || S.scene?.node !== nid) return }
     if (n.then === 'moo') { await this.sleep(400); this.moo() }
@@ -2515,9 +2623,13 @@ export class Game {
    * false — пул исчерпан, правило промолчало.
    */
   awayMsg(kind: AwayKind): boolean | void {
-    const deliver = (m: NewMsg) => this.noteAlik(this.push({ from: 'alik', time: fmtTime(this.S.clock), ...m } as NewMsg))
+    const deliver = (m: NewMsg, claims?: readonly LedgerEvent[]) => this.noteAlik(this.push({ from: 'alik', time: fmtTime(this.S.clock), ...m } as NewMsg), claims)
     switch (kind) {
-      case 'text': deliver({ kind: 'text', from: 'alik', text: this.addrLine('IDLE', L.IDLE) }); return
+      case 'text': {
+        const line = this.addrSaidLine('IDLE', L.IDLE)
+        deliver({ kind: 'text', from: 'alik', text: saidText(line) }, saidClaims(line))
+        return
+      }
       case 'sticker': { const s = this.draw('STICKERS', L.STICKERS); deliver({ kind: 'sticker', from: 'alik', e: s.e, c: s.c }); return }
       case 'fwd': {
         const { key, pool } = this.fwdPool()
@@ -2534,7 +2646,7 @@ export class Game {
         this.noteAlikPay(50)
         deliver({ kind: 'transfer', from: 'alik', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE), amount: 50 })
         return
-      case 'formality': for (const text of this.formalityLines()) deliver({ kind: 'text', from: 'alik', text }); return
+      case 'formality': for (const text of this.formalityLines()) deliver({ kind: 'text', from: 'alik', text: saidText(text) }, saidClaims(text)); return
       case 'coldWar': {
         const text = this.decks.pick('COLD_WAR', COLD_WAR, this.lineFacts(), { mode: 'sequential', noRepeat: true })
         if (!text) return false
@@ -2556,7 +2668,8 @@ export class Game {
         const ex = this.uniq(() => this.X.excuse())
         this.meetRel(ex.r)
         this.recordPromise(ex.p)
-        deliver({ kind: 'text', from: 'alik', text: ex.texts.join(' ') })
+        const text = saidJoin(...ex.texts)
+        deliver({ kind: 'text', from: 'alik', text: saidText(text) }, saidClaims(text))
       }
     }
   }

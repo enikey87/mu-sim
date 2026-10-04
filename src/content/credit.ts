@@ -1,5 +1,6 @@
 // Кредитная лестница, проданные вещи и мама-запаска (docs/design/money.md, MVP 3).
 import type { Due } from '../engine/time'
+import { registerDaysSince } from '../engine/rules/days-since'
 
 export type LoanId = 'consumer' | 'refi' | 'micro'
 export type ThingId = 'microwave' | 'guitar' | 'tile' | 'tires'
@@ -52,7 +53,7 @@ export const THINGS: readonly Thing[] = [
   { id: 'microwave', amount: 4500, choice: 'Продать микроволновку', done: 'Микроволновку забрали. Разогревать больше нечего' },
   { id: 'guitar', amount: 7000, choice: 'Продать гитару', done: 'Гитару увезли. Струны ещё звучали в подъезде' },
   { id: 'tile', amount: 3500, choice: 'Продать плитку с объекта Алика', done: 'Плитку с объекта Алика продали. Он сказал «это была твоя»' },
-  { id: 'tires', amount: 9000, choice: 'Продать зимнюю резину', done: 'Зимнюю резину продали. Летом. Машины у вас нет' },
+  { id: 'tires', amount: 9000, choice: 'Продать зимнюю резину', done: 'Зимнюю резину продали. Машины у вас нет' },
 ]
 
 export const MOM_HELPS: readonly MomHelp[] = [
@@ -68,6 +69,11 @@ export const creditStage = 'credit.stage'
 export const creditOffer = 'credit.offer'
 export const creditBroke = 'credit.broke'
 export const momDone = 'mom.done'
+export const momDachaAt = 'mom.dacha.at'
+/** Дней с продажи дачи — счётчик без события не читается как 0 (#496). */
+export const momDachaDays = 'mom.dacha.days'
+registerDaysSince(momDachaDays, momDachaAt)
+
 /** «Не сейчас» в карточке: банк повторит предложение только по новой причине (отказ, падение уровня). */
 export const creditDeclined = 'credit.declined'
 

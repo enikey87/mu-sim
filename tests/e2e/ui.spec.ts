@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
-  // ?nointro — интро новой партии ~12 с анимации, e2e не должны её ждать
+  // ?nointro — интро новой партии ~10 с анимации, e2e не должны её ждать
   await page.goto('/?fast&nointro')
   await expect(page.locator('.chat-head .name')).toHaveText('Алик Воздухонесян')
 })
@@ -217,4 +217,57 @@ test('сброс во время ответа Алика: старая парт�
   await page.waitForTimeout(800)
   await expect(page.locator('.msg')).toHaveCount(introCount)
   await expect(page.locator('#debt')).toHaveText(/240\s000 ₽/)
+})
+
+test('интро: строки затухают без обрыва и не накладываются на титул (#517)', async ({ page }) => {
+  await page.addInitScript(() => localStorage.clear())
+  await page.goto('/?fast')
+  const intro = page.locator('.intro')
+  await expect(intro).toBeVisible({ timeout: 10_000 })
+  const hint = page.getByText('Коснитесь, чтобы начать')
+  if (await hint.isVisible()) await intro.click()
+  await expect(page.locator('.intro-line.on')).toBeVisible()
+
+  const probe = await page.evaluate(async () => {
+    const previous = new WeakMap<HTMLElement, number>()
+    const outgoing = new Set<string>()
+    let maxVisible = 0
+    let maxOutDrop = 0
+    let outSamples = 0
+    let titleFrames = 0
+    let frames = 0
+    const start = performance.now()
+    while (performance.now() - start < 11_000) {
+      const lines = [...document.querySelectorAll('.intro-line')] as HTMLElement[]
+      let visible = 0
+      for (const el of lines) {
+        const o = parseFloat(getComputedStyle(el).opacity)
+        if (!Number.isFinite(o)) continue
+        if (o > 0.08) visible++
+        if (el.dataset.phase === 'out') {
+          outgoing.add(el.textContent ?? '')
+          const before = previous.get(el)
+          if (before !== undefined) {
+            maxOutDrop = Math.max(maxOutDrop, before - o)
+            outSamples++
+          }
+        }
+        previous.set(el, o)
+      }
+      const title = document.querySelector('.intro-title') as HTMLElement | null
+      if (title && parseFloat(getComputedStyle(title).opacity) > 0.08) { visible++; titleFrames++ }
+      maxVisible = Math.max(maxVisible, visible)
+      frames++
+      if (!document.querySelector('.intro')) break
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    }
+    return { maxVisible, maxOutDrop, outSamples, outgoing: outgoing.size, titleFrames, frames }
+  })
+
+  expect(probe.frames).toBeGreaterThan(100)
+  expect(probe.outgoing).toBe(4)
+  expect(probe.outSamples).toBeGreaterThan(20)
+  expect(probe.titleFrames).toBeGreaterThan(5)
+  expect(probe.maxOutDrop, 'резкий обрыв уходящей строки').toBeLessThan(0.75)
+  expect(probe.maxVisible, 'строка поверх строки или титула').toBeLessThanOrEqual(1)
 })

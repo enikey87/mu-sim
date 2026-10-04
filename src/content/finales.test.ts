@@ -49,7 +49,7 @@ describe('финалы сериалов: контент', () => {
         expect(ACH[f.fx?.ach ?? ''], `${arc}.${f.id} ach`).toBeDefined()
         expect(ACH[`fin_${arc}_${f.id}`]).toBeDefined()
         expect(SETUP[`${arc}.${f.id}`], `нет теста на ${arc}.${f.id}`).toBeDefined()
-        for (const m of f.m.map(valueOf)) if (typeof m !== 'string') expect(CAST[m.w], m.w).toBeDefined()
+        for (const m of f.m.map(valueOf)) if (typeof m !== 'string' && 'w' in m) expect(CAST[m.w], m.w).toBeDefined()
       }
     }
   })
@@ -69,9 +69,11 @@ describe('финалы сериалов: выбор', () => {
       game.S.day = 300
       game.S.mem['asked.alik_death'] = 1 // иначе у похорон «Обиделся»
       toLast(game, id)
+      const expected = fitting(game, ARCS[id].eps.at(-1)!)
+      if (id !== 'alik_death') expect(expected.length, `${id}: нет уместной строки`).toBeGreaterThan(0)
       const from = game.S.msgs.length
       await game.playArc(id)
-      expect(said(game, from), id).toEqual(expect.arrayContaining(fitting(game, ARCS[id].eps.at(-1)!)))
+      expect(said(game, from), id).toEqual(expect.arrayContaining(expected))
       expect(game.S.mem['finale.' + id]).toBe('default')
       expect(game.finaleTitle(id)).toBe(DEFAULT_FINALE[id])
       expect(game.arcDoneLines(id)).toBe(ARC_DONE[id])
@@ -85,10 +87,12 @@ describe('финалы сериалов: выбор', () => {
         game.S.day = 300
         SETUP[`${arc}.${f.id}`](game)
         toLast(game, arc)
+        const expected = fitting(game, f)
         const from = game.S.msgs.length
         await game.playArc(arc)
         expect(game.S.mem['finale.' + arc], `${arc}.${f.id}`).toBe(f.id)
-        expect(said(game, from)).toEqual(expect.arrayContaining(fitting(game, f)))
+        expect(said(game, from).length, `${arc}.${f.id}: финал промолчал`).toBeGreaterThan(0)
+        expect(said(game, from)).toEqual(expect.arrayContaining(expected))
         expect(game.S.ach[`fin_${arc}_${f.id}`]).toBeDefined()
         expect(game.S.ach[f.fx!.ach!]).toBeDefined()
         expect(game.finaleTitle(arc)).toBe(f.title)
@@ -269,11 +273,13 @@ describe('новые сериалы: фундамент, Рубик, Разми�
     expect(b.S.mem['finale.razmik']).toBe('shift')
     expect(b.S.debt).toBe(debt + 6000)
   })
-  it('«деньги в фундаменте» противоречит «банке с огурцами»', () => {
+  it('рассказ о конверте объясняет переход из банки в фундамент', async () => {
     const { game } = makeGame()
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в банке с огурцами.' })
-    game.alikMsg({ kind: 'text', from: 'alik', text: lines(ARCS.beton.eps[0])[1] })
-    expect(game.S.mem['lie.old']).toBe('money_jar')
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в банке с огурцами.' }, ['money_jar'])
+    await game.playEpisode(ARCS.beton.eps[0], 'beton')
+    expect(game.S.ledger.transitions).toContainEqual(expect.objectContaining({ subject: 'money.location', from: 'bank', to: 'foundation' }))
+    expect(game.lie()).toBeNull()
+    expect(game.facts().lieOpen).toBe(false)
   })
 })
 

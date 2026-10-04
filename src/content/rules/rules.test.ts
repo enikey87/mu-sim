@@ -6,6 +6,7 @@ import type { Game } from '../../engine/game'
 import type { Choice, Ctx } from '../../engine/state'
 import { D } from '../excuses'
 import { ARCS, ARC_DONE } from '../arcs'
+import { saidText } from '../fact'
 import { RUDE_AGAIN, SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, SWING } from '../misc'
 
 const rel = { n: 'дядя Самвел', g: 'дяди Самвела' }
@@ -209,7 +210,7 @@ describe('ответы Алика (PlayerSays)', () => {
     const { game } = makeGame()
     game.S.arcs.boris = { i: ARCS.boris.eps.length, last: 0 }
     const t = await reply(game, { text: 'Как там Борис?', tone: 'polite', act: 'arc', arg: 'boris' })
-    expect(oneOf(ARC_DONE.boris.map(frag), t.join(' '))).toBe(true)
+    expect(oneOf(ARC_DONE.boris.map((s) => frag(saidText(s))), t.join(' '))).toBe(true)
   })
   it('сериал не закончился — следующая серия', async () => {
     const { game } = makeGame()
@@ -320,7 +321,8 @@ describe('ход Алика (AlikTurn): веса как в оригинале', 
     const { game } = makeGame({ seed: 5 })
     const f = { ...game.facts(), sent: 20, arcAvailable: true, arcsStarted: 3, mood: 5 } // сериалы уже идут — без «первого сериала»
     const n: Record<string, number> = {}
-    const N = 6000
+    // доля Turn_Scene ≈ 0,094 при пороге 0,09: на 6000 ходах шум (σ ≈ 0,004) решал исход по сиду
+    const N = 72000
     for (let i = 0; i < N; i++) { const r = game.rules.match({ event: 'AlikTurn' }, f)!.name; n[r] = (n[r] ?? 0) + 1 }
     const p = (k: string) => (n[k] ?? 0) / N
     expect(p('Turn_Excuse')).toBeGreaterThan(0.12)

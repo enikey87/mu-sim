@@ -4,15 +4,16 @@
 // go: 'node' | 'scene:node' | null (конец). Нет opts — сцена закончилась.
 import type { ExcuseApi } from './excuses'
 import type { Rng } from '../engine/rng'
-import { type Entry, gate, is, missing, gte, lte, valueOf } from './fact'
+import { type Entry, type Claimed, gate, is, missing, gte, lte, valueOf } from './fact'
+import { saidJoin, saidMap } from './fact'
 import { needs, WORLD } from './world'
 import { QUESTS, COURT_SCENE } from './quests'
 import { PAYDAY_SCENE } from './payday'
-import { HEAT, bathAsked, blocked, cardSent, intro, polite, ritualCount, ritualCut } from './memkeys'
+import { HEAT, bathAsked, blocked, cardSent, grantPaid, intro, karineKnowsDebt, karineThinksTax, polite, ritualCount, ritualCut } from './memkeys'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- форма переменных задаётся сценой
 export type Vars = Record<string, any>
-export type Line = string | ((v: Vars) => string)
+export type Line = string | Claimed | ((v: Vars) => string | Claimed)
 export interface SceneOpt { t: Line | Entry<string>[]; go: string | null; tone?: 'polite' | 'neutral' | 'rude' }
 export interface SceneFx {
   days?: number; debt?: number; money?: number; mood?: number; ach?: string; barter?: boolean; invoice?: boolean
@@ -24,6 +25,8 @@ export interface SceneFx {
 export interface SceneNode {
   a?: Entry<Line>[]; a2?: Entry<Line>[]; who?: string; who2?: string
   sys?: Line | Entry<Line>[]; sys2?: Line | Entry<Line>[]
+  /** Источник явных claims sys/sys2 (например, «Я Алику всё заплатил» — говорит Грант). */
+  claimsWho?: string
   fx?: SceneFx; doc?: boolean
   then?: 'promise' | 'transfer' | 'moo'
   /** Шаг, который собирается на лету (например, «утро Дня выплаты» из событий партии). */
@@ -50,7 +53,7 @@ export interface Scene { start: string; init?: (rng: Rng, open: <T>(arr: readonl
 // до сериала «Баран Борис» баран ещё без имени: иначе сериал потом «знакомит» с Борисом второй раз
 const REDO = [
   {
-    claim: 'Сынок, беда. Заказчик говорит, плитка отвалилась. Пока не переделаешь — денег нет.',
+    claim: { t: 'Сынок, беда. Заказчик говорит, плитка отвалилась. Пока не переделаешь — денег нет.', claims: ['no_money'] },
     maybe: 'Всё может отвалиться, брат. Даже я от тебя. Съезди посмотри.',
     seen: 'Плитка на месте. Идеально ровная.',
     fine: 'Алик, плитка на месте!',
@@ -109,7 +112,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
           fx: { days: 1, ach: 'meet' },
           sys: [needs('baran')('Вы прождали у объекта 3 часа. Алика нет. Зато пришёл баран.'), 'Вы прождали у объекта до темноты. Сторож угостил вас чаем и спросил, кого вы ждёте. Узнав, долго смеялся.'],
           a: [
-            () => `${A()}, прости! ${X.reason()}. Я был рядом, видел тебя издалека!`,
+            () => saidJoin(`${A()}, прости! `, X.reason(), '. Я был рядом, видел тебя издалека!'),
             () => 'Я приезжал! Ты, наверное, у другого объекта стоял. У меня их шесть.',
             () => `Брат, я подъехал, а там ты грустный стоишь. Не стал мешать.`,
           ],
@@ -153,7 +156,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
         },
         home2: { a: [() => `${A()}, какие деньги после хаша? Это неуважение к хашу!`, 'Эээ, после хаша о деньгах не говорят. Это у нас закон.'], then: 'promise' },
         transfer_pls: {
-          a: [() => `Переводы — это ненадёжно, брат. Я только наличными. А с наличными — ${low(X.reason())}.`, 'На карту нельзя, налоговая смотрит. А наличные у тёщи.'],
+          a: [() => saidJoin('Переводы — это ненадёжно, брат. Я только наличными. А с наличными — ', saidMap(X.reason(), low), '.'), 'На карту нельзя, налоговая смотрит. А наличные у тёщи.'],
           then: 'promise',
         },
       },
@@ -251,15 +254,16 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
       start: 'ask',
       nodes: {
         ask: {
-          a: [() => `${A()}, заказчик мне не платит. Позвони ему сам, скажи, что от меня. Номер скину.`],
+          a: [() => ({ t: `${A()}, заказчик мне не платит. Позвони ему сам, скажи, что от меня. Номер скину.`, claims: ['customer_owes'] })],
           opts: [
             { t: 'Звоню', go: 'call' },
             { t: 'Это ваш заказчик, не мой', go: 'notmine' },
           ],
         },
         call: {
-          fx: { ach: 'customer' },
-          sys: ['Вы звоните заказчику… Заказчик: «Я Алику всё заплатил ещё в марте. Наличными. В мешке. При свидетелях».', 'Вы звоните заказчику… Заказчик: «Алик? Я ему заплатил дважды, второй раз — за то, чтобы он больше не звонил».'],
+          fx: { ach: 'customer', set: { [grantPaid]: true } },
+          claimsWho: 'grant',
+          sys: [{ t: 'Вы звоните заказчику… Заказчик: «Я Алику всё заплатил ещё в марте. Наличными. В мешке. При свидетелях».', claims: ['customer_paid'] }, { t: 'Вы звоните заказчику… Заказчик: «Алик? Я ему заплатил дважды, второй раз — за то, чтобы он больше не звонил».', claims: ['customer_paid'] }],
           opts: [{ t: 'Алик, заказчик говорит, что всё заплатил!', go: 'confront' }],
         },
         confront: {
@@ -289,7 +293,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
       nodes: {
         start: {
           fx: { set: { [intro('arsen')]: true } },
-          a: ['Здравствуйте, это Арсен, племянник дяди Алика. Дядя просил передать, что он в горах и денег нет.', 'Добрый день. Пишет Арсен. Дядя Алик потерял телефон. Совсем. Навсегда.'],
+          a: [{ t: 'Здравствуйте, это Арсен, племянник дяди Алика. Дядя просил передать, что он в горах и денег нет.', claims: ['no_money'] }, 'Добрый день. Пишет Арсен. Дядя Алик потерял телефон. Совсем. Навсегда.'],
           opts: [
             { t: 'Арсен, это же сам Алик пишет', go: 'caught' },
             { t: 'Передай дяде, что я жду', go: 'pass' },
@@ -433,7 +437,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
           a: ['Правду? Скажешь правду — я расстроюсь, а расстроенный я не плачу. Выбирай, брат.'],
           opts: [{ t: 'Ладно, мы друзья', go: 'ok' }, { t: 'Скажу правду', go: 'truth2' }],
         },
-        truth2: { fx: { mood: -2 }, a: ['Хорошо. Тогда и я скажу правду: денег нет. Вот. Все довольны?'] },
+        truth2: { fx: { mood: -2 }, a: [{ t: 'Хорошо. Тогда и я скажу правду: денег нет. Вот. Все довольны?', claims: ['no_money'] }] },
         ok: { a: ['Вот! Ты настоящий друг. Друзьям я плачу в первую очередь.'], then: 'promise' },
         mad: { a: ['Собираюсь! Официально — не плачу, а неофициально — не плачу по-другому. Разница есть.'] },
       },
@@ -453,6 +457,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
         },
         tell: {
           who: 'karine',
+          fx: { set: { [karineKnowsDebt]: true } },
           a: ['Ах вот оно что! А мне он сказал, что вы — налоговая. Сейчас я с ним поговорю.'],
           sys: 'Из телефона доносится крик на армянском.',
           then: 'moo',
@@ -460,10 +465,14 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
         },
         tell2: {
           fx: { ach: 'wife' },
-          a: ['Брат, зачем ты жене сказал?! Она теперь ВСЁ знает. Денег теперь точно нет — она их забрала.'],
+          a: [{ t: 'Брат, зачем ты жене сказал?! Она теперь ВСЁ знает. Денег теперь точно нет — она их забрала.', claims: ['no_money'] }],
           then: 'promise',
         },
-        wrong: { who: 'karine', a: ['Хорошо. А то Алик сказал, вы налоговая.'] },
+        wrong: {
+          who: 'karine',
+          fx: { set: { [karineThinksTax]: true } },
+          a: ['Хорошо. А то Алик сказал, вы налоговая.'],
+        },
       },
     },
 

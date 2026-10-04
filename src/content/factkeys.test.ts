@@ -8,8 +8,8 @@ import { CTX_KEYS, FAMILIES, HAS_KEYS, isFactKey } from './factkeys'
 
 describe('ключи фактов', () => {
   it('под префиксом известен только элемент семейства', () => {
-    for (const k of ['arc.boris', 'arc.done', 'ach.q_niva', 'since.dead', 'ctx.topic', 'has.boris', 'said.money_jar', 'caught.money_dubai|money_jar', 'intro.arsen', 'met.baran', 'finale.boris', 'legend.of.niva', 'wedding.samvel', 'topic.beton', 'inv.Валерьянка Алику']) expect(isFactKey(k), k).toBe(true)
-    for (const k of ['since.daed', 'arc.borsi', 'ach.nope', 'ctx.topci', 'has.karine', 'said.money_jarr', 'caught.money_jar', 'caught.money_jar|nope', 'met.borris', 'finale.nope', 'topic.nope', 'inv.Воздух', 'wedding.crane', 'payday.chian', 'no.such.key']) expect(isFactKey(k), k).toBe(false)
+    for (const k of ['arc.boris', 'arc.done', 'ach.q_niva', 'since.dead', 'ctx.topic', 'has.boris', 'heard.money_jar', 'cb.beton', 'intro.arsen', 'met.baran', 'finale.boris', 'legend.of.niva', 'wedding.samvel', 'topic.beton', 'inv.Валерьянка Алику']) expect(isFactKey(k), k).toBe(true)
+    for (const k of ['since.daed', 'arc.borsi', 'ach.nope', 'ctx.topci', 'has.karine', 'heard.money_jarr', 'said.money_jar', 'caught.money_dubai|money_jar', 'met.borris', 'finale.nope', 'topic.nope', 'inv.Воздух', 'wedding.crane', 'payday.chian', 'no.such.key']) expect(isFactKey(k), k).toBe(false)
   })
 
   it('facts() и реестр сверены в обе стороны', () => {

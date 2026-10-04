@@ -1,5 +1,6 @@
 // Мелкие тексты движка: «полежал на полу», застолье, платёжки, ответы на допработу и т.д.
-import { type Line, eq, gate, gte, is, missing, of, set, type Entry } from './fact'
+import { type Line, during, eq, gate, gte, is, missing, of, type Entry } from './fact'
+import { type ClaimKey } from './ids'
 import { needs, WORLD } from './world'
 import { alikDead, bloodGiven, court, endgame, polite, sick, threatClaim, wedding } from './memkeys'
 import { sold } from './credit'
@@ -16,7 +17,8 @@ export const FLOOR: Line[] = [
   'Вы позвонили маме. Мама спросила про Алика. Терпение восстановлено не полностью.',
 ].map((t): Line => ({ t, repeat: true, cooldown: { turns: 60 } })).concat([
   // нищета — факт уровня moneyBottom; кровь пишет blood.given и платит BLOOD_PAY в game (docs/design/money.md)
-  gate(is('moneyBottom'))({ remember: [set(bloodGiven, true)], t: 'Вы сдали кровь за деньги. Терпение восстановлено, гемоглобин — нет.', repeat: true, cooldown: { turns: 60 } }),
+  // blood.given с forDays: «спасибо, что пришли» только пока факт жив (#535)
+  gate(is('moneyBottom'))({ remember: [during(bloodGiven, 7)], t: 'Вы сдали кровь за деньги. Терпение восстановлено, гемоглобин — нет.', repeat: true, cooldown: { turns: 60 } }),
   gate(is(sold('microwave')))('Вы вспомнили про микроволновку. Её уже нет. Терпение восстановлено.'),
   'Вы написали завещание: всё — Алику, пусть подавится. Терпение восстановлено.',
   'Вы примерили гроб в ритуальном салоне. Удобно. Терпение восстановлено.',
@@ -25,7 +27,7 @@ export const FLOOR: Line[] = [
 export const FEAST = ['Ну, за объект!', 'Вай, какой хаш!', 'Алик, иди сюда, тост!', 'За маму!', 'Алик, кто там пишет? Положи телефон!', 'Ещё по одной!']
 
 export const PHOTO_A = ['Вот, смотри, платёжка.', 'Держи скрин.', 'Смотри, всё отправлено.', 'Вот доказательство.', 'Фото из банка.']
-export const PHOTO_B = ['Всё отправил!', 'Проверяй!', 'Жди, дойдёт.', 'Банк подтвердил.', 'Идёт через Грузию.', 'Видишь? Честно.']
+export const PHOTO_B = [{ t: 'Всё отправил!', claims: ['sent' as ClaimKey] }, 'Проверяй!', 'Жди, дойдёт.', 'Банк подтвердил.', 'Идёт через Грузию.', 'Видишь? Честно.']
 
 export const JOB_YES_P = ['Ладно, сделаю', 'Хорошо, сделаю', 'Ну ладно…', 'Сделаю. Но это последний раз.', 'Ладно. Ради тебя.', 'Эх… Хорошо.']
 export const JOB_NO_P = ['Нет, сначала деньги', 'Сначала оплата, Алик', 'Нет. Хватит.', 'Не-а. Деньги вперёд.', 'Алик, нет.']

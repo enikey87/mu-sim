@@ -1,5 +1,5 @@
 // Реплики без повторов: хеши всех показанных текстов хранятся в сохранении.
-export type Keyed = string | { texts?: string[]; text?: string; t?: string }
+export type Keyed = string | { texts?: Array<string | { t: string }>; text?: string | { t: string }; t?: string | { t: string } }
 
 export const hash = (s: string): number => {
   let h = 5381
@@ -7,8 +7,13 @@ export const hash = (s: string): number => {
   return h
 }
 
+const keyText = (x: string | { t: string }): string => (typeof x === 'string' ? x : x.t)
+
 export const keyOf = (t: Keyed): string =>
-  typeof t === 'string' ? t : t.texts ? t.texts.join('|') : (t.text ?? t.t ?? JSON.stringify(t))
+  typeof t === 'string' ? t : t.texts ? t.texts.map(keyText).join('|')
+  : t.text ? keyText(t.text)
+  : t.t ? keyText(t.t)
+  : JSON.stringify(t)
 
 export class Seen {
   private set: Set<number>

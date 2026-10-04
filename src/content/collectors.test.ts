@@ -5,7 +5,10 @@ import { collectorsRecruited, creditBroke, endgame, intro, paydayScene, threatCl
 import { loanTaken, loanDueAt } from './credit'
 import { D } from './excuses'
 import { NOTIF } from './life'
+import { GROUP } from './arcs'
+import { meet } from './world'
 import { isOpen, test, valueOf, type Entry, type Facts } from '../engine/rules'
+import { playtest } from '../tools/playtest'
 
 const texts = (g: ReturnType<typeof makeGame>['game'], from = 0) =>
   g.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' || m.kind === 'sys' ? [m.text] : []))
@@ -172,5 +175,64 @@ describe('коллекторы (#128)', () => {
     expect(isOpen(tea, { ...claim, 'arc.collectors': 2 })).toBe(false)
     expect(isOpen(tea, { ...claim, 'arc.collectors': 3 })).toBe(true)
     expect(isOpen(tea, { ...claim, 'arc.collectors': 4, [collectorsRecruited]: true })).toBe(false)
+  })
+
+  it('GROUP: требование долга — только до вербовки; «свои» — только после (#468)', () => {
+    const debt = (GROUP.collectors as Entry<unknown>[]).filter((e) => /задолженност|Долг — он и в чате/.test(String(valueOf(e))))
+    const ours = (GROUP.collectors as Entry<unknown>[]).filter((e) => /мы теперь свои|Смена на объекте/.test(String(valueOf(e))))
+    expect(debt.length).toBe(2)
+    expect(ours.length).toBe(2)
+    for (const e of debt) {
+      expect(isOpen(e, {}), 'до знакомства/вербовки долг открыт').toBe(true)
+      expect(isOpen(e, { [collectorsRecruited]: true }), 'после вербовки долг закрыт').toBe(false)
+    }
+    for (const e of ours) {
+      expect(isOpen(e, {}), 'без вербовки «свои» закрыты').toBe(false)
+      expect(isOpen(e, { [collectorsRecruited]: true })).toBe(true)
+    }
+  })
+
+  it('в партиях ботом завербованные коллекторы в групповом чате долг не требуют (#493)', async () => {
+    const debtRe = /задолженност|Долг — он и в чате/
+    const after: string[] = []
+    // групповой чат с завербованными коллекторами редок: партии идут, пока не наберётся выборка, а не по трём заранее найденным сидам
+    for (let seed = 65001; seed <= 65040 && after.length < 2; seed++) {
+      const { game } = await playtest(seed, 300)
+      // реплики коллекторов внутри группового чата — после факта вербовки, который поставила серия
+      let inGroup = false, recruitedAt = Infinity
+      for (const [i, m] of game.S.msgs.entries()) {
+        if (m.kind === 'sys' && /добавил вас в группу/.test(m.text)) inGroup = true
+        if (m.kind === 'sys' && /удалил вас из группы/.test(m.text)) inGroup = false
+        if (m.kind === 'text' && m.who === 'collectors' && /С вас больше не требуем/.test(m.text)) recruitedAt = Math.min(recruitedAt, i)
+        if (inGroup && i > recruitedAt && m.kind === 'text' && m.who === 'collectors') after.push(m.text)
+      }
+    }
+    expect(after.length, 'в выборке нет групповых реплик завербованных коллекторов — проверка была бы пустой').toBeGreaterThan(0)
+    expect(after.filter((t) => debtRe.test(t))).toEqual([])
+  }, 600_000)
+
+  it('групповой чат ходом партии: до вербовки требуют долг, после — нет (#468)', async () => {
+    const debtRe = /задолженност|Долг — он и в чате/
+    const oursRe = /мы теперь свои|Смена на объекте|Раствор месим/
+    const runGroup = async (recruited: boolean) => {
+      const { game } = makeGame({ seed: recruited ? 11 : 7 })
+      game.rules.applyOps(meet('collectors'), {})
+      if (recruited) game.S.mem[collectorsRecruited] = true
+      game.S.stats.sent = 10
+      // ход через fire → recoverTurn (не прямой groupChat)
+      game.rules.add({
+        name: 'Test_ForceGroup468', event: 'AlikTurn', when: [], specificity: 99,
+        respond: async ({ game: g }) => { await g.groupChat() },
+      })
+      const n = game.S.msgs.length
+      await game.fire('AlikTurn')
+      return game.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' && m.who === 'collectors' ? [m.text] : []))
+    }
+    const before = await runGroup(false)
+    expect(before.some((t) => debtRe.test(t)), before.join(' | ')).toBe(true)
+    expect(before.some((t) => oursRe.test(t))).toBe(false)
+    const after = await runGroup(true)
+    expect(after.some((t) => debtRe.test(t)), after.join(' | ')).toBe(false)
+    expect(after.some((t) => oursRe.test(t)), after.join(' | ')).toBe(true)
   })
 })

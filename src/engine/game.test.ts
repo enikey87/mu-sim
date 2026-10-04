@@ -9,7 +9,6 @@ import { seededRng } from './rng'
 import { SAVE_KEY } from './state'
 import { fmtTime } from './time'
 import { ARCS } from '../content/arcs'
-import { CLAIMS } from '../content/lies'
 import { COLD_WAR } from '../content/rude'
 import { HEAT, bloodGiven } from '../content/memkeys'
 import { valueOf, spec, type Facts } from './rules'
@@ -171,6 +170,11 @@ describe('Game: начало и ход', () => {
     await game.send('Алло')
     expect(game.S.stats.sent).toBe(sent + 1)
     errors.mockRestore()
+  })
+  it('партия бота (strictTurns): ошибка хода падает, а не восстанавливается молча (#435)', async () => {
+    const { game } = makeGame({ strictTurns: true })
+    game.rules.add({ name: 'Test_Boom', event: 'PlayerMessage', when: [], specificity: 99, respond: () => { throw new Error('boom') } })
+    await expect(game.send('Ну как там?')).rejects.toThrow('boom')
   })
   it('сломанная сцена не остаётся в состоянии: кнопки собираются, ход принимается', async () => {
     const { game } = makeGame()
@@ -917,11 +921,11 @@ describe('Game: пачка непрочитанных записывает в м
   it('заявление из пачки — на доске: «вы же говорили» видит и то, что пришло без игрока', async () => {
     let claims = 0
     for (let seed = 1; seed <= 40; seed++) {
-      const { game, texts } = await excusePack(seed)
-      for (const c of CLAIMS.filter((c) => texts.some((t) => c.re.test(t)))) {
+      const { game } = await excusePack(seed)
+      for (const c of game.S.ledger.claims) {
         claims++
-        expect(game.S.mem[`said.${c.key}`], c.key).toBe(game.S.day)
-        expect(game.S.mem[`by.${c.key}`], c.key).toBe('alik')
+        expect(c.day, c.claimKey).toBe(game.S.day)
+        expect(c.source, c.claimKey).toBe('alik')
       }
     }
     expect(claims).toBeGreaterThan(5)

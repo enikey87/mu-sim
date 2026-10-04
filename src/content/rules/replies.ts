@@ -6,15 +6,16 @@ import { type Rule, eq, ne, is, gte, add, set, valueOf } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { AlikOffline, ThickJournal } from './criteria'
 import { cooldown } from './rude'
-import { TOPICS, TOPIC_FALLBACK, TOPIC_NAME, TOPIC_OBSESSED, DESPERATE_REPLY } from '../topics'
+import { TOPICS, TOPIC_FALLBACK, TOPIC_NAME, TOPIC_OBSESSED, DESPERATE_PAIRS } from '../topics'
 import { D, low, cap } from '../excuses'
 import { GREET_A, WHEN_COND, SWING } from '../misc'
 import { type TalkKind, talkPairs, talkId, TALK_REMEMBER } from '../talk'
+import { saidClaims, saidText, type Said } from '../fact'
 import { ARCS, NO_NEWS_A, NO_NEWS_B, GROUP_SEEN_A, GROUP_SEEN_B, WRONG_A, WRONG_B } from '../arcs'
 import * as L from '../life'
 import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, PROMISE_PENCIL, PROMISE_FAR } from '../misc'
-import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_SENT, LIE_THIRD, LIE_NOCRED } from '../lies'
-import { HEAT, alikShaved, moustacheAskAt, asked, caughtCount, count, doneAsked, finaleOf, lie, nextTransfer, topic, topicMute } from '../memkeys'
+import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_THIRD, LIE_NOCRED } from '../lies'
+import { HEAT, alikShaved, moustacheAskAt, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, topic, topicMute } from '../memkeys'
 import { PROMISE_SHAVE_ASK } from '../world'
 
 type R = Rule<Game, GameEvent, Offer>
@@ -37,7 +38,7 @@ async function sorry(game: Game, line: string): Promise<void> {
   game.setCtx(null)
 }
 
-const simple = (intent: string, line: (g: Game) => string, after?: (g: Game) => void | Promise<void>): R =>
+const simple = (intent: string, line: (g: Game) => Said, after?: (g: Game) => void | Promise<void>): R =>
   says(intent, { respond: async ({ game }) => { await game.say([line(game)]); game.setCtx(null); await after?.(game) } })
 
 export const replyRules: R[] = [
@@ -85,7 +86,7 @@ export const replyRules: R[] = [
       const id = talkId(kind, sub, Number(i))
       game.lines.mark(id)
       game.rules.applyOps(TALK_REMEMBER[id] ?? [], {})
-      await game.say([kind === 'chorus' ? { w: sub, t: pair[1] } : pair[1]])
+      await game.say([kind === 'chorus' ? { w: sub, t: saidText(pair[1]), claims: saidClaims(pair[1]) } : pair[1]])
     },
   }),
 
@@ -161,7 +162,14 @@ export const replyRules: R[] = [
   says('defend', { respond: async ({ game }) => { const r = game.uniq(game.X.defend); game.recordPromise(r.p); await game.say([r.text]); game.setCtx(game.ctxFromPromise(r.p)) } }),
   says('ping', { respond: async ({ game }) => { const r = game.uniq(game.X.ping); game.recordPromise(r.p); await game.say([r.text]); game.setCtx(game.ctxFromPromise(r.p)) } }),
   // отчаяние от бедности — не крик: ссора не греется, Алик отвечает человеку, потом отмазывается как обычно
-  says('desperate', { respond: async ({ game }) => { await game.say([game.uniq(() => game.draw('DESPERATE_REPLY', DESPERATE_REPLY))]); await game.excuseTurn() } }),
+  // общий ответ — в тоне реплики (#480): крик капсом (sentinel «shout») — свой пул, остальные деньги — по тону;
+  // moneyReply сам следит за повторами (одноразовый пул + перефраз fallback'ом), поэтому без uniq
+  says('desperate', { respond: async ({ game, facts }) => {
+    const pair = DESPERATE_PAIRS[String(facts.arg ?? '')]
+    if (pair) await game.say([game.uniq(() => pair.answer)])
+    else await game.say([game.moneyReply(String(facts.tone ?? 'neutral'), facts.arg === 'shout')])
+    await game.excuseTurn()
+  } }),
 
   says('prev', {
     respond: async ({ game, facts }) => {
@@ -256,9 +264,8 @@ export const replyRules: R[] = [
       return game.caught(game.uniq(() => `${game.draw('LIE_OPEN', LIE_OPEN)} ${game.X.fill(game.draw('LIE_EXPLAIN', LIE_EXPLAIN), map)}`))
     },
   }),
-  says('catchLie', { remember: [add(caughtCount)], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_GRANDPA', LIE_GRANDPA))) }, [eq(lie.kind, 'grandpa')]),
-  says('catchLie', { remember: [add(caughtCount)], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_CUSTOMER', LIE_CUSTOMER))) }, [eq(lie.kind, 'customer')]),
-  says('catchLie', { remember: [add(caughtCount)], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_SENT', LIE_SENT))) }, [eq(lie.kind, 'sent')]),
+  says('catchLie', { remember: [add(caughtCount)], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_GRANDPA', LIE_GRANDPA))) }, [eq('lieKind', 'grandpa')]),
+  says('catchLie', { remember: [add(caughtCount)], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_CUSTOMER', LIE_CUSTOMER))) }, [eq('lieKind', 'customer')]),
   // третий раз пойман — признаётся (по-своему); дальше — Алику уже никто не верит
   { ...says('catchLie', { remember: [add(caughtCount)], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_THIRD', LIE_THIRD))) }, [gte(caughtCount, 2)]), bonus: 1 },
   { ...says('catchLie', { remember: [add(caughtCount)], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_NOCRED', LIE_NOCRED))) }, [gte(caughtCount, 3)]), bonus: 2 },

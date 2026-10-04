@@ -31,6 +31,14 @@ describe('условия: операторы', () => {
     expect(test(gt('x', 0), {})).toBe(false)
     expect(test(gt('s', 1), { s: '5' })).toBe(true)
   })
+  it('счётчик дней без события: числовые сравнения ложны (#496)', () => {
+    expect(test(lte('since.dead', 3), {})).toBe(false)
+    expect(test(lt('since.dead', 3), {})).toBe(false)
+    expect(test(gte('since.dead', 0), {})).toBe(false)
+    expect(test(gt('since.dead', 0), {})).toBe(false)
+    expect(test(lte('since.dead', 3), { 'since.dead': null })).toBe(false)
+    expect(test(lte('since.dead', 3), { 'since.dead': 2 })).toBe(true)
+  })
   it('between — два условия', () => {
     const [a, b] = between('n', 1, 5)
     expect(test(a, f) && test(b, f)).toBe(true)

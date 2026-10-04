@@ -3,6 +3,9 @@
 // семейства (`arc.<id>`, `said.<claim>`…) — до конкретного элемента в factkeys.ts, и им же
 // сторожат линтер правил (tools.test.ts) и memkeys.test.ts.
 
+import { momDachaAt, momDachaDays } from './credit'
+import { registerDaysSince } from '../engine/rules/days-since'
+
 /** Ключ пары утверждений «пойманы на противоречии»; канонический формат — здесь, lies.ts реэкспортирует. */
 export const pairKey = (a: string, b: string): string => [a, b].sort().join('|')
 
@@ -27,11 +30,18 @@ export const cryptoHodl = 'crypto.hodl'
 export const bathAsked = 'bath.asked'
 export const mamaCalls = 'mama.calls'
 export const phoneKarine = 'phone.karine'
+/** Игрок сказал Карине, что Алик ему должен (сцена жены, ветка tell). */
+export const karineKnowsDebt = 'karine.knowsDebt'
+/** Карине считает игрока налоговой (сцена жены, ветка wrong). */
+export const karineThinksTax = 'karine.thinksTax'
 /** Алик сбрил усы по ставке — живёт ~40 дней (`during`), пока отрастут. */
 export const alikShaved = 'alik.shaved'
 /** День, когда игрок спросил «как усы?» — перерыв между показами кнопки (#352). */
 export const moustacheAskAt = 'moustache.askAt'
 export const alikDay = 'alik.day'
+/** Дней с последнего сообщения Алика — без события нет значения (#496). */
+registerDaysSince('sinceAlik', alikDay)
+
 export const mooAt = 'mooAt'
 export const sorryAt = 'sorryAt'
 export const rudeAt = 'rudeAt'
@@ -50,6 +60,8 @@ export const nivaAway = 'niva.away'
 export const nivaBack = 'niva.back'
 /** «Нива» у игрока после финала «Нива выбрала тебя» (#256). */
 export const nivaPlayer = 'niva.player'
+/** Машина ушла с продажей зимней резины (покупатель забрал комплектом): продажа машину убирает, а не отрицает (#530). */
+export const carGone = 'car.gone'
 export const garikConcrete = 'garik.concrete'
 export const garikCut = 'garik.cut'
 export const houseOnGarik = 'house.onGarik'
@@ -98,11 +110,6 @@ export const holidayGreeted = 'holiday.greeted'
 /** «Займи 50» в эндгейме: просьба прозвучала и что игрок ответил (docs/design/lend-50.md). */
 export const lend50 = { asked: 'lend50.asked', answer: 'lend50.answer' } as const
 
-export const lie = { old: 'lie.old', new: 'lie.new', alikOld: 'lie.alikOld', kind: 'lie.kind' } as const
-
-export const said = <C extends string>(claim: C): `said.${C}` => `said.${claim}`
-export const saidLast = <C extends string>(claim: C): `saidLast.${C}` => `saidLast.${claim}`
-export const byClaim = <C extends string>(claim: C): `by.${C}` => `by.${claim}`
 export const cb = <C extends string>(claim: C): `cb.${C}` => `cb.${claim}`
 export const met = <W extends string>(who: W): `met.${W}` => `met.${who}`
 export const intro = <W extends string>(who: W): `intro.${W}` => `intro.${who}`
@@ -112,7 +119,6 @@ export const topic = <K extends string>(k: K): `topic.${K}` => `topic.${k}`
 export const topicMute = <K extends string>(k: K): `topicMute.${K}` => `topicMute.${k}`
 export const finaleOf = <A extends string>(arc: A): `finale.${A}` => `finale.${arc}`
 export const legendOf = <A extends string>(arc: A): `legend.of.${A}` => `legend.of.${arc}`
-export const caughtPair = (a: string, b: string): `caught.${string}` => `caught.${pairKey(a, b)}`
 export const wedding = <W extends string>(who: W): `wedding.${W}` => `wedding.${who}`
 /** Активная сцена Дня выплаты (id узла) — факт на доске мира. */
 export const paydayScene = 'payday'
@@ -144,8 +150,8 @@ export const EVENT_KEY_LIST = [
   'moneyNormal', 'moneyLow', 'moneyBottom', 'paymentDueTomorrow',
   'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sorrySwing', 'promiseLive', 'promisePassed', 'promiseStake',
   'period', 'night', 'offline', 'scene', 'sinceAlik', 'lateCount', 'arcAvailable',
-  'arcsStarted', 'arcsDone', 'quests', 'callbackReady', 'arcUnfinished', 'deathCanAdvance', 'collectorsCanAdvance',
-  'intent', 'tone', 'arg', 'category', 'arc', 'argArcDone', 'greet', 'promise', 'somedayCount',
+  'arcsStarted', 'arcsDone', 'quests', 'callbackReady', 'lieOpen', 'lieKind', 'lieAlikOld', 'arcUnfinished', 'deathCanAdvance', 'collectorsCanAdvance',
+  'intent', 'tone', 'arg', 'category', 'arc', 'argArcDone', 'greet', 'promise', 'somedayCount', momDachaDays,
 ] as const
 export type EventKey = (typeof EVENT_KEY_LIST)[number]
 export const EVENT_KEYS: ReadonlySet<string> = new Set(EVENT_KEY_LIST)
@@ -156,11 +162,11 @@ export const ACTOR_KEYS: ReadonlySet<string> = new Set(ACTOR_KEY_LIST)
 
 export const MEM_KEYS: ReadonlySet<string> = new Set([
   HEAT, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, evicted, vendetta, court, courtVerdict,
-  ritualCount, ritualCut, caughtCount, cryptoHodl, bathAsked, mamaCalls, phoneKarine, alikShaved, moustacheAskAt, alikDay, mooAt, sorryAt, courtReferral,
-  rudeAt, thanksAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway, nivaPlayer,
+  ritualCount, ritualCut, caughtCount, cryptoHodl, bathAsked, mamaCalls, phoneKarine, karineKnowsDebt, karineThinksTax, alikShaved, moustacheAskAt, alikDay, mooAt, sorryAt, courtReferral,
+  rudeAt, thanksAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway, nivaPlayer, carGone,
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday,
   lightOff, netRation, phoneWarn, holidayGreeted,
-  creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, criticalAt, creditOfferSum,
-  ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lend50), ...Object.values(lie),
+  creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, criticalAt, creditOfferSum, momDachaAt,
+  ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lend50),
 ])

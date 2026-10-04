@@ -3,6 +3,7 @@ import type { Bags } from './deck'
 import { type Facts, type RuleState, freshRuleState } from './rules'
 import type { PromiseCondition, Rel, WhenKind } from '../content/excuses'
 import type { Vars } from '../content/scenes'
+import { freshLedger, migrateLedger, type LedgerState } from '../content/ledger'
 
 export const SAVE_KEY = 'alik-save-v4'
 /** Отметка устройства, а не партии: просьба «займи 50» уже звучала — вторая партия говорит другим текстом. */
@@ -23,7 +24,7 @@ interface MsgBase { id: number; time?: string }
 export type Msg =
   | (MsgBase & { kind: 'sep'; text: string })
   | (MsgBase & { kind: 'sys'; text: string; unread?: boolean })
-  | (MsgBase & { kind: 'text'; from: 'me' | 'alik'; text: string; who?: string; legend?: boolean; deleted?: boolean; edited?: boolean; react?: string; topical?: boolean })
+  | (MsgBase & { kind: 'text'; from: 'me' | 'alik'; text: string; who?: string; legend?: boolean; deleted?: boolean; edited?: boolean; react?: string; topical?: boolean; topicText?: string })
   | (MsgBase & { kind: 'transfer'; from: 'alik'; text: string; amount?: number })
   | (MsgBase & { kind: 'voice'; from: 'alik'; len: number; feast?: boolean })
   | (MsgBase & { kind: 'photo'; from: 'alik'; text: string })
@@ -163,6 +164,8 @@ export interface GameState {
   pendingCards: Array<{ icon: string; app: string; text: string } & Partial<Pick<Card, 'lines' | 'offer' | 'answered' | 'result'>>>
   /** День, когда звучала строка бедности: окно тишины пула переживает перезагрузку (#387). */
   poorSaid: Record<string, number>
+  /** Типизированный журнал знаний игрока: утверждения, переходы, эпизоды противоречий. */
+  ledger: LedgerState
 }
 
 export function freshState(): GameState {
@@ -172,6 +175,7 @@ export function freshState(): GameState {
     stats: { moo: 0, fifty: 0, paid: 0, sent: 0 },
     offlineDays: 0, ram: false, muted: false, scene: null, ctx: null, choices: null, arcs: {}, tier: 0,
     battery: 100, money: START_MONEY, lastSeen: 0, mem: {}, actors: {}, rules: freshRuleState(), endings: {}, ending: null, introShown: false, bank: null, pendingCards: [], poorSaid: {},
+    ledger: freshLedger(),
   })
 }
 
@@ -228,6 +232,7 @@ export function loadState(storage: Storage | null): GameState | null {
       introShown: typeof s.introShown === 'boolean' ? s.introShown : true,
       pendingCards: Array.isArray(s.pendingCards) ? s.pendingCards : [],
       poorSaid: loadPoorSaid(s.poorSaid),
+      ledger: migrateLedger(s.mem ?? {}, s.ledger),
     })
   } catch {
     return null

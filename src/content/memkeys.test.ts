@@ -4,20 +4,24 @@ import { readdirSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import type { Criterion, Entry } from '../engine/rules'
 import { Gated } from '../engine/rules'
-import { ACTOR_KEYS, MEM_KEYS, caughtPair } from './memkeys'
+import { ACTOR_KEYS, MEM_KEYS } from './memkeys'
 import { isFactKey } from './factkeys'
+import { momDachaAt, momDachaDays } from './credit'
+import { daySinceEvent } from '../engine/rules/days-since'
 
 const flat = (cs: readonly Criterion[]): Criterion[] => cs.flatMap((c) => (c.op === 'all' ? flat(c.all ?? []) : [c]))
-/** «Не позже n дней после события» без «событие было»: нет факта — число 0, и условие всегда истинно.
- *  `gte(since.x, 0)` нижней границей не считается: без факта оно тоже всегда истинно. */
+/** Ключ счётчика «дней с события» → ключ самого события: реестр registerDaysSince + since.* (#496). */
+const eventOfCounter = (key: string): string | null => daySinceEvent(key)
+/** «Не позже n дней после события» без «событие было»: нет факта — нет значения, и условие ложно. */
 const sinceGuarded = (where: string, cs: readonly Criterion[], bad: string[]) => {
   const all = flat(cs)
   for (const c of all) {
-    if (!(c.op === '<' || c.op === '<=') || !c.key.startsWith('since.')) continue
-    const ach = 'ach.' + c.key.slice('since.'.length)
+    if (!(c.op === '<' || c.op === '<=')) continue
+    const event = eventOfCounter(c.key)
+    if (!event) continue
     const lower = all.some((o) =>
       (o.key === c.key && (o.op === '>' || (o.op === '>=' && Number(o.value) > 0)))
-      || (o.key === ach && (o.op === 'exist' || (o.op === '==' && o.value === true))))
+      || (o.key === event && (o.op === 'exist' || (o.op === '==' && o.value === true))))
     if (!lower) bad.push(`${where}: ${c.key} ${c.op} ${String(c.value)} без нижней границы`)
   }
 }
@@ -188,6 +192,50 @@ describe('реестр mem-ключей', () => {
     ])
   })
 
+  it('счётчик дней без события — нет значения; верхняя граница ложна (#496)', async () => {
+    const { makeGame } = await import('../test/helpers')
+    const { test: holds } = await import('./fact')
+    const { game } = makeGame()
+    delete game.S.mem[momDachaAt]
+    expect(game.facts()[momDachaDays]).toBeUndefined()
+    expect(holds({ key: momDachaDays, op: '<=', value: 40 }, game.lineFacts())).toBe(false)
+    delete game.S.mem['alik.day']
+    expect(game.facts().sinceAlik).toBeUndefined()
+    expect(holds({ key: 'sinceAlik', op: '<=', value: 3 }, game.lineFacts())).toBe(false)
+    const bad: string[] = []
+    sinceGuarded('dacha', [{ key: momDachaDays, op: '<=', value: 40 }], bad)
+    sinceGuarded('dachaOk', [{ key: momDachaAt, op: 'exist' }, { key: momDachaDays, op: '<=', value: 40 }], bad)
+    sinceGuarded('alik', [{ key: 'sinceAlik', op: '<=', value: 3 }], bad)
+    expect(bad).toEqual([
+      'dacha: mom.dacha.days <= 40 без нижней границы',
+      'alik: sinceAlik <= 3 без нижней границы',
+    ])
+  })
+
+  it('движок пишет и читает только ключи памяти из реестра (#473/#496)', async () => {
+    const { botTurn } = await import('../tools/bot')
+    const { makeGame } = await import('../test/helpers')
+    const { watchFactKeys, test: holds } = await import('../engine/rules')
+    const keys = new Set<string>()
+    watchFactKeys((k) => keys.add(k))
+    for (const seed of [1, 2, 3, 5, 8]) {
+      const { game } = makeGame({ seed })
+      game.S.mem = new Proxy(game.S.mem, {
+        get: (t, p) => { if (typeof p === 'string' && p !== 'toJSON') keys.add(p); return Reflect.get(t, p) as unknown },
+        set: (t, p, v: unknown) => { if (typeof p === 'string' && p !== 'toJSON') keys.add(p); return Reflect.set(t, p, v) },
+      })
+      // хаб держит исходный mem — переподключим, иначе чтения через holds не видны Proxy (#496)
+      ;(game as { rules: { hub: { world: typeof game.S.mem } } }).rules.hub.world = game.S.mem
+      for (let i = 0; i < 150; i++) await botTurn(game)
+    }
+    // NC: holds незарегистрированного ключа попадает в сверку
+    holds({ key: 'probe.read', op: 'exist' }, {})
+    expect(keys.has('probe.read')).toBe(true)
+    watchFactKeys(null)
+    expect([...keys].filter((k) => k !== 'probe.read' && !isFactKey(k)), 'ключ памяти, которого реестр не знает').toEqual([])
+    expect(keys.size).toBeGreaterThan(50)
+  }, 60_000)
+
   it('since.* в контенте — с настоящей нижней границей', async () => {
     const bad: string[] = []
     for (const path of contentModules()) scanSince(await import(path), path, bad)
@@ -202,6 +250,5 @@ describe('реестр mem-ключей', () => {
       expect(k).not.toMatch(/[\s]/)
     }
     expect(isFactKey('caught')).toBe(true)
-    expect(caughtPair('alik', 'boris')).toBe('caught.alik|boris')
   })
 })

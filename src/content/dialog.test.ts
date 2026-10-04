@@ -3,14 +3,16 @@ import { describe, it, expect } from 'vitest'
 import type { GameEvent } from './rules/events'
 import { makeGame , setMoney} from '../test/helpers'
 import { ARCS, GROUP } from './arcs'
-import { D } from './excuses'
+import { D, make } from './excuses'
 import { ENDGAME_RETURNERS } from './endgame'
 import { NOTIF } from './life'
 import { CONDOLE_REVIVED, GREET_A, FLOOR } from './misc'
 import { SPEND } from './life'
-import { WORLD, needs } from './world'
+import { WORLD, needs, meet } from './world'
 import { turnRules } from './rules/turn'
 import { valueOf, type Entry } from '../engine/rules'
+import { wedding } from './memkeys'
+import { is, saidText, type Said } from './fact'
 import type { Game } from '../engine/game'
 
 const texts = (g: Game, n = 0) => g.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' ? [m.text] : []))
@@ -44,6 +46,15 @@ describe('несостыковки из партии пользователя', 
     for (let i = 0; i < 20; i++) await game.afterTurn()
     expect(game.S.msgs.some((m) => m.kind === 'text' && m.who === 'boris')).toBe(false)
     expect(GROUP.boris.length).toBeGreaterThan(0)
+  })
+  it('коллекторы знакомы, но не завербованы: в групповом чате им есть что сказать, ход не обрывается (#435)', async () => {
+    const { game } = makeGame()
+    game.rules.applyOps(meet('collectors'), {})
+    const n = game.S.msgs.length
+    await game.groupChat() // в свежей партии говорить может только collectors — колода не должна быть пустой
+    const range = game.S.msgs.slice(n)
+    expect(range.some((m) => m.kind === 'text' && m.who === 'collectors')).toBe(true)
+    expect(range.some((m) => m.kind === 'sys' && m.text.includes('удалил вас из группы'))).toBe(true) // ход доигран до конца
   })
   it('«Опять» на отправке номера карты звучит только со второго раза', async () => {
     const { game } = makeGame()
@@ -282,13 +293,13 @@ describe('несостыковки из плейтеста ботами', () => 
     game.S.mem.blocked = true
     for (const ev of ['AlikAway', 'StoryBeat', 'PeriodLine', 'PromiseDue'] as GameEvent[]) expect((await game.fire(ev))?.name).toBe('Quiet_Blocked_' + ev)
   })
-  it('где деньги — меняется по сюжету: «Нива» полгода назад не ловится как ложь', () => {
+  it('где деньги — меняется по сюжету: старое место всё ещё ловится как открытый эпизод', () => {
     const { game } = makeGame()
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в банке с огурцами.' })
-    game.forgetLie()
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в банке с огурцами.' }, ['money_jar'])
     game.S.day += 60
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в фундаменте, брат.' })
-    expect(game.lie()).toBeNull()
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в фундаменте, брат.' }, ['money_foundation'])
+    expect(game.lie()).not.toBeNull()
+    expect(game.buildChoices().some((c) => c.act === 'catchLie')).toBe(true)
   })
   it('серия по вопросу — не в тот же день, что предыдущая; сама — не больше одной в день', async () => {
     const { game } = makeGame()
@@ -430,12 +441,40 @@ describe('несостыковки из плейтеста ботами, рау�
     const { game } = makeGame()
     await game.playArc('grandpa')
     for (const id of ['goar', 'mkrtich', 'gagik', 'samvel', 'garik']) game.S.mem['intro.' + id] = true
-    const own = /(Самвела(?!-)|Гарика|Гоар|Мкртича|Гагика|Грачика)[^.!?]*?(похорон|поминк|умер|свадьб|женил|крестин|юбилей|обручен|родила|роды)/i
+    const own = /(свадьб|похорон|поминк|умер|женил|крестин|юбилей|обручен|родила|роды)[^.!?]*?(Самвела(?!-)|Гарика|Гоар|Мкртича|Гагика|Грачика)|(Самвела(?!-)|Гарика|Гоар|Мкртича|Гагика|Грачика)[^.!?]*?(свадьб|похорон|поминк|умер|женил|крестин|юбилей|обручен|родила|роды)/i
+    const invented = (t: string) => own.test(t.replaceAll('Здоровьем дяди Самвела клянусь', ''))
+    expect(invented('У дяди Самвела свадьба.')).toBe(true)
+    expect(invented('Похороны Гарика перенесли.')).toBe(true)
+    expect(invented('Здоровьем дяди Самвела клянусь, верну после свадьбы.')).toBe(false)
     const said: string[] = []
-    for (let i = 0; i < 600; i++) said.push(game.X.excuse({}).texts.join(' '))
-    expect(said.filter((t) => own.test(t))).toEqual([])
+    for (let i = 0; i < 600; i++) said.push(game.X.excuse({}).texts.map(saidText).join(' '))
+    expect(said.filter(invented)).toEqual([])
     expect(said.some((t) => /Самвела|Гарика|Гоар|Мкртича|Гагика|Грачика/.test(t))).toBe(true)
   }, 60_000) // 600 отмазок генератора: время растёт с корпусом
+  it('генератор пропускает свадебное событие у героя сериала, но не обычный повод', () => {
+    let events = 0
+    const X = make(<T,>(key: string, entries: readonly Entry<T>[]): T => {
+      if (key === 'LEGROLL') return 1 as T
+      if (key === 'EVENT') return (events++ === 0 ? 'свадьба' : 'ремонт') as T
+      return valueOf(entries[0])
+    })
+    const excuse = X.excuse()
+    expect(excuse.texts.map(saidText).join(' ')).toContain('у дяди Самвела ремонт')
+    expect(events).toBe(2)
+  })
+  it('легендарная отмазка про свадьбу Самвела доступна только во время свадьбы', async () => {
+    const { game } = makeGame()
+    const line = 'Он на свадьбе у дяди Самвела.'
+    const available = () => game.open(D.LEGENDARY as Entry<Said>[]).some((t) => saidText(t).includes(line))
+    expect(available()).toBe(false)
+    game.S.mem['intro.samvel'] = true
+    expect(available()).toBe(false)
+    await game.playArc('samvel')
+    expect(game.holds(is(wedding('samvel')))).toBe(true)
+    expect(available()).toBe(true)
+    game.nextDay(9)
+    expect(available()).toBe(false)
+  })
   it('пока в семье прощаются, застолья и смертного одра не бывает', async () => {
     const { game } = makeGame()
     game.S.day = 250

@@ -5,7 +5,7 @@
 import { type Line, type LineSpec, type Entry, is, eq, ne, exists, gte, lte, gate, missing } from './fact'
 import type { Scene } from './scenes'
 import { needs, WORLD } from './world'
-import { bathAsked, court, cryptoHodl, garikConcrete, met, payday, rubikFined, taxThawed } from './memkeys'
+import { bathAsked, court, cryptoHodl, garikConcrete, karineKnowsDebt, met, payday, rubikFined, taxThawed } from './memkeys'
 
 export const ANNOUNCE = [
   needs('karineHome')(needs('karine')('Брат. Завтра. Всё. Честно. Я не шучу. Даже Карине не шутит.')),
@@ -86,7 +86,7 @@ export const GRAND: Record<Slot, Line[]> = {
     { t: 'Эти пятьдесят рублей лежали в сейфе,', when: [exists('finale.nune')], prio: 2 },
     { t: 'Эти пятьдесят рублей лежали в фундаменте, рядом с конвертом,', when: [exists('finale.beton')], prio: 2 },
     needs('niva')({ t: 'Эти пятьдесят рублей были в бардачке «Нивы»,', when: [exists('finale.niva')], prio: 2 }),
-    { t: 'Эти пятьдесят рублей были в банке с огурцами,', when: [exists('said.money_jar')], prio: 2 },
+    { t: 'Эти пятьдесят рублей были в банке с огурцами,', when: [is('heard.money_jar')], prio: 2 },
     { t: 'Эти пятьдесят рублей лежали в кассе шаурмичной дедушки,', when: [exists('finale.grandpa')], prio: 2 },
     { t: 'Эти пятьдесят рублей были в кабине крана, на сорока метрах,', when: [exists('finale.razmik')], prio: 2 },
     { t: 'Эти пятьдесят рублей лежали в мешке лаваша, между сорок первым и сорок вторым,', when: [is('ach.q_crypto')], prio: 2 },
@@ -233,7 +233,12 @@ export const PAYDAY_SCENE: Scene = {
       ],
     },
     share: { who: 'samvel', a: ['Вот это воспитание! Начинаем.'], hook: 'claims' },
-    refuse: { fx: { set: { [payday.refused]: true } }, who: 'karine', a: [gate(is(bathAsked))('Ни рубля? Тогда я забираю ванную силой. И все за мной.'), gate(missing(bathAsked), is(met('karine')))('Ни рубля? Тогда я забираю ванную. Переложишь нам — считай, отдал. И все за мной.'), gate(missing(bathAsked), missing(met('karine')), WORLD.karineHome)('Я жена Алика, если что. Ни рубля? Тогда я забираю ванную. Переложишь нам — считай, отдал. И все за мной.')], a2: ['Брат, ты сказал «ни рубля» — родня услышала «по рублю». Я бессилен.'], hook: 'claims' },
+    refuse: { fx: { set: { [payday.refused]: true } }, who: 'karine', a: [
+      gate(is(bathAsked))('Ни рубля? Тогда я забираю ванную силой. И все за мной.'),
+      gate(missing(bathAsked), is(met('karine')), is(karineKnowsDebt))('Ни рубля? Тогда я забираю ванную. Переложишь нам — считай, отдал. И все за мной.'),
+      gate(missing(bathAsked), is(met('karine')), missing(karineKnowsDebt))('Ни рубля? Тогда я забираю ванную. И все за мной.'),
+      gate(missing(bathAsked), missing(met('karine')), WORLD.karineHome)('Я жена Алика, если что. Ни рубля? Тогда я забираю ванную. И все за мной.'),
+    ], a2: ['Брат, ты сказал «ни рубля» — родня услышала «по рублю». Я бессилен.'], hook: 'claims' },
     grand: {
       a: [GRAND_OPEN], hook: 'grand',
       opts: [

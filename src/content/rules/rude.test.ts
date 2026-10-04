@@ -6,7 +6,8 @@ import type { Facts } from '../../engine/rules'
 import type { Msg } from '../../engine/state'
 import * as T from '../rude'
 import { HEAT } from '../memkeys'
-import { valueOf, spec, during, isOpen, type Entry } from '../fact'
+import { valueOf, spec, during, isOpen, saidText, type Entry } from '../fact'
+import { P_VIA_BORIS, P_VIA_KARINE, P_VIA_MAMA } from './player-choice-pools'
 
 const texts = (game: Game, from: number) => game.S.msgs.slice(from).map((m) => (m.kind === 'text' || m.kind === 'sys' ? m.text : m.kind === 'sticker' ? m.e : ''))
 const whos = (game: Game, from: number) => game.S.msgs.slice(from).filter((m): m is Extract<Msg, { kind: 'text' }> => m.kind === 'text').map((m) => m.who ?? 'alik')
@@ -99,7 +100,7 @@ describe('лестница грубости: ступени', () => {
   })
   it('голосовое от Самвела и альтернативный отправитель «Нива» уместны только после знакомства', () => {
     const { game } = makeGame()
-    const open = (pool: readonly Entry<T.Said>[], match: string) => pool.filter((e) => isOpen(e, game.lineFacts())).map(valueOf).some(([, t]) => t.includes(match))
+    const open = (pool: readonly Entry<T.Said>[], match: string) => pool.filter((e) => isOpen(e, game.lineFacts())).map(valueOf).some(([, t]) => saidText(t).includes(match))
     expect(open(T.RUDE_CALLS_VOICE, 'Это Самвел')).toBe(false)
     expect(open(T.RUDE_ALT, 'Пишу с «Нивы»')).toBe(false)
     game.S.mem['intro.samvel'] = true
@@ -131,7 +132,7 @@ describe('лестница грубости: ступени', () => {
     const { r, n } = await fire(game, 'rude')
     expect(r).toBe('Rude_Calls')
     const t = texts(game, n)
-    expect(t[0]).toMatch(/Мама Алика/)
+    expect(t[0]).toMatch(/[Мм]ам[аы] Алика/) // пул: «Мама Алика (n)» и «от мамы Алика: n»
     expect(t.some((x) => all(T.RUDE_CALLS_VOICE).includes(x))).toBe(true)
     expect(t.some((x) => T.RUDE_CALLS_ALIK.includes(x))).toBe(true)
   })
@@ -193,6 +194,25 @@ describe('лестница грубости: ступени', () => {
     game.S.mem['finale.rubik'] = 'karine'
     expect(fresh(game).find((c) => c.act === 'via')?.arg).toBe('mama')
     expect((await says(game, 'sorry')).r).toBe('Says_sorry_blocked')
+  })
+  it('кнопка посредника обращается к посреднику, без украшения «Алик, …» (#512)', async () => {
+    const setups: Array<[string, readonly Entry<string>[], (g: Game) => void]> = [
+      ['boris', P_VIA_BORIS, (g) => { g.S.arcs.boris = { i: 4, last: 0 } }],
+      ['karine', P_VIA_KARINE, (g) => { g.S.mem['intro.karine'] = true }],
+      ['mama', P_VIA_MAMA, () => { /* мама — запасной посредник всегда */ }],
+    ]
+    for (const [arg, pool, setup] of setups) {
+      const { game } = makeGame()
+      setup(game)
+      // украшение вешается на повтор уже отправленного: шлём кнопку, снова в блоке — и следующий вариант снова дословный
+      for (let i = 0; i < pool.length + 2; i++) {
+        game.S.mem.blocked = true
+        const via = fresh(game).find((c) => c.act === 'via')
+        expect(via?.arg).toBe(arg)
+        expect(pool.map(valueOf), via?.text).toContain(via?.text)
+        await game.send(via!)
+      }
+    }
   })
   it('S4 — семейный суд в группе (один раз): прелюдия, голосование, приговор — 10 дней вежливости', async () => {
     const { game } = makeGame()

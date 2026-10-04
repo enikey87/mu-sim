@@ -3,12 +3,13 @@ import { describe, it, expect } from 'vitest'
 import { lintRules, type Rule } from '../engine/rules'
 import { allRules } from '../content/rules'
 import { isFactKey } from '../content/factkeys'
-import { multiSampleCoverage, formatCoverage, neverClass, neverInAllSamples, gateIssues, endgameOnly, COVERAGE_SAMPLES, DIRECT_MIN_GAMES } from './coverage'
+import { multiSampleCoverage, runCoverageJobs, formatCoverage, neverClass, neverInAllSamples, gateIssues, stableGateIssues, endgameOnly, COVERAGE_SAMPLES, DIRECT_MIN_GAMES, type SampleReport, type SampleSpec } from './coverage'
 import { DIRECT } from './direct'
 import { is } from '../content/fact'
 import { endgame } from '../content/memkeys'
 import { wallClock } from '../engine/clock'
 import { ruleCoverage } from './coverage'
+import { playtest } from './playtest'
 
 describe('линтер правил', () => {
   it('в игре нет правил, которые никогда не могут победить, и правил без ответа', () => {
@@ -27,6 +28,37 @@ describe('линтер правил', () => {
 })
 
 describe('гейт покрытия: сработало хоть раз (#278)', () => {
+  it('выборки стартуют вместе, возвращаются по порядку и не теряются', async () => {
+    const specs: SampleSpec[] = [1, 2, 3].map((seed) => ({ kind: 'full', seeds: [seed], turns: 1, grumpy: 0 }))
+    const complete: Array<(report: SampleReport) => void> = []
+    const pending = runCoverageJobs(specs, () => new Promise((resolve) => complete.push(resolve)))
+    expect(complete).toHaveLength(3)
+    const report = (seed: number): SampleReport => ({
+      kind: 'full', turns: seed, weighted: [], fired: {}, games: {}, never: seed === 2 ? ['B'] : ['A', 'B'], unsaid: [], events: {},
+    })
+    complete[2](report(3))
+    complete[0](report(1))
+    complete[1](report(2))
+    const result = await pending
+    expect(result.samples.map((s) => s.turns)).toEqual([1, 2, 3])
+    expect(result.never).toEqual(['B'])
+    await expect(runCoverageJobs([], async () => report(0))).rejects.toThrow('Нет выборок')
+    await expect(multiSampleCoverage([])).rejects.toThrow('Нет выборок')
+    await expect(runCoverageJobs(specs, async () => undefined as unknown as SampleReport)).rejects.toThrow()
+    await expect(runCoverageJobs(specs, async () => { throw new Error('sample failed') })).rejects.toThrow('sample failed')
+  })
+  it('воркеры дают те же отчёты, что последовательные выборки', async () => {
+    const specs: SampleSpec[] = [
+      { kind: 'full', seeds: [7], turns: 12, grumpy: 0 },
+      { kind: 'main', seeds: [103], turns: 12, grumpy: 0 },
+    ]
+    const parallel = await multiSampleCoverage(specs, { freeText: 0.15 })
+    const serial = await Promise.all(specs.map(async (s) => ({
+      ...await ruleCoverage(s.seeds, s.turns, undefined, s.grumpy, { freeText: 0.15, untilEnding: s.kind === 'main' }), kind: s.kind,
+    })))
+    expect(parallel.samples).toEqual(serial)
+    expect(parallel.never).toEqual(neverInAllSamples(serial.map((s) => s.never)))
+  })
   it('недостижимость в отчёте — пересечение never по выборкам', () => {
     expect(neverInAllSamples([['A', 'B'], ['B', 'C'], ['B']])).toEqual(['B'])
     expect(neverInAllSamples([['A'], ['B'], ['C']])).toEqual([])
@@ -91,7 +123,50 @@ describe('гейт: DIRECT освобождает только редкие пр
       .toEqual([expect.stringMatching(/^Late: сработало в/)])
   })
   it('частые правила основной игры не в DIRECT: гейт видит их сам — контроль с light.off краснеет', () => {
-    expect(['Bill_Due', 'Credit_Due', 'Turn_LightOff'].filter((n) => n in DIRECT)).toEqual([])
+    expect(['Bill_Due', 'Credit_Due', 'Beat_LightOff'].filter((n) => n in DIRECT)).toEqual([])
+  })
+})
+
+describe('гейт на чужих семействах сидов (#434)', () => {
+  const rule = (name: string, late = false) => ({ name, when: late ? [is(endgame.active)] : [] })
+  const family = (shift: number, main: Record<string, number>, full: Record<string, number> = {}) => ({
+    shift,
+    samples: [{ kind: 'main' as const, games: main }, { kind: 'full' as const, games: full }],
+  })
+
+  it('0/8/4 требует прямой случай; с ним вердикт один и зелёный', () => {
+    const families = [family(2000, {}), family(4000, { Rare: 8 }), family(6000, { Rare: 4 })]
+    expect(stableGateIssues(families, [rule('Rare')], {})).toEqual([
+      expect.stringMatching(/^Rare: .*\+2000: 0.*\+4000: 8.*\+6000: 4.*прямой случай/),
+    ])
+    expect(stableGateIssues(families, [rule('Rare')], { Rare: {} })).toEqual([])
+  })
+
+  it('9/9/9 снимает DIRECT; 6/7/9 оставляет его', () => {
+    const hot = [2000, 4000, 6000].map((shift) => family(shift, { Hot: 9 }))
+    expect(stableGateIssues(hot, [rule('Hot')], { Hot: {} })).toEqual([
+      expect.stringMatching(/^Hot: .*\+2000: 9.*\+4000: 9.*\+6000: 9.*снять из DIRECT/),
+    ])
+    const threshold = [2000, 4000, 6000].map((shift) => family(shift, { Hot: DIRECT_MIN_GAMES }))
+    expect(stableGateIssues(threshold, [rule('Hot')], { Hot: {} })).toHaveLength(1)
+    const mixed = [family(2000, { Hot: 6 }), family(4000, { Hot: 7 }), family(6000, { Hot: 9 })]
+    expect(stableGateIssues(mixed, [rule('Hot')], { Hot: {} })).toEqual([])
+  })
+
+  it('0/0/0 без DIRECT красный; эндгейм считает и полные выборки', () => {
+    const families = [family(2000, {}, { Late: 1 }), family(4000, {}, { Late: 8 }), family(6000, {}, { Late: 4 })]
+    expect(stableGateIssues(families, [rule('Dead')], {})).toEqual([
+      expect.stringMatching(/^Dead: .*прямой случай/),
+    ])
+    expect(stableGateIssues(families, [rule('Late', true)], {})).toEqual([])
+    expect(stableGateIssues(families, [rule('Late')], {})).toEqual([
+      expect.stringMatching(/^Late: .*прямой случай/),
+    ])
+    expect(stableGateIssues([], [rule('Dead')], {})).toEqual([
+      expect.stringMatching(/нет семейств/),
+    ])
+    expect(stableGateIssues([{ shift: 2000, samples: [{ kind: 'main', games: {} }] }], [rule('Dead')], {}))
+      .toEqual([expect.stringMatching(/main и full/)])
   })
 })
 
@@ -129,4 +204,41 @@ describe('покрытие правил', () => {
     expect(banners, 'баннеров не было — проверка была бы пустой').toBeGreaterThan(0)
     expect(pending.size, 'таймер баннера остался живым после прогона').toBe(0)
   }, 300_000)
+})
+
+describe('strictTurns в покрытии и плейтесте (#468)', () => {
+  // регулярка по исходнику не видела флага, убранного в комментарий; сторож — настоящая партия (#493)
+  it('правило, бросающее в ходе, валит партию плейтеста — не тихий recover (#493)', async () => {
+    const boom = {
+      name: 'Test_PlaytestBoom493',
+      event: 'PlayerMessage' as const,
+      when: [] as [],
+      specificity: 999,
+      respond: () => { throw new Error('boom-playtest-493') },
+    }
+    allRules.push(boom as unknown as (typeof allRules)[number])
+    try {
+      await expect(playtest(1, 4)).rejects.toThrow(/boom-playtest-493/)
+    } finally {
+      const i = allRules.findIndex((r) => r.name === 'Test_PlaytestBoom493')
+      if (i >= 0) allRules.splice(i, 1)
+    }
+  })
+
+  it('правило, бросающее в ходе, валит ruleCoverage — не тихий recover (#468)', async () => {
+    const boom = {
+      name: 'Test_CoverageBoom468',
+      event: 'PlayerMessage' as const,
+      when: [] as [],
+      specificity: 999,
+      respond: () => { throw new Error('boom-coverage-468') },
+    }
+    allRules.push(boom as unknown as (typeof allRules)[number])
+    try {
+      await expect(ruleCoverage([1], 4, undefined, 0, { freeText: 0 })).rejects.toThrow(/boom-coverage-468/)
+    } finally {
+      const i = allRules.findIndex((r) => r.name === 'Test_CoverageBoom468')
+      if (i >= 0) allRules.splice(i, 1)
+    }
+  })
 })

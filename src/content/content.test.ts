@@ -10,6 +10,7 @@ import { allRules } from './rules'
 import { Decks } from '../engine/deck'
 import { seededRng } from '../engine/rng'
 import { Gated, valueOf, type Entry } from '../engine/rules'
+import { saidText } from './fact'
 
 const sources = import.meta.glob(['../**/*.ts', '../**/*.tsx', '!../**/*.test.*'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>
 const allSource = Object.values(sources).join('\n')
@@ -39,7 +40,10 @@ describe('scenes', () => {
     const all = <T,>(arr: readonly Entry<T>[]) => arr.map(valueOf)
     for (const [sid, sc] of Object.entries(scenes)) {
       const vars = { ...base, ...sc.init?.(seededRng(1), all, 200) }
-      const txt = (l: Line) => (typeof l === 'function' ? l(vars) : l)
+      const txt = (l: Line) => {
+        const r = typeof l === 'function' ? l(vars) : l
+        return typeof r === 'string' ? r : r.t
+      }
       for (const [nid, n] of Object.entries(sc.nodes)) {
         const has = n.a || n.a2 || n.sys || n.sys2 || n.opts || n.then || n.doc || n.hook
         expect(has, `${sid}.${nid}`).toBeTruthy()
@@ -69,12 +73,12 @@ describe('arcs and cast', () => {
       expect(a.follow.length, id).toBeGreaterThanOrEqual(2)
       expect(ACH[a.eps[a.eps.length - 1].fx?.ach ?? ''], `${id} final ach`).toBeDefined()
       expect(ARC_DONE[id]?.length, `${id} ARC_DONE`).toBeGreaterThan(0)
-      for (const ep of a.eps) for (const m of ep.m.map(valueOf)) if (typeof m !== 'string') expect(CAST[m.w], `${id} who ${m.w}`).toBeDefined()
+      for (const ep of a.eps) for (const m of ep.m.map(valueOf)) if (typeof m !== 'string' && 'w' in m) expect(CAST[m.w], `${id} who ${m.w}`).toBeDefined()
     }
     for (const w of Object.keys(GROUP)) expect(CAST[w], `group ${w}`).toBeDefined()
     // реплики семейного чата не совпадают с репликами сериалов (иначе — повтор в переписке)
     const arcLines = new Set(Object.values(ARCS).flatMap((a) => a.eps.flatMap((e) => e.m.map(valueOf).map((m) => (typeof m === 'string' ? m : m.t)))))
-    for (const t of Object.values(GROUP).flat().map(valueOf)) expect(arcLines.has(t), t).toBe(false)
+    for (const t of Object.values(GROUP).flat().map(valueOf).map(saidText)) expect(arcLines.has(t), t).toBe(false)
   })
 })
 
@@ -135,31 +139,32 @@ describe('excuse generator', () => {
         const e = X.excuse({ preferLong: i % 2 === 0 })
         expect(e.texts.length).toBeGreaterThan(0)
         for (const t of e.texts) {
-          expect(t, t).not.toMatch(/undefined|null|NaN|\[object|\s,|\s\.\s| {2}/)
-          expect(t.length).toBeGreaterThan(2)
+          const s = saidText(t)
+          expect(s, s).not.toMatch(/undefined|null|NaN|\[object|\s,|\s\.\s| {2}/)
+          expect(s.length).toBeGreaterThan(2)
         }
-        if (e.p) expect(e.texts.join(' ').toLowerCase()).toContain(e.p.t.toLowerCase())
-        seen.add(e.texts.join('|'))
+        if (e.p) expect(e.texts.map(saidText).join(' ').toLowerCase()).toContain(e.p.t.toLowerCase())
+        seen.add(e.texts.map(saidText).join('|'))
       }
       expect(seen.size / 3000, `tier ${tier}`).toBeGreaterThan(0.97)
     }
   }, 60_000) // 12 000 отмазок: время растёт с корпусом, а не с числом проверок
   it('higher tiers use escalated excuses', () => {
     const X = api(5, 3)
-    const esc = ([...D.ESC1, ...D.ESC2, ...D.ESC3] as Entry<string>[]).map(valueOf)
+    const esc = ([...D.ESC1, ...D.ESC2, ...D.ESC3] as Entry<import('./fact').Said>[]).map((e) => saidText(valueOf(e)))
     let hits = 0
-    for (let i = 0; i < 500; i++) if (esc.some((e) => X.excuse().texts.join(' ').includes(e))) hits++
+    for (let i = 0; i < 500; i++) if (esc.some((e) => X.excuse().texts.map(saidText).join(' ').includes(e))) hits++
     expect(hits).toBeGreaterThan(50)
     const X0 = api(5, 0)
-    for (let i = 0; i < 300; i++) expect(esc.some((e) => X0.excuse().texts.join(' ').includes(e))).toBe(false)
+    for (let i = 0; i < 300; i++) expect(esc.some((e) => X0.excuse().texts.map(saidText).join(' ').includes(e))).toBe(false)
   })
   it('constr:true только если constr() взял из CONSTR, не из ESC', () => {
-    const esc = ([...D.ESC1, ...D.ESC2, ...D.ESC3] as Entry<string>[]).map(valueOf)
+    const esc = ([...D.ESC1, ...D.ESC2, ...D.ESC3] as Entry<import('./fact').Said>[]).map((e) => saidText(valueOf(e)))
     const X = api(11, 3)
     let escOnSite = 0, flagged = 0
     for (let i = 0; i < 3000; i++) {
       const e = X.excuse()
-      const text = e.texts.join(' ')
+      const text = e.texts.map(saidText).join(' ')
       // шаблон «я на объекте. …» — два слота constr(); «время на объекте» в сроке не считается
       if (!/я на объекте\./i.test(text)) continue
       if (!esc.some((s) => text.includes(s))) continue
@@ -175,9 +180,21 @@ describe('excuse generator', () => {
   it('legendary excuses appear and never repeat', () => {
     const X = api(9)
     const legends: string[] = []
-    for (let i = 0; i < 8000; i++) { const e = X.excuse(); if (e.legendary) legends.push(e.texts[0]) }
+    for (let i = 0; i < 8000; i++) { const e = X.excuse(); if (e.legendary) legends.push(saidText(e.texts[0])) }
     expect(legends.length).toBeGreaterThan(50)
     expect(new Set(legends).size).toBe(legends.length)
+  })
+  it('«Алик всегда возвращает свои долги» — легендарная, не больше раза за партию (#508)', () => {
+    const LINE = 'Алик всегда возвращает свои долги, ты же знаешь.'
+    expect(D.LEGENDARY).toContain(LINE)
+    expect(D.LEGENDARY.length).toBe(101)
+    const X = api(9)
+    const hits: string[] = []
+    for (let i = 0; i < 12_000; i++) {
+      const e = X.excuse()
+      if (e.legendary && saidText(e.texts[0]) === LINE) hits.push(LINE)
+    }
+    expect(hits.length).toBe(1)
   })
   it('helper generators produce text', () => {
     const X = api(3)
@@ -199,7 +216,7 @@ describe('rules content', () => {
   })
   it('every intent offered by a choice rule has a reply rule', () => {
     const intents = new Set<string>()
-    for (const m of allSource.matchAll(/act: '(\w+)'/g)) intents.add(m[1])
+    for (const m of allSource.matchAll(/\bact: '(\w+)'/g)) intents.add(m[1])
     const replies = new Set(allRules.filter((r) => r.event === 'PlayerSays').flatMap((r) => r.when.filter((c) => c.key === 'intent').map((c) => String(c.value))))
     for (const i of intents) expect(replies.has(i), `no reply for intent ${i}`).toBe(true)
   })

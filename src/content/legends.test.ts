@@ -195,11 +195,12 @@ describe('легенда денег', () => {
     game.S.day += 31
     expect(game.legend()).toBeUndefined()
   })
-  it('противоречие легенде ловится: «деньги в сейфе», потом «деньги в Дубае»', () => {
+  it('противоречие легенде ловится: «деньги в сейфе», потом «деньги в Дубае»', async () => {
     const { game } = makeGame()
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Маленький Алик проглотил ключ от сейфа. Ждём.' })
-    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в Дубае.' })
-    expect(game.S.mem['lie.old']).toBe('money_safe')
+    await game.playEpisode(ARCS.nune.eps[3], 'nune') // «Маленький Алик проглотил ключ от сейфа»
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в Дубае.' }, ['money_dubai'])
+    expect(game.lie()?.old.key).toBe('money_safe')
+    expect(game.facts().lieOpen).toBe(true)
   })
 
   /** Сроки, которых сюжет не приводит: ни факта, ни срока в днях. Клятва со ставкой на них не звучит. */

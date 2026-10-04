@@ -4,11 +4,9 @@ import type { UiState } from '../engine/ui-state'
 import { ACH } from '../content/achievements'
 import { ARCS } from '../content/arcs'
 import { ENDINGS } from '../content/finales'
-import { SPEND } from '../content/life'
+import { STARTS } from '../content/quests'
 import { alikShaved, payday } from '../content/memkeys'
 import { fmtDate } from '../engine/time'
-import { START_MONEY } from '../engine/state'
-import { spec } from '../engine/rules'
 
 /** Граница между движком и интерфейсом: единственный модуль UI, который знает устройство S и ключей памяти.
  *  Компоненты получают фасад GameUi и плоский снимок; контент и memkeys не импортируют (страж — view.test.ts). */
@@ -147,58 +145,23 @@ export const viewOf = (u: GameUi): View => {
  *  (тот же объект, что и раньше; windowing и dirtyFrom считаются по нему в Chat). */
 export const feedMsgs = (u: GameUi): Msg[] => realOf(u).S.msgs
 
-export type IntroNote = { icon: string; app: string; text: string; me?: true }
 export type IntroView = {
-  /** Первое сообщение Алика в чате — обещание завязки; интро показывает именно его. */
-  intro: string
-  /** Ответ игрока в прологе чата. */
-  reply: string
-  /** Системная строка завязки («…прошло 184 дня…»). */
+  /** Короткое обещание завязки — факт из STARTS.vow, то же, что входит в первое сообщение Алика. */
+  vow: string
+  /** Системная строка завязки («…прошло 184 дня…») — та же, что в чате. */
   gap: string
-  /** Дней после сдачи — счётчик интро бежит до этого числа. */
-  day: number
-  /** Дата календаря для листания — той же функцией, что разделители чата. */
-  dateAt: (day: number) => string
-  /** Промежуточные: обещания Алика, стикер, списания банка — без незнакомых имён (#249). */
-  notes: IntroNote[]
+  /** Дата сдачи (день 0) — той же функцией, что разделители чата. */
+  date: string
 }
 
-/** Уведомления середины интро: обещания, стикер, банк из пулов партии (docs/design/intro.md).
- *  Сторож «интро не знакомит с чужими» живёт в ui.test.tsx и идёт по настоящему выводу (аудит #335):
- *  прежний фильтр ниже отсеивал ничего — в SPEND имён нет. */
-export function introMidNotes(money = START_MONEY, seed = 1): IntroNote[] {
-  const why = SPEND.map((e) => spec(e).t)
-  const i = Math.abs(seed) % Math.max(1, why.length)
-  const a = why[i] ?? 'Продукты'
-  const b = why[(i + 1) % why.length] ?? 'Кофе с горя'
-  const rub = (n: number) => n.toLocaleString('ru-RU')
-  const bal1 = money - 340
-  const bal2 = bal1 - 128
-  const vows = [
-    'Завтра всё будет, брат',
-    'В понедельник, какой — не скажу',
-    'Деньги в пути. Путь длинный',
-  ]
-  const v0 = vows[seed % vows.length]!
-  const v1 = vows[(seed + 1) % vows.length]!
-  return [
-    { icon: '💬', app: 'Алик', text: v0 },
-    { icon: '💬', app: 'Алик', text: '🏗️' },
-    { icon: '🏦', app: 'Банк', text: `Списание 340 ₽. ${a}. Баланс: ${rub(bal1)} ₽` },
-    { icon: '💬', app: 'Алик', text: v1 },
-    { icon: '💬', app: 'Алик', text: vows[(seed + 2) % vows.length]! },
-    { icon: '🏦', app: 'Банк', text: `Списание 128 ₽. ${b}. Баланс: ${rub(bal2)} ₽` },
-  ]
-}
-
-/** Интро новой партии: null, если уже показано. Пролог читается из ленты — интро совпадает с чатом по построению. */
+/** Интро новой партии: null, если уже показано. Обещание и завязка — из той же партии, что пролог чата. */
 export const introOf = (u: GameUi): IntroView | null => {
   const S = realOf(u).S
   if (S.introShown) return null
   const alik = S.msgs.find((m): m is Extract<Msg, { kind: 'text' }> => m.kind === 'text' && m.from === 'alik')
-  const me = S.msgs.find((m): m is Extract<Msg, { kind: 'text' }> => m.kind === 'text' && m.from === 'me')
   const sys = S.msgs.find((m): m is Extract<Msg, { kind: 'sys' }> => m.kind === 'sys')
-  if (!alik || !me || !sys) return null
-  const seed = [...alik.text].reduce((n, c) => n + c.charCodeAt(0), 0)
-  return { intro: alik.text, reply: me.text, gap: sys.text, day: S.day, dateAt: fmtDate, notes: introMidNotes(S.money, seed) }
+  if (!alik || !sys) return null
+  const start = STARTS.find((s) => s.intro === alik.text)
+  if (!start) return null
+  return { vow: start.vow, gap: sys.text, date: fmtDate(0) }
 }

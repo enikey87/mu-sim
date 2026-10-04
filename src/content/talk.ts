@@ -6,9 +6,10 @@ import type { GameState } from '../engine/state'
 import { type Entry, type FactOp, set } from './fact'
 import { needs } from './world'
 import { grantPaid } from './memkeys'
+import { type Said } from './fact'
 
 /** Вопрос, ответ и (необязательно) когда вопрос уместен: по состоянию и по тому, что Алик только что сказал. */
-export type TalkPair = readonly [string, string, ((S: GameState, said: string) => boolean)?]
+export type TalkPair = readonly [string, Said, ((S: GameState, said: string) => boolean)?]
 
 /** Игрок отвечает вмешавшемуся персонажу, отвечает сам персонаж. */
 export const CHORUS_TALK: Record<string, Entry<TalkPair>[]> = {
@@ -32,6 +33,7 @@ export const CHORUS_TALK: Record<string, Entry<TalkPair>[]> = {
     ['Самвел, вы же хозяин свадьбы — объявите сбор', 'Объявлял. Собрали на конверт молодым. Молодые — это Алик. Опять.', (S) => !!S.arcs.samvel],
   ],
   nune: [
+    // бумаги в сейфе — не утверждение о деньгах, claims тут нет
     needs('dekret')(['Нуне, покажите мне бумаги', 'Бумаги в сейфе. Сейф в офисе. Офис в прошлом. Я в декрете. Цепочка, молодой человек.']),
     ['Нуне, по бумагам — кто кому должен?', 'По бумагам — все всем. По жизни — Алик вам. Но вы этого от меня не слышали.'],
     needs('dekretNow')(['Нуне, выйдете из декрета — позвоните мне', 'Первым делом. После Алика. После мамы Алика. После педиатра. Вы четвёртый.']),
@@ -42,7 +44,7 @@ export const CHORUS_TALK: Record<string, Entry<TalkPair>[]> = {
   ],
   razmik: [
     // «наверху» — пока сериал не кончился: в финале Размик слезает
-    ['Размик, как там наверху?', 'Видно всё. Видно Алика. Видно, что денег нет. Видно Арарат — это единственное, что радует.', (S) => (S.arcs.razmik?.i ?? 0) < ARCS.razmik.eps.length],
+    ['Размик, как там наверху?', { t: 'Видно всё. Видно Алика. Видно, что денег нет. Видно Арарат — это единственное, что радует.', claims: ['no_money'] }, (S) => (S.arcs.razmik?.i ?? 0) < ARCS.razmik.eps.length],
     ['Размик, давайте вместе на него надавим', 'Давай. Ты снизу, я сверху. Он посередине. Ему не привыкать.'],
   ],
   rubik: [
