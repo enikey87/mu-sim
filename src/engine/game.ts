@@ -2526,6 +2526,8 @@ export class Game {
       this.ui.busy = true
       this.clearSchedule(this.idleT)
       const yes = answer === true
+      // «мёртв»: работа зачтена, а прямые say движка гейт смерти не видит — голоса нет (#532)
+      const dead = !!this.S.mem[memkeys.alikDead]
       const reply = mirror ? mirror.me : this.playerLine(() => (yes ? this.draw('JY', JOB_YES_P) : this.draw('JN', JOB_NO_P)))
       this.seen.mark(reply)
       this.push({ kind: 'text', from: 'me', text: reply, time: fmtTime(this.S.clock) })
@@ -2543,15 +2545,14 @@ export class Game {
           this.sys(`Вы сделали работу. Долг Алика вырос на ${add.toLocaleString('ru-RU')} ₽`)
           this.mood(2)
           this.unlock('fence')
-          await this.say([this.uniq(this.X.jobYes)])
         } else {
           // кнопка в ленте после Дня выплаты: мир уже закрыт, долг не трогаем
           this.sys('Работа сделана. Долг уже закрыт Днём выплаты — ничего не выросло.')
-          await this.say([this.uniq(this.X.jobYes)])
         }
+        if (!dead) await this.say([this.uniq(this.X.jobYes)])
       } else {
         this.mood(-1)
-        await this.say([this.uniq(this.X.jobNo)])
+        if (!dead) await this.say([this.uniq(this.X.jobNo)])
       }
       this.S.ctx = null
       this.ui.busy = false
