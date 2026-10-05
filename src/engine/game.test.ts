@@ -296,6 +296,23 @@ describe('Game: допработа', () => {
     await game.answerJob(job2.id, false)
     expect(game.S.mood).toBe(mood - 1)
   })
+  it('мёртвый не отвечает на допработу: игрок отвечает — Алик молчит, долг идёт; ход берёт голос смерти, а не сериал движка', async () => {
+    const { game } = makeGame()
+    await game.job()
+    const job = game.S.msgs.findLast((m) => m.kind === 'job')!
+    game.S.mem.alik_dead = true
+    const [debt, from] = [game.S.debt, game.S.msgs.length]
+    await game.answerJob(job.id, true)
+    // прямые say движка мимо гейта смерти: работа зачтена, голоса нет
+    expect(alikTexts(game.S.msgs.slice(from))).toEqual([])
+    expect(game.S.debt).toBeGreaterThan(debt)
+    expect(game.S.msgs.find((m) => m.id === job.id)).toMatchObject({ kind: 'job', answered: true })
+    // при мёртвом единственный сериал — смерть: ход не может уйти к Turn_ArcSecond (lte('arcsStarted', 1))
+    game.S.arcs.alik_death = { i: 1, last: 0 }
+    game.S.day = 305
+    game.S.stats.sent = 10
+    expect(game.rules.match({ event: 'AlikTurn' }, game.facts())?.name).toBe('Turn_WhileDead')
+  })
 })
 
 describe('Game: батарея', () => {
