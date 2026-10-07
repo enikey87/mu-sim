@@ -11,7 +11,7 @@ import { SPEND } from './life'
 import { WORLD, needs, meet } from './world'
 import { turnRules } from './rules/turn'
 import { valueOf, type Entry } from '../engine/rules'
-import { wedding } from './memkeys'
+import { wedding, polite, blocked } from './memkeys'
 import { is, saidText, type Said } from './fact'
 import type { Game } from '../engine/game'
 
@@ -334,6 +334,26 @@ describe('несостыковки из плейтеста ботами, рау�
     const { game } = makeGame()
     game.S.mem.alik_dead = true
     expect((await game.fire('PlayerMessage', { tone: 'rude' }))?.name).toBe('Tone_WhileDead')
+  })
+  it('окно смерти: ход Алика при alik_dead — голос смерти, хоть вежливый режим, хоть блок (#546)', async () => {
+    const { game } = makeGame()
+    // say() украшает реплику обращением — сверяем по маркерам пулов смерти
+    const DEAD_RE = /том свете|Алик умер|сказала — умер|Я умер|не пишите|Тссс/
+    game.S.mem.alik_dead = true
+    // вежливый режим и блок — залипающие состояния, смерть их не гасит: ничья специфичностей запрещена
+    game.S.mem[polite] = true
+    for (let i = 0; i < 40; i++) expect((await game.fire('AlikTurn'))?.name, `вежливый ход ${i}`).toBe('Turn_WhileDead')
+    game.S.mem[polite] = false
+    game.S.mem[blocked] = true
+    for (let i = 0; i < 40; i++) expect((await game.fire('AlikTurn'))?.name, `блок ход ${i}`).toBe('Turn_WhileDead')
+    // путь игрока: после send звучит только голос смерти
+    game.S.choices = null
+    const choice = game.choices.find((c) => !c.act && c.tone === 'neutral') ?? game.choices.find((c) => !c.act)
+    const from = game.S.msgs.length
+    await game.send(choice!)
+    const voices = game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' && m.from !== 'me' ? [m.text] : []))
+    expect(voices.length, voices.join(' | ')).toBeGreaterThan(0)
+    expect(voices.every((t) => DEAD_RE.test(t)), voices.join(' | ')).toBe(true)
   })
   it('Арсен не кричит в ответ, пока не появился', async () => {
     const { game } = makeGame()
