@@ -315,6 +315,11 @@ def check_frequency(path):
         text = n.group(1) if n else s.group(1) if s else None
         if text is None or any(x in text for x in SAME_DAY_OK):
             continue
+        # разные недели сводки — разные события; цифры дат нельзя схлопывать в «#»
+        # (сид 3 раунда 36: 15–21 и 22–28 мар. в один день → ложный same_day_repeat).
+        # подлинный повтор той же недели — bank_week_repeat по SUMMARY_RE.
+        if re.search(SUMMARY_RE, text):
+            continue
         key = ('n:' if n else 's:') + re.sub(r'\d[\d\s]*', '#', text)
         day[key] += 1
         if day[key] > 1:
