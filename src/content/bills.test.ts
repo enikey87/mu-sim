@@ -200,7 +200,9 @@ describe('платежи по календарю', () => {
     const weeks = Math.ceil((game.S.day - start) / 7)
     for (const label of ['Связь', 'Проездной']) {
       const n = charged.filter((t) => t === `-${label}`).length
-      expect(n, label).toBeGreaterThanOrEqual(weeks - 1)
+      // нижняя граница −3: успех с опозданием сдвигает следующий срок на неделю от
+      // исполнения (#553) — цепочка дрейфует вперёд, в окно попадает на пару попыток меньше
+      expect(n, label).toBeGreaterThanOrEqual(weeks - 3)
       expect(n, label).toBeLessThanOrEqual(weeks)
     }
   })
@@ -385,14 +387,14 @@ describe('платежи по календарю', () => {
     expect(game.lines.eligible('NOTIF', [ungated], game.lineFacts()).some((p) => /Выселяю/.test(p.text))).toBe(true)
     expect(game.lines.eligible('NOTIF', [live], game.lineFacts()).some((p) => /Выселяю/.test(p.text))).toBe(false)
   })
-  it('платёж после перескока срока идёт в сводку недели срока, не обработки (#300)', async () => {
+  it('платёж после перескока срока встаёт в сводку недели обработки, если неделя срока уже ушла (#553)', async () => {
     const { game } = makeGame()
     setMoney(game, 10_000_000)
     const due = Number(game.S.mem[billDueAt('transit')])
     expect(dateOf(due).getDay(), 'проездной — воскресенье').toBe(0)
     game.S.day = due + 1 // понедельник следующей недели
     await game.fire('BillDue', { bill: 'transit', at: due })
-    expect(game.S.bank?.week).toBe(weekOf(due))
+    expect(game.S.bank?.week).toBe(weekOf(game.S.day))
     expect(weekOf(due)).not.toBe(weekOf(game.S.day))
     game.S.day = due + 8
     game.flushBankWeek()
@@ -400,7 +402,22 @@ describe('платежи по календарю', () => {
     expect(summary.lines?.join(' ')).toMatch(/Проездной 500 ₽/)
     expect(summary.lines?.join(' ')).not.toMatch(/2 раза/)
     const { fmtShortDate } = await import('../engine/time')
-    expect(summary.text).toMatch(new RegExp(`Сводка за неделю ${fmtShortDate(weekOf(due))}`))
+    // строка там, где игрок мог её увидеть: неделя обработки, не неделя срока с показанной сводкой
+    expect(summary.text).toMatch(new RegExp(`Сводка за неделю ${fmtShortDate(weekOf(due + 1))}`))
+  })
+  it('платёж после перескока срока остаётся в открытой неделе срока (#300)', async () => {
+    const { game } = makeGame()
+    setMoney(game, 10_000_000)
+    const due = Number(game.S.mem[billDueAt('transit')])
+    game.chargeBill('phone') // строка открывает буфер недели срока — сводка ещё не выходила
+    expect(game.S.bank?.week).toBe(weekOf(due))
+    game.S.day = due + 1
+    await game.fire('BillDue', { bill: 'transit', at: due })
+    expect(game.S.bank?.week).toBe(weekOf(due))
+    game.S.day = due + 8
+    game.flushBankWeek()
+    const summary = cards(game, 'Банк').filter((c) => c.text.startsWith('Сводка')).at(-1)!
+    expect(summary.lines?.join(' ')).toMatch(/Проездной 500 ₽/)
   })
   it('карточка банка во время сцены ждёт её конца (#300)', async () => {
     const { game } = makeGame()

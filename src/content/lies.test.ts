@@ -99,8 +99,11 @@ describe('партия бота', () => {
     for (let seed = 1; seed <= 5 && !caught; seed++) {
       game = makeGame({ seed }).game
       for (let i = 0; i < 400 && !caught; i++) {
-        const c = await botTurn(game)
-        if (c?.act === 'catchLie') caught++
+        // доставленная поимка — по счётчику, не по нажатой кнопке: сообщение, которое батарея
+        // убила в полёте («Не доставлено»), поимкой не стоит считать (#553)
+        const before = Number(game.S.mem.caught ?? 0)
+        await botTurn(game)
+        if (Number(game.S.mem.caught ?? 0) > before) caught++
       }
     }
     expect(caught, 'кнопка «Поймать на лжи» за 400 ходов одной из пяти партий').toBe(1)

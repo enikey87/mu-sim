@@ -594,8 +594,13 @@ export class Game {
   private bankLine(label: string, delta: number, refused = false, onDay = this.S.day): void {
     if (this.moneySealed()) return
     const week = weekOf(onDay)
-    if (this.S.bank && this.S.bank.week !== week) this.flushBankWeek()
-    const b = (this.S.bank ??= { week, lines: {}, bal: this.S.money })
+    // строка не встаёт в неделю, чья сводка уже ушла: буфер ушёл вперёд — платёж виден в текущей
+    // неделе, иначе сводка недели срока утверждала бы списание вопреки карточкам этой недели (#553)
+    const stale = week < weekOf(this.S.day) && (this.S.bank == null || week < this.S.bank.week)
+    const at = stale ? this.S.day : onDay
+    const target = weekOf(at)
+    if (this.S.bank && this.S.bank.week !== target) this.flushBankWeek()
+    const b = (this.S.bank ??= { week: target, lines: {}, bal: this.S.money })
     const key = `${refused ? '!' : delta < 0 ? '-' : '+'}${label}`
     const l = (b.lines[key] ??= { sum: 0, n: 0 })
     l.sum += Math.abs(delta)
@@ -671,6 +676,12 @@ export class Game {
   creditEventLive(id: LoanId, at: unknown): boolean {
     return this.dueLive(loanDueAt(id), at)
   }
+  /** Следующий срок после попытки: календарный, а если он в той же неделе, что попытка — на неделю
+   *  от неё: в одной неделе платёж по метке не стоит и «списанным», и «не прошло» (#553). */
+  private nextDue(due: Due): number {
+    const nat = this.S.day + dueIn(due, this.S.day)
+    return weekOf(nat) === weekOf(this.S.day) ? this.S.day + 7 : nat
+  }
   /** Списать платёж или записать неоплату и последствия. */
   chargeBill(id: BillId): void {
     if (this.moneySealed()) return
@@ -684,6 +695,8 @@ export class Game {
     delete this.S.mem[billDueAt(id)]
     if (this.adjustMoney(-bill.amount, bill.label, { onDay })) {
       this.rules.applyOps([set(billUnpaid(id), false), set(billStreak(id), 0)], {})
+      this.S.mem[billDueAt(id)] = this.nextDue(bill.due)
+      this.scheduleBillDue(id, Number(this.S.mem[billDueAt(id)]))
       this.scheduleBills()
       if (this.moneyLevel() === 'bottom' && this.newFall()) this.maybeCreditOffer()
       return
@@ -694,6 +707,8 @@ export class Game {
     if (id === 'phone' && streak >= 1) this.rules.applyOps([set(phoneWarn, true)], {})
     if (id === 'phone' && streak >= 2) this.rules.applyOps([set(netRation, true)], {})
     if (id === 'transit' && streak >= 2) this.rules.applyOps([set(netRation, true)], {})
+    this.S.mem[billDueAt(id)] = this.nextDue(bill.due)
+    this.scheduleBillDue(id, Number(this.S.mem[billDueAt(id)]))
     this.scheduleBills()
     // неоплата — факт и последствия, а не ежедневное эхо: банк говорит один раз за полосу (#184/#178)
     this.refused(`Не прошло: ${bill.label}, ${this.rub(bill.amount)}`, 'Недостаточно средств. Достоинство не принимается.', streak === 1)
@@ -734,12 +749,15 @@ export class Game {
     delete this.S.mem[loanDueAt(id)]
     if (this.adjustMoney(-payment, loan.label, { onDay })) {
       this.rules.applyOps([set(loanFailed(id), false)], {}) // платёж прошёл — полоса неоплат закрыта
+      this.S.mem[loanDueAt(id)] = this.nextDue(loan.due)
+      this.scheduleEvent(Number(this.S.mem[loanDueAt(id)]), 'CreditDue', { credit: id, at: Number(this.S.mem[loanDueAt(id)]) })
       this.scheduleCredits()
       return
     }
     // банк говорит один раз за полосу неоплат, а не каждую неделю (#184/#178)
     const first = !this.S.mem[loanFailed(id)]
     if (first) this.rules.applyOps([set(loanFailed(id), true)], {})
+    this.S.mem[loanDueAt(id)] = this.nextDue(loan.due)
     this.scheduleCredits()
     const why = `Не прошло: ${loan.label}, ${this.rub(payment)}`
     if (id === 'micro' && !this.S.mem[creditBroke]) {
@@ -895,7 +913,17 @@ export class Game {
         result = 'Не сейчас'
       } else return
       const cur = this.S.msgs.find((x) => x.id === id)
-      if (cur?.kind === 'card') this.replaceMsg(cur, { answered: true, result })
+      if (cur?.kind === 'card') {
+        // числа результата верны на день нажатия: у карточки прошлой недели они стояли бы задним
+        // числом, и сводка недели показа противоречила бы строке недели нажатия (#553)
+        const late = result !== 'Не сейчас' && cur.day != null && weekOf(cur.day) !== weekOf(this.S.day)
+        if (late) {
+          this.replaceMsg(cur, { answered: true })
+          this.push({ kind: 'card', time: fmtTime(this.S.clock), icon: cur.icon, app: cur.app, text: result })
+        } else {
+          this.replaceMsg(cur, { answered: true, result })
+        }
+      }
       // уровень денег сменился — варианты отчаяния уходят сразу, не через ход
       if (!this.ui.busy) this.S.choices = this.buildChoices()
     }
@@ -971,6 +999,8 @@ export class Game {
     if (this.disposed) throw new GameDisposed()
     const msg = { ...m, id: this.S.nextId++ } as Msg
     if ((msg.kind === 'text' || msg.kind === 'sys') && msg.text.includes('{')) msg.text = this.fillMoney(msg.text)
+    // день показа — на карточке: ответ с числами верен для своего дня, не дня показа (#553)
+    if (msg.kind === 'card' && msg.day === undefined) msg.day = this.S.day
     this.quietHeader()
     this.S.msgs.push(msg)
     this.touchMsgs(this.S.msgs.length - 1)
