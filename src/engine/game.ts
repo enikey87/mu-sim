@@ -914,9 +914,9 @@ export class Game {
       } else return
       const cur = this.S.msgs.find((x) => x.id === id)
       if (cur?.kind === 'card') {
-        // числа результата верны на день нажатия: у карточки прошлой недели они стояли бы задним
-        // числом, и сводка недели показа противоречила бы строке недели нажатия (#553)
-        const late = result !== 'Не сейчас' && cur.day != null && weekOf(cur.day) !== weekOf(this.S.day)
+        // числа результата верны на день нажатия: на карточке другого дня они стояли бы задним
+        // числом под сепаратором показа, и отказ/сводка того же дня выглядели бы невозможными (#553/#556)
+        const late = result !== 'Не сейчас' && cur.day != null && cur.day !== this.S.day
         if (late) {
           this.replaceMsg(cur, { answered: true })
           this.push({ kind: 'card', time: fmtTime(this.S.clock), icon: cur.icon, app: cur.app, text: result })

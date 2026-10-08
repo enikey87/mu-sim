@@ -45,7 +45,7 @@ export interface Card {
   lines?: string[]
   offer?: { take?: string; sell?: string }
   event?: PhoneEvent
-  /** Игровой день показа: числа в результате верны на день нажатия, не показа (#553). */
+  /** Игровой день показа: числа в результате верны на день нажатия, не показа (#553/#556). */
   day?: number
   /** Кнопки закрыты; `result` — чем кончилось. */
   answered?: boolean
