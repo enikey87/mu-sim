@@ -50,18 +50,64 @@ describe('ответ на предложение позже показа (#553, 
     expect(summaries(game).at(-1)?.lines?.join(' ')).toMatch(/Кредит: кредиту «Всё будет»/)
   })
 
-  it('кнопка в ту же неделю — как было: результат на самой карточке', () => {
+  it('кнопка в тот же день — результат на самой карточке', () => {
     const { game } = makeGame()
     setMoney(game, 100)
     game.chargeBill('rent')
     const offer = cards(game, 'Банк').at(-1)!
     const n = cards(game, 'Банк').length
-    game.S.day += 2 // другой день, та же неделя
     game.answerCard(offer.id, 'take')
     const shown = cards(game, 'Банк').find((c) => c.id === offer.id)!
     expect(shown.answered).toBe(true)
     expect(shown.result).toMatch(/^Кредит взят: \+/)
     expect(cards(game, 'Банк'), 'лента не растёт').toHaveLength(n)
+  })
+
+  it('кнопка в другой день той же недели: результат отдельной карточкой в день нажатия (#556)', () => {
+    const { game } = makeGame()
+    setMoney(game, 100)
+    game.chargeBill('rent')
+    const offer = cards(game, 'Банк').at(-1)!
+    expect(offer.offer?.take).toBeTruthy()
+    const showDay = offer.day!
+    expect(weekOf(showDay + 2), 'тот же понедельник недели').toBe(weekOf(showDay))
+    game.S.day = showDay + 2
+    game.answerCard(offer.id, 'take')
+    const shown = cards(game, 'Банк').find((c) => c.id === offer.id)!
+    expect(shown.answered).toBe(true)
+    expect(shown.result, 'на карточке показа чисел нет — они верны на день нажатия').toBeUndefined()
+    const res = cards(game, 'Банк').at(-1)!
+    expect(res.id).not.toBe(offer.id)
+    expect(res.text).toMatch(/^Кредит взят: \+/)
+    expect(res.day).toBe(game.S.day)
+  })
+
+  it('отказ между показом и нажатием внутри недели не противоречит балансу результата (#556)', () => {
+    const { game } = makeGame()
+    setMoney(game, 100)
+    game.chargeBill('rent') // дно: отказ + предложение
+    const offer = cards(game, 'Банк').at(-1)!
+    expect(offer.offer?.take).toBeTruthy()
+    const showDay = offer.day!
+    // тот же понедельник недели: отказ проездного уводит видимые деньги, потом кнопка
+    game.S.day = showDay + 2
+    expect(weekOf(game.S.day)).toBe(weekOf(showDay))
+    setMoney(game, 10) // как в сиде 76117: перед отказом почти пусто
+    game.chargeBill('transit')
+    const refuse = cards(game, 'Банк').at(-1)!
+    expect(refuse.text).toMatch(/^Не прошло: Проездной/)
+    expect(refuse.day).toBe(game.S.day)
+    const before = game.S.money
+    game.answerCard(offer.id, 'take')
+    const shown = cards(game, 'Банк').find((c) => c.id === offer.id)!
+    expect(shown.result, 'числа не на карточке показа').toBeUndefined()
+    const res = cards(game, 'Банк').at(-1)!
+    expect(res.day, 'результат под днём нажатия, не показа').toBe(game.S.day)
+    expect(res.day).toBe(refuse.day)
+    expect(res.text).toMatch(/^Кредит взят: \+/)
+    const bal = Number(res.text.match(/Баланс: ([\d\s]+)/)?.[1]?.replace(/\s/g, ''))
+    expect(bal).toBe(game.S.money)
+    expect(bal).toBeGreaterThan(before)
   })
 })
 
