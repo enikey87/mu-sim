@@ -78,6 +78,49 @@ describe('ответ по теме', () => {
       if (c) expect(c.text).not.toMatch(/ковчег|Урарту|Тигран/)
     }
   })
+  it('грубые реплики с цитатой из отмазки закрыты rneed (#560): корпус — автоскан «…» + таблица без кавычек', () => {
+    // Цитата без rneed звучит, будто Алик это говорил: «Хватит „перевод в пути“» без такой отмазки.
+    // Факт-гейты (needs/gate) — своё условие на доске, а не на текст отмазки — вне корпуса.
+    const CITED: Record<string, Record<number, string>> = {
+      // цитаты без кавычек, которые автоскан формой не видит
+      bank: { 4: 'перевод в пути' },
+      history: { 0: 'Урарту', 3: 'Тигран', 4: 'ковчег' },
+    }
+    for (const [k, t] of Object.entries(TOPICS)) {
+      t.r.forEach((entry, i) => {
+        if (typeof entry !== 'string') return
+        const cited = [...valueOf(entry).matchAll(/«([^»]+)»/g)].map((m) => m[1])
+        if (CITED[k]?.[i]) cited.push(CITED[k][i])
+        for (const c of cited) {
+          expect(t.rneed?.[i], `${k}.r[${i}] цитирует «${c}» без rneed`).toBeDefined()
+          expect(t.rneed![i].test(c), `${k}.rneed[${i}] не узнаёт цитату «${c}»`).toBe(true)
+        }
+      })
+    }
+  })
+  it('грубая цитата — только по сказанному: «перевод в пути» не на «Банк пусть капает» (#560)', () => {
+    const { game } = makeGame()
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Банк пусть капает.', topical: true })
+    expect(game.topicOfLast()).toBe('bank')
+    for (let i = 0; i < 40; i++) {
+      const c = fresh(game).find((x) => x.tone === 'rude')
+      expect(c?.text ?? '').not.toMatch(/перевод в пути/)
+    }
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Джан, я тебе отправил перевод. Банк спросил цель платежа.', topical: true })
+    expect(game.topicOfLast()).toBe('bank')
+    expect(offered(game, (c) => c.tone === 'rude' && /перевод в пути/.test(c.text))).toBe(true)
+  })
+  it('грубые цитаты истории — только по сказанному: Урарту, Тигран, ковчег (#560)', () => {
+    const { game } = makeGame()
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Нашли древний кувшин, приехали археологи.', topical: true })
+    expect(game.topicOfLast()).toBe('history')
+    for (let i = 0; i < 40; i++) {
+      const c = fresh(game).find((x) => x.tone === 'rude')
+      expect(c?.text ?? '').not.toMatch(/Урарту|Тигран|ковчег/i)
+    }
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Это ещё Урарту решило.', topical: true })
+    expect(offered(game, (c) => c.tone === 'rude' && /Урарту/.test(c.text))).toBe(true)
+  })
   it('дважды подряд про одну тему — третий раз не предлагается', async () => {
     const { game } = makeGame()
     for (const i of [0, 1]) await game.send({ text: 'q', tone: 'neutral', act: 'topic', arg: `food:${i}` })
