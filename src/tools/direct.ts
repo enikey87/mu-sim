@@ -5,7 +5,7 @@
 import type { Game } from '../engine/game'
 import type { Facts } from '../engine/rules'
 import { during } from '../engine/rules'
-import { HEAT, nuneKeyPassed } from '../content/memkeys'
+import { HEAT, nuneKeyPassed, sorryAt } from '../content/memkeys'
 
 export type DirectCase = { event: string; facts?: Facts; target?: string; setup?: (g: Game) => void }
 
@@ -31,6 +31,13 @@ export const DIRECT: Record<string, DirectCase> = {
   Turn_WhileDead: { event: 'AlikTurn', setup: (g) => { g.S.mem.alik_dead = true } },
   Says_OtherArcWhileDead: { event: 'PlayerSays', facts: { intent: 'arc', arg: 'boris' }, setup: (g) => { g.S.mem.alik_dead = true } },
   Court_Verdict_Lettered: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem.court = 6; g.S.mem.payday = 'strasbourg' } },
+  // #553: дрейф сроков платежей увёл оба правила из выборок — прямой случай держит их под гейтом
+  Court_After: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem.court = 7 } },
+  Says_sorry_sorrySwing3: {
+    event: 'PlayerSays',
+    facts: { intent: 'sorry' },
+    setup: (g) => { const t = g.S.stats.sent; g.S.mem[sorryAt] = [t - 1, t - 2, t - 3].join(',') },
+  },
   Turn_Wedding_Samvel: { event: 'AlikTurn', setup: (g) => { g.S.mem['wedding.samvel'] = true } },
   Turn_Wedding_Razmik: { event: 'AlikTurn', setup: (g) => { g.S.mem['wedding.razmik'] = true } },
   Turn_Wedding_Boris: { event: 'AlikTurn', setup: (g) => { g.S.mem['wedding.boris'] = true } },
@@ -149,6 +156,4 @@ export const DIRECT: Record<string, DirectCase> = {
       g.S.promises[0].met = g.S.day
     },
   },
-  // после расширения LEGENDARY бот реже доходит до угроз→сцены (#508)
-  Scene_tax: { event: 'PickScene', setup: (g) => { g.S.mem['count.threat'] = 1 } },
 }
