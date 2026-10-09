@@ -130,6 +130,20 @@ describe('ответ по теме', () => {
     game.alikMsg({ kind: 'text', from: 'alik', text: 'Ем хаш.', topical: true })
     expect(game.topicOfLast()).toBe('food')
   })
+  it('заглушенная ближайшая тема не проваливается к старой теме ленты (#564)', async () => {
+    const { game } = makeGame()
+    for (const i of [0, 1]) await game.send({ text: 'q', tone: 'neutral', act: 'topic', arg: `beton:${i}` })
+    // ниже по ленте — реплика другой темы, ближайшая — бетон, но бетон исчерпан двумя вопросами
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Ем хаш.', topical: true })
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Бетон опять не застывает.', topical: true })
+    expect(game.topicOfLast()).toBeUndefined()
+    expect(offered(game, (c) => c.act === 'topic')).toBe(false)
+    const foodRude = TOPICS.food.r.map(valueOf)
+    expect(offered(game, (c) => c.tone === 'rude' && foodRude.includes(c.text))).toBe(false)
+    await game.send({ text: 'Алик, привет', tone: 'polite' }) // серия вопросов прервалась — тема снова доступна
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Бетон опять не застывает.', topical: true })
+    expect(game.topicOfLast()).toBe('beton')
+  })
   it('новая сцена сбрасывает старый контекст («что вы удалили?»)', async () => {
     const { game } = makeGame()
     game.S.ctx = { deleted: true }
