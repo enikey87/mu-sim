@@ -50,7 +50,7 @@ import { UiState, type Moo, type Notif, type SendFeel } from './ui-state'
 import { classifyUserInput, legalClaim, type ClassifiedInput } from './input'
 import { holidayOf, holidayGreetKey, holidayDays, HOLIDAY_EXCUSES } from '../content/holidays'
 import { dueIn, dateOf, fmtDate, fmtDayMonth, fmtShortDate, fmtTime, weekOf, nightHour, periodOf, tierOf, TIERS, type Due, type Period } from './time'
-import { type GameState, type Msg, type NewMsg, type Card, type PhoneEvent, type Choice, type Ctx, type Tone, type Storage, type InputCategory, freshState, loadState, saveState, SAVE_KEY, LEND50_SEEN_KEY, MAX_PATIENCE, isLate, countOf, setCount, type PromiseRec } from './state'
+import { type GameState, type BankWeek, type Msg, type NewMsg, type Card, type PhoneEvent, type Choice, type Ctx, type Tone, type Storage, type InputCategory, freshState, loadState, saveState, SAVE_KEY, LEND50_SEEN_KEY, MAX_PATIENCE, isLate, countOf, setCount, type PromiseRec } from './state'
 
 /** Текст срока как буквальный шаблон без учёта регистра; кэш — topicOfLast зовётся из facts() на каждую реплику. */
 const LITERAL = new Map<string, RegExp>()
@@ -607,6 +607,14 @@ export class Game {
     l.n++
     b.bal = this.S.money
   }
+  /** Строки буфера по знакам: «Списано», «Поступило», «Не прошло». */
+  private bankLines(b: BankWeek, refused = true): string[] {
+    const part = (sign: string, head: string): string[] => {
+      const rows = Object.entries(b.lines).filter(([k]) => k[0] === sign)
+      return rows.length ? [`${head}: ${rows.map(([k, v]) => `${k.slice(1)} ${this.rub(v.sum)}${v.n > 1 ? ` (${v.n} ${[2, 3, 4].includes(v.n % 10) && ![12, 13, 14].includes(v.n % 100) ? 'раза' : 'раз'})` : ''}`).join(', ')}`] : []
+    }
+    return [...part('-', 'Списано'), ...part('+', 'Поступило'), ...(refused ? part('!', 'Не прошло') : [])]
+  }
   /** Сводка прошедшей недели — одна карточка, когда календарь перешёл в новую (#287). */
   flushBankWeek(): void {
     const b = this.S.bank
@@ -614,11 +622,7 @@ export class Game {
     if (!b || b.week >= weekOf(this.S.day)) return
     this.S.bank = null
     if (this.moneySealed()) return
-    const part = (sign: string, head: string): string[] => {
-      const rows = Object.entries(b.lines).filter(([k]) => k[0] === sign)
-      return rows.length ? [`${head}: ${rows.map(([k, v]) => `${k.slice(1)} ${this.rub(v.sum)}${v.n > 1 ? ` (${v.n} ${[2, 3, 4].includes(v.n % 10) && ![12, 13, 14].includes(v.n % 100) ? 'раза' : 'раз'})` : ''}`).join(', ')}`] : []
-    }
-    const lines = [...part('-', 'Списано'), ...part('+', 'Поступило'), ...part('!', 'Не прошло')]
+    const lines = this.bankLines(b)
     if (!lines.length) return
     this.bankCard(`Сводка за неделю ${fmtShortDate(b.week)} – ${fmtShortDate(b.week + 6)}: баланс ${this.rub(b.bal)}`, { lines, event: 'bank.summary' })
   }
@@ -897,6 +901,9 @@ export class Game {
       const loan = nextLoan(Number(this.S.mem[creditStage] ?? 0))
       const thing = nextThing(this.S.mem)
       let result: string
+      // смены баланса, которых игрок ещё не видел (буфер недели): результат называет их —
+      // иначе его баланс не восстанавливается из сводки (#563); у «Не сейчас» баланса нет
+      const unseen = pick !== 'later' && this.S.bank ? this.bankLines(this.S.bank, false) : []
       if (pick === 'take' && m.offer.take && loan) {
         const before = this.S.money
         this.takeCredit()
@@ -919,9 +926,9 @@ export class Game {
         const late = result !== 'Не сейчас' && cur.day != null && cur.day !== this.S.day
         if (late) {
           this.replaceMsg(cur, { answered: true })
-          this.push({ kind: 'card', time: fmtTime(this.S.clock), icon: cur.icon, app: cur.app, text: result })
+          this.push({ kind: 'card', time: fmtTime(this.S.clock), icon: cur.icon, app: cur.app, text: result, lines: unseen.length ? unseen : undefined })
         } else {
-          this.replaceMsg(cur, { answered: true, result })
+          this.replaceMsg(cur, { answered: true, result, lines: unseen.length ? unseen : undefined })
         }
       }
       // уровень денег сменился — варианты отчаяния уходят сразу, не через ход

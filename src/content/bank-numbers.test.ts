@@ -217,3 +217,46 @@ describe('цепочка видимых чисел сходится (#553)', () 
     expect(log.length, 'сводки за период были').toBeGreaterThan(5)
   })
 })
+
+// форма сида 79031: сводка утром, тихое списание в новый буфер, кредит в тот же день
+const num = (text: string, re: RegExp): number => Number(text.match(re)?.[1]?.replace(/\s/g, ''))
+
+describe('результат кнопки называет строки недели, которых игрок ещё не видел (#563)', () => {
+  it('сводка, тихое списание и кредит в один день: баланс сходится через строку результата', () => {
+    const { game } = makeGame()
+    setMoney(game, 6800)
+    game.chargeBill('phone') // строка недели: у сводки будут и баланс, и «Списано»
+    expect(cards(game, 'Банк'), 'предложения ещё нет — падение впереди').toHaveLength(0)
+    game.S.day = weekOf(game.S.day) + 7 // новая неделя, понедельник — срок связи
+    game.chargeBill('phone') // −400: сводка уходит в ленту, строка — в новый буфер, деньги на дне → предложение
+    const offer = cards(game, 'Банк').at(-1)!
+    expect(offer.offer?.take).toBeTruthy()
+    const B = num(summaries(game).at(-1)!.text, /баланс ([\d\s]+) ₽/)
+    expect(game.S.money, 'видимый баланс уехал от сводки — форма 79031').not.toBe(B)
+    game.answerCard(offer.id, 'take')
+    const res = cards(game, 'Банк').at(-1)!
+    expect(res.id).toBe(offer.id) // ответ в тот же день — итог на самой карточке
+    const A = num(res.result!, /\+([\d\s]+) ₽/)
+    const Y = num(res.result!, /Баланс: ([\d\s]+) ₽/)
+    expect(res.lines, 'тихое списание названо на карточке результата').toEqual(['Списано: Связь 400 ₽'])
+    expect(Y).toBe(B - 400 + A)
+  })
+
+  it('ответ кнопкой позже показа: отдельная карточка результата тоже называет строки', () => {
+    const { game } = makeGame()
+    setMoney(game, 100)
+    game.chargeBill('rent') // дно: отказ и предложение одной карточкой
+    const offer = cards(game, 'Банк').at(-1)!
+    expect(offer.offer?.take).toBeTruthy()
+    const showDay = offer.day!
+    game.S.day = showDay + 2 // другой день той же недели
+    expect(weekOf(game.S.day)).toBe(weekOf(showDay))
+    game.adjustMoney(2000, 'Зарплата')
+    game.chargeBill('phone')
+    game.answerCard(offer.id, 'take')
+    const res = cards(game, 'Банк').at(-1)!
+    expect(res.id).not.toBe(offer.id)
+    expect(res.day).toBe(game.S.day)
+    expect(res.lines?.map((l) => l.replace(/\s/g, ' '))).toEqual(['Списано: Связь 400 ₽', 'Поступило: Зарплата 2 000 ₽'])
+  })
+})
