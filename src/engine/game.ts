@@ -1445,8 +1445,12 @@ export class Game {
       for (const p of this.S.promises) text = text.replace(literalRe(p.t), '')
       text = text.replace(/^[.\s,;:!?…—–-]+|[.\s,;:!?…—–-]+$/g, '').trim()
       if (!text) continue
-      const hit = Object.entries(TOPICS).find(([k, t]) => t.re.test(text) && !this.topicMuted(k))
-      if (hit) { this.topicText = text; return hit[0] }
+      const hit = Object.entries(TOPICS).find(([, t]) => t.re.test(text))
+      if (!hit) continue
+      // ближайшая тема заглушена — темы нет: до реплики старой темы поиск не доходит (#564)
+      if (this.topicMuted(hit[0])) return undefined
+      this.topicText = text
+      return hit[0]
     }
     return undefined
   }
