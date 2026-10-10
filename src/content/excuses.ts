@@ -35,8 +35,8 @@ export interface When {
   tomorrow?: boolean
   /** Оценка автора в днях: горизонт события, у увёртки без `due` — её поздняя дата, если она позже `d`. */
   est?: number
-  /** Событие — идущее состояние мира со сроком (свадьба, болезнь): горизонт — остаток срока, `est` — когда его нет. */
-  state?: { key?: string; actor?: string; prefix?: string }
+  /** Событие — идущее состояние мира со сроком (свадьба, болезнь): горизонт — остаток срока, `est` — когда его нет. `keys` — состояние только из списка (у остальных ключей с тем же корнем срока нет). */
+  state?: { key?: string; keys?: string[]; actor?: string; prefix?: string }
   /** Праздник или сезон: горизонт — до ближайшей даты календаря. */
   holiday?: HolidayRef
 }
@@ -311,12 +311,13 @@ D.VERB = [
 const WHEN: Entry<When>[] = [
   { t: 'завтра', d: 1, kind: 'clear', tomorrow: true }, { t: 'в пятницу, край — в понедельник', d: 4, kind: 'dodge', due: { weekday: 5, plus: 3 } }, { t: 'после Навасарда', d: null, kind: 'holiday', holiday: 'navasard' },
   { t: 'в понедельник, какой — не скажу', d: 7, kind: 'dodge', due: { weekday: 1 } },
-  gate(exists('arc.grant'), missing(grantPaid))({ t: 'как заказчик заплатит', d: null, kind: 'event', est: 30, condition: grantPaid }),
+  gate(exists('arc.grant'), missing(grantPaid))({ t: 'как заказчик заплатит', d: null, kind: 'never', condition: grantPaid }),
   { t: 'до конца недели', d: 5, kind: 'clear', due: { week: true } }, { t: 'через час, максимум два', d: 0, kind: 'clear' }, { t: 'после праздника', d: 10, kind: 'event', est: 10 },
   { t: 'когда брат вернётся из Гюмри', d: null, kind: 'never' }, { t: 'в среду утром', d: 0, kind: 'clear', due: { weekday: 3 } },
   { t: 'завтра с утра, если дождя не будет', d: 1, kind: 'clear', tomorrow: true },
   gate(WORLD.baran, of('boris', is(sick)))({ t: 'как баран поправится', d: null, kind: 'event', est: 14, state: { key: sick, actor: 'boris' } }),
-  { t: 'сразу после свадьбы', d: 7, kind: 'event', est: 7, state: { prefix: 'wedding.' } }, { t: 'в следующем месяце', d: 30, kind: 'clear', due: { monthEnd: 1 } }, { t: 'на днях', d: 2, kind: 'dodge' },
+  // «сразу после свадьбы» — только у свадьбы с концом (Борис, Размик): у Самвела и Ануш срока в мире нет (#571)
+  { t: 'сразу после свадьбы', d: 7, kind: 'event', est: 7, state: { keys: [wedding('boris'), wedding('razmik')] } }, { t: 'в следующем месяце', d: 30, kind: 'clear', due: { monthEnd: 1 } }, { t: 'на днях', d: 2, kind: 'dodge' },
   { t: 'до Нового года', d: 90, kind: 'clear', due: { newYear: true } }, { t: 'послезавтра, край — послепослезавтра', d: 3, kind: 'dodge' },
   { t: 'как только абрикосы созреют', d: null, kind: 'holiday', holiday: 'apricots' },
   // фазу луны игра не считает — это оценка, а не дата
@@ -325,18 +326,18 @@ const WHEN: Entry<When>[] = [
   { t: 'когда Арарат вернут', d: null, kind: 'never' }, { t: 'сегодня вечером', d: 0, kind: 'clear' },
   // поздняя из двух дат — конец следующей недели: от 7 до 13 дней, берём верхнюю
   { t: 'на следующей неделе, в начале или в конце', d: 7, kind: 'dodge', est: 13 },
-  needs('dekretNow')(needs('nune')({ t: 'как Нуне из декрета выйдет', d: null, kind: 'event', est: 540, condition: nuneDekretOver })),
-  gate(exists('arc.beton'), missing(betonSet))({ t: 'как бетон застынет', d: null, kind: 'event', est: 28, condition: betonSet }),
-  { t: 'после приёмки второго этажа', d: null, kind: 'event', est: 60 }, gate(missing(actSigned))({ t: 'как акт подпишут', d: null, kind: 'event', est: 21, condition: actSigned }),
-  needs('crane')({ t: 'когда кран освободится', d: null, kind: 'event', est: 30 }), { t: 'после Вардавара', d: null, kind: 'holiday', holiday: 'vardavar' },
+  needs('dekretNow')(needs('nune')({ t: 'как Нуне из декрета выйдет', d: null, kind: 'never', condition: nuneDekretOver })),
+  gate(exists('arc.beton'), missing(betonSet))({ t: 'как бетон застынет', d: null, kind: 'never', condition: betonSet }),
+  { t: 'после приёмки второго этажа', d: null, kind: 'never' }, gate(missing(actSigned))({ t: 'как акт подпишут', d: null, kind: 'never', condition: actSigned }),
+  needs('crane')({ t: 'когда кран освободится', d: null, kind: 'never' }), { t: 'после Вардавара', d: null, kind: 'holiday', holiday: 'vardavar' },
   { t: 'как отопление дадут', d: null, kind: 'never' },
   gate(gte('month', 3), lte('month', 10))({ t: 'к зиме', d: null, kind: 'holiday', holiday: 'winter' }), { t: 'к Пасхе', d: null, kind: 'holiday', holiday: 'easter' },
-  { t: 'как объект в Абовяне сдадим', d: null, kind: 'event', est: 120 },
-  { t: 'когда налоговая уйдёт', d: null, kind: 'event', est: 60 }, needs('nivaHome')(needs('niva')({ t: 'после техосмотра «Нивы»', d: null, kind: 'event', est: 14 })),
+  { t: 'как объект в Абовяне сдадим', d: null, kind: 'never' },
+  { t: 'когда налоговая уйдёт', d: null, kind: 'never' }, needs('nivaHome')(needs('niva')({ t: 'после техосмотра «Нивы»', d: null, kind: 'never' })),
   { t: 'в конце квартала', d: 45, kind: 'clear', due: { quarter: true } },
-  needs('samvel')({ t: 'как дядя Самвел проснётся', d: 1, kind: 'event', est: 1 }), { t: 'после футбола', d: 1, kind: 'event', est: 1 },
+  needs('samvel')({ t: 'как дядя Самвел проснётся', d: 1, kind: 'never' }), { t: 'после футбола', d: 1, kind: 'event', est: 1 },
   { t: 'как снег в горах сойдёт', d: null, kind: 'never' },
-  { t: 'в следующий вторник, но не в этот', d: 9, kind: 'clear', due: { weekday: 2, next: true } }, { t: 'как только штукатурка высохнет', d: 14, kind: 'event', est: 14 },
+  { t: 'в следующий вторник, но не в этот', d: 9, kind: 'clear', due: { weekday: 2, next: true } },   { t: 'как только штукатурка высохнет', d: 14, kind: 'never' },
   { t: 'когда рак на Арагаце свистнет', d: null, kind: 'never' }, { t: 'после обеда, но не сегодняшнего', d: 1, kind: 'dodge' },
 ]
 D.WHEN = WHEN

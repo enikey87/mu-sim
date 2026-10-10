@@ -19,7 +19,7 @@ export interface Legend {
 export const LEGENDS: Record<string, Legend> = {
   // --- бухгалтер Нуне
   safe_nune: {
-    until: { t: 'как Нуне из декрета выйдет', d: null, kind: 'event', est: 540, condition: nuneDekretOver },
+    until: { t: 'как Нуне из декрета выйдет', d: null, kind: 'never', condition: nuneDekretOver },
     lines: [
       { t: 'Сейф закрыт, ключ у Нуне в сумочке, сумочка в роддоме. Цепочка, брат. Не я её придумал.', claims: ['money_safe'] },
       'Звонил Нуне. Говорит, ключ на месте. Сейф на месте. Деньги на месте. Только всё это в разных местах.',
@@ -33,7 +33,7 @@ export const LEGENDS: Record<string, Legend> = {
     ],
   },
   safe_baby: {
-    until: { t: 'как ключ выйдет', d: null, kind: 'event', est: 14, condition: nuneKeyPassed },
+    until: { t: 'как ключ выйдет', d: null, kind: 'never', condition: nuneKeyPassed },
     lines: [
       'Ключ ещё не вышел. Врач говорит: терпение. Как у тебя. Вы с малышом похожи.',
       { t: 'Даём малышу чернослив. Всей семьёй. Он смеётся. Мы нет. Деньги — там же, в сейфе.', claims: ['money_safe'] },
@@ -47,7 +47,7 @@ export const LEGENDS: Record<string, Legend> = {
     ],
   },
   safe_wrongkey: {
-    until: { t: 'как второй ключ найдём', d: null, kind: 'event', est: 60 },
+    until: { t: 'как второй ключ найдём', d: null, kind: 'never' },
     lines: [
       needs('boris', 'crane')('Второй ключ ищем. Обыскали малыша, Нуне, Бориса и кран. Кран обиделся.'),
       'Сейф вызвали вскрывать. Медвежатник пришёл, посмотрел, сказал: «Там пусто». Я ему не верю. Он просто устал.',
@@ -61,7 +61,7 @@ export const LEGENDS: Record<string, Legend> = {
   },
   // --- «Нива» с деньгами в бардачке
   niva_stuck: {
-    until: { t: 'как «Нива» заведётся', d: null, kind: 'event', est: 14, condition: nivaAway },
+    until: { t: 'как «Нива» заведётся', d: null, kind: 'never', condition: nivaAway },
     lines: [
       needs('garikFree')(needs('garik')('Толкали «Ниву» с Гариком. Она ни в какую. Деньги в бардачке, бардачок заклинило — из солидарности.')),
       '«Нива» стоит, деньги в ней. Я каждый день подхожу, глажу капот. Она молчит. Как банк.',
@@ -74,7 +74,7 @@ export const LEGENDS: Record<string, Legend> = {
     ],
   },
   niva_gone: {
-    until: { t: 'как «Нива» найдётся', d: null, kind: 'event', est: 30, condition: nivaBack },
+    until: { t: 'как «Нива» найдётся', d: null, kind: 'never', condition: nivaBack },
     lines: [
       'Если увидишь «Ниву» — не пугай её, брат. Она нервная. Скажи, что я не злюсь.',
       'Дал объявление: «Пропала «Нива», белая, с деньгами. Нашедшему — половина». Половина твоя, брат. Шучу. Моя.',
@@ -87,7 +87,7 @@ export const LEGENDS: Record<string, Legend> = {
     ],
   },
   niva_abroad: {
-    until: { t: 'как «Нива» вернётся из Грузии', d: null, kind: 'event', est: 30, condition: nivaBack },
+    until: { t: 'как «Нива» вернётся из Грузии', d: null, kind: 'never', condition: nivaBack },
     lines: [
       '«Нива» в Тбилиси. Деньги с ней. Грузины говорят: машина хорошая, пусть остаётся. Переговоры идут.',
       needs('moustache')('Позвонил в грузинскую полицию. Спросили: «Нива» белая, с усами на капоте? Нет, говорю, усы — это я.'),
@@ -100,7 +100,7 @@ export const LEGENDS: Record<string, Legend> = {
     ],
   },
   niva_back: {
-    until: { t: 'как новые колёса продадим', d: null, kind: 'event', est: 30 },
+    until: { t: 'как новые колёса продадим', d: null, kind: 'never' },
     lines: [
       { t: 'Грузинские колёса выставил на продажу. Бардачок проверил ещё раз. И ещё раз. Пустой.', claims: [{ retract: 'money_niva' }] },
       'Покупатель на колёса есть. Хочет в рассрочку. Как я. Мы с ним друг друга поймём.',
@@ -151,7 +151,7 @@ export const LEGENDS: Record<string, Legend> = {
     ],
   },
   boris_object: {
-    until: { t: 'как Борис объект сдаст', d: null, kind: 'event', est: 30 },
+    until: { t: 'как Борис объект сдаст', d: null, kind: 'never' },
     lines: [
       'Теперь всё решает Борис. Я только подписываю, копытом. Как сдаст объект — сразу расчёт.',
       'Борис сказал «бее», бригада поняла «работаем до пятницы». Если сдадим в пятницу — пятница твоя.',
@@ -163,7 +163,7 @@ export const LEGENDS: Record<string, Legend> = {
     ],
   },
   crypto: {
-    until: { t: 'как «Лаваш-коин» вырастет', d: null, kind: 'event', est: 365 },
+    until: { t: 'как «Лаваш-коин» вырастет', d: null, kind: 'never' },
     lines: [
       'Твои деньги в «Лаваш-коине». Курс стабильный: один коин — один лаваш.',
       'Курс вырос! Теперь за два коина дают три лаваша. В рублях пока не считают.',
@@ -174,7 +174,7 @@ export const LEGENDS: Record<string, Legend> = {
     ],
   },
   frozen: {
-    until: { t: 'как счета разморозят', d: null, kind: 'event', est: 60, condition: taxThawed },
+    until: { t: 'как счета разморозят', d: null, kind: 'never', condition: taxThawed },
     lines: [
       'Счета всё ещё заморожены. Налоговая говорит: «ждите». Я жду. Ты ждёшь. Все ждут.',
       gate(gte('arc.boris', 10))('Звонил в налоговую: сказали, разморозят, как только Борис даст показания ещё раз. Он отказывается. Принципиальный.'),
@@ -189,7 +189,7 @@ export const LEGENDS: Record<string, Legend> = {
   },
   // --- деньги в фундаменте
   beton_money: {
-    until: { t: 'как фундамент вскроем', d: null, kind: 'event', est: 90 },
+    until: { t: 'как фундамент вскроем', d: null, kind: 'never' },
     lines: [
       'Деньги лежат, брат. Глубина полтора метра. Надёжнее любого банка — у банка хоть санитарный день бывает.',
       gate(WORLD.grant, missing(grantPaid))('Вскрыть нельзя — дом упадёт. Дом упадёт — Грант не заплатит. Там всё держится на твоих деньгах. Буквально.'),
@@ -203,7 +203,7 @@ export const LEGENDS: Record<string, Legend> = {
     ],
   },
   beton_law: {
-    until: { t: 'как Грант признает, что должен тебе', d: null, kind: 'event', est: 60 },
+    until: { t: 'как Грант признает, что должен тебе', d: null, kind: 'never' },
     lines: [
       'Я тебе больше не должен, Арсен говорит — долг переехал вместе с деньгами. В бетон. Пиши Гранту.',
       'Арсен составил от твоего имени иск к Гранту. Госпошлину оплатишь? Это вложение, брат.',
@@ -230,7 +230,7 @@ export const LEGENDS: Record<string, Legend> = {
   },
   // --- инспектор Рубик
   inspect: {
-    until: { t: 'как Рубик акт подпишет', d: null, kind: 'event', est: 30, condition: actSigned },
+    until: { t: 'как Рубик акт подпишет', d: null, kind: 'never', condition: actSigned },
     lines: [
       gate(WORLD.grant, missing(actSigned))('Без акта Грант не платит, без Гранта — я. А акт у Рубика. А Рубик у меня в ванной.'),
       needs('garik')('Рубик теперь проверяет Гарика. Говорит, слишком честные глаза — подозрительно.'),
@@ -243,7 +243,7 @@ export const LEGENDS: Record<string, Legend> = {
     ],
   },
   inspect_karine: {
-    until: { t: 'как Карине с Рубиком разберётся', d: null, kind: 'event', est: 30, condition: finaleOf('rubik') }, // любой финал Рубика: Карине с ним разобралась, так или иначе
+    until: { t: 'как Карине с Рубиком разберётся', d: null, kind: 'never', condition: finaleOf('rubik') }, // любой финал Рубика: Карине с ним разобралась, так или иначе
     lines: [
       'Рубик читает Карине стихи. Про плитку. Карине смеётся. Я — нет.',
       'Пока семья решает, деньги трогать нельзя — это может быть приданое. Моё или Карине — пока неясно.',
@@ -257,7 +257,7 @@ export const LEGENDS: Record<string, Legend> = {
   },
   // --- Размик на кране
   crane_queue: {
-    until: { t: 'как Размик с крана слезет', d: null, kind: 'event', est: 45, condition: finaleOf('razmik') },
+    until: { t: 'как Размик с крана слезет', d: null, kind: 'never', condition: finaleOf('razmik') },
     lines: [
       'Сначала Размик — он выше. Потом ты. Очередь, брат. Я уважаю очередь больше, чем деньги.',
       'Размик который день ничего не ест. Ты хотя бы ешь. Кому нужнее? Вот.',
@@ -284,7 +284,7 @@ export const LEGENDS: Record<string, Legend> = {
   },
   // --- свадьба дяди Самвела
   wedding: {
-    until: { t: 'сразу после свадьбы Самвела', d: null, kind: 'event', est: 8, state: { key: wedding('samvel') } },
+    until: { t: 'сразу после свадьбы Самвела', d: null, kind: 'never' },
     lines: [
       'Я тамада, у меня микрофон, у тебя — ожидание. Всё честно распределено.',
       'Гости подарили конверты. Конверты у Самвела. Самвел танцует. Как дотанцует — поделим.',
@@ -298,7 +298,7 @@ export const LEGENDS: Record<string, Legend> = {
   },
   // --- заказчик Грант
   grant: {
-    until: { t: 'как Грант заплатит', d: null, kind: 'event', est: 30, condition: grantPaid },
+    until: { t: 'как Грант заплатит', d: null, kind: 'never', condition: grantPaid },
     lines: [
       'Я бы отдал, но Грант не платит мне. Я не могу платить тебе из денег, которых нет. Это же логика, брат.',
       'Звонил Гранту. Хочет экспертизу: не верит, что так ровно кладут руками. Эксперт тоже не верит.',
@@ -310,7 +310,7 @@ export const LEGENDS: Record<string, Legend> = {
     ],
   },
   grant_la: {
-    until: { t: 'как Грант из Лос-Анджелеса вернётся', d: null, kind: 'event', est: 60 },
+    until: { t: 'как Грант из Лос-Анджелеса вернётся', d: null, kind: 'never' },
     lines: [
       { t: 'Грант в Лос-Анджелесе. Там сейчас ночь, когда у нас день. Поэтому денег нет ни днём, ни ночью.', claims: ['no_money'] },
       'Написал Гранту. Он ответил эмодзи с пальмой. Я считаю, это «скоро».',
@@ -322,7 +322,7 @@ export const LEGENDS: Record<string, Legend> = {
     ],
   },
   grant_twin: {
-    until: { t: 'как разберёмся, какой Грант настоящий', d: null, kind: 'event', est: 60 },
+    until: { t: 'как разберёмся, какой Грант настоящий', d: null, kind: 'never' },
     lines: [
       'Платить должен настоящий Грант. А их двое. Пока не разберёмся — никто не платит. Юридически.',
       'Позвал обоих Грантов в кафе. Пришёл один. Какой — непонятно. Заплатил за кофе — значит, не настоящий.',
@@ -335,7 +335,7 @@ export const LEGENDS: Record<string, Legend> = {
   },
   // --- бессмертный дедушка
   grandpa: {
-    until: { t: 'после прощания с дедушкой', d: null, kind: 'event', est: 365 },
+    until: { t: 'после прощания с дедушкой', d: null, kind: 'never' },
     lines: [
       'Деньги отложены на прощание с дедушкой. Прощание откладывается. Деньги тоже.',
       'Дедушка сказал: «Не трогайте мои похоронные». Я не трогаю. Твои лежат рядом, их тоже не трогаю.',
@@ -347,7 +347,7 @@ export const LEGENDS: Record<string, Legend> = {
     ],
   },
   grandpa_will: {
-    until: { t: 'как завещание вступит в силу', d: null, kind: 'event', est: 365 },
+    until: { t: 'как завещание вступит в силу', d: null, kind: 'never' },
     lines: [
       needs('arsen')('Пока завещание не вступит в силу, я не могу распоряжаться. Юрист сказал. Арсен сказал.'),
       'Нотариус говорит: завещание вступит, как только дедушка умрёт. Дедушка говорит: «Не дождётесь».',
@@ -359,7 +359,7 @@ export const LEGENDS: Record<string, Legend> = {
     ],
   },
   grandpa_wedding: {
-    until: { t: 'после свадьбы дедушки', d: null, kind: 'event', est: 30 },
+    until: { t: 'после свадьбы дедушки', d: null, kind: 'never' },
     lines: [
       'Дедушка молодожён, все деньги — на медовый месяц. Приданое у медсестры тоже старинное.',
       'Медсестра из хосписа потребовала брачный контракт. Твои деньги в нём прописаны. Как мои.',
@@ -385,7 +385,7 @@ export const LEGENDS: Record<string, Legend> = {
   },
   // --- Гарик в фундаменте
   garik: {
-    until: { t: 'как Гарика достанем', d: null, kind: 'event', est: 30, condition: finaleOf('garik') },
+    until: { t: 'как Гарика достанем', d: null, kind: 'never', condition: finaleOf('garik') },
     lines: [
       'Код от сейфа знает только Гарик. А Гарик в фундаменте. Кричу ему в трубочку — он не слышит, бетон толстый.',
       'Гарику передали в трубочку бумагу и ручку — пусть напишет код. Он написал «помогите». Это не код.',
@@ -398,7 +398,7 @@ export const LEGENDS: Record<string, Legend> = {
   },
   // --- плитка-убийца (суд)
   court_tile: {
-    until: { t: 'как суд по плитке закончится', d: null, kind: 'event', est: 30, condition: finaleOf('tile') },
+    until: { t: 'как суд по плитке закончится', d: null, kind: 'never', condition: finaleOf('tile') },
     lines: [
       'Пока идёт суд по твоей плитке, все мои счета арестованы. Из-за тебя, кстати. Плитка — твоя.',
       needs('grant')('Адвокат Гранта требует плитку как вещдок. Снимать будешь ты — ты же её клал.'),

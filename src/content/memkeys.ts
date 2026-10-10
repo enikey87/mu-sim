@@ -90,6 +90,7 @@ export const saidFriday = 'said.friday'
 export const payday = {
   at: 'payday.at', sum: 'payday.sum', chain: 'payday.chain', caught: 'payday.caught',
   morning: 'payday.morning', contra: 'payday.contra', doubt: 'payday.doubt', refused: 'payday.refused',
+  resume: 'payday.resume',
 } as const
 
 export const count = {

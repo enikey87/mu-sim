@@ -846,6 +846,14 @@ export class Game {
     this.maybeCreditOffer('Предложение банка ещё открыто')
   }
   private clearScene(alsoCtx = false): void {
+    // прерванная до исхода сцена Дня выплаты (игрок ответил не её вариантом — «поймал на лжи», своим текстом) —
+    // не потерянный третий акт: once-метки beat'ов сняты, день снят, узел прервания запомнен — сцена продолжит с него
+    if (this.S.scene?.id === 'payday' && this.S.mem[memkeys.paydayScene] === undefined) {
+      this.S.mem[memkeys.payday.resume] = this.S.scene.node
+      delete this.S.mem[memkeys.payday.at]
+      delete this.rules.state.once['Beat_Payday']
+      delete this.rules.state.once['Beat_Payday_Late']
+    }
     this.S.scene = null
     if (alsoCtx) this.S.ctx = null
     this.flushSceneCards()
@@ -1888,7 +1896,7 @@ export class Game {
     let end: number | undefined
     for (const x of this.S.rules.schedule) {
       if (x.kind !== 'restore' || x.at <= this.S.day) continue
-      if (state.key !== undefined ? x.key !== state.key : !x.key.startsWith(state.prefix ?? '')) continue
+      if (state.keys !== undefined ? !state.keys.includes(x.key) : state.key !== undefined ? x.key !== state.key : !x.key.startsWith(state.prefix ?? '')) continue
       if (state.actor !== undefined && x.actor !== state.actor) continue
       if (end === undefined || x.at < end) end = x.at
     }
@@ -2561,6 +2569,20 @@ export class Game {
     if (n.then === 'transfer') await this.transfer()
     if (n.then === 'promise') await this.promiseLine()
     if (!n.opts) this.clearScene(n.then !== 'promise')
+    this.emit()
+  }
+
+  /**
+   * Продолжение прерванной сцены с узла прерывания (#571): сказанное не повторяем —
+   * заново только варианты игрока. Узел без вариантов двигает сцену своим шагом (hook).
+   */
+  async resumeNode(sid: string, nid: string): Promise<void> {
+    const sc = this.scenes[sid]
+    if (!sc.nodes[nid].opts) return this.enterNode(sid, nid)
+    const S = this.S
+    S.scene = { id: sid, node: nid, vars: sc.init ? sc.init(this.rng, (arr) => this.open(arr), S.day) : {} }
+    S.ctx = null
+    S.choices = null
     this.emit()
   }
 
