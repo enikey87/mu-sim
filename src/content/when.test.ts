@@ -41,8 +41,8 @@ describe('разметка сроков', () => {
       const at = `${where}: «${w.t}»`
       kinds.add(w.kind)
       if (w.kind === 'never' || w.kind === 'absurd') {
-        expect(w.d, `${at}: нет срока — нет и числа`).toBeNull()
-        expect([w.due, w.est, w.state, w.holiday, w.condition], at).toEqual([undefined, undefined, undefined, undefined, undefined])
+        // срока в мире нет — числу неоткуда взяться; журналу обещаний оставлены d/condition (#571)
+        expect([w.due, w.est, w.state, w.holiday], `${at}: у срока без конца не осталось источника горизонта`).toEqual([undefined, undefined, undefined, undefined])
       }
       if (w.kind === 'clear' || w.kind === 'dodge') expect(w.d !== null || w.due !== undefined, `${at}: ясный срок и увёртка без даты`).toBe(true)
       if (w.kind === 'event') expect(typeof w.est, `${at}: событие без оценки`).toBe('number')
@@ -73,11 +73,11 @@ describe('разметка сроков', () => {
     expect(byText('как только абрикосы созреют')).toMatchObject({ d: null, kind: 'holiday', holiday: 'apricots' })
   })
 
-  it('срок легенды — событие своей легенды с оценкой; у свадеб — идущее состояние', () => {
-    for (const [id, l] of Object.entries(LEGENDS)) expect(l.until.kind, id).toBe('event')
-    expect(LEGENDS.boris_wedding.until.state).toEqual({ key: wedding('boris') })
-    expect(LEGENDS.wedding.until.state).toEqual({ key: wedding('samvel') })
-    expect(LEGENDS.crane_wedding.until.state).toEqual({ key: wedding('razmik') })
+  it('срок легенды: у события — конец в мире (оценка из реплики или остаток свадьбы), у бесконечного — «никогда»', () => {
+    // свадьбы с концом — Борис и Размик; свадьба Самвела конца не имеет и в горизонт не идёт (#571)
+    expect(LEGENDS.boris_wedding.until).toMatchObject({ kind: 'event', state: { key: wedding('boris') } })
+    expect(LEGENDS.crane_wedding.until).toMatchObject({ kind: 'event', state: { key: wedding('razmik') } })
+    expect(LEGENDS.wedding.until.kind).toBe('never')
   })
 })
 
@@ -129,8 +129,11 @@ describe('факты контекста: род и горизонт', () => {
     const nextWeek = await said(byText('на следующей неделе, в начале или в конце'))
     expect(ctx(nextWeek)).toEqual({ kind: 'dodge', days: 13, horizon: 'far' }) // поздняя дата — оценка, а не d: 7
 
-    const decree = await said(byText('как Нуне из декрета выйдет'))
-    expect(ctx(decree)).toEqual({ kind: 'event', days: 540, horizon: 'veryFar' })
+    const moon = await said(byText('после полнолуния'))
+    expect(ctx(moon)).toEqual({ kind: 'event', days: 15, horizon: 'far' })
+
+    // срок без конца в мире (кран) горизонт не даёт вовсе: кнопка — ирония из «никогда» (#571)
+    expect(ctx(await said(byText('как Размик с крана слезет')))).toEqual({ kind: 'never', days: undefined, horizon: undefined })
 
     const nav = await said(byText('после Навасарда'))
     expect(ctx(nav).days).toBe(holidayDays('navasard', nav.S.day))
@@ -151,13 +154,16 @@ describe('факты контекста: род и горизонт', () => {
     expect(ctx(g)).toEqual({ kind: 'clear', days: 6, horizon: 'near' })
   })
 
-  it('событие с идущим состоянием мира — остаток срока, а не оценка', async () => {
+  it('generic «сразу после свадьбы» помнит только свадьбы с концом — Борис и Размик; свадьба Самвела горизонта не даёт', async () => {
     const term = byText('сразу после свадьбы')
-    const running = await said(term, (g) => { g.rules.applyOps([{ key: wedding('samvel'), op: '=', value: true, forDays: 8, scope: 'world' }], {}) })
+    const running = await said(term, (g) => { g.rules.applyOps([{ key: wedding('boris'), op: '=', value: true, forDays: 8, scope: 'world' }], {}) })
     expect(ctx(running).days).toBe(8)
     running.S.day += 2
     expect(ctx(running).days).toBe(6) // свадьба идёт — срок сжимается
     expect(ctx(await said(term)).days).toBe(7) // свадьбы нет — оценка автора
+    // свадьба Самвела конца не имеет: общий срок её не берёт, горизонт — оценка, а не 8 дней (#571)
+    const samvel = await said(term, (g) => { g.rules.applyOps([{ key: wedding('samvel'), op: '=', value: true, forDays: 8, scope: 'world' }], {}) })
+    expect(ctx(samvel).days).toBe(7)
 
     const sickBoris = await said(byText('как баран поправится'), (g) => { g.rules.applyOps([{ key: sick, op: '=', value: true, forDays: 10, scope: 'target' }], { target: 'boris' }) })
     expect(ctx(sickBoris).days).toBe(10)
@@ -165,9 +171,9 @@ describe('факты контекста: род и горизонт', () => {
 
   it('срок легенды: настоящий setLegend и клятва → род, оценка и остаток свадьбы', async () => {
     const { game } = makeGame()
-    game.setLegend('safe_nune', 'nune')
+    game.setLegend('boris_receipts', 'nune')
     await game.promiseLine(undefined, true)
-    expect(ctx(game)).toEqual({ kind: 'event', days: 540, horizon: 'veryFar' })
+    expect(ctx(game)).toEqual({ kind: 'event', days: 3, horizon: 'near' })
 
     const wed = makeGame().game
     wed.S.arcs.boris = { i: 5, last: -99 }

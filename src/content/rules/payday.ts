@@ -122,17 +122,25 @@ const outcome = (id: string, when: R['when'], extra: Partial<R> = {}): R => ({
     game.scheduleEvent(game.S.day + 1, 'PaydayButton', { outcome: id })
   },
 })
+/** Прерванная сцена Дня выплаты продолжает с узла прерывания (#571): сказанное не звучит дважды. */
+const resumePayday = (game: Game): Promise<void> => {
+  const at = game.S.mem[pd.resume]
+  if (at === undefined) return game.enterNode('payday', 'announce')
+  delete game.S.mem[pd.resume]
+  return game.resumeNode('payday', String(at))
+}
+
 export const paydayRules: R[] = [
   // запуск: третий акт — когда сошлись линии (3+ законченных сериала после 330-го дня) или просто поздно
   {
     name: 'Beat_Payday', event: 'StoryBeat', when: [gte('day', 330), gte('arcsDone', 3), missing(paydayScene), missing(pd.at), missing(alikDead)], bonus: 10, once: true, priority: 'cinematic',
-    respond: ({ game }) => game.enterNode('payday', 'announce'),
+    respond: ({ game }) => resumePayday(game),
   },
   // условия Дня выплаты — в when, а не в respond: промолчавшее правило остаётся в пуле (разовый шанс
   // не тратится) и после выплаты перехватывало бы каждый StoryBeat, ничего не говоря
   {
     name: 'Beat_Payday_Late', event: 'StoryBeat', when: [gte('day', 420), gte('sent', 150), missing(alikDead), missing(paydayScene), missing(pd.at)], bonus: 9, once: true, priority: 'cinematic',
-    respond: ({ game }) => game.enterNode('payday', 'announce'),
+    respond: ({ game }) => resumePayday(game),
   },
   outcome('real', [is('ach.saint'), gte(caughtCount, 3), is('ach.court'), gte('quests', 5)]),
   // поймал великую отмазку — заслуга игрока: важнее исходов «по стилю партии» (одинаковая специфичность решалась бы случайно)

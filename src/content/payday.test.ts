@@ -125,6 +125,22 @@ describe('День выплаты', () => {
     game.S.mem.payday = 'coins'
     expect(late(game)).toBe(false)
   })
+  it('прерванная сцена Дня выплаты не теряет третий акт: его объявляют снова (#571)', async () => {
+    const { game } = makeGame()
+    game.S.day = 340
+    game.S.stats.sent = 200
+    rich(game)
+    expect((await game.fire('StoryBeat'))?.name).toBe('Beat_Payday')
+    expect(game.S.scene?.id).toBe('payday')
+    // игрок жмёт реплику с актом («поймать на лжи») посреди сцены — сцена прерывается
+    await game.send({ text: 'Стоп. Это всё неправда.', tone: 'neutral', act: 'catchLie' })
+    expect(game.S.mem.payday, 'исход не записан — акт не завершён').toBeUndefined()
+    // не потерян: тот же ход объявляет сцену снова (once-метка beat'а снята вместе с днём)
+    expect(game.S.scene?.id).toBe('payday')
+    await choose(game, 'bag')
+    await choose(game, 'share')
+    expect(String(game.S.mem['payday.chain']).length).toBeGreaterThan(80)
+  })
   it('исходы по стилю партии: частный побеждает', async () => {
     const pick = async (setup: (g: Game) => void) => { const { game } = makeGame(); setup(game); return (await game.fire('PaydayOutcome'))?.name }
     expect(await pick(() => {})).toBe('Payday_default')

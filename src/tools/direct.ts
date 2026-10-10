@@ -156,4 +156,10 @@ export const DIRECT: Record<string, DirectCase> = {
       g.S.promises[0].met = g.S.day
     },
   },
+  // #571: переразметка сроков («никогда» без числа) увела траектории выборок — пять правил держим прямыми случаями
+  Scene_heir: { event: 'PickScene', setup: (g) => { g.S.arcs.grandpa = { i: 4, last: 0 }; g.S.arcs.boris = { i: 4, last: 0 } } },
+  Chorus_garik_FedUp: { event: 'Mentioned', target: 'garik', setup: (g) => { g.S.mem['intro.garik'] = true; g.S.actors.garik = { interjections: 3 } } },
+  Finale_razmik_shift: { event: 'ArcFinale', facts: { arc: 'razmik' }, setup: (g) => { g.S.ach.fence = 1 } },
+  Finale_tile_lost: { event: 'ArcFinale', facts: { arc: 'tile' }, setup: (g) => { g.S.mem.court = 6 } },
+  Says_sorry_blocked_boris: { event: 'PlayerSays', facts: { intent: 'sorry' }, setup: (g) => { blocked(g); g.S.arcs.boris = { i: 4, last: 0 } } },
 }
