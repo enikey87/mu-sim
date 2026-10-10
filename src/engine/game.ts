@@ -615,6 +615,27 @@ export class Game {
     }
     return [...part('-', 'Списано'), ...part('+', 'Поступило'), ...(refused ? part('!', 'Не прошло') : [])]
   }
+  /** Движения недели, которых ещё не было на карточке результата: сводка держит весь буфер, итог — только дельту. */
+  private unseenBankLines(b: BankWeek): string[] {
+    const shown = b.shown ?? {}
+    const lines: BankWeek['lines'] = {}
+    for (const [k, v] of Object.entries(b.lines)) {
+      const prev = shown[k]
+      const sum = v.sum - (prev?.sum ?? 0)
+      const n = v.n - (prev?.n ?? 0)
+      if (sum > 0 && n > 0) lines[k] = { sum, n }
+    }
+    return this.bankLines({ week: b.week, lines, bal: b.bal }, false)
+  }
+  /** Снимок после кнопки: её сумма уже в тексте баланса и не должна стать строкой следующей карточки. */
+  private markBankShown(): void {
+    const b = this.S.bank
+    if (!b) return
+    const shown: NonNullable<BankWeek['shown']> = {}
+    // копия, не ссылка: bankLine мутирует тот же объект, и дельта следующей карточки обнулится
+    for (const [k, v] of Object.entries(b.lines)) shown[k] = { sum: v.sum, n: v.n }
+    b.shown = shown
+  }
   /** Сводка прошедшей недели — одна карточка, когда календарь перешёл в новую (#287). */
   flushBankWeek(): void {
     const b = this.S.bank
@@ -901,9 +922,8 @@ export class Game {
       const loan = nextLoan(Number(this.S.mem[creditStage] ?? 0))
       const thing = nextThing(this.S.mem)
       let result: string
-      // смены баланса, которых игрок ещё не видел (буфер недели): результат называет их —
-      // иначе его баланс не восстанавливается из сводки (#563); у «Не сейчас» баланса нет
-      const unseen = pick !== 'later' && this.S.bank ? this.bankLines(this.S.bank, false) : []
+      // дельта с прошлой карточки результата, не весь буфер (#563/#568); у «Не сейчас» баланса нет
+      const unseen = pick !== 'later' && this.S.bank ? this.unseenBankLines(this.S.bank) : []
       if (pick === 'take' && m.offer.take && loan) {
         const before = this.S.money
         this.takeCredit()
@@ -930,6 +950,7 @@ export class Game {
         } else {
           this.replaceMsg(cur, { answered: true, result, lines: unseen.length ? unseen : undefined })
         }
+        if (result !== 'Не сейчас') this.markBankShown()
       }
       // уровень денег сменился — варианты отчаяния уходят сразу, не через ход
       if (!this.ui.busy) this.S.choices = this.buildChoices()

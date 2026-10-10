@@ -52,7 +52,12 @@ export interface Card {
   result?: string
 }
 /** Недельная сводка банка: что прошло по карте с понедельника `week`; баланс — после последней строки. */
-export interface BankWeek { week: number; lines: Record<string, { sum: number; n: number }>; bal: number }
+export interface BankWeek {
+  week: number
+  lines: Record<string, { sum: number; n: number }>
+  bal: number
+  shown?: Record<string, { sum: number; n: number }>
+}
 
 export type NewMsg = Msg extends infer M ? (M extends Msg ? Omit<M, 'id'> : never) : never
 

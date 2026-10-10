@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest'
 import { makeGame, setMoney, cards } from '../test/helpers'
 import { billDueAt } from './bills'
-import { LOANS, loanTaken, loanDueAt } from './credit'
+import { LOANS, loanTaken, loanDueAt, creditStage } from './credit'
 import { weekOf, dateOf } from '../engine/time'
 import type { Game } from '../engine/game'
 
@@ -258,5 +258,66 @@ describe('результат кнопки называет строки неде
     expect(res.id).not.toBe(offer.id)
     expect(res.day).toBe(game.S.day)
     expect(res.lines?.map((l) => l.replace(/\s/g, ' '))).toEqual(['Списано: Связь 400 ₽', 'Поступило: Зарплата 2 000 ₽'])
+  })
+})
+
+const lineDelta = (lines: string[] | undefined): number => {
+  let d = 0
+  for (const line of lines ?? []) {
+    const sign = line.startsWith('Списано') ? -1 : line.startsWith('Поступило') ? 1 : 0
+    for (const m of line.matchAll(/([\d\s]+) ₽/g)) d += sign * Number(m[1].replace(/\s/g, ''))
+  }
+  return d
+}
+
+// форма сида 96002: продажа и кредит в одной неделе; второй итог не пересказывает строки первого
+describe('вторая карточка недели не повторяет уже названные строки (#568)', () => {
+  const saleThenOffer = () => {
+    const { game } = makeGame()
+    game.S.mem[creditStage] = 2 // следующая ступень — микрозайм, как в трассировке 96002
+    setMoney(game, 420)
+    game.chargeBill('phone') // 20 ₽ и строка «Связь» — её назовёт первая карточка
+    const offer = cards(game, 'Банк').at(-1)!
+    expect(offer.offer?.sell).toBeTruthy()
+    game.answerCard(offer.id, 'sell')
+    const sold = cards(game, 'Банк').find((c) => c.id === offer.id)!
+    const firstBal = num(sold.result!, /Баланс: ([\d\s]+) ₽/)
+    expect(firstBal).toBe(4_520)
+    expect(sold.lines?.map((l) => l.replace(/\s/g, ' '))).toEqual(['Списано: Связь 400 ₽'])
+    const again = cards(game, 'Банк').filter((c) => c.offer && !c.answered).at(-1)!
+    expect(again.text).toMatch(/^Продано, а остаток всё ещё критический/)
+    return { game, firstBal, again }
+  }
+
+  it('продажа, затем кредит: от 4 520 только +4 480, без связи и авито', () => {
+    const { game, firstBal, again } = saleThenOffer()
+    game.answerCard(again.id, 'take')
+    const res = cards(game, 'Банк').find((c) => c.id === again.id)!
+    expect(res.result).toMatch(/^Микрозайм взят/)
+    const credit = num(res.result!, /\+([\d\s]+) ₽/)
+    const secondBal = num(res.result!, /Баланс: ([\d\s]+) ₽/)
+    expect(credit).toBe(4_480)
+    expect(secondBal).toBe(9_000)
+    expect(res.lines, 'весь буфер повторил бы связь и авито').toBeUndefined()
+    expect(firstBal + lineDelta(res.lines) + credit).toBe(secondBal)
+    game.S.day = weekOf(game.S.day) + 8
+    game.flushBankWeek()
+    const summary = summaries(game).at(-1)!.lines!.join(' ').replace(/\s/g, ' ')
+    expect(summary, 'сводка недели по-прежнему знает все движения').toMatch(/Связь 400 ₽/)
+    expect(summary).toMatch(/Авито 4 500 ₽/)
+    expect(summary).toMatch(/4 480 ₽/)
+  })
+
+  it('та же метка между карточками: вторая называет прирост, не накопленную сумму', () => {
+    const { game, firstBal, again } = saleThenOffer()
+    game.adjustMoney(-400, 'Связь') // буфер: Связь 800 (2 раза); игрок видел только первые 400
+    expect(game.S.money).toBe(4_120)
+    game.answerCard(again.id, 'take')
+    const res = cards(game, 'Банк').find((c) => c.id === again.id)!
+    const credit = num(res.result!, /\+([\d\s]+) ₽/)
+    const secondBal = num(res.result!, /Баланс: ([\d\s]+) ₽/)
+    expect(res.lines?.map((l) => l.replace(/\s/g, ' '))).toEqual(['Списано: Связь 400 ₽'])
+    expect(firstBal + lineDelta(res.lines) + credit).toBe(secondBal)
+    expect(game.S.bank?.lines['-Связь'], 'буфер недели не теряет уже показанное').toEqual({ sum: 800, n: 2 })
   })
 })
