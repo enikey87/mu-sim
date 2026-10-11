@@ -162,4 +162,6 @@ export const DIRECT: Record<string, DirectCase> = {
   Finale_razmik_shift: { event: 'ArcFinale', facts: { arc: 'razmik' }, setup: (g) => { g.S.ach.fence = 1 } },
   Finale_tile_lost: { event: 'ArcFinale', facts: { arc: 'tile' }, setup: (g) => { g.S.mem.court = 6 } },
   Says_sorry_blocked_boris: { event: 'PlayerSays', facts: { intent: 'sorry' }, setup: (g) => { blocked(g); g.S.arcs.boris = { i: 4, last: 0 } } },
+  // #576: звонок с объекта сдвинул розыгрыш выборок — сцена «если спросят» из них ушла; гейт по воротке угрозы
+  Scene_tax: { event: 'PickScene', setup: (g) => { g.S.mem['count.threat'] = 1 } },
 }

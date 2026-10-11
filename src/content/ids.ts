@@ -90,7 +90,7 @@ export type AchId =
 
 export const CAST_IDS = [
   'boris', 'grant', 'nune', 'samvel', 'karine', 'garik', 'arsen', 'mkrtich',
-  'niva', 'mama', 'intercom', 'judge', 'goar', 'razmik', 'rubik', 'collectors',
+  'niva', 'mama', 'intercom', 'judge', 'goar', 'razmik', 'rubik', 'collectors', 'taron',
 ] as const
 export type CastId = (typeof CAST_IDS)[number]
 
