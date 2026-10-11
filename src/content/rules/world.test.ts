@@ -1,5 +1,6 @@
 // Новые возможности системы правил внутри игры: сцены по сюжету, наступившие обещания, хор, состояния мира, приоритеты.
 import { describe, it, expect } from 'vitest'
+import { type FactOp } from '../fact'
 import { makeGame, alikTexts } from '../../test/helpers'
 import { ARCS } from '../arcs'
 import { FINALES } from '../finales'
@@ -164,7 +165,12 @@ describe('обещания наступают', () => {
     expect(game.S.promises).toHaveLength(2)
   })
   it('каждое событийное условие имеет декларативный producer', () => {
-    const fromArcs = Object.values(ARCS).flatMap((arc) => arc.eps.flatMap((ep) => ep.remember ?? []))
+    // producer у серии — в remember эпизода или на строке, которая факт утверждает (#588)
+    const lineRemember = (x: unknown): FactOp[] => { const spec = typeof x === 'object' && x !== null ? (x as { remember?: FactOp[] }) : {}; return spec.remember ?? [] }
+    const fromArcs = Object.values(ARCS).flatMap((arc) => arc.eps.flatMap((ep) => [
+      ...(ep.remember ?? []),
+      ...ep.m.flatMap((x) => lineRemember(valueOf(x))),
+    ]))
     const fromLegends = Object.values(LEGENDS).flatMap((legend) => legend.lines.flatMap((line) => {
       const spec = valueOf(line)
       return typeof spec === 'string' ? [] : spec.remember ?? []
