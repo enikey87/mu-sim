@@ -2202,6 +2202,8 @@ export class Game {
     }
     if (debtFx) (this.S.ctx ??= {}).debtMoved = debtMoved
     const m = this.open(ep.m)
+    // факт пишет строка, которая его утверждает: remember строки применяется, только если строка звучала (#588)
+    for (const x of m) if (typeof x !== 'string' && 'remember' in x && x.remember) this.rules.applyOps(x.remember, {})
     if (ep.remember) this.rules.applyOps(ep.remember, {})
     if (this.S.ctx) {
       delete this.S.ctx.debtMoved

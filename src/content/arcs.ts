@@ -6,7 +6,7 @@ import type { LedgerEvent } from './fact-types'
 import { needs, meet, WORLD } from './world'
 import { actSigned, alikDead, betonSet, borisMarried, collectorsRecruited, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantPaid, houseOnGarik, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikBath, sick, taxFrozen, wedding } from './memkeys'
 
-export type ArcMsg = Said | { w: string; t: string; claims?: LedgerEvent[] }
+export type ArcMsg = Said | { w: string; t: string; claims?: LedgerEvent[]; remember?: FactOp[] } | { t: string; claims: LedgerEvent[]; remember?: FactOp[] }
 export interface Episode {
   /** Сообщения серии; с needs — только уместные. */
   m: Entry<ArcMsg>[]
@@ -155,11 +155,11 @@ export const ARCS: Record<string, Arc> = {
       { remember: meet('karine'), m: ['Жена, Карине, носит Рубику обед. Третью неделю. Рубик поправился на пять кило и прислал ей стихи. Я начинаю нервничать. Акт — тоже.'], then: 'promise', legend: 'inspect_karine' },
       { m: [{ w: 'karine', t: 'Алик, Рубик сделал мне предложение. Акт подпишет, если соглашусь. Ради плиточника, может, и соглашусь.' }, 'Брат, ты же не хочешь, чтобы из-за твоих денег распалась семья? Скажи, что подождёшь.'], then: 'promise' },
       {
-        remember: [set(actSigned, true), set(grantPaid, true), set(taxFrozen, true)],
+        // remember — у строк, а не у серии: без Гранта строк про подпись нет, и акта никто не подписывал (#588)
         m: [
-          gate(WORLD.grant, missing(grantPaid))({ t: 'Карине отказала! Рубик в обиде подписал акт: «Чтобы вас больше не видеть». Объект сдан, Грант заплатил!', claims: [{ move: { from: 'customer_owes', to: 'customer_paid' } }, 'customer_paid'] }),
-          gate(WORLD.grant, is(grantPaid))({ t: 'Карине отказала! Рубик в обиде подписал акт: «Чтобы вас больше не видеть». Теперь и бумага говорит, что Грант со мной рассчитался.', claims: ['customer_paid'] }),
-          gate(missing(taxFrozen))('А Рубик, оказывается, из налоговой. Проверял не плитку — меня. Счета заморожены. Деньги есть, брат! Просто холодные.'),
+          gate(WORLD.grant, missing(grantPaid))({ t: 'Карине отказала! Рубик в обиде подписал акт: «Чтобы вас больше не видеть». Объект сдан, Грант заплатил!', claims: [{ move: { from: 'customer_owes', to: 'customer_paid' } }, 'customer_paid'], remember: [set(actSigned, true), set(grantPaid, true)] }),
+          gate(WORLD.grant, is(grantPaid))({ t: 'Карине отказала! Рубик в обиде подписал акт: «Чтобы вас больше не видеть». Теперь и бумага говорит, что Грант со мной рассчитался.', claims: ['customer_paid'], remember: [set(actSigned, true), set(grantPaid, true)] }),
+          gate(missing(taxFrozen))({ t: 'А Рубик, оказывается, из налоговой. Проверял не плитку — меня. Счета заморожены. Деньги есть, брат! Просто холодные.', claims: [], remember: [set(taxFrozen, true)] }),
           gate(is(taxFrozen))('А Рубик, оказывается, из налоговой. Проверял не плитку — меня. Заодно объяснил, почему счета до сих пор заморожены.'),
         ],
         fx: { ach: 'arc_rubik' }, legend: 'frozen',
