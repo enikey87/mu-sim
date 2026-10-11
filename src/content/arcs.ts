@@ -4,7 +4,7 @@ import { type Entry, type FactOp, type Criterion, type FactKey, type Said, set, 
 import { type ClaimKey } from './ids'
 import type { LedgerEvent } from './fact-types'
 import { needs, meet, WORLD } from './world'
-import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, collectorsRecruited, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantPaid, houseOnGarik, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikBath, sick, taxFrozen, wedding } from './memkeys'
+import { actSigned, alikDead, betonSet, borisMarried, collectorsRecruited, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantPaid, houseOnGarik, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikBath, sick, taxFrozen, wedding } from './memkeys'
 
 export type ArcMsg = Said | { w: string; t: string; claims?: LedgerEvent[] }
 export interface Episode {
@@ -52,7 +52,8 @@ export const ARCS: Record<string, Arc> = {
     eps: [
       { m: ['Брат, у меня новый баран. Борис зовут. Умный — смотрит на Арарат и вздыхает. Как ты.'], remember: meet('baran') },
       { m: ['Борис заболел. Съел смету. Всю. Врач сказал — отравился цифрами.'], then: 'promise', state: { key: sick, days: 10, actor: 'boris' }, legend: 'boris_smeta' },
-      { m: ['Борису лучше. Но теперь он ест только квитанции. Твои тоже съел, извини.'], remember: [set(borisSmetaReady, true)], legend: 'boris_receipts' },
+      // выздоровление Бориса — не готовая смета: факт «смету составили» ставит реплика легенды, которая это утверждает (#586)
+      { m: ['Борису лучше. Но теперь он ест только квитанции. Твои тоже съел, извини.'], legend: 'boris_receipts' },
       { m: [{ w: 'boris', t: 'Бее.' }, 'Это Борис тебе написал. Сам! Он научился. Я в шоке, брат.'] },
       { remember: meet('goar'), m: ['Борис влюбился. В козу тёти Гоар. Семьи против. Все деньги уходят на примирение.'], then: 'promise', legend: 'boris_wedding' },
       // «после свадьбы» наступает, когда свадьба (5 дней) прошла, а не в день приглашения
