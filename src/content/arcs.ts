@@ -4,7 +4,7 @@ import { type Entry, type FactOp, type Criterion, type FactKey, type Said, set, 
 import { type ClaimKey } from './ids'
 import type { LedgerEvent } from './fact-types'
 import { needs, meet, WORLD } from './world'
-import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, collectorsRecruited, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantPaid, houseOnGarik, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, sick, taxFrozen, wedding } from './memkeys'
+import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, collectorsRecruited, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantPaid, houseOnGarik, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikBath, sick, taxFrozen, wedding } from './memkeys'
 
 export type ArcMsg = Said | { w: string; t: string; claims?: LedgerEvent[] }
 export interface Episode {
@@ -150,7 +150,7 @@ export const ARCS: Record<string, Arc> = {
       { m: ['Рубик проверяет уровнем. Уровень показывает идеально. Рубик уровню не верит. Вызвал из Еревана второй уровень. Государственный, с печатью.'] },
       { m: [{ w: 'rubik', t: 'Молодой человек, это вы клали? Сознайтесь, кому дали. Суммы меня не интересуют. Хотя интересуют.' }] },
       { m: ['Рубик взял образец твоей плитки на экспертизу. Отколол. Прямо из середины. Экспертиза в Москве, сроков не называют. Пока — дырка. Заказчик в ярости, не платит.', 'Дырку заделаешь? Только не ровно, брат. Ровно — опять заподозрят.'] },
-      { m: ['Рубик остался жить на объекте. Не уедет, говорит, пока не найдёт взяткодателя. Спит в ванной, на твоей плитке. Хвалит — прохладная.'] },
+      { remember: [set(rubikBath, true)], m: ['Рубик остался жить на объекте. Не уедет, говорит, пока не найдёт взяткодателя. Спит в ванной, на твоей плитке. Хвалит — прохладная.'] },
       { remember: meet('karine'), m: ['Жена, Карине, носит Рубику обед. Третью неделю. Рубик поправился на пять кило и прислал ей стихи. Я начинаю нервничать. Акт — тоже.'], then: 'promise', legend: 'inspect_karine' },
       { m: [{ w: 'karine', t: 'Алик, Рубик сделал мне предложение. Акт подпишет, если соглашусь. Ради плиточника, может, и соглашусь.' }, 'Брат, ты же не хочешь, чтобы из-за твоих денег распалась семья? Скажи, что подождёшь.'], then: 'promise' },
       {

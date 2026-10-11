@@ -142,6 +142,8 @@ export const creditOfferSum = 'credit.offerSum'
 export const collectorsRecruited = 'collectors.recruited'
 /** Звонок с объекта состоялся: «всех рассчитали, кроме игрока» (#325, docs/design/crew-call.md). */
 export const crewPaid = 'crew.paid'
+/** Рубик остался жить на объекте и спит в ванной (#590): до этой серии про ванную не говорят. */
+export const rubikBath = 'rubik.bath'
 
 /** Ключи досок персонажей (S.actors), не мира. */
 export const sick = 'sick'
@@ -170,6 +172,6 @@ export const MEM_KEYS: ReadonlySet<string> = new Set([
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday,
   lightOff, netRation, phoneWarn, holidayGreeted,
-  creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, criticalAt, creditOfferSum, momDachaAt, crewPaid,
+  creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, criticalAt, creditOfferSum, momDachaAt, crewPaid, rubikBath,
   ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lend50),
 ])

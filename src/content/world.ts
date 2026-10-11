@@ -1,7 +1,7 @@
 // Тексты для новых возможностей системы правил: обещания, которые наступают, хор персонажей,
 // состояния мира со сроком (свадьба, болезнь Бориса, «Алик умер»).
 import { type Criterion, type Line, type Entry, named, exists, is, eq, gte, ne, missing, set, gate } from './fact'
-import { cryptoHodl, garikConcrete, garikCut, grandpaDying, grantPaid, intro, karineKnowsDebt, karineThinksTax, met, mourning, nivaAway, nivaPlayer, nuneDekretOver, payday, saidFriday, saidTomorrow, alikShaved, wedding, collectorsRecruited } from './memkeys'
+import { cryptoHodl, garikConcrete, garikCut, grandpaDying, grantPaid, intro, karineKnowsDebt, karineThinksTax, met, mourning, nivaAway, nivaPlayer, nuneDekretOver, payday, saidFriday, saidTomorrow, alikShaved, wedding, collectorsRecruited, rubikBath } from './memkeys'
 import type { WhoId } from './ids'
 
 // Мир последователен: кто и что есть в истории и в каком оно положении — факты, их ставит серия (remember), ступень суда
@@ -87,6 +87,8 @@ export const WORLD = {
   taron: named('taron', is(intro('taron'))),
   /** Алик перевербовал коллекторов — микрозайм с игрока не требуют (#128). */
   collectorsRecruited: named('collectorsRecruited', is(collectorsRecruited)),
+  /** Рубик спит в ванной на объекте (#590): серия «остался жить» пишет факт — до неё про ванную молчut. */
+  rubikBath: named('rubikBath', is(rubikBath)),
 } satisfies Record<string, Criterion>
 export type WorldKey = keyof typeof WORLD
 export const needs = (...keys: WorldKey[]) => gate(...keys.map((k) => WORLD[k]))
@@ -182,7 +184,7 @@ export const CHORUS: Record<string, Line[]> = {
   // «всё заплатил» — только когда это уже факт мира: иначе легенда «я не плачу, пока…» спорит с хором
   grant: [gate(is(grantPaid))({ t: 'Алик, опять вы про меня? Я вам всё заплатил.', claims: ['customer_paid'] }), 'Молодой человек, не верьте ему, я плачу исправно.', gate(is(grantPaid))({ t: 'Меня нет. Это автоответчик. Всё оплачено.', claims: ['customer_paid'] })],
   razmik: ['Брат, не верь ему. Я ему тоже верил. Сорок метров верил.', 'Кто меня звал? Если про деньги — я первый в очереди. По высоте.', 'Плиточник, держись. Кто на кране не сидел — тот Алика не знает.'],
-  rubik: ['Молодой человек, я всё записываю. Вы теперь тоже в протоколе.', 'Инспекция не спит. Инспекция в ванной, но не спит.', 'Слишком ровно пишете, молодой человек. Подозрительно.'],
+  rubik: ['Молодой человек, я всё записываю. Вы теперь тоже в протоколе.', needs('rubikBath')('Инспекция не спит. Инспекция в ванной, но не спит.'), 'Слишком ровно пишете, молодой человек. Подозрительно.'],
   collectors: [
     needs('collectorsRecruited')('Мы теперь у Алика. Раствор — наш процент.'),
     needs('collectorsRecruited')('Не верьте «Деньги-Ара». Верьте вертикали. Мы на объекте.'),
