@@ -14,6 +14,7 @@ import { saidClaims, saidText, type Said } from '../fact'
 import { ARCS, NO_NEWS_A, NO_NEWS_B, GROUP_SEEN_A, GROUP_SEEN_B, WRONG_A, WRONG_B } from '../arcs'
 import * as L from '../life'
 import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, PROMISE_PENCIL, PROMISE_FAR } from '../misc'
+import { CREW_PAID } from '../crew'
 import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_THIRD, LIE_NOCRED } from '../lies'
 import { HEAT, alikShaved, moustacheAskAt, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, topic, topicMute } from '../memkeys'
 import { PROMISE_SHAVE_ASK } from '../world'
@@ -133,6 +134,15 @@ export const replyRules: R[] = [
     },
   })),
 
+  // упрёк по звонку с объекта (#577): отнекивается, перекладывает, винит чай. Голой колодой, без uniq:
+  // uniq на пуле таком длины при частых нажатиях вырождается в повторы подряд — колода сама не даёт
+  // двух одинаковых ответов рядом (стык циклов)
+  says('crewPaid', {
+    respond: async ({ game }) => {
+      await game.say([game.draw('CREW_PAID', CREW_PAID)])
+      game.setCtx(null)
+    },
+  }),
   says('condole', { respond: async ({ game }) => { game.mood(1); await game.say([game.pair('CONDOLE_A', D.CONDOLE_A, 'CONDOLE_B', D.CONDOLE_B)]); game.setCtx(null) } }),
   // соболезнуешь, а покойник уже встал и говорит тост
   says('condole', { respond: async ({ game }) => { await game.say([game.uniq(() => game.draw('CONDOLE_REVIVED', CONDOLE_REVIVED))]); game.setCtx(null) } }, [is('ctx.revived')]),

@@ -6,6 +6,7 @@ import { type Rule, gte, missing, set } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { alikDead, blocked, crewPaid, endgame } from '../memkeys'
 import { CREW_CALL } from '../crew'
+import { meet } from '../world'
 import { sayFresh } from './rude'
 
 type R = Rule<Game, GameEvent, Offer>
@@ -16,6 +17,7 @@ const CREW_CALL_MIN_DAY = 200
 export const crewRules: R[] = [
   {
     name: 'Beat_CrewCall', event: 'AlikIdle', once: true, priority: 'cinematic',
+    remember: meet('taron'),
     // гейты — факты мира: середина партии, нет блокировки, смерти Алика, эндгейма и открытой сцены
     when: [gte('day', CREW_CALL_MIN_DAY), missing(blocked), missing(alikDead), missing(endgame.active), missing('scene')],
     respond: async ({ game }) => {

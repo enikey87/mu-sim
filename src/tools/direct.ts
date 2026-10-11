@@ -164,4 +164,11 @@ export const DIRECT: Record<string, DirectCase> = {
   Says_sorry_blocked_boris: { event: 'PlayerSays', facts: { intent: 'sorry' }, setup: (g) => { blocked(g); g.S.arcs.boris = { i: 4, last: 0 } } },
   // #576: звонок с объекта сдвинул розыгрыш выборок — сцена «если спросят» из них ушла; гейт по воротке угрозы
   Scene_tax: { event: 'PickScene', setup: (g) => { g.S.mem['count.threat'] = 1 } },
+  // #577: упрёк по звонку сдвинул розыгрыш ещё три правила — держим прямыми случаями
+  Says_condole_ctxrevived: { event: 'PlayerSays', facts: { intent: 'condole' }, setup: (g) => { g.S.ctx = { revived: true } } },
+  Finale_rubik_default: { event: 'ArcFinale', facts: { arc: 'rubik' } },
+  Finale_razmik_default: { event: 'ArcFinale', facts: { arc: 'razmik' } },
+  Finale_beton_opened: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem['count.rude'] = 6; g.S.mem[HEAT] = 3 } },
+  // #577: после разрастания пулов звонка выборки перестали собирать и второе приглашение Арсена
+  Court_Lawyer_Again: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem.court = 1; g.S.mem['intro.arsen'] = true } },
 }

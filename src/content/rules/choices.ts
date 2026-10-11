@@ -11,9 +11,10 @@ import * as L from '../life'
 import { GROUP_Q } from '../misc'
 import { P_LIE } from '../lies'
 import { TOPICS } from '../topics'
+import { P_CREW_PAID } from '../crew'
 import { WORLD, SPEAKS } from '../world'
 import { fmtDayMonth, fmtDays } from '../../engine/time'
-import { HEAT, alikDead, alikShaved, moustacheAskAt, blocked, court, mourning, phoneKarine } from '../memkeys'
+import { HEAT, alikDead, alikShaved, moustacheAskAt, blocked, court, mourning, phoneKarine, crewPaid } from '../memkeys'
 import { requirePlayerPool } from '../player-pools'
 import {
   P_VIA_BORIS, P_VIA_KARINE, P_VIA_MAMA, P_MOO, P_MOUSTACHE, P_COURT,
@@ -74,6 +75,13 @@ export const choiceRules: R[] = [
     when: [is('lieOpen'), missing(blocked), missing(alikDead), missing(phoneKarine), eq('offline', false)],
     act: 'catchLie', tone: 'neutral', bonus: 6,
     text: (g) => { const l = g.lie()!; return g.playerLine(() => g.X.fill(g.draw('P_LIE', P_LIE), { old: l.old.say, new: l.new.say })) },
+  }),
+  // упрёк по звонку с объекта: пул живёт только под фактом звонка, в окнах молчания — молчит (#577)
+  offer({
+    name: 'CrewPaid',
+    when: [is(crewPaid), missing(blocked), missing(alikDead)],
+    act: 'crewPaid', tone: 'neutral', bonus: 4,
+    text: (g) => fromArr(g, 'P_CREW_PAID', P_CREW_PAID),
   }),
   // извиниться после грубости
   offer({ name: 'Sorry', when: [is('ctx.offended')], act: 'sorry', tone: 'polite', bonus: 5, text: (g) => fromD(g, 'P_SORRY') }),
