@@ -4,9 +4,9 @@ import { describe, it, expect } from 'vitest'
 import { makeGame, alikTexts } from '../test/helpers'
 import type { Game } from '../engine/game'
 import { alikDead, blocked, crewPaid, endgame } from './memkeys'
-import { CREW_PAID } from './crew'
+import { CREW_CALL, CREW_PAID } from './crew'
 import { SPEAKS, WORLD } from './world'
-import { is } from './fact'
+import { is, valueOf } from './fact'
 
 const taronMsgs = (game: ReturnType<typeof makeGame>['game']) =>
   game.S.msgs.filter((m) => m.kind === 'text' && m.who === 'taron')
@@ -30,6 +30,18 @@ describe('звонок с объекта', () => {
     expect(said.length, 'Тарон пишет сам — этим и входит в историю').toBe(1)
     expect(game.S.mem['intro.taron'], 'знакомство писал движок, не разметка').toBe(true)
     expect(game.S.mem[crewPaid], 'факт звонка — на доске мира').toBe(true)
+  })
+
+  it('единственный звонок не говорит, что Тарон уже звонил', async () => {
+    const pool = CREW_CALL.map((e) => valueOf(e)[1]).join('\n')
+    expect(pool).not.toMatch(/Это снова Тарон/)
+    const { game } = makeGame()
+    game.S.day = 210
+    await game.fire('AlikIdle')
+    expect(taronMsgs(game).flatMap((m) => (m.kind === 'text' ? [m.text] : [])).join(' ')).not.toMatch(/снова/)
+    expect(game.S.mem[crewPaid]).toBe(true)
+    await game.fire('AlikIdle')
+    expect(taronMsgs(game)).toHaveLength(1)
   })
 
   it('звонок один раз за партию: второй idle молчит', async () => {
