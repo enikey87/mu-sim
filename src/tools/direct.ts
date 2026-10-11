@@ -169,6 +169,8 @@ export const DIRECT: Record<string, DirectCase> = {
   Finale_rubik_default: { event: 'ArcFinale', facts: { arc: 'rubik' } },
   Finale_razmik_default: { event: 'ArcFinale', facts: { arc: 'razmik' } },
   Finale_beton_opened: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem['count.rude'] = 6; g.S.mem[HEAT] = 3 } },
+  // #585: праздничная кнопка сдвинула выборки — тишина на наступившем сроке ушла из них
+  Quiet_Dead_PromiseDue: { event: 'PromiseDue', setup: dead },
   // #577: после разрастания пулов звонка выборки перестали собирать и второе приглашение Арсена
   Court_Lawyer_Again: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem.court = 1; g.S.mem['intro.arsen'] = true } },
 }

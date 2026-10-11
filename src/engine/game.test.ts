@@ -215,8 +215,9 @@ describe('Game: начало и ход', () => {
     const mine: string[] = []
     for (let i = 0; i < 80; i++) {
       const c = game.choices.find((x) => x.tone === 'polite' && !x.act) ?? game.choices[0]
-      // короткие кнопки сцен («Сбер», «Алик…») по замыслу не перефразируются — их не считаем
-      if (!(c.scene && c.text.length <= 8)) mine.push(c.text)
+      // короткие кнопки сцен («Сбер», «Алик…») по замыслу не перефразируются — их не считаем;
+      // кнопка-намерение (act) — контекстный вопрос, который ждёт ответа игрока, а не draw пула: тоже не считаем
+      if (!(c.scene && c.text.length <= 8) && !c.act) mine.push(c.text)
       game.S.offlineDays = 0
       await game.send(c)
       if (game.battery.dead) await game.battery.charge()

@@ -2,7 +2,7 @@
 // Берутся два самых приоритетных (специфичность + bonus); из одного слота — только одна.
 import type { Game } from '../../engine/game'
 import type { Choice, Tone } from '../../engine/state'
-import { type Rule, type Facts, type Criterion, type Entry, eq, is, exists, missing, gt, gte, lte, isOpen, valueOf } from '../fact'
+import { type Rule, type Facts, type Criterion, type Entry, eq, ne, is, exists, missing, gt, gte, lte, isOpen, valueOf } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { D, cap } from '../excuses'
 import { talkPairs, talkId } from '../talk'
@@ -12,9 +12,10 @@ import { GROUP_Q } from '../misc'
 import { P_LIE } from '../lies'
 import { TOPICS } from '../topics'
 import { P_CREW_PAID } from '../crew'
+import { P_HOLIDAY, type Holiday } from '../holidays'
 import { WORLD, SPEAKS } from '../world'
 import { fmtDayMonth, fmtDays } from '../../engine/time'
-import { HEAT, alikDead, alikShaved, moustacheAskAt, blocked, court, mourning, phoneKarine, crewPaid } from '../memkeys'
+import { HEAT, alikDead, alikShaved, moustacheAskAt, blocked, court, mourning, phoneKarine, crewPaid, endgame } from '../memkeys'
 import { requirePlayerPool } from '../player-pools'
 import {
   P_VIA_BORIS, P_VIA_KARINE, P_VIA_MAMA, P_MOO, P_MOUSTACHE, P_COURT,
@@ -82,6 +83,13 @@ export const choiceRules: R[] = [
     when: [is(crewPaid), missing(blocked), missing(alikDead)],
     act: 'crewPaid', tone: 'neutral', bonus: 4,
     text: (g) => fromArr(g, 'P_CREW_PAID', P_CREW_PAID),
+  }),
+  // праздник в календаре переписки: деньги под ним, один вариант на окно (#585); в окне молчания — молчит
+  offer({
+    name: 'Holiday',
+    when: [ne('holiday', false), missing(endgame.active), missing(alikDead), missing(blocked)],
+    act: 'holiday', tone: 'neutral', bonus: 4,
+    text: (g, facts) => { const pool = P_HOLIDAY[facts.holiday as Holiday]; return pool ? fromArr(g, `P_HOLIDAY.${String(facts.holiday)}`, pool) : '' },
   }),
   // извиниться после грубости
   offer({ name: 'Sorry', when: [is('ctx.offended')], act: 'sorry', tone: 'polite', bonus: 5, text: (g) => fromD(g, 'P_SORRY') }),
