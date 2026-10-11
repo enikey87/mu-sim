@@ -15,6 +15,7 @@ import { ARCS, NO_NEWS_A, NO_NEWS_B, GROUP_SEEN_A, GROUP_SEEN_B, WRONG_A, WRONG_
 import * as L from '../life'
 import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, PROMISE_PENCIL, PROMISE_FAR } from '../misc'
 import { CREW_PAID } from '../crew'
+import { HOLIDAY_MONEY, type Holiday } from '../holidays'
 import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_THIRD, LIE_NOCRED } from '../lies'
 import { HEAT, alikShaved, moustacheAskAt, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, topic, topicMute } from '../memkeys'
 import { PROMISE_SHAVE_ASK } from '../world'
@@ -140,6 +141,15 @@ export const replyRules: R[] = [
   says('crewPaid', {
     respond: async ({ game }) => {
       await game.say([game.draw('CREW_PAID', CREW_PAID)])
+      game.setCtx(null)
+    },
+  }),
+  // деньги в окне праздника (#585): ответ пулом этого праздника — ход не уходит в обычную отмазку мимо него
+  says('holiday', {
+    respond: async ({ game, facts }) => {
+      const pool = HOLIDAY_MONEY[String(facts.holiday) as Holiday]
+      if (!pool) return false
+      await game.say([game.draw('HOLIDAY_MONEY', pool)])
       game.setCtx(null)
     },
   }),
