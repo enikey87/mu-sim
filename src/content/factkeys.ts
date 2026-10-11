@@ -21,7 +21,7 @@ import {
   actSigned, grantPaid, rubikFined, threatClaim, nuneKeyPassed, nuneDekretOver, grandpaDying,
   betonSet, cardSent, saidTomorrow, saidFriday, payday, count, endgame, holidayGreeted, lend50,
   paydayScene, lightOff, netRation, phoneWarn, creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited,
-  criticalAt, creditOfferSum,
+  criticalAt, creditOfferSum, crewPaid,
 } from './memkeys'
 import { momDachaAt, momDachaDays, type LoanId, type MomId, type ThingId } from './credit'
 import { valueOf } from '../engine/rules'
@@ -56,7 +56,7 @@ export type MemExactKey =
   | typeof betonSet | typeof cardSent | typeof saidTomorrow | typeof saidFriday | typeof paydayScene
   | typeof lightOff | typeof netRation | typeof phoneWarn | typeof holidayGreeted
   | typeof creditStage | typeof creditOffer | typeof creditBroke | typeof momDone | typeof creditDeclined | typeof moneyPoor | typeof collectorsRecruited
-  | typeof criticalAt | typeof creditOfferSum
+  | typeof criticalAt | typeof creditOfferSum | typeof crewPaid
   | typeof payday[keyof typeof payday] | typeof count[keyof typeof count]
   | typeof endgame[keyof typeof endgame] | typeof lend50[keyof typeof lend50]
 

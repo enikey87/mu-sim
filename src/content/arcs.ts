@@ -42,6 +42,7 @@ export const CAST: Record<string, { name: string; color: string }> = {
   razmik: { name: 'Крановщик Размик 🏗️', color: '#c46a1d' },
   rubik: { name: 'Инспектор Рубик', color: '#4a5d7e' },
   collectors: { name: 'Коллекторы «Деньги-Ара»', color: '#5a4a3a' },
+  taron: { name: 'Тарон (чайнос)', color: '#8a7355' },
 };
 
 export const ARCS: Record<string, Arc> = {

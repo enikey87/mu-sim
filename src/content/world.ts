@@ -83,6 +83,8 @@ export const WORLD = {
   lavashHeld: named('lavashHeld', is(cryptoHodl), missing(payday.chain)),
   /** Коллекторы вошли в историю (написали сами). */
   collectors: named('collectors', is(intro('collectors'))),
+  /** Тарон (чайнос) вошёл в историю — своим звонком с объекта (#325). */
+  taron: named('taron', is(intro('taron'))),
   /** Алик перевербовал коллекторов — микрозайм с игрока не требуют (#128). */
   collectorsRecruited: named('collectorsRecruited', is(collectorsRecruited)),
 } satisfies Record<string, Criterion>
@@ -95,7 +97,7 @@ export const SPEAKS = {
   boris: WORLD.borisWrites, arsen: WORLD.arsen, razmik: WORLD.razmik, rubik: WORLD.rubik,
   karine: WORLD.karineSpeaks, garik: WORLD.garikKnown,
   samvel: WORLD.samvel, nune: WORLD.nune, mkrtich: WORLD.mkrtich, grant: WORLD.grant,
-  collectors: WORLD.collectors,
+  collectors: WORLD.collectors, taron: WORLD.taron,
 } satisfies Partial<Record<WhoId, Criterion>>
 
 /** Динамический id из сообщения/реестра: lookup без string-index у самого SPEAKS. */
@@ -163,6 +165,7 @@ export const MENTION_RE: Record<string, RegExp> = {
   razmik: /Размик/,
   rubik: /Рубик/,
   collectors: /Коллектор/i,
+  taron: /Тарон/,
 }
 export const CHORUS: Record<string, Line[]> = {
   garik: [needs('garikFree')('Я вообще-то рядом стою. Алик, скажи ему правду.'), 'Алик, опять ты про меня? Я даже не знаю, о чём речь.', needs('garikFree')('Привет. Я ничего не брал. Если что — я на свадьбе.'), 'Брат, не верь ему про меня. Верь про других.'],
