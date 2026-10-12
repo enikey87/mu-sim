@@ -32,6 +32,7 @@ export type Msg =
   | (MsgBase & { kind: 'fwd'; from: 'alik'; f: string; text: string })
   | (MsgBase & { kind: 'doc'; from: 'alik'; title: string; rows: Array<[string, number]>; total: number })
   | (MsgBase & { kind: 'job'; from: 'alik'; text: string; answered?: boolean })
+  | (MsgBase & { kind: 'lend50'; text: string; link: string })
   | (MsgBase & { kind: 'card' } & Card)
 
 /** Что за событие телефона: по нему оракул отличает законный повтор (сводка, отказ, уровень) от настоящего (#304). */
@@ -105,6 +106,8 @@ export interface Choice {
   arg?: string | number
   scene?: string
   go?: string | null
+  /** Залитая кнопка — только у ответа «Перевёл» в просьбе «займи 50» (#616). */
+  primary?: boolean
 }
 
 export interface PromiseRec {
