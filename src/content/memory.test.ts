@@ -149,3 +149,35 @@ describe('память не объявляет новый случай (#587)', 
     expect(witness).not.toMatch(/звонила/)
   })
 })
+
+describe('строка про «Ниву» не утверждает, что она сейчас едет (#603)', () => {
+  // «едет» — любое текущее движение: находка «До сих пор едет» и её варианты
+  const notDriving = /едет|в пути|на ходу/i
+
+  it('гейт при арке 0–1 серии: строка в пуле и без утверждения «едет»', async () => {
+    // квест «толкнуть» требует легенду niva_stuck первой серии («не заводится») — дальше «уехала сама» арка не дошла
+    const { game } = makeGame()
+    await game.playArc('niva')
+    await game.enterNode('q_niva', 'ask')
+    await choose(game, 'push')
+    game.nextDay(1)
+    const drove = remembered(game).find((t) => /толкал/.test(t))
+    expect(drove).toBeTruthy()
+    expect(drove).not.toMatch(notDriving)
+  })
+
+  it('гейт при арке до серии возврата (arc.niva = 6): строка в пуле и без утверждения «едет»', async () => {
+    const { game } = makeGame()
+    while ((game.S.arcs.niva?.i ?? 0) < 6) {
+      game.S.day += 5
+      await game.playArc('niva')
+    }
+    expect(game.S.arcs.niva?.i).toBe(6)
+    await game.enterNode('q_niva', 'ask')
+    await choose(game, 'push')
+    game.nextDay(1)
+    const drove = remembered(game).find((t) => /толкал/.test(t))
+    expect(drove).toBeTruthy()
+    expect(drove).not.toMatch(notDriving)
+  })
+})
