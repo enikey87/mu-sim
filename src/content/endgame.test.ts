@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { makeGame , setMoney} from '../test/helpers'
 import {
-  ENDGAME_ALIK_BACK, ENDGAME_FORMALITIES, ENDGAME_LEAVE, ENDGAME_MONEY, ENDGAME_MUTE,
-  ENDGAME_RENAMES, ENDGAME_RETURNER_LINES, ENDGAME_RETURNERS,
+  ENDGAME_ALIK_BACK, ENDGAME_ARCH, ENDGAME_ARCH_LIE, ENDGAME_FORMALITIES, ENDGAME_LEAVE, ENDGAME_MONEY,
+  ENDGAME_MUTE, ENDGAME_RENAMES, ENDGAME_RETURNER_LINES, ENDGAME_RETURNERS,
 } from './endgame'
 import { valueOf } from '../engine/rules'
 import { saidText } from './fact'
@@ -32,8 +32,7 @@ async function enterGame(game: Game, outcome = 'default'): Promise<void> {
   await answerAsk(game)
 }
 
-describe('бесконечная группа после Дня выплаты', () => {
-  it('открывается один раз и сохраняет результат концовки', async () => {
+describe('бесконечная группа после Дня выплаты', () => {  it('открывается один раз и сохраняет результат концовки', async () => {
     const { game } = makeGame()
     game.adjustDebt(-game.S.debt)
     setMoney(game, 252400)
@@ -150,6 +149,8 @@ describe('бесконечная группа после Дня выплаты',
       ['leave', ENDGAME_LEAVE, 60],
       ['formalities', ENDGAME_FORMALITIES, 150],
       ['renames', ENDGAME_RENAMES, 30],
+      ['archive', ENDGAME_ARCH.map((e) => saidText(valueOf(e).line)), 30],
+      ['archive-lie', ENDGAME_ARCH_LIE, 4],
     ]
     for (const [name, pool, min] of pools) {
       expect(new Set(pool).size, name).toBe(pool.length)
@@ -167,6 +168,8 @@ describe('бесконечная группа после Дня выплаты',
       ['formalities', ENDGAME_FORMALITIES],
       ['returners', Object.values(ENDGAME_RETURNER_LINES).flat()],
       ['alik-back', ENDGAME_ALIK_BACK],
+      ['archive', ENDGAME_ARCH.map((e) => saidText(valueOf(e).line))],
+      ['archive-lie', ENDGAME_ARCH_LIE],
     ]
     // куски по 30 символов вместо перебора всех подстрок каждой пары: общий кусок ≥ 30 — это общий
     // ровно-30-символьный, поэтому проверка та же, а 17 700 пар находятся за один проход

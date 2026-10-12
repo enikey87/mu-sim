@@ -4,7 +4,7 @@ import { makeGame } from '../test/helpers'
 import { spec, valueOf } from './fact'
 import { OATH_FORMS } from './misc'
 import { WORLD, meet, PROMISE_MET, PROMISE_SHAVE, PROMISE_SHAVE_ASK, PROMISE_SHAVE_KEPT } from './world'
-import { alikDead, alikShaved, endgame, nuneKeyPassed } from './memkeys'
+import { alikDead, alikShaved, endgame, moustacheKept, nuneKeyPassed } from './memkeys'
 import { D, low } from './excuses'
 import { promiseRules } from './rules/world'
 import type { Entry } from './fact'
@@ -79,6 +79,7 @@ describe('ставка «усы»', () => {
         expect(alik(game, from).join(' ').toLowerCase()).toContain('ус')
         expect(game.S.mem[alikShaved]).toBeUndefined()
         expect(game.S.promises[0].kept).toBe(true)
+        expect(game.S.mem[moustacheKept], 'факт спасённой ставки — на нём стоит архив дела (#608)').toBe(true)
         saved = true
       }
     }

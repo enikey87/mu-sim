@@ -25,12 +25,12 @@ import {
 import { allRules } from '../content/rules'
 import type { GameEvent, Offer } from '../content/rules/events'
 import { CLAIMS, claimByKey, CALLBACK_OPEN, type Claim } from '../content/lies'
-import { CLAIM_LEDGER, activeClaim, claimKeyOf, closeEpisode, currentEpisode, publishClaim, publishRetraction, publishTransition } from '../content/ledger'
+import { CLAIM_LEDGER, activeClaim, claimKeyOf, closeEpisode, currentEpisode, publishClaim, publishRetraction, publishTransition, type EpisodeRec } from '../content/ledger'
 import { isWhoId, type ClaimKey } from '../content/ids'
 import { type Claimed, type LedgerEvent, type LineSpec as ContentLineSpec, type Said, saidClaims, saidJoin, saidText } from '../content/fact-types'
 import * as memkeys from '../content/memkeys'
 import {
-  ENDGAME_CHOICES, ENDGAME_FALLBACK, ENDGAME_FORMALITIES, ENDGAME_GROUP, ENDGAME_INTRO, ENDGAME_JUBILEES,
+  ENDGAME_ARCH, ENDGAME_ARCH_LIE, ENDGAME_CHOICES, ENDGAME_FALLBACK, ENDGAME_FORMALITIES, ENDGAME_GROUP, ENDGAME_INTRO, ENDGAME_JUBILEES,
   ENDGAME_LEAVE, ENDGAME_MONEY, ENDGAME_MUTE, ENDGAME_OPEN, ENDGAME_RENAMES, ENDGAME_RETURNER_LINES, ENDGAME_RETURNERS, ENDGAME_VENDETTA, ENDGAME_ALIK_BACK,
   LEND50_ASK, LEND50_ASK_AGAIN, LEND50_CHOICES, LEND50_LINK, LEND50_MEMORY, LEND50_NO, LEND50_NUNE, LEND50_RENAME, LEND50_SERIOUS, LEND50_SYS, LEND50_YES,
 } from '../content/endgame'
@@ -2126,7 +2126,10 @@ export class Game {
   /** Новейший открытый эпизод противоречия: две версии, тема и чья была прошлая. */
   lie(): { old: Claim; new: Claim; kind: LieKind; alikOld: boolean } | null {
     const ep = currentEpisode(this.S.ledger)
-    if (!ep) return null
+    return ep ? this.episodeLie(ep) : null
+  }
+  /** Две версии эпизода как утверждения контента: их `say` игрок слышал сам (архив дела, #608). */
+  private episodeLie(ep: EpisodeRec): { old: Claim; new: Claim; kind: LieKind; alikOld: boolean } | null {
     const a = this.S.ledger.claims.find((c) => c.id === ep.aClaim)
     const b = this.S.ledger.claims.find((c) => c.id === ep.bClaim)
     if (!a || !b) return null
@@ -2453,7 +2456,7 @@ export class Game {
     const S = this.S
     S.ctx = null
     if (action === 'money') {
-      await this.say([this.draw('ENDGAME_MONEY', ENDGAME_MONEY)])
+      await this.say([this.archiveLine() ?? this.draw('ENDGAME_MONEY', ENDGAME_MONEY)])
       return
     }
     if (action === 'mute') {
@@ -2480,16 +2483,48 @@ export class Game {
       const quip = this.decks.tryDraw('ENDGAME_ALIK_BACK', ENDGAME_ALIK_BACK, true)
       if (quip) await this.say([quip])
     }
-    await this.say([this.draw('ENDGAME_LEAVE', ENDGAME_LEAVE)])
+    await this.say([this.archiveLine() ?? this.draw('ENDGAME_LEAVE', ENDGAME_LEAVE)])
+  }
+
+  /**
+   * Архив дела (docs/design/endgame.md): закрытый факт этой партии, который в группе ещё не звучал.
+   * Одна ссылка на факт — на все три поверхности: сказанное формальностью не повторяют «Где деньги?»
+   * и предлог возврата. Фактов нет — null, и кнопка звучит своим прежним общим пулом.
+   */
+  archiveLine(): Said | null {
+    const S = this.S
+    const spoken = new Set(String(S.mem[memkeys.endgame.arch] ?? '').split(',').filter(Boolean))
+    const take = (slug: string, make: () => Said | null): Said | null => {
+      if (spoken.has(slug)) return null
+      const said = make()
+      if (said === null) return null
+      spoken.add(slug)
+      S.mem[memkeys.endgame.arch] = [...spoken].join(',')
+      return said
+    }
+    // пойманное враньё: своя реплика на эпизод, с say обеих его версий
+    for (const ep of S.ledger.episodes) {
+      if (ep.status !== 'caught') continue
+      const said = take(`lie.${ep.id}`, () => {
+        const pair = this.episodeLie(ep)
+        const tpl = this.decks.pick('ENDGAME_ARCH_LIE', ENDGAME_ARCH_LIE, this.lineFacts())
+        return pair && tpl ? this.X.fill(tpl, { old: pair.old.say, new: pair.new.say }) : null
+      })
+      if (said) return said
+    }
+    // финал сериала или ставка усами: факт объявляет гейт своей строки
+    const fact = this.decks.pick('ENDGAME_ARCH', ENDGAME_ARCH, this.lineFacts(), { eligible: (e) => !spoken.has(valueOf(e).slug) })
+    return fact ? take(fact.slug, () => valueOf(fact.line)) : null
   }
 
   /** Очередной закрывающий акт (на круглом счёте — и юбилей); счёт актов растёт здесь. */
   formalityLines(): Said[] {
     const n = Number(this.S.mem[memkeys.endgame.forms] ?? 0) + 1
     this.S.mem[memkeys.endgame.forms] = n
+    const archive = this.archiveLine()
     const jubilee = ENDGAME_JUBILEES[n]
     const memory = this.line('LEND50_MEMORY', LEND50_MEMORY)
-    return [this.draw('ENDGAME_FORMALITIES', ENDGAME_FORMALITIES), ...(memory ? [memory] : []), ...(jubilee ? [jubilee] : [])]
+    return [archive ?? this.draw('ENDGAME_FORMALITIES', ENDGAME_FORMALITIES), ...(memory ? [memory] : []), ...(jubilee ? [jubilee] : [])]
   }
   async endgameFormality(): Promise<void> {
     for (const text of this.formalityLines()) await this.say([text])

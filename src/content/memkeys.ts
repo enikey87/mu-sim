@@ -36,6 +36,8 @@ export const karineKnowsDebt = 'karine.knowsDebt'
 export const karineThinksTax = 'karine.thinksTax'
 /** Алик сбрил усы по ставке — живёт ~40 дней (`during`), пока отрастут. */
 export const alikShaved = 'alik.shaved'
+/** Ставка «усы» сдержана переводом: факт навсегда — на него опирается архив дела (#608). */
+export const moustacheKept = 'moustache.kept'
 /** День, когда игрок спросил «как усы?» — перерыв между показами кнопки (#352). */
 export const moustacheAskAt = 'moustache.askAt'
 export const alikDay = 'alik.day'
@@ -103,6 +105,8 @@ export const count = {
 export const endgame = {
   active: 'endgame.active', started: 'endgame.started', intro: 'endgame.intro', forms: 'endgame.forms',
   exits: 'endgame.exits', mutes: 'endgame.mutes', renames: 'endgame.renames',
+  /** Какие факты архива дела уже прозвучали в группе — одна ссылка на факт, а не на партию (#608). */
+  arch: 'endgame.arch',
 } as const
 
 /** Праздник, который партия уже поздравила: «newYear@2026» — год начала окна (#255). */
@@ -167,7 +171,7 @@ export const ACTOR_KEYS: ReadonlySet<string> = new Set(ACTOR_KEY_LIST)
 
 export const MEM_KEYS: ReadonlySet<string> = new Set([
   HEAT, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, evicted, vendetta, court, courtVerdict,
-  ritualCount, ritualCut, caughtCount, cryptoHodl, bathAsked, mamaCalls, phoneKarine, karineKnowsDebt, karineThinksTax, alikShaved, moustacheAskAt, alikDay, mooAt, sorryAt, courtReferral,
+  ritualCount, ritualCut, caughtCount, cryptoHodl, bathAsked, mamaCalls, phoneKarine, karineKnowsDebt, karineThinksTax, alikShaved, moustacheKept, moustacheAskAt, alikDay, mooAt, sorryAt, courtReferral,
   rudeAt, thanksAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway, nivaPlayer, carGone,
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday,
