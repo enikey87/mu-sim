@@ -450,6 +450,9 @@ body {
 @keyframes intro-line-in { from { opacity: 0 } to { opacity: 1 } }
 @keyframes intro-line-out { from { opacity: 1 } to { opacity: 0 } }
 .intro-hint { position: absolute; bottom: 22px; left: 0; right: 0; text-align: center; font-size: 13px; opacity: .85; animation: intro-pulse 1.6s ease-in-out infinite; }
+/* строка о счётчике: на интро — над подсказкой, в досье — в потоке (#611) */
+.intro .track-note { position: absolute; bottom: 50px; left: 22px; right: 22px; }
+.track-note { margin: 0; font-size: 12px; opacity: .6; text-align: center; }
 @keyframes intro-pulse { 50% { opacity: .35 } }
 .intro-title {
   position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;

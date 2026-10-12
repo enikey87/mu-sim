@@ -10,6 +10,7 @@ import { fmtDate } from '../engine/time'
 import type { Game } from '../engine/game'
 import { introOf, uiOf } from './view'
 import { introDateLine, introVowLine, LINE_MS, FADE_MS } from './Intro'
+import { enable, GAME_HOST } from '../analytics/metrics'
 
 function renderApp(game: Game, onReset = vi.fn()) {
   const utils = render(<App game={game} onReset={onReset} />)
@@ -1014,5 +1015,35 @@ describe('усы: аватар без усов, пока верен факт с�
     renderApp(game)
     expect(avatar().className).toContain('ram')
     expect(avatar().className).not.toContain('shaved')
+  })
+})
+
+describe('строка о счётчике: видна только когда он включён (#611)', () => {
+  afterEach(() => { enable({ host: '', search: '', id: '' }) })
+
+  it('счётчик молчит — строки нет ни на интро, ни в досье', () => {
+    const { game } = makeGame()
+    render(<App game={game} onReset={vi.fn()} intro />)
+    expect(document.querySelector('.track-note')).toBeNull()
+  })
+
+  it('счётчик включён — одна строка на интро и в досье, и она говорит то же', () => {
+    enable({ host: GAME_HOST, search: '', id: '4242' })
+    const { game } = makeGame()
+    const { unmount } = render(<App game={game} onReset={vi.fn()} intro />)
+    const onIntro = document.querySelector('.intro .track-note')!
+    expect(onIntro).toBeInTheDocument()
+    const text = onIntro.textContent
+    expect(text).toMatch(/ходы считаются/i)
+    expect(text).toMatch(/текст сообщений/i)
+    expect(document.querySelectorAll('.track-note')).toHaveLength(1)
+    unmount()
+
+    renderApp(game)
+    fireEvent.click(screen.getByTitle('Обещания и ачивки'))
+    const dossier = screen.getByRole('dialog', { name: 'Досье на Алика' })
+    const inSheet = within(dossier).getByText(text!)
+    expect(inSheet).toBeInTheDocument()
+    expect(within(dossier).getAllByText(text!)).toHaveLength(1)
   })
 })

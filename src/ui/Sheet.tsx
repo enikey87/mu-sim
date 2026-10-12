@@ -3,6 +3,7 @@ import { useGame } from './useGame'
 import { fmtDate } from '../engine/time'
 import { useModal } from './useModal'
 import { viewOf, type PromiseRow } from './view'
+import { TrackNote } from './TrackNote'
 
 /** Значок записи журнала: свой у каждого состояния (docs/design/promise-amnesty.md). */
 const due = (p: PromiseRow) => (p.due === null ? '' : ` ${fmtDate(p.due)}`)
@@ -80,6 +81,7 @@ export function Sheet({ onClose, onReset }: { onClose: () => void; onReset: () =
             <li key={a.id} className={a.got ? '' : 'locked'}>{a.got ? '🏆' : '🔒'} <b>{a.title}</b> — {a.desc}</li>
           ))}
         </ul>
+        <TrackNote />
         <button className="danger" id="resetBtn" onClick={onReset}>Начать заново</button>
       </div>
     </div>
