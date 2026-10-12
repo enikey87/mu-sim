@@ -1,6 +1,7 @@
 // Интро v2: пять строк-титров на экране блокировки, по одной; титул — последняя; уезд в чат.
 import { useEffect, useRef, useState } from 'react'
 import { useGameApi } from './useGame'
+import { TrackNote } from './TrackNote'
 import type { IntroView } from './view'
 
 /** Карточки 0–3 — строки ~1,8 с; 4 — титул ~2,5 с. */
@@ -104,6 +105,7 @@ export function Intro({ data, gate, onDone }: { data: IntroView; gate: boolean; 
         </div>
       )}
       {!started && <div className="intro-hint">Коснитесь, чтобы начать</div>}
+      <TrackNote />
     </div>
   )
 }

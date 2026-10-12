@@ -5,6 +5,7 @@ import { realClock } from './engine/clock'
 import { browserAudio } from './engine/audio'
 import { SAVE_KEY } from './engine/state'
 import { App } from './ui/App'
+import { enable, firstGesture } from './analytics/metrics'
 import './styles.css'
 
 // Параметры адреса: ?fast — паузы в ~30 раз короче, ?hour=3 — подменить час, ?away=90 — «не было 90 минут»,
@@ -21,6 +22,18 @@ const newGame = () => {
   })
   ;(window as unknown as { __alik: Game }).__alik = game // API для scripts/playtest-tech.mjs (и консоли): что он вызывает, проверяет src/tools/window-api.test.ts
   return game
+}
+
+// Счётчик Метрики включает только вход страницы и только когда заданы номер, хост игры и адрес без debug/fast;
+// тег грузится первым жестом — тем же, что разрешает звук (docs/design/analytics.md).
+if (enable({ host: location.hostname, search: location.search })) {
+  const gesture = () => {
+    firstGesture()
+    document.removeEventListener('pointerdown', gesture)
+    document.removeEventListener('keydown', gesture)
+  }
+  document.addEventListener('pointerdown', gesture)
+  document.addEventListener('keydown', gesture)
 }
 
 // Игра создаётся вне React: StrictMode вызывает инициализаторы дважды, а у игры есть таймеры

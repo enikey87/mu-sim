@@ -181,8 +181,15 @@ export const FINALES: Record<string, Finale[]> = {
 }
 
 // ---- концовки игры: складываются из финалов сериалов ----
+/** id концовок вне Дня выплаты — перечислены, чтобы `id` был закрытым типом (#611: цель `ending` не примет произвольную строку). */
+export const PLAIN_ENDING_IDS = ['family', 'heir', 'ram', 'alik', 'honest', 'vendetta', 'multiverse'] as const
+/** Исходы Дня выплаты: хвост id `payday_*` (docs/design/analytics.md, цель `endgame`). */
+export const PAYDAY_OUTCOMES = ['real', 'coins', 'lavash', 'niva', 'strasbourg', 'notyou', 'default'] as const
+export type PaydayId = (typeof PAYDAY_OUTCOMES)[number]
+export type EndingId = (typeof PLAIN_ENDING_IDS)[number] | `payday_${PaydayId}`
+
 export interface Ending {
-  id: string
+  id: EndingId
   title: string
   icon: string
   /** Сообщения в чате перед экраном концовки. */
@@ -243,5 +250,5 @@ export const ENDINGS: Ending[] = [
     ['strasbourg', 'Через Страсбург', '🇪🇺', 'Европейский суд постановил: «Выплатить… когда-нибудь». Юридически сильная формулировка.'],
     ['notyou', 'Не тебе', '🏗️', 'Весь долг выплачен. Размику — он выше в очереди. Тебе — место на кране.'],
     ['default', 'Пятьдесят рублей', '🪙', 'День выплаты состоялся: 50 рублей «остатка». Следующий — через год. Алик уже начал копить.'],
-  ] as const).map(([id, title, icon, text]): Ending => ({ id: 'payday_' + id, title: 'День выплаты: ' + title, icon, m: [], text, when: [eq(paydayScene, id)] })),
+  ] as const satisfies readonly (readonly [PaydayId, string, string, string])[]).map(([id, title, icon, text]): Ending => ({ id: `payday_${id}`, title: 'День выплаты: ' + title, icon, m: [], text, when: [eq(paydayScene, id)] })),
 ]
