@@ -1,7 +1,7 @@
 import type { Choice } from '../engine/state'
-import { type Entry, type Line, type Said, exists, gate, is } from './fact'
-import { needs } from './world'
-import { lend50, met } from './memkeys'
+import { type Entry, type Line, type Said, eq, exists, gate, is } from './fact'
+import { needs, WORLD } from './world'
+import { finaleOf, lend50, met, moustacheKept } from './memkeys'
 
 export const ENDGAME_GROUP = 'ВЫПЛАТА ЗАКРЫТА ✅ (не выходить)'
 
@@ -587,3 +587,83 @@ export const ENDGAME_JUBILEES: Record<number, string> = {
   50: 'Пятьдесят формальностей. Вот где настоящая выплата, брат.',
   100: 'Сто раз всё закрыли. За постоянство — тост.',
 }
+
+// ---- архив дела: закрытый факт этой партии звучит в группе один раз (docs/design/endgame.md) ----
+
+/**
+ * Ссылка архива: `slug` хранит, что в группе уже прозвучало, `line` — сама реплика. Требования живут
+ * на самой записи: гейт факта — у колоды, поэтому ссылка не выпадает рядом с чужим сериалом.
+ */
+export interface ArchiveLine { slug: string; line: Said }
+
+/**
+ * Каждое значение, которое игра пишет в `finale.*` (частные id из `FINALES` и `'default'` каждого
+ * сериала), — своя реплика под гейтом этого значения. Строка, называющая человека, требует знакомства.
+ */
+export const ENDGAME_ARCH: Entry<ArchiveLine>[] = [
+  gate(eq(finaleOf('boris'), 'brigadir'), WORLD.boris)({ slug: 'fin.boris.brigadir', line: 'Борис теперь прораб и платит всем подряд. Ведомость закроем, заслуги припишем мне.' }),
+  gate(eq(finaleOf('boris'), 'toyou'), WORLD.boris)({ slug: 'fin.boris.toyou', line: 'Борис переехал к тебе, а алименты на него пришли ко мне. Подпиши опёку: ты теперь попечитель выплаты.' }),
+  gate(eq(finaleOf('boris'), 'default'), WORLD.boris)({ slug: 'fin.boris.default', line: 'Бориса забрали в налоговую свидетелем. Счета заморожены, выплата тоже. Формальность: подтвердить, что заморозка не помеха.' }),
+
+  gate(eq(finaleOf('beton'), 'opened'), WORLD.grant)({ slug: 'fin.beton.opened', line: 'Грант вскрыл угол отбойником и достал конверт. Толстый, но лёгкий по деньгам.' }),
+  gate(eq(finaleOf('beton'), 'corner'), WORLD.mkrtich)({ slug: 'fin.beton.corner', line: 'Мкртич отбил для тебя кусок бетона с уголком конверта. Номинал не виден, зато трофей настоящий.' }),
+  gate(eq(finaleOf('beton'), 'ledger'), WORLD.nune)({ slug: 'fin.beton.ledger', line: 'Нуне сверила выписки и уличила меня при всём объекте. Протокол подписан, денег нет.' }),
+  gate(eq(finaleOf('beton'), 'default'))({ slug: 'fin.beton.default', line: 'Деньги в фундаменте признали неотделимым улучшением. Дом продан вместе с ними — улучшение уехало.' }),
+
+  gate(eq(finaleOf('samvel'), 'tamada'), WORLD.samvel)({ slug: 'fin.samvel.tamada', line: 'Ты был тамадой на свадьбе Самвела. Почёт не облагается налогом и не выплачивается деньгами.' }),
+  gate(eq(finaleOf('samvel'), 'groom'), WORLD.samvel)({ slug: 'fin.samvel.groom', line: 'Самвел выдал за тебя племянницу. Теперь ты родня, а в родне деньги не считают — это наш главный документ.' }),
+  gate(eq(finaleOf('samvel'), 'default'), WORLD.samvel)({ slug: 'fin.samvel.default', line: 'Свадьба Самвела закончилась, и он женится снова. Состав гостей тот же, повод новый.' }),
+
+  gate(eq(finaleOf('niva'), 'chose'), WORLD.niva)({ slug: 'fin.niva.chose', line: '«Нива» сама уехала к тебе. Машина у тебе, бумаги в пути — значит, выплата в дороге.' }),
+  gate(eq(finaleOf('niva'), 'default'), WORLD.niva)({ slug: 'fin.niva.default', line: '«Нива» уехала и оставила записку «Не ищи». Уважаю её выбор — тоже формальность, подтверди.' }),
+
+  gate(eq(finaleOf('nune'), 'ledger'), WORLD.nune)({ slug: 'fin.nune.ledger', line: 'Нуне пересчитала мой долг и довела его до большего. Акты в порядке, платить должна бухгалтерия.' }),
+  gate(eq(finaleOf('nune'), 'default'), WORLD.nune, WORLD.dekret)({ slug: 'fin.nune.default', line: 'Нуне ушла во второй декрет, и ключ от сейфа снова при ней. Очередь за деньгами подросла.' }),
+
+  gate(eq(finaleOf('grant'), 'ally'), WORLD.grant)({ slug: 'fin.grant.ally', line: 'Грант перевёл тебе тысячу как союзнику. Мы теперь один клуб: платите друг другу напрямую.' }),
+  gate(eq(finaleOf('grant'), 'default'), WORLD.grant)({ slug: 'fin.grant.default', line: 'У Гранта есть брат-близнец. Оба мне не платят, но по очереди — это хоть график.' }),
+
+  gate(eq(finaleOf('alik_death'), 'will'))({ slug: 'fin.alik_death.will', line: 'На моих поминках зачитали завещание: кредит в банке теперь твой. Наследство принято, платите сами.' }),
+  gate(eq(finaleOf('alik_death'), 'sulk'))({ slug: 'fin.alik_death.sulk', line: 'Мои похороны прошли без тебя. Я обиделся посмертно, срок действия обиды неизвестен.' }),
+  gate(eq(finaleOf('alik_death'), 'default'))({ slug: 'fin.alik_death.default', line: 'Похороны отменились: я живой. Поминки оплачены, возврату не подлежат — как и выплата.' }),
+
+  gate(eq(finaleOf('garik'), 'cutter'), WORLD.garik)({ slug: 'fin.garik.cutter', line: 'Гарика достали перфоратором, и работал ты. Смета выросла, Гарик доволен.' }),
+  gate(eq(finaleOf('garik'), 'default'), WORLD.garik)({ slug: 'fin.garik.default', line: 'Гарика достали из фундамента, а он не хочет обратно. Там тихо и никто не просит денег.' }),
+
+  gate(eq(finaleOf('tile'), 'lost'))({ slug: 'fin.tile.lost', line: 'Суд решил, что ты должен заказчику за мою же плитку. Реквизиты мои — переводи, я передам.' }),
+  gate(eq(finaleOf('tile'), 'default'))({ slug: 'fin.tile.default', line: 'Суд установил: виноват пол под плиткой, а клал его я. По этой линии мы квиты.' }),
+
+  gate(eq(finaleOf('grandpa'), 'revoke'))({ slug: 'fin.grandpa.revoke', line: 'Дедушка переписал завещание: мне — долги, тебе — благословение. Оформим дарение.' }),
+  gate(eq(finaleOf('grandpa'), 'default'))({ slug: 'fin.grandpa.default', line: 'Дедушка пережил хоспис и открыл в нём шаурмичную. Меню одно: «До похорон».' }),
+
+  gate(eq(finaleOf('rubik'), 'bribe'), WORLD.rubik)({ slug: 'fin.rubik.bribe', line: 'Рубик вычислил взяткодателя, и это ты. Я заплатил за тебя и вычел из долга — по-братски.' }),
+  gate(eq(finaleOf('rubik'), 'karine'), WORLD.karine)({ slug: 'fin.rubik.karine', line: 'Карине ушла к Рубику, акт подписан, деньги у неё. Спрашивай у неё — она всё проверяет.' }),
+  gate(eq(finaleOf('rubik'), 'default'), WORLD.rubik)({ slug: 'fin.rubik.default', line: 'Рубик, оказывается, из налоговой: проверял не плитку, а меня. Счета заморожены, деньги холодные.' }),
+
+  gate(eq(finaleOf('razmik'), 'union'), WORLD.razmik)({ slug: 'fin.razmik.union', line: 'Размик собрал профсоюз кредиторов. Взносов нет — у кредиторов денег нет.' }),
+  gate(eq(finaleOf('razmik'), 'swap'), WORLD.razmik, WORLD.crane)({ slug: 'fin.razmik.swap', line: 'Размик уступил тебе кран: говорит, тебе нужнее. Голодовка с понедельника, лаваш подаю лично.' }),
+  gate(eq(finaleOf('razmik'), 'shift'), WORLD.razmik)({ slug: 'fin.razmik.shift', line: 'Ты отработал смену в кабине крана вместо Размика. Оплата потом, всё вместе.' }),
+  gate(eq(finaleOf('razmik'), 'default'), WORLD.razmik, WORLD.crane)({ slug: 'fin.razmik.default', line: 'Размик на кране и первый в очереди: он выше тебя. Логика железная.' }),
+
+  gate(eq(finaleOf('collectors'), 'default'), WORLD.collectors)({ slug: 'fin.collectors.default', line: 'Коллекторы теперь мои: месят раствор и мечту о платеже. На объекте.' }),
+
+  // ставка усами: сбрил — ачивка навсегда (`alik.shaved` к эпилогу часто уже погашен),
+  // спас — запись со ставкой (`moustache.kept`); спасённая строка не говорит, что усы сбриты
+  gate(is('ach.shaved'))({ slug: 'stake.shaved', line: 'Ставку я продул: усов нет, фото профиля обновлено. В банке теперь отказывают в узнавании.' }),
+  gate(is(moustacheKept), WORLD.moustache)({ slug: 'stake.kept', line: 'Ставку я сдержал: перевод пришёл, усы на месте. Клятва выполнена, деньги — нет.' }),
+]
+
+/**
+ * Пойманное враньё: одна реплика на эпизод, в которую входят `say` обеих версий этого эпизода
+ * ({old} и {new} подставляет игра). Открытый, объяснённый и отозванный эпизод реплики не даёт.
+ */
+export const ENDGAME_ARCH_LIE: string[] = [
+  'Ты меня поймал: {old} и {new}. Оба места закрыты, деньги — в акте.',
+  'Значит, {old} и {new}. Зафиксировано, подписано, оплачено не будет.',
+  'В твоём журнале {old} и {new}. В моём — одно: «в процессе».',
+  'Ты сам видел: {old}. Потом сам видел: {new}. Свидетелей больше, чем денег.',
+  'Поймал на двух версиях: {old} и {new}. Обе подтверждены, поэтому обе недействительны.',
+  'Я слышу упрёк: {old}, а потом {new}. Журнал полон, деньги пусты.',
+  'Ладно, поймал: {old} и {new}. Деньги были в обоих местах, поэтому не в одном.',
+  'По журналу выходит: {old}, а потом {new}. Я в журнале ничего не подделывал, брат.',
+]
