@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import type { Entry } from './fact-types'
 import { makeGame, alikTexts } from '../test/helpers'
 import { ARCS } from './arcs'
 import { FINALES } from './finales'
@@ -90,5 +91,35 @@ describe('вопрос «уже случилось?» только перед с
     await followBefore('grant', 'Грант заплатил?', /заплатил|оплачено/, 'Что заказчик?')
     await followBefore('razmik', 'Размик слез?', /Размик слез!/, 'Как там Размик?', { when: /лаваш/, has: 'Размик ещё на кране?' })
     await followBefore('niva', '«Нива» нашлась?', /«Нива» вернулась!/, 'Есть новости про «Ниву»?', { when: /Гюмри/, has: 'Где «Нива»?' })
+    await followBefore('samvel', 'Самвел ещё женится?', /Самвел женится снова/, 'Как там свадьба?')
+  })
+})
+
+describe('вопрос про развязку Самвела — только перед серией, которая отвечает (#604)', () => {
+  const at = () => [0, 1, 2, 3, 4, 5, 6, 7]
+
+  it('до серии «Самвел женится снова» кнопки нет; перед ней — есть', async () => {
+    const { game } = makeGame()
+    for (const i of at()) {
+      const lines = game.open(ARCS.samvel.follow)
+      expect(lines, `серия ${i}`).toContain('Как там свадьба?')
+      if (i === 7) expect(lines, 'перед развязкой').toContain('Самвел ещё женится?')
+      else expect(lines, `до развязки, серия ${i}`).not.toContain('Самвел ещё женится?')
+      game.S.day += 5
+      await game.playArc('samvel')
+    }
+    // после развязки вопроса тоже нет — он отвечен
+    expect(game.open(ARCS.samvel.follow)).not.toContain('Самвел ещё женится?')
+  })
+
+  // негативный контроль: та же строка без gate открыта на любой серии — значит, кнопку убирает именно гейт
+  it('снятие номера серии возвращает кнопку: строка без gate видна и до развязки', async () => {
+    const { game } = makeGame()
+    const bare = [...ARCS.samvel.follow.slice(0, 3), 'Самвел ещё женится?'] as Entry<string>[]
+    for (let i = 0; i < 5; i++) {
+      expect(game.open(bare), `серия ${i}`).toContain('Самвел ещё женится?')
+      game.S.day += 5
+      await game.playArc('samvel')
+    }
   })
 })
