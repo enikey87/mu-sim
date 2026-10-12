@@ -122,6 +122,27 @@ describe('Game: начало и ход', () => {
     expect(shout.ui.feelId).toBe(1)
     expect(vibes).toContainEqual([80, 40, 80])
 
+    // #583: капс на готовой кнопке — не грубость: кнопка несёт свой тон, классификатор читает только свой текст
+    const bottom = makeGame().game
+    setMoney(bottom, Game.MONEY_BOTTOM)
+    bottom.S.choices = null
+    const btn = bottom.choices.find((c) => c.act === 'desperate')
+    expect(btn, 'кнопка отчаяния на дне').toBeDefined()
+    expect(btn!.tone, 'тон кнопки задан разметкой').toBe('neutral')
+    await bottom.send(btn!)
+    expect(bottom.ui.feel, 'телефон не трясёт от кнопки').not.toBe('shake')
+    expect(bottom.S.mem[HEAT] ?? 0, 'ссора не греется').toBe(0)
+    expect(bottom.S.mem.rudeAt, 'ход не помечен грубым').toBeUndefined()
+    // та же кнопка текстом капсом: отклика грубости нет — тон задан кнопке, а не тексту
+    const caps = makeGame().game
+    expect(caps.feelFor({ text: 'АЛИК, Я ПРОДАМ ПЛИТКУ. ВАШУ. СО СТЕНЫ.', tone: 'neutral', act: 'desperate', arg: 'tileWill' })).toBeNull()
+
+    // тот же текст, набранный игроком, — крик и тряска
+    const typed = makeGame({ audio }).game
+    await typed.send('АЛИК, Я ПРОДАМ ПЛИТКУ. ВАШУ. СО СТЕНЫ.')
+    expect(typed.ui.feel).toBe('shake')
+    expect(typed.S.mem.rudeAt).toBe(typed.S.stats.sent)
+
     const benign = makeGame({ audio }).game
     await benign.send('АЛИК!!!')
     expect(benign.ui.feel).toBeNull()
@@ -215,8 +236,9 @@ describe('Game: начало и ход', () => {
     const mine: string[] = []
     for (let i = 0; i < 80; i++) {
       const c = game.choices.find((x) => x.tone === 'polite' && !x.act) ?? game.choices[0]
-      // короткие кнопки сцен («Сбер», «Алик…») по замыслу не перефразируются — их не считаем
-      if (!(c.scene && c.text.length <= 8)) mine.push(c.text)
+      // короткие кнопки сцен («Сбер», «Алик…») по замыслу не перефразируются — их не считаем;
+      // кнопка-намерение (act) — контекстный вопрос, который ждёт ответа игрока, а не draw пула: тоже не считаем
+      if (!(c.scene && c.text.length <= 8) && !c.act) mine.push(c.text)
       game.S.offlineDays = 0
       await game.send(c)
       if (game.battery.dead) await game.battery.charge()
@@ -295,6 +317,23 @@ describe('Game: допработа', () => {
     const mood = game.S.mood
     await game.answerJob(job2.id, false)
     expect(game.S.mood).toBe(mood - 1)
+  })
+  it('мёртвый не отвечает на допработу: игрок отвечает — Алик молчит, долг идёт; ход берёт голос смерти, а не сериал движка', async () => {
+    const { game } = makeGame()
+    await game.job()
+    const job = game.S.msgs.findLast((m) => m.kind === 'job')!
+    game.S.mem.alik_dead = true
+    const [debt, from] = [game.S.debt, game.S.msgs.length]
+    await game.answerJob(job.id, true)
+    // прямые say движка мимо гейта смерти: работа зачтена, голоса нет
+    expect(alikTexts(game.S.msgs.slice(from))).toEqual([])
+    expect(game.S.debt).toBeGreaterThan(debt)
+    expect(game.S.msgs.find((m) => m.id === job.id)).toMatchObject({ kind: 'job', answered: true })
+    // при мёртвом единственный сериал — смерть: ход не может уйти к Turn_ArcSecond (lte('arcsStarted', 1))
+    game.S.arcs.alik_death = { i: 1, last: 0 }
+    game.S.day = 305
+    game.S.stats.sent = 10
+    expect(game.rules.match({ event: 'AlikTurn' }, game.facts())?.name).toBe('Turn_WhileDead')
   })
 })
 

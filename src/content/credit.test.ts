@@ -245,7 +245,9 @@ describe('кредитная лестница', () => {
     const weeks = Math.ceil((game.S.day - start) / 7)
     for (const l of LOANS) {
       const n = charged.filter((t) => t === `-${l.label}`).length
-      expect(n, l.id).toBeGreaterThanOrEqual(weeks - 1)
+      // нижняя граница −3: успех с опозданием сдвигает следующий срок на неделю от
+      // исполнения (#553) — цепочка дрейфует вперёд, в окно попадает на пару попыток меньше
+      expect(n, l.id).toBeGreaterThanOrEqual(weeks - 3)
       expect(n, l.id).toBeLessThanOrEqual(weeks)
     }
   })

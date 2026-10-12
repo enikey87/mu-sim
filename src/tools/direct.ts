@@ -5,7 +5,7 @@
 import type { Game } from '../engine/game'
 import type { Facts } from '../engine/rules'
 import { during } from '../engine/rules'
-import { HEAT, nuneKeyPassed } from '../content/memkeys'
+import { HEAT, nuneKeyPassed, sorryAt } from '../content/memkeys'
 
 export type DirectCase = { event: string; facts?: Facts; target?: string; setup?: (g: Game) => void }
 
@@ -31,6 +31,13 @@ export const DIRECT: Record<string, DirectCase> = {
   Turn_WhileDead: { event: 'AlikTurn', setup: (g) => { g.S.mem.alik_dead = true } },
   Says_OtherArcWhileDead: { event: 'PlayerSays', facts: { intent: 'arc', arg: 'boris' }, setup: (g) => { g.S.mem.alik_dead = true } },
   Court_Verdict_Lettered: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem.court = 6; g.S.mem.payday = 'strasbourg' } },
+  // #553: дрейф сроков платежей увёл оба правила из выборок — прямой случай держит их под гейтом
+  Court_After: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem.court = 7 } },
+  Says_sorry_sorrySwing3: {
+    event: 'PlayerSays',
+    facts: { intent: 'sorry' },
+    setup: (g) => { const t = g.S.stats.sent; g.S.mem[sorryAt] = [t - 1, t - 2, t - 3].join(',') },
+  },
   Turn_Wedding_Samvel: { event: 'AlikTurn', setup: (g) => { g.S.mem['wedding.samvel'] = true } },
   Turn_Wedding_Razmik: { event: 'AlikTurn', setup: (g) => { g.S.mem['wedding.razmik'] = true } },
   Turn_Wedding_Boris: { event: 'AlikTurn', setup: (g) => { g.S.mem['wedding.boris'] = true } },
@@ -149,6 +156,21 @@ export const DIRECT: Record<string, DirectCase> = {
       g.S.promises[0].met = g.S.day
     },
   },
-  // после расширения LEGENDARY бот реже доходит до угроз→сцены (#508)
+  // #571: переразметка сроков («никогда» без числа) увела траектории выборок — пять правил держим прямыми случаями
+  Scene_heir: { event: 'PickScene', setup: (g) => { g.S.arcs.grandpa = { i: 4, last: 0 }; g.S.arcs.boris = { i: 4, last: 0 } } },
+  Chorus_garik_FedUp: { event: 'Mentioned', target: 'garik', setup: (g) => { g.S.mem['intro.garik'] = true; g.S.actors.garik = { interjections: 3 } } },
+  Finale_razmik_shift: { event: 'ArcFinale', facts: { arc: 'razmik' }, setup: (g) => { g.S.ach.fence = 1 } },
+  Finale_tile_lost: { event: 'ArcFinale', facts: { arc: 'tile' }, setup: (g) => { g.S.mem.court = 6 } },
+  Says_sorry_blocked_boris: { event: 'PlayerSays', facts: { intent: 'sorry' }, setup: (g) => { blocked(g); g.S.arcs.boris = { i: 4, last: 0 } } },
+  // #576: звонок с объекта сдвинул розыгрыш выборок — сцена «если спросят» из них ушла; гейт по воротке угрозы
   Scene_tax: { event: 'PickScene', setup: (g) => { g.S.mem['count.threat'] = 1 } },
+  // #577: упрёк по звонку сдвинул розыгрыш ещё три правила — держим прямыми случаями
+  Says_condole_ctxrevived: { event: 'PlayerSays', facts: { intent: 'condole' }, setup: (g) => { g.S.ctx = { revived: true } } },
+  Finale_rubik_default: { event: 'ArcFinale', facts: { arc: 'rubik' } },
+  Finale_razmik_default: { event: 'ArcFinale', facts: { arc: 'razmik' } },
+  Finale_beton_opened: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem['count.rude'] = 6; g.S.mem[HEAT] = 3 } },
+  // #585: праздничная кнопка сдвинула выборки — тишина на наступившем сроке ушла из них
+  Quiet_Dead_PromiseDue: { event: 'PromiseDue', setup: dead },
+  // #577: после разрастания пулов звонка выборки перестали собирать и второе приглашение Арсена
+  Court_Lawyer_Again: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem.court = 1; g.S.mem['intro.arsen'] = true } },
 }

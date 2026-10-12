@@ -277,6 +277,11 @@ describe('оракул: сторож у каждой проверки', () => {
     expect(oracle(synthetic(payday)).verdict!.violations.same_day_repeat).toBeUndefined()
     expect(oracle(synthetic(['[система] Алик скрыл от вас статус', '[система] Алик скрыл от вас статус'])).verdict!.violations.same_day_repeat).toBe(1)
   })
+  it('разные недельные сводки в один день — не same_day_repeat (раунд 36, сид 3)', () => {
+    const a = '(карточка в ленте: 🏦 Банк — Сводка за неделю 15 мар. – 21 мар.: баланс 1 267 ₽ · Списано: Связь 400 ₽)'
+    const b = '(карточка в ленте: 🏦 Банк — Сводка за неделю 22 мар. – 28 мар.: баланс 367 ₽ · Списано: Связь 400 ₽)'
+    expect(oracle(synthetic([a, b])).verdict!.violations.same_day_repeat).toBeUndefined()
+  })
   it('повторяемое — по событию: сводка, отказ, уровень, «завтра списание», батарея, непрочитанные, строка пула с repeat (#229, #304)', () => {
     for (const event of ['bank.summary', 'bank.refusal', 'bank.level', 'bank.warn', 'battery', 'unread']) {
       const n = { text: 'Банк — Не прошло: Связь, 400 ₽. Баланс: 9 700 ₽', event }

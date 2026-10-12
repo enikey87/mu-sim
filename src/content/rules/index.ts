@@ -8,10 +8,11 @@ import { choiceRules } from './choices'
 import { worldRules } from './world'
 import { finaleRules, endingRules } from './finales'
 import { rudeRules, rudeSaysRules } from './rude'
+import { crewRules } from './crew'
 import { courtRules } from './court'
 import { paydayRules } from './payday'
 import { endgameRules } from './endgame'
 import { billRules } from './bills'
 import { creditRules } from './credit'
 
-export const allRules: Rule<Game, GameEvent, Offer>[] = [...toneRules, ...storyRules, ...ignoreRules, ...periodRules, ...turnRules, ...idleRules, ...awayRules, ...replyRules, ...choiceRules, ...worldRules, ...finaleRules, ...endingRules, ...rudeRules, ...rudeSaysRules, ...courtRules, ...paydayRules, ...endgameRules, ...billRules, ...creditRules]
+export const allRules: Rule<Game, GameEvent, Offer>[] = [...toneRules, ...storyRules, ...ignoreRules, ...periodRules, ...turnRules, ...idleRules, ...awayRules, ...replyRules, ...choiceRules, ...worldRules, ...finaleRules, ...endingRules, ...rudeRules, ...rudeSaysRules, ...crewRules, ...courtRules, ...paydayRules, ...endgameRules, ...billRules, ...creditRules]

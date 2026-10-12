@@ -50,7 +50,7 @@ import { UiState, type Moo, type Notif, type SendFeel } from './ui-state'
 import { classifyUserInput, legalClaim, type ClassifiedInput } from './input'
 import { holidayOf, holidayGreetKey, holidayDays, HOLIDAY_EXCUSES } from '../content/holidays'
 import { dueIn, dateOf, fmtDate, fmtDayMonth, fmtShortDate, fmtTime, weekOf, nightHour, periodOf, tierOf, TIERS, type Due, type Period } from './time'
-import { type GameState, type Msg, type NewMsg, type Card, type PhoneEvent, type Choice, type Ctx, type Tone, type Storage, type InputCategory, freshState, loadState, saveState, SAVE_KEY, LEND50_SEEN_KEY, MAX_PATIENCE, isLate, countOf, setCount, type PromiseRec } from './state'
+import { type GameState, type BankWeek, type Msg, type NewMsg, type Card, type PhoneEvent, type Choice, type Ctx, type Tone, type Storage, type InputCategory, freshState, loadState, saveState, SAVE_KEY, LEND50_SEEN_KEY, MAX_PATIENCE, isLate, countOf, setCount, type PromiseRec } from './state'
 
 /** Текст срока как буквальный шаблон без учёта регистра; кэш — topicOfLast зовётся из facts() на каждую реплику. */
 const LITERAL = new Map<string, RegExp>()
@@ -594,13 +594,47 @@ export class Game {
   private bankLine(label: string, delta: number, refused = false, onDay = this.S.day): void {
     if (this.moneySealed()) return
     const week = weekOf(onDay)
-    if (this.S.bank && this.S.bank.week !== week) this.flushBankWeek()
-    const b = (this.S.bank ??= { week, lines: {}, bal: this.S.money })
+    // строка не встаёт в неделю, чья сводка уже ушла: буфер ушёл вперёд — платёж виден в текущей
+    // неделе, иначе сводка недели срока утверждала бы списание вопреки карточкам этой недели (#553)
+    const stale = week < weekOf(this.S.day) && (this.S.bank == null || week < this.S.bank.week)
+    const at = stale ? this.S.day : onDay
+    const target = weekOf(at)
+    if (this.S.bank && this.S.bank.week !== target) this.flushBankWeek()
+    const b = (this.S.bank ??= { week: target, lines: {}, bal: this.S.money })
     const key = `${refused ? '!' : delta < 0 ? '-' : '+'}${label}`
     const l = (b.lines[key] ??= { sum: 0, n: 0 })
     l.sum += Math.abs(delta)
     l.n++
     b.bal = this.S.money
+  }
+  /** Строки буфера по знакам: «Списано», «Поступило», «Не прошло». */
+  private bankLines(b: BankWeek, refused = true): string[] {
+    const part = (sign: string, head: string): string[] => {
+      const rows = Object.entries(b.lines).filter(([k]) => k[0] === sign)
+      return rows.length ? [`${head}: ${rows.map(([k, v]) => `${k.slice(1)} ${this.rub(v.sum)}${v.n > 1 ? ` (${v.n} ${[2, 3, 4].includes(v.n % 10) && ![12, 13, 14].includes(v.n % 100) ? 'раза' : 'раз'})` : ''}`).join(', ')}`] : []
+    }
+    return [...part('-', 'Списано'), ...part('+', 'Поступило'), ...(refused ? part('!', 'Не прошло') : [])]
+  }
+  /** Движения недели, которых ещё не было на карточке результата: сводка держит весь буфер, итог — только дельту. */
+  private unseenBankLines(b: BankWeek): string[] {
+    const shown = b.shown ?? {}
+    const lines: BankWeek['lines'] = {}
+    for (const [k, v] of Object.entries(b.lines)) {
+      const prev = shown[k]
+      const sum = v.sum - (prev?.sum ?? 0)
+      const n = v.n - (prev?.n ?? 0)
+      if (sum > 0 && n > 0) lines[k] = { sum, n }
+    }
+    return this.bankLines({ week: b.week, lines, bal: b.bal }, false)
+  }
+  /** Снимок после кнопки: её сумма уже в тексте баланса и не должна стать строкой следующей карточки. */
+  private markBankShown(): void {
+    const b = this.S.bank
+    if (!b) return
+    const shown: NonNullable<BankWeek['shown']> = {}
+    // копия, не ссылка: bankLine мутирует тот же объект, и дельта следующей карточки обнулится
+    for (const [k, v] of Object.entries(b.lines)) shown[k] = { sum: v.sum, n: v.n }
+    b.shown = shown
   }
   /** Сводка прошедшей недели — одна карточка, когда календарь перешёл в новую (#287). */
   flushBankWeek(): void {
@@ -609,11 +643,7 @@ export class Game {
     if (!b || b.week >= weekOf(this.S.day)) return
     this.S.bank = null
     if (this.moneySealed()) return
-    const part = (sign: string, head: string): string[] => {
-      const rows = Object.entries(b.lines).filter(([k]) => k[0] === sign)
-      return rows.length ? [`${head}: ${rows.map(([k, v]) => `${k.slice(1)} ${this.rub(v.sum)}${v.n > 1 ? ` (${v.n} ${[2, 3, 4].includes(v.n % 10) && ![12, 13, 14].includes(v.n % 100) ? 'раза' : 'раз'})` : ''}`).join(', ')}`] : []
-    }
-    const lines = [...part('-', 'Списано'), ...part('+', 'Поступило'), ...part('!', 'Не прошло')]
+    const lines = this.bankLines(b)
     if (!lines.length) return
     this.bankCard(`Сводка за неделю ${fmtShortDate(b.week)} – ${fmtShortDate(b.week + 6)}: баланс ${this.rub(b.bal)}`, { lines, event: 'bank.summary' })
   }
@@ -671,6 +701,12 @@ export class Game {
   creditEventLive(id: LoanId, at: unknown): boolean {
     return this.dueLive(loanDueAt(id), at)
   }
+  /** Следующий срок после попытки: календарный, а если он в той же неделе, что попытка — на неделю
+   *  от неё: в одной неделе платёж по метке не стоит и «списанным», и «не прошло» (#553). */
+  private nextDue(due: Due): number {
+    const nat = this.S.day + dueIn(due, this.S.day)
+    return weekOf(nat) === weekOf(this.S.day) ? this.S.day + 7 : nat
+  }
   /** Списать платёж или записать неоплату и последствия. */
   chargeBill(id: BillId): void {
     if (this.moneySealed()) return
@@ -684,6 +720,8 @@ export class Game {
     delete this.S.mem[billDueAt(id)]
     if (this.adjustMoney(-bill.amount, bill.label, { onDay })) {
       this.rules.applyOps([set(billUnpaid(id), false), set(billStreak(id), 0)], {})
+      this.S.mem[billDueAt(id)] = this.nextDue(bill.due)
+      this.scheduleBillDue(id, Number(this.S.mem[billDueAt(id)]))
       this.scheduleBills()
       if (this.moneyLevel() === 'bottom' && this.newFall()) this.maybeCreditOffer()
       return
@@ -694,6 +732,8 @@ export class Game {
     if (id === 'phone' && streak >= 1) this.rules.applyOps([set(phoneWarn, true)], {})
     if (id === 'phone' && streak >= 2) this.rules.applyOps([set(netRation, true)], {})
     if (id === 'transit' && streak >= 2) this.rules.applyOps([set(netRation, true)], {})
+    this.S.mem[billDueAt(id)] = this.nextDue(bill.due)
+    this.scheduleBillDue(id, Number(this.S.mem[billDueAt(id)]))
     this.scheduleBills()
     // неоплата — факт и последствия, а не ежедневное эхо: банк говорит один раз за полосу (#184/#178)
     this.refused(`Не прошло: ${bill.label}, ${this.rub(bill.amount)}`, 'Недостаточно средств. Достоинство не принимается.', streak === 1)
@@ -734,12 +774,15 @@ export class Game {
     delete this.S.mem[loanDueAt(id)]
     if (this.adjustMoney(-payment, loan.label, { onDay })) {
       this.rules.applyOps([set(loanFailed(id), false)], {}) // платёж прошёл — полоса неоплат закрыта
+      this.S.mem[loanDueAt(id)] = this.nextDue(loan.due)
+      this.scheduleEvent(Number(this.S.mem[loanDueAt(id)]), 'CreditDue', { credit: id, at: Number(this.S.mem[loanDueAt(id)]) })
       this.scheduleCredits()
       return
     }
     // банк говорит один раз за полосу неоплат, а не каждую неделю (#184/#178)
     const first = !this.S.mem[loanFailed(id)]
     if (first) this.rules.applyOps([set(loanFailed(id), true)], {})
+    this.S.mem[loanDueAt(id)] = this.nextDue(loan.due)
     this.scheduleCredits()
     const why = `Не прошло: ${loan.label}, ${this.rub(payment)}`
     if (id === 'micro' && !this.S.mem[creditBroke]) {
@@ -803,6 +846,14 @@ export class Game {
     this.maybeCreditOffer('Предложение банка ещё открыто')
   }
   private clearScene(alsoCtx = false): void {
+    // прерванная до исхода сцена Дня выплаты (игрок ответил не её вариантом — «поймал на лжи», своим текстом) —
+    // не потерянный третий акт: once-метки beat'ов сняты, день снят, узел прервания запомнен — сцена продолжит с него
+    if (this.S.scene?.id === 'payday' && this.S.mem[memkeys.paydayScene] === undefined) {
+      this.S.mem[memkeys.payday.resume] = this.S.scene.node
+      delete this.S.mem[memkeys.payday.at]
+      delete this.rules.state.once['Beat_Payday']
+      delete this.rules.state.once['Beat_Payday_Late']
+    }
     this.S.scene = null
     if (alsoCtx) this.S.ctx = null
     this.flushSceneCards()
@@ -879,6 +930,8 @@ export class Game {
       const loan = nextLoan(Number(this.S.mem[creditStage] ?? 0))
       const thing = nextThing(this.S.mem)
       let result: string
+      // дельта с прошлой карточки результата, не весь буфер (#563/#568); у «Не сейчас» баланса нет
+      const unseen = pick !== 'later' && this.S.bank ? this.unseenBankLines(this.S.bank) : []
       if (pick === 'take' && m.offer.take && loan) {
         const before = this.S.money
         this.takeCredit()
@@ -895,7 +948,18 @@ export class Game {
         result = 'Не сейчас'
       } else return
       const cur = this.S.msgs.find((x) => x.id === id)
-      if (cur?.kind === 'card') this.replaceMsg(cur, { answered: true, result })
+      if (cur?.kind === 'card') {
+        // числа результата верны на день нажатия: на карточке другого дня они стояли бы задним
+        // числом под сепаратором показа, и отказ/сводка того же дня выглядели бы невозможными (#553/#556)
+        const late = result !== 'Не сейчас' && cur.day != null && cur.day !== this.S.day
+        if (late) {
+          this.replaceMsg(cur, { answered: true })
+          this.push({ kind: 'card', time: fmtTime(this.S.clock), icon: cur.icon, app: cur.app, text: result, lines: unseen.length ? unseen : undefined })
+        } else {
+          this.replaceMsg(cur, { answered: true, result, lines: unseen.length ? unseen : undefined })
+        }
+        if (result !== 'Не сейчас') this.markBankShown()
+      }
       // уровень денег сменился — варианты отчаяния уходят сразу, не через ход
       if (!this.ui.busy) this.S.choices = this.buildChoices()
     }
@@ -971,6 +1035,8 @@ export class Game {
     if (this.disposed) throw new GameDisposed()
     const msg = { ...m, id: this.S.nextId++ } as Msg
     if ((msg.kind === 'text' || msg.kind === 'sys') && msg.text.includes('{')) msg.text = this.fillMoney(msg.text)
+    // день показа — на карточке: ответ с числами верен для своего дня, не дня показа (#553)
+    if (msg.kind === 'card' && msg.day === undefined) msg.day = this.S.day
     this.quietHeader()
     this.S.msgs.push(msg)
     this.touchMsgs(this.S.msgs.length - 1)
@@ -1415,8 +1481,12 @@ export class Game {
       for (const p of this.S.promises) text = text.replace(literalRe(p.t), '')
       text = text.replace(/^[.\s,;:!?…—–-]+|[.\s,;:!?…—–-]+$/g, '').trim()
       if (!text) continue
-      const hit = Object.entries(TOPICS).find(([k, t]) => t.re.test(text) && !this.topicMuted(k))
-      if (hit) { this.topicText = text; return hit[0] }
+      const hit = Object.entries(TOPICS).find(([, t]) => t.re.test(text))
+      if (!hit) continue
+      // ближайшая тема заглушена — темы нет: до реплики старой темы поиск не доходит (#564)
+      if (this.topicMuted(hit[0])) return undefined
+      this.topicText = text
+      return hit[0]
     }
     return undefined
   }
@@ -1563,9 +1633,11 @@ export class Game {
   /** Совместимый шорткат для тестов и отладки из консоли. */
   classify(text: string): Tone { return this.classifyInput(text).tone }
 
-  /** Какой отклик дать на это сообщение (категорию игроку не показываем). */
+  /** Какой отклик дать на это сообщение (категорию игроку не показываем). Категория приходит с объекта:
+   *  свой текст её получил классификатором при отправке, готовая кнопка — своей разметкой. Капс в
+   *  зелёной кнопке ходом грубости не делает (#583) — заново её текст не читаем. */
   feelFor(o: Choice): SendFeel | null {
-    const cat: InputCategory = o.category ?? this.classifyInput(o.text).category
+    const cat: InputCategory | undefined = o.category
     if (o.act === 'moo' || cat === 'cow') return 'moo'
     if (o.act === 'sorry' || cat === 'apology') return 'sorry'
     if (cat === 'intimidation' || cat === 'violent-threat') return 'intimidate'
@@ -1826,7 +1898,7 @@ export class Game {
     let end: number | undefined
     for (const x of this.S.rules.schedule) {
       if (x.kind !== 'restore' || x.at <= this.S.day) continue
-      if (state.key !== undefined ? x.key !== state.key : !x.key.startsWith(state.prefix ?? '')) continue
+      if (state.keys !== undefined ? !state.keys.includes(x.key) : state.key !== undefined ? x.key !== state.key : !x.key.startsWith(state.prefix ?? '')) continue
       if (state.actor !== undefined && x.actor !== state.actor) continue
       if (end === undefined || x.at < end) end = x.at
     }
@@ -2132,6 +2204,8 @@ export class Game {
     }
     if (debtFx) (this.S.ctx ??= {}).debtMoved = debtMoved
     const m = this.open(ep.m)
+    // факт пишет строка, которая его утверждает: remember строки применяется, только если строка звучала (#588)
+    for (const x of m) if (typeof x !== 'string' && 'remember' in x && x.remember) this.rules.applyOps(x.remember, {})
     if (ep.remember) this.rules.applyOps(ep.remember, {})
     if (this.S.ctx) {
       delete this.S.ctx.debtMoved
@@ -2502,6 +2576,20 @@ export class Game {
     this.emit()
   }
 
+  /**
+   * Продолжение прерванной сцены с узла прерывания (#571): сказанное не повторяем —
+   * заново только варианты игрока. Узел без вариантов двигает сцену своим шагом (hook).
+   */
+  async resumeNode(sid: string, nid: string): Promise<void> {
+    const sc = this.scenes[sid]
+    if (!sc.nodes[nid].opts) return this.enterNode(sid, nid)
+    const S = this.S
+    S.scene = { id: sid, node: nid, vars: sc.init ? sc.init(this.rng, (arr) => this.open(arr), S.day) : {} }
+    S.ctx = null
+    S.choices = null
+    this.emit()
+  }
+
   // ---------- допработа ----------
   /** Отмазки-зеркала, открытые сейчас: правдивые в этой партии и когда Алику есть чем возмутиться. */
   mirrors(): Mirror[] {
@@ -2526,6 +2614,8 @@ export class Game {
       this.ui.busy = true
       this.clearSchedule(this.idleT)
       const yes = answer === true
+      // «мёртв»: работа зачтена, а прямые say движка гейт смерти не видит — голоса нет (#532)
+      const dead = !!this.S.mem[memkeys.alikDead]
       const reply = mirror ? mirror.me : this.playerLine(() => (yes ? this.draw('JY', JOB_YES_P) : this.draw('JN', JOB_NO_P)))
       this.seen.mark(reply)
       this.push({ kind: 'text', from: 'me', text: reply, time: fmtTime(this.S.clock) })
@@ -2543,15 +2633,14 @@ export class Game {
           this.sys(`Вы сделали работу. Долг Алика вырос на ${add.toLocaleString('ru-RU')} ₽`)
           this.mood(2)
           this.unlock('fence')
-          await this.say([this.uniq(this.X.jobYes)])
         } else {
           // кнопка в ленте после Дня выплаты: мир уже закрыт, долг не трогаем
           this.sys('Работа сделана. Долг уже закрыт Днём выплаты — ничего не выросло.')
-          await this.say([this.uniq(this.X.jobYes)])
         }
+        if (!dead) await this.say([this.uniq(this.X.jobYes)])
       } else {
         this.mood(-1)
-        await this.say([this.uniq(this.X.jobNo)])
+        if (!dead) await this.say([this.uniq(this.X.jobNo)])
       }
       this.S.ctx = null
       this.ui.busy = false

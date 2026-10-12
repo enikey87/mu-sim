@@ -183,8 +183,10 @@ export const stateRules: R[] = [
   weddingNoise('boris'), weddingNoise('samvel'), weddingNoise('razmik'), weddingNoise('anush'),
   { name: 'Turn_BorisSick', event: 'AlikTurn', when: [of('boris', is(sick))], specificity: 0, weight: 10, cooldown: { turns: 3 }, respond: noise('BORIS_SICK', BORIS_SICK) },
   // «умер» — значит, умер: ни болтовни простоя, ни сюжетных ходов, ни «доброе утро»; на слова игрока — Карине / «с того света»
-  // ход Алика по другим путям (после сцены, после пропажи) — тоже «умер»
-  { name: 'Turn_WhileDead', event: 'AlikTurn', when: [is(alikDead)], respond: ({ game }) => deadTurn(game) },
+  // ход Алика по другим путям (после сцены, после пропажи) — тоже «умер».
+  // bonus: 10 — гейт, а не специфичность: в ничьей с Turn_Polite/Turn_Blocked (тоже 1) и ниже
+  // Phone_Karine_AlikTurn (10) правило выигрывало не всегда, и Алик говорил своим голосом (#546)
+  { name: 'Turn_WhileDead', event: 'AlikTurn', when: [is(alikDead)], bonus: 10, respond: ({ game }) => deadTurn(game) },
   // пока Алик «мёртв», это состояние перекрывает ответ на любое сообщение игрока (кроме вопроса о сериале — так идут похороны)
   { name: 'Tone_WhileDead', event: 'PlayerMessage', when: [is(alikDead)], bonus: 10, respond: ({ game }) => deadTurn(game) },
   { name: 'Says_WhileDead', event: 'PlayerSays', when: [is(alikDead), ne('intent', 'arc')], bonus: 6, respond: ({ game }) => deadTurn(game) },

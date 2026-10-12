@@ -116,15 +116,15 @@ describe('матрица: каждая кнопка каждого срока �
     expect(text.toLowerCase()).toContain(navasard.t.toLowerCase())
   })
 
-  it('число дней в ответе на горизонт — из факта, со склонением: каждая фраза с {days} называет «540 дней»', async () => {
+  it('число дней в ответе на горизонт — из факта, со склонением: каждая фраза с {days} называет «100 дней»', async () => {
     let withDays = 0
     for (let seed = 1; seed <= 20; seed++) {
-      const { said: text, vars } = await pressed(byText('как Нуне из декрета выйдет'), 'Opt_WhenFar', undefined, seed)
-      expect(vars.days).toBe('540 дней')
+      const { said: text, vars } = await pressed({ t: 'через сто дней', d: 100, kind: 'clear' }, 'Opt_WhenFar', undefined, seed)
+      expect(vars.days).toBe('100 дней')
       expect(text, text).not.toMatch(/\{/)
       const line = PROMISE_FAR.find((l) => text.toLowerCase().includes(chunk(l)))
       expect(line, text).toBeDefined()
-      if (line!.includes('{days}')) { withDays++; expect(text, text).toContain('540 дней') }
+      if (line!.includes('{days}')) { withDays++; expect(text, text).toContain('100 дней') }
     }
     expect(withDays, 'ни одной фразы с числом дней за 20 партий — проверка пустеет').toBeGreaterThan(0)
   })
@@ -134,8 +134,8 @@ describe('игрок нажимает кнопку настоящим ходом
   it('срок каждого рода → кнопка из выбора → send → ответ по той же кнопке', async () => {
     const cases: Array<[string, string, (t: string) => boolean]> = [
       ['завтра', 'promiseOk', (t) => from(D.PROMISE_OK, t)],
-      ['как заказчик заплатит', 'promisePencil', (t) => from(PROMISE_PENCIL, t)],
-      ['как Нуне из декрета выйдет', 'promiseFar', (t) => from(PROMISE_FAR, t)],
+      ['после полнолуния', 'promisePencil', (t) => from(PROMISE_PENCIL, t)],
+      ['до Нового года', 'promiseFar', (t) => from(PROMISE_FAR, t)],
       ['когда рак на Арагаце свистнет', 'promiseNever', (t) => from(PROMISE_NEVER, t)],
     ]
     for (const [term, act, ok] of cases) {

@@ -73,8 +73,8 @@ describe('число дней в кнопке — из факта, со скло
     const b = buttons(g)
     expect(b.length).toBeGreaterThan(0)
     for (const x of b) expect(x.text, x.text).toContain('21 день')
-    const far = await said(byText('как Нуне из декрета выйдет'))
-    for (const x of buttons(far)) expect(x.text, x.text).toContain('540 дней')
+    const far = await said(byText('после полнолуния'))
+    for (const x of buttons(far)) expect(x.text, x.text).toContain('15 дней')
   })
 })
 
@@ -176,8 +176,8 @@ describe('игрок видит кнопки настоящим путём', () 
     const cases: Array<[string, string[], string]> = [
       ['завтра', ['P_WHEN_OK', 'P_WHEN'], 'близкий ясный срок'],
       ['после футбола', ['P_WHEN_OK_EVENT', 'P_WHEN'], 'близкое событие'],
-      ['как заказчик заплатит', ['P_WHEN_PENCIL'], 'далёкий: 30 дней'],
-      ['как Нуне из декрета выйдет', ['P_WHEN_FAR'], 'очень далёкий'],
+      ['после полнолуния', ['P_WHEN_PENCIL'], 'далёкий: 15 дней'],
+      ['до Нового года', ['P_WHEN_FAR'], 'очень далёкий'],
       ['когда рак на Арагаце свистнет', ['P_WHEN_NEVER'], '«никогда»'],
       ['в следующем веке, в начале', ['P_WHEN_NEVER'], 'абсурд'],
     ]

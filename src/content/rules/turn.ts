@@ -102,7 +102,8 @@ export const turnRules: R[] = [
   { name: 'Turn_Quest', event: 'AlikTurn', when: [gte('sent', 3)], specificity: 0, weight: W.quest, respond: async ({ game }) => { if (!(await game.fire('PickQuest'))) await game.excuseTurn() } },
   // первый сериал — в первые ходы, второй — к пятнадцатому: сюжет должен начаться сразу
   { name: 'Turn_ArcFirst', event: 'AlikTurn', when: [gte('sent', 1), lte('arcsStarted', 0), is('arcAvailable')], odds: 0.75, respond: async ({ game }) => { const id = game.nextArc(); if (id) await game.playArc(id) } },
-  { name: 'Turn_ArcSecond', event: 'AlikTurn', when: [gte('sent', 6), lte('arcsStarted', 1), is('arcAvailable')], odds: 0.4, respond: async ({ game }) => { const id = game.nextArc(); if (id) await game.playArc(id) } },
+  // lte('arcsStarted', 1) при смерти пропускает только сериал смерти: специфичность выше Turn_WhileDead, а говорит он не голосом смерти (#532)
+  { name: 'Turn_ArcSecond', event: 'AlikTurn', when: [gte('sent', 6), lte('arcsStarted', 1), is('arcAvailable'), missing(alikDead)], odds: 0.4, respond: async ({ game }) => { const id = game.nextArc(); if (id) await game.playArc(id) } },
   { name: 'Turn_Arc', event: 'AlikTurn', when: [gte('sent', 2), is('arcAvailable')], specificity: 0, weight: W.arc, respond: async ({ game }) => { const id = game.nextArc(); if (id) await game.playArc(id) } },
   { name: 'Turn_Group', event: 'AlikTurn', when: [gte('sent', 8)], specificity: 0, weight: W.group, respond: ({ game }) => game.groupChat() },
   { name: 'Turn_Wrong', event: 'AlikTurn', when: [gte('sent', 5)], specificity: 0, weight: W.wrong, respond: ({ game }) => game.wrongChat() },

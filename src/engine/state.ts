@@ -45,12 +45,19 @@ export interface Card {
   lines?: string[]
   offer?: { take?: string; sell?: string }
   event?: PhoneEvent
+  /** Игровой день показа: числа в результате верны на день нажатия, не показа (#553/#556). */
+  day?: number
   /** Кнопки закрыты; `result` — чем кончилось. */
   answered?: boolean
   result?: string
 }
 /** Недельная сводка банка: что прошло по карте с понедельника `week`; баланс — после последней строки. */
-export interface BankWeek { week: number; lines: Record<string, { sum: number; n: number }>; bal: number }
+export interface BankWeek {
+  week: number
+  lines: Record<string, { sum: number; n: number }>
+  bal: number
+  shown?: Record<string, { sum: number; n: number }>
+}
 
 export type NewMsg = Msg extends infer M ? (M extends Msg ? Omit<M, 'id'> : never) : never
 
