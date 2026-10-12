@@ -460,6 +460,62 @@ describe('App', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Скопировано')
   })
 
+  it('отмазка — главный блок карточки: не цитата под абзацем, копирование на нём, «Играть дальше» — основная кнопка', async () => {
+    const { game } = makeGame()
+    game.S.day = 340
+    Object.assign(game.S.mem, { payday: 'coins', 'payday.chain': 'Эти пятьдесят рублей лежали в сейфе.' })
+    await game.fire('CheckEnding')
+    renderApp(game)
+    const end = screen.getByRole('dialog', { name: /День выплаты/ })
+
+    // блок отмазки — не blockquote.grand, а отдельный блок карточки
+    const block = end.querySelector('#grandExcuse')
+    expect(block).not.toBeNull()
+    expect(block!.tagName).not.toBe('BLOCKQUOTE')
+    expect(block!.classList.contains('grand')).toBe(true)
+    expect(end.querySelector('blockquote.grand')).toBeNull()
+    expect(within(block as HTMLElement).getByText(/лежали в сейфе/)).toBeInTheDocument()
+
+    // стоит выше абзаца исхода, а не под ним
+    const para = end.querySelector('p')
+    expect(para).not.toBeNull()
+    expect(block!.compareDocumentPosition(para!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    // кнопка копирования — на блоке отмазки, а не рядом с карточкой
+    const copy = end.querySelector('#copyExcuse')
+    expect(block!.contains(copy)).toBe(true)
+    expect(copy!.textContent).toBe('Скопировать великую отмазку')
+
+    // «Играть дальше» остаётся залитой кнопкой внизу, «Начать заново» — обычной
+    const cont = end.querySelector('#endingContinue')!
+    const reset = end.querySelector('#endingReset')!
+    expect(cont.textContent).toBe('Играть дальше')
+    expect(cont.classList.contains('secondary')).toBe(false)
+    expect(reset.textContent).toBe('Начать заново')
+    expect(reset.classList.contains('secondary')).toBe(true)
+
+    // буфер получает прежнюю строку
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    await act(async () => { fireEvent.click(copy as HTMLElement) })
+    expect(writeText).toHaveBeenCalledWith(
+      'Алик, где деньги? — великая отмазка Дня выплаты:\n«Эти пятьдесят рублей лежали в сейфе.»',
+    )
+    expect(screen.getByRole('status')).toHaveTextContent('Скопировано')
+  })
+
+  it('концовка без отмазки не показывает блок отмазки', async () => {
+    const { game } = makeGame()
+    game.S.arcs.samvel = { i: 8, last: 0 }
+    game.S.mem['finale.samvel'] = 'groom'
+    game.S.day = 320
+    await game.fire('CheckEnding')
+    renderApp(game)
+    const end = screen.getByRole('dialog', { name: /Породнились/ })
+    expect(end.querySelector('#grandExcuse')).toBeNull()
+    expect(end.querySelector('#copyExcuse')).toBeNull()
+  })
+
   it('копирование отмазки: отказ clipboard → тост об ошибке', async () => {
     const { game } = makeGame()
     game.S.day = 340
