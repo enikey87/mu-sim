@@ -21,7 +21,7 @@ export function Choices() {
         ) : (
           <button
             key={i + o.text}
-            className={[o.tone === 'rude' ? 'rude' : '', o.scene || o.act ? 'ctx' : ''].join(' ').trim()}
+            className={[o.tone === 'rude' ? 'rude' : '', o.scene || o.act ? 'ctx' : '', o.primary ? 'primary' : ''].join(' ').trim()}
             onClick={() => void game.send(o)}
           >
             {o.text}

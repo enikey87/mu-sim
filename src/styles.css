@@ -148,6 +148,18 @@ body {
 .transfer { background: #e3f6e9; color: #135c2e; }
 @media (prefers-color-scheme: dark) { .transfer { background: #1d3b2a; color: #9be3b5; } }
 .transfer .sum { font-size: 20px; font-weight: 800; }
+/* Карточка просьбы «займи 50» (#616): цвета перевода, крупная сумма, кнопка-ссылка вместо голого адреса. */
+.lend50 {
+  align-self: center; width: min(90%, 320px); z-index: 1; margin: 6px 0;
+  padding: 10px 12px; border-radius: 14px; text-align: center; font-size: 12.5px;
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, .08); animation: pop .18s ease-out;
+}
+.lend50-btn {
+  display: block; width: 100%; box-sizing: border-box; text-align: center; text-decoration: none;
+  border-radius: 12px; padding: 10px 16px; background: var(--accent); color: #fff; font-weight: 600;
+}
+.lend50-url { font-size: 11px; opacity: .75; word-break: break-all; }
 .voice { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
 .voice .play {
   width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: #fff;
@@ -187,6 +199,7 @@ body {
 }
 .choices button { font-size: 13px; }
 .choices button.ctx { background: rgba(47, 158, 92, .16); }
+.choices button.primary, .choices button.primary:hover { background: var(--accent); color: #fff; }
 .choices button.rude { color: var(--danger); }
 .choices button:disabled { opacity: .45; cursor: default; }
 .choices button.locked, .choices button.locked:hover { background: rgba(127, 127, 127, .15); color: var(--muted); letter-spacing: 2px; }
@@ -205,6 +218,7 @@ body {
   .msg .react,
   .new-messages,
   .typing-bubble span,
+  .lend50,
   .phone.feel-shake,
   .phone.feel-sorry,
   .phone.feel-intimidate::after,

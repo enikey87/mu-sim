@@ -559,7 +559,7 @@ export const LEND50_ASK_AGAIN = [
   'Верну. Ты меня знаешь.',
 ]
 export const LEND50_CHOICES: Choice[] = [
-  { text: 'Перевёл. Расписку давай', tone: 'polite', act: 'lend50Yes' },
+  { text: 'Перевёл. Расписку давай', tone: 'polite', act: 'lend50Yes', primary: true },
   { text: 'Алик, ты серьёзно?', tone: 'neutral', act: 'lend50Serious' },
   { text: 'Не дам', tone: 'neutral', act: 'lend50No' },
 ]

@@ -4,12 +4,13 @@ import userEvent from '@testing-library/user-event'
 import { App } from './App'
 import { messageRenderStats } from './Message'
 import { messageListRenderStats, messageListBuildStats } from './Chat'
-import { makeGame, setMoney, memStorage } from '../test/helpers'
+import { makeGame, setMoney, memStorage, flush } from '../test/helpers'
 import { SAVE_KEY, loadState } from '../engine/state'
 import { fmtDate } from '../engine/time'
 import type { Game } from '../engine/game'
 import { introOf, uiOf } from './view'
 import { introDateLine, introVowLine, LINE_MS, FADE_MS } from './Intro'
+import { LEND50_LINK, LEND50_SYS } from '../content/endgame'
 
 function renderApp(game: Game, onReset = vi.fn()) {
   const utils = render(<App game={game} onReset={onReset} />)
@@ -235,6 +236,30 @@ describe('App', () => {
     expect(link).toHaveAttribute('target', '_blank')
     expect(link).toHaveAttribute('rel', 'noopener')
     expect(screen.getByText(/Поддержать автора:/)).toBeInTheDocument()
+  })
+
+  it('просьба «займи 50» — одна карточка перевода с кнопкой «Перевести», без серых плашек (#616)', async () => {
+    const { game } = makeGame()
+    game.S.mem.payday = 'default'
+    game.S.ending = 'payday_default'
+    game.S.endings.payday_default = game.S.day
+    await act(async () => { await game.closeEnding(); await flush() })
+    renderApp(game)
+    const card = screen.getByTestId('lend50-card')
+    expect(within(card).getByText('50 ₽')).toBeInTheDocument()
+    expect(within(card).getByText(LEND50_SYS)).toBeInTheDocument()
+    const link = within(card).getByRole('link', { name: 'Перевести' })
+    expect(link).toHaveAttribute('href', LEND50_LINK)
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener')
+    expect(within(card).getByText(LEND50_LINK)).toHaveClass('lend50-url') // адрес виден мелким текстом
+    // честная фраза и адрес — только в карточке, а не в серых плашках .sys
+    const sys = [...document.querySelectorAll('.sys')].map((el) => el.textContent ?? '')
+    expect(sys).not.toContain(LEND50_SYS)
+    expect(sys.some((t) => t.includes(LEND50_LINK))).toBe(false)
+    // залитая кнопка ответа — только «Перевёл»
+    expect(screen.getByRole('button', { name: 'Перевёл. Расписку давай' })).toHaveClass('primary')
+    expect(screen.getByRole('button', { name: 'Не дам' })).not.toHaveClass('primary')
   })
 
   it('кнопки допработы отвечают и исчезают', async () => {
