@@ -17,6 +17,7 @@ export const Message = memo(function Message({ m }: { m: Msg }) {
   const game = useGameApi()
   if (m.kind === 'sep') return <div className="sep">{m.text}</div>
   if (m.kind === 'sys') return <div className={'sys' + (m.unread ? ' unread' : '')}>{linkified(m.text)}</div>
+  if (m.kind === 'lend50') return <Lend50Card m={m} />
   if (m.kind === 'card') return <PhoneCard m={m} />
 
   const cls = ['msg', m.from]
@@ -36,6 +37,19 @@ export const Message = memo(function Message({ m }: { m: Msg }) {
     </div>
   )
 })
+
+/** Честная просьба поддержать автора: одна карточка в цвете перевода, кнопка-ссылка вместо голого адреса (#616).
+ *  Текст — голос игры (не пузырь Алика), сумма — крупно, как в переводе; адрес видно мелким текстом. */
+function Lend50Card({ m }: { m: Extract<Msg, { kind: 'lend50' }> }) {
+  return (
+    <div className="lend50 transfer" data-testid="lend50-card">
+      <div className="sum">50 ₽</div>
+      <div>{m.text}</div>
+      <a className="lend50-btn" href={m.link} target="_blank" rel="noopener">Перевести</a>
+      <div className="lend50-url">{m.link}</div>
+    </div>
+  )
+}
 
 /** Банк, мама, Авито — компактная карточка посреди ленты: не реплика Алика и не игрока, нажимать не нужно (#287). */
 function PhoneCard({ m }: { m: Extract<Msg, { kind: 'card' }> }) {

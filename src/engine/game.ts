@@ -2380,8 +2380,8 @@ export class Game {
   }
 
   /**
-   * Просьба «займи 50» идёт реплика за репликой с typing; системная пометка и ссылка завершают цепочку.
-   * asked ставится только после ссылки, поэтому кнопки не могут появиться у неполной просьбы (#219/#248/#358).
+   * Просьба «займи 50» идёт реплика за репликой с typing; карточку перевода завершает цепочку.
+   * asked ставится только после карточки, поэтому кнопки не могут появиться у неполной просьбы (#219/#248/#358).
    * Звать только при endgame.active и !asked.
    */
   private async deliverLend50Ask(): Promise<void> {
@@ -2392,10 +2392,8 @@ export class Game {
     const lines = again ? LEND50_ASK_AGAIN : LEND50_ASK
     for (const text of lines) await this.endgameLine(text)
     await this.sleep(500)
-    this.sys(LEND50_SYS)
-    this.save()
-    await this.sleep(250)
-    this.sys(LEND50_LINK)
+    // одна карточка вместо двух системных плашек: фраза игры, сумма и кнопка «Перевести» (#616)
+    this.push({ kind: 'lend50', text: LEND50_SYS, link: LEND50_LINK })
     this.storage?.setItem(LEND50_SEEN_KEY, '1') // отметка устройства, а не партии: она только выбирает текст
     S.mem[memkeys.lend50.asked] = true
     S.choices = null // buildChoices отдаст LEND50_CHOICES
@@ -2416,7 +2414,7 @@ export class Game {
     this.touchMsgs(at)
   }
 
-  /** Убрать хвост просьбы без asked — перед воспроизведением с начала. */
+  /** Убрать хвост просьбы без asked — перед воспроизведением с начала; карточка идёт после реплик и снимается вместе с ними (#616). */
   private stripIncompleteLend50(): void {
     if (this.S.mem[memkeys.lend50.asked]) return
     const pool = new Set<string>([...LEND50_ASK, ...LEND50_ASK_AGAIN])
