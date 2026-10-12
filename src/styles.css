@@ -258,6 +258,16 @@ body {
 .sheet-head { display: flex; justify-content: space-between; align-items: center; }
 .sheet h3 { font-size: 14px; margin: 14px 0 6px; color: var(--muted); }
 .list { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+/* досье: концовки и ачивки — плитки, не строки журнала (docs/design/dossier.md) */
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(98px, 1fr)); gap: 6px; }
+.tile {
+  background: var(--panel); border: 1px solid rgba(127, 127, 127, .25); border-radius: 10px;
+  padding: 8px 6px; font-size: 12px; text-align: center; overflow-wrap: break-word;
+}
+.tile-icon { display: block; font-size: 22px; line-height: 1.15; }
+.tile-name { display: block; margin-top: 4px; hyphens: auto; }
+.tile-desc { display: block; margin-top: 3px; font-size: 11px; color: var(--muted); hyphens: auto; }
+.tile.locked { opacity: .5; }
 .list li { padding: 5px 0; border-bottom: 1px solid rgba(127, 127, 127, .15); }
 .list li.locked { opacity: .4; }
 .list .late { color: var(--danger); }

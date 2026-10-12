@@ -64,11 +64,14 @@ export function Sheet({ onClose, onReset }: { onClose: () => void; onReset: () =
         </ul>
 
         <h3>Концовки <span id="endCount">{v.endingCount}/{v.endingTotal}</span></h3>
-        <ul id="endings" className="list">
+        <div id="endings" className="tiles" role="list">
           {v.endings.map((e) => (
-            <li key={e.id} className={e.got ? '' : 'locked'}>{e.got ? <>{e.icon} <b>{e.title}</b></> : '🔒 ???'}</li>
+            <div key={e.id} role="listitem" className={e.got ? 'tile' : 'tile locked'}>
+              <span className="tile-icon">{e.got ? e.icon : '🔒'}</span>
+              <span className="tile-name">{e.got ? <b>{e.title}</b> : '???'}</span>
+            </div>
           ))}
-        </ul>
+        </div>
 
         <h3>Трофеи</h3>
         <ul id="items" className="list">
@@ -76,11 +79,15 @@ export function Sheet({ onClose, onReset }: { onClose: () => void; onReset: () =
         </ul>
 
         <h3>Ачивки <span id="achCount">{v.achGot}/{v.achTotal}</span></h3>
-        <ul id="achList" className="list">
+        <div id="achList" className="tiles" role="list">
           {v.ach.map((a) => (
-            <li key={a.id} className={a.got ? '' : 'locked'}>{a.got ? '🏆' : '🔒'} <b>{a.title}</b> — {a.desc}</li>
+            <div key={a.id} role="listitem" className={a.got ? 'tile' : 'tile locked'}>
+              <span className="tile-icon">{a.got ? '🏆' : '🔒'}</span>
+              <span className="tile-name"><b>{a.title}</b></span>
+              <span className="tile-desc">{a.desc}</span>
+            </div>
           ))}
-        </ul>
+        </div>
         <TrackNote />
         <button className="danger" id="resetBtn" onClick={onReset}>Начать заново</button>
       </div>

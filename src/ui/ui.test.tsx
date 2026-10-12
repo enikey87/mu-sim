@@ -333,6 +333,70 @@ describe('App', () => {
     expect(line(/🎯 событие наступило/)).toContain('снег в горах')
   })
 
+  it('досье: концовки и ачивки — плитки, журнал остаётся списком', () => {
+    const { game } = makeGame()
+    game.recordPromise({ text: 'завтра — всё отдам', d: 1 })
+    game.S.arcs.boris = { i: 3, last: 0 }
+    game.S.endings.family = game.S.day
+    game.unlock('first')
+    renderApp(game)
+    fireEvent.click(screen.getByTitle('Обещания и ачивки'))
+    const dialog = screen.getByRole('dialog')
+
+    // полученная концовка — плитка с иконкой и названием, а не строка списка
+    const endings = document.getElementById('endings')!
+    const tile = within(endings).getByText('Породнились').closest('.tile')!
+    expect(tile).not.toBeNull()
+    expect(tile.className).toBe('tile')
+    expect(tile.querySelector('.tile-icon')!.textContent).toBe('💍')
+    expect(endings.querySelectorAll('.list li')).toHaveLength(0)
+    // закрытая концовка — тихая плитка «???» без названия
+    const locked = within(endings).getAllByText('???')[0].closest('.tile')!
+    expect(locked.className).toBe('tile locked')
+    expect(locked.querySelector('.tile-icon')!.textContent).toBe('🔒')
+    expect(within(endings).queryByText('Наследство долга')).toBeNull()
+    // счётчик на месте
+    expect(within(dialog).getByText('1/14')).toBeInTheDocument()
+
+    // полученная ачивка — плитка с кубком, названием и описанием
+    const ach = document.getElementById('achList')!
+    const got = within(ach).getByText('Первый шаг').closest('.tile')!
+    expect(got.className).toBe('tile')
+    expect(got.querySelector('.tile-icon')!.textContent).toBe('🏆')
+    expect(got.querySelector('.tile-desc')!.textContent).toBe('Написал Алику')
+    // закрытая ачивка показывает название и описание и тише полученной
+    const lockedAch = within(ach).getByText('Брат джан').closest('.tile')!
+    expect(lockedAch.className).toBe('tile locked')
+    expect(lockedAch.querySelector('.tile-icon')!.textContent).toBe('🔒')
+    expect(lockedAch.querySelector('.tile-desc')!.textContent).toBe('Алик назвал тебя «брат джан»')
+    expect(within(dialog).getByText('1/14')).toBeInTheDocument() // счётчики — в заголовках секций
+    expect(document.getElementById('achCount')!.textContent).toBe('1/' + document.querySelectorAll('#achList .tile').length)
+
+    // журнал обещаний и сериалы — по-прежнему список строк
+    const promises = document.getElementById('promises')!
+    expect(promises.matches('.list')).toBe(true)
+    expect(promises.querySelectorAll('li')).toHaveLength(1)
+    expect(document.getElementById('arcs')!.matches('.list')).toBe(true)
+    expect(document.getElementById('items')!.matches('.list')).toBe(true)
+  })
+
+  it('досье: плитки не кнопки и не ссылки — фокус с «Закрыть» доходит до «Начать заново»', async () => {
+    const { game } = makeGame()
+    game.S.endings.family = game.S.day
+    game.unlock('first')
+    renderApp(game)
+    const info = screen.getByTitle('Обещания и ачивки')
+    await userEvent.setup().click(info)
+    const dialog = screen.getByRole('dialog', { name: 'Досье на Алика' })
+    expect(document.querySelectorAll('.tile').length).toBe(document.querySelectorAll('#endings .tile').length + document.querySelectorAll('#achList .tile').length)
+    expect(document.querySelectorAll('.tile button, .tile a')).toHaveLength(0)
+    await userEvent.setup().tab()
+    const reset = screen.getByText('Начать заново')
+    expect(dialog.contains(document.activeElement)).toBe(true)
+    reset.focus()
+    expect(document.activeElement).toBe(reset)
+  })
+
   it('Esc закрывает досье и возвращает фокус на кнопку досье', () => {
     const { game } = makeGame()
     renderApp(game)
