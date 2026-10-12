@@ -46,8 +46,39 @@ const INIT_OPTIONS = {
 
 const global = (): Metrics => globalThis as Metrics
 
+/** Хранилище браузера: день первого засчитанного визита и сумма секунд по нему. */
+const KEY_FIRST_DAY = 'alik.firstDay'
+const KEY_TOTAL_SEC = 'alik.visibleSec'
+
+type Store = Pick<Storage, 'getItem' | 'setItem'>
+
+const store = (): Store | null => {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage
+  } catch {
+    return null // приватный режим браузера
+  }
+}
+
+const readNum = (s: Store | null, key: string): number => {
+  const n = Number(s?.getItem(key))
+  return Number.isFinite(n) && n > 0 ? n : 0
+}
+const writeNum = (s: Store | null, key: string, n: number): void => {
+  try { s?.setItem(key, String(Math.round(n))) } catch { /* приватный режим */ }
+}
+
+/** Полночь по местному времени: разница между такими — календарные дни, а не 24 часа. */
+const startOfDay = (t: number): number => {
+  const d = new Date(t)
+  d.setHours(0, 0, 0, 0)
+  return d.getTime()
+}
+
 let counter = 0
 let pageviewSent = false
+/** С какого момента вкладка видима в этом показе; пока скрыта — время не идёт. */
+let shownAt: number | null = null
 
 /** Включён ли счётчик — от этого строка игроку на интро и в досье. */
 export const isOn = (): boolean => counter !== 0
@@ -62,6 +93,7 @@ export function enable(opts: { host: string; search: string; id?: string }): boo
   const url = new URLSearchParams(opts.search)
   counter = id && opts.host === GAME_HOST && !url.has('debug') && !url.has('fast') ? Number(id) : 0
   pageviewSent = false
+  shownAt = null
   return isOn()
 }
 
@@ -69,6 +101,43 @@ export function enable(opts: { host: string; search: string; id?: string }): boo
 export function track(goal: Goal, params: Params): void {
   if (!counter) return
   global().ym?.(counter, 'reachGoal', goal, params)
+}
+
+/**
+ * `boot`: первый жест загрузки, один раз. `since` — календарных дней с первого
+ * засчитанного визита в этом браузере; день записывается только при включённом
+ * счётчике и «Начать заново» его не стирает — удержание считается на человека.
+ */
+export function boot(save: 'yes' | 'no', now = Date.now()): void {
+  if (!counter) return
+  const s = store()
+  let first = Number(s?.getItem(KEY_FIRST_DAY))
+  if (!Number.isFinite(first) || first <= 0) {
+    first = startOfDay(now)
+    try { s?.setItem(KEY_FIRST_DAY, String(first)) } catch { /* приватный режим */ }
+  }
+  const since = Math.max(0, Math.round((startOfDay(now) - first) / 86_400_000))
+  track('boot', { save, since })
+}
+
+/** Вкладка снова показана: с этого момента идут секунды видимости. */
+export function shown(now = Date.now()): void {
+  if (!counter || shownAt !== null || document.hidden) return
+  shownAt = now
+}
+
+/**
+ * `left`: вкладка скрылась или страница закрывается — одна цель на отрезок, без
+ * второго срабатывания. Пока вкладка скрыта, секунды не идут.
+ */
+export function left(depth: { phase: Phase; day: number; turns: number }, now = Date.now()): void {
+  if (!counter || shownAt === null) return
+  const sec = Math.max(0, Math.round((now - shownAt) / 1000))
+  shownAt = null
+  const s = store()
+  const total = readNum(s, KEY_TOTAL_SEC) + sec
+  writeNum(s, KEY_TOTAL_SEC, total)
+  track('left', { ...depth, sec, total })
 }
 
 /**

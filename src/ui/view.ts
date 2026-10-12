@@ -3,7 +3,7 @@ import { isLate, type Msg, type PromiseRec } from '../engine/state'
 import type { UiState } from '../engine/ui-state'
 import { ACH } from '../content/achievements'
 import { ARCS } from '../content/arcs'
-import { ENDINGS } from '../content/finales'
+import { ENDINGS, type EndingId } from '../content/finales'
 import { STARTS } from '../content/quests'
 import { alikShaved, payday } from '../content/memkeys'
 import { fmtDate } from '../engine/time'
@@ -84,10 +84,10 @@ export type View = {
   muted: boolean
   sceneId: string | null
   payday: PaydayView
-  endingId: string | null
+  endingId: EndingId | null
   endingCount: number
   endingTotal: number
-  ending: { id: string; title: string; text: string; icon: string } | null
+  ending: { id: EndingId; title: string; text: string; icon: string } | null
   /** Великая отмазка Дня выплаты: только для концовок payday_* со строкой-цепочкой в памяти. */
   grandExcuse: string | null
   finales: FinaleRow[]
@@ -119,7 +119,7 @@ export const viewOf = (u: GameUi): View => {
             sum: S.mem[payday.sum] !== undefined ? Number(S.mem[payday.sum]) : null,
           }
         : { daysLeft: null, sum: null },
-    endingId: S.ending,
+    endingId: ending?.id ?? null,
     endingCount: Object.keys(S.endings).length,
     endingTotal: ENDINGS.length,
     ending: ending ? { id: ending.id, title: ending.title, text: ending.text, icon: ending.icon } : null,

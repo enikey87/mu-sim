@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { useGame } from './useGame'
 import { useModal } from './useModal'
 import { viewOf } from './view'
+import { track } from '../analytics/metrics'
 
 export function Toast() {
   const game = useGame()
@@ -96,6 +97,7 @@ export function EndingScreen({ onReset }: { onReset: () => void }) {
     onEscape: () => game.closeEnding(),
   })
   if (!e) return null
+  const endingId = v.ending?.id ?? null
   return (
     <div
       className="ending"
@@ -113,7 +115,7 @@ export function EndingScreen({ onReset }: { onReset: () => void }) {
         <div className="ending-icon">{e.icon}</div>
         <small>Концовка {v.endingCount} из {v.endingTotal}</small>
         <h2>{e.title}</h2>
-        {v.grandExcuse && (
+        {v.grandExcuse && endingId && (
           <div className="grand" id="grandExcuse">
             <div className="grand-text">«{v.grandExcuse}»</div>
             <button
@@ -121,6 +123,7 @@ export function EndingScreen({ onReset }: { onReset: () => void }) {
               id="copyExcuse"
               onClick={() => {
                 const text = `Алик, где деньги? — великая отмазка Дня выплаты:\n«${v.grandExcuse}»`
+                track('copied', { id: endingId })
                 void copyText(text).then((ok) => game.flash(ok ? 'Скопировано' : 'Не удалось скопировать'))
               }}
             >

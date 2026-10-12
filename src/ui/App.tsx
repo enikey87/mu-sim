@@ -17,13 +17,17 @@ export function App({ game, onReset, debug = false, intro = false, introGate = f
   useEffect(() => {
     const gesture = () => ui.gesture()
     const vis = () => void ui.onVisibility(document.hidden)
+    // закрытие страницы не всегда присылает visibilitychange — тот же путь отрезка (#612)
+    const hide = () => void ui.onVisibility(true)
     document.addEventListener('pointerdown', gesture)
     document.addEventListener('keydown', gesture)
     document.addEventListener('visibilitychange', vis)
+    document.addEventListener('pagehide', hide)
     return () => {
       document.removeEventListener('pointerdown', gesture)
       document.removeEventListener('keydown', gesture)
       document.removeEventListener('visibilitychange', vis)
+      document.removeEventListener('pagehide', hide)
     }
   }, [ui])
 

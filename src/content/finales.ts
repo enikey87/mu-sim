@@ -188,6 +188,16 @@ export const PAYDAY_OUTCOMES = ['real', 'coins', 'lavash', 'niva', 'strasbourg',
 export type PaydayId = (typeof PAYDAY_OUTCOMES)[number]
 export type EndingId = (typeof PLAIN_ENDING_IDS)[number] | `payday_${PaydayId}`
 
+/**
+ * Хвост `payday_*` как исход Дня выплаты. Не-`payday` или неизвестный хвост — `null`:
+ * список проверяется на самом деле, а не только типами, потому что `S.ending` приходит из сохранения.
+ */
+export function paydayOutcome(id: string): PaydayId | null {
+  if (!id.startsWith('payday_')) return null
+  const tail = id.slice(7)
+  return (PAYDAY_OUTCOMES as readonly string[]).includes(tail) ? (tail as PaydayId) : null
+}
+
 export interface Ending {
   id: EndingId
   title: string
