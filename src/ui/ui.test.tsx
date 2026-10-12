@@ -4,12 +4,14 @@ import userEvent from '@testing-library/user-event'
 import { App } from './App'
 import { messageRenderStats } from './Message'
 import { messageListRenderStats, messageListBuildStats } from './Chat'
-import { makeGame, setMoney, memStorage } from '../test/helpers'
+import { makeGame, setMoney, memStorage, flush } from '../test/helpers'
 import { SAVE_KEY, loadState } from '../engine/state'
 import { fmtDate } from '../engine/time'
 import type { Game } from '../engine/game'
 import { introOf, uiOf } from './view'
 import { introDateLine, introVowLine, LINE_MS, FADE_MS } from './Intro'
+import { enable, GAME_HOST } from '../analytics/metrics'
+import { LEND50_LINK, LEND50_SYS } from '../content/endgame'
 
 function renderApp(game: Game, onReset = vi.fn()) {
   const utils = render(<App game={game} onReset={onReset} />)
@@ -235,6 +237,30 @@ describe('App', () => {
     expect(link).toHaveAttribute('target', '_blank')
     expect(link).toHaveAttribute('rel', 'noopener')
     expect(screen.getByText(/Поддержать автора:/)).toBeInTheDocument()
+  })
+
+  it('просьба «займи 50» — одна карточка перевода с кнопкой «Перевести», без серых плашек (#616)', async () => {
+    const { game } = makeGame()
+    game.S.mem.payday = 'default'
+    game.S.ending = 'payday_default'
+    game.S.endings.payday_default = game.S.day
+    await act(async () => { await game.closeEnding(); await flush() })
+    renderApp(game)
+    const card = screen.getByTestId('lend50-card')
+    expect(within(card).getByText('50 ₽')).toBeInTheDocument()
+    expect(within(card).getByText(LEND50_SYS)).toBeInTheDocument()
+    const link = within(card).getByRole('link', { name: 'Перевести' })
+    expect(link).toHaveAttribute('href', LEND50_LINK)
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener')
+    expect(within(card).getByText(LEND50_LINK)).toHaveClass('lend50-url') // адрес виден мелким текстом
+    // честная фраза и адрес — только в карточке, а не в серых плашках .sys
+    const sys = [...document.querySelectorAll('.sys')].map((el) => el.textContent ?? '')
+    expect(sys).not.toContain(LEND50_SYS)
+    expect(sys.some((t) => t.includes(LEND50_LINK))).toBe(false)
+    // залитая кнопка ответа — только «Перевёл»
+    expect(screen.getByRole('button', { name: 'Перевёл. Расписку давай' })).toHaveClass('primary')
+    expect(screen.getByRole('button', { name: 'Не дам' })).not.toHaveClass('primary')
   })
 
   it('кнопки допработы отвечают и исчезают', async () => {
@@ -1134,5 +1160,35 @@ describe('усы: аватар без усов, пока верен факт с�
     renderApp(game)
     expect(avatar().className).toContain('ram')
     expect(avatar().className).not.toContain('shaved')
+  })
+})
+
+describe('строка о счётчике: видна только когда он включён (#611)', () => {
+  afterEach(() => { enable({ host: '', search: '', id: '' }) })
+
+  it('счётчик молчит — строки нет ни на интро, ни в досье', () => {
+    const { game } = makeGame()
+    render(<App game={game} onReset={vi.fn()} intro />)
+    expect(document.querySelector('.track-note')).toBeNull()
+  })
+
+  it('счётчик включён — одна строка на интро и в досье, и она говорит то же', () => {
+    enable({ host: GAME_HOST, search: '', id: '4242' })
+    const { game } = makeGame()
+    const { unmount } = render(<App game={game} onReset={vi.fn()} intro />)
+    const onIntro = document.querySelector('.intro .track-note')!
+    expect(onIntro).toBeInTheDocument()
+    const text = onIntro.textContent
+    expect(text).toMatch(/ходы считаются/i)
+    expect(text).toMatch(/текст сообщений/i)
+    expect(document.querySelectorAll('.track-note')).toHaveLength(1)
+    unmount()
+
+    renderApp(game)
+    fireEvent.click(screen.getByTitle('Обещания и ачивки'))
+    const dossier = screen.getByRole('dialog', { name: 'Досье на Алика' })
+    const inSheet = within(dossier).getByText(text!)
+    expect(inSheet).toBeInTheDocument()
+    expect(within(dossier).getAllByText(text!)).toHaveLength(1)
   })
 })
