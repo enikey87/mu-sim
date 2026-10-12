@@ -1,9 +1,21 @@
 // Память Алика: реплики с условиями звучат, когда событие было, и один раз; важное — раньше общего.
 import { describe, it, expect } from 'vitest'
 import { makeGame } from '../test/helpers'
+import type { Game } from '../engine/game'
 import { MEMORY } from './memory'
 import { RUDE_AGAIN, SORRY_AGAIN } from './misc'
 import { lintLines, spec } from '../engine/rules'
+import { ARCS } from './arcs'
+import { FINALES } from './finales'
+
+const remembered = (game: Game) => game.lines.eligible('MEMORY', MEMORY, game.lineFacts()).map((p) => p.text)
+
+async function choose(game: Game, go: string) {
+  game.S.choices = null
+  const c = game.choices.find((x) => x.go === go)
+  expect(c, go).toBeTruthy()
+  await game.send(c!)
+}
 
 describe('память Алика', () => {
   it('пулы без пустых реплик и повторов', () => {
@@ -53,5 +65,87 @@ describe('память Алика', () => {
   })
   it('у каждой реплики памяти есть условие', () => {
     for (const l of MEMORY) expect(spec(l).when?.length, spec(l).t).toBeGreaterThan(0)
+  })
+})
+
+describe('память не объявляет новый случай (#587)', () => {
+  it('после квеста козы она не снова на крыше', async () => {
+    const { game } = makeGame()
+    await game.enterNode('q_goat', 'ask')
+    await choose(game, 'climb')
+    expect(game.S.ach.q_goat).toBeDefined()
+    game.nextDay(1)
+    const goat = remembered(game).find((t) => /коз/i.test(t))
+    expect(goat).toBeTruthy()
+    expect(goat).not.toMatch(/опять на крыше/)
+  })
+
+  it('после фото плитки заказов не больше трёх', async () => {
+    const { game } = makeGame()
+    await game.enterNode('q_photo', 'ask')
+    await choose(game, 'send')
+    expect(game.S.ach.q_photo).toBeDefined()
+    game.nextDay(1)
+    const photo = remembered(game).find((t) => /реклам/.test(t))
+    expect(photo).toBeTruthy()
+    const n = photo!.match(/(\S+)\s+заказ/)
+    if (n) expect(['три', '3']).toContain(n[1])
+    expect(photo).not.toMatch(/десять/)
+  })
+
+  it('Размик и банк не говорят «опять», пока второго раза нет', async () => {
+    const { game: razmik } = makeGame()
+    while ((razmik.S.arcs.razmik?.i ?? 0) < ARCS.razmik.eps.length) {
+      razmik.S.day += 5
+      await razmik.playArc('razmik')
+    }
+    expect(razmik.S.mem['finale.razmik']).toBe('default')
+    razmik.nextDay(1)
+    const down = remembered(razmik).filter((t) => /Размик/.test(t))
+    expect(down.some((t) => /внизу/.test(t))).toBe(true)
+    expect(down.join(' ')).not.toMatch(/опять/)
+
+    const { game } = makeGame()
+    await game.playFinale('alik_death', FINALES.alik_death.find((f) => f.id === 'will')!)
+    expect(game.S.mem['finale.alik_death']).toBe('will')
+    game.nextDay(1)
+    const bank = remembered(game).find((t) => /наследник/.test(t))
+    expect(bank).toBeTruthy()
+    expect(bank).not.toMatch(/опять/)
+  })
+
+  it('квест один раз: «Нива» не вернулась, чайник не списан вторично, курс не вырос, налоговая не звонила снова', async () => {
+    const { game: niva } = makeGame()
+    await niva.playArc('niva')
+    await niva.enterNode('q_niva', 'ask')
+    await choose(niva, 'push')
+    niva.nextDay(1)
+    const drove = remembered(niva).find((t) => /толкал/.test(t))
+    expect(drove).toBeTruthy()
+    expect(drove).not.toMatch(/вернулась/)
+
+    const { game: kettle } = makeGame()
+    await kettle.enterNode('q_lottery', 'ask')
+    await choose(kettle, 'draw')
+    kettle.nextDay(1)
+    const burned = remembered(kettle).find((t) => /Чайник/.test(t))
+    expect(burned).toBeTruthy()
+    expect(burned).not.toMatch(/ещё раз/)
+
+    const { game: coin } = makeGame()
+    await coin.enterNode('q_crypto', 'ask')
+    await choose(coin, 'rate')
+    await choose(coin, 'hodl')
+    const rate = remembered(coin).find((t) => /Лаваш-коин/.test(t))
+    expect(rate).toBeTruthy()
+    expect(rate).not.toMatch(/вырос|с сыром/)
+
+    const { game: tax } = makeGame()
+    await tax.enterNode('q_witness', 'ask')
+    await choose(tax, 'truth')
+    tax.nextDay(1)
+    const witness = remembered(tax).find((t) => /свидетел/.test(t))
+    expect(witness).toBeTruthy()
+    expect(witness).not.toMatch(/звонила/)
   })
 })

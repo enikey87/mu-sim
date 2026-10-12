@@ -122,6 +122,27 @@ describe('Game: начало и ход', () => {
     expect(shout.ui.feelId).toBe(1)
     expect(vibes).toContainEqual([80, 40, 80])
 
+    // #583: капс на готовой кнопке — не грубость: кнопка несёт свой тон, классификатор читает только свой текст
+    const bottom = makeGame().game
+    setMoney(bottom, Game.MONEY_BOTTOM)
+    bottom.S.choices = null
+    const btn = bottom.choices.find((c) => c.act === 'desperate')
+    expect(btn, 'кнопка отчаяния на дне').toBeDefined()
+    expect(btn!.tone, 'тон кнопки задан разметкой').toBe('neutral')
+    await bottom.send(btn!)
+    expect(bottom.ui.feel, 'телефон не трясёт от кнопки').not.toBe('shake')
+    expect(bottom.S.mem[HEAT] ?? 0, 'ссора не греется').toBe(0)
+    expect(bottom.S.mem.rudeAt, 'ход не помечен грубым').toBeUndefined()
+    // та же кнопка текстом капсом: отклика грубости нет — тон задан кнопке, а не тексту
+    const caps = makeGame().game
+    expect(caps.feelFor({ text: 'АЛИК, Я ПРОДАМ ПЛИТКУ. ВАШУ. СО СТЕНЫ.', tone: 'neutral', act: 'desperate', arg: 'tileWill' })).toBeNull()
+
+    // тот же текст, набранный игроком, — крик и тряска
+    const typed = makeGame({ audio }).game
+    await typed.send('АЛИК, Я ПРОДАМ ПЛИТКУ. ВАШУ. СО СТЕНЫ.')
+    expect(typed.ui.feel).toBe('shake')
+    expect(typed.S.mem.rudeAt).toBe(typed.S.stats.sent)
+
     const benign = makeGame({ audio }).game
     await benign.send('АЛИК!!!')
     expect(benign.ui.feel).toBeNull()
@@ -215,8 +236,9 @@ describe('Game: начало и ход', () => {
     const mine: string[] = []
     for (let i = 0; i < 80; i++) {
       const c = game.choices.find((x) => x.tone === 'polite' && !x.act) ?? game.choices[0]
-      // короткие кнопки сцен («Сбер», «Алик…») по замыслу не перефразируются — их не считаем
-      if (!(c.scene && c.text.length <= 8)) mine.push(c.text)
+      // короткие кнопки сцен («Сбер», «Алик…») по замыслу не перефразируются — их не считаем;
+      // кнопка-намерение (act) — контекстный вопрос, который ждёт ответа игрока, а не draw пула: тоже не считаем
+      if (!(c.scene && c.text.length <= 8) && !c.act) mine.push(c.text)
       game.S.offlineDays = 0
       await game.send(c)
       if (game.battery.dead) await game.battery.charge()

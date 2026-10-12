@@ -1633,9 +1633,11 @@ export class Game {
   /** Совместимый шорткат для тестов и отладки из консоли. */
   classify(text: string): Tone { return this.classifyInput(text).tone }
 
-  /** Какой отклик дать на это сообщение (категорию игроку не показываем). */
+  /** Какой отклик дать на это сообщение (категорию игроку не показываем). Категория приходит с объекта:
+   *  свой текст её получил классификатором при отправке, готовая кнопка — своей разметкой. Капс в
+   *  зелёной кнопке ходом грубости не делает (#583) — заново её текст не читаем. */
   feelFor(o: Choice): SendFeel | null {
-    const cat: InputCategory = o.category ?? this.classifyInput(o.text).category
+    const cat: InputCategory | undefined = o.category
     if (o.act === 'moo' || cat === 'cow') return 'moo'
     if (o.act === 'sorry' || cat === 'apology') return 'sorry'
     if (cat === 'intimidation' || cat === 'violent-threat') return 'intimidate'
@@ -2202,6 +2204,8 @@ export class Game {
     }
     if (debtFx) (this.S.ctx ??= {}).debtMoved = debtMoved
     const m = this.open(ep.m)
+    // факт пишет строка, которая его утверждает: remember строки применяется, только если строка звучала (#588)
+    for (const x of m) if (typeof x !== 'string' && 'remember' in x && x.remember) this.rules.applyOps(x.remember, {})
     if (ep.remember) this.rules.applyOps(ep.remember, {})
     if (this.S.ctx) {
       delete this.S.ctx.debtMoved

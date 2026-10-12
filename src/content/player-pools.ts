@@ -9,6 +9,8 @@ import { CHORUS_TALK, MEMORY_TALK } from './talk'
 import { LEGENDS } from './legends'
 import { GROUP_Q, JOB_YES_P, JOB_NO_P } from './misc'
 import { IDLE_Q, STICKER_Q, FWD_Q, REACT_Q, DEL_Q } from './life'
+import { P_CREW_PAID } from './crew'
+import { P_HOLIDAY } from './holidays'
 import { ENDGAME_CHOICES, LEND50_CHOICES } from './endgame'
 import {
   P_VIA_BORIS, P_VIA_KARINE, P_VIA_MAMA, P_MOO, P_MOUSTACHE, P_COURT,
@@ -74,6 +76,8 @@ put('DEL_Q', DEL_Q)
 put('WRONG_Q', WRONG_Q)
 put('WQ', WRONG_Q) // ключ колоды в Opt_Wrong
 
+put('P_CREW_PAID', P_CREW_PAID) // упрёк по звонку с объекта (#577)
+for (const h of ['newYear', 'march8'] as const) put(`P_HOLIDAY.${h}`, P_HOLIDAY[h]) // кнопка праздника (#585)
 put('P_VIA_BORIS', P_VIA_BORIS)
 put('P_VIA_KARINE', P_VIA_KARINE)
 put('P_VIA_MAMA', P_VIA_MAMA)

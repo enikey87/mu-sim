@@ -4,9 +4,9 @@ import { type Entry, type FactOp, type Criterion, type FactKey, type Said, set, 
 import { type ClaimKey } from './ids'
 import type { LedgerEvent } from './fact-types'
 import { needs, meet, WORLD } from './world'
-import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, collectorsRecruited, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantPaid, houseOnGarik, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, sick, taxFrozen, wedding } from './memkeys'
+import { actSigned, alikDead, betonSet, borisMarried, collectorsRecruited, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantPaid, houseOnGarik, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikBath, sick, taxFrozen, wedding } from './memkeys'
 
-export type ArcMsg = Said | { w: string; t: string; claims?: LedgerEvent[] }
+export type ArcMsg = Said | { w: string; t: string; claims?: LedgerEvent[]; remember?: FactOp[] } | { t: string; claims: LedgerEvent[]; remember?: FactOp[] }
 export interface Episode {
   /** Сообщения серии; с needs — только уместные. */
   m: Entry<ArcMsg>[]
@@ -52,7 +52,8 @@ export const ARCS: Record<string, Arc> = {
     eps: [
       { m: ['Брат, у меня новый баран. Борис зовут. Умный — смотрит на Арарат и вздыхает. Как ты.'], remember: meet('baran') },
       { m: ['Борис заболел. Съел смету. Всю. Врач сказал — отравился цифрами.'], then: 'promise', state: { key: sick, days: 10, actor: 'boris' }, legend: 'boris_smeta' },
-      { m: ['Борису лучше. Но теперь он ест только квитанции. Твои тоже съел, извини.'], remember: [set(borisSmetaReady, true)], legend: 'boris_receipts' },
+      // выздоровление Бориса — не готовая смета: факт «смету составили» ставит реплика легенды, которая это утверждает (#586)
+      { m: ['Борису лучше. Но теперь он ест только квитанции. Твои тоже съел, извини.'], legend: 'boris_receipts' },
       { m: [{ w: 'boris', t: 'Бее.' }, 'Это Борис тебе написал. Сам! Он научился. Я в шоке, брат.'] },
       { remember: meet('goar'), m: ['Борис влюбился. В козу тёти Гоар. Семьи против. Все деньги уходят на примирение.'], then: 'promise', legend: 'boris_wedding' },
       // «после свадьбы» наступает, когда свадьба (5 дней) прошла, а не в день приглашения
@@ -93,7 +94,7 @@ export const ARCS: Record<string, Arc> = {
   },
   niva: {
     title: 'Побег «Нивы»',
-    follow: [needs('nivaAway')('«Нива» нашлась?'), needs('nivaAway')('Где «Нива»?'), 'Есть новости про «Ниву»?', 'Алик, как там «Нива»?'],
+    follow: [gate(eq('arc.niva', 5), WORLD.nivaAway)('«Нива» нашлась?'), needs('nivaAway')('Где «Нива»?'), 'Есть новости про «Ниву»?', 'Алик, как там «Нива»?'],
     eps: [
       { remember: meet('niva'), m: [{ t: 'Моя «Нива» не заводится. А деньги у неё в бардачке.', claims: ['money_niva'] }], then: 'promise', legend: 'niva_stuck' },
       { m: ['«Нива» завелась. И уехала сама. С деньгами. Ищем всем селом.'], remember: [set(nivaAway, true)], legend: 'niva_gone' },
@@ -124,7 +125,7 @@ export const ARCS: Record<string, Arc> = {
   },
   grant: {
     title: 'Заказчик Грант',
-    follow: ['Что заказчик?', 'Грант заплатил?', needs('twin')('Алик, а Грант правда близнец?'), 'Как там заказчик?'],
+    follow: ['Что заказчик?', gate(eq('arc.grant', 3))('Грант заплатил?'), needs('twin')('Алик, а Грант правда близнец?'), 'Как там заказчик?'],
     eps: [
       { remember: meet('grant'), m: [{ t: 'Заказчик Грант мне не платит. Говорит, плитка слишком ровная — подозрительно.', claims: ['customer_owes'] }], then: 'promise', legend: 'grant' },
       { m: [{ w: 'grant', t: 'Алик, завтра в бане как договорились. Ой. Не тот чат.' }] },
@@ -144,21 +145,21 @@ export const ARCS: Record<string, Arc> = {
   rubik: {
     title: 'Инспектор Рубик',
     minDay: 205,
-    follow: ['Рубик уехал?', 'Акт подписали?', 'Как там инспектор?', 'Алик, что с проверкой?'],
+    follow: [gate(eq('arc.rubik', 4))('Рубик уехал?'), gate(eq('arc.rubik', 7))('Акт подписали?'), 'Как там инспектор?', 'Алик, что с проверкой?'],
     eps: [
       { m: ['На объект приехал инспектор Рубик. Посмотрел на твою плитку и сказал: «Так ровно без взятки не кладут». Ищет, кто дал. Пока не найдёт — деньги стоят.'], then: 'promise', legend: 'inspect' },
       { m: ['Рубик проверяет уровнем. Уровень показывает идеально. Рубик уровню не верит. Вызвал из Еревана второй уровень. Государственный, с печатью.'] },
       { m: [{ w: 'rubik', t: 'Молодой человек, это вы клали? Сознайтесь, кому дали. Суммы меня не интересуют. Хотя интересуют.' }] },
       { m: ['Рубик взял образец твоей плитки на экспертизу. Отколол. Прямо из середины. Экспертиза в Москве, сроков не называют. Пока — дырка. Заказчик в ярости, не платит.', 'Дырку заделаешь? Только не ровно, брат. Ровно — опять заподозрят.'] },
-      { m: ['Рубик остался жить на объекте. Не уедет, говорит, пока не найдёт взяткодателя. Спит в ванной, на твоей плитке. Хвалит — прохладная.'] },
+      { remember: [set(rubikBath, true)], m: ['Рубик остался жить на объекте. Не уедет, говорит, пока не найдёт взяткодателя. Спит в ванной, на твоей плитке. Хвалит — прохладная.'] },
       { remember: meet('karine'), m: ['Жена, Карине, носит Рубику обед. Третью неделю. Рубик поправился на пять кило и прислал ей стихи. Я начинаю нервничать. Акт — тоже.'], then: 'promise', legend: 'inspect_karine' },
       { m: [{ w: 'karine', t: 'Алик, Рубик сделал мне предложение. Акт подпишет, если соглашусь. Ради плиточника, может, и соглашусь.' }, 'Брат, ты же не хочешь, чтобы из-за твоих денег распалась семья? Скажи, что подождёшь.'], then: 'promise' },
       {
-        remember: [set(actSigned, true), set(grantPaid, true), set(taxFrozen, true)],
+        // remember — у строк, а не у серии: без Гранта строк про подпись нет, и акта никто не подписывал (#588)
         m: [
-          gate(WORLD.grant, missing(grantPaid))({ t: 'Карине отказала! Рубик в обиде подписал акт: «Чтобы вас больше не видеть». Объект сдан, Грант заплатил!', claims: [{ move: { from: 'customer_owes', to: 'customer_paid' } }, 'customer_paid'] }),
-          gate(WORLD.grant, is(grantPaid))({ t: 'Карине отказала! Рубик в обиде подписал акт: «Чтобы вас больше не видеть». Теперь и бумага говорит, что Грант со мной рассчитался.', claims: ['customer_paid'] }),
-          gate(missing(taxFrozen))('А Рубик, оказывается, из налоговой. Проверял не плитку — меня. Счета заморожены. Деньги есть, брат! Просто холодные.'),
+          gate(WORLD.grant, missing(grantPaid))({ t: 'Карине отказала! Рубик в обиде подписал акт: «Чтобы вас больше не видеть». Объект сдан, Грант заплатил!', claims: [{ move: { from: 'customer_owes', to: 'customer_paid' } }, 'customer_paid'], remember: [set(actSigned, true), set(grantPaid, true)] }),
+          gate(WORLD.grant, is(grantPaid))({ t: 'Карине отказала! Рубик в обиде подписал акт: «Чтобы вас больше не видеть». Теперь и бумага говорит, что Грант со мной рассчитался.', claims: ['customer_paid'], remember: [set(actSigned, true), set(grantPaid, true)] }),
+          gate(missing(taxFrozen))({ t: 'А Рубик, оказывается, из налоговой. Проверял не плитку — меня. Счета заморожены. Деньги есть, брат! Просто холодные.', claims: [], remember: [set(taxFrozen, true)] }),
           gate(is(taxFrozen))('А Рубик, оказывается, из налоговой. Проверял не плитку — меня. Заодно объяснил, почему счета до сих пор заморожены.'),
         ],
         fx: { ach: 'arc_rubik' }, legend: 'frozen',
@@ -168,7 +169,7 @@ export const ARCS: Record<string, Arc> = {
   razmik: {
     title: 'Размик на кране',
     minDay: 230,
-    follow: [needs('razmikUp')('Размик ещё на кране?'), 'Как там Размик?', needs('razmikUp')('Размик слез?'), 'Алик, что с крановщиком?'],
+    follow: [needs('razmikUp')('Размик ещё на кране?'), 'Как там Размик?', gate(eq('arc.razmik', 7))('Размик слез?'), 'Алик, что с крановщиком?'],
     eps: [
       { m: ['Брат, ситуация. Крановщик Размик залез на кран и объявил голодовку. Я ему тоже должен.', 'Он на сорок метров выше тебя — значит, в очереди первый. Логично?'], then: 'promise', legend: 'crane_queue' },
       { remember: meet('goar'), m: ['Размику подаём лаваш крюком. Он отказывается — голодовка. Лаваш съедает коза тёти Гоар: она внизу держит пикет, из солидарности. Коза поправилась. Размик нет.'] },
@@ -215,7 +216,7 @@ export const ARCS: Record<string, Arc> = {
   garik: {
     title: 'Гарик в фундаменте',
     minDay: 200,
-    follow: ['Как там Гарик?', gate(is(garikConcrete))('Гарика достали?'), gate(is(garikConcrete))('Гарик ещё в фундаменте?'), 'Алик, что с Гариком?'],
+    follow: ['Как там Гарик?', gate(eq('arc.garik', 5), is(garikConcrete))('Гарика достали?'), gate(is(garikConcrete))('Гарик ещё в фундаменте?'), 'Алик, что с Гариком?'],
     eps: [
       // garik.cut — в фундаменте без связи: пишет сам только после серии с интернетом (SPEAKS)
       { m: ['Беда, брат. Мой шурин Гарик застыл в фундаменте. Живой, но в фундаменте. Бетон схватился быстрее, чем Гарик.'], remember: [set(garikConcrete, true), set(garikCut, true), ...meet('garik')], then: 'promise', legend: 'garik' },
