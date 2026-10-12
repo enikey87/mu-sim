@@ -1,12 +1,12 @@
 // Правила новых возможностей: выбор сцен, наступившие обещания, хор персонажей, состояния мира.
 import type { Game } from '../../engine/game'
-import { type Rule, type Facts, type Entry, type Line, eq, ne, gte, lte, is, add, of, missing, during, spec } from '../fact'
+import { type Rule, type Facts, type Entry, type Line, eq, ne, gte, lte, is, add, of, missing, during, set, spec } from '../fact'
 
 import type { GameEvent, Offer } from './events'
 import { WORLD, speaks as speaksCriterion } from '../world'
 import { CHORUS_LEGEND } from '../legends'
 import { PROMISE_DUE, PROMISE_DUE_COSMIC, PROMISE_DUE_KEPT, PROMISE_MET, PROMISE_SHAVE, PROMISE_SHAVE_KEPT, CHORUS, CHORUS_FED_UP, WEDDING_NOISE, BORIS_SICK, DEAD_KARINE, DEAD_ALIK } from '../world'
-import { alikDead, alikShaved, blocked, count, endgame, grantPaid, interjections, intro, met, mourning, payday, sick } from '../memkeys'
+import { alikDead, alikShaved, blocked, count, endgame, grantPaid, interjections, intro, met, mourning, moustacheKept, payday, sick } from '../memkeys'
 import { JournalForAmnesty } from './criteria'
 import { low } from '../excuses'
 
@@ -82,8 +82,9 @@ const stakeShave = async ({ game, facts }: { game: Game; facts: Facts }) => {
 }
 export const promiseRules: R[] = [
   {
-    // ставка «усы» сдержана переводом — выше обычного Due_Kept
+    // ставка «усы» сдержана переводом — выше обычного Due_Kept; факт навсегда: на него опирается архив дела (#608)
     name: 'Due_StakeKept', event: 'PromiseDue', when: [...stakeOpen, gte('mood', 8)], odds: 0.5, cooldown: { days: 10 }, priority: 'chatter', specificity: 4,
+    remember: [set(moustacheKept, true)],
     respond: stakeKept,
   },
   {
@@ -95,6 +96,7 @@ export const promiseRules: R[] = [
   {
     // событийный срок: условие наступило без денег — та же ставка (#307)
     name: 'Condition_StakeKept', event: 'PromiseConditionMet', when: [...stakeOpen, gte('mood', 8)], odds: 0.5, cooldown: { days: 10 }, priority: 'chatter', specificity: 4,
+    remember: [set(moustacheKept, true)],
     respond: stakeKept,
   },
   {
