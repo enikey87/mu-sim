@@ -80,7 +80,8 @@ export const ARCS: Record<string, Arc> = {
   },
   samvel: {
     title: 'Свадьба дяди Самвела',
-    follow: [gate(missing('finale.samvel'))('Свадьба Самвела ещё идёт?'), 'Как там свадьба?', gate(missing('finale.samvel'))('Алик, какой день свадьбы?'), 'Самвел ещё женится?'],
+    // «Самвел ещё женится?» — вопрос про развязку: кнопка только перед серией, которая на него отвечает (#604)
+    follow: [gate(missing('finale.samvel'))('Свадьба Самвела ещё идёт?'), 'Как там свадьба?', gate(missing('finale.samvel'))('Алик, какой день свадьбы?'), gate(eq('arc.samvel', 7))('Самвел ещё женится?')],
     eps: [
       { m: ['У дяди Самвела свадьба. Третий день. Я тамада, отойти не могу.'], remember: meet('tamada', 'samvel'), then: 'promise', state: { key: wedding('samvel'), days: 8 }, legend: 'wedding' },
       { m: ['Свадьба дяди Самвела. Какой день — уже никто не считает. Коньяк кончился, привезли новый. Всё хорошо.'] },
