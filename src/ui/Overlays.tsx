@@ -113,10 +113,9 @@ export function EndingScreen({ onReset }: { onReset: () => void }) {
         <div className="ending-icon">{e.icon}</div>
         <small>Концовка {v.endingCount} из {v.endingTotal}</small>
         <h2>{e.title}</h2>
-        <p>{e.text}</p>
         {v.grandExcuse && (
-          <>
-            <blockquote className="grand" id="grandExcuse">«{v.grandExcuse}»</blockquote>
+          <div className="grand" id="grandExcuse">
+            <div className="grand-text">«{v.grandExcuse}»</div>
             <button
               className="secondary"
               id="copyExcuse"
@@ -127,8 +126,9 @@ export function EndingScreen({ onReset }: { onReset: () => void }) {
             >
               Скопировать великую отмазку
             </button>
-          </>
+          </div>
         )}
+        <p>{e.text}</p>
         <ul className="ending-stats">
           <li>{v.day} дней после сдачи объекта</li>
           <li>Долг Алика: {v.debt.toLocaleString('ru-RU')} ₽</li>
