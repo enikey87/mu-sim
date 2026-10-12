@@ -5,7 +5,7 @@ import { realClock } from './engine/clock'
 import { browserAudio } from './engine/audio'
 import { SAVE_KEY } from './engine/state'
 import { App } from './ui/App'
-import { enable, firstGesture } from './analytics/metrics'
+import { enable, firstGesture, boot, shown } from './analytics/metrics'
 import './styles.css'
 
 // Параметры адреса: ?fast — паузы в ~30 раз короче, ?hour=3 — подменить час, ?away=90 — «не было 90 минут»,
@@ -29,11 +29,14 @@ const newGame = () => {
 if (enable({ host: location.hostname, search: location.search })) {
   const gesture = () => {
     firstGesture()
+    // первый жест один: `boot` — про этот жест, а не про загрузку файла
+    boot(hadSave ? 'yes' : 'no')
     document.removeEventListener('pointerdown', gesture)
     document.removeEventListener('keydown', gesture)
   }
   document.addEventListener('pointerdown', gesture)
   document.addEventListener('keydown', gesture)
+  shown() // с этой секунды идут секунды видимости: до жеста страница тоже на экране
 }
 
 // Игра создаётся вне React: StrictMode вызывает инициализаторы дважды, а у игры есть таймеры

@@ -8,7 +8,7 @@ import { PAYDAY_HOOKS } from '../content/rules/payday'
 import { QUEST_WHEN } from '../content/rules/world'
 import { LEGENDS } from '../content/legends'
 import { TOPICS, P_NEU_B_LATE, P_RUDE_BLOCKED, P_RUDE_POLITE, P_POL_POLITE, P_NIGHT, P_FRIDAY, P_MONEY, P_DESPERATE, DESPERATE_REPLY, MONEY_REPLY_POLITE, MONEY_REPLY_NEUTRAL, MONEY_REPLY_REGIMENT } from '../content/topics'
-import { FINALES, ENDINGS, DEFAULT_FINALE, type Finale } from '../content/finales'
+import { FINALES, ENDINGS, DEFAULT_FINALE, paydayOutcome, type Finale, type PaydayId } from '../content/finales'
 import { ARCS, ARC_DONE, CAST, type Episode, GROUP, GROUP_OOPS, WRONG_TO, WRONG_WHAT, WRONG_OOPS } from '../content/arcs'
 import * as L from '../content/life'
 import { ACH } from '../content/achievements'
@@ -48,6 +48,7 @@ import { type Audio, silentAudio } from './audio'
 import { typo } from './typo'
 import { UiState, type Moo, type Notif, type SendFeel } from './ui-state'
 import { classifyUserInput, legalClaim, type ClassifiedInput } from './input'
+import { track, left, shown, type Phase } from '../analytics/metrics'
 import { holidayOf, holidayGreetKey, holidayDays, HOLIDAY_EXCUSES } from '../content/holidays'
 import { dueIn, dateOf, fmtDate, fmtDayMonth, fmtShortDate, fmtTime, weekOf, nightHour, periodOf, tierOf, TIERS, type Due, type Period } from './time'
 import { type GameState, type BankWeek, type Msg, type NewMsg, type Card, type PhoneEvent, type Choice, type Ctx, type Tone, type Storage, type InputCategory, freshState, loadState, saveState, SAVE_KEY, LEND50_SEEN_KEY, MAX_PATIENCE, isLate, countOf, setCount, type PromiseRec } from './state'
@@ -111,6 +112,8 @@ export type AwayKind = 'text' | 'sticker' | 'fwd' | 'deleted' | 'voice' | 'trans
 const POOR_REPEAT_DAYS = 14
 /** Минимум сообщений игрока между клятвами легенды — одна защита на все пути (#179). */
 const LEGEND_VOW_GAP = 8
+/** Пороги цели `milestone`: сколько сообщений игрока отправлено (docs/design/analytics.md). */
+const MILESTONES = [1, 10, 25, 50, 100, 200] as const
 
 export class Game {
   /** Только чтение: подмена состояния целиком (`this.S = …`) — один из обходов долга из аудита #142. */
@@ -162,6 +165,8 @@ export class Game {
   private dayMovedInTurn = false
   /** Ключи банковских SMS за день — одно и то же не дважды (#251 / #178). */
   private bankSmsDay: { day: number; keys: Set<string> } | null = null
+  /** Пороги цели `milestone`, уже пройденные или отправленные; «Начать заново» создаёт новую игру — список с нуля (#612). */
+  private milestones = new Set<number>()
 
   constructor(opts: GameOptions = {}) {
     this.storage = opts.storage === undefined ? (typeof localStorage !== 'undefined' ? localStorage : null) : opts.storage
@@ -1684,6 +1689,7 @@ export class Game {
     const mine = this.push({ kind: 'text', from: 'me', text: o.text, time: fmtTime(S.clock) })
     this.seen.mark(o.text)
     S.stats.sent++
+    this.noteMilestone()
     this.unlock('first')
     if (this.isNight()) this.unlock('nightowl')
     if (tone === 'polite') { if (++S.politeStreak >= 10) this.unlock('saint') } else S.politeStreak = 0
@@ -2293,21 +2299,24 @@ export class Game {
     this.S.endings[id] = this.S.day
     this.S.ending = id
     this.unlock('end_' + id)
+    track('ending', { id: e.id })
     this.emit()
   }
   async closeEnding(): Promise<void> {
     const id = this.S.ending
     this.S.ending = null
     // вход в эндгейм: вступление, потом просьба «займи 50»; формальности — AlikAway/Idle при висящей просьбе (#321)
-    if (id?.startsWith('payday_') && !this.S.mem[memkeys.endgame.active]) {
-      try { await this.startEndgame(id.slice(7)) } catch (e) { this.swallowDisposed(e) }
+    const outcome = id === null ? null : paydayOutcome(id)
+    if (outcome && !this.S.mem[memkeys.endgame.active]) {
+      try { await this.startEndgame(outcome) } catch (e) { this.swallowDisposed(e) }
     }
     this.save()
     this.emit()
   }
 
-  private async startEndgame(outcome: string): Promise<void> {
+  private async startEndgame(outcome: PaydayId): Promise<void> {
     const S = this.S
+    track('endgame', { outcome })
     // Пока вступление и просьба — busy: иначе кнопки эндгейма и таймеры вклиниваются в цепочку.
     this.ui.busy = true
     try {
@@ -2825,8 +2834,34 @@ export class Game {
     if (gapMin > 120) this.battery.restore() // телефон заряжался
     await this.awayBurst(Math.min(5, 1 + Math.floor(gapMin / 30)), Math.min(10, 1 + Math.floor(gapMin / 120)))
   }
+  /**
+   * Цель `milestone`: сообщения игрока пересекли 1, 10, 25, 50, 100, 200. Порог,
+   * пройденный до загрузки, досылается молча — старое сохранение в день выкладки
+   * иначе пришлёт все разом.
+   */
+  private noteMilestone(): void {
+    const n = this.S.stats.sent
+    for (const t of MILESTONES) {
+      if (n === t && !this.milestones.has(t)) { this.milestones.add(t); track('milestone', { n: t, day: this.S.day }) }
+      else if (n > t) this.milestones.add(t)
+    }
+  }
+  /** Фаза партии для цели `left`: экран, на котором игрок ушёл (docs/design/analytics.md). */
+  private phase(): Phase {
+    if (this.S.mem[memkeys.endgame.active]) return 'endgame'
+    if (this.S.scene?.id === 'payday') return 'payday'
+    if (!this.S.introShown) return 'intro'
+    return 'chat'
+  }
   async onVisibility(hidden: boolean): Promise<void> {
-    if (hidden) { this.hiddenAt = this.clock.now(); this.save(); return }
+    if (hidden) {
+      // отрезок закрывают скрытие вкладки и pagehide; второй раз цель не шлётся
+      left({ phase: this.phase(), day: this.S.day, turns: this.S.stats.sent })
+      this.hiddenAt = this.clock.now()
+      this.save()
+      return
+    }
+    shown()
     const gapMin = (this.clock.now() - this.hiddenAt) / 60000
     if (this.hiddenAt && gapMin >= 3 && !this.ui.busy && !this.battery.dead && this.S.stats.sent) await this.awayBurst(Math.min(4, 1 + Math.floor(gapMin / 10)), 1)
   }

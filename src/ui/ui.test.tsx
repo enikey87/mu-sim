@@ -1128,3 +1128,16 @@ describe('строка о счётчике: видна только когда �
     expect(within(dossier).getAllByText(text!)).toHaveLength(1)
   })
 })
+
+describe('pagehide закрывает отрезок видимости (#612)', () => {
+  afterEach(() => { enable({ host: '', search: '', id: '' }) })
+
+  it('закрытие страницы даёт тот же путь, что скрытие вкладки', () => {
+    const { game } = makeGame()
+    renderApp(game)
+    const spy = vi.spyOn(game, 'onVisibility')
+    fireEvent(document, new Event('pagehide'))
+    expect(spy).toHaveBeenCalledWith(true)
+    spy.mockRestore()
+  })
+})
