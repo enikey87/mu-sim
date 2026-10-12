@@ -273,4 +273,17 @@ describe('«Мууу»: выходной уровень (#282)', () => {
     audio.moo()
     expect(Math.max(...heard.gains)).toBe(MOO_VOL)
   })
+
+  // APK (docs/android.md): WebView без системного TTS — синтетической речи нет, но партия идёт дальше
+  it('нет синтеза речи (WebView без TTS) — голос молчит, остальной звук работает', () => {
+    const { heard } = stubAudio()
+    vi.stubGlobal('speechSynthesis', undefined) // ни движка, ни интерфейса: как в WebView без TTS
+    vi.stubGlobal('SpeechSynthesisUtterance', undefined)
+    const audio = browserAudio()
+    audio.unlock()
+    expect(() => audio.alikVoice(() => 'Брат, где деньги?')).not.toThrow()
+    expect(() => audio.feast((a) => a[0] ?? 'тост')).not.toThrow()
+    audio.moo()
+    expect(Math.max(...heard.gains)).toBe(MOO_VOL) // «Мууу» и SMS-писк — Web Audio, речи не требуют
+  })
 })

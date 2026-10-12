@@ -16,13 +16,18 @@
     "rules:report": "RULES_REPORT=1 vitest run src/tools/tools.test.ts",
     "rules:stable": "RULES_STABLE=1 vitest run src/tools/stable.test.ts",
     "test:rules": "vitest run src/engine/rules --coverage",
-    "playtest": "vitest run src/tools/playtest.test.ts"
+    "playtest": "vitest run src/tools/playtest.test.ts",
+    "cap:sync": "npm run build && npx cap sync android",
+    "android": "cd android && ./gradlew assembleDebug"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/core": "^8.5.3",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
     "@eslint/js": "9.39.5",
     "@playwright/test": "1.63.0",
     "@testing-library/jest-dom": "7.0.1",
