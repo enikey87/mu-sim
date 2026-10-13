@@ -339,6 +339,65 @@ describe('ход Алика (AlikTurn): веса как в оригинале', 
   })
 })
 
+describe('гарантия первой серии к 12-му сообщению (#636)', () => {
+  const at12 = (seed: number) => {
+    const { game } = makeGame({ seed })
+    game.S.stats.sent = 12
+    return game
+  }
+
+  it('свободный ход после 12 сообщений без сериала ставит первую серию, arcsStarted = 1', async () => {
+    for (let seed = 1; seed <= 24; seed++) {
+      const game = at12(seed)
+      expect(game.facts().arcAvailable, `seed ${seed}: сериал должен быть доступен`).toBe(true)
+      await game.fire('AlikTurn')
+      expect(Object.keys(game.S.arcs), `seed ${seed}`).toHaveLength(1)
+    }
+  })
+
+  it('промах шанса Turn_ArcFirst ловит гарантия — не взвешенный пул', () => {
+    const caught: number[] = []
+    for (let seed = 1; seed <= 64 && caught.length < 8; seed++) {
+      const game = at12(seed)
+      if (game.rules.match({ event: 'AlikTurn' }, game.facts())?.name === 'Turn_ArcGuarantee') caught.push(seed)
+    }
+    expect(caught.length, 'на части сидов шанс Turn_ArcFirst промахивается — иначе случай недостижим').toBeGreaterThan(0)
+  })
+
+  it('до двенадцати сообщений гарантия молчит', () => {
+    for (let seed = 1; seed <= 40; seed++) {
+      const { game } = makeGame({ seed })
+      game.S.stats.sent = 11
+      expect(game.rules.match({ event: 'AlikTurn' }, game.facts())?.name, `seed ${seed}`).not.toBe('Turn_ArcGuarantee')
+    }
+  })
+
+  it('смерть и эндгейм на 12-м сообщении говорят своим правилом', () => {
+    const modes: Array<[string, (g: ReturnType<typeof makeGame>['game']) => void, string]> = [
+      ['смерть', (g) => { g.S.mem.alik_dead = true }, 'Turn_WhileDead'],
+      ['эндгейм', (g) => { g.S.mem['endgame.active'] = true }, 'Endgame_Turn'],
+    ]
+    for (const [what, setup, name] of modes) {
+      for (let seed = 1; seed <= 12; seed++) {
+        const game = at12(seed)
+        setup(game)
+        expect(game.rules.match({ event: 'AlikTurn' }, game.facts())?.name, `${what}, seed ${seed}`).toBe(name)
+      }
+    }
+  })
+
+  it('блок, вежливость и вендетта на 12-м сообщении гарантией не перебиваются — ни один её ход', () => {
+    // их ход и без гарантии спорит с Turn_ArcSecond (spec 4 против 1 и пула) — проверяем, что она не добавила претендента
+    for (const key of ['blocked', 'polite', 'vendetta']) {
+      for (let seed = 1; seed <= 12; seed++) {
+        const game = at12(seed)
+        game.S.mem[key] = true
+        for (let i = 0; i < 60; i++) expect(game.rules.match({ event: 'AlikTurn' }, game.facts())?.name, `${key}, seed ${seed}`).not.toBe('Turn_ArcGuarantee')
+      }
+    }
+  })
+})
+
 describe('промолчавшее правило не оставляет следа (строгий режим, makeGame)', () => {
   it('след в S — SilenceBreach, и ход игрока её не глотает', async () => {
     const { game } = makeGame()

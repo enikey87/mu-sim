@@ -29,6 +29,8 @@ export const DIRECT: Record<string, DirectCase> = {
   Opt_Cow: { event: 'BuildChoices', setup: (g) => { g.S.mem.mooAt = g.S.stats.sent } },
   Away_Offline: { event: 'AlikAway', setup: (g) => { g.S.offlineDays = 2 } },
   Turn_WhileDead: { event: 'AlikTurn', setup: (g) => { g.S.mem.alik_dead = true } },
+  // гарантия первой серии (#636): к 12-му сообщению шанс Turn_ArcFirst мог промахнуться всю посадку
+  Turn_ArcGuarantee: { event: 'AlikTurn', setup: (g) => { g.S.stats.sent = 12 } },
   Says_OtherArcWhileDead: { event: 'PlayerSays', facts: { intent: 'arc', arg: 'boris' }, setup: (g) => { g.S.mem.alik_dead = true } },
   Court_Verdict_Lettered: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem.court = 6; g.S.mem.payday = 'strasbourg' } },
   // #553: дрейф сроков платежей увёл оба правила из выборок — прямой случай держит их под гейтом
