@@ -178,4 +178,6 @@ export const DIRECT: Record<string, DirectCase> = {
   // #684: сплиты серий сдвинули розыгрыш выборок — поздравление и сцена «займи 5000» из них ушли; гейт по чаще не сосчитал
   Says_congrats: { event: 'PlayerSays', facts: { intent: 'congrats' } },
   Scene_lend: { event: 'PickScene', setup: (g) => { g.S.mood = 4 } }, // денег в свежей партии хватает (START_MONEY)
+  // #681: новые сообщения в сериях сдвинули выборки ещё раз — амнистия при 5+ просроченных из них ушла
+  Scene_amnesty: { event: 'PickScene', setup: (g) => { for (let i = 0; i < 5; i++) g.recordPromise({ text: `завтра, раз ${i}`, d: 1 }); g.S.day += 5 } },
 }
