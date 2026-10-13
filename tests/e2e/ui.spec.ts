@@ -271,3 +271,28 @@ test('интро: строки затухают без обрыва и не на
   expect(probe.maxOutDrop, 'резкий обрыв уходящей строки').toBeLessThan(0.75)
   expect(probe.maxVisible, 'строка поверх строки или титула').toBeLessThanOrEqual(1)
 })
+
+test('PWA: манифест, иконки и theme-color на месте (#687)', async ({ page }) => {
+  await page.goto('/?fast')
+  await expect(page.locator('link[rel="manifest"]')).toHaveCount(1)
+  await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveCount(1)
+  // theme-color — под обе схемы, иначе рамка браузера выламывается из палитры
+  await expect(page.locator('meta[name="theme-color"]')).toHaveCount(2)
+
+  const mfResp = await page.request.get('manifest.webmanifest')
+  expect(mfResp.status()).toBe(200)
+  const mf = await mfResp.json()
+  expect(mf.name).toBe('Алик, где деньги?')
+  expect(mf.short_name).toBe('Алик')
+  expect(mf.display).toBe('standalone')
+  // относительные пути: сборка живёт и на GitHub Pages в подпапке, и локально
+  expect(mf.start_url).toBe('./')
+  expect(mf.scope).toBe('./')
+  // иконки манифеста доступны и это PNG
+  expect(mf.icons.length).toBeGreaterThan(0)
+  for (const icon of mf.icons) {
+    const r = await page.request.get(icon.src)
+    expect(r.status(), icon.src).toBe(200)
+    expect((await r.headers())['content-type'], icon.src).toContain('image/png')
+  }
+})
