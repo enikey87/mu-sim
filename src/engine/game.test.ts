@@ -6,7 +6,7 @@ import { silentAudio } from './audio'
 import { manualClock, realClock } from './clock'
 import { Game } from './game'
 import { seededRng } from './rng'
-import { SAVE_KEY } from './state'
+import { SAVE_KEY, type PromiseRec, type Msg } from './state'
 import { fmtTime } from './time'
 import { ARCS } from '../content/arcs'
 import { COLD_WAR } from '../content/rude'
@@ -1213,3 +1213,42 @@ describe('Game: деньги на карте', () => {
   })
 })
 
+
+describe('Game: пачка непрочитанных называет просроченное обещание (#637)', () => {
+  /** Системная строка пачки — первая sys с unread после from. */
+  const sysLine = (game: Game, from: number): Extract<Msg, { kind: 'sys' }> | undefined =>
+    game.S.msgs.slice(from).find((m): m is Extract<Msg, { kind: 'sys' }> => m.kind === 'sys' && !!m.unread)
+  it('просроченное обещание — в строке непрочитанных и в заголовке, уведомление про число сообщений', async () => {
+    const { game } = makeGame()
+    game.S.stats.sent = 6
+    game.S.promises.push({ t: 'Верну долг до пятницы', made: game.S.day - 5, due: game.S.day - 1 })
+    const from = game.S.msgs.length
+    await game.awayBurst(4, 1, 'Пока телефон заряжался')
+    const sys = sysLine(game, from)
+    expect(sys?.text).toContain('непрочитанные сообщения')
+    expect(sys?.text).toContain('Верну долг до пятницы')
+    expect(sys?.text).toContain('просрочено')
+    expect(game.ui.title).toMatch(/^\(\d+\) Алик, где деньги\?/)
+    expect(game.ui.title).toContain('просрочено')
+    expect(game.ui.title).not.toContain('Верну долг до пятницы')
+  })
+  it('нет просрочки — прежние строка и заголовок: нет обещаний, срок впереди, «когда-нибудь», сдержано, амнистия', async () => {
+    const cases: Array<(day: number) => PromiseRec[]> = [
+      () => [],
+      (day) => [{ t: 'Верну завтра', made: day, due: day + 1 }],
+      (day) => [{ t: 'Верну когда-нибудь', made: day, due: null }],
+      (day) => [{ t: 'Верну скоро', made: day - 5, due: day - 1, asked: true }],
+      (day) => [{ t: 'Верну в срок', made: day - 5, due: day - 1, amnesty: day }],
+    ]
+    for (const make of cases) {
+      const { game } = makeGame()
+      game.S.stats.sent = 6
+      game.S.promises.push(...make(game.S.day))
+      const from = game.S.msgs.length
+      await game.awayBurst(4, 1, 'Пока телефон заряжался')
+      const sys = sysLine(game, from)
+      expect(sys?.text).toBe('Пока телефон заряжался — непрочитанные сообщения')
+      expect(game.ui.title).toMatch(/^\(\d+\) Алик, где деньги\?$/)
+    }
+  })
+})

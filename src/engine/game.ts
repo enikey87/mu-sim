@@ -2815,10 +2815,16 @@ export class Game {
     this.S.clock = now
     const got = this.S.msgs.length - at
     if (got) {
-      this.S.msgs.splice(at, 0, { kind: 'sys', text: `${why ? why + ' — ' : ''}непрочитанные сообщения`, unread: true, id: this.S.nextId++ })
+      // просроченное обещание — одно, с самой ранней датой: строка непрочитанных и заголовок называют его (#637)
+      const late = this.latePromises().reduce<PromiseRec | undefined>(
+        (min, p) => (min === undefined || (p.due ?? 0) < (min.due ?? 0) ? p : min), undefined)
+      const sysText = late
+        ? `${why ? why + ' — ' : ''}непрочитанные сообщения — просрочено обещание: «${late.t}»`
+        : `${why ? why + ' — ' : ''}непрочитанные сообщения`
+      this.S.msgs.splice(at, 0, { kind: 'sys', text: sysText, unread: true, id: this.S.nextId++ })
       this.touchMsgs(at)
       this.ui.unread = got
-      this.ui.title = `(${got}) Алик, где деньги?`
+      this.ui.title = late ? `(${got}) Алик, где деньги? — просрочено обещание` : `(${got}) Алик, где деньги?`
       this.unlock('away')
       this.notify('💬', 'Алик Воздухонесян', `${got} ${got < 5 ? 'новых сообщения' : 'новых сообщений'}`, { event: 'unread' })
       this.audio.beep()
