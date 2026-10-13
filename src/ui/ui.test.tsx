@@ -5,8 +5,8 @@ import { App } from './App'
 import { messageRenderStats, LONG_PRESS_MS } from './Message'
 import { messageListRenderStats, messageListBuildStats } from './Chat'
 import { DEBT_MS } from './Header'
-import { makeGame, setMoney, memStorage, flush } from '../test/helpers'
-import { SAVE_KEY, loadState } from '../engine/state'
+import { makeGame, setMoney, memStorage, flush, botTurn } from '../test/helpers'
+import { SAVE_KEY, loadState, DEBT0, type Msg } from '../engine/state'
 import { fmtDate } from '../engine/time'
 import type { Game } from '../engine/game'
 import { introOf, uiOf } from './view'
@@ -268,6 +268,29 @@ describe('App', () => {
     expect(screen.getByText(/^изменено/)).toBeInTheDocument()
   })
 
+  it('кружок-аватар говорящего: эмодзи CAST на его цвете; у Алика и игрока кружка нет (#686)', async () => {
+    const { game } = makeGame()
+    game.push({ kind: 'text', from: 'alik', text: 'Плитка там нормальная, кстати.', who: 'mkrtich' })
+    game.push({ kind: 'text', from: 'alik', text: 'Про деньги потом.' })
+    game.push({ kind: 'text', from: 'me', text: 'Жду ответа.' })
+    renderApp(game)
+    const { CAST } = await import('../content/arcs')
+    const bubble = (text: string) =>
+      [...document.querySelectorAll('.msg')].find((el) => el.textContent?.includes(text)) as HTMLElement
+    const guest = bubble('Плитка там нормальная, кстати.')
+    const ava = guest.querySelector('.ava') as HTMLElement
+    expect(guest).toHaveClass('has-ava')
+    expect(ava.textContent).toBe(CAST.mkrtich.emoji)
+    expect(ava).toHaveAttribute('aria-hidden', 'true')
+    // цвет аватара — тот же, что у подписи имени (оба из CAST)
+    expect(ava.style.background).not.toBe('')
+    expect(ava.style.background).toBe((guest.querySelector('.who-name') as HTMLElement).style.color)
+    // негативный контроль: у Алика и у своей реплики кружка нет
+    expect(bubble('Про деньги потом.').querySelector('.ava')).toBeNull()
+    expect(bubble('Про деньги потом.')).not.toHaveClass('has-ava')
+    expect(bubble('Жду ответа.').querySelector('.ava')).toBeNull()
+  })
+
   it('легендарная отмазка в ленте — как обычная реплика: ни класса legend, ни золотой обводки (#638)', async () => {
     const { readFileSync } = await import('node:fs')
     const { game } = makeGame()
@@ -386,6 +409,28 @@ describe('App', () => {
     // срок по событию — свой значок до события и после: «когда-нибудь» ему не подходит
     expect(line(/⏳ ждём события/)).toContain('Нуне из декрета')
     expect(line(/🎯 событие наступило/)).toContain('снег в горах')
+  })
+
+  it('акт сверки: числа партии сходятся с лентой', async () => {
+    const { game } = makeGame({ seed: 689 })
+    for (let i = 0; i < 150; i++) await botTurn(game)
+    renderApp(game)
+    fireEvent.click(screen.getByTitle('Обещания и ачивки'))
+    const act = document.getElementById('act')!.textContent!
+    // работа — константа партии, фиксированный якорь (формат — как в акте: ru-RU, с неразрывным пробелом)
+    expect(act).toContain(`За работу: ${DEBT0.toLocaleString('ru-RU')} ₽`)
+    // долг в акте — тот же, что показывает шапка
+    expect(act).toContain(game.S.debt.toLocaleString('ru-RU'))
+    // переводы: сколько пришло в ленту — столько в акте (партия путём игрока на сиде 689)
+    const transfers = game.S.msgs.filter((m): m is Extract<Msg, { kind: 'transfer' }> => m.kind === 'transfer' && m.from === 'alik')
+    expect(transfers.length).toBeGreaterThan(0)
+    const paid = transfers.reduce((a, m) => a + (m.amount ?? 0), 0)
+    expect(act).toContain(`Переводов получено: ${transfers.length} на ${paid.toLocaleString('ru-RU')} ₽`)
+    // обещания и пойманная ложь — из тех же фактов, что журнал досье
+    expect(act).toContain(`Обещаний: ${game.S.promises.length} (`)
+    expect(act).toContain(`Ложи поймано: ${Number(game.S.mem['caught'] ?? 0)}.`)
+    expect(act).toContain('Расхождение объяснено Аликом.')
+    fireEvent.click(document.getElementById('closeSheet')!)
   })
 
   it('досье: концовки и ачивки — плитки, журнал остаётся списком', () => {

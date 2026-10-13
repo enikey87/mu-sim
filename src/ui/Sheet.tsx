@@ -54,6 +54,13 @@ export function Sheet({ onClose, onReset }: { onClose: () => void; onReset: () =
           ))}
         </ul>
 
+        <h3>Акт сверки <small>бухгалтерия Нуне</small></h3>
+        <ul id="act" className="list">
+          {v.act.map((a, i) => (
+            <li key={i}>{a.text}</li>
+          ))}
+        </ul>
+
         <h3>Сериалы</h3>
         <ul id="arcs" className="list">
           {v.arcs.map((a) => (

@@ -1,11 +1,11 @@
 import type { Game } from '../engine/game'
-import { isLate, type Msg, type PromiseRec } from '../engine/state'
+import { DEBT0, isLate, type GameState, type Msg, type PromiseRec } from '../engine/state'
 import type { UiState } from '../engine/ui-state'
 import { ACH } from '../content/achievements'
 import { ARCS } from '../content/arcs'
 import { ENDINGS, type EndingId } from '../content/finales'
 import { STARTS } from '../content/quests'
-import { alikShaved, payday } from '../content/memkeys'
+import { alikShaved, caughtCount, payday } from '../content/memkeys'
 import { fmtDate } from '../engine/time'
 
 /** Граница между движком и интерфейсом: единственный модуль UI, который знает устройство S и ключей памяти.
@@ -74,6 +74,29 @@ export type ArcRow = { id: string; title: string; state: string; done: boolean; 
 export type EndingRow = { id: string; title: string; icon: string; got: boolean }
 export type AchRow = { id: string; title: string; desc: string; got: boolean }
 export type FinaleRow = { id: string; title: string; finale: string }
+/** Строка «Акта сверки» — сухая фиксация числа; текст фиксированный (не пул), голос системных сообщений. */
+export type ActRow = { text: string }
+
+/** «Акт сверки» — сводка партии числами из уже существующих фактов и ленты (#689).
+ *  Смешное — в числе и контрасте, не в вариативности: строки фиксированные, без колоды. */
+const actRows = (S: GameState): ActRow[] => {
+  const rub = (n: number): string => `${n.toLocaleString('ru-RU')} ₽`
+  const transfers = S.msgs.filter((m): m is Extract<Msg, { kind: 'transfer' }> => m.kind === 'transfer' && m.from === 'alik')
+  const paid = transfers.reduce((a, m) => a + (m.amount ?? 0), 0)
+  const legends = S.msgs.filter((m) => m.kind === 'text' && m.legend).length
+  const late = S.promises.filter((p) => isLate(p, S.day)).length
+  const kept = S.promises.filter((p) => p.kept).length
+  const someday = S.promises.filter((p) => p.due === null && !p.condition).length
+  const diff = DEBT0 - S.debt
+  return [
+    { text: `За работу: ${rub(DEBT0)}. Должен сейчас: ${rub(S.debt)}.` },
+    { text: diff > 0 ? `Возвращено и зачтено: ${rub(diff)}.` : diff < 0 ? `Начислено сверх работы: ${rub(-diff)}. Основание: объяснено Аликом.` : 'Возвращено: 0 ₽. Расхождений нет.' },
+    { text: `Обещаний: ${S.promises.length} (просрочено — ${late}, сдержано — ${kept}, «когда-нибудь» — ${someday}).` },
+    { text: `Ложи поймано: ${Number(S.mem[caughtCount] ?? 0)}. Переводов получено: ${transfers.length} на ${rub(paid)}.` },
+    { text: `Дней со сдачи: ${S.day}. Легендарных отмазок: ${legends}. «Муу» за кадром: ${S.stats.moo}.` },
+    { text: 'Расхождение объяснено Аликом.' },
+  ]
+}
 
 export type View = {
   day: number
@@ -92,6 +115,7 @@ export type View = {
   grandExcuse: string | null
   finales: FinaleRow[]
   promises: PromiseRow[]
+  act: ActRow[]
   arcs: ArcRow[]
   endings: EndingRow[]
   items: string[]
@@ -128,6 +152,7 @@ export const viewOf = (u: GameUi): View => {
       .filter((id) => g.finaleTitle(id))
       .map((id) => ({ id, title: ARCS[id].title, finale: g.finaleTitle(id)! })),
     promises: S.promises.map((p) => ({ text: p.t, due: p.due, amnesty: p.amnesty ?? null, state: promiseState(p, S.day) })),
+    act: actRows(S),
     arcs: Object.entries(ARCS).map(([id, a]) => {
       const i = S.arcs[id]?.i ?? 0
       const finale = g.finaleTitle(id)
