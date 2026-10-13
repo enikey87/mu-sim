@@ -49,13 +49,14 @@ const silent: Receiver = { on: false, gesture: () => {}, track: () => {} }
 /** Ошибка одного приёмника (нет скрипта, клиент бросил) не отменяет вызов другого. */
 const safe = (f: () => void): void => { try { f() } catch { /* приёмник упал — остальные живут */ } }
 
-/** Тег приёмника — как звук: по первому жесту, одним скриптом в head. */
-const loadScript = (src: string, anonymous = false, attrs?: Record<string, string>): void => {
+/** Тег приёмника — как звук: по первому жесту, одним скриптом в head. `onload` — когда скрипт встал. */
+const loadScript = (src: string, anonymous = false, attrs?: Record<string, string>, onload?: () => void): void => {
   const script = document.createElement('script')
   script.async = true
   if (anonymous) script.crossOrigin = 'anonymous'
   for (const [k, v] of Object.entries(attrs ?? {})) script.setAttribute(k, v)
   script.src = src
+  if (onload) script.addEventListener('load', onload)
   document.head.appendChild(script)
 }
 
@@ -156,14 +157,11 @@ const posthog = (key: string): Receiver => ({
 
 // ---------- Umami ----------
 
-/** Аргументы вызова клиента Umami: [событие?, параметры?]. До прихода script.js это очередь. */
-type UmamiCall = [string?, Record<string, unknown>?]
+/** Вызов клиента Umami: своё событие с параметрами или без события — просмотр страницы. */
+type UmamiCall = { event?: string; props?: Record<string, unknown> }
 
-/** Клиент Umami без npm-пакета: функция-очередь вызовов, как в ручном трекинге Umami. */
-type Umami = {
-  (event?: string, props?: Record<string, unknown>): void
-  q?: UmamiCall[]
-}
+/** Клиент Umami — тот объект, который ставит script.js: `track()` без аргументов есть просмотр страницы. */
+type Umami = { track: (event?: string, props?: Record<string, unknown>) => void }
 
 type UmamiGlobals = { umami?: Umami }
 const umamiGlobal = (): UmamiGlobals => globalThis as UmamiGlobals
@@ -171,15 +169,37 @@ const umamiGlobal = (): UmamiGlobals => globalThis as UmamiGlobals
 /** Umami Cloud: свои события с параметрами, без карты кликов и без записи сессии. */
 const TAG_UMAMI = 'https://cloud.umami.is/script.js'
 
-const umami = (key: string): Receiver => ({
-  on: true,
-  gesture: () => safe(() => {
-    const u = umamiGlobal().umami ??= ((...args: unknown[]) => { u.q ??= []; u.q.push(args as UmamiCall) }) as Umami
-    u() // свой просмотр страницы: автосбор выключен, шлём сами
-    loadScript(TAG_UMAMI, false, { 'data-auto-track': 'false', 'data-website-id': key })
-  }),
-  track: (goal, params) => safe(() => { umamiGlobal().umami?.(goal, params as Record<string, unknown>) }),
-})
+/**
+ * Живой script.js Umami ставит клиент, только если глобала нет (`t.umami||(t.umami={…})`), и очередь
+ * вызовов не разбирает вовсе (выкачан и разобран при аудите #656). Заглушка в `window.umami` навсегда
+ * перебивает настоящий клиент — и все цели молча теряются (#676). Поэтому здесь глобал до прихода тега
+ * не занимаем: вызовы копим у себя, а просмотр страницы и буфер добиваем, когда клиент встал.
+ */
+const umami = (key: string): Receiver => {
+  let queue: UmamiCall[] = []
+
+  /** Клиент встал — отдать всё, что накопилось, по порядку. Пока его нет, вызовы ждут в буфере. */
+  const flush = () => {
+    const client = umamiGlobal().umami
+    if (!client) return
+    const pending = queue
+    queue = []
+    for (const call of pending) safe(() => {
+      if (call.event === undefined) client.track() // без события — просмотр страницы
+      else client.track(call.event, call.props)
+    })
+  }
+  const send = (call: UmamiCall) => { queue.push(call); flush() }
+
+  return {
+    on: true,
+    gesture: () => safe(() => {
+      send({}) // свой просмотр страницы: автосбор выключен, шлём сами; до тега он лежит в буфере
+      loadScript(TAG_UMAMI, false, { 'data-auto-track': 'false', 'data-website-id': key }, () => safe(flush))
+    }),
+    track: (goal, params) => safe(() => send({ event: goal, props: params as Record<string, unknown> })),
+  }
+}
 
 // ---------- модуль ----------
 
