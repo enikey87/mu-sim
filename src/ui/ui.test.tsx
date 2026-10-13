@@ -268,6 +268,21 @@ describe('App', () => {
     expect(screen.getByText(/^изменено/)).toBeInTheDocument()
   })
 
+  it('легендарная отмазка в ленте — как обычная реплика: ни класса legend, ни золотой обводки (#638)', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { game } = makeGame()
+    game.push({ kind: 'text', from: 'alik', text: 'Деньги у бабушки в банке' })
+    game.push({ kind: 'text', from: 'alik', text: 'Великая отмазка Дня выплаты', legend: true })
+    renderApp(game)
+    const usual = [...document.querySelectorAll('.msg.alik')].find((el) => el.textContent?.includes('Деньги у бабушки'))!
+    const legendary = [...document.querySelectorAll('.msg.alik')].find((el) => el.textContent?.includes('Великая отмазка'))!
+    expect(legendary.classList.contains('legend')).toBe(false)
+    expect([...legendary.classList]).toEqual([...usual.classList])
+    // факт легендарности в ленте остаётся: иначе тест не проверил бы, что снята именно отметка
+    expect(game.S.msgs.some((m) => m.kind === 'text' && m.legend)).toBe(true)
+    expect(readFileSync('src/styles.css', 'utf8')).not.toMatch(/\.msg\.legend\b/)
+  })
+
   it('ссылка в системной строке — настоящая: новая вкладка, игра остаётся открытой', () => {
     const { game } = makeGame()
     game.push({ kind: 'sys', text: 'Поддержать автора: https://www.donationalerts.com/r/enikey87' })
