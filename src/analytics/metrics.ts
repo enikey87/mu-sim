@@ -1,5 +1,5 @@
 // Аналитика живых игроков: приёмники целей, docs/design/analytics.md.
-// Вызов из игры один — track(имя, параметры); приёмников два — Метрика и PostHog, каждый своим тегом
+// Вызов из игры один — track(имя, параметры); приёмников три — Метрика, PostHog и Umami, каждый своим тегом
 // и своим пустым ключом. В тестах клиенты подставные, живой сети прогон не трогает.
 import type { EndingId, PaydayId } from '../content/finales'
 
@@ -8,6 +8,9 @@ export const COUNTER_ID = ''
 
 /** Ключ проекта PostHog (EU). Пусто — приёмник молчит; вписывает автор. */
 export const POSTHOG_KEY = ''
+
+/** Ключ сайта Umami. Пусто — приёмник молчит; вписывает автор. */
+export const UMAMI_KEY = ''
 
 /** Хост, на котором приёмники включаются: localhost, превью и e2e молчат. */
 export const GAME_HOST = 'enikey87.github.io'
@@ -47,10 +50,11 @@ const silent: Receiver = { on: false, gesture: () => {}, track: () => {} }
 const safe = (f: () => void): void => { try { f() } catch { /* приёмник упал — остальные живут */ } }
 
 /** Тег приёмника — как звук: по первому жесту, одним скриптом в head. */
-const loadScript = (src: string, anonymous = false): void => {
+const loadScript = (src: string, anonymous = false, attrs?: Record<string, string>): void => {
   const script = document.createElement('script')
   script.async = true
   if (anonymous) script.crossOrigin = 'anonymous'
+  for (const [k, v] of Object.entries(attrs ?? {})) script.setAttribute(k, v)
   script.src = src
   document.head.appendChild(script)
 }
@@ -150,6 +154,33 @@ const posthog = (key: string): Receiver => ({
   track: (goal, params) => safe(() => { phGlobal().posthog?.capture(goal, params) }),
 })
 
+// ---------- Umami ----------
+
+/** Аргументы вызова клиента Umami: [событие?, параметры?]. До прихода script.js это очередь. */
+type UmamiCall = [string?, Record<string, unknown>?]
+
+/** Клиент Umami без npm-пакета: функция-очередь вызовов, как в ручном трекинге Umami. */
+type Umami = {
+  (event?: string, props?: Record<string, unknown>): void
+  q?: UmamiCall[]
+}
+
+type UmamiGlobals = { umami?: Umami }
+const umamiGlobal = (): UmamiGlobals => globalThis as UmamiGlobals
+
+/** Umami Cloud: свои события с параметрами, без карты кликов и без записи сессии. */
+const TAG_UMAMI = 'https://cloud.umami.is/script.js'
+
+const umami = (key: string): Receiver => ({
+  on: true,
+  gesture: () => safe(() => {
+    const u = umamiGlobal().umami ??= ((...args: unknown[]) => { u.q ??= []; u.q.push(args as UmamiCall) }) as Umami
+    u() // свой просмотр страницы: автосбор выключен, шлём сами
+    loadScript(TAG_UMAMI, false, { 'data-auto-track': 'false', 'data-website-id': key })
+  }),
+  track: (goal, params) => safe(() => { umamiGlobal().umami?.(goal, params as Record<string, unknown>) }),
+})
+
 // ---------- модуль ----------
 
 /** Хранилище браузера: день первого засчитанного визита и сумма секунд по нему. */
@@ -192,15 +223,16 @@ export const isOn = (): boolean => receivers.some((r) => r.on)
 /**
  * Включает приёмники. Звать может только вход страницы (src/main.tsx) и только когда
  * заданы все три условия: ключ приёмника, хост игры и адрес без `debug`/`fast`.
- * `id` — номер Метрики, `posthogKey` — ключ PostHog: подстановки для теста с приёмником;
- * игра передаёт константы `COUNTER_ID` и `POSTHOG_KEY`.
+ * `id` — номер Метрики, `posthogKey` — ключ PostHog, `umamiKey` — ключ Umami: подстановки
+ * для теста с приёмником; игра передаёт константы `COUNTER_ID`, `POSTHOG_KEY` и `UMAMI_KEY`.
  */
-export function enable(opts: { host: string; search: string; id?: string; posthogKey?: string }): boolean {
+export function enable(opts: { host: string; search: string; id?: string; posthogKey?: string; umamiKey?: string }): boolean {
   const url = new URLSearchParams(opts.search)
   const allowed = opts.host === GAME_HOST && !url.has('debug') && !url.has('fast')
   const ya = allowed && (opts.id ?? COUNTER_ID) ? Number(opts.id ?? COUNTER_ID) : 0
   const ph = allowed ? (opts.posthogKey ?? POSTHOG_KEY) : ''
-  receivers = [ya ? metrika(ya) : silent, ph ? posthog(ph) : silent]
+  const um = allowed ? (opts.umamiKey ?? UMAMI_KEY) : ''
+  receivers = [ya ? metrika(ya) : silent, ph ? posthog(ph) : silent, um ? umami(um) : silent]
   pageviewSent = false
   shownAt = null
   return isOn()
