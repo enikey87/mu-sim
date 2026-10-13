@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { useGame } from './useGame'
 import { viewOf } from './view'
 
@@ -9,25 +9,31 @@ const MARKS = [3, 2, 4, 3, 2, 4]
 export function Choices() {
   const game = useGame()
   const locked = game.ui.busy || game.battery.dead
+  // Ряд заморожен на весь ход мира: пересборка вариантов посреди хода (сцена, эндгейм, серия) меняла число «?»,
+  // добавляла/убирала кнопки и перезапускала анимацию — ряд мигал (#657). Число берём с последнего кадра без busy:
+  // того самого ряда, который игрок видел перед ходом; подписи ждут конца хода.
+  const shown = useRef<number | null>(null)
+  if (!locked) shown.current = game.choices.length
+  const count = locked ? shown.current ?? game.choices.length : game.choices.length
   return (
     <div className="choices" id="choices" aria-busy={locked}>
-      {game.choices.map((o, i) =>
-        locked ? (
-          <button key={'locked' + i} className="locked" disabled aria-label="Варианты скрыты, Алик отвечает">
-            {Array.from({ length: MARKS[i % MARKS.length] }, (_, j) => (
-              <span key={j} className="q" aria-hidden="true" style={{ animationDelay: `${-((i * 3 + j * 7) % 10) * 0.09}s` }}>?</span>
-            ))}
-          </button>
-        ) : (
-          <button
-            key={i + o.text}
-            className={[o.tone === 'rude' ? 'rude' : '', o.scene || o.act ? 'ctx' : '', o.primary ? 'primary' : ''].join(' ').trim()}
-            onClick={() => void game.send(o)}
-          >
-            {o.text}
-          </button>
-        ),
-      )}
+      {locked
+        ? Array.from({ length: count }, (_, i) => (
+            <button key={'locked' + i} className="locked" disabled aria-label="Варианты скрыты, Алик отвечает">
+              {Array.from({ length: MARKS[i % MARKS.length] }, (_, j) => (
+                <span key={j} className="q" aria-hidden="true" style={{ animationDelay: `${-((i * 3 + j * 7) % 10) * 0.09}s` }}>?</span>
+              ))}
+            </button>
+          ))
+        : game.choices.map((o, i) => (
+            <button
+              key={i + o.text}
+              className={[o.tone === 'rude' ? 'rude' : '', o.scene || o.act ? 'ctx' : '', o.primary ? 'primary' : ''].join(' ').trim()}
+              onClick={() => void game.send(o)}
+            >
+              {o.text}
+            </button>
+          ))}
     </div>
   )
 }
