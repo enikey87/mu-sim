@@ -9,11 +9,14 @@ import { Toast, Notification, DeadScreen, EndingScreen } from './Overlays'
 import { DebugPanel } from './DebugPanel'
 import { Intro } from './Intro'
 import { uiOf, viewOf, introOf } from './view'
+import { platform } from '../platform'
 
 /** Корень: единственный компонент с Game в руках — отдаёт дереву фасад, а живую игру только DebugPanel. */
 export function App({ game, onReset, debug = false, intro = false, introGate = false }: { game: Game; onReset: () => void; debug?: boolean; intro?: boolean; introGate?: boolean }) {
   const ui = uiOf(game)
   // звук разрешается первым касанием; «вернулся к вкладке» — пачка непрочитанных
+  useEffect(() => { platform().ready() }, [])
+
   useEffect(() => {
     const gesture = () => ui.gesture()
     const vis = () => void ui.onVisibility(document.hidden)
@@ -110,6 +113,19 @@ function Phone({ onReset, intro, introGate }: { onReset: () => void; intro: bool
 
   const introUp = !!introData && !introGone
   const blocked = sheet || game.battery.dead || !!endingId || introUp
+
+  useEffect(() => {
+    const sync = () => {
+      if (!blocked && !document.hidden) platform().gameplayStart()
+      else platform().gameplayStop()
+    }
+    sync()
+    document.addEventListener('visibilitychange', sync)
+    return () => {
+      document.removeEventListener('visibilitychange', sync)
+      platform().gameplayStop()
+    }
+  }, [blocked])
 
   return (
     <div className="phone" ref={phone}>
