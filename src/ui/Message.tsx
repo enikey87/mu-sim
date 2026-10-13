@@ -101,6 +101,8 @@ export const Message = memo(function Message({ m }: { m: Msg }) {
   if (m.kind === 'text' && m.deleted) cls.push('deleted')
   if (['transfer', 'photo', 'sticker', 'fwd', 'doc'].includes(m.kind)) cls.push(m.kind)
   const who = m.kind === 'text' ? game.castOf(m.who) : undefined
+  // у говорящего не-Алика — кружок-аватар (#686): свои реплики игрока и реплики Алика идут без него
+  if (who) cls.push('has-ava')
 
   return (
     <div
@@ -108,6 +110,7 @@ export const Message = memo(function Message({ m }: { m: Msg }) {
       data-testid="msg"
       {...press}
     >
+      {who && <div className="ava" aria-hidden="true" style={{ background: who.color }}>{who.emoji}</div>}
       {who && <div className="who-name" style={{ color: who.color }}>{who.name}</div>}
       <div>{body(m, game)}</div>
       <div className="meta">
