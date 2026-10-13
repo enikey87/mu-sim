@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent, act, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { App } from './App'
-import { messageRenderStats } from './Message'
+import { messageRenderStats, LONG_PRESS_MS } from './Message'
 import { messageListRenderStats, messageListBuildStats } from './Chat'
 import { makeGame, setMoney, memStorage, flush } from '../test/helpers'
 import { SAVE_KEY, loadState } from '../engine/state'
@@ -654,6 +654,109 @@ describe('App', () => {
     play.mockClear()
     fireEvent.keyDown(voice, { key: ' ' })
     expect(play).toHaveBeenCalled()
+  })
+
+  // жест по пузырю: что уносит в буфер (#634)
+  it('контекстное меню на реплике Алика кладёт её текст в буфер; своя, удалённая, голосовое, sys и разделитель молчат', async () => {
+    const { game } = makeGame()
+    game.push({ kind: 'text', from: 'alik', text: 'Деньги в банке у огурцов' })
+    game.push({ kind: 'text', from: 'me', text: 'Своя реплика' })
+    game.push({ kind: 'text', from: 'alik', text: 'секрет', deleted: true })
+    game.push({ kind: 'voice', from: 'alik', len: 33 })
+    game.push({ kind: 'sep', text: 'Вчера' })
+    game.push({ kind: 'sys', text: 'Алик снова в сети' })
+    renderApp(game)
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    const bubble = (text: string) =>
+      [...document.querySelectorAll('.msg')].find((el) => el.textContent?.includes(text)) as HTMLElement
+
+    await act(async () => { fireEvent.contextMenu(bubble('Деньги в банке у огурцов')) })
+    expect(writeText).toHaveBeenCalledWith('Деньги в банке у огурцов')
+    expect(screen.getByRole('status')).toHaveTextContent('Скопировано')
+
+    await act(async () => { fireEvent.contextMenu(bubble('Своя реплика')) })
+    await act(async () => { fireEvent.contextMenu(bubble('🚫 Сообщение удалено')) })
+    await act(async () => { fireEvent.contextMenu(screen.getByLabelText('Голосовое сообщение')) })
+    await act(async () => { fireEvent.contextMenu(document.querySelector('.sys') as HTMLElement) })
+    await act(async () => { fireEvent.contextMenu(document.querySelector('.sep') as HTMLElement) })
+    expect(writeText).toHaveBeenCalledTimes(1)
+  })
+
+  it('долгое удержание реплики Алика копирует; короткое, уехавший палец и отпущенное раньше срока — нет', async () => {
+    const { game } = makeGame()
+    game.push({ kind: 'text', from: 'alik', text: 'Деньги в банке у огурцов' })
+    renderApp(game)
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    const bubble = [...document.querySelectorAll('.msg')].find((el) =>
+      el.textContent?.includes('Деньги в банке у огурцов')) as HTMLElement
+    vi.useFakeTimers()
+    try {
+      act(() => { fireEvent.pointerDown(bubble, { pointerId: 1, pointerType: 'touch', clientX: 0, clientY: 0 }) })
+      act(() => { vi.advanceTimersByTime(LONG_PRESS_MS - 50) })
+      expect(writeText).not.toHaveBeenCalled()
+      act(() => { vi.advanceTimersByTime(50) })
+      expect(writeText).toHaveBeenCalledWith('Деньги в банке у огурцов')
+
+      // отпустили раньше срока
+      writeText.mockClear()
+      act(() => { fireEvent.pointerDown(bubble, { pointerId: 2, pointerType: 'touch', clientX: 0, clientY: 0 }) })
+      act(() => { vi.advanceTimersByTime(LONG_PRESS_MS - 50) })
+      act(() => { fireEvent.pointerUp(bubble, { pointerId: 2 }) })
+      act(() => { vi.advanceTimersByTime(LONG_PRESS_MS) })
+      expect(writeText).not.toHaveBeenCalled()
+
+      // палец уехал — жест больше не копирование
+      act(() => { fireEvent.pointerDown(bubble, { pointerId: 3, pointerType: 'touch', clientX: 0, clientY: 0 }) })
+      act(() => { vi.advanceTimersByTime(50) })
+      act(() => { fireEvent.pointerMove(bubble, { pointerId: 3, clientX: 0, clientY: 60 }) })
+      act(() => { vi.advanceTimersByTime(LONG_PRESS_MS) })
+      expect(writeText).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+    await act(async () => {})
+    expect(screen.getByRole('status')).toHaveTextContent('Скопировано')
+  })
+
+  it('в буфер уходит видимое: перевод — сумма и комментарий, допработа — без кнопок, акт — строки и итог', async () => {
+    const { game } = makeGame()
+    game.push({ kind: 'transfer', from: 'alik', text: 'аванс на терпение' })
+    game.push({ kind: 'job', from: 'alik', text: 'сделай допработу' })
+    game.push({ kind: 'doc', from: 'alik', title: 'АКТ № 1', rows: [['Налог на ожидание', 4500]], total: 4500 })
+    renderApp(game)
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    const bubble = (cls: string) => document.querySelector(`.msg.${cls}`) as HTMLElement
+    const byText = (text: string) =>
+      [...document.querySelectorAll('.msg')].find((el) => el.textContent?.includes(text)) as HTMLElement
+
+    await act(async () => { fireEvent.contextMenu(bubble('transfer')) })
+    expect(writeText).toHaveBeenCalledWith('50 ₽\n«аванс на терпение»')
+    await act(async () => { fireEvent.contextMenu(byText('сделай допработу')) })
+    expect(writeText).toHaveBeenLastCalledWith('сделай допработу')
+    await act(async () => { fireEvent.contextMenu(bubble('doc')) })
+    const sum = (4500).toLocaleString('ru-RU')
+    expect(writeText).toHaveBeenLastCalledWith(
+      `АКТ № 1\nНалог на ожидание −${sum} ₽\nИтого в пользу Алика ${sum} ₽`,
+    )
+    expect(screen.getByRole('status')).toHaveTextContent('Скопировано')
+  })
+
+  it('копирование реплики: отказ clipboard → тост об ошибке', async () => {
+    const { game } = makeGame()
+    game.push({ kind: 'text', from: 'alik', text: 'Деньги в банке у огурцов' })
+    renderApp(game)
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn().mockRejectedValue(new Error('denied')) },
+    })
+    const execBackup = document.execCommand
+    document.execCommand = () => false
+    await act(async () => { fireEvent.contextMenu(document.querySelector('.msg.alik') as HTMLElement) })
+    expect(screen.getByRole('status')).toHaveTextContent('Не удалось скопировать')
+    document.execCommand = execBackup
   })
 
   it('feel-класс снимается на animationend', async () => {

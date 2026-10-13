@@ -28,7 +28,8 @@ export function Notification() {
   )
 }
 
-async function copyText(text: string): Promise<boolean> {
+/** В буфер через clipboard API, иначе — через спрятанный textarea: жест пузыря и кнопка концовки (#634). */
+export async function copyText(text: string): Promise<boolean> {
   try {
     if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(text)
