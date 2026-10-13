@@ -112,6 +112,7 @@ describe('коллекторы (#128)', () => {
       game.S.stats.sent++
       const r = await game.fire('StoryBeat')
       if (r) names.add(r.name)
+      if (game.S.scene) game.S.scene = null // игрок отвечает на сцену квеста: пока она открыта, StoryBeat молчит (floor cinematic)
       if (game.S.arcs.collectors!.last !== days.at(-1)) days.push(game.S.arcs.collectors!.last)
     }
     expect(game.S.arcs.collectors?.i).toBe(5)
