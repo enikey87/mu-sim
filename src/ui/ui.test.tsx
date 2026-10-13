@@ -79,6 +79,45 @@ describe('App', () => {
     for (const t of texts) expect(screen.getAllByText(t).some((el) => el.closest('.choices'))).toBe(true)
   })
 
+  it('длинный ход: пока мир говорит, ряд вариантов не пересобирается — «?» те же, подписи один раз в конце (#657)', async () => {
+    const { game } = makeGame({ seed: 2 })
+    renderApp(game)
+    const box = () => document.querySelectorAll('#choices button')
+    const initial = [...box()] as HTMLButtonElement[]
+    const n0 = initial.length
+    const labels = initial.map((b) => b.textContent!)
+    expect(n0).toBeGreaterThan(2)
+
+    // начало хода: busy встал до пересборки вариантов (как в sendTurn) — ряд скрыл подписи, число то же
+    act(() => { game.ui.busy = true; game.emit() })
+    const locked = [...box()] as HTMLButtonElement[]
+    expect(locked.length).toBe(n0)
+    for (const b of locked) { expect(b).toHaveClass('locked'); expect(b).toBeDisabled() }
+    const choicesBox = document.getElementById('choices')!
+    for (const t of labels) expect(within(choicesBox).queryByText(t)).toBeNull()
+
+    // ход мира: сцена пересобирает варианты (у неё другое число) и Алик говорит несколько раз
+    await act(async () => {
+      game.S.choices = null
+      await game.enterNode('newjob', 'which')
+      game.push({ kind: 'text', from: 'alik', text: 'Брат, подожди, я ещё подумаю.' })
+    })
+    const mid = [...box()] as HTMLButtonElement[]
+    expect(mid.length).toBe(n0) // число кнопок не изменилось посреди хода
+    for (const [i, b] of mid.entries()) expect(b).toBe(locked[i]) // ряд не пересобран — те же узлы, анимация не перезапускается
+    for (const b of mid) expect(b).toBeDisabled()
+
+    act(() => { game.push({ kind: 'text', from: 'alik', text: 'И ещё пару слов, джан.' }) })
+    expect([...box()]).toEqual(mid)
+
+    // конец хода: подписи нового набора появляются один раз
+    act(() => { game.ui.busy = false; game.S.choices = game.buildChoices(); game.emit() })
+    const after = [...box()] as HTMLButtonElement[]
+    expect(after.length).toBe(2) // newjob.which: «Пойду» и «Нет»
+    for (const b of after) expect(b).not.toHaveClass('locked')
+    for (const t of labels) expect(within(choicesBox).queryByText(t)).toBeNull()
+  })
+
   it('после раскрытия высоких вариантов удерживает текущий диалог у нижнего края', () => {
     const { game } = makeGame()
     renderApp(game)
