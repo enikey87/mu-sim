@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { App } from './App'
 import { messageRenderStats, LONG_PRESS_MS } from './Message'
 import { messageListRenderStats, messageListBuildStats } from './Chat'
+import { DEBT_MS } from './Header'
 import { makeGame, setMoney, memStorage, flush } from '../test/helpers'
 import { SAVE_KEY, loadState } from '../engine/state'
 import { fmtDate } from '../engine/time'
@@ -1345,5 +1346,73 @@ describe('pagehide закрывает отрезок видимости (#612)',
     fireEvent(document, new Event('pagehide'))
     expect(spy).toHaveBeenCalledWith(true)
     spy.mockRestore()
+  })
+})
+
+describe('долг в шапке доезжает до новой суммы (#635)', () => {
+  const debtText = () => document.getElementById('debt')!.textContent!
+  const num = (t: string) => Number(t.replace(/[^\d]/g, ''))
+  afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers() })
+
+  it('время доезда фиксированное и короткое — большое изменение не растягивается', () => {
+    expect(DEBT_MS).toBeLessThanOrEqual(1000)
+  })
+
+  it('перевод: сумма едет от 240 000 к 239 950 через промежуточную', () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('matchMedia', () => ({ matches: false }))
+    const { game } = makeGame({ seed: 1 })
+    renderApp(game)
+    expect(num(debtText())).toBe(240000)
+    act(() => { game.adjustDebt(-50); game.emit() })
+    expect(num(debtText())).toBe(240000) // до первого кадра держится прежняя сумма
+    act(() => { vi.advanceTimersByTime(DEBT_MS / 2) })
+    const mid = num(debtText())
+    expect(mid).toBeGreaterThan(239950)
+    expect(mid).toBeLessThan(240000)
+    act(() => { vi.advanceTimersByTime(DEBT_MS) })
+    expect(num(debtText())).toBe(239950)
+  })
+
+  it('допработа: сумма едет вверх и доезжает до новой', () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('matchMedia', () => ({ matches: false }))
+    const { game } = makeGame({ seed: 1 })
+    renderApp(game)
+    act(() => { game.adjustDebt(1800); game.emit() })
+    act(() => { vi.advanceTimersByTime(DEBT_MS / 2) })
+    const mid = num(debtText())
+    expect(mid).toBeGreaterThan(240000)
+    expect(mid).toBeLessThan(241800)
+    act(() => { vi.advanceTimersByTime(DEBT_MS) })
+    expect(num(debtText())).toBe(241800)
+  })
+
+  it('prefers-reduced-motion: новая сумма сразу, без промежуточной', () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('matchMedia', () => ({ matches: true }))
+    const { game } = makeGame({ seed: 1 })
+    renderApp(game)
+    expect(num(debtText())).toBe(240000)
+    act(() => { game.adjustDebt(-50); game.emit() })
+    expect(num(debtText())).toBe(239950)
+    act(() => { vi.advanceTimersByTime(DEBT_MS) })
+    expect(num(debtText())).toBe(239950)
+  })
+
+  it('«К выплате» и «Дней после сдачи» этим кодом не анимируются', () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('matchMedia', () => ({ matches: false }))
+    const { game } = makeGame({ seed: 1 })
+    game.S.scene = { id: 'payday', node: 'split', vars: {} }
+    game.S.mem['payday.sum'] = 120000
+    renderApp(game)
+    expect(document.querySelector('#paydaySum')?.textContent).toMatch(/К выплате: 120\s000 ₽/)
+    expect(document.getElementById('days')!.textContent).toBe(String(game.S.day))
+    act(() => { game.adjustDebt(-50); game.emit() })
+    act(() => { vi.advanceTimersByTime(DEBT_MS / 2) })
+    expect(debtText()).not.toMatch(/240\s000 ₽/) // долг в этот момент едет
+    expect(document.querySelector('#paydaySum')?.textContent).toMatch(/К выплате: 120\s000 ₽/)
+    expect(document.getElementById('days')!.textContent).toBe(String(game.S.day))
   })
 })
