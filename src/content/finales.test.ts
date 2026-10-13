@@ -36,6 +36,7 @@ const SETUP: Record<string, (g: Game) => void> = {
   'razmik.union': (g) => { g.S.ach.customer = 190 },
   'razmik.swap': (g) => { g.S.mem['count.rude'] = 10; g.S.mem['rude.heat'] = 3 },
   'razmik.shift': (g) => { g.S.ach.fence = 190 },
+  'collectors.intern': (g) => { g.S.mem['count.rude'] = 6 },
 }
 
 describe('финалы сериалов: контент', () => {

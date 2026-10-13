@@ -368,6 +368,20 @@ describe('«Займи 50»', () => {
     expect(game.choices).toEqual([])
   })
 
+  it('на витрине карточки со ссылкой нет, в вебе она есть (#688)', async () => {
+    const { game } = makeGame({ externalPay: false })
+    const from = await enter(game)
+    expect(cards(game, from)).toHaveLength(0)
+    expect(JSON.stringify(game.S.msgs.slice(from))).not.toContain('donationalerts')
+    expect(game.S.mem['lend50.asked']).toBe(true)
+    expect(game.choices.map((c) => c.act)).toEqual(['lend50Yes', 'lend50Serious', 'lend50No'])
+
+    const web = makeGame()
+    const webFrom = await enter(web.game)
+    expect(cards(web.game, webFrom)).toHaveLength(1)
+    expect(cards(web.game, webFrom)[0]).toMatchObject({ text: LEND50_SYS, link: LEND50_LINK })
+  })
+
   it('ответы Алика на кнопки без опечаток (#248)', async () => {
     const expectExact = (act: string, t: string[]) => {
       if (act === 'lend50Yes') expect(t).toContain(LEND50_YES)

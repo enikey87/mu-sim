@@ -32,7 +32,8 @@ describe('статус Алика живёт миром', () => {
     await turn(game)
     expect(statuses(game)).toEqual(['Алик Воздухонесян изменил статус: «Ищу «Ниву». Видели — звоните»'])
     for (let i = 0; i < 3; i++) await turn(game)
-    expect(statuses(game)).toHaveLength(1)
+    // строка про «Ниву» звучит один раз: следующие ходы её не повторяют (чужое открытое состояние — своя строка)
+    expect(statuses(game).filter((s) => s.includes('Ищу «Ниву»'))).toHaveLength(1)
   })
   it('Борис заболел и Размик на кране — свои строки; два открытых состояния — по одной строке за ход', async () => {
     const { game } = makeGame()

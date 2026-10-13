@@ -13,6 +13,7 @@ import { D } from './excuses'
 import type { Said } from './fact'
 import { makeGame, memStorage } from '../test/helpers'
 import { SAVE_KEY, loadState, saveState } from '../engine/state'
+import { valueOf } from '../engine/rules'
 import { grantPaid } from './memkeys'
 
 const meta = { source: 'alik' as const, day: 1 }
@@ -271,7 +272,7 @@ describe('рассказанные переходы и отзывы (#436)', () 
   it('готовая реплика и строка легенды сообщают пустой бардачок после показа', async () => {
     const { game } = makeGame()
     game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в «Ниве».' }, ['money_niva'])
-    await game.say([ARC_DONE.niva[0]])
+    await game.say([valueOf(ARC_DONE.niva[0])])
     expect(game.S.ledger.transitions).toHaveLength(1)
     const line = game.linePicked('LEG_niva_back', LEGENDS.niva_back.lines, { filter: (s) => s.t.includes('Бардачок проверил') })!
     await game.say([{ t: line.text, claims: line.spec.claims ?? [] }])

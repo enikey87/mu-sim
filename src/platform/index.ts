@@ -1,0 +1,37 @@
+import { webPlatform } from './web'
+import type { Platform } from './types'
+
+export type { Platform, PlatformId } from './types'
+export { safeStorage } from './storage'
+export { webPlatform } from './web'
+
+let current: Platform | null = null
+
+/** Подмена адаптера в тесте. Игра читает тот же объект, что и интерфейс. */
+export function adoptPlatform(p: Platform): void {
+  current = p
+}
+
+/** Уже выбранный адаптер. До boot — веб, чтобы интерфейс не ждал SDK. */
+export function platform(): Platform {
+  return current ?? (current = webPlatform())
+}
+
+export async function bootPlatform(): Promise<Platform> {
+  current = await createPlatform()
+  await current.init()
+  return current
+}
+
+async function createPlatform(): Promise<Platform> {
+  // сравнение с константой: vite вырезает чужие ветки из веб-сборки вместе с их import()
+  if (import.meta.env.VITE_PLATFORM === 'yandex') {
+    const { yandexPlatform } = await import('./yandex')
+    return yandexPlatform()
+  }
+  if (import.meta.env.VITE_PLATFORM === 'vk') {
+    const { vkPlatform } = await import('./vk')
+    return vkPlatform()
+  }
+  return webPlatform()
+}

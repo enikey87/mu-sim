@@ -144,6 +144,8 @@ export const criticalAt = 'money.criticalAt'
 export const creditOfferSum = 'credit.offerSum'
 /** Коллекторы остались на объекте Алика — микрозайм с игрока больше не требуют (#128). */
 export const collectorsRecruited = 'collectors.recruited'
+/** Взыскание развернулось: коллекторы работают на игрока, а не на Алика (#679). */
+export const collectorsTurned = 'collectors.turned'
 /** Звонок с объекта состоялся: «всех рассчитали, кроме игрока» (#325, docs/design/crew-call.md). */
 export const crewPaid = 'crew.paid'
 /** Рубик остался жить на объекте и спит в ванной (#590): до этой серии про ванную не говорят. */
@@ -176,6 +178,6 @@ export const MEM_KEYS: ReadonlySet<string> = new Set([
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday,
   lightOff, netRation, phoneWarn, holidayGreeted,
-  creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, criticalAt, creditOfferSum, momDachaAt, crewPaid, rubikBath,
+  creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, collectorsTurned, criticalAt, creditOfferSum, momDachaAt, crewPaid, rubikBath,
   ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lend50),
 ])

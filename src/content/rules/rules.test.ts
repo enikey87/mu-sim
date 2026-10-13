@@ -210,7 +210,7 @@ describe('ответы Алика (PlayerSays)', () => {
     const { game } = makeGame()
     game.S.arcs.boris = { i: ARCS.boris.eps.length, last: 0 }
     const t = await reply(game, { text: 'Как там Борис?', tone: 'polite', act: 'arc', arg: 'boris' })
-    expect(oneOf(ARC_DONE.boris.map((s) => frag(saidText(s))), t.join(' '))).toBe(true)
+    expect(oneOf(ARC_DONE.boris.map((s) => frag(saidText(valueOf(s)))), t.join(' '))).toBe(true)
   })
   it('сериал не закончился — следующая серия', async () => {
     const { game } = makeGame()
