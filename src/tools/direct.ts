@@ -175,4 +175,7 @@ export const DIRECT: Record<string, DirectCase> = {
   Quiet_Dead_PromiseDue: { event: 'PromiseDue', setup: dead },
   // #577: после разрастания пулов звонка выборки перестали собирать и второе приглашение Арсена
   Court_Lawyer_Again: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem.court = 1; g.S.mem['intro.arsen'] = true } },
+  // #684: сплиты серий сдвинули розыгрыш выборок — поздравление и сцена «займи 5000» из них ушли; гейт по чаще не сосчитал
+  Says_congrats: { event: 'PlayerSays', facts: { intent: 'congrats' } },
+  Scene_lend: { event: 'PickScene', setup: (g) => { g.S.mood = 4 } }, // денег в свежей партии хватает (START_MONEY)
 }
