@@ -175,9 +175,10 @@ export const DIRECT: Record<string, DirectCase> = {
   Quiet_Dead_PromiseDue: { event: 'PromiseDue', setup: dead },
   // #577: после разрастания пулов звонка выборки перестали собирать и второе приглашение Арсена
   Court_Lawyer_Again: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem.court = 1; g.S.mem['intro.arsen'] = true } },
-  // #683: колкости (Talk_arc/Talk_word в кадрах выбора) сдвинули розыгрыш выборок — четыре правила держим прямыми случаями
+  // #683/#684: колкости и сплиты серий сдвинули розыгрыш выборок — правила держим прямыми случаями
   Says_congrats: { event: 'PlayerSays', facts: { intent: 'congrats' } },
   Says_wrong: { event: 'PlayerSays', facts: { intent: 'wrong' }, setup: (g) => { g.S.ctx = { wrong: true } } },
+  Scene_lend: { event: 'PickScene', setup: (g) => { g.S.mood = 4 } }, // денег в свежей партии хватает (START_MONEY)
   Scene_loan: { event: 'PickScene', setup: (g) => { g.S.day = 230 } },
   Quest_q_niva: { event: 'PickQuest', setup: (g) => { g.S.mem[legendId] = 'niva_stuck'; g.S.mem[legendDay] = g.S.day } },
 }

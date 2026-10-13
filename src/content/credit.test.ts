@@ -394,7 +394,7 @@ describe('после первого дна бедность до выплаты 
       game.adjustMoney = (delta, reason, opts) => {
         const ok = adjust(delta, reason, opts)
         if (ok && delta > 0 && game.S.mem[moneyPoor]) {
-          expect(/^(Кредит: |Авито$|Мама$|Перевод от Алика$|Выплата$|По карте$|День выплаты$|Донорский центр$)/.test(reason), `seed ${seed}: неизвестный приход «${reason}»`).toBe(true)
+          expect(/^(Кредит: |Кредит |Авито$|Мама$|Перевод от Алика$|Выплата$|По карте$|День выплаты$|Донорский центр$)/.test(reason), `seed ${seed}: неизвестный приход «${reason}»`).toBe(true)
           if (/Алика|Выплата|По карте|Донорский/.test(reason)) whole += delta
         }
         return ok
