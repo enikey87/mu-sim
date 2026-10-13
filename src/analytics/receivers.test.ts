@@ -1,10 +1,11 @@
-// #653: второй приёмник целей — PostHog. Оба клиента подставные, живой сети прогон не трогает.
+// #653: второй приёмник целей — PostHog. #656: третий — Umami. Клиенты подставные, живой сети прогон не трогает.
 import { describe, it, expect, beforeEach } from 'vitest'
-import { enable, firstGesture, isOn, track, GAME_HOST, POSTHOG_KEY, COUNTER_ID } from './metrics'
+import { enable, firstGesture, isOn, track, GAME_HOST, POSTHOG_KEY, COUNTER_ID, UMAMI_KEY } from './metrics'
 import type { Goal } from './metrics'
 
 type YmCall = [number, string, ...unknown[]]
 type PhCall = [string, ...unknown[]]
+type UmCall = [string?, Record<string, unknown>?]
 
 /** Подставной клиент PostHog: очередь вызовов [метод, …], init пишет в `_i` — как настоящий. */
 const phClient = (calls: PhCall[]) => {
@@ -16,25 +17,37 @@ const phClient = (calls: PhCall[]) => {
   return q
 }
 
+/** Подставной клиент Umami: функция-очередь вызовов, как в ручном трекинге Umami. */
+const umClient = (calls: UmCall[]) => {
+  const u = ((...args: unknown[]) => { calls.push(args as UmCall) }) as { (): void; q?: UmCall[] }
+  u.q = []
+  return u
+}
+
 const yaScripts = () => [...document.querySelectorAll('script[src*="mc.yandex.ru"]')]
 const phScripts = () => [...document.querySelectorAll('script[src*="posthog"]')]
+const umScripts = () => [...document.querySelectorAll('script[src*="cloud.umami.is"]')]
 const search = (extra: string) => `?${extra}`
 
-/** Подставные клиенты обоих приёмников: `ym: false` / `ph: false` — клиента нет. */
-const setup = (opts: { ym?: boolean; ph?: boolean } = {}) => {
+/** Подставные клиенты всех приёмников: `ym: false` / `ph: false` / `um: false` — клиента нет. */
+const setup = (opts: { ym?: boolean; ph?: boolean; um?: boolean } = {}) => {
   const ym: YmCall[] = []
   const ph: PhCall[] = []
+  const um: UmCall[] = []
   if (opts.ym !== false) (globalThis as { ym?: unknown }).ym = (...args: unknown[]) => { ym.push(args as YmCall) }
   else delete (globalThis as { ym?: unknown }).ym
   if (opts.ph !== false) (globalThis as { posthog?: unknown }).posthog = phClient(ph)
   else delete (globalThis as { posthog?: unknown }).posthog
-  return { ym, ph }
+  if (opts.um !== false) (globalThis as { umami?: unknown }).umami = umClient(um)
+  else delete (globalThis as { umami?: unknown }).umami
+  return { ym, ph, um }
 }
 
 beforeEach(() => {
-  setup({ ym: false, ph: false })
+  setup({ ym: false, ph: false, um: false })
   yaScripts().forEach((s) => s.remove())
   phScripts().forEach((s) => s.remove())
+  umScripts().forEach((s) => s.remove())
   // модульное состояние приёмников — с нуля на каждый тест
   enable({ host: '', search: '' })
 })
@@ -177,5 +190,60 @@ describe('падение одного приёмника не глушит вт�
     track('ending', { id: 'family' })
     expect(ym).toContainEqual([4242, 'reachGoal', 'ending', { id: 'family' }])
     expect(yaScripts()).toHaveLength(1)
+  })
+})
+
+describe('Umami: третий приёмник (#656)', () => {
+  it('ключ задан, хост игры, без debug/fast — цель приходит в Umami с тем же id, что и в остальные', () => {
+    const { ym, ph, um } = setup()
+    expect(enable({ host: GAME_HOST, search: '', id: '4242', posthogKey: 'ph_key', umamiKey: 'um_key' })).toBe(true)
+    track('ending', { id: 'family' })
+    expect(ym).toContainEqual([4242, 'reachGoal', 'ending', { id: 'family' }])
+    expect(ph).toContainEqual(['capture', 'ending', { id: 'family' }])
+    expect(um).toEqual([['ending', { id: 'family' }]])
+  })
+
+  it('ключ Umami пуст — вызова Umami нет, Метрика цель получает', () => {
+    const { ym, um } = setup()
+    enable({ host: GAME_HOST, search: '', id: '4242', umamiKey: '' })
+    track('ending', { id: 'family' })
+    expect(um).toHaveLength(0)
+    expect(ym).toContainEqual([4242, 'reachGoal', 'ending', { id: 'family' }])
+  })
+
+  it('ключ Umami пустой в константе — приёмник молчит, остальные живут', () => {
+    expect(UMAMI_KEY).toBe('')
+  })
+
+  it('автосбор выключен, свой просмотр один на первом жесте', () => {
+    const { um } = setup()
+    enable({ host: GAME_HOST, search: '', umamiKey: 'um_key' })
+    firstGesture()
+    expect(um).toHaveLength(1)
+    expect(um[0]).toEqual([])
+    const tags = umScripts()
+    expect(tags).toHaveLength(1)
+    expect((tags[0] as HTMLScriptElement).getAttribute('data-auto-track')).toBe('false')
+    expect((tags[0] as HTMLScriptElement).getAttribute('data-website-id')).toBe('um_key')
+    firstGesture()
+    track('ending', { id: 'family' })
+    expect(um.filter((c) => c.length === 0)).toHaveLength(1)
+  })
+
+  it('до жеста ни просмотра, ни тега', () => {
+    const { um } = setup()
+    enable({ host: GAME_HOST, search: '', umamiKey: 'um_key' })
+    expect(um).toHaveLength(0)
+    expect(umScripts()).toHaveLength(0)
+  })
+
+  it('падение Umami не отменяет цель в Метрику и PostHog', () => {
+    const { ym, ph } = setup({ um: false })
+    ;(globalThis as { umami?: unknown }).umami = () => { throw new Error('нет скрипта Umami') }
+    enable({ host: GAME_HOST, search: '', id: '4242', posthogKey: 'ph_key', umamiKey: 'um_key' })
+    firstGesture()
+    track('ending', { id: 'family' })
+    expect(ym).toContainEqual([4242, 'reachGoal', 'ending', { id: 'family' }])
+    expect(ph).toContainEqual(['capture', 'ending', { id: 'family' }])
   })
 })
