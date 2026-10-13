@@ -97,7 +97,7 @@ export const Message = memo(function Message({ m }: { m: Msg }) {
   if (m.kind === 'card') return <PhoneCard m={m} />
 
   const cls = ['msg', m.from]
-  if (m.kind === 'text' && m.legend) cls.push('legend')
+  // легендарная отмазка рамкой не отмечается: в ленте она неотличима от обычной реплики (#638)
   if (m.kind === 'text' && m.deleted) cls.push('deleted')
   if (['transfer', 'photo', 'sticker', 'fwd', 'doc'].includes(m.kind)) cls.push(m.kind)
   const who = m.kind === 'text' ? game.castOf(m.who) : undefined

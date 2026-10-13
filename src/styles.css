@@ -138,7 +138,6 @@ body {
 .msg.me { align-self: flex-end; background: var(--me); border-bottom-right-radius: 4px; }
 .msg.alik { align-self: flex-start; background: var(--them); border-bottom-left-radius: 4px; }
 .msg .meta { font-size: 11px; color: var(--muted); text-align: right; margin-top: 2px; }
-.msg.legend { outline: 2px solid gold; }
 .who-name { font-size: 12px; font-weight: 700; margin-bottom: 2px; }
 .sep, .sys {
   align-self: center; font-size: 12px; color: #fff; background: var(--sys);
