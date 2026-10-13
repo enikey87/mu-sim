@@ -5,8 +5,8 @@ import { App } from './App'
 import { messageRenderStats, LONG_PRESS_MS } from './Message'
 import { messageListRenderStats, messageListBuildStats } from './Chat'
 import { DEBT_MS } from './Header'
-import { makeGame, setMoney, memStorage, flush } from '../test/helpers'
-import { SAVE_KEY, loadState } from '../engine/state'
+import { makeGame, setMoney, memStorage, flush, botTurn } from '../test/helpers'
+import { SAVE_KEY, loadState, DEBT0, type Msg } from '../engine/state'
 import { fmtDate } from '../engine/time'
 import type { Game } from '../engine/game'
 import { introOf, uiOf } from './view'
@@ -386,6 +386,28 @@ describe('App', () => {
     // срок по событию — свой значок до события и после: «когда-нибудь» ему не подходит
     expect(line(/⏳ ждём события/)).toContain('Нуне из декрета')
     expect(line(/🎯 событие наступило/)).toContain('снег в горах')
+  })
+
+  it('акт сверки: числа партии сходятся с лентой', async () => {
+    const { game } = makeGame({ seed: 689 })
+    for (let i = 0; i < 150; i++) await botTurn(game)
+    renderApp(game)
+    fireEvent.click(screen.getByTitle('Обещания и ачивки'))
+    const act = document.getElementById('act')!.textContent!
+    // работа — константа партии, фиксированный якорь (формат — как в акте: ru-RU, с неразрывным пробелом)
+    expect(act).toContain(`За работу: ${DEBT0.toLocaleString('ru-RU')} ₽`)
+    // долг в акте — тот же, что показывает шапка
+    expect(act).toContain(game.S.debt.toLocaleString('ru-RU'))
+    // переводы: сколько пришло в ленту — столько в акте (партия путём игрока на сиде 689)
+    const transfers = game.S.msgs.filter((m): m is Extract<Msg, { kind: 'transfer' }> => m.kind === 'transfer' && m.from === 'alik')
+    expect(transfers.length).toBeGreaterThan(0)
+    const paid = transfers.reduce((a, m) => a + (m.amount ?? 0), 0)
+    expect(act).toContain(`Переводов получено: ${transfers.length} на ${paid.toLocaleString('ru-RU')} ₽`)
+    // обещания и пойманная ложь — из тех же фактов, что журнал досье
+    expect(act).toContain(`Обещаний: ${game.S.promises.length} (`)
+    expect(act).toContain(`Ложи поймано: ${Number(game.S.mem['caught'] ?? 0)}.`)
+    expect(act).toContain('Расхождение объяснено Аликом.')
+    fireEvent.click(document.getElementById('closeSheet')!)
   })
 
   it('досье: концовки и ачивки — плитки, журнал остаётся списком', () => {
