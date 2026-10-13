@@ -123,3 +123,15 @@ describe('вопрос про развязку Самвела — только �
     }
   })
 })
+
+describe('плитка с5 — реестр памятников без гейта на Гранта (#682)', () => {
+  it('серия видна и без Гранта в истории, Грант в тексте не упоминается', async () => {
+    const { game } = makeGame()
+    expect(game.S.mem[intro('grant')], 'Гранта ещё нет в истории').toBeUndefined()
+    const from = game.S.msgs.length
+    await game.playEpisode(ARCS.tile.eps[4], 'tile')
+    const lines = alikTexts(game.S.msgs.slice(from))
+    expect(lines.some((l) => l.includes('Твою плитку внесли в реестр памятников')), 'серия прозвучала').toBe(true)
+    expect(lines.some((l) => l.includes('Грант')), 'о Гранте не говорится').toBe(false)
+  })
+})
