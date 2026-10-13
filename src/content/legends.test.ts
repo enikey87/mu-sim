@@ -27,7 +27,9 @@ describe('легенда денег', () => {
     expect(game.legend()).toBe('safe_baby')
     const t = texts(game, n)
     expect(t[0]).toMatch(/проглотил ключ/)
-    expect(t[1]).toMatch(/как ключ выйдет/)
+    // панч серии — отдельным сообщением (#684), срок — после него
+    expect(t[1]).toBe('Ждём.')
+    expect(t[2]).toMatch(/как ключ выйдет/)
     expect(game.S.promises.at(-1)?.t).toMatch(/как ключ выйдет/)
   })
   it('пока легенда жива, ход Алика продолжает её линию', async () => {
