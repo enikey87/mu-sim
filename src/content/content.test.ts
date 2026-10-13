@@ -80,6 +80,13 @@ describe('arcs and cast', () => {
     const arcLines = new Set(Object.values(ARCS).flatMap((a) => a.eps.flatMap((e) => e.m.map(valueOf).map((m) => (typeof m === 'string' ? m : m.t)))))
     for (const t of Object.values(GROUP).flat().map(valueOf).map(saidText)) expect(arcLines.has(t), t).toBe(false)
   })
+  it('у каждого собеседника — эмодзи для кружка-аватара: 1–2 знака, без текста (#686)', () => {
+    for (const [id, c] of Object.entries(CAST)) {
+      expect(c.emoji, `${id}: эмодзи есть`).toMatch(/\p{Extended_Pictographic}/u)
+      expect(c.emoji, `${id}: только эмодзи, не слова`).not.toMatch(/[А-Яа-яЁёA-Za-z0-9]/)
+      expect([...c.emoji].length, `${id}: 1–2 эмодзи, не больше`).toBeLessThanOrEqual(4)
+    }
+  })
 })
 
 describe('achievements', () => {
