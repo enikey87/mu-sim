@@ -5,7 +5,7 @@
 import type { Game } from '../engine/game'
 import type { Facts } from '../engine/rules'
 import { during } from '../engine/rules'
-import { HEAT, nuneKeyPassed, sorryAt } from '../content/memkeys'
+import { HEAT, legendDay, legendId, nuneKeyPassed, sorryAt } from '../content/memkeys'
 
 export type DirectCase = { event: string; facts?: Facts; target?: string; setup?: (g: Game) => void }
 
@@ -175,4 +175,9 @@ export const DIRECT: Record<string, DirectCase> = {
   Quiet_Dead_PromiseDue: { event: 'PromiseDue', setup: dead },
   // #577: после разрастания пулов звонка выборки перестали собирать и второе приглашение Арсена
   Court_Lawyer_Again: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem.court = 1; g.S.mem['intro.arsen'] = true } },
+  // #683: колкости (Talk_arc/Talk_word в кадрах выбора) сдвинули розыгрыш выборок — четыре правила держим прямыми случаями
+  Says_congrats: { event: 'PlayerSays', facts: { intent: 'congrats' } },
+  Says_wrong: { event: 'PlayerSays', facts: { intent: 'wrong' }, setup: (g) => { g.S.ctx = { wrong: true } } },
+  Scene_loan: { event: 'PickScene', setup: (g) => { g.S.day = 230 } },
+  Quest_q_niva: { event: 'PickQuest', setup: (g) => { g.S.mem[legendId] = 'niva_stuck'; g.S.mem[legendDay] = g.S.day } },
 }

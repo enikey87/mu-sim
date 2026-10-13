@@ -203,13 +203,16 @@ export const choiceRules: R[] = [
     text: (g) => fromArr(g, 'P_COURT', P_COURT),
   }),
   // «Это корова?» — только сразу после «Мууу», а не всю игру
-  // ответить на то, что только что прозвучало: реплику легенды денег, вмешавшегося персонажа, воспоминание Алика
-  ...(['legend', 'chorus', 'memory'] as const).map((kind) => {
+  // ответить на то, что только что прозвучало: реплику легенды денег, вмешавшегося персонажа, воспоминание Алика,
+  // реплику серии («колкость» #683 — окно держит проверка said в паре) или форму клятвы
+  ...(['legend', 'chorus', 'memory', 'arc', 'word'] as const).map((kind) => {
     let arg = ''
     return offer({
-      name: 'Talk_' + kind, when: [kind === 'memory' ? is('ctx.memory') : exists(`ctx.${kind}`)], act: 'talk', tone: 'neutral', bonus: 2, odds: 0.8,
+      name: 'Talk_' + kind,
+      when: [kind === 'memory' ? is('ctx.memory') : kind === 'word' ? exists('ctx.when') : exists(`ctx.${kind}`)],
+      act: 'talk', tone: 'neutral', bonus: 2, odds: 0.8,
       text: (g, f) => {
-        const sub = kind === 'memory' ? '' : String(f['ctx.' + kind])
+        const sub = kind === 'memory' || kind === 'word' ? '' : String(f['ctx.' + kind])
         const said = g.S.msgs.slice(-6).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : [])).join(' ')
         const facts = g.lineFacts()
         const i = talkPairs(kind, sub).findIndex((e, j) => !g.lines.has(talkId(kind, sub, j)) && isOpen(e, facts) && (valueOf(e)[2]?.(g.S, said) ?? true))
