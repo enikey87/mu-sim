@@ -93,6 +93,8 @@ export interface GameOptions {
   strictSilence?: boolean
   /** Ошибка хода в партии бота — падение (гейт покрытия, плейтест), а не console.error с восстановлением */
   strictTurns?: boolean
+  /** Карточка с внешней ссылкой «займи 50». На витрине платформы — false. */
+  externalPay?: boolean
 }
 
 
@@ -159,6 +161,7 @@ export class Game {
   private typos: boolean
   /** Оборванный ошибкой ход — падение партии бота (гейт покрытия, плейтест), а не тихое восстановление. */
   private strictTurns: boolean
+  private externalPay: boolean
   private hiddenAt = 0
   /** Ход игрока: nextDay уже был (offline / fx.days) — обычный +1…3 в конце не дублируем. */
   private inPlayerTurn = false
@@ -177,6 +180,7 @@ export class Game {
     this.noTimers = !!opts.noTimers
     this.typos = opts.typos ?? true
     this.strictTurns = !!opts.strictTurns
+    this.externalPay = opts.externalPay !== false
     this.S = loadState(this.storage) ?? freshState()
     if (this.S.mem[momHelp('dacha')] && this.S.mem[momDachaAt] == null) this.S.mem[momDachaAt] = this.S.day
     // колбеки батареи — в узком хосте, а не в публичном интерфейсе Game: game.dead() путался бы со смертью Алика
@@ -2404,7 +2408,8 @@ export class Game {
     for (const text of lines) await this.endgameLine(text)
     await this.sleep(500)
     // одна карточка вместо двух системных плашек: фраза игры, сумма и кнопка «Перевести» (#616)
-    this.push({ kind: 'lend50', text: LEND50_SYS, link: LEND50_LINK })
+    // на витрине внешняя ссылка запрещена — просьба остаётся, карточки нет
+    if (this.externalPay) this.push({ kind: 'lend50', text: LEND50_SYS, link: LEND50_LINK })
     this.storage?.setItem(LEND50_SEEN_KEY, '1') // отметка устройства, а не партии: она только выбирает текст
     S.mem[memkeys.lend50.asked] = true
     S.choices = null // buildChoices отдаст LEND50_CHOICES
