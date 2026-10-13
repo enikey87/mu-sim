@@ -3,6 +3,7 @@ import type { Msg } from '../engine/state'
 import { useGame, useGameApi } from './useGame'
 import { PhotoSvg } from './PhotoSvg'
 import { copyText } from './Overlays'
+import { platform } from '../platform'
 
 /** Счётчик рендеров Message — только в test. */
 export const messageRenderStats = { count: 0 }
@@ -93,7 +94,7 @@ export const Message = memo(function Message({ m }: { m: Msg }) {
   const press = usePressToCopy(copyable, game)
   if (m.kind === 'sep') return <div className="sep">{m.text}</div>
   if (m.kind === 'sys') return <div className={'sys' + (m.unread ? ' unread' : '')}>{linkified(m.text)}</div>
-  if (m.kind === 'lend50') return <Lend50Card m={m} />
+  if (m.kind === 'lend50') return platform().externalPay ? <Lend50Card m={m} /> : null
   if (m.kind === 'card') return <PhoneCard m={m} />
 
   const cls = ['msg', m.from]

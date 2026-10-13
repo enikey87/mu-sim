@@ -13,6 +13,7 @@ import { introOf, uiOf } from './view'
 import { introDateLine, introVowLine, LINE_MS, FADE_MS } from './Intro'
 import { enable, GAME_HOST } from '../analytics/metrics'
 import { LEND50_LINK, LEND50_SYS } from '../content/endgame'
+import { adoptPlatform, webPlatform } from '../platform'
 
 function renderApp(game: Game, onReset = vi.fn()) {
   const utils = render(<App game={game} onReset={onReset} />)
@@ -339,6 +340,18 @@ describe('App', () => {
     // залитая кнопка ответа — только «Перевёл»
     expect(screen.getByRole('button', { name: 'Перевёл. Расписку давай' })).toHaveClass('primary')
     expect(screen.getByRole('button', { name: 'Не дам' })).not.toHaveClass('primary')
+  })
+
+  it('витрина не рисует карточку, уже лежащую в сейве (#688)', () => {
+    adoptPlatform({ ...webPlatform(), externalPay: false })
+    try {
+      const { game } = makeGame()
+      game.push({ kind: 'lend50', text: LEND50_SYS, link: LEND50_LINK })
+      renderApp(game)
+      expect(screen.queryByTestId('lend50-card')).toBeNull()
+    } finally {
+      adoptPlatform(webPlatform())
+    }
   })
 
   it('кнопки допработы отвечают и исчезают', async () => {

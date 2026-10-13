@@ -33,6 +33,8 @@ describe('счётчик Метрики: молчит, пока не выпол�
       ['vite preview', { host: '127.0.0.1:4173', search: '', id: '12345' }],
       ['?debug', { host: GAME_HOST, search: search('debug'), id: '12345' }],
       ['?fast', { host: GAME_HOST, search: search('fast'), id: '12345' }],
+      ['Яндекс Игры', { host: 'games.yandex.ru', search: '', id: '12345' }],
+      ['VK', { host: 'vk.com', search: '', id: '12345' }],
     ]
     for (const [name, opts] of cases) {
       const calls = receiver()
