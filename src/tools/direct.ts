@@ -181,4 +181,6 @@ export const DIRECT: Record<string, DirectCase> = {
   Scene_lend: { event: 'PickScene', setup: (g) => { g.S.mood = 4 } }, // денег в свежей партии хватает (START_MONEY)
   Scene_loan: { event: 'PickScene', setup: (g) => { g.S.day = 230 } },
   Quest_q_niva: { event: 'PickQuest', setup: (g) => { g.S.mem[legendId] = 'niva_stuck'; g.S.mem[legendDay] = g.S.day } },
+  // слияние #683+#684 ещё раз сместило розыгрыш: голосовое уходит из выборок на сплит-партиях
+  Says_voice: { event: 'PlayerSays', facts: { intent: 'voice' } },
 }
