@@ -645,7 +645,8 @@ export const ENDGAME_ARCH: Entry<ArchiveLine>[] = [
   gate(eq(finaleOf('razmik'), 'shift'), WORLD.razmik)({ slug: 'fin.razmik.shift', line: 'Ты отработал смену в кабине крана вместо Размика. Оплата потом, всё вместе.' }),
   gate(eq(finaleOf('razmik'), 'default'), WORLD.razmik, WORLD.crane)({ slug: 'fin.razmik.default', line: 'Размик на кране и первый в очереди: он выше тебя. Логика железная.' }),
 
-  gate(eq(finaleOf('collectors'), 'default'), WORLD.collectors)({ slug: 'fin.collectors.default', line: 'Коллекторы теперь мои: месят раствор и мечту о платеже. На объекте.' }),
+  gate(eq(finaleOf('collectors'), 'intern'), WORLD.collectors)({ slug: 'fin.collectors.intern', line: 'Коллекторы взяли тебя на стажировку. Учат взыскивать с меня профессионально — три чая за смену.' }),
+  gate(eq(finaleOf('collectors'), 'default'), WORLD.collectors)({ slug: 'fin.collectors.default', line: 'Коллекторы теперь взыскивают с меня в твою пользу. Работают медленно: чай длинный, долг — тоже.' }),
 
   // ставка усами: сбрил — ачивка навсегда (`alik.shaved` к эпилогу часто уже погашен),
   // спас — запись со ставкой (`moustache.kept`); спасённая строка не говорит, что усы сбриты

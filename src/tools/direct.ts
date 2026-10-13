@@ -169,6 +169,8 @@ export const DIRECT: Record<string, DirectCase> = {
   Says_sorry_blocked_boris: { event: 'PlayerSays', facts: { intent: 'sorry' }, setup: (g) => { blocked(g); g.S.arcs.boris = { i: 4, last: 0 } } },
   // #576: звонок с объекта сдвинул розыгрыш выборок — сцена «если спросят» из них ушла; гейт по воротке угрозы
   Scene_tax: { event: 'PickScene', setup: (g) => { g.S.mem['count.threat'] = 1 } },
+  // #679: разворот коллекторов сдвинул розыгрыш выборок — сцена амнистии ушла из них
+  Scene_amnesty: { event: 'PickScene', setup: (g) => { for (let i = 0; i < 5; i++) g.S.promises.push({ t: `обещание ${i}`, made: g.S.day - 10, due: g.S.day - 1 - i }) } },
   // #577: упрёк по звонку сдвинул розыгрыш ещё три правила — держим прямыми случаями
   Says_condole_ctxrevived: { event: 'PlayerSays', facts: { intent: 'condole' }, setup: (g) => { g.S.ctx = { revived: true } } },
   Finale_rubik_default: { event: 'ArcFinale', facts: { arc: 'rubik' } },
