@@ -47,7 +47,41 @@ describe('ответ на предложение позже показа (#553, 
     expect(game.S.bank?.week).toBe(weekOf(game.S.day))
     game.S.day += 7
     game.flushBankWeek()
-    expect(summaries(game).at(-1)?.lines?.join(' ')).toMatch(/Кредит: кредиту «Всё будет»/)
+    expect(summaries(game).at(-1)?.lines?.join(' ')).toMatch(/Кредит «Всё будет»/)
+  })
+
+  it('поступление второго кредита — именительным: «Кредит на погашение кредита», без «Кредит: кредиту» (#677)', () => {
+    const { game } = makeGame()
+    setMoney(game, 100)
+    game.S.mem[creditStage] = 1 // следующая ступень — «на погашение кредита»
+    game.chargeBill('rent') // дно: отказ и предложение одной карточкой
+    const offer = cards(game, 'Банк').at(-1)!
+    expect(offer.offer?.take).toBeTruthy()
+    const due = Number(game.S.mem[billDueAt('phone')])
+    game.S.day = weekOf(due) + 8 // новая неделя
+    game.chargeBill('phone')
+    game.answerCard(offer.id, 'take')
+    game.S.day += 7
+    game.flushBankWeek()
+    const line = summaries(game).at(-1)?.lines?.join(' ') ?? ''
+    expect(line).toMatch(/Кредит на погашение кредита/)
+    expect(line).not.toMatch(/Кредит: кредиту/)
+  })
+
+  it('микрозайм читается чисто: «Кредит: МФО «Деньги-Ара»» — строка не переименована (#677)', () => {
+    const { game } = makeGame()
+    setMoney(game, 100)
+    game.S.mem[creditStage] = 2 // следующая ступень — микрозайм
+    game.chargeBill('rent')
+    const offer = cards(game, 'Банк').at(-1)!
+    expect(offer.offer?.take).toBeTruthy()
+    const due = Number(game.S.mem[billDueAt('phone')])
+    game.S.day = weekOf(due) + 8
+    game.chargeBill('phone')
+    game.answerCard(offer.id, 'take')
+    game.S.day += 7
+    game.flushBankWeek()
+    expect(summaries(game).at(-1)?.lines?.join(' ')).toMatch(/Кредит: МФО «Деньги-Ара»/)
   })
 
   it('кнопка в тот же день — результат на самой карточке', () => {
