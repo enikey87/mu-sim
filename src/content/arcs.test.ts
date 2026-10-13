@@ -83,6 +83,46 @@ describe('гейты реплик серии до её remember (#450)', () => {
   })
 })
 
+describe('связка Гарик×бетон (#680)', () => {
+  const has = (lines: string[], bit: string) => lines.some((line) => line.includes(bit))
+
+  async function throughGarik(beton: boolean) {
+    const { game } = makeGame()
+    if (beton) await game.playArc('beton')
+    const bits: string[] = []
+    for (let i = 0; i < 4; i++) {
+      game.S.day += 5
+      const from = game.S.msgs.length
+      await game.playArc('garik')
+      bits.push(...alikTexts(game.S.msgs.slice(from)))
+    }
+    return bits
+  }
+
+  it('розетка в серии 2 раньше блога; «тёплый и шуршит» — только если бетон уже был', async () => {
+    const withBeton = await throughGarik(true)
+    const socket = withBeton.findIndex((line) => line.includes('розетку'))
+    const blog = withBeton.findIndex((line) => line.includes('Жизнь в основании'))
+    expect(socket).toBeGreaterThanOrEqual(0)
+    expect(blog).toBeGreaterThan(socket)
+    expect(has(withBeton, 'тёплый и шуршит')).toBe(true)
+
+    const without = await throughGarik(false)
+    expect(has(without, 'розетку')).toBe(true)
+    expect(has(without, 'Жизнь в основании')).toBe(true)
+    expect(has(without, 'тёплый и шуршит')).toBe(false)
+    expect(has(without, 'фундамент тёплый')).toBe(true)
+  })
+
+  // негативный контроль: та же строка без gate звучит и без бетона — отсутствие держит гейт
+  it('снятый гейт возвращает «тёплый и шуршит» в партии без бетона', async () => {
+    const { game } = makeGame()
+    const bare = 'Гарик говорит, удобно: тёплый и шуршит.'
+    expect(game.open([bare])).toEqual([bare])
+    expect(game.open(ARCS.garik.eps[2].m).map((m) => (typeof m === 'string' ? m : m.t))).not.toContain(bare)
+  })
+})
+
 describe('вопрос «уже случилось?» только перед серией, которая отвечает (#589)', () => {
   it('до развязки кнопки нет; когда следующая серия — она, кнопка есть', async () => {
     await followBefore('garik', 'Гарика достали?', /Гарика достали!/, 'Как там Гарик?', { when: /трубочку/, has: 'Гарик ещё в фундаменте?' })
