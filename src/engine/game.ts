@@ -893,7 +893,9 @@ export class Game {
       set(loanTaken(loan.id), true),
       set(loanPayment(loan.id), payment),
     ], {})
-    this.adjustMoney(amount, `Кредит: ${loan.label.replace(/^Платёж по /, '').replace(/^Платёж /, '')}`)
+    // поступление зовёт кредит именительным падежом: «Кредит «Всё будет»», а не «Кредит: кредиту…» (#677)
+    const receipt = loan.label.replace(/^Платёж по /, '').replace(/^Платёж /, '')
+    this.adjustMoney(amount, receipt.startsWith('кредиту ') ? `Кредит ${receipt.slice('кредиту '.length)}` : `Кредит: ${receipt}`)
     this.scheduleCredits()
   }
   sellThing(id?: ThingId): void {
