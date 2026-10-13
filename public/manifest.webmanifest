@@ -1,0 +1,17 @@
+{
+  "name": "Алик, где деньги?",
+  "short_name": "Алик",
+  "description": "SMS с генподрядчиком Аликом: вежливо просишь деньги — получаешь отмазку. Иногда «Мууууу».",
+  "lang": "ru",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b0e12",
+  "theme_color": "#0f1a1f",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
