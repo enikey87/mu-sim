@@ -25,24 +25,25 @@ export interface Episode {
   then?: 'promise'
 }
 export interface Arc { title: string; /** Линия механики денег, а не сюжетный сериал: не считается законченным сериалом партии (#338). */ mechanic?: true; minDay?: number; /** Условие старта (не продолжения): иначе сериал в пуле nextArc (#128). */ when?: Criterion[]; follow: Entry<string>[]; eps: Episode[] }
-export const CAST: Record<string, { name: string; color: string }> = {
-  boris: { name: 'Борис 🐏', color: '#b07b2c' },
-  grant: { name: 'Заказчик Грант', color: '#2f6fb3' },
-  nune: { name: 'Нуне (бухгалтер)', color: '#b0418f' },
-  samvel: { name: 'Дядя Самвел', color: '#7a5bbf' },
-  karine: { name: 'Карине', color: '#d0453a' },
-  garik: { name: 'Гарик', color: '#2d8a7a' },
-  arsen: { name: 'Арсен', color: '#5b7c1f' },
-  mkrtich: { name: 'Прораб Мкртич', color: '#9a6a2a' },
-  niva: { name: '«Нива» 🚙', color: '#4d6b3a' },
-  mama: { name: 'Мама Алика', color: '#c0567a' },
-  intercom: { name: 'Домофон тёти Гоар', color: '#6b6b6b' },
-  judge: { name: 'Судья Ашот', color: '#3f4a5a' },
-  goar: { name: 'Тётя Гоар', color: '#8a5a8c' },
-  razmik: { name: 'Крановщик Размик 🏗️', color: '#c46a1d' },
-  rubik: { name: 'Инспектор Рубик', color: '#4a5d7e' },
-  collectors: { name: 'Коллекторы «Деньги-Ара»', color: '#5a4a3a' },
-  taron: { name: 'Тарон (чайнос)', color: '#8a7355' },
+// emoji — кружок-аватар в ленте (#686): у кого эмодзи уже в имени, тот же; остальным — по характеру.
+export const CAST: Record<string, { name: string; color: string; emoji: string }> = {
+  boris: { name: 'Борис 🐏', color: '#b07b2c', emoji: '🐏' },
+  grant: { name: 'Заказчик Грант', color: '#2f6fb3', emoji: '📅' },
+  nune: { name: 'Нуне (бухгалтер)', color: '#b0418f', emoji: '🧮' },
+  samvel: { name: 'Дядя Самвел', color: '#7a5bbf', emoji: '🥃' },
+  karine: { name: 'Карине', color: '#d0453a', emoji: '🌹' },
+  garik: { name: 'Гарик', color: '#2d8a7a', emoji: '🧱' },
+  arsen: { name: 'Арсен', color: '#5b7c1f', emoji: '🎓' },
+  mkrtich: { name: 'Прораб Мкртич', color: '#9a6a2a', emoji: '📐' },
+  niva: { name: '«Нива» 🚙', color: '#4d6b3a', emoji: '🚙' },
+  mama: { name: 'Мама Алика', color: '#c0567a', emoji: '🥧' },
+  intercom: { name: 'Домофон тёти Гоар', color: '#6b6b6b', emoji: '🔔' },
+  judge: { name: 'Судья Ашот', color: '#3f4a5a', emoji: '⚖️' },
+  goar: { name: 'Тётя Гоар', color: '#8a5a8c', emoji: '🐐' },
+  razmik: { name: 'Крановщик Размик 🏗️', color: '#c46a1d', emoji: '🏗️' },
+  rubik: { name: 'Инспектор Рубик', color: '#4a5d7e', emoji: '🔍' },
+  collectors: { name: 'Коллекторы «Деньги-Ара»', color: '#5a4a3a', emoji: '🍵' },
+  taron: { name: 'Тарон (чайнос)', color: '#8a7355', emoji: '🫖' },
 };
 
 export const ARCS: Record<string, Arc> = {

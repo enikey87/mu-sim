@@ -268,6 +268,29 @@ describe('App', () => {
     expect(screen.getByText(/^изменено/)).toBeInTheDocument()
   })
 
+  it('кружок-аватар говорящего: эмодзи CAST на его цвете; у Алика и игрока кружка нет (#686)', async () => {
+    const { game } = makeGame()
+    game.push({ kind: 'text', from: 'alik', text: 'Плитка там нормальная, кстати.', who: 'mkrtich' })
+    game.push({ kind: 'text', from: 'alik', text: 'Про деньги потом.' })
+    game.push({ kind: 'text', from: 'me', text: 'Жду ответа.' })
+    renderApp(game)
+    const { CAST } = await import('../content/arcs')
+    const bubble = (text: string) =>
+      [...document.querySelectorAll('.msg')].find((el) => el.textContent?.includes(text)) as HTMLElement
+    const guest = bubble('Плитка там нормальная, кстати.')
+    const ava = guest.querySelector('.ava') as HTMLElement
+    expect(guest).toHaveClass('has-ava')
+    expect(ava.textContent).toBe(CAST.mkrtich.emoji)
+    expect(ava).toHaveAttribute('aria-hidden', 'true')
+    // цвет аватара — тот же, что у подписи имени (оба из CAST)
+    expect(ava.style.background).not.toBe('')
+    expect(ava.style.background).toBe((guest.querySelector('.who-name') as HTMLElement).style.color)
+    // негативный контроль: у Алика и у своей реплики кружка нет
+    expect(bubble('Про деньги потом.').querySelector('.ava')).toBeNull()
+    expect(bubble('Про деньги потом.')).not.toHaveClass('has-ava')
+    expect(bubble('Жду ответа.').querySelector('.ava')).toBeNull()
+  })
+
   it('легендарная отмазка в ленте — как обычная реплика: ни класса legend, ни золотой обводки (#638)', async () => {
     const { readFileSync } = await import('node:fs')
     const { game } = makeGame()
