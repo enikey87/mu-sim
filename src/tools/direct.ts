@@ -5,7 +5,7 @@
 import type { Game } from '../engine/game'
 import type { Facts } from '../engine/rules'
 import { during } from '../engine/rules'
-import { HEAT, nuneKeyPassed, sorryAt } from '../content/memkeys'
+import { HEAT, legendDay, legendId, nuneKeyPassed, sorryAt } from '../content/memkeys'
 
 export type DirectCase = { event: string; facts?: Facts; target?: string; setup?: (g: Game) => void }
 
@@ -59,16 +59,7 @@ export const DIRECT: Record<string, DirectCase> = {
   Ending_alik: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem['finale.garik'] = 'cutter'; g.S.ach.fence = 1 } },
   Ending_heir: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem['finale.alik_death'] = 'will' } },
   Says_via_boris: { event: 'PlayerSays', facts: { intent: 'via', arg: 'boris' }, setup: (g) => { g.S.mem.blocked = true } },
-  Quiet_PaydayOpen_PromiseDue: {
-    event: 'PromiseDue', facts: { promise: 0 },
-    setup: (g) => {
-      g.S.mem.payday = 'default'
-      g.S.ending = 'payday_default'
-      g.S.endings.payday_default = g.S.day
-      g.recordPromise({ text: 'в пятницу', d: 1 })
-      g.S.day += 1
-    },
-  },
+  // с колкостями (#683) PromiseDue в открытом экране выплаты ловят сами выборки — случай снят по порогу гейта
   // стенд мёртвого телефона больше не доходит и в выборках (#133): оставшиеся редкие окна держатся случаями ниже
   Quiet_Dead_AlikAway: { event: 'AlikAway', setup: (g) => { g.S.mem.alik_dead = true } },
   // стенд доходит не в каждой выборке (#269); наследство деда уходит Борису — он уже в партии
@@ -170,7 +161,7 @@ export const DIRECT: Record<string, DirectCase> = {
   // #576: звонок с объекта сдвинул розыгрыш выборок — сцена «если спросят» из них ушла; гейт по воротке угрозы
   Scene_tax: { event: 'PickScene', setup: (g) => { g.S.mem['count.threat'] = 1 } },
   // #679: разворот коллекторов сдвинул розыгрыш выборок — сцена амнистии ушла из них
-  Scene_amnesty: { event: 'PickScene', setup: (g) => { for (let i = 0; i < 5; i++) g.S.promises.push({ t: `обещание ${i}`, made: g.S.day - 10, due: g.S.day - 1 - i }) } },
+  // с колкостями (#683) распухший журнал собирается ботами сам — случай снят по порогу гейта
   // #577: упрёк по звонку сдвинул розыгрыш ещё три правила — держим прямыми случаями
   Says_condole_ctxrevived: { event: 'PlayerSays', facts: { intent: 'condole' }, setup: (g) => { g.S.ctx = { revived: true } } },
   Finale_rubik_default: { event: 'ArcFinale', facts: { arc: 'rubik' } },
@@ -180,7 +171,15 @@ export const DIRECT: Record<string, DirectCase> = {
   Quiet_Dead_PromiseDue: { event: 'PromiseDue', setup: dead },
   // #577: после разрастания пулов звонка выборки перестали собирать и второе приглашение Арсена
   Court_Lawyer_Again: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem.court = 1; g.S.mem['intro.arsen'] = true } },
-  // #684: сплиты серий сдвинули розыгрыш выборок — поздравление и сцена «займи 5000» из них ушли; гейт по чаще не сосчитал
+  // #683/#684: колкости и сплиты серий сдвинули розыгрыш выборок — правила держим прямыми случаями
   Says_congrats: { event: 'PlayerSays', facts: { intent: 'congrats' } },
+  Says_wrong: { event: 'PlayerSays', facts: { intent: 'wrong' }, setup: (g) => { g.S.ctx = { wrong: true } } },
   Scene_lend: { event: 'PickScene', setup: (g) => { g.S.mood = 4 } }, // денег в свежей партии хватает (START_MONEY)
+  Scene_loan: { event: 'PickScene', setup: (g) => { g.S.day = 230 } },
+  Quest_q_niva: { event: 'PickQuest', setup: (g) => { g.S.mem[legendId] = 'niva_stuck'; g.S.mem[legendDay] = g.S.day } },
+  // слияние #683+#684 ещё раз сместило розыгрыш: голосовое уходит из выборок на сплит-партиях
+  Says_voice: { event: 'PlayerSays', facts: { intent: 'voice' } },
+  // апелляция на жаре: колкости растянули партии — угроза-повтор уходит из выборок (#683);
+  // once встречного иска израсходован, иначе Hot (bonus 2) перебивает Hot_Again (bonus 1)
+  Tone_Threat_Hot_Again: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.rules.once['Tone_Threat_Hot'] = true; g.S.mem[HEAT] = 2 } },
 }
