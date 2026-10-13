@@ -175,3 +175,31 @@ describe('плитка с5 — реестр памятников без гейт
     expect(lines.some((l) => l.includes('Грант')), 'о Гранте не говорится').toBe(false)
   })
 })
+
+describe('панч серии по факту другой арки (#681)', () => {
+  const insert = 'Ту самую — что тряпочку с арматурины унесла.'
+
+  it('вставка про козу тёти Гоар звучит, когда в сериале про деньги в фундаменте была вторая серия', async () => {
+    const { game } = makeGame()
+    game.S.arcs.beton = { i: 2, last: 0 } // две серии фундамента позади — факт, не номер хода
+    const from = game.S.msgs.length
+    await game.playEpisode(ARCS.boris.eps[4], 'boris')
+    expect(alikTexts(game.S.msgs.slice(from))).toContain(insert)
+  })
+
+  it('в партии без второй серии фундамента вставки нет', async () => {
+    const { game } = makeGame()
+    const from = game.S.msgs.length
+    await game.playEpisode(ARCS.boris.eps[4], 'boris')
+    expect(alikTexts(game.S.msgs.slice(from))).not.toContain(insert)
+  })
+
+  // негативный контроль: тот же факт открыт на любой серии Бориса — значит, вставку держит именно гейт
+  it('без гейта вставка звучала бы и без серий фундамента', async () => {
+    const { game } = makeGame()
+    const bare = [...ARCS.boris.eps[4].m, insert] as Entry<string>[]
+    const from = game.S.msgs.length
+    await game.playEpisode({ ...ARCS.boris.eps[4], m: bare }, 'boris')
+    expect(alikTexts(game.S.msgs.slice(from))).toContain(insert)
+  })
+})
