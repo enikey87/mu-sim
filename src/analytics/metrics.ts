@@ -1,11 +1,15 @@
-// Аналитика живых игроков: Яндекс Метрика, docs/design/analytics.md.
-// Приёмник — глобальная `ym`; в тестах она подставная. Номер счётчика пуст, пока не впишет автор.
+// Аналитика живых игроков: приёмники целей, docs/design/analytics.md.
+// Вызов из игры один — track(имя, параметры); приёмников два — Метрика и PostHog, каждый своим тегом
+// и своим пустым ключом. В тестах клиенты подставные, живой сети прогон не трогает.
 import type { EndingId, PaydayId } from '../content/finales'
 
-/** Номер счётчика Метрики. Пусто — счётчик молчит; вписывает автор (docs/design/analytics.md). */
+/** Номер счётчика Метрики. Пусто — приёмник молчит; вписывает автор (docs/design/analytics.md). */
 export const COUNTER_ID = ''
 
-/** Хост, на котором счётчик включается: localhost, превью и e2e молчат. */
+/** Ключ проекта PostHog (EU). Пусто — приёмник молчит; вписывает автор. */
+export const POSTHOG_KEY = ''
+
+/** Хост, на котором приёмники включаются: localhost, превью и e2e молчат. */
 export const GAME_HOST = 'enikey87.github.io'
 
 /** Имена целей закрыты типом: произвольной строки в `track` не передать. */
@@ -25,6 +29,34 @@ export type GoalParams = {
 
 type Params = { [G in Goal]: GoalParams[G] }[Goal]
 
+/**
+ * Приёмник цели — узкий объект: включился ли, тег по первому жесту, одна цель.
+ * Метрика и PostHog — две реализации; список живёт здесь, игра про приёмники не знает.
+ */
+type Receiver = {
+  on: boolean
+  /** Первый жест: init приёмника, его один просмотр страницы, его тег. */
+  gesture: () => void
+  track: (goal: Goal, params: Params) => void
+}
+
+/** Приёмник, который молчит: ни сети, ни вызовов. */
+const silent: Receiver = { on: false, gesture: () => {}, track: () => {} }
+
+/** Ошибка одного приёмника (нет скрипта, клиент бросил) не отменяет вызов другого. */
+const safe = (f: () => void): void => { try { f() } catch { /* приёмник упал — остальные живут */ } }
+
+/** Тег приёмника — как звук: по первому жесту, одним скриптом в head. */
+const loadScript = (src: string, anonymous = false): void => {
+  const script = document.createElement('script')
+  script.async = true
+  if (anonymous) script.crossOrigin = 'anonymous'
+  script.src = src
+  document.head.appendChild(script)
+}
+
+// ---------- Метрика ----------
+
 type Ym = ((id: number, method: string, ...rest: readonly unknown[]) => void) & { q?: unknown[][] }
 
 type Metrics = {
@@ -33,18 +65,92 @@ type Metrics = {
   disableYaCounter?: unknown
 }
 
+const global = (): Metrics => globalThis as Metrics
+
 /** Тег Метрики грузится с mc.yandex.ru: своей npm-зависимости нет. */
-const TAG_SRC = 'https://mc.yandex.ru/metrika/tag.js'
+const TAG_YA = 'https://mc.yandex.ru/metrika/tag.js'
 
 /** Вебвизор, карта кликов и ссылки выключены; точный показатель отказов включён. */
-const INIT_OPTIONS = {
+const INIT_YA = {
   clickmap: false,
   trackLinks: false,
   webvisor: false,
   accurateTrackBounce: true,
 }
 
-const global = (): Metrics => globalThis as Metrics
+const metrika = (id: number): Receiver => ({
+  on: true,
+  gesture: () => safe(() => {
+    const m = global()
+    // очередь вызовов до прихода тега: `ym` к этому моменту ещё не функция Метрики
+    const ym = (m.ym ??= ((...args: unknown[]) => { ym.q ??= []; ym.q.push(args) }) as Ym)
+    ym(id, 'init', INIT_YA)
+    ym(id, 'hit', location.href)
+    loadScript(TAG_YA)
+  }),
+  track: (goal, params) => safe(() => { global().ym?.(id, 'reachGoal', goal, params) }),
+})
+
+// ---------- PostHog ----------
+
+/** Аргументы вызова клиента PostHog: [метод, …]. До прихода array.js это очередь. */
+type PhCall = [string, ...unknown[]]
+
+/** Клиент PostHog без npm-пакета: массив-очередь вызовов, `_i` — оттуда array.js запускает init. */
+type PostHog = PhCall[] & {
+  _i: unknown[][]
+  __SV?: number
+  init: (key: string, config: PhConfig) => void
+  capture: (event: string, props?: Record<string, unknown>) => void
+}
+
+type PhConfig = {
+  api_host: string
+  defaults: string
+  autocapture: false
+  capture_pageview: false
+  disable_session_recording: true
+}
+
+type PhGlobals = { posthog?: PostHog }
+const phGlobal = (): PhGlobals => globalThis as PhGlobals
+
+/** PostHog Cloud в ЕС: приём и активы — разные хосты, как в официальном сниппете. */
+const HOST_PH = 'https://eu.i.posthog.com'
+const TAG_PH = `${HOST_PH.replace('.i.posthog.com', '-assets.i.posthog.com')}/static/array.js`
+
+/** Сбор включён быть не должен: автоcбор кликов и ввода, свой просмотр страницы и запись сессии — всё выключено.
+ *  Просмотр страницы шлём сами, один, первым жестом — как у Метрики. */
+const INIT_PH: PhConfig = {
+  api_host: HOST_PH,
+  defaults: '2026-05-30',
+  autocapture: false,
+  capture_pageview: false,
+  disable_session_recording: true,
+}
+
+/** Заглушка клиента до прихода array.js — те же методы, что в официальном сниппете PostHog. */
+const stubPosthog = (): PostHog => {
+  const q = [] as unknown as PostHog
+  q._i = []
+  q.__SV = 1
+  q.init = (key, config) => { q._i.push([key, config, 'posthog']) }
+  q.capture = (event, props) => { q.push(['capture', event, props]) }
+  return q
+}
+
+const posthog = (key: string): Receiver => ({
+  on: true,
+  gesture: () => safe(() => {
+    const ph = phGlobal().posthog ??= stubPosthog()
+    ph.init(key, INIT_PH)
+    ph.capture('$pageview')
+    loadScript(TAG_PH, true)
+  }),
+  track: (goal, params) => safe(() => { phGlobal().posthog?.capture(goal, params) }),
+})
+
+// ---------- модуль ----------
 
 /** Хранилище браузера: день первого засчитанного визита и сумма секунд по нему. */
 const KEY_FIRST_DAY = 'alik.firstDay'
@@ -75,41 +181,44 @@ const startOfDay = (t: number): number => {
   return d.getTime()
 }
 
-let counter = 0
+let receivers: Receiver[] = [silent]
 let pageviewSent = false
 /** С какого момента вкладка видима в этом показе; пока скрыта — время не идёт. */
 let shownAt: number | null = null
 
-/** Включён ли счётчик — от этого строка игроку на интро и в досье. */
-export const isOn = (): boolean => counter !== 0
+/** Включён ли модуль — от этого строка игроку на интро и в досье: хватает одного приёмника. */
+export const isOn = (): boolean => receivers.some((r) => r.on)
 
 /**
- * Включает счётчик. Звать может только вход страницы (src/main.tsx) и только когда
- * заданы все три условия: номер, хост игры и адрес без `debug`/`fast`.
- * `id` — подстановка для теста с приёмником; игра передаёт константу `COUNTER_ID`.
+ * Включает приёмники. Звать может только вход страницы (src/main.tsx) и только когда
+ * заданы все три условия: ключ приёмника, хост игры и адрес без `debug`/`fast`.
+ * `id` — номер Метрики, `posthogKey` — ключ PostHog: подстановки для теста с приёмником;
+ * игра передаёт константы `COUNTER_ID` и `POSTHOG_KEY`.
  */
-export function enable(opts: { host: string; search: string; id?: string }): boolean {
-  const id = opts.id ?? COUNTER_ID
+export function enable(opts: { host: string; search: string; id?: string; posthogKey?: string }): boolean {
   const url = new URLSearchParams(opts.search)
-  counter = id && opts.host === GAME_HOST && !url.has('debug') && !url.has('fast') ? Number(id) : 0
+  const allowed = opts.host === GAME_HOST && !url.has('debug') && !url.has('fast')
+  const ya = allowed && (opts.id ?? COUNTER_ID) ? Number(opts.id ?? COUNTER_ID) : 0
+  const ph = allowed ? (opts.posthogKey ?? POSTHOG_KEY) : ''
+  receivers = [ya ? metrika(ya) : silent, ph ? posthog(ph) : silent]
   pageviewSent = false
   shownAt = null
   return isOn()
 }
 
-/** Цель в счётчик. Молчит, пока счётчик не включён. */
+/** Цель — во все включённые приёмники, одним вызовом из игры. Молчит, пока модуль не включён. */
 export function track(goal: Goal, params: Params): void {
-  if (!counter) return
-  global().ym?.(counter, 'reachGoal', goal, params)
+  if (!isOn()) return
+  for (const r of receivers) if (r.on) r.track(goal, params)
 }
 
 /**
  * `boot`: первый жест загрузки, один раз. `since` — календарных дней с первого
  * засчитанного визита в этом браузере; день записывается только при включённом
- * счётчике и «Начать заново» его не стирает — удержание считается на человека.
+ * модуле и «Начать заново» его не стирает — удержание считается на человека.
  */
 export function boot(save: 'yes' | 'no', now = Date.now()): void {
-  if (!counter) return
+  if (!isOn()) return
   const s = store()
   let first = Number(s?.getItem(KEY_FIRST_DAY))
   if (!Number.isFinite(first) || first <= 0) {
@@ -122,7 +231,7 @@ export function boot(save: 'yes' | 'no', now = Date.now()): void {
 
 /** Вкладка снова показана: с этого момента идут секунды видимости. */
 export function shown(now = Date.now()): void {
-  if (!counter || shownAt !== null || document.hidden) return
+  if (!isOn() || shownAt !== null || document.hidden) return
   shownAt = now
 }
 
@@ -131,7 +240,7 @@ export function shown(now = Date.now()): void {
  * второго срабатывания. Пока вкладка скрыта, секунды не идут.
  */
 export function left(depth: { phase: Phase; day: number; turns: number }, now = Date.now()): void {
-  if (!counter || shownAt === null) return
+  if (!isOn() || shownAt === null) return
   const sec = Math.max(0, Math.round((now - shownAt) / 1000))
   shownAt = null
   const s = store()
@@ -141,19 +250,11 @@ export function left(depth: { phase: Phase; day: number; turns: number }, now = 
 }
 
 /**
- * Тег Метрики первым жестом — как звук: до касания сеть не трогаем.
- * Один просмотр страницы за загрузку; повторные состояния интерфейса — нет.
+ * Теги приёмников первым жестом — как звук: до касания сеть не трогаем.
+ * Один просмотр страницы у каждого приёмника за загрузку; повторные состояния интерфейса — нет.
  */
 export function firstGesture(): void {
-  if (!counter || pageviewSent) return
+  if (!isOn() || pageviewSent) return
   pageviewSent = true
-  const m = global()
-  // очередь вызовов до прихода тега: `ym` к этому моменту ещё не функция Метрики
-  const ym = (m.ym ??= ((...args: unknown[]) => { ym.q ??= []; ym.q.push(args) }) as Ym)
-  ym(counter, 'init', INIT_OPTIONS)
-  ym(counter, 'hit', location.href)
-  const script = document.createElement('script')
-  script.async = true
-  script.src = TAG_SRC
-  document.head.appendChild(script)
+  for (const r of receivers) if (r.on) r.gesture()
 }
