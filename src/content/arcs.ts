@@ -4,7 +4,7 @@ import { type Entry, type FactOp, type Criterion, type FactKey, type Said, set, 
 import { type ClaimKey } from './ids'
 import type { LedgerEvent } from './fact-types'
 import { needs, meet, WORLD } from './world'
-import { actSigned, alikDead, betonSet, borisMarried, collectorsRecruited, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantPaid, houseOnGarik, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikBath, sick, taxFrozen, wedding } from './memkeys'
+import { actSigned, alikDead, betonSet, borisMarried, collectorsRecruited, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantPaid, houseOnGarik, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikBath, sick, taxFrozen, wedding } from './memkeys'
 
 export type ArcMsg = Said | { w: string; t: string; claims?: LedgerEvent[]; remember?: FactOp[] } | { t: string; claims: LedgerEvent[]; remember?: FactOp[] }
 export interface Episode {
@@ -292,9 +292,10 @@ export const ARCS: Record<string, Arc> = {
         ],
       },
       {
+        remember: [set(collectorsTurned, true)],
         m: [
-          { w: 'collectors', t: 'С вас больше не требуем. Мы теперь люди Алика. Если что — мы на объекте, месим.' },
-          'Видишь? Коллекторы мои. Банк пусть капает — рейтинг у тебя и так упал. А эти — свои.',
+          { w: 'collectors', t: 'Мы пересчитали. Алик должен вам больше, чем вы — нам. Теперь мы взыскиваем для вас. Условия — за чаем.' },
+          'Не радуйся, брат. Они взыскивают медленно. У них чай длинный.',
         ],
         fx: { ach: 'arc_collectors' },
       },
@@ -315,11 +316,13 @@ export const GROUP: Record<string, Entry<Said>[]> = {
   arsen: ['Дядя, можно я плиточнику напишу от твоего имени? Практикуюсь.', 'Я прочитал про это в интернете. Это называется «кидалово».', 'Дядя, я ему напишу, что ты в горах.', 'А если он в суд подаст?', 'Я юрист, я посчитал: платить невыгодно.'],
   boris: ['Бееее.', 'Бее-бее?', 'Бее!!!', 'Бе.'],
   collectors: [
-    // до вербовки — требуют долг; после — только «свои» (#435/#468)
+    // до вербовки — требуют долг; после — «свои»; после разворота — взыскивают для игрока (#435/#468/#679)
     gate(missing(collectorsRecruited))('Алик Воздухонесян, напоминаем о задолженности. Мы в группе. Мы всегда в группе.'),
     gate(missing(collectorsRecruited))('Это чат стройки? Нам всё равно. Долг — он и в чате долг.'),
-    needs('collectorsRecruited')('Алик, плиточнику скажи: мы теперь свои. Раствор месим, долги — нет.'),
-    needs('collectorsRecruited')('Смена на объекте. «Деньги-Ара» пусть пишет стихи.'),
+    gate(is(collectorsRecruited), missing(collectorsTurned))('Алик, плиточнику скажи: мы теперь свои. Раствор месим, долги — нет.'),
+    gate(is(collectorsRecruited), missing(collectorsTurned))('Смена на объекте. «Деньги-Ара» пусть пишет стихи.'),
+    needs('collectorsTurned')('Алик Воздухонесян, мы теперь взыскиваем в пользу плиточника. В чате — тоже.'),
+    needs('collectorsTurned')('Ваше дело в работе. Чай длинный, долг — тоже.'),
   ],
 };
 export const GROUP_OOPS = ['Ой. Не тот чат.', 'Брат, это не то, что ты думаешь.', 'Это я случайно.', 'Ара, удалите его кто-нибудь!'];
@@ -342,7 +345,7 @@ export const WRONG_B = ['Не бери в голову.', 'Всё хорошо �
 
 
 // Спросили про сериал, который уже закончился — отдельные ответы (раньше было общее «пока без новостей»)
-export const ARC_DONE: Record<string, Said[]> = {
+export const ARC_DONE: Record<string, Entry<Said>[]> = {
   boris: ['Борис? Он теперь в налоговой работает. Не спрашивай.', 'Борис ушёл в горы. С налоговой. Они подружились.'],
   beton: [{ t: 'Деньги в фундаменте, фундамент у судьи, судья — мой кум. Всё в семье, брат.', claims: ['money_foundation'] }, { t: 'Ашот говорит, дом стоит крепко. Это твои деньги держат. Гордись.', claims: ['money_foundation'] }],
   rubik: ['Рубик уехал. Экспертиза из Москвы ещё едет. Счета — в морозилке.', 'Рубик теперь в налоговой. Пишет Карине стихи на бланках. Бланки платные — ей нравится.'],
@@ -355,6 +358,12 @@ export const ARC_DONE: Record<string, Said[]> = {
   garik: ['Гарик вернулся в фундамент. Сам. Говорит, дома.', 'Гарик всё ещё блогер. Спонсор — цемент, подписчики — бетон.'],
   tile: ['Твоя плитка теперь достопримечательность. Туристы спрашивают автора.', 'Суд закрыт. Плитка оправдана. Ты — под вопросом.'],
   grandpa: ['Дедушка жив. Дедушка всегда жив.', 'Дедушка открыл вторую шаурмичную. В бывшей больнице.'],
-  // только после финала линии — к тому моменту collectors.recruited уже стоит (серия 4)
-  collectors: ['Коллекторы? Мои. Месят раствор и философию.', '«Деньги-Ара» звонит им — они не берут. У них смена.'],
+  // обычный финал линии разворачивает взыскание (#679): «свои» — только до разворота, дальше — работа на игрока;
+  // стажёрский финал отвечает своими done и сюда не доходит
+  collectors: [
+    gate(missing(collectorsTurned))('Коллекторы? Мои. Месят раствор и философию.'),
+    gate(missing(collectorsTurned))('«Деньги-Ара» звонит им — они не берут. У них смена.'),
+    needs('collectorsTurned')('Коллекторы? Теперь они взыскивают с меня в твою пользу. Философски.'),
+    needs('collectorsTurned')('«Деньги-Ара» мне звонит — они не берут. У них твоё дело и длинный чай.'),
+  ],
 }

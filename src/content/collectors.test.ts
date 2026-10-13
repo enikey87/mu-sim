@@ -1,11 +1,11 @@
 // Коллекторы после credit.broke: мини-сериал, перевербовка, микрозайм молчит (#128).
 import { describe, it, expect } from 'vitest'
 import { makeGame, setMoney } from '../test/helpers'
-import { collectorsRecruited, creditBroke, endgame, intro, paydayScene, threatClaim } from './memkeys'
+import { collectorsRecruited, collectorsTurned, creditBroke, endgame, intro, paydayScene, threatClaim } from './memkeys'
 import { loanTaken, loanDueAt } from './credit'
 import { D } from './excuses'
 import { NOTIF } from './life'
-import { GROUP } from './arcs'
+import { ARC_DONE, GROUP } from './arcs'
 import { meet } from './world'
 import { isOpen, test, valueOf, type Entry, type Facts } from '../engine/rules'
 import { playtest } from '../tools/playtest'
@@ -192,6 +192,59 @@ describe('коллекторы (#128)', () => {
     }
   })
 
+  it('GROUP и ARC_DONE: после разворота «свои» закрыты, взыскание для игрока открыто (#679)', () => {
+    const gated = (arr: Entry<unknown>[], re: RegExp) => arr.filter((e) => re.test(String(valueOf(e))))
+    const ours = gated(GROUP.collectors as Entry<unknown>[], /мы теперь свои|Смена на объекте/)
+    const turned = gated(GROUP.collectors as Entry<unknown>[], /взыскиваем в пользу плиточника|Чай длинный/)
+    expect(ours.length).toBe(2)
+    expect(turned.length).toBe(2)
+    for (const e of ours) expect(isOpen(e, { [collectorsRecruited]: true, [collectorsTurned]: true }), 'после разворота «свои» закрыты').toBe(false)
+    for (const e of turned) {
+      expect(isOpen(e, { [collectorsRecruited]: true }), 'до разворота взыскание для игрока закрыто').toBe(false)
+      expect(isOpen(e, { [collectorsRecruited]: true, [collectorsTurned]: true })).toBe(true)
+    }
+    // обычный финал разворачивает взыскание; до разворота ARC_DONE держит «свои», после — работу на игрока
+    const doneOurs = gated(ARC_DONE.collectors as Entry<unknown>[], /Мои\. Месят|У них смена/)
+    const doneTurned = gated(ARC_DONE.collectors as Entry<unknown>[], /в твою пользу|твоё дело/)
+    expect(doneOurs.length).toBe(2)
+    expect(doneTurned.length).toBe(2)
+    for (const e of doneOurs) expect(isOpen(e, { [collectorsTurned]: true })).toBe(false)
+    for (const e of doneTurned) {
+      expect(isOpen(e, {}), 'до разворота ответы про взыскание закрыты').toBe(false)
+      expect(isOpen(e, { [collectorsTurned]: true })).toBe(true)
+    }
+  })
+
+  it('разворот взыскания и финал по грубости (#679)', async () => {
+    // без грубости: обычный финал — разворот, факт разворота стоит
+    const plain = makeGame().game
+    plain.S.arcs.collectors = { i: 4, last: -99 }
+    plain.S.mem[collectorsRecruited] = true
+    const before = plain.S.msgs.length
+    await plain.playArc('collectors')
+    expect(plain.S.mem['finale.collectors']).toBe('default')
+    expect(plain.S.mem[collectorsTurned]).toBe(true)
+    expect(texts(plain, before).some((t) => /взыскиваем для вас/.test(t))).toBe(true)
+    // грубость ниже порога — ещё разворот
+    const nearly = makeGame().game
+    nearly.S.arcs.collectors = { i: 4, last: -99 }
+    nearly.S.mem[collectorsRecruited] = true
+    nearly.S.mem['count.rude'] = 5
+    await nearly.playArc('collectors')
+    expect(nearly.S.mem['finale.collectors']).toBe('default')
+    expect(nearly.S.mem[collectorsTurned]).toBe(true)
+    // порог грубости достигнут — стажёрский финал вместо разворота, факт разворота не стоит
+    const rude = makeGame().game
+    rude.S.arcs.collectors = { i: 4, last: -99 }
+    rude.S.mem[collectorsRecruited] = true
+    rude.S.mem['count.rude'] = 6
+    const from = rude.S.msgs.length
+    await rude.playArc('collectors')
+    expect(rude.S.mem['finale.collectors']).toBe('intern')
+    expect(rude.S.mem[collectorsTurned]).toBeUndefined()
+    expect(texts(rude, from).some((t) => /Стажировка — три чая/.test(t))).toBe(true)
+  })
+
   it('в партиях ботом завербованные коллекторы в групповом чате долг не требуют (#493)', async () => {
     const debtRe = /задолженност|Долг — он и в чате/
     const after: string[] = []
@@ -203,7 +256,7 @@ describe('коллекторы (#128)', () => {
       for (const [i, m] of game.S.msgs.entries()) {
         if (m.kind === 'sys' && /добавил вас в группу/.test(m.text)) inGroup = true
         if (m.kind === 'sys' && /удалил вас из группы/.test(m.text)) inGroup = false
-        if (m.kind === 'text' && m.who === 'collectors' && /С вас больше не требуем/.test(m.text)) recruitedAt = Math.min(recruitedAt, i)
+        if (m.kind === 'text' && m.who === 'collectors' && /Мы остаёмся у Алика/.test(m.text)) recruitedAt = Math.min(recruitedAt, i)
         if (inGroup && i > recruitedAt && m.kind === 'text' && m.who === 'collectors') after.push(m.text)
       }
     }

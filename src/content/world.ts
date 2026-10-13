@@ -1,7 +1,7 @@
 // Тексты для новых возможностей системы правил: обещания, которые наступают, хор персонажей,
 // состояния мира со сроком (свадьба, болезнь Бориса, «Алик умер»).
 import { type Criterion, type Line, type Entry, named, exists, is, eq, gte, ne, missing, set, gate } from './fact'
-import { cryptoHodl, garikConcrete, garikCut, grandpaDying, grantPaid, intro, karineKnowsDebt, karineThinksTax, met, mourning, nivaAway, nivaPlayer, nuneDekretOver, payday, saidFriday, saidTomorrow, alikShaved, wedding, collectorsRecruited, rubikBath } from './memkeys'
+import { cryptoHodl, garikConcrete, garikCut, grandpaDying, grantPaid, intro, karineKnowsDebt, karineThinksTax, met, mourning, nivaAway, nivaPlayer, nuneDekretOver, payday, saidFriday, saidTomorrow, alikShaved, wedding, collectorsRecruited, collectorsTurned, rubikBath } from './memkeys'
 import type { WhoId } from './ids'
 
 // Мир последователен: кто и что есть в истории и в каком оно положении — факты, их ставит серия (remember), ступень суда
@@ -87,6 +87,8 @@ export const WORLD = {
   taron: named('taron', is(intro('taron'))),
   /** Алик перевербовал коллекторов — микрозайм с игрока не требуют (#128). */
   collectorsRecruited: named('collectorsRecruited', is(collectorsRecruited)),
+  /** Взыскание развернулось: коллекторы работают на игрока, а не на Алика (#679). */
+  collectorsTurned: named('collectorsTurned', is(collectorsTurned)),
   /** Рубик спит в ванной на объекте (#590): серия «остался жить» пишет факт — до неё про ванную молчut. */
   rubikBath: named('rubikBath', is(rubikBath)),
 } satisfies Record<string, Criterion>
