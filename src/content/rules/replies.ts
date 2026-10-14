@@ -1,6 +1,6 @@
 // Событие PlayerSays { intent, arg } — ответ Алика на контекстную реплику игрока.
 // Общее правило по intent + более специфичные для частных случаев (память, контекст).
-import type { Game } from '../../engine/game'
+import type { ContentApi } from '../../engine/game'
 import { fmtDays } from '../../engine/time'
 import { type Rule, eq, ne, is, gte, add, set, valueOf } from '../fact'
 import type { GameEvent, Offer } from './events'
@@ -17,10 +17,11 @@ import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, PROMISE_PENCIL,
 import { CREW_PAID } from '../crew'
 import { HOLIDAY_MONEY, type Holiday } from '../holidays'
 import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_THIRD, LIE_NOCRED } from '../lies'
-import { HEAT, alikShaved, moustacheAskAt, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, topic, topicMute } from '../memkeys'
+import { HEAT, alikShaved, moustacheAskAt, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, topic, topicLast, topicMute, topicRun } from '../memkeys'
+import type { ArcId, TopicId } from '../ids'
 import { PROMISE_SHAVE_ASK } from '../world'
 
-type R = Rule<Game, GameEvent, Offer>
+type R = Rule<ContentApi, GameEvent, Offer>
 const says = (intent: string, rest: Partial<R> & Pick<R, 'respond'>, extra: R['when'] = []): R => ({
   name: `Says_${intent}${extra.length ? '_' + extra.map((c) => (c.key + (typeof c.value === 'string' ? '_' + c.value : c.value === true || c.value === undefined ? '' : c.value)).replace(/[^\wа-я]/gi, '')).join('_') : ''}`,
   event: 'PlayerSays',
@@ -28,19 +29,16 @@ const says = (intent: string, rest: Partial<R> & Pick<R, 'respond'>, extra: R['w
   ...rest,
 })
 
-async function sorry(game: Game, line: string): Promise<void> {
+async function sorry(game: ContentApi, line: string): Promise<void> {
   cooldown(game, 1) // извинение остужает ссору
   game.mood(3)
   game.unlock('sorry')
-  const wasOff = game.S.offlineDays
-  game.S.offlineDays = Math.floor(game.S.offlineDays / 3)
-  if (wasOff && game.S.offlineDays) game.nextDay(game.S.offlineDays)
-  game.S.offlineDays = 0
+  game.forgiveOffline()
   await game.say([line])
   game.setCtx(null)
 }
 
-const simple = (intent: string, line: (g: Game) => Said, after?: (g: Game) => void | Promise<void>): R =>
+const simple = (intent: string, line: (g: ContentApi) => Said, after?: (g: ContentApi) => void | Promise<void>): R =>
   says(intent, { respond: async ({ game }) => { await game.say([line(game)]); game.setCtx(null); await after?.(game) } })
 
 export const replyRules: R[] = [
@@ -87,7 +85,7 @@ export const replyRules: R[] = [
       game.setCtx(null)
       const id = talkId(kind, sub, Number(i))
       game.lines.mark(id)
-      game.rules.applyOps(TALK_REMEMBER[id] ?? [], {})
+      game.applyFacts(TALK_REMEMBER[id] ?? [])
       await game.say([kind === 'chorus' ? { w: sub, t: saidText(pair[1]), claims: saidClaims(pair[1]) } : pair[1]])
     },
   }),
@@ -98,7 +96,7 @@ export const replyRules: R[] = [
   says('transferQ', {
     respond: async ({ game }) => {
       const reply = game.uniq(game.X.transferQ)
-      if (reply.nextTransfer) game.S.mem[nextTransfer] = reply.nextTransfer
+      if (reply.nextTransfer) game.applyFacts([set(nextTransfer, reply.nextTransfer)])
       await game.say([reply.text])
       game.setCtx(null)
     },
@@ -109,7 +107,7 @@ export const replyRules: R[] = [
 
   says('moustacheAsk', {
     respond: async ({ game }) => {
-      game.rules.applyOps([set(moustacheAskAt, game.S.day)], {})
+      game.applyFacts([set(moustacheAskAt, game.day)])
       await game.say([game.uniq(() => game.draw('PROMISE_SHAVE_ASK', PROMISE_SHAVE_ASK))])
       game.setCtx(null)
     },
@@ -162,7 +160,7 @@ export const replyRules: R[] = [
       const rel = game.ctx?.rel
       game.mood(2)
       if (rel) await game.say([game.uniq(() => game.X.congrats(rel))])
-      if (game.chance(0.25 + game.S.mood * 0.03)) { await game.transfer(); return }
+      if (game.chance(0.25 + Number(game.facts().mood) * 0.03)) { await game.transfer(); return }
       const r = game.uniq(game.X.ping)
       game.recordPromise(r.p)
       await game.say([`Про деньги — ${low(r.p.text)}.`])
@@ -194,7 +192,7 @@ export const replyRules: R[] = [
   says('prev', {
     respond: async ({ game, facts }) => {
       const i = Number(facts.arg)
-      if (game.S.promises[i]) game.S.promises[i].asked = true
+      game.promiseAsked(i)
       const r = game.uniq(game.X.prev)
       game.recordPromise(r.p)
       await game.say([r.text])
@@ -206,7 +204,7 @@ export const replyRules: R[] = [
     cooldown: { days: 20 },
     respond: async ({ game, facts }) => {
       const i = Number(facts.arg)
-      if (game.S.promises[i]) game.S.promises[i].asked = true
+      game.promiseAsked(i)
       game.unlock('memory')
       await game.promiseLine(game.uniq(() => game.draw('PREV_MANY', PREV_MANY)))
     },
@@ -214,11 +212,10 @@ export const replyRules: R[] = [
 
   says('arc', {
     respond: async ({ game, facts }) => {
-      const id = String(facts.arg ?? '')
-      game.S.mem[asked(id)] = Number(game.S.mem[asked(id)] ?? 0) + 1 // для финалов: «спрашивал про Бориса 3+ раз»
-      const st = game.S.arcs[id]
+      const id = String(facts.arg ?? '') as ArcId
+      game.applyFacts([add(asked(id), 1)]) // для финалов: «спрашивал про Бориса 3+ раз»
       // на вопрос — следующая серия; второй вопрос подряд в тот же день — «пока без новостей» (не проглатывать сериал)
-      if (st && ARCS[id] && game.arcCanAdvance(id, true)) { await game.playArc(id); game.S.arcs[id].byAsk = true; return }
+      if (game.arcStarted(id) && ARCS[id] && game.arcCanAdvance(id, true)) { await game.playArc(id); game.arcByAsk(id); return }
       // «Передавайте привет Борису» — не вопрос: «пока без новостей» на него звучит невпопад
       await game.say([facts.greet ? game.uniq(() => game.draw('GREET_A', GREET_A)) : game.pair('NN_A', NO_NEWS_A, 'NN_B', NO_NEWS_B)])
       game.setCtx(null)
@@ -227,10 +224,10 @@ export const replyRules: R[] = [
   // сериал закончился — у каждого свой финальный ответ вместо общего «без новостей»
   says('arc', {
     respond: async ({ game, facts }) => {
-      const id = String(facts.arg ?? '')
-      game.S.mem[doneAsked(id)] = game.S.day
+      const id = String(facts.arg ?? '') as ArcId
+      game.applyFacts([set(doneAsked(id), game.day)])
       const lines = game.arcDoneLines(id) ?? NO_NEWS_A
-      await game.say([game.uniq(() => game.draw(`DONE_${id}_${game.S.mem[finaleOf(id)] ?? ''}`, lines))])
+      await game.say([game.uniq(() => game.draw(`DONE_${id}_${game.mem()[finaleOf(id)] ?? ''}`, lines))])
       game.setCtx(null)
     },
   }, [is('argArcDone')]),
@@ -239,11 +236,10 @@ export const replyRules: R[] = [
   // ответ по теме: вопрос и ответ парой (p[i] ↔ a[i]); ответ уже был — общий
   says('topic', {
     respond: async ({ game, facts }) => {
-      const [k, i] = String(facts.arg ?? '').split(':')
-      const mem = game.S.mem
-      const n = (mem[topic(k)] = Number(mem[topic(k)] ?? 0) + 1)
-      mem.topicRun = mem.topicLast === k ? Number(mem.topicRun ?? 0) + 1 : 1
-      mem.topicLast = k
+      const [k, i] = String(facts.arg ?? '').split(':') as [TopicId, string]
+      game.applyFacts([add(topic(k), 1)])
+      const n = Number(game.mem()[topic(k)] ?? 0)
+      game.applyFacts([set(topicRun, game.mem().topicLast === k ? Number(game.mem().topicRun ?? 0) + 1 : 1), set(topicLast, k)])
       // некоторые вопросы сразу превращаются в мини-квест («Приеду поесть» → хаш в 7 утра)
       const quest = TOPICS[k]?.quest?.[Number(i)]
       // квест из разговора — по тем же условиям, что и сам квест, и один раз за игру
@@ -260,8 +256,7 @@ export const replyRules: R[] = [
         await game.sleep(600)
         await game.say([game.uniq(() => game.draw('TOPIC_OBS', TOPIC_OBSESSED).replace('{n}', TOPIC_NAME[k]))])
         game.unlock('memory')
-        mem[topic(k)] = 0
-        mem[topicMute(k)] = game.S.day + 20
+        game.applyFacts([set(topic(k), 0), set(topicMute(k), game.day + 20)])
       }
       game.setCtx(null)
       if (game.chance(0.35)) await game.promiseLine()

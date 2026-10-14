@@ -1,6 +1,6 @@
 // Событие BuildChoices — какие контекстные реплики предложить игроку.
 // Берутся два самых приоритетных (специфичность + bonus); из одного слота — только одна.
-import type { Game } from '../../engine/game'
+import type { ContentApi } from '../../engine/game'
 import type { Choice, Tone } from '../../engine/state'
 import { type Rule, type Facts, type Criterion, type Entry, eq, ne, is, exists, missing, gt, gte, lte, isOpen, valueOf } from '../fact'
 import type { GameEvent, Offer } from './events'
@@ -21,15 +21,15 @@ import {
   P_VIA_BORIS, P_VIA_KARINE, P_VIA_MAMA, P_MOO, P_MOUSTACHE, P_COURT,
 } from './player-choice-pools'
 
-type R = Rule<Game, GameEvent, Offer>
+type R = Rule<ContentApi, GameEvent, Offer>
 
 interface OfferSpec {
   name: string
   when: Criterion[]
   act?: string
   tone: Tone
-  text: (game: Game, facts: Facts) => string
-  arg?: (game: Game, facts: Facts) => string | number | undefined
+  text: (game: ContentApi, facts: Facts) => string
+  arg?: (game: ContentApi, facts: Facts) => string | number | undefined
   bonus?: number
   specificity?: number
   slot?: string
@@ -37,20 +37,20 @@ interface OfferSpec {
   odds?: number
 }
 
-const fromD = (game: Game, key: string, map: Record<string, string> = {}) => {
+const fromD = (game: ContentApi, key: string, map: Record<string, string> = {}) => {
   requirePlayerPool(`D.${key}`, D[key])
   return game.playerLine(() => game.X.fill(game.draw(key, D[key]), map))
 }
-const fromArr = (game: Game, key: string, arr: readonly Entry<unknown>[]) => {
+const fromArr = (game: ContentApi, key: string, arr: readonly Entry<unknown>[]) => {
   requirePlayerPool(key, arr)
   return game.playerLine(() => game.draw(key, arr as readonly Entry<string>[]))
 }
 // пул — в реестре кнопок (#491), но строка — как есть, без украшения обращением: обращаемся к посреднику, а не к Алику (#512)
-const plainFromArr = (game: Game, key: string, arr: readonly Entry<unknown>[]) => {
+const plainFromArr = (game: ContentApi, key: string, arr: readonly Entry<unknown>[]) => {
   requirePlayerPool(key, arr)
   return game.draw(key, arr as readonly Entry<string>[])
 }
-const freshFromArr = (game: Game, key: string, arr: readonly Entry<unknown>[]) => {
+const freshFromArr = (game: ContentApi, key: string, arr: readonly Entry<unknown>[]) => {
   requirePlayerPool(key.startsWith('F_') ? `ARCS.${key.slice(2)}.follow` : key, arr)
   return game.freshPlayer(key, arr as readonly Entry<string>[]) ?? ''
 }
@@ -105,7 +105,7 @@ export const choiceRules: R[] = [
     name: 'Opt_Moustache', event: 'BuildChoices', when: [is(alikShaved)], bonus: 2,
     slot: 'moustache',
     offer: ({ game }) => {
-      if (game.S.day - Number(game.S.mem[moustacheAskAt] ?? -99) < 5) return null
+      if (game.day - Number(game.mem()[moustacheAskAt] ?? -99) < 5) return null
       const text = freshFromArr(game, 'P_MOUSTACHE', P_MOUSTACHE)
       return text ? { text, tone: 'neutral' as const, act: 'moustacheAsk' } : null
     },
@@ -127,7 +127,7 @@ export const choiceRules: R[] = [
   offer({ name: 'Sticker', when: [eq('ctx.type', 'sticker')], act: 'stickerQ', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'STICKER_Q', L.STICKER_Q) }),
   offer({ name: 'Fwd', when: [eq('ctx.type', 'fwd')], act: 'fwdQ', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'FWD_Q', L.FWD_Q) }),
   offer({ name: 'ReactOnly', when: [eq('ctx.type', 'reactOnly')], act: 'reactQ', tone: 'neutral', bonus: 3, // «👍 — это да или нет?» — с той реакцией, что Алик поставил на самом деле
-    text: (g) => { const m = [...g.S.msgs].reverse().find((x) => x.kind === 'text' && x.from === 'me'); const r = (m?.kind === 'text' && m.react) || '👍'; return fromArr(g, 'REACT_Q', L.REACT_Q).replace('👍', r) } }),
+    text: (g) => { const m = [...g.msgsView()].reverse().find((x) => x.kind === 'text' && x.from === 'me'); const r = (m?.kind === 'text' && m.react) || '👍'; return fromArr(g, 'REACT_Q', L.REACT_Q).replace('👍', r) } }),
   offer({ name: 'Deleted', when: [is('ctx.deleted')], act: 'deletedQ', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'DEL_Q', L.DEL_Q) }),
   // процитировать можно только то, что в этом чате сказали
   offer({ name: 'Group', when: [is('ctx.group')], act: 'group', tone: 'neutral', bonus: 3, text: (g, f) => (f['ctx.quote'] && g.chance(0.4) ? `«${f['ctx.quote']}»?!` : fromArr(g, 'GQ', GROUP_Q)) }),
@@ -170,10 +170,10 @@ export const choiceRules: R[] = [
     ...(() => {
       let idx = -1
       return {
-        text: (g: Game) => {
+        text: (g: ContentApi) => {
           const late = g.latePromises()
           const p = late[g.rnd(late.length)]
-          idx = g.S.promises.indexOf(p)
+          idx = g.promiseIndexOf(p)
           return fromD(g, 'P_PREV', { t: p.t, date: fmtDayMonth(p.made) })
         },
         arg: () => idx,
@@ -213,9 +213,9 @@ export const choiceRules: R[] = [
       act: 'talk', tone: 'neutral', bonus: 2, odds: 0.8,
       text: (g, f) => {
         const sub = kind === 'memory' || kind === 'word' ? '' : String(f['ctx.' + kind])
-        const said = g.S.msgs.slice(-6).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : [])).join(' ')
+        const said = g.msgsView().slice(-6).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : [])).join(' ')
         const facts = g.lineFacts()
-        const i = talkPairs(kind, sub).findIndex((e, j) => !g.lines.has(talkId(kind, sub, j)) && isOpen(e, facts) && (valueOf(e)[2]?.(g.S, said) ?? true))
+        const i = talkPairs(kind, sub).findIndex((e, j) => !g.lines.has(talkId(kind, sub, j)) && isOpen(e, facts) && (valueOf(e)[2]?.(g, said) ?? true))
         if (i < 0) return ''
         arg = `${kind}|${sub}|${i}`
         return valueOf(talkPairs(kind, sub)[i])[0]
@@ -231,7 +231,7 @@ export const choiceRules: R[] = [
       let arg = ''
       return {
         // вопрос и ответ идут парой: p[i] ↔ a[i]
-        text: (g: Game, f: Facts) => {
+        text: (g: ContentApi, f: Facts) => {
           const t = TOPICS[String(f['ctx.topic'])]
           const fits = t.p.filter((_, i) => !t.need?.[i] || t.need[i].test(g.topicText))
           const q = g.freshPlayer('PT_' + f['ctx.topic'], fits)

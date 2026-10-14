@@ -1,10 +1,10 @@
 // Кредитная лестница: платёж по календарю; предложение и выбор — карточка банка в ленте (Game.answerCard, #287).
-import type { Game } from '../../engine/game'
+import type { ContentApi } from '../../engine/game'
 import { type Rule } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { LOANS, type LoanId } from '../credit'
 
-type R = Rule<Game, GameEvent, Offer>
+type R = Rule<ContentApi, GameEvent, Offer>
 
 const loanOf = (facts: { credit?: unknown }): LoanId | null => {
   const id = String(facts.credit ?? '')

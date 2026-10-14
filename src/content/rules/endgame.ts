@@ -1,9 +1,9 @@
-import type { Game } from '../../engine/game'
+import type { ContentApi } from '../../engine/game'
 import { type Rule, eq, exists, is, missing, named } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { endgame, paydayScene } from '../memkeys'
 
-type R = Rule<Game, GameEvent, Offer>
+type R = Rule<ContentApi, GameEvent, Offer>
 
 const active = is(endgame.active)
 /** Исход выплаты определён, экран концовки ещё не закрыт: группы ещё нет, но «до выплаты» уже кончилось. */

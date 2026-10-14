@@ -61,7 +61,9 @@ src/
             achievements.ts; world.ts — труппа как факты (WORLD, SPEAKS); memkeys.ts — реестр ключей памяти; factkeys.ts — какие ключи игра
             порождает (семейства `arc.<id>`, `said.<claim>`… до элемента);
             rules/ — events (тип событий), criteria, turn, replies, choices, world, finales, rude,
-            court, payday, endgame
+            court, payday, endgame; правила типизированы узким ContentApi (Pick<Game> в engine/game.ts):
+            состояния S у контента нет — чтение производными читателями, изменение методами с инвариантом
+            (страж — rules/boundary.test.ts)
   ui/       React-телефон: чат со следованием ленты, досье, концовки, debug-панель.
             view.ts — единственный вход к состоянию: фасад GameUi (без S) и плоский снимок для показа
             (S, memkeys и контент-константы не покидают его; страж импортов и фасада — view.test.ts;

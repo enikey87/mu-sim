@@ -1,12 +1,12 @@
 // Платежи по календарю: предупреждение за день, списание или неоплата с последствиями.
-import type { Game } from '../../engine/game'
+import type { ContentApi } from '../../engine/game'
 import { type Rule, is, named, ne, set } from '../fact'
 import type { GameEvent, Offer } from './events'
 import {
   BILLS, billDue, lightOff, netRation, phoneWarn, type BillId,
 } from '../bills'
 
-type R = Rule<Game, GameEvent, Offer>
+type R = Rule<ContentApi, GameEvent, Offer>
 
 const billOf = (facts: { bill?: unknown }): BillId | null => {
   const id = String(facts.bill ?? '')
@@ -30,8 +30,8 @@ export const billRules: R[] = [
       if (!id || game.moneySealed() || !game.billEventLive(id, facts.at, 'BillWarn')) return
       if (id !== 'rent') return // warn в расписании только у коммуналки (#251)
       const bill = BILLS.find((b) => b.id === id)!
-      if (bill.skip?.(game.S.mem)) return
-      game.rules.applyOps([set(billDue(id), true)], {})
+      if (bill.skip?.(game.mem())) return
+      game.applyFacts([set(billDue(id), true)])
       game.notify('🏦', 'Банк', `Завтра списание: ${bill.label}, ${bill.amount.toLocaleString('ru-RU')} ₽. Успейте накопить достоинство.`, { event: 'bank.warn' })
     },
   },

@@ -9,7 +9,7 @@ export interface Bill {
   label: string
   amount: number
   due: Due
-  skip?: (mem: Record<string, unknown>) => boolean
+  skip?: (mem: Readonly<Record<string, unknown>>) => boolean
 }
 
 export const BILLS: readonly Bill[] = [
