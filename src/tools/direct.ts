@@ -69,7 +69,7 @@ export const DIRECT: Record<string, DirectCase> = {
   Finale_razmik_swap: { event: 'ArcFinale', facts: { arc: 'razmik' }, setup: (g) => { g.S.mem['count.rude'] = 10; g.S.mem[HEAT] = 3 } },
   Finale_razmik_union: { event: 'ArcFinale', facts: { arc: 'razmik' }, setup: (g) => { g.S.ach.customer = 1 } },
   Finale_rubik_karine: { event: 'ArcFinale', facts: { arc: 'rubik' }, setup: (g) => { g.S.ach.wife = 1 } },
-  Payday_notyou: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['finale.razmik'] = 'default'; g.S.mem['count.rude'] = 8 } },
+  Payday_notyou: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['finale.razmik'] = 'default' } },
   Payday_strasbourg: { event: 'PaydayOutcome', setup: (g) => { g.S.ach.strasbourg = 1 } },
   Quiet_Blocked_PromiseDue: { event: 'PromiseDue', facts: { promise: 0 }, setup: (g) => { g.S.mem.blocked = true; g.recordPromise({ text: 'в пятницу', d: 1 }); g.S.day += 1 } },
   Says_sorry_blocked_hinted: {
@@ -84,7 +84,7 @@ export const DIRECT: Record<string, DirectCase> = {
   },
   Finale_boris_toyou: { event: 'ArcFinale', facts: { arc: 'boris' }, setup: (g) => { g.S.items.push('баран Борис') } },
   Finale_niva_chose: { event: 'ArcFinale', facts: { arc: 'niva' }, setup: (g) => { g.S.items.push('«Нива» 1987 года') } },
-  Payday_lavash: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['payday.caught'] = true; g.S.mem['crypto.hodl'] = true } },
+  Payday_lavash: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['crypto.hodl'] = true } },
   Phone_Karine_PlayerMessage: { event: 'PlayerMessage', facts: { tone: 'neutral' }, setup: (g) => { g.rules.applyOps([during('phone.karine', 1)], {}) } },
   Quiet_Blocked_AlikAway: { event: 'AlikAway', setup: (g) => { g.S.mem.blocked = true } },
   Quiet_PhoneKarine_AlikIdle: { event: 'AlikIdle', setup: (g) => { g.rules.applyOps([during('phone.karine', 1)], {}) } },
@@ -124,8 +124,7 @@ export const DIRECT: Record<string, DirectCase> = {
   Payday_real: {
     event: 'PaydayOutcome',
     setup: (g) => {
-      Object.assign(g.S.ach, { saint: 1, court: 1, q_hash: 1, q_goat: 1, q_niva: 1, q_mama: 1, q_photo: 1 })
-      g.S.mem.caught = 3
+      Object.assign(g.S.ach, { saint: 1, court: 1 })
     },
   },
   Payday_niva: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['finale.niva'] = 'chose' } },
@@ -182,6 +181,9 @@ export const DIRECT: Record<string, DirectCase> = {
   // #703: правка пулов звонка сдвинула розыгрыш выборок — кафе и счёт из них ушли
   Scene_meet: { event: 'PickScene', setup: (g) => { g.S.day = 215 } },
   Scene_invoice: { event: 'PickScene', setup: (g) => { g.S.day = 215 } },
+  // #731: правка NAME_RE сдвинула розыгрыш выборок ещё раз — «заказчик жалуется» и «позвони заказчику» ушли из них
+  Scene_redo: { event: 'PickScene' },
+  Scene_customer: { event: 'PickScene', setup: (g) => { g.S.day = 210 } },
   // после #679/#681 бот в выборках до обычного финала коллекторов не доходит: держим прямым случаем
   Finale_collectors_default: { event: 'ArcFinale', facts: { arc: 'collectors' } },
 }

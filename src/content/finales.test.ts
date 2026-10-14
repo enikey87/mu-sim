@@ -200,6 +200,14 @@ describe('финалы сериалов: выбор', () => {
     await game.playArc('samvel')
     expect(game.S.mem['finale.samvel']).toBe('default')
   })
+  // #730: условие «Жениха» — только «Святой» (10 вежливых подряд), крики ему не мешают:
+  // реплика не утверждает отсутствия криков — этого условия больше нет
+  it('реплика «Жениха» называет вежливость, а не «ни разу не крикнул»', () => {
+    const groom = FINALES.samvel.find((f) => f.id === 'groom')!
+    const text = [...lines(groom), ...lines({ m: groom.done })].join('\n')
+    expect(text, 'утверждение об отсутствии криков без факта').not.toMatch(/ни разу|ни одного раза|не кричал|не крикнул|не грубил/i)
+    expect(text, 'называет факт, на котором стоит условие').toMatch(/свят/i)
+  })
   it('НС: без bonus приоретет «Жениха» над «Тамадой» теряется', () => {
     const groom = FINALES.samvel.find((f) => f.id === 'groom')!
     expect(groom.bonus).toBe(1)
@@ -336,6 +344,15 @@ describe('концовки игры', () => {
     expect(texts).not.toMatch(/Борис|Нива/) // концовка больше не требует их финалов — текст не опирается на них
     const pay = (FINALES.grant.find((f) => f.id === 'ally')!.fx!.pay as number).toLocaleString('ru-RU').replace(/\u00A0/g, ' ')
     expect(texts).toContain(`${pay} ₽`)
+  })
+  // #729: условие «Настоящих денег» — вежливость и суд (#713); в экран вернулись поимки на лжи и квесты:
+  // правку #722 отменило слияние ветки #723
+  it('экран «Настоящих денег» не называет убранных условий', () => {
+    const e = ENDINGS.find((x) => x.id === 'payday_real')!
+    const texts = [...lines(e), e.text].join(' ')
+    expect(texts, 'убранные условия — поимки и квесты — в тексте').not.toMatch(/поимк|ловил|квест|quests/i)
+    expect(texts, 'называет действующие условия').toMatch(/вежлив/)
+    expect(texts).toMatch(/суд/)
   })
   it('каждую концовку можно получить', async () => {
     const setups: Record<string, (g: Game) => void | Record<string, unknown>> = {
