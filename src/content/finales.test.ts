@@ -326,18 +326,24 @@ describe('концовки игры', () => {
     game.S.mem['finale.samvel'] = 'groom'
     expect(await check(game)).toBeNull()
   })
-  it('редкое сочетание побеждает: «Честные деньги» раньше частичных', async () => {
+  it('«Честные деньги» — один факт Гранта: ни Бориса, ни «Нивы»; сумма — из финала', async () => {
     const { game } = late()
-    Object.assign(game.S.mem, { 'finale.boris': 'brigadir', 'finale.grant': 'ally', 'finale.niva': 'chose' })
+    game.S.mem['finale.grant'] = 'ally'
     expect(await check(game)).toBe('honest')
+    const e = ENDINGS.find((x) => x.id === 'honest')!
+    const texts = [...lines(e), e.text].join(' ').replace(/\u00A0/g, ' ')
+    expect(texts).toContain('Грант')
+    expect(texts).not.toMatch(/Борис|Нива/) // концовка больше не требует их финалов — текст не опирается на них
+    const pay = (FINALES.grant.find((f) => f.id === 'ally')!.fx!.pay as number).toLocaleString('ru-RU').replace(/\u00A0/g, ' ')
+    expect(texts).toContain(`${pay} ₽`)
   })
   it('каждую концовку можно получить', async () => {
     const setups: Record<string, (g: Game) => void | Record<string, unknown>> = {
       family: (g) => { g.S.mem['finale.samvel'] = 'groom' },
       heir: (g) => { g.S.mem['finale.alik_death'] = 'will' },
-      ram: (g) => { g.S.mem['finale.boris'] = 'toyou'; g.S.items.push('баран Борис', '½ фундамента') },
-      alik: (g) => { g.S.mem['finale.garik'] = 'cutter'; g.S.ach.fence = 190 },
-      honest: (g) => Object.assign(g.S.mem, { 'finale.boris': 'brigadir', 'finale.grant': 'ally', 'finale.niva': 'chose' }),
+      ram: (g) => { g.S.mem['finale.boris'] = 'toyou' },
+      alik: (g) => { g.S.mem['finale.garik'] = 'cutter' },
+      honest: (g) => { g.S.mem['finale.grant'] = 'ally' },
       multiverse: (g) => { g.S.day = 800; g.S.stats.sent = 300; g.S.mem['endgame.active'] = true },
       vendetta: (g) => { g.S.mem.vendetta = true },
     }
@@ -372,9 +378,9 @@ describe('концовки игры', () => {
     const SCENARIO: Record<string, Step[]> = {
       family: [finale('samvel.groom')],
       heir: [finale('alik_death.will')],
-      ram: [finale('boris.toyou'), finale('niva.chose')], // второй трофей — «Нива»
-      alik: [async (g) => { g.S.ach.fence = 190 }, finale('garik.cutter')],
-      honest: [finale('boris.brigadir'), finale('grant.ally'), async (g) => { g.S.mem['asked.niva'] = 5; toLast(g, 'niva'); await g.playArc('niva') }],
+      ram: [finale('boris.toyou')],
+      alik: [finale('garik.cutter')],
+      honest: [finale('grant.ally')],
       vendetta: [async (g) => { Object.assign(g.S.mem, { 'count.rude': 25, 'rude.heat': 5 }); await g.send({ text: 'АЛИК!!! ТЫ ВРЁШЬ!!!', tone: 'rude' }); expect(g.S.mem.vendetta).toBe(true) }],
       // единственная концовка эндгейма: группа открылась выплатой и живёт до 800-го дня
       multiverse: [async (g) => { await payday(false)(g); g.closeEnding(); expect(g.S.mem['endgame.active']).toBe(true) }],

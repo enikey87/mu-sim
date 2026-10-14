@@ -56,7 +56,7 @@ export const DIRECT: Record<string, DirectCase> = {
   Finale_alik_death_will: { event: 'ArcFinale', facts: { arc: 'alik_death' }, setup: (g) => { g.S.ach.forgive = 1; g.S.mem['asked.alik_death'] = 1 } },
   Finale_rubik_bribe: { event: 'ArcFinale', facts: { arc: 'rubik' }, setup: (g) => { g.S.ach.redo = 1 } },
   Finale_samvel_tamada: { event: 'ArcFinale', facts: { arc: 'samvel' }, setup: (g) => { g.S.ach.toast = 1 } },
-  Ending_alik: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem['finale.garik'] = 'cutter'; g.S.ach.fence = 1 } },
+  Ending_alik: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem['finale.garik'] = 'cutter' } },
   Ending_heir: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem['finale.alik_death'] = 'will' } },
   Says_via_boris: { event: 'PlayerSays', facts: { intent: 'via', arg: 'boris' }, setup: (g) => { g.S.mem.blocked = true } },
   // с колкостями (#683) PromiseDue в открытом экране выплаты ловят сами выборки — случай снят по порогу гейта
@@ -69,7 +69,7 @@ export const DIRECT: Record<string, DirectCase> = {
   Finale_razmik_swap: { event: 'ArcFinale', facts: { arc: 'razmik' }, setup: (g) => { g.S.mem['count.rude'] = 10; g.S.mem[HEAT] = 3 } },
   Finale_razmik_union: { event: 'ArcFinale', facts: { arc: 'razmik' }, setup: (g) => { g.S.ach.customer = 1 } },
   Finale_rubik_karine: { event: 'ArcFinale', facts: { arc: 'rubik' }, setup: (g) => { g.S.ach.wife = 1 } },
-  Payday_notyou: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['finale.razmik'] = 'default' } },
+  Payday_notyou: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['finale.razmik'] = 'default'; g.S.mem['count.rude'] = 8 } },
   Payday_strasbourg: { event: 'PaydayOutcome', setup: (g) => { g.S.ach.strasbourg = 1 } },
   Quiet_Blocked_PromiseDue: { event: 'PromiseDue', facts: { promise: 0 }, setup: (g) => { g.S.mem.blocked = true; g.recordPromise({ text: 'в пятницу', d: 1 }); g.S.day += 1 } },
   Says_sorry_blocked_hinted: {
@@ -80,11 +80,11 @@ export const DIRECT: Record<string, DirectCase> = {
   Ending_payday_lavash: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'lavash' } },
   Ending_ram: {
     event: 'CheckEnding',
-    setup: (g) => { g.S.day = 300; g.S.mem['finale.boris'] = 'toyou'; g.S.items.push('баран Борис', '½ фундамента') },
+    setup: (g) => { g.S.day = 300; g.S.mem['finale.boris'] = 'toyou' },
   },
   Finale_boris_toyou: { event: 'ArcFinale', facts: { arc: 'boris' }, setup: (g) => { g.S.items.push('баран Борис') } },
   Finale_niva_chose: { event: 'ArcFinale', facts: { arc: 'niva' }, setup: (g) => { g.S.items.push('«Нива» 1987 года') } },
-  Payday_lavash: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['crypto.hodl'] = true } },
+  Payday_lavash: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['payday.caught'] = true; g.S.mem['crypto.hodl'] = true } },
   Phone_Karine_PlayerMessage: { event: 'PlayerMessage', facts: { tone: 'neutral' }, setup: (g) => { g.rules.applyOps([during('phone.karine', 1)], {}) } },
   Quiet_Blocked_AlikAway: { event: 'AlikAway', setup: (g) => { g.S.mem.blocked = true } },
   Quiet_PhoneKarine_AlikIdle: { event: 'AlikIdle', setup: (g) => { g.rules.applyOps([during('phone.karine', 1)], {}) } },
@@ -114,12 +114,7 @@ export const DIRECT: Record<string, DirectCase> = {
   Ending_family: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem['finale.samvel'] = 'groom' } },
   Ending_honest: {
     event: 'CheckEnding',
-    setup: (g) => {
-      g.S.day = 300
-      g.S.mem['finale.boris'] = 'brigadir'
-      g.S.mem['finale.grant'] = 'ally'
-      g.S.mem['finale.niva'] = 'chose'
-    },
+    setup: (g) => { g.S.day = 300; g.S.mem['finale.grant'] = 'ally' },
   },
   Ending_vendetta: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem.vendetta = true } },
   Ending_payday_real: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'real' } },
@@ -129,7 +124,8 @@ export const DIRECT: Record<string, DirectCase> = {
   Payday_real: {
     event: 'PaydayOutcome',
     setup: (g) => {
-      Object.assign(g.S.ach, { saint: 1, court: 1 })
+      Object.assign(g.S.ach, { saint: 1, court: 1, q_hash: 1, q_goat: 1, q_niva: 1, q_mama: 1, q_photo: 1 })
+      g.S.mem.caught = 3
     },
   },
   Payday_niva: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['finale.niva'] = 'chose' } },
