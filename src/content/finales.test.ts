@@ -437,6 +437,60 @@ describe('концовки игры', () => {
   })
 })
 
+describe('«Бараном»: баран Бориса — путём игрока, а не лотереей (#752)', () => {
+  // Единственный производитель `has.boris` — товар барахолки. Он брался равным розыгрышем из ~13
+  // товаров, а барахолка при перерыве 25 дней и конкуренции с другими сценами открывалась 0–2 раза
+  // за партию: концовка не собиралась ни разу. Теперь при открытых воротах барана предлагают первым.
+  const choose = async (g: Game, go: string) => { g.S.choices = null; const c = g.choices.find((x) => x.go === go); expect(c, go).toBeDefined(); await g.send(c!) }
+
+  /** Дожить до барахолки и забрать барана: игрок жмёт «Беру!» в сцене обмена. */
+  async function buyBaran(game: Game): Promise<boolean> {
+    for (let t = 0; t < 200; t++) {
+      if (game.S.scene?.id === 'barter') {
+        const n = String((game.S.scene.vars as { n?: string } | undefined)?.n ?? '')
+        if (/Борис/.test(n)) { await choose(game, 'take'); return true }
+        await choose(game, 'refuse') // чужой товар — отказ; барахолка откроется снова
+      } else await game.send({ text: 'Алик, когда деньги?', tone: 'neutral' })
+      game.S.offlineDays = 0
+    }
+    return false
+  }
+
+  it('баран предлагается первым и обмен даёт концовку «Бараном»', async () => {
+    const { game } = makeGame({ seed: 11 })
+    await game.playArc('boris') // линия Бориса началась — ворота открыты
+    expect(await buyBaran(game)).toBe(true)
+    expect(game.facts()['has.boris'], 'факт «Борис у игрока»').toBe(true)
+    toLast(game, 'boris')
+    await game.playArc('boris')
+    expect(game.S.mem['finale.boris']).toBe('toyou')
+    game.nextDay(320 - game.day)
+    await game.fire('CheckEnding')
+    expect(game.S.ending).toBe('ram')
+  })
+
+  it('НС: ворота закрыты (линия Бориса не начата) — барана в обмене нет', () => {
+    const { game } = makeGame()
+    game.S.mem['intro.baran'] = true // про барана слышали, но линии Бориса нет
+    const open = <T,>(a: readonly Parameters<typeof game.open<T>>[0][number][]) => game.open<T>(a)
+    const offered = new Set<string>()
+    for (let i = 0; i < 60; i++) offered.add(String(game.scenes.barter.init!(game.rng, open, game.S.day).n))
+    expect(offered).not.toContain('баран Борис')
+  })
+
+  it('НС: купленного барана обмен не предлагает снова', () => {
+    const { game } = makeGame()
+    game.S.arcs.boris = { i: 1, last: 0 }
+    game.S.mem['intro.baran'] = true
+    const open = <T,>(a: readonly Parameters<typeof game.open<T>>[0][number][]) => game.open<T>(a)
+    expect(String(game.scenes.barter.init!(game.rng, open, game.S.day).n)).toBe('баран Борис')
+    game.S.items.push('баран Борис') // куплен
+    const offered = new Set<string>()
+    for (let i = 0; i < 60; i++) offered.add(String(game.scenes.barter.init!(game.rng, open, game.S.day).n))
+    expect(offered).not.toContain('баран Борис')
+  })
+})
+
 describe('финалы по числу вопросов достижимы игроком (#753)', () => {
   // Финалы вида «спрашивал 5/6 раз» упирались в размер пула `follow` (4 строки): вопрос про сериал
   // переставал предлагаться после четырёх формулировок, и `asked.*` не дотягивал до порога.
