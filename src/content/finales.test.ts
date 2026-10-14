@@ -490,3 +490,48 @@ describe('«Бараном»: баран Бориса — путём игрок�
     expect(offered).not.toContain('баран Борис')
   })
 })
+
+describe('финалы по числу вопросов достижимы игроком (#753)', () => {
+  // Финалы вида «спрашивал 5/6 раз» упирались в размер пула `follow` (4 строки): вопрос про сериал
+  // переставал предлагаться после четырёх формулировок, и `asked.*` не дотягивал до порога.
+  // Здесь порог набирается настоящими нажатиями кнопки «как там X?».
+  const askLine = async (game: Game, arc: string, need: number) => {
+    let asks = 0
+    for (let t = 0; t < 120 && Number(game.S.mem[`asked.${arc}`] ?? 0) < need; t++) {
+      const q = game.choices.find((c) => c.act === 'arc' && c.arg === arc)
+      if (q) { asks++; await game.send(q) } else await game.send({ text: 'Алик, что с деньгами?', tone: 'neutral' })
+      game.S.offlineDays = 0 // ждём не «пропажи», а вопросов игрока
+    }
+    return asks
+  }
+
+  it('«Нива выбрала тебя»: 5 вопросов кнопкой — порог шпаргалки набран, а не подставлен тестом', async () => {
+    const { game } = makeGame()
+    await game.playArc('niva') // линия началась
+    expect(await askLine(game, 'niva', 5)).toBeGreaterThanOrEqual(5)
+    expect(Number(game.S.mem['asked.niva'])).toBeGreaterThanOrEqual(5)
+    toLast(game, 'niva')
+    await game.playArc('niva')
+    expect(game.S.mem['finale.niva'], 'частный финал, а не обычный «Не ищи»').toBe('chose')
+  })
+
+  it('«Бригадир»: 6 вопросов кнопкой — тот же класс условия', async () => {
+    const { game } = makeGame()
+    await game.playArc('boris')
+    expect(await askLine(game, 'boris', 6)).toBeGreaterThanOrEqual(6)
+    expect(Number(game.S.mem['asked.boris'])).toBeGreaterThanOrEqual(6)
+    toLast(game, 'boris')
+    await game.playArc('boris')
+    expect(game.S.mem['finale.boris']).toBe('brigadir')
+  })
+
+  it('повторный вопрос в тот же день по-прежнему отвечает «пока без новостей» и не глотает серию', async () => {
+    const { game } = makeGame()
+    await game.playArc('niva')
+    await game.fire('PlayerSays', { intent: 'arc', arg: 'niva' }) // серия по вопросу
+    const i = game.S.arcs.niva.i
+    await game.fire('PlayerSays', { intent: 'arc', arg: 'niva' }) // второй раз в тот же день
+    expect(game.S.arcs.niva.i, 'серия не проглочена').toBe(i)
+    expect(Number(game.S.mem['asked.niva'])).toBe(2) // счётчик копится, серия — нет
+  })
+})
