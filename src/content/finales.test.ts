@@ -345,6 +345,15 @@ describe('концовки игры', () => {
     const pay = (FINALES.grant.find((f) => f.id === 'ally')!.fx!.pay as number).toLocaleString('ru-RU').replace(/\u00A0/g, ' ')
     expect(texts).toContain(`${pay} ₽`)
   })
+  // #729: условие «Настоящих денег» — вежливость и суд (#713); в экран вернулись поимки на лжи и квесты:
+  // правку #722 отменило слияние ветки #723
+  it('экран «Настоящих денег» не называет убранных условий', () => {
+    const e = ENDINGS.find((x) => x.id === 'payday_real')!
+    const texts = [...lines(e), e.text].join(' ')
+    expect(texts, 'убранные условия — поимки и квесты — в тексте').not.toMatch(/поимк|ловил|квест|quests/i)
+    expect(texts, 'называет действующие условия').toMatch(/вежлив/)
+    expect(texts).toMatch(/суд/)
+  })
   it('каждую концовку можно получить', async () => {
     const setups: Record<string, (g: Game) => void | Record<string, unknown>> = {
       family: (g) => { g.S.mem['finale.samvel'] = 'groom' },
