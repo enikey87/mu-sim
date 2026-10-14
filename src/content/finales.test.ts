@@ -306,18 +306,16 @@ describe('концовки игры', () => {
     game.S.mem['finale.samvel'] = 'groom'
     expect(await check(game)).toBeNull()
   })
-  it('«Честные деньги» — по одному финалу Гранта, раньше частичных', async () => {
+  it('«Честные деньги» — один факт Гранта: ни Бориса, ни «Нивы»; сумма — из финала', async () => {
     const { game } = late()
     game.S.mem['finale.grant'] = 'ally'
     expect(await check(game)).toBe('honest')
-  })
-  it('текст «Честных денег» — только Грант и его сумма: ни Бориса, ни «Нивы», ни старых 1 550', () => {
     const e = ENDINGS.find((x) => x.id === 'honest')!
-    const texts = [e.text, ...e.m.map((x) => (typeof x === 'string' ? x : 't' in x ? x.t : ''))]
-    for (const t of texts) {
-      expect(t, t).not.toMatch(/Борис|Нив|1 550/)
-    }
-    expect(e.text).toContain('1 000 ₽')
+    const texts = [...lines(e), e.text].join(' ').replace(/\u00A0/g, ' ')
+    expect(texts).toContain('Грант')
+    expect(texts).not.toMatch(/Борис|Нива/) // концовка больше не требует их финалов — текст не опирается на них
+    const pay = (FINALES.grant.find((f) => f.id === 'ally')!.fx!.pay as number).toLocaleString('ru-RU').replace(/\u00A0/g, ' ')
+    expect(texts).toContain(`${pay} ₽`)
   })
   it('каждую концовку можно получить', async () => {
     const setups: Record<string, (g: Game) => void | Record<string, unknown>> = {
