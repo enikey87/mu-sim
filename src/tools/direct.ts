@@ -182,6 +182,9 @@ export const DIRECT: Record<string, DirectCase> = {
   // #703: правка пулов звонка сдвинула розыгрыш выборок — кафе и счёт из них ушли
   Scene_meet: { event: 'PickScene', setup: (g) => { g.S.day = 215 } },
   Scene_invoice: { event: 'PickScene', setup: (g) => { g.S.day = 215 } },
+  // #731: правка NAME_RE сдвинула розыгрыш выборок ещё раз — «заказчик жалуется» и «позвони заказчику» ушли из них
+  Scene_redo: { event: 'PickScene' },
+  Scene_customer: { event: 'PickScene', setup: (g) => { g.S.day = 210 } },
   // после #679/#681 бот в выборках до обычного финала коллекторов не доходит: держим прямым случаем
   Finale_collectors_default: { event: 'ArcFinale', facts: { arc: 'collectors' } },
 }
