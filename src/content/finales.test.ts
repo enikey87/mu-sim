@@ -136,15 +136,22 @@ describe('финалы сериалов: выбор', () => {
     expect(c.S.offlineDays).toBe(20)
   })
   it('два финала подходят — побеждает более специфичный («Жених» перекрывает «Тамаду»)', async () => {
+    // приоритет обязан быть не случайностью равной специфичности: прогоняем разные сиды
+    for (const seed of [1, 2, 3, 4, 5]) {
+      const { game } = makeGame({ seed })
+      SETUP['samvel.tamada'](game)
+      SETUP['samvel.groom'](game)
+      toLast(game, 'samvel')
+      await game.playArc('samvel')
+      expect(game.S.mem['finale.samvel'], `сид ${seed}`).toBe('groom')
+      expect(game.S.mem['wedding.anush']).toBe(true)
+      expect(game.S.mem['wedding.samvel']).toBeUndefined()
+    }
+    // свадьба игрока окрашивает ходы своим правилом, не Самвела (#256)
     const { game } = makeGame()
-    SETUP['samvel.tamada'](game)
     SETUP['samvel.groom'](game)
     toLast(game, 'samvel')
     await game.playArc('samvel')
-    expect(game.S.mem['finale.samvel']).toBe('groom')
-    expect(game.S.mem['wedding.anush']).toBe(true)
-    expect(game.S.mem['wedding.samvel']).toBeUndefined()
-    // свадьба игрока окрашивает ходы своим правилом, не Самвела (#256)
     game.S.arcs.beton = { i: 1, last: 0 }
     let noise = 0
     for (let i = 0; i < 150; i++) {
@@ -179,13 +186,26 @@ describe('финалы сериалов: выбор', () => {
     game.rules.settle()
     expect(game.S.mem['wedding.anush']).toBeUndefined()
   })
-  it('грубил хоть раз — в женихи не берут', async () => {
+  it('грубил хоть раз — одного Святого хватает: «Жених» не требует ни одного крика', async () => {
     const { game } = makeGame()
     SETUP['samvel.groom'](game)
     game.S.mem['count.rude'] = 1
     toLast(game, 'samvel')
     await game.playArc('samvel')
+    expect(game.S.mem['finale.samvel']).toBe('groom')
+  })
+  it('без Святого женихом не стать — частный финал уступает место обычному', async () => {
+    const { game } = makeGame()
+    toLast(game, 'samvel')
+    await game.playArc('samvel')
     expect(game.S.mem['finale.samvel']).toBe('default')
+  })
+  it('НС: без bonus приоретет «Жениха» над «Тамадой» теряется', () => {
+    const groom = FINALES.samvel.find((f) => f.id === 'groom')!
+    expect(groom.bonus).toBe(1)
+    // когда оба условия выполнены, у «Жениха» and «Тамады» по одному условию — разводит только bonus
+    expect(groom.when).toHaveLength(1)
+    expect(FINALES.samvel.find((f) => f.id === 'tamada')!.bonus).toBeUndefined()
   })
   it('финал с fx.pay: paid растёт, fifty — только при 50 ₽', async () => {
     const { game } = makeGame()
