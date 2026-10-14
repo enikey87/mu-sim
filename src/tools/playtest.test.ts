@@ -157,9 +157,29 @@ describe('плейтест', () => {
   }, 60_000)
 })
 
+/** Сиды из PLAYTEST_SEEDS: «1-4», «1,3,5», одиночный. Диапазон с концом меньше начала или не-число — ошибка:
+ *  пустой прогон выглядел бы зелёным разбором («370001-37008» — раунд 37 аудита, техаудит P3-11). */
 const seeds = (s: string): number[] => s.split(',').flatMap((p) => {
   const [a, b] = p.split('-').map(Number)
+  if (!Number.isFinite(a) || (p.includes('-') && (!Number.isFinite(b) || b < a))) {
+    throw new Error(`PLAYTEST_SEEDS: не понимаю «${p}» — ждём «1-4» (начало ≤ конец), «1,3,5» или один сид`)
+  }
   return b ? Array.from({ length: b - a + 1 }, (_, i) => a + i) : [a]
+})
+
+describe('PLAYTEST_SEEDS: диапазон и список сидов', () => {
+  it('форматы прежние: диапазон, список, одиночный', () => {
+    expect(seeds('1-4')).toEqual([1, 2, 3, 4])
+    expect(seeds('1,3')).toEqual([1, 3])
+    expect(seeds('370001')).toEqual([370001])
+  })
+  it('опечатка диапазона — громкая ошибка, а не пустой зелёный прогон', () => {
+    // «370001-37008» (конец меньше начала) молча давал 0 партий — раунд 37 аудита, техаудит P3-11
+    expect(() => seeds('370001-37008')).toThrow(/PLAYTEST_SEEDS.*370001-37008/)
+    expect(() => seeds('2-1')).toThrow(/PLAYTEST_SEEDS/)
+    expect(() => seeds('x')).toThrow(/PLAYTEST_SEEDS/)
+    expect(() => seeds('1-')).toThrow(/PLAYTEST_SEEDS/)
+  })
 })
 
 describe.runIf(process.env.PLAYTEST_OUT)('прогон для разбора', () => {
