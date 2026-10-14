@@ -246,10 +246,9 @@ describe('лестница грубости: ступени', () => {
     await game.afterTurn()
     expect(game.S.mem.polite).toBeUndefined()
   })
-  it('вендетта: серия криков, 25+ за игру и ни одного извинения — один раз; потом окрашивает ходы', async () => {
+  it('вендетта: 15 криков за игру и ни одного извинения — один раз; потом окрашивает ходы', async () => {
     const { game } = makeGame()
-    heat(game, 5)
-    game.S.mem['count.rude'] = 25
+    game.S.mem['count.rude'] = 15
     const { r, n } = await fire(game, 'rude')
     expect(r).toBe('Rude_Vendetta')
     expect(texts(game, n)).toEqual(expect.arrayContaining(all(T.VENDETTA)))
@@ -260,10 +259,22 @@ describe('лестница грубости: ступени', () => {
     for (let i = 0; i < 200 && !colored; i++) { game.S.stats.sent += 5; colored = game.rules.match({ event: 'AlikTurn' }, game.facts())?.name === 'Turn_Vendetta' }
     expect(colored).toBe(true)
   })
+  it('вендетта объявляется при холодной ссоре: 15 криков без единого извинения, жар не нужен', async () => {
+    const { game } = makeGame()
+    heat(game, 0)
+    game.S.mem['count.rude'] = 15
+    expect((await fire(game, 'rude')).r).toBe('Rude_Vendetta')
+  })
   it('хоть раз извинился — вендетты не будет', async () => {
     const { game } = makeGame()
     heat(game, 5)
-    Object.assign(game.S.mem, { 'count.rude': 25, 'count.sorry': 1 })
+    Object.assign(game.S.mem, { 'count.rude': 15, 'count.sorry': 1 })
+    expect((await fire(game, 'rude')).r).not.toBe('Rude_Vendetta')
+  })
+  it('до 15 криков вендетты не будет: 14-й крик остаётся ступенью лестницы', async () => {
+    const { game } = makeGame()
+    heat(game, 0)
+    game.S.mem['count.rude'] = 14
     expect((await fire(game, 'rude')).r).not.toBe('Rude_Vendetta')
   })
 })

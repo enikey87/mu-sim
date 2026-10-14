@@ -101,7 +101,7 @@ export const DIRECT: Record<string, DirectCase> = {
   Turn_Vendetta: { event: 'AlikTurn', setup: (g) => { g.S.mem.vendetta = true } },
   Rude_Vendetta: {
     event: 'PlayerMessage', facts: { tone: 'rude' },
-    setup: (g) => { g.S.mem[HEAT] = 5; g.S.mem['count.rude'] = 25; g.S.mem['count.sorry'] = 0 },
+    setup: (g) => { g.S.mem['count.rude'] = 15; g.S.mem['count.sorry'] = 0 },
   },
   Says_sorry_blocked: {
     event: 'PlayerSays', facts: { intent: 'sorry' },

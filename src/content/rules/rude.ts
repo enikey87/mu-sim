@@ -129,9 +129,9 @@ export const rudeRules: R[] = [
     name: 'Rude_Polite', event: 'PlayerMessage', when: [rude, is(polite)], bonus: 8, remember: [add(count.rude)],
     respond: async ({ game }) => { await game.say([line(game, 'POLITE_RUDE', T.POLITE_RUDE)]) },
   },
-  // финал — вендетта: серия криков, 25+ за игру и ни одного извинения
+  // финал — вендетта: серия криков за игру и ни одного извинения
   {
-    name: 'Rude_Vendetta', event: 'PlayerMessage', when: [rude, gte(HEAT, 5), gte(count.rude, 25), lte(count.sorry, 0)], bonus: 8, once: true, priority: 'cinematic',
+    name: 'Rude_Vendetta', event: 'PlayerMessage', when: [rude, gte(count.rude, 15), lte(count.sorry, 0)], bonus: 8, once: true, priority: 'cinematic',
     remember: [add(count.rude), set(vendetta, true)],
     respond: async ({ game }) => {
       await game.sticker({ e: '🗡️', c: 'Вендетта' })
