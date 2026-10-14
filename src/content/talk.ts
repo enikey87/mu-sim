@@ -2,14 +2,14 @@
 // Пары «вопрос ↔ ответ» (p[i] ↔ a[i]), каждая один раз за игру. Пары по легендам денег — в legends.ts (talk).
 import { LEGENDS } from './legends'
 import { ARCS } from './arcs'
-import type { GameState } from '../engine/state'
+import type { ContentApi } from '../engine/game'
 import { type Entry, type FactOp, set } from './fact'
 import { needs } from './world'
 import { grantPaid } from './memkeys'
 import { type Said } from './fact'
 
-/** Вопрос, ответ и (необязательно) когда вопрос уместен: по состоянию и по тому, что Алик только что сказал. */
-export type TalkPair = readonly [string, Said, ((S: GameState, said: string) => boolean)?]
+/** Вопрос, ответ и (необязательно) когда вопрос уместен: по состоянию игры и по тому, что Алик только что сказал. */
+export type TalkPair = readonly [string, Said, ((game: ContentApi, said: string) => boolean)?]
 
 /** Игрок отвечает вмешавшемуся персонажу, отвечает сам персонаж. */
 export const CHORUS_TALK: Record<string, Entry<TalkPair>[]> = {
@@ -30,7 +30,7 @@ export const CHORUS_TALK: Record<string, Entry<TalkPair>[]> = {
   ],
   samvel: [
     ['Самвел, скажите тост за возврат долга', 'Поднимаю! За то, чтобы долги возвращались, как гости — не вовремя, но с подарками! Алик, пей до дна. И плати.'],
-    ['Самвел, вы же хозяин свадьбы — объявите сбор', 'Объявлял. Собрали на конверт молодым. Молодые — это Алик. Опять.', (S) => !!S.arcs.samvel],
+    ['Самвел, вы же хозяин свадьбы — объявите сбор', 'Объявлял. Собрали на конверт молодым. Молодые — это Алик. Опять.', (g) => g.arcStarted('samvel')],
   ],
   nune: [
     // бумаги в сейфе — не утверждение о деньгах, claims тут нет
@@ -44,7 +44,7 @@ export const CHORUS_TALK: Record<string, Entry<TalkPair>[]> = {
   ],
   razmik: [
     // «наверху» — пока сериал не кончился: в финале Размик слезает
-    ['Размик, как там наверху?', { t: 'Видно всё. Видно Алика. Видно, что денег нет. Видно Арарат — это единственное, что радует.', claims: ['no_money'] }, (S) => (S.arcs.razmik?.i ?? 0) < ARCS.razmik.eps.length],
+    ['Размик, как там наверху?', { t: 'Видно всё. Видно Алика. Видно, что денег нет. Видно Арарат — это единственное, что радует.', claims: ['no_money'] }, (g) => Number(g.facts()['arc.razmik'] ?? 0) < ARCS.razmik.eps.length],
     ['Размик, давайте вместе на него надавим', 'Давай. Ты снизу, я сверху. Он посередине. Ему не привыкать.'],
   ],
   rubik: [

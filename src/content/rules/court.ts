@@ -1,6 +1,6 @@
 // Линия суда: каждая угроза судом двигает дело на ступень (court = номер ступени).
 // 0 насмешка → 1 юрист Арсен → 2 досудебная претензия → 3 заседание (сцена) → 4 апелляция → 5 Страсбург → 6 решение; дальше — «опять суд?».
-import type { Game } from '../../engine/game'
+import type { ContentApi } from '../../engine/game'
 import { type Rule, eq, gte, lte, add, set, is, missing } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { COURT, COURT_AFTER, COURT_LAWYER_AGAIN, COURT_VERDICT_AFTER_LETTER } from '../quests'
@@ -8,10 +8,10 @@ import { THREAT_AGAIN } from '../misc'
 import { meet } from '../world'
 import { count, court, courtReferral, intro, paydayScene, threatClaim } from '../memkeys'
 
-type R = Rule<Game, GameEvent, Offer>
+type R = Rule<ContentApi, GameEvent, Offer>
 const threat = eq('tone', 'threat')
 
-async function saySaid(game: Game, lines: ReadonlyArray<readonly [string, string]>): Promise<void> {
+async function saySaid(game: ContentApi, lines: ReadonlyArray<readonly [string, string]>): Promise<void> {
   for (const [w, t] of lines) { await game.say([w === 'alik' ? t : { w, t }]); await game.sleep(400) }
 }
 
@@ -26,12 +26,12 @@ export const REFERRAL: Record<string, string> = {
 }
 
 /** Префикс к реплике ступени, а не отдельное сообщение: реплик не больше, поток розыгрыша не сдвигается. */
-function referred(game: Game, lines: ReadonlyArray<readonly [string, string]>): ReadonlyArray<readonly [string, string]> {
-  const claim = String(game.S.mem[threatClaim] ?? '')
-  const said = String(game.S.mem[courtReferral] ?? '').split(',').filter(Boolean)
+function referred(game: ContentApi, lines: ReadonlyArray<readonly [string, string]>): ReadonlyArray<readonly [string, string]> {
+  const claim = String(game.mem()[threatClaim] ?? '')
+  const said = String(game.mem()[courtReferral] ?? '').split(',').filter(Boolean)
   const i = lines.findIndex(([w]) => w === 'alik')
   if (!REFERRAL[claim] || said.includes(claim) || i < 0) return lines
-  game.rules.applyOps([set(courtReferral, [...said, claim].join(','))], {})
+  game.applyFacts([set(courtReferral, [...said, claim].join(','))])
   return lines.map((l, j): readonly [string, string] => (j === i ? [l[0], `${REFERRAL[claim]} ${l[1]}`] : l))
 }
 
@@ -55,7 +55,7 @@ export const courtRules: R[] = [
     // претензия, апелляция, Страсбург, решение — по ступеням
     name: 'Court_Step', event: 'PlayerMessage', when: [threat, gte(court, 1), lte(court, 6)], remember: [add(count.threat), add(court)],
     respond: async ({ game }) => {
-      const stage = Number(game.S.mem[court]) - 1 // память уже сдвинута на следующую ступень
+      const stage = Number(game.mem()[court]) - 1 // память уже сдвинута на следующую ступень
       game.unlock('memory')
       if (stage === 3) return game.enterNode('court', game.scenes.court.start) // заседание: суд уже идёт, переводить нечего
       await saySaid(game, referred(game, COURT[stage]))

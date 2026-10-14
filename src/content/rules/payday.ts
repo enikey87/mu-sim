@@ -1,41 +1,41 @@
 // День выплаты: шаги сцены (hook) собираются из событий партии; исход выбирают правила PaydayOutcome.
-import type { Game } from '../../engine/game'
-import { type Rule, eq, gte, is, exists, missing } from '../fact'
+import type { ContentApi } from '../../engine/game'
+import { type Rule, eq, gte, is, exists, missing, set } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { SOURCES, SOURCES_TOPUP, ROLL, CLAIMS, GRAND, GRAND_FALLBACK, SLOTS, CONTRADICTIONS, MORNING_CONTRA, OUTCOME, type Source, type Call, type Claim } from '../payday'
 import { alikDead, caughtCount, count, cryptoHodl, payday as pd, paydayScene } from '../memkeys'
 
-type R = Rule<Game, GameEvent, Offer>
+type R = Rule<ContentApi, GameEvent, Offer>
 const NAMES = ['Гарик', 'Борис', 'Гоар', 'мама', 'Рубик', 'Размик', 'Нуне', 'Карине', 'Страсбург', 'малыш', '«Нив', 'Грант']
 const fmt = (n: number) => n.toLocaleString('ru-RU')
 
-async function money(game: Game, sum: number): Promise<void> {
-  game.S.mem[pd.sum] = sum
+async function money(game: ContentApi, sum: number): Promise<void> {
+  game.applyFacts([set(pd.sum, sum)])
   await game.sleep(500)
   game.sys(`К выплате: ${fmt(sum)} ₽`)
   game.emit()
 }
 
 /** Шаги сцены «День выплаты». Каждый шаг заканчивается переходом в следующий узел сцены. */
-export const PAYDAY_HOOKS: Record<string, (game: Game) => Promise<void>> = {
+export const PAYDAY_HOOKS: Record<string, (game: ContentApi) => Promise<void>> = {
   announce: async (game) => {
-    game.S.mem[pd.at] = game.S.day + 1
+    game.applyFacts([set(pd.at, game.day + 1)])
     game.unlock('payday')
   },
   // утро: линии партии отдают деньги, счётчик растёт до долга (с допработами), а не до 240 000 из договора
   morning: async (game) => {
     await game.sleep(700)
     // анонс ставит payday.at = day+1 («завтра»); away/зарядка могут сдвинуть календарь, пока сцена висит
-    const at = Number(game.S.mem[pd.at] ?? game.S.day + 1)
-    if (game.S.day < at) game.nextDay(at - game.S.day)
+    const at = Number(game.mem()[pd.at] ?? game.day + 1)
+    if (game.day < at) game.nextDay(at - game.day)
     game.sys('— День выплаты —')
-    const owed = game.S.debt
+    const owed = game.debt
     let sum = 0
     for (let i = 0; i < 4 && sum < owed; i++) {
       const p = game.linePicked('PD_SRC', SOURCES)
       if (!p) break
       await game.say([p.text])
-      game.S.mem[pd.morning] = `${game.S.mem[pd.morning] ?? ''}\n${p.text}`
+      game.applyFacts([set(pd.morning, `${game.mem()[pd.morning] ?? ''}\n${p.text}`)])
       const over = sum + (p.spec as Source).amount - owed
       sum = Math.min(owed, sum + (p.spec as Source).amount)
       await money(game, sum)
@@ -55,7 +55,7 @@ export const PAYDAY_HOOKS: Record<string, (game: Game) => Promise<void>> = {
   },
   // дележ: каждый требует долю, счётчик тает до 50 ₽
   claims: async (game) => {
-    let sum = Number(game.S.mem[pd.sum] ?? game.S.debt)
+    let sum = Number(game.mem()[pd.sum] ?? game.debt)
     const took = new Set<string>()
     for (let i = 0; i < 5 && sum > 50; i++) {
       const p = game.linePicked('PD_CLAIM', CLAIMS, { filter: (l) => !took.has((l as Claim).who) })
@@ -64,7 +64,7 @@ export const PAYDAY_HOOKS: Record<string, (game: Game) => Promise<void>> = {
       await game.say([{ w: (p.spec as Claim).who, t: p.text }])
       sum = Math.max(50, sum - (p.spec as Claim).cut)
       // отказал делиться — берут вдвое: родня слышит «по рублю»
-      if (game.S.mem[pd.refused]) sum = Math.max(50, sum - Math.round((p.spec as Claim).cut / 2))
+      if (game.mem()[pd.refused]) sum = Math.max(50, sum - Math.round((p.spec as Claim).cut / 2))
       await money(game, sum)
     }
     // остаток уходит не «сам собой», а с объяснением — иначе арифметика видна и не сходится
@@ -81,18 +81,18 @@ export const PAYDAY_HOOKS: Record<string, (game: Game) => Promise<void>> = {
       return t
     })
     const chain = links.join(' ').replace(/,\s*$/, '.')
-    game.S.mem[pd.chain] = chain
+    game.applyFacts([set(pd.chain, chain)])
     await game.typingFor(4000, 'печатает очень длинное сообщение…')
     await game.say([chain])
     // поймать можно на противоречии с партией или с тем, что Алик сам сказал утром этого же дня
-    const morning = String(game.S.mem[pd.morning] ?? '')
-    const c = MORNING_CONTRA.find((x) => x.morning.test(morning) && x.link.test(chain)) ?? CONTRADICTIONS.find((x) => x.link.test(chain) && x.when(game.S.mem))
-    if (game.S.scene) game.S.scene.vars.catch = c?.say
-    game.S.mem[pd.contra] = !!c
+    const morning = String(game.mem()[pd.morning] ?? '')
+    const c = MORNING_CONTRA.find((x) => x.morning.test(morning) && x.link.test(chain)) ?? CONTRADICTIONS.find((x) => x.link.test(chain) && x.when(game.mem()))
+    game.setSceneVar('catch', c?.say)
+    game.applyFacts([set(pd.contra, !!c)])
   },
   catch: async (game) => {
-    if (game.S.mem[pd.contra]) {
-      game.S.mem[pd.caught] = true
+    if (game.mem()[pd.contra]) {
+      game.applyFacts([set(pd.caught, true)])
       await game.say(['…Ты поймал меня в День выплаты. Такого не было даже в Страсбурге. Хорошо. Хорошо! Ты заслужил.'])
     } else await game.say(['Неправда? Каждое слово — из нашей с тобой жизни, брат. Проверь по журналу.'])
     await PAYDAY_HOOKS.outcome(game)
@@ -107,26 +107,26 @@ const outcome = (id: string, when: R['when'], extra: Partial<R> = {}): R => ({
     const o = OUTCOME[id]
     await game.sleep(900)
     // «перевёл {sum}» — ровно то, что осталось «к выплате» после всех долей, а не 240 000 из воздуха
-    if (o.sys) game.sys(o.sys.replace('{debt}', fmt(game.S.debt)).replace('{sum}', fmt(Number(game.S.mem[pd.sum] ?? game.S.debt))))
+    if (o.sys) game.sys(o.sys.replace('{debt}', fmt(game.debt)).replace('{sum}', fmt(Number(game.mem()[pd.sum] ?? game.debt))))
     for (const l of game.open(o.lines)) await game.say([typeof l === 'string' ? l : { w: l[0], t: l[1] }])
     // долг меняем до печати выплаты: после paydayScene adjustDebt уже не пустит
-    if (id === 'real' || id === 'coins') { game.adjustMoney(game.S.debt, 'День выплаты'); game.adjustDebt(-game.S.debt) }
-    if (id === 'lavash') { game.adjustDebt(-game.S.debt); game.S.items.push('Лаваш × 240 000') }
-    if (id === 'niva') { game.adjustDebt(-Math.min(5000, game.S.debt)); game.S.items.push('«Нива» (выплата)') }
-    if (id === 'notyou') game.S.items.push('Место на кране (40 м)')
+    if (id === 'real' || id === 'coins') { game.adjustMoney(game.debt, 'День выплаты'); game.adjustDebt(-game.debt) }
+    if (id === 'lavash') { game.adjustDebt(-game.debt); game.giveItem('Лаваш × 240 000') }
+    if (id === 'niva') { game.adjustDebt(-Math.min(5000, game.debt)); game.giveItem('«Нива» (выплата)') }
+    if (id === 'notyou') game.giveItem('Место на кране (40 м)')
     if (id === 'default') { if (game.adjustDebt(-50)) game.adjustMoney(50, 'День выплаты') }
-    game.S.mem[paydayScene] = id
+    game.applyFacts([set(paydayScene, id)])
     game.sealOpenJobs()
-    game.S.mem[pd.sum] = undefined
+    game.clearFact(pd.sum)
     game.setLegend(null) // деньги «отданы» — легенда денег кончилась
-    game.scheduleEvent(game.S.day + 1, 'PaydayButton', { outcome: id })
+    game.scheduleEvent(game.day + 1, 'PaydayButton', { outcome: id })
   },
 })
 /** Прерванная сцена Дня выплаты продолжает с узла прерывания (#571): сказанное не звучит дважды. */
-const resumePayday = (game: Game): Promise<void> => {
-  const at = game.S.mem[pd.resume]
+const resumePayday = (game: ContentApi): Promise<void> => {
+  const at = game.mem()[pd.resume]
   if (at === undefined) return game.enterNode('payday', 'announce')
-  delete game.S.mem[pd.resume]
+  game.clearFact(pd.resume)
   return game.resumeNode('payday', String(at))
 }
 

@@ -2,7 +2,7 @@
 // Ступени — правила с растущей специфичностью: следующая перекрывает предыдущую без явного порядка.
 // S0 обида → S1 семья пишет в личку → S2 звонки мамы → S3 блок и чужие номера → S4 семейный суд → S5 вежливость-убийца;
 // сбоку — «Мууу»-дипломатия, встречный иск, ритуал примирения, холодная война, привыкание; финал — вендетта.
-import type { Game } from '../../engine/game'
+import type { ContentApi } from '../../engine/game'
 import { type Rule, type Line, type Entry, eq, ne, gte, lte, is, add, set, missing, mapEntry, valueOf, saidClaims, saidText } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { WORLD, speaks } from '../world'
@@ -10,33 +10,33 @@ import * as T from '../rude'
 import { RUDE_AGAIN } from '../misc'
 import { HEAT, blocked, blockedHint, count, mamaCalls, phoneKarine, polite, ritualCount, statusHidden, vendetta } from '../memkeys'
 
-type R = Rule<Game, GameEvent, Offer>
+type R = Rule<ContentApi, GameEvent, Offer>
 const rude = eq('tone', 'rude')
 const cools = [add(count.rude), add(HEAT)]
 // остывание — отложенное событие, а не отложенное «−1»: после примирения (температура = 0) старые остывания не уводят её в минус
 const cool: R['trigger'] = [{ event: 'RudeCool', delay: 20 }]
 
 /** Реплика участника без повторов: пул [кто, текст]. */
-export async function sayFresh(game: Game, key: string, pool: readonly Entry<T.Said>[]): Promise<boolean> {
-  const bag = structuredClone(game.S.bags[key])
+export async function sayFresh(game: ContentApi, key: string, pool: readonly Entry<T.Said>[]): Promise<boolean> {
+  const bag = game.bagOf(key)
   const x = game.seen.pickFresh(() => game.draw(key, pool.map((e) => mapEntry(e, ([, v]) => v))), (v) => v)
   const t = saidText(x)
   // свежих нет — ничего не сказано, и колода остаётся там, где была
-  if (game.seen.has(t)) { if (bag) game.S.bags[key] = bag; else delete game.S.bags[key]; return false }
+  if (game.seen.has(t)) { game.restoreBag(key, bag); return false }
   game.seen.mark(t)
   const [who, said] = pool.map(valueOf).find(([, v]) => v === x)!
   await game.say([who === 'alik' ? said : { w: who, t, claims: saidClaims(said) }])
   return true
 }
 /** Остудить ссору на n, не ниже нуля. */
-export const cooldown = (game: Game, n: number) => { game.S.mem[HEAT] = Math.max(0, Number(game.S.mem[HEAT] ?? 0) - n) }
+export const cooldown = (game: ContentApi, n: number) => game.coolConflict(n)
 /** Повторяемая реплика (вежливый режим, вендетта): не чаще раза в 6 ходов, свежие — раньше. */
-const line = (game: Game, key: string, arr: readonly Line[]) => game.line(key, arr, { repeat: true, cooldown: { turns: 6 }, fallback: game.X.offended })!
+const line = (game: ContentApi, key: string, arr: readonly Line[]) => game.line(key, arr, { repeat: true, cooldown: { turns: 6 }, fallback: game.X.offended })!
 /** Реплика по правилам Hades (условия, приоритет, один раз); пул исчерпан — генератор, а не повтор. */
-const freshOr = (game: Game, key: string, arr: readonly Line[], fallback: () => string) => game.line(key, arr, { fallback })!
+const freshOr = (game: ContentApi, key: string, arr: readonly Line[], fallback: () => string): string => game.line(key, arr, { fallback })!
 const speakerWhen = (who: string) => { const criterion = speaks(who); return criterion ? [criterion] : [] }
 
-async function offended(game: Game, text?: string, away = true): Promise<void> {
+async function offended(game: ContentApi, text?: string, away = true): Promise<void> {
   game.mood(-2)
   if (game.chance(0.3)) await game.sticker({ e: '🏠🔥', c: 'Всё горит' })
   await game.say([text ?? game.uniq(game.X.offended)])
@@ -86,8 +86,8 @@ export const rudeRules: R[] = [
     respond: async ({ game }) => {
       game.mood(-1)
       // счётчик пропущенных только растёт: он копится за партию, а не выдумывается каждый раз
-      const calls = Number(game.S.mem[mamaCalls] ?? 6) + 1 + game.rnd(4)
-      game.rules.applyOps([set(mamaCalls, calls)], {})
+      const calls = Number(game.mem()[mamaCalls] ?? 6) + 1 + game.rnd(4)
+      game.applyFacts([set(mamaCalls, calls)])
       game.sys(game.draw('RC_SYS', T.RUDE_CALLS_SYS).replace('{n}', String(calls)))
       await game.sleep(600)
       await sayFresh(game, 'RC_VOICE', T.RUDE_CALLS_VOICE)

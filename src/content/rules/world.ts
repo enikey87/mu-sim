@@ -1,5 +1,5 @@
 // Правила новых возможностей: выбор сцен, наступившие обещания, хор персонажей, состояния мира.
-import type { Game } from '../../engine/game'
+import type { ContentApi } from '../../engine/game'
 import { type Rule, type Facts, type Entry, type Line, eq, ne, gte, lte, is, add, of, missing, during, set, spec } from '../fact'
 
 import type { GameEvent, Offer } from './events'
@@ -10,7 +10,7 @@ import { alikDead, alikShaved, blocked, count, endgame, grantPaid, interjections
 import { JournalForAmnesty } from './criteria'
 import { low } from '../excuses'
 
-type R = Rule<Game, GameEvent, Offer>
+type R = Rule<ContentApi, GameEvent, Offer>
 
 // ---- выбор сцены (PickScene): раньше — случайно из колоды, теперь — по сюжету ----
 // Специфичность у всех 0 (выбор по весам), условия — ворота; после показа — перерыв 25 дней.
@@ -57,8 +57,8 @@ export const questRules: R[] = [
 ]
 
 // ---- обещание наступило (PromiseDue — отложенное событие на день срока) ----
-const promiseText = (game: Game, f: Facts) => game.S.promises[Number(f.promise)]
-const dueLine = (game: Game, f: Facts, key: string, arr: readonly Entry<string>[]) => {
+const promiseText = (game: ContentApi, f: Facts) => game.promiseAt(Number(f.promise))
+const dueLine = (game: ContentApi, f: Facts, key: string, arr: readonly Entry<string>[]) => {
   const p = promiseText(game, f)!
   return game.uniq(() => `${game.X.g('ADDR')}, ${low(game.X.fill(game.draw(key, arr), { t: p.t }))}`)
 }
@@ -67,15 +67,13 @@ const live = eq('promiseLive', true)
 const stakeMoustache = eq('promiseStake', 'moustache')
 // не promiseLive: срок мог остаться позади (#327)
 const stakeOpen = [eq('promisePassed', true), stakeMoustache, missing(alikShaved), missing(endgame.active)] as const
-const stakeKept = async ({ game, facts }: { game: Game; facts: Facts }) => {
+const stakeKept = async ({ game, facts }: { game: ContentApi; facts: Facts }) => {
   await game.say([dueLine(game, facts, 'DUE_SHAVE_KEPT', PROMISE_SHAVE_KEPT)])
   await game.transfer()
-  const p = game.S.promises[Number(facts.promise)]
-  if (p) { p.asked = true; p.kept = true; p.stakeDone = true }
+  game.promiseStakeKept(Number(facts.promise))
 }
-const stakeShave = async ({ game, facts }: { game: Game; facts: Facts }) => {
-  const p = game.S.promises[Number(facts.promise)]
-  if (p) p.stakeDone = true
+const stakeShave = async ({ game, facts }: { game: ContentApi; facts: Facts }) => {
+  game.promiseStakeDone(Number(facts.promise))
   game.sys('Алик Воздухонесян сменил фото профиля. На фото — Алик без усов.')
   await game.say([dueLine(game, facts, 'DUE_SHAVE', PROMISE_SHAVE)])
   game.unlock('shaved')
@@ -120,8 +118,7 @@ export const promiseRules: R[] = [
       await game.say([dueLine(game, facts, 'DUE_KEPT', PROMISE_DUE_KEPT)])
       await game.transfer()
       // сдержал (на 50 ₽) — в журнале больше не «просрочено», упрекать нечем; `kept` — чтобы досье не звало это «припомнил»
-      const p = game.S.promises[Number(facts.promise)]
-      if (p) { p.asked = true; p.kept = true }
+      game.promiseKept(Number(facts.promise))
     },
   },
   {
@@ -136,7 +133,7 @@ const chorusResponse = (who: string, pool: readonly Line[]): R['respond'] => asy
   const p = game.linePicked('CH_' + who, pool)
   if (!p) return false // новых реплик нет — молчит
   await game.say([{ w: who, t: p.text, claims: p.spec.claims ?? [] }])
-  game.S.ctx = { ...(game.S.ctx ?? {}), chorus: who } // можно ответить самому персонажу
+  game.setCtx({ ...(game.ctx ?? {}), chorus: who }) // можно ответить самому персонажу
 }
 const chorus = (who: string): R => ({
   name: `Chorus_${who}`, event: 'Mentioned', target: who, when: [missing(alikDead), ...speaks(who)], odds: 0.3, cooldown: { turns: 12 }, priority: 'chatter',
@@ -167,7 +164,7 @@ const fedUp = (who: string): R => ({
 export const chorusRules: R[] = [...Object.keys(CHORUS).map(chorus), ...deadChorusRules, ...Object.keys(CHORUS_FED_UP).map(fedUp)]
 
 // ---- состояния мира со сроком: окрашивают обычный ход ----
-const noise = (key: string, arr: readonly Entry<string>[]) => async ({ game }: { game: Game }) => {
+const noise = (key: string, arr: readonly Entry<string>[]) => async ({ game }: { game: ContentApi }) => {
   await game.say([game.uniq(() => game.draw(key, arr))])
 }
 /** Факт у каждой свадьбы свой: два срока на одном ключе откатывали бы друг друга. */
@@ -175,7 +172,7 @@ const weddingNoise = (who: import('../factkeys').WeddingId): R => ({
   name: `Turn_Wedding_${who.charAt(0).toUpperCase()}${who.slice(1)}`, event: 'AlikTurn', when: [is(`wedding.${who}`)],
   specificity: 0, weight: 12, cooldown: { turns: 3 }, respond: noise('WEDDING', WEDDING_NOISE),
 })
-async function deadTurn(game: Game): Promise<void> {
+async function deadTurn(game: ContentApi): Promise<void> {
   game.setCtx(null)
   // Карине ушла к Рубику — о смерти сообщает мама Алика
   if (game.chance(0.5)) await game.say([{ w: game.canSpeak('karine') ? 'karine' : 'mama', t: game.uniq(() => game.draw('DEAD_K', DEAD_KARINE)) }])

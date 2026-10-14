@@ -1,9 +1,11 @@
 // Общие помощники тестов: игра с seeded-случайностью, ручными часами и памятью вместо localStorage.
-import { Game, type GameOptions } from '../engine/game'
+import { Game, type ContentApi, type GameOptions } from '../engine/game'
 import { manualClock, type ManualClock } from '../engine/clock'
 import { seededRng } from '../engine/rng'
 import { setCount, type Storage } from '../engine/state'
 import type { Msg } from '../engine/state'
+import type { Facts, Query, Rule, RuleCtx } from '../engine/rules'
+import type { GameEvent, Offer } from '../content/rules/events'
 
 export function memStorage(init: Record<string, string> = {}): Storage & { data: Record<string, string> } {
   const data = { ...init }
@@ -37,6 +39,17 @@ export { botTurn } from '../tools/bot'
 
 /** Деньги партии — только через adjustMoney: в тестах ставим их здесь, одной строкой и явно. */
 export const setMoney = (g: Game, n: number): void => { setCount(g.S, 'money', n) }
+
+/** Контекст ответа правила для прямого вызова respond в тестах: правила контента типизированы узким
+ *  ContentApi, а RuleSet.ctx собирает контекст широким Game — мостим один раз здесь, а не кастом в каждом тесте. */
+export function respondCtx(
+  rule: Rule<ContentApi, GameEvent, Offer>,
+  game: Game,
+  q: Pick<Query, 'event' | 'facts' | 'sender' | 'target'>,
+  facts: Facts,
+): RuleCtx<ContentApi> {
+  return game.rules.ctx(game, rule as unknown as Rule<Game, string, Offer>, q, facts) as unknown as RuleCtx<ContentApi>
+}
 
 export type CardMsg = Extract<Msg, { kind: 'card' }>
 /** Карточки телефона в ленте (банк, мама, Авито, #287); `app` — только этого приложения. */

@@ -203,7 +203,7 @@ export const MORNING_CONTRA: Array<{ morning: RegExp; link: RegExp; say: string 
   { morning: /Борис-прораб выписал премию/, link: /Борис как прораб выдал|Борис съел/, say: 'Стоп. Борис сегодня сам всем премию раздал.' },
   { morning: /Размик сбросился/, link: /Размик/, say: 'Стоп. Размик сегодня сам сбросился.' },
 ]
-export const CONTRADICTIONS: Array<{ link: RegExp; when: (m: Record<string, unknown>) => boolean; say: string }> = [
+export const CONTRADICTIONS: Array<{ link: RegExp; when: (m: Readonly<Record<string, unknown>>) => boolean; say: string }> = [
   { link: /Грузию/, when: (m) => m['finale.niva'] === 'chose', say: 'Стоп. «Нива» уже вернулась — ко мне. С деньгами.' },
   { link: /сейфе|ключ от сейфа/, when: (m) => m['finale.nune'] === 'ledger', say: 'Стоп. Нуне сама сказала: в сейфе ничего нет.' },
   { link: /Борис как прораб/, when: (m) => m['finale.boris'] === 'toyou', say: 'Стоп. Борис живёт у меня. Какой прораб?' },

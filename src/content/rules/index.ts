@@ -1,5 +1,5 @@
 // Все правила игры. Порядок не важен: выбор решает специфичность и вес.
-import type { Game } from '../../engine/game'
+import type { ContentApi } from '../../engine/game'
 import type { Rule } from '../../engine/rules'
 import type { GameEvent, Offer } from './events'
 import { toneRules, ignoreRules, periodRules, turnRules, idleRules, awayRules, storyRules } from './turn'
@@ -15,4 +15,4 @@ import { endgameRules } from './endgame'
 import { billRules } from './bills'
 import { creditRules } from './credit'
 
-export const allRules: Rule<Game, GameEvent, Offer>[] = [...toneRules, ...storyRules, ...ignoreRules, ...periodRules, ...turnRules, ...idleRules, ...awayRules, ...replyRules, ...choiceRules, ...worldRules, ...finaleRules, ...endingRules, ...rudeRules, ...rudeSaysRules, ...crewRules, ...courtRules, ...paydayRules, ...endgameRules, ...billRules, ...creditRules]
+export const allRules: Rule<ContentApi, GameEvent, Offer>[] = [...toneRules, ...storyRules, ...ignoreRules, ...periodRules, ...turnRules, ...idleRules, ...awayRules, ...replyRules, ...choiceRules, ...worldRules, ...finaleRules, ...endingRules, ...rudeRules, ...rudeSaysRules, ...crewRules, ...courtRules, ...paydayRules, ...endgameRules, ...billRules, ...creditRules]

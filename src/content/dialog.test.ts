@@ -1,7 +1,7 @@
 // Несостыковки из партии пользователя (docs/PLAYTEST_ISSUES.md): каждая — тестом, чтобы не вернулась.
 import { describe, it, expect } from 'vitest'
 import type { GameEvent } from './rules/events'
-import { makeGame , setMoney} from '../test/helpers'
+import { makeGame , setMoney, respondCtx } from '../test/helpers'
 import { ARCS, GROUP } from './arcs'
 import { D, make } from './excuses'
 import { ENDGAME_RETURNERS } from './endgame'
@@ -84,7 +84,7 @@ describe('несостыковки из партии пользователя', 
     // само правило, а не розыгрыш хода: Turn_Memory — редкий гость среди ходов Алика (вес в розыгрыше), и цикл AlikTurn
     // с лимитом держал тест на удаче сида: p90≈45 ходов, max 88, лимит 60 не покрывал 3 сида из 100 (#327)
     const rule = turnRules.find((r) => r.name === 'Turn_Memory')!
-    await rule.respond!(game.rules.ctx(game, rule, { event: 'AlikTurn' }, game.facts()))
+    await rule.respond!(respondCtx(rule, game, { event: 'AlikTurn' }, game.facts()))
     const line = texts(game, n).find((t) => /отдал тебе/.test(t))!
     expect(line).toContain('«Место на кране»')
     expect(line).not.toContain('(40 м)')
