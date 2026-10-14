@@ -101,7 +101,8 @@ export const DIRECT: Record<string, DirectCase> = {
   Turn_Vendetta: { event: 'AlikTurn', setup: (g) => { g.S.mem.vendetta = true } },
   Rude_Vendetta: {
     event: 'PlayerMessage', facts: { tone: 'rude' },
-    setup: (g) => { g.S.mem['count.rude'] = 15; g.S.mem['count.sorry'] = 0 },
+    // 15-й крик: порог в правиле читает счётчик до remember текущего крика (#742)
+    setup: (g) => { g.S.mem['count.rude'] = 14; g.S.mem['count.sorry'] = 0 },
   },
   Says_sorry_blocked: {
     event: 'PlayerSays', facts: { intent: 'sorry' },
