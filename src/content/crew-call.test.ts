@@ -4,9 +4,10 @@ import { describe, it, expect } from 'vitest'
 import { makeGame, alikTexts } from '../test/helpers'
 import type { Game } from '../engine/game'
 import { alikDead, blocked, crewPaid, endgame } from './memkeys'
-import { CREW_CALL, CREW_PAID } from './crew'
+import { CREW_CALL, P_CREW_PAID, CREW_PAID } from './crew'
 import { SPEAKS, WORLD } from './world'
-import { is, valueOf } from './fact'
+import { is, set, valueOf } from './fact'
+import { sayFresh } from './rules/rude'
 
 const taronMsgs = (game: ReturnType<typeof makeGame>['game']) =>
   game.S.msgs.filter((m) => m.kind === 'text' && m.who === 'taron')
@@ -122,6 +123,38 @@ describe('упрёк по звонку с объекта', () => {
     for (const a of answers) expect(CREW_PAID.some((l) => a.includes(l)), a).toBe(true)
     expect(answers[0], 'колода не зациклена на одной строке').not.toBe(answers[1])
     expect(sysMsgs(game).filter((t) => t === 'Пропущенный звонок: Тарон (объект)').length, 'звонок — один раз').toBe(1)
+  })
+
+  // ревью раунда 45 (#703): упрёк и ответ ссылались на «пострадавших», которых звонок мог не назвать
+  it('звонок без имён (вариант «плиточнику — в следующий раз») не открывает упрёков про штукатура, водителя, электрика, козла', async () => {
+    const { game } = makeGame()
+    game.S.day = 210
+    // звонок вариантом 3 — тем же путём, что и правило Beat_CrewCall: один элемент пула + факт звонка
+    expect(await sayFresh(game, 'CREW_CALL', [CREW_CALL[2]])).toBe(true)
+    game.rules.applyOps([set(crewPaid, true)], {})
+    const offered = game.open(P_CREW_PAID)
+    expect(offered.length, 'упрёк предлагается').toBeGreaterThan(0)
+    expect(offered.join('\n')).not.toMatch(/штукатур|водител|электрик|козл|Тарон получ/i)
+    // выборщик не заглядывает дальше открытого: кнопка — тоже из этих строк
+    const rules = optCrewPaid(game)
+    const c = rules[0].offer!(game.rules.ctx(game, rules[0], { event: 'BuildChoices' }, game.facts()))
+    expect(offered).toContain(c!.text)
+  })
+
+  it('ответы Алика субъектно-агностичны: ответ не отвечает на субъект, которого упрёк не называл', async () => {
+    const { game } = makeGame()
+    game.S.day = 210
+    await sayFresh(game, 'CREW_CALL', [CREW_CALL[2]])
+    game.rules.applyOps([set(crewPaid, true)], {})
+    for (const l of CREW_PAID) expect(l, l).not.toMatch(/штукатур|водител|электрик|козл/i)
+    // мутация «субъектный ответ на чужой упрёк» невозможна: субъектных ответов в пуле нет
+    for (let i = 0; i < 5; i++) {
+      const n = game.S.msgs.length
+      await game.fire('PlayerSays', { intent: 'crewPaid' })
+      const answer = alikTexts(game.S.msgs.slice(n)).join(' ')
+      expect(CREW_PAID.some((l) => answer.includes(l)), answer).toBe(true)
+      expect(answer).not.toMatch(/штукатур|водител|электрик|козл/i)
+    }
   })
 
   it('в окне блокировки и смерти упрёка нет', async () => {

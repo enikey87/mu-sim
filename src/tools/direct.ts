@@ -184,6 +184,9 @@ export const DIRECT: Record<string, DirectCase> = {
   Tone_Threat_Hot_Again: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.rules.once['Tone_Threat_Hot'] = true; g.S.mem[HEAT] = 2 } },
   // #681: новые сообщения в сериях сдвинули выборки ещё раз — амнистия при 5+ просроченных из них ушла
   Scene_amnesty: { event: 'PickScene', setup: (g) => { for (let i = 0; i < 5; i++) g.recordPromise({ text: `завтра, раз ${i}`, d: 1 }); g.S.day += 5 } },
+  // #703: правка пулов звонка сдвинула розыгрыш выборок — кафе и счёт из них ушли
+  Scene_meet: { event: 'PickScene', setup: (g) => { g.S.day = 215 } },
+  Scene_invoice: { event: 'PickScene', setup: (g) => { g.S.day = 215 } },
   // после #679/#681 бот в выборках до обычного финала коллекторов не доходит: держим прямым случаем
   Finale_collectors_default: { event: 'ArcFinale', facts: { arc: 'collectors' } },
 }
