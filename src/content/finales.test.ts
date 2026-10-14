@@ -200,6 +200,14 @@ describe('финалы сериалов: выбор', () => {
     await game.playArc('samvel')
     expect(game.S.mem['finale.samvel']).toBe('default')
   })
+  // #730: условие «Жениха» — только «Святой» (10 вежливых подряд), крики ему не мешают:
+  // реплика не утверждает отсутствия криков — этого условия больше нет
+  it('реплика «Жениха» называет вежливость, а не «ни разу не крикнул»', () => {
+    const groom = FINALES.samvel.find((f) => f.id === 'groom')!
+    const text = [...lines(groom), ...lines({ m: groom.done })].join('\n')
+    expect(text, 'утверждение об отсутствии криков без факта').not.toMatch(/ни разу|ни одного раза|не кричал|не крикнул|не грубил/i)
+    expect(text, 'называет факт, на котором стоит условие').toMatch(/свят/i)
+  })
   it('НС: без bonus приоретет «Жениха» над «Тамадой» теряется', () => {
     const groom = FINALES.samvel.find((f) => f.id === 'groom')!
     expect(groom.bonus).toBe(1)
