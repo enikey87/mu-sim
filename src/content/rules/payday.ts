@@ -3,7 +3,7 @@ import type { ContentApi } from '../../engine/game'
 import { type Rule, eq, gte, is, exists, missing, set } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { SOURCES, SOURCES_TOPUP, ROLL, CLAIMS, GRAND, GRAND_FALLBACK, SLOTS, CONTRADICTIONS, MORNING_CONTRA, OUTCOME, type Source, type Call, type Claim } from '../payday'
-import { alikDead, caughtCount, count, cryptoHodl, payday as pd, paydayScene } from '../memkeys'
+import { alikDead, cryptoHodl, payday as pd, paydayScene } from '../memkeys'
 import { samvelLine } from '../world'
 
 type R = Rule<ContentApi, GameEvent, Offer>
@@ -144,14 +144,15 @@ export const paydayRules: R[] = [
     name: 'Beat_Payday_Late', event: 'StoryBeat', when: [gte('day', 420), gte('sent', 150), missing(alikDead), missing(paydayScene), missing(pd.at)], bonus: 9, once: true, priority: 'cinematic',
     respond: ({ game }) => resumePayday(game),
   },
-  outcome('real', [is('ach.saint'), gte(caughtCount, 3), is('ach.court'), gte('quests', 5)]),
+  // иерархия исходов — бонусами специфичности, а не числом условий: real 4 > lavash 3 > coins 2 > niva/strasbourg/notyou 1 > default 0
+  outcome('real', [is('ach.saint'), is('ach.court')], { bonus: 2 }),
   // поймал великую отмазку — заслуга игрока: важнее исходов «по стилю партии» (одинаковая специфичность решалась бы случайно)
   outcome('coins', [is(pd.caught)], { bonus: 1 }),
-  outcome('lavash', [is(pd.caught), is(cryptoHodl)], { bonus: 1 }),
+  outcome('lavash', [is(cryptoHodl)], { bonus: 2 }),
   // исходы «по стилю партии» — одной специфичности: подходит несколько — выбор случайный, а не всегда один
   outcome('niva', [eq('finale.niva', 'chose')], { specificity: 1 }),
   outcome('strasbourg', [is('ach.strasbourg')], { specificity: 1 }),
-  outcome('notyou', [exists('finale.razmik'), gte(count.rude, 8)], { specificity: 1 }),
+  outcome('notyou', [exists('finale.razmik')], { specificity: 1 }),
   outcome('default', []),
   {
     name: 'Payday_Button', event: 'PaydayButton', when: [], priority: 'system',
