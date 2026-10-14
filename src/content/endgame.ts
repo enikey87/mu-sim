@@ -1,6 +1,6 @@
 import type { Choice } from '../engine/state'
 import { type Entry, type Line, type Said, eq, exists, gate, is } from './fact'
-import { needs, WORLD } from './world'
+import { needs, samvelLine, WORLD } from './world'
 import { finaleOf, lend50, met, moustacheKept } from './memkeys'
 
 export const ENDGAME_GROUP = 'ВЫПЛАТА ЗАКРЫТА ✅ (не выходить)'
@@ -275,7 +275,8 @@ export interface EndgameReturner {
 
 export const ENDGAME_RETURNERS: Entry<EndgameReturner>[] = [
   gate(is(met('boris')))(needs('borisWrites')({ who: 'boris', name: 'Борис' })),
-  gate(is(met('samvel')))({ who: 'samvel', name: 'Дядя Самвел' }),
+  // возвращатель — по факту линии, а не по знакомству: знакомство могла поставить реплика распорядителя (#701)
+  gate(samvelLine)({ who: 'samvel', name: 'Дядя Самвел' }),
   gate(is(met('nune')))(needs('dekret')({ who: 'nune', name: 'Нуне', she: true })),
   gate(is(met('karine')))(needs('karineHome')({ who: 'karine', name: 'Карине', she: true })),
   gate(is(met('grant')))({ who: 'grant', name: 'Заказчик Грант' }),

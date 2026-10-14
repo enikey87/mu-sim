@@ -3,8 +3,8 @@
 // перевёртыш (деньги приходят в невозможной форме) → кнопка на следующий день.
 // Реплики — пулы с условиями и приоритетом (game.line): звучит то, что было в этой партии.
 import { type Line, type LineSpec, type Entry, is, eq, ne, exists, gte, lte, gate, missing } from './fact'
-import type { Scene } from './scenes'
-import { needs, WORLD } from './world'
+import type { Scene, SceneNode } from './scenes'
+import { needs, samvelLine, WORLD } from './world'
 import { bathAsked, court, cryptoHodl, garikConcrete, karineKnowsDebt, met, payday, rubikFined, taxThawed } from './memkeys'
 
 export const ANNOUNCE = [
@@ -42,7 +42,7 @@ export const SOURCES: Source[] = [
   // общие — если партия бедная
   { t: 'Продал бетономешалку. Жалко, она была как член семьи. 40 000.', amount: 40000 },
   { t: 'Мама открыла свою шкатулку. 25 000. Сказала: «Отдай хорошему мальчику, а то неудобно».', amount: 25000 },
-  { t: 'Самвел дал из конвертов. Сказал — последние. Врёт, у него ещё сорок свадеб.', amount: 30000, when: [WORLD.samvel] },
+  { t: 'Самвел дал из конвертов. Сказал — последние. Врёт, у него ещё сорок свадеб.', amount: 30000, when: [samvelLine] },
 ]
 export const SOURCES_TOPUP = 'Остальное добрал сам: занял у кума под честное слово. Итого {sum}. Ровно. Я сам в шоке, брат.'
 
@@ -65,7 +65,7 @@ export const ROLL: Entry<Call>[] = [
 /** Дележ: каждый требует долю. cut — сколько уходит. */
 export interface Claim extends LineSpec { who: string; cut: number }
 export const CLAIMS: Entry<Claim>[] = [
-  needs('samvel')({ who: 'samvel', t: 'Сначала — подарок молодым. Какие молодые — неважно, свадьба всегда идёт.', cut: 50000 }),
+  gate(samvelLine)({ who: 'samvel', t: 'Сначала — подарок молодым. Какие молодые — неважно, свадьба всегда идёт.', cut: 50000 }),
   needs('karineHome')({ who: 'karine', t: 'Ванная. Вы обещали переложить ванную. Считаю по рыночной. С плиткой.', when: [is(bathAsked)], cut: 60000 }),
   { who: 'goar', t: 'А кто будет платить за мою козу? Кого-то четыре часа снимали с крыши — её или вас, я уже не помню, но четыре часа помню. Моральный ущерб — козе.', when: [is('ach.q_goat')], prio: 2, cut: 60000 },
   { who: 'goar', t: 'А сервиз? За него мне зачли шесть тысяч. Я пересчитала — сорок пять. Значит, тридцать девять сверху.', when: [is('ach.q_tamada')], prio: 2, cut: 39000 },
@@ -211,6 +211,18 @@ export const CONTRADICTIONS: Array<{ link: RegExp; when: (m: Readonly<Record<str
 ]
 
 // ---- сцена: узлы с выбором; hook — шаг, который собирается из партии на лету (rules/payday.ts) ----
+/** Узел «по традиции, доли»: хозяин — тот, кого игрок встречал в своей линии. Без самвеловской линии
+ *  говорит Алик: его реплика не ставила бы Самвелу знакомство (alikMsg пишет intro.<who> говорящему),
+ *  и в кульминации Самвел появлялся «из ниоткуда» (#701). Тот же бит, другой голос. */
+const splitNode = (who?: string, yes?: string): SceneNode => ({
+  who,
+  a: ['Прежде чем выплатить — по традиции, доли. Плиточник, ты же не против?'],
+  opts: [
+    { t: 'Конечно, по традиции', go: yes ?? 'share', tone: 'polite' },
+    { t: 'Ни рубля никому!', go: 'refuse', tone: 'rude' },
+  ],
+})
+
 export const PAYDAY_SCENE: Scene = {
   start: 'announce',
   nodes: {
@@ -225,14 +237,10 @@ export const PAYDAY_SCENE: Scene = {
     bag: { a: ['Правильно! Сумку побольше. Мешок, конечно, тоже возьму — вдруг не влезет.'], hook: 'morning' },
     witness: { a: ['Бери свидетеля! Чем больше свидетелей, тем честнее я выгляжу. Только не козу — у неё конфликт интересов.'], hook: 'morning' },
     doubt: { fx: { set: { [payday.doubt]: true } }, a: ['Не верь. Я сам себе не верю. Но завтра — поверишь.'], hook: 'morning' },
-    split: {
-      who: 'samvel', a: ['Прежде чем выплатить — по традиции, доли. Плиточник, ты же не против?'],
-      opts: [
-        { t: 'Конечно, по традиции', go: 'share', tone: 'polite' },
-        { t: 'Ни рубля никому!', go: 'refuse', tone: 'rude' },
-      ],
-    },
-    share: { who: 'samvel', a: ['Вот это воспитание! Начинаем.'], hook: 'claims' },
+    split: splitNode(),
+    splitSamvel: splitNode('samvel', 'shareSamvel'),
+    share: { a: ['Вот это воспитание! Начинаем.'], hook: 'claims' },
+    shareSamvel: { who: 'samvel', a: ['Вот это воспитание! Начинаем.'], hook: 'claims' },
     refuse: { fx: { set: { [payday.refused]: true } }, who: 'karine', a: [
       gate(is(bathAsked))('Ни рубля? Тогда я забираю ванную силой. И все за мной.'),
       gate(missing(bathAsked), is(met('karine')), is(karineKnowsDebt))('Ни рубля? Тогда я забираю ванную. Переложишь нам — считай, отдал. И все за мной.'),
