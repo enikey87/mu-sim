@@ -3,7 +3,14 @@
 // said в паре: без триггера в последних репликах кнопки нет.
 import { describe, it, expect } from 'vitest'
 import { makeGame } from '../test/helpers'
+import { valueOf } from '../engine/rules'
 import type { Choice } from '../engine/state'
+import type { Entry } from './fact'
+import { ARC_TALK, WORD_TALK } from './talk'
+import { saidTriggers, saidTrigger, type TalkPair } from './said'
+import { ARCS, ARC_DONE } from './arcs'
+import { FINALES } from './finales'
+import { OATH_FORMS } from './misc'
 
 const find = (chs: Choice[]) => (text: string): Choice | undefined => chs.find((c) => c.text === text)
 
@@ -53,5 +60,33 @@ describe('колкости (#683)', () => {
     expect(jab).toBeDefined()
     await game.send(jab!)
     expect(game.S.msgs.some((m) => m.kind === 'text' && m.from === 'alik' && m.text === 'Не считает, брат. Ему никто не верит, а мне — ты.')).toBe(true)
+  })
+})
+
+/** Все строки значения — включая вложенные Entry и объекты: серии, финалы, формы клятвы. */
+const str = (v: unknown, out: string[] = []): string[] => {
+  if (typeof v === 'string') out.push(v)
+  else if (Array.isArray(v)) for (const x of v) str(x, out)
+  else if (v && typeof v === 'object') for (const x of Object.values(v)) str(x, out)
+  return out
+}
+
+describe('колкости (#738): триггер окна — данные, а не строка в предикате', () => {
+  it('каждый триггер находится в источнике своей пары: правка серии или формы красит тест', () => {
+    expect(saidTriggers().length, 'триггеров не стало — проверка пустеет').toBeGreaterThanOrEqual(11)
+    const seen: string[] = []
+    const pairs: Array<[string, readonly Entry<TalkPair>[]]> = [...Object.entries(ARC_TALK), ['word', WORD_TALK]]
+    for (const [arc, es] of pairs) {
+      const source = arc === 'word'
+        ? str(OATH_FORMS)
+        : [...str(ARCS[arc]?.eps), ...str(FINALES[arc] ?? []), ...str((ARC_DONE as Record<string, unknown>)[arc])]
+      for (const e of es) {
+        const t = saidTrigger(valueOf(e)[2])
+        if (!t) continue
+        seen.push(t)
+        expect(source.some((s) => s.includes(t)), `триггер «${t}» (${arc}) не найден в источнике — правка текста умертвит колкость`).toBe(true)
+      }
+    }
+    expect(seen.sort(), 'реестр триггеров и предикаты расходятся').toEqual([...saidTriggers()].sort())
   })
 })
