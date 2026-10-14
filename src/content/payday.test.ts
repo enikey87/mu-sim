@@ -145,11 +145,12 @@ describe('День выплаты', () => {
     const pick = async (setup: (g: Game) => void) => { const { game } = makeGame(); setup(game); return (await game.fire('PaydayOutcome'))?.name }
     expect(await pick(() => {})).toBe('Payday_default')
     expect(await pick((g) => { g.S.mem['payday.caught'] = true })).toBe('Payday_coins')
-    expect(await pick((g) => { g.S.mem['payday.caught'] = true; g.S.mem['crypto.hodl'] = true })).toBe('Payday_lavash') // деньги оставлены в «Лаваш-коине»
+    expect(await pick((g) => { g.S.mem['payday.caught'] = true; g.S.mem['crypto.hodl'] = true })).toBe('Payday_lavash') // и поимка, и крипта: лаваш (3) выше монет (2)
+    expect(await pick((g) => { g.S.mem['crypto.hodl'] = true })).toBe('Payday_lavash') // одной крипты хватает — поимка больше не нужна
     expect(await pick((g) => { g.S.mem['finale.niva'] = 'chose' })).toBe('Payday_niva')
     expect(await pick((g) => { g.S.ach.strasbourg = 1 })).toBe('Payday_strasbourg')
-    expect(await pick((g) => { g.S.mem['finale.razmik'] = 'default'; g.S.mem['count.rude'] = 8 })).toBe('Payday_notyou')
-    expect(await pick((g) => { Object.assign(g.S.ach, { saint: 1, court: 1, q_hash: 1, q_goat: 1, q_niva: 1, q_mama: 1, q_photo: 1 }); g.S.mem.caught = 3 })).toBe('Payday_real')
+    expect(await pick((g) => { g.S.mem['finale.razmik'] = 'default' })).toBe('Payday_notyou') // любой финал Размика, без счётчика криков
+    expect(await pick((g) => { g.S.ach.saint = 1; g.S.ach.court = 1 })).toBe('Payday_real') // вежливость и суд — квесты и поимки не нужны
   })
   it('в перекличке — только те, кого игрок встречал, и каждый один раз', async () => {
     const { game } = makeGame()
