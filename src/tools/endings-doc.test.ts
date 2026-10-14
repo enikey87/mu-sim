@@ -28,13 +28,13 @@ const STORY_LABELS: Record<string, RegExp> = {
   'finale.boris': /Борис уходит/,
   'finale.garik': /Вырубщик/,
   'finale.grant': /Союзник/,
-  vendetta: /Rude_Vendetta/,
-  'count.rude': /крик/,
+  vendetta: /Rude_Vendetta|Вендетт/,
+  'count.rude': /\d+\s*криков/, // форма условия («15 криков»), а не пояснение «кричать не запрещено»
   'count.sorry': /извинени/,
   'finale.niva': /выбрала тебя/,
-  items: /трофе/,
+  items: /\d\+?\s*трофея|трофея в инвентаре/, // «2+ трофея»-условие, а не «трофеи не нужны»
   'ach.fence': /забор/,
-  HEAT: /жар/,
+  HEAT: /жар[ае]?\s*≥|HEAT/, // форма условия, а не пояснение «жар больше не нужен»
 }
 
 const checkRow = (id: string, row: string | undefined, keys: string[], labels: Record<string, RegExp>): void => {
