@@ -96,6 +96,11 @@ export type WorldKey = keyof typeof WORLD
 export const needs = (...keys: WorldKey[]) => gate(...keys.map((k) => WORLD[k]))
 export const meet = (...ids: WhoId[]) => ids.map((id) => set(intro(id), true))
 
+/** Самвеловская линия партии началась — по счётчику серий, а не по факту знакомства: знакомство
+ *  могли поставить реплика распорядителя или суд, и Самвел звучал в кульминации «из ниоткуда» (#701).
+ *  Вторая часть — из meet() первой серии: линия ставит знакомство сама, упоминать Самвела можно. */
+export const samvelLine = named('samvelLine', exists('arc.samvel'), is(intro('samvel')))
+
 /** Кто пишет в чат сам (хор, семейный чат, родня на крик) только при условии знакомства, а не просто состояния; остальные — всегда. */
 export const SPEAKS = {
   boris: WORLD.borisWrites, arsen: WORLD.arsen, razmik: WORLD.razmik, rubik: WORLD.rubik,

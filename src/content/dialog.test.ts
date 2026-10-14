@@ -451,10 +451,13 @@ describe('несостыковки из плейтеста ботами, рау�
     game.recordPromise({ text: 'завтра — закину', d: 1, tomorrow: true })
     expect(quoted().length).toBe(3)
   })
-  it('обратно в группу добавляет только тот, кто уже писал сам', () => {
+  it('обратно в группу добавляет только тот, кто уже писал сам', async () => {
     const { game } = makeGame()
     expect(game.open(ENDGAME_RETURNERS)).toEqual([])
+    // знакомство без линии возвращателя не делает: его даёт сериал Самвела (#701)
     game.S.mem['met.samvel'] = true
+    expect(game.open(ENDGAME_RETURNERS)).toEqual([])
+    await game.playArc('samvel')
     expect(game.open(ENDGAME_RETURNERS).map((r) => r.who)).toEqual(['samvel'])
   })
   it('свадьбу и похороны своим героям устраивает их сериал, а не генератор отмазок', async () => {

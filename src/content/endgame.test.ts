@@ -209,7 +209,7 @@ describe('бесконечная группа после Дня выплаты',
   it('исчерпав запас, возвращатель перестаёт возвращать — дальше возвращает Алик', async () => {
     const { game } = makeGame()
     await enterGame(game)
-    game.S.mem['met.samvel'] = true // единственный допустимый возвращатель
+    await game.playArc('samvel') // единственный допустимый возвращатель: линия ставит и знакомство
     const before = game.S.msgs.length
     for (let i = 0; i <= ENDGAME_RETURNER_LINES.samvel.length; i++) await game.send(game.choices.find((c) => c.act === 'endgameLeave')!)
     const spoken = game.S.msgs.slice(before).flatMap((m) => (m.kind === 'text' && m.who === 'samvel' ? [m.text] : []))
