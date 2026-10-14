@@ -136,15 +136,22 @@ describe('финалы сериалов: выбор', () => {
     expect(c.S.offlineDays).toBe(20)
   })
   it('два финала подходят — побеждает более специфичный («Жених» перекрывает «Тамаду»)', async () => {
+    // приоритет обязан быть не случайностью равной специфичности: прогоняем разные сиды
+    for (const seed of [1, 2, 3, 4, 5]) {
+      const { game } = makeGame({ seed })
+      SETUP['samvel.tamada'](game)
+      SETUP['samvel.groom'](game)
+      toLast(game, 'samvel')
+      await game.playArc('samvel')
+      expect(game.S.mem['finale.samvel'], `сид ${seed}`).toBe('groom')
+      expect(game.S.mem['wedding.anush']).toBe(true)
+      expect(game.S.mem['wedding.samvel']).toBeUndefined()
+    }
+    // свадьба игрока окрашивает ходы своим правилом, не Самвела (#256)
     const { game } = makeGame()
-    SETUP['samvel.tamada'](game)
     SETUP['samvel.groom'](game)
     toLast(game, 'samvel')
     await game.playArc('samvel')
-    expect(game.S.mem['finale.samvel']).toBe('groom')
-    expect(game.S.mem['wedding.anush']).toBe(true)
-    expect(game.S.mem['wedding.samvel']).toBeUndefined()
-    // свадьба игрока окрашивает ходы своим правилом, не Самвела (#256)
     game.S.arcs.beton = { i: 1, last: 0 }
     let noise = 0
     for (let i = 0; i < 150; i++) {
@@ -179,13 +186,26 @@ describe('финалы сериалов: выбор', () => {
     game.rules.settle()
     expect(game.S.mem['wedding.anush']).toBeUndefined()
   })
-  it('грубил хоть раз — в женихи не берут', async () => {
+  it('грубил хоть раз — одного Святого хватает: «Жених» не требует ни одного крика', async () => {
     const { game } = makeGame()
     SETUP['samvel.groom'](game)
     game.S.mem['count.rude'] = 1
     toLast(game, 'samvel')
     await game.playArc('samvel')
+    expect(game.S.mem['finale.samvel']).toBe('groom')
+  })
+  it('без Святого женихом не стать — частный финал уступает место обычному', async () => {
+    const { game } = makeGame()
+    toLast(game, 'samvel')
+    await game.playArc('samvel')
     expect(game.S.mem['finale.samvel']).toBe('default')
+  })
+  it('НС: без bonus приоретет «Жениха» над «Тамадой» теряется', () => {
+    const groom = FINALES.samvel.find((f) => f.id === 'groom')!
+    expect(groom.bonus).toBe(1)
+    // когда оба условия выполнены, у «Жениха» and «Тамады» по одному условию — разводит только bonus
+    expect(groom.when).toHaveLength(1)
+    expect(FINALES.samvel.find((f) => f.id === 'tamada')!.bonus).toBeUndefined()
   })
   it('финал с fx.pay: paid растёт, fifty — только при 50 ₽', async () => {
     const { game } = makeGame()
@@ -306,18 +326,24 @@ describe('концовки игры', () => {
     game.S.mem['finale.samvel'] = 'groom'
     expect(await check(game)).toBeNull()
   })
-  it('редкое сочетание побеждает: «Честные деньги» раньше частичных', async () => {
+  it('«Честные деньги» — один факт Гранта: ни Бориса, ни «Нивы»; сумма — из финала', async () => {
     const { game } = late()
-    Object.assign(game.S.mem, { 'finale.boris': 'brigadir', 'finale.grant': 'ally', 'finale.niva': 'chose' })
+    game.S.mem['finale.grant'] = 'ally'
     expect(await check(game)).toBe('honest')
+    const e = ENDINGS.find((x) => x.id === 'honest')!
+    const texts = [...lines(e), e.text].join(' ').replace(/\u00A0/g, ' ')
+    expect(texts).toContain('Грант')
+    expect(texts).not.toMatch(/Борис|Нива/) // концовка больше не требует их финалов — текст не опирается на них
+    const pay = (FINALES.grant.find((f) => f.id === 'ally')!.fx!.pay as number).toLocaleString('ru-RU').replace(/\u00A0/g, ' ')
+    expect(texts).toContain(`${pay} ₽`)
   })
   it('каждую концовку можно получить', async () => {
     const setups: Record<string, (g: Game) => void | Record<string, unknown>> = {
       family: (g) => { g.S.mem['finale.samvel'] = 'groom' },
       heir: (g) => { g.S.mem['finale.alik_death'] = 'will' },
-      ram: (g) => { g.S.mem['finale.boris'] = 'toyou'; g.S.items.push('баран Борис', '½ фундамента') },
-      alik: (g) => { g.S.mem['finale.garik'] = 'cutter'; g.S.ach.fence = 190 },
-      honest: (g) => Object.assign(g.S.mem, { 'finale.boris': 'brigadir', 'finale.grant': 'ally', 'finale.niva': 'chose' }),
+      ram: (g) => { g.S.mem['finale.boris'] = 'toyou' },
+      alik: (g) => { g.S.mem['finale.garik'] = 'cutter' },
+      honest: (g) => { g.S.mem['finale.grant'] = 'ally' },
       multiverse: (g) => { g.S.day = 800; g.S.stats.sent = 300; g.S.mem['endgame.active'] = true },
       vendetta: (g) => { g.S.mem.vendetta = true },
     }
@@ -352,9 +378,9 @@ describe('концовки игры', () => {
     const SCENARIO: Record<string, Step[]> = {
       family: [finale('samvel.groom')],
       heir: [finale('alik_death.will')],
-      ram: [finale('boris.toyou'), finale('niva.chose')], // второй трофей — «Нива»
-      alik: [async (g) => { g.S.ach.fence = 190 }, finale('garik.cutter')],
-      honest: [finale('boris.brigadir'), finale('grant.ally'), async (g) => { g.S.mem['asked.niva'] = 5; toLast(g, 'niva'); await g.playArc('niva') }],
+      ram: [finale('boris.toyou')],
+      alik: [finale('garik.cutter')],
+      honest: [finale('grant.ally')],
       vendetta: [async (g) => { Object.assign(g.S.mem, { 'count.rude': 25, 'rude.heat': 5 }); await g.send({ text: 'АЛИК!!! ТЫ ВРЁШЬ!!!', tone: 'rude' }); expect(g.S.mem.vendetta).toBe(true) }],
       // единственная концовка эндгейма: группа открылась выплатой и живёт до 800-го дня
       multiverse: [async (g) => { await payday(false)(g); g.closeEnding(); expect(g.S.mem['endgame.active']).toBe(true) }],
