@@ -245,19 +245,21 @@ describe('Game: начало и ход', () => {
     }
     expect(new Set(mine).size).toBe(mine.length)
   })
-  it('исчерпанный пул вопросов к сериалу не повторяет уже показанный вариант', () => {
+  it('вопрос про сериал: свежие формулировки первыми, исчерпанный пул — повторяемый (#753)', () => {
+    // Зачем: счётчик `asked.*` упирался в размер пула `follow` (4 строки) — вопрос про сериал
+    // пропадал после четырёх формулировок, и финал вида «спрашивал 5 раз» был недостижим.
+    // Теперь пустая выдача не считается: пока есть свежая формулировка — она, потом — повтор.
     const { game } = makeGame()
     game.S.arcs.tile = { i: 2, last: 0 }
     game.S.ctx = { arc: 'tile' }
-    const offered = new Set<string>()
-    for (let i = 0; i < 6; i++) {
-      const choice = game.buildChoices().find((item) => item.act === 'arc' && item.arg === 'tile')
-      if (choice) {
-        expect(offered.has(choice.text)).toBe(false)
-        offered.add(choice.text)
-      }
+    const texts: (string | undefined)[] = []
+    for (let i = 0; i < 8; i++) {
+      texts.push(game.buildChoices().find((item) => item.act === 'arc' && item.arg === 'tile')?.text)
     }
-    expect(offered.size).toBe(4)
+    const fresh = texts.slice(0, 4).filter((t): t is string => !!t)
+    expect(new Set(fresh).size, 'первые четыре — свежие, без повторов').toBe(fresh.length)
+    expect(texts.slice(4).every((t) => !!t), 'после исчерпания пула вопрос всё ещё предлагается').toBe(true)
+    expect(texts.slice(4).some((t) => fresh.includes(t!)), 'повтор — из того же пула').toBe(true)
   })
   it('терпение кончается — «полежал на полу»', async () => {
     const { game } = makeGame()

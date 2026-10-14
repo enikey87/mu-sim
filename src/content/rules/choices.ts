@@ -190,11 +190,15 @@ export const choiceRules: R[] = [
   offer({
     // вопрос про сериал — только если он к чему-то приведёт (иначе «Как Нуне?» трижды подряд → «пока без новостей»)
     name: 'Arc', slot: 'arc', when: [missing(alikDead), exists('ctx.arc'), is('ctx.arcCanAdvance')], act: 'arc', tone: 'polite', bonus: 1,
-    text: (g, f) => freshFromArr(g, 'F_' + f['ctx.arc'], ARCS[String(f['ctx.arc'])].follow), arg: (_g, f) => String(f['ctx.arc']),
+    // свежая формулировка, а исчерпанный пул — повторяемая: иначе вопрос про сериал пропадает
+    // после четырёх формулировок пула `follow`, и счётчики `asked.*` упираются в размер пула —
+    // финалы вида «спрашивал 5 раз» (`asked.niva`, `asked.boris`) недостижимы (#753).
+    // У `ArcDeath` эта связка была и раньше.
+    text: (g, f) => { const key = 'F_' + f['ctx.arc']; const arr = ARCS[String(f['ctx.arc'])].follow; return g.freshPlayer(key, arr) ?? g.draw(key, arr) }, arg: (_g, f) => String(f['ctx.arc']),
   }),
   offer({
     name: 'ArcAny', slot: 'arc', when: [missing(alikDead), exists('arcUnfinished')], odds: 0.2, act: 'arc', tone: 'polite',
-    text: (g, f) => freshFromArr(g, 'F_' + f.arcUnfinished, ARCS[String(f.arcUnfinished)].follow), arg: (_g, f) => String(f.arcUnfinished),
+    text: (g, f) => { const key = 'F_' + f.arcUnfinished; const arr = ARCS[String(f.arcUnfinished)].follow; return g.freshPlayer(key, arr) ?? g.draw(key, arr) }, arg: (_g, f) => String(f.arcUnfinished),
   }),
 
   // дело в суде открыто — игрок может его продолжить (угроза двигает линию суда)
