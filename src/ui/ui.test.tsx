@@ -425,7 +425,7 @@ describe('App', () => {
   })
 
   it('акт сверки: числа партии сходятся с лентой', async () => {
-    const { game } = makeGame({ seed: 311 })
+    const { game } = makeGame({ seed: 316 })
     for (let i = 0; i < 40; i++) await botTurn(game)
     renderApp(game)
     fireEvent.click(screen.getByTitle('Обещания и ачивки'))
