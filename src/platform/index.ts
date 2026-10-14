@@ -18,8 +18,15 @@ export function platform(): Platform {
 }
 
 export async function bootPlatform(): Promise<Platform> {
-  current = await createPlatform()
-  await current.init()
+  try {
+    current = await createPlatform()
+    await current.init()
+  } catch {
+    // Чанк адаптера не доехал (сеть) или SDK упал на инициализации — уходим на веб, как при отказе
+    // SDK внутри адаптера. Без этого `bootPlatform` бросает, `main.tsx` не доходит до createRoot:
+    // старт витрины остаётся белым экраном без восстановления.
+    current = webPlatform()
+  }
   return current
 }
 

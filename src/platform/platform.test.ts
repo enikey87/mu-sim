@@ -83,6 +83,36 @@ describe('адаптер витрины (#688)', () => {
     await expect(vkPlatform().init()).resolves.toBeUndefined()
   })
 
+  // #710: чанк адаптера грузится динамическим import — его сбой уносил рендер корня (белый экран).
+  // Фолбэк молчаливый, как у отказа SDK внутри адаптера.
+  it('недогруз чанка адаптера — игра всё равно стартует, на веб-адаптере', async () => {
+    vi.resetModules()
+    vi.stubEnv('VITE_PLATFORM', 'vk')
+    vi.doMock('./vk', () => { throw new Error('Loading chunk failed') })
+    const fresh = await import('./index')
+    const p = await fresh.bootPlatform() // не бросает
+    expect(p.id).toBe('web')
+    expect(fresh.platform().id).toBe('web')
+    expect(fresh.platform().externalPay).toBe(true)
+    vi.doUnmock('./vk')
+    vi.unstubAllEnvs()
+    vi.resetModules()
+  })
+
+  it('падение на инициализации адаптера — тот же молчаливый фолбэк на веб', async () => {
+    vi.resetModules()
+    vi.stubEnv('VITE_PLATFORM', 'yandex')
+    vi.doMock('./yandex', () => ({
+      yandexPlatform: () => ({ id: 'yandex', externalPay: false, init: async () => { throw new Error('sdk died') }, ready() {}, gameplayStart() {}, gameplayStop() {} }),
+    }))
+    const fresh = await import('./index')
+    await expect(fresh.bootPlatform()).resolves.toMatchObject({ id: 'web' })
+    expect(fresh.platform().id).toBe('web')
+    vi.doUnmock('./yandex')
+    vi.unstubAllEnvs()
+    vi.resetModules()
+  })
+
   it('бросающий storage не роняет старт партии', () => {
     const raw = {
       getItem: () => { throw new Error('SecurityError') },
