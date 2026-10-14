@@ -2,8 +2,11 @@
 import { describe, it, expect } from 'vitest'
 import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
-import { CLAIMS, ROLL } from './payday'
+import type { Criterion } from '../engine/rules'
+import { spec } from '../engine/rules/lines'
+import { CLAIMS, ROLL, type Claim } from './payday'
 import { ARCS } from './arcs'
+import { valueOf, type Entry } from './fact'
 
 const texts = (g: Game, n = 0) => g.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' || m.kind === 'sys' ? [m.text] : []))
 const choose = async (g: Game, go: string) => { g.S.choices = null; const c = g.choices.find((x) => x.go === go); expect(c, go).toBeDefined(); await g.send(c!) }
@@ -228,6 +231,57 @@ describe('День выплаты', () => {
     const withLine = await host(true)
     expect(withLine.who).toBe('samvel')
     expect(withLine.claims).toContain('samvel')
+  })
+  // #740: замер на 201 партии — доля была первым словом спикера у тёти Гоар (140 из 142), мамы (49 из 201)
+  // и Нуне (2 из 79, сид 99031); остальные к дележу уже писали сами. Незнакомый голос — представление.
+  it('доля незнакомого спикера представляется; знакомого — как раньше, и дележ считается одинаково (#740)', async () => {
+    const play = async (known: boolean, quest: 'q_goat' | 'q_tamada' = 'q_goat') => {
+      const { game } = makeGame()
+      Object.assign(game.S.ach, { [quest]: 1 })
+      game.S.arcs.nune = { i: 1, last: 0 } // dekret: Нуне могла так и не заговорить самой
+      if (known) Object.assign(game.S.mem, { 'met.goar': true, 'met.nune': true, 'met.mama': true })
+      await game.enterNode('payday', 'announce')
+      await choose(game, 'bag')
+      const n = game.S.msgs.length
+      await choose(game, 'share')
+      return texts(game, n).join('\n')
+    }
+    const strangers = await play(false)
+    expect(strangers).toMatch(/Это тётя Гоар\. Коза — моя\./)
+    expect(strangers).toMatch(/Здравствуйте\. Я Нуне\./)
+    expect(strangers).toMatch(/Это мама Алика\./)
+    expect(strangers).not.toMatch(/поседела/)
+    const strangersTamada = await play(false, 'q_tamada')
+    expect(strangersTamada).toMatch(/Это тётя Гоар\. А сервиз\?/)
+    const known = await play(true)
+    expect(known).not.toMatch(/Это тётя Гоар|Я Нуне|Это мама Алика/)
+    expect(known).toMatch(/А кто будет платить за мою козу/)
+    expect(known).toMatch(/Налог с выплаты\. Я из декрета/)
+    expect(known).toMatch(/Я из-за вас обоих поседела/)
+    // доли те же: 240 000 − 60 000 (коза) − 30 000 (налог) − 25 000 (лекарства) = 125 000; сервиз — 39 000
+    expect(strangers).toMatch(/К выплате: 125\s000 ₽/)
+    expect(strangersTamada).toMatch(/К выплате: 146\s000 ₽/)
+    expect(known).toMatch(/К выплате: 125\s000 ₽/)
+    for (const out of [strangers, strangersTamada, known]) expect(out).toMatch(/К выплате: 50 ₽/)
+  })
+  it('у спикера доли с веткой «первый раз» разведены по знакомству все реплики, а не одна (#740)', () => {
+    const crit = (e: Entry<Claim>, f: (c: Criterion) => boolean): boolean =>
+      (spec(e).when ?? []).some(function walk(c): boolean {
+        return f(c) || (c.all ?? []).some(walk)
+      })
+    const first = (e: Entry<Claim>, who: string) => crit(e, (c) => c.key === `met.${who}` && c.op === '!exist')
+    const known = (e: Entry<Claim>, who: string) => crit(e, (c) => c.key === `met.${who}` && c.op === '==' && c.value === true)
+    let branched = 0
+    for (const who of new Set(CLAIMS.map((e) => valueOf(e).who))) {
+      const entries = CLAIMS.filter((e) => valueOf(e).who === who)
+      // без ветки «первый раз» знакомство спикера держат факты его арки/сцены (grant, razmik, rubik, judge, samvel, karine, boris)
+      if (!entries.some((e) => first(e, who))) continue
+      branched += entries.length
+      for (const e of entries) {
+        expect(first(e, who) !== known(e, who), `${who}: «${valueOf(e).t.slice(0, 40)}…» без разведения по знакомству`).toBe(true)
+      }
+    }
+    expect(branched, 'веток «первый раз» не стало — проверка пустеет').toBeGreaterThanOrEqual(6)
   })
   it('после выплаты старая допработа и перевод не меняют долг; кнопка допработы закрыта', async () => {
     const { game } = makeGame()
