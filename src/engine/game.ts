@@ -35,12 +35,12 @@ import {
   LEND50_ASK, LEND50_ASK_AGAIN, LEND50_CHOICES, LEND50_LINK, LEND50_MEMORY, LEND50_NO, LEND50_NUNE, LEND50_RENAME, LEND50_SERIOUS, LEND50_SYS, LEND50_YES,
 } from '../content/endgame'
 import { type Rng, mathRng, rndInt, shuffle, chance } from './rng'
-import { Decks } from './deck'
+import { Decks, type Bag } from './deck'
 import { Battery } from './battery'
 import { Seen, type Keyed } from './uniq'
 import {
   RuleSet, makeHub, Lines, resolver, test, isOpen, valueOf, set, spec, daysSince,
-  type Criterion, type Entry, type Facts, type Resolver, type Rule, type Query, type Priority, type Line as PoolLine, type LineOpts, type Picked,
+  type Criterion, type Entry, type FactOp, type Facts, type Resolver, type Rule, type Query, type Priority, type Line as PoolLine, type LineOpts, type Picked,
 } from './rules'
 import { MENTION_RE, WORLD } from '../content/world'
 import { type Clock, type GameTimer, type WallTimer, realClock, isManualClock, wallClock } from './clock'
@@ -389,6 +389,59 @@ export class Game {
     return arr.filter((e) => isOpen(e, facts)).map(valueOf)
   }
   canSpeak = (who: string): boolean => { const criterion = speaks(who); return !criterion || this.holds(criterion) }
+
+  // ---------- узкий интерфейс контента (ContentApi, тип в конце файла) ----------
+  // Правила видят игру только через ContentApi: чтение состояния — производными читателями,
+  // изменение — методами, у которых инвариант внутри. Прямого S в интерфейсе нет.
+
+  /** Игровой день (facts().day — то же число, но без пересборки снимка). */
+  get day(): number { return this.S.day }
+  /** Долг: число запечатано в ячейке, пишет только adjustDebt. */
+  get debt(): number { return this.S.debt }
+  /** Память мира — только читать; запись — applyFacts/remember, условия видят её и без снимка. */
+  mem(): Readonly<Facts> { return this.S.mem }
+  /** Лента — только читать: парам разговора и реакциям нужны последние сообщения. */
+  msgsView(): readonly Msg[] { return this.S.msgs }
+  /** Снять факт мира: для условий, сохранения и сводок то же самое, что отсутствующий ключ. */
+  clearFact(key: string): void { delete this.S.mem[key] }
+  /** Факты на доску мира — тот же канал, что remember у правил, но из тела ответа. */
+  applyFacts(ops: FactOp[]): void { this.rules.applyOps(ops, {}) }
+
+  /** Обещание по индексу, только читать: текст нужен строкам срока. */
+  promiseAt(i: number): Readonly<PromiseRec> | undefined { return this.S.promises[i] }
+  /** Индекс обещания в журнале: кнопка «напомнить» передаёт индекс ответу. */
+  promiseIndexOf(p: PromiseRec): number { return this.S.promises.indexOf(p) }
+  /** «Припомнил» обещание (спросили о сроке). Единственная точка записи promises из контента. */
+  promiseAsked(i: number): void { const p = this.S.promises[i]; if (p) p.asked = true }
+  /** Сдержал слово переводом в срок: asked + kept. */
+  promiseKept(i: number): void { const p = this.S.promises[i]; if (p) { p.asked = true; p.kept = true } }
+  /** Сдержал ставку («усы») переводом: asked + kept + ставка сыграла. */
+  promiseStakeKept(i: number): void { const p = this.S.promises[i]; if (p) { p.asked = true; p.kept = true; p.stakeDone = true } }
+  /** Ставка сыграла без денег — усы сбриты. */
+  promiseStakeDone(i: number): void { const p = this.S.promises[i]; if (p) p.stakeDone = true }
+
+  /** Сериал начат (есть запись о прогрессе). */
+  arcStarted(id: string): boolean { return !!this.S.arcs[id] }
+  /** Серия показана по вопросу игрока: второй вопрос того же дня — «пока без новостей». */
+  arcByAsk(id: string): void { this.S.arcs[id]!.byAsk = true }
+  /** Игрок получил вещь (исходы Дня выплаты): последняя становится темой «помнишь?». */
+  giveItem(item: string): void { this.S.items.push(item) }
+  /** Переменная идущей сцены: хуки Дня выплаты пишут ловушку, амнистия — счётчик. */
+  setSceneVar(key: string, v: unknown): void { if (this.S.scene) this.S.scene.vars[key] = v }
+  /** Извинение сокращает «пропал» втрое и сразу возвращает Алика, если тот уже почти вернулся. */
+  forgiveOffline(): void {
+    const wasOff = this.S.offlineDays
+    this.S.offlineDays = Math.floor(this.S.offlineDays / 3)
+    if (wasOff && this.S.offlineDays) this.nextDay(this.S.offlineDays)
+    this.S.offlineDays = 0
+  }
+  /** Остудить ссору на n, не ниже нуля (извинения и примирение; факт — rude.heat). */
+  coolConflict(n: number): void { this.S.mem[memkeys.HEAT] = Math.max(0, Number(this.S.mem[memkeys.HEAT] ?? 0) - n) }
+  /** Снимок колоды (bag) — для отката выборки, которая ничего не сказала. */
+  bagOf(key: string): Bag | undefined { return structuredClone(this.S.bags[key]) }
+  /** Вернуть колоду на снимок: повторно поданная строка не расходует колоду второй раз. */
+  restoreBag(key: string, bag: Bag | undefined): void { if (bag) this.S.bags[key] = bag; else delete this.S.bags[key] }
+
   /**
    * Реплика из пула по правилам Hades: подходящие условия, не сказанные, верхний приоритет.
    * Пул исчерпан — fallback (обычно генератор отмазок) или null.
@@ -536,7 +589,8 @@ export class Game {
   fillMoney = (t: string): string =>
     t.replace('{debt}', this.S.debt.toLocaleString('ru-RU')).replace('{money}', this.S.money.toLocaleString('ru-RU')).replace('{night}', nightHour(this.S.clock)).replace('{Night}', cap(nightHour(this.S.clock)))
 
-  get ctx(): Ctx | null { return this.S.ctx }
+  /** Последний контекст реплики Алика — только читать; менять — setCtx. */
+  get ctx(): Readonly<Ctx> | null { return this.S.ctx }
   setCtx(c: Ctx | null): void { this.S.ctx = c }
 
   /** День выплаты закрыт — долг больше не меняется (docs/design/endgame.md). */
@@ -1365,7 +1419,7 @@ export class Game {
   amnesty(): number {
     const late = this.latePromises()
     for (const p of late) p.amnesty = this.S.day
-    if (this.S.scene) this.S.scene.vars.amnestied = late.length
+    this.setSceneVar('amnestied', late.length)
     return late.length
   }
 
@@ -2901,3 +2955,43 @@ export class Game {
   get clockText(): string { return fmtTime(this.S.clock) }
   castOf(who?: string) { return who ? CAST[who] : undefined }
 }
+
+/**
+ * Узкий интерфейс контента: правила видят ровно это, а не весь `Game`. Новый метод движка не виден
+ * правилам, пока не добавлен сюда явно, — так интерфейс не расползается сам. Состояния `S` здесь нет:
+ * читать мир — производными читателями (`day`, `debt`, `mem`, `msgsView`, `facts`, `promiseAt`, …),
+ * менять — методами, у которых инвариант внутри (`adjustDebt`, `applyFacts`, `forgiveOffline`, …).
+ * `Pick`, а не ручной интерфейс: члены берутся у живого `Game` и не расходятся с ним.
+ */
+export type ContentApi = Pick<Game,
+  // речь, лента и интерфейсные эффекты
+  | 'say' | 'sys' | 'emit' | 'notify' | 'typingFor' | 'markTopical' | 'awayMsg' | 'deletedMsg'
+  | 'sticker' | 'voice' | 'photo' | 'forward' | 'transfer' | 'job' | 'groupChat' | 'wrongChat'
+  | 'shortReply' | 'randomNotif' | 'readOnly' | 'unlock' | 'mood' | 'sleep'
+  // ход и события
+  | 'fire' | 'scheduleEvent' | 'turnRoll' | 'alikTurn' | 'excuseTurn' | 'nextDay'
+  | 'goOffline' | 'period' | 'periodLine' | 'tribunal' | 'endgameAction' | 'endgameFormality'
+  | 'endgameLend50' | 'reachEnding' | 'playFinale'
+  // сериалы, сцены, квесты
+  | 'playArc' | 'nextArc' | 'arcCanAdvance' | 'arcDoneLines' | 'arcStarted' | 'arcByAsk'
+  | 'startScene' | 'enterNode' | 'resumeNode' | 'scenes' | 'questAllowed' | 'takeQuest' | 'setLegend'
+  | 'setSceneVar'
+  // обещания
+  | 'recordPromise' | 'promiseLine' | 'ctxFromPromise' | 'latePromises' | 'promiseAt' | 'promiseIndexOf'
+  | 'promiseAsked' | 'promiseKept' | 'promiseStakeKept' | 'promiseStakeDone'
+  // деньги, долги и вещи
+  | 'adjustDebt' | 'adjustMoney' | 'moneySealed' | 'moneyReply' | 'chargeBill' | 'chargeCredit'
+  | 'billEventLive' | 'creditEventLive' | 'fillMoney' | 'giveItem' | 'sealOpenJobs'
+  // факты мира и память
+  | 'facts' | 'lineFacts' | 'holds' | 'mem' | 'clearFact' | 'applyFacts' | 'canSpeak' | 'day' | 'debt'
+  | 'msgsView' | 'topicText'
+  // ложь и её поимка
+  | 'lie' | 'caught' | 'callback'
+  // колоды и реплики
+  | 'draw' | 'open' | 'uniq' | 'pair' | 'line' | 'linePicked' | 'lines' | 'seen' | 'decks' | 'X'
+  | 'addrSaidLine' | 'playerLine' | 'freshPlayer' | 'rnd' | 'chance' | 'bagOf' | 'restoreBag'
+  // контекст последней реплики
+  | 'ctx' | 'setCtx'
+  // режимы
+  | 'forgiveOffline' | 'coolConflict'
+>

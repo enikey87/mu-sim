@@ -1,5 +1,5 @@
 // Ход Алика в ответ на обычное сообщение игрока.
-import type { Game } from '../../engine/game'
+import type { ContentApi } from '../../engine/game'
 import { type Rule, eq, ne, gte, lte, is, exists, missing, add, set, gate } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { meet } from '../world'
@@ -10,7 +10,7 @@ import { LEGENDS } from '../legends'
 import { count, creditBroke, endgame, payday, polite, thanksAt, vendetta, nivaPlayer, alikDead } from '../memkeys'
 import { GREET, GREET_MORNING, GREET_NIGHT, THANKS, THANKS_THIRD } from '../misc'
 
-type R = Rule<Game, GameEvent, Offer>
+type R = Rule<ContentApi, GameEvent, Offer>
 
 /** Тёплый ответ ломает режимы вежливости-убийцы, вендетты и эндгейма — там он молчит. */
 const warm = [ne(polite, true), ne(vendetta, true), ne(endgame.active, true)]
@@ -30,13 +30,13 @@ export const toneRules: R[] = [
   {
     name: 'Tone_Thanks', event: 'PlayerMessage', when: [eq('category', 'gratitude'), ...warm],
     remember: [add(count.thanks)],
-    respond: async ({ game }) => {
-      // «спасибо» — бесплатный текст, а настроение двигает переводы и сцены: бамп не чаще раза в THANKS_MOOD_GAP ходов
-      if (game.S.stats.sent - Number(game.S.mem[thanksAt] ?? -99) >= THANKS_MOOD_GAP) {
+    respond: async ({ game, facts }) => {
+      // «спасибо» — бесплатный текст, а настроение двигают переводы и сцены: бамп не чаще раза в THANKS_MOOD_GAP ходов
+      if (Number(facts.sent) - Number(game.mem()[thanksAt] ?? -99) >= THANKS_MOOD_GAP) {
         game.mood(1)
-        game.rules.applyOps([set(thanksAt, game.S.stats.sent)], {})
+        game.applyFacts([set(thanksAt, Number(facts.sent))])
       }
-      if (Number(game.S.mem[count.thanks] ?? 0) === 3) await game.say([THANKS_THIRD])
+      if (Number(game.mem()[count.thanks] ?? 0) === 3) await game.say([THANKS_THIRD])
       else await game.say([game.uniq(() => game.draw('THANKS', THANKS))])
     },
   },
@@ -58,7 +58,7 @@ export const storyRules: R[] = [
     when: [is(creditBroke), missing(endgame.active), missing(alikDead)],
     once: true, bonus: 10, priority: 'cinematic',
     respond: async ({ game }) => {
-      if (game.S.arcs.collectors) return false
+      if (game.arcStarted('collectors')) return false
       await game.playArc('collectors')
     },
   },
@@ -76,9 +76,9 @@ export const storyRules: R[] = [
   // легенда денег продолжается и между «обычными» ходами
   {
     name: 'Beat_Legend', event: 'StoryBeat', when: [exists('legend')], specificity: 0, odds: 0.12, cooldown: { turns: 5 }, priority: 'chatter',
-    respond: async ({ game, facts }) => { const p = game.linePicked('LEG_' + facts.legend, LEGENDS[String(facts.legend)].lines); if (!p) return false; game.markTopical(await game.say([{ t: p.text, claims: p.spec.claims ?? [] }])); game.S.ctx = { ...(game.S.ctx ?? {}), legend: String(facts.legend) } },
+    respond: async ({ game, facts }) => { const p = game.linePicked('LEG_' + facts.legend, LEGENDS[String(facts.legend)].lines); if (!p) return false; game.markTopical(await game.say([{ t: p.text, claims: p.spec.claims ?? [] }])); game.setCtx({ ...(game.ctx ?? {}), legend: String(facts.legend) }) },
   },
-  { name: 'Beat_Memory', event: 'StoryBeat', when: [gte('sent', 10)], specificity: 0, odds: 0.08, cooldown: { turns: 6 }, priority: 'chatter', respond: async ({ game }) => { const t = game.line('MEMORY', MEMORY); if (!t) return false; await game.say([t]); game.unlock('memory'); game.S.ctx = { ...(game.S.ctx ?? {}), memory: true } } },
+  { name: 'Beat_Memory', event: 'StoryBeat', when: [gte('sent', 10)], specificity: 0, odds: 0.08, cooldown: { turns: 6 }, priority: 'chatter', respond: async ({ game }) => { const t = game.line('MEMORY', MEMORY); if (!t) return false; await game.say([t]); game.unlock('memory'); game.setCtx({ ...(game.ctx ?? {}), memory: true }) } },
   { name: 'Beat_Quest', event: 'StoryBeat', when: [gte('sent', 6)], specificity: 0, odds: 0.06, cooldown: { turns: 8 }, priority: 'chatter', respond: ({ game }) => game.fire('PickQuest').then((r) => !!r) },
 ]
 
@@ -120,7 +120,7 @@ export const turnRules: R[] = [
       const p = game.linePicked('LEG_' + facts.legend, LEGENDS[String(facts.legend)].lines)
       if (!p) return game.excuseTurn()
       game.markTopical(await game.say([{ t: p.text, claims: p.spec.claims ?? [] }]))
-      game.S.ctx = { ...(game.S.ctx ?? {}), legend: String(facts.legend) } // можно переспросить именно про это
+      game.setCtx({ ...(game.ctx ?? {}), legend: String(facts.legend) }) // можно переспросить именно про это
       if (game.chance(0.6)) await game.promiseLine(undefined, true)
     },
   },
