@@ -2,10 +2,22 @@
 import { describe, it, expect } from 'vitest'
 import { makeGame } from '../test/helpers'
 import { valueOf } from '../engine/rules'
+import { Gated } from './fact'
 import { needs } from './world'
 import { TOPICS, P_RUDE_BLOCKED, P_RUDE_POLITE, TOPIC_OBSESSED, P_NIGHT } from './topics'
 import { D, make, type DrawFn } from './excuses'
 import type { Game } from '../engine/game'
+
+/** Словарь цитат: регулярки rneed всех тем — то, что игра уже считает «словами Алика». Ведётся не руками: он и есть rneed. */
+const CITE_WORDS = Object.values(TOPICS).flatMap((t) => Object.values(t.rneed ?? {}))
+/** Узкие исключения: слово матчит словарь цитат, но цитатой не является — причина у каждого (#739). */
+const NOT_A_CITE: Record<string, string[]> = {
+  // «Скинь перевод» — просьба игрока, а не цитата из отмазки: слово бытовое для темы банка
+  'bank.r[1]': ['перевод'],
+}
+/** Все вхождения регулярки в текст (флаги регулярки сохраняются, g добавляется). */
+const hits = (text: string, re: RegExp): string[] =>
+  [...text.matchAll(new RegExp(re.source, [...new Set([...re.flags, 'g'])].join('')))].map((m) => m[0])
 
 const fresh = (game: Game) => { game.S.choices = null; return game.choices }
 const offered = (game: Game, pred: (c: ReturnType<Game['buildChoices']>[number]) => boolean, tries = 30) => {
@@ -78,24 +90,38 @@ describe('ответ по теме', () => {
       if (c) expect(c.text).not.toMatch(/ковчег|Урарту|Тигран/)
     }
   })
-  it('грубые реплики с цитатой из отмазки закрыты rneed (#560): корпус — автоскан «…» + таблица без кавычек', () => {
+  it('грубые реплики с цитатой из отмазки закрыты rneed (#560): словарь цитат выводится из rneed, таблицы нет (#739)', () => {
     // Цитата без rneed звучит, будто Алик это говорил: «Хватит „перевод в пути“» без такой отмазки.
-    // Факт-гейты (needs/gate) — своё условие на доске, а не на текст отмазки — вне корпуса.
-    const CITED: Record<string, Record<number, string>> = {
-      // цитаты без кавычек, которые автоскан формой не видит
-      bank: { 4: 'перевод в пути' },
-      history: { 0: 'Урарту', 3: 'Тигран', 4: 'ковчег' },
-    }
+    // Корпус — кавычки и словарь цитат (а не ручная таблица CITED): слово, которое узнаёт rneed-регулярка.
+    // У реплики с rneed словарь — свой, темы (свой гейт она уже объявила; «перевод» в history.r[4] — бытовое
+    // слово, не цитата из банковской отмазки); у реплики без rneed — словарь всех тем: необъявленная цитата
+    // любой темы в ней — находка. Факт-гейты (needs/gate) — своё условие на доске, а не на тексте — вне корпуса.
+    const cited = (text: string, vocab: RegExp[]): string[] => [
+      ...[...text.matchAll(/«([^»]+)»/g)].map((m) => m[1]),
+      ...new Set(vocab.flatMap((re) => hits(text, re))),
+    ]
     for (const [k, t] of Object.entries(TOPICS)) {
       t.r.forEach((entry, i) => {
-        if (typeof entry !== 'string') return
-        const cited = [...valueOf(entry).matchAll(/«([^»]+)»/g)].map((m) => m[1])
-        if (CITED[k]?.[i]) cited.push(CITED[k][i])
-        for (const c of cited) {
+        if (entry instanceof Gated) return
+        const vocab = t.rneed?.[i] ? Object.values(t.rneed) : CITE_WORDS
+        for (const c of cited(entry, vocab)) {
+          if (NOT_A_CITE[`${k}.r[${i}]`]?.includes(c)) continue
           expect(t.rneed?.[i], `${k}.r[${i}] цитирует «${c}» без rneed`).toBeDefined()
           expect(t.rneed![i].test(c), `${k}.rneed[${i}] не узнаёт цитату «${c}»`).toBe(true)
         }
       })
+    }
+  })
+  it('сверка узнаёт цитаты из отмазок — словарь не пуст и покрывает известные (#739)', () => {
+    // Свидетели: сегодняшние цитаты (кавычки + слова) сверка обязана находить, иначе проверка выше пуста.
+    const known: Array<[keyof typeof TOPICS, number, string]> = [
+      ['bank', 4, 'перевод в пути'], ['history', 0, 'Урарту'], ['history', 3, 'Тигран'], ['history', 4, 'ковчег'],
+    ]
+    for (const [k, i, c] of known) {
+      const text = valueOf(TOPICS[k].r[i])
+      expect(text, `${k}.r[${i}] содержит цитату`).toContain(c)
+      const found = [...text.matchAll(/«([^»]+)»/g)].map((m) => m[1]).concat(CITE_WORDS.flatMap((re) => hits(text, re)))
+      expect(found.some((f) => f.includes(c) || c.includes(f)), `${k}.r[${i}]: сверка не находит «${c}»`).toBe(true)
     }
   })
   it('грубая цитата — только по сказанному: «перевод в пути» не на «Банк пусть капает» (#560)', () => {
