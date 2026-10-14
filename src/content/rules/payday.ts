@@ -4,6 +4,7 @@ import { type Rule, eq, gte, is, exists, missing } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { SOURCES, SOURCES_TOPUP, ROLL, CLAIMS, GRAND, GRAND_FALLBACK, SLOTS, CONTRADICTIONS, MORNING_CONTRA, OUTCOME, type Source, type Call, type Claim } from '../payday'
 import { alikDead, caughtCount, count, cryptoHodl, payday as pd, paydayScene } from '../memkeys'
+import { samvelLine } from '../world'
 
 type R = Rule<Game, GameEvent, Offer>
 const NAMES = ['Гарик', 'Борис', 'Гоар', 'мама', 'Рубик', 'Размик', 'Нуне', 'Карине', 'Страсбург', 'малыш', '«Нив', 'Грант']
@@ -51,7 +52,8 @@ export const PAYDAY_HOOKS: Record<string, (game: Game) => Promise<void>> = {
       came.add((p.spec as Call).who)
       await game.say([{ w: (p.spec as Call).who, t: p.text }])
     }
-    await game.enterNode('payday', 'split')
+    // хозяин дележа — только по факту самвеловской линии (#701): без неё говорит Алик
+    await game.enterNode('payday', game.holds(samvelLine) ? 'splitSamvel' : 'split')
   },
   // дележ: каждый требует долю, счётчик тает до 50 ₽
   claims: async (game) => {

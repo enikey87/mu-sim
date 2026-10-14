@@ -191,15 +191,42 @@ describe('День выплаты', () => {
     expect(out).toMatch(/родня услышала «по рублю»/)
     expect(out).toMatch(/К выплате: 180\s500 ₽/) // 239 000 − 39 000 − 19 500
   })
-  it('доля и перекличка Самвела/Карине уместны только после знакомства', () => {
+  it('доля Самвела уместна только по факту его линии, а не по знакомству от чужой реплики (#701)', () => {
     const { game } = makeGame()
     const whos = (pool: ReturnType<typeof game.lines.eligible>) => pool.map((p) => (p.spec as { who?: string }).who)
     expect(whos(game.lines.eligible('PD_CLAIM', CLAIMS, game.lineFacts()))).not.toContain('samvel')
     const roll = whos(game.lines.eligible('PD_ROLL', ROLL, game.lineFacts()))
     expect(roll).not.toContain('samvel')
     expect(roll).not.toContain('karine')
+    // знакомство без линии (суд, родня) претензию не открывает — открывает его сериал
     game.S.mem['intro.samvel'] = true
+    expect(whos(game.lines.eligible('PD_CLAIM', CLAIMS, game.lineFacts()))).not.toContain('samvel')
+    game.S.arcs.samvel = { i: ARCS.samvel.eps.length, last: 0 }
     expect(whos(game.lines.eligible('PD_CLAIM', CLAIMS, game.lineFacts()))).toContain('samvel')
+  })
+  // несостыковка из плейтест-раундов 43–44: распорядитель дележа сам открывал Самвелу знакомство,
+  // и в партии без его линии он требовал «подарок молодым» на свадьбе, которой не было (#701)
+  it('дележ без самвеловской линии ведёт Алик, с линией — дядя Самвел, и претензия только по линии', async () => {
+    const host = async (line: boolean) => {
+      const { game } = makeGame()
+      game.S.day = 340
+      if (line) await game.playArc('samvel') // линия партии — настоящим производителем, не памятью
+      await game.enterNode('payday', 'announce')
+      await choose(game, 'bag')
+      const hostLine = game.S.msgs.find((m) => m.kind === 'text' && /по традиции, доли/.test(m.text))
+      expect(hostLine, 'дележ звучит').toBeDefined()
+      const pool = (p: ReturnType<typeof game.lines.eligible>) => p.map((x) => (x.spec as { who?: string }).who)
+      return {
+        who: hostLine!.kind === 'text' ? hostLine!.who : undefined,
+        claims: pool(game.lines.eligible('PD_CLAIM', CLAIMS, game.lineFacts())),
+      }
+    }
+    const noLine = await host(false)
+    expect(noLine.who).toBeUndefined() // говорит Алик: Самвел не появляется «из ниоткуда»
+    expect(noLine.claims).not.toContain('samvel')
+    const withLine = await host(true)
+    expect(withLine.who).toBe('samvel')
+    expect(withLine.claims).toContain('samvel')
   })
   it('после выплаты старая допработа и перевод не меняют долг; кнопка допработы закрыта', async () => {
     const { game } = makeGame()
