@@ -3,6 +3,7 @@ dist/
 .playwright-mcp/
 .DS_Store
 coverage/
+.vitest/
 playwright-report/
 test-results/
 __pycache__/
