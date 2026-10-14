@@ -962,51 +962,72 @@ describe('App', () => {
         time: '12:00',
       })
     }
-    // начальная эпоха должна видеть уже заполненную ленту
+    // начальная эпоха должна видеть уже заполненную ленту; mountMs — полная сборка ленты
+    // на этой же машине: база для относительного порога ниже
     game.notifyMsgs()
+    const tm = performance.now()
     renderApp(game)
-    messageRenderStats.count = 0
-    messageListRenderStats.count = 0
-    messageListBuildStats.created = 0
-    messageListBuildStats.touched = 0
-    const t0 = performance.now()
-    act(() => { game.setStatus('в сети', 'online') })
-    const statusMs = performance.now() - t0
-    expect(messageListRenderStats.count).toBe(0)
-    expect(messageRenderStats.count).toBe(0)
-    expect(messageListBuildStats.created).toBe(0)
-    expect(messageListBuildStats.touched).toBe(0)
+    const mountMs = performance.now() - tm
+    const reset = () => {
+      messageRenderStats.count = 0
+      messageListRenderStats.count = 0
+      messageListBuildStats.created = 0
+      messageListBuildStats.touched = 0
+    }
 
-    messageRenderStats.count = 0
-    messageListRenderStats.count = 0
-    messageListBuildStats.created = 0
-    messageListBuildStats.touched = 0
-    const t1 = performance.now()
-    let last!: ReturnType<typeof game.push>
-    act(() => { last = game.push({ kind: 'text', from: 'alik', text: 'новое', time: '12:01' }) })
-    const pushMs = performance.now() - t1
-    expect(messageListRenderStats.count).toBe(1)
-    expect(messageRenderStats.count).toBe(1)
-    expect(messageListBuildStats.created).toBe(1)
-    expect(messageListBuildStats.touched).toBe(1)
+    // статус не касается ленты: ни узлов, ни рендеров — счётчики нулевые на каждом круге
+    const statusMs: number[] = []
+    for (let i = 0; i < 3; i++) {
+      reset()
+      const t = performance.now()
+      act(() => { game.setStatus(`в сети ${i}`, 'online') })
+      statusMs.push(performance.now() - t)
+      expect(messageListRenderStats.count).toBe(0)
+      expect(messageRenderStats.count).toBe(0)
+      expect(messageListBuildStats.created).toBe(0)
+      expect(messageListBuildStats.touched).toBe(0)
+    }
 
-    messageRenderStats.count = 0
-    messageListBuildStats.created = 0
-    messageListBuildStats.touched = 0
-    const t2 = performance.now()
-    await act(async () => { await game.editLast(last) })
-    const patchMs = performance.now() - t2
-    expect(messageListBuildStats.created).toBe(1)
-    expect(messageListBuildStats.touched).toBe(1)
-    expect(messageRenderStats.count).toBe(1)
-    expect(screen.getByText(/^изменено/)).toBeInTheDocument()
+    // push и правка — по три круга, порог берётся от минимума: разовый шум (GC/JIT-спайк,
+    // дававший 82.5 мс при пороге 80 — техаудит P2-5) минимумом гасится, регрессия замедляет все три
+    const pushMs: number[] = []
+    const patchMs: number[] = []
+    for (let i = 0; i < 3; i++) {
+      reset()
+      const t1 = performance.now()
+      let last!: ReturnType<typeof game.push>
+      act(() => { last = game.push({ kind: 'text', from: 'alik', text: `новое ${i}`, time: '12:01' }) })
+      pushMs.push(performance.now() - t1)
+      expect(messageListRenderStats.count).toBe(1)
+      expect(messageRenderStats.count).toBe(1)
+      expect(messageListBuildStats.created).toBe(1)
+      expect(messageListBuildStats.touched).toBe(1)
 
-    expect(statusMs).toBeLessThan(80)
-    expect(pushMs).toBeLessThan(120)
-    expect(patchMs).toBeLessThan(80)
+      reset()
+      const t2 = performance.now()
+      await act(async () => { await game.editLast(last) })
+      patchMs.push(performance.now() - t2)
+      expect(messageListRenderStats.count).toBe(1)
+      expect(messageListBuildStats.created).toBe(1)
+      expect(messageListBuildStats.touched).toBe(1)
+      expect(messageRenderStats.count).toBe(1)
+    }
+    expect(screen.getAllByText(/^изменено/)).toHaveLength(3)
+
+    // Порог — минимум операции против половины полной сборки, замеренной здесь же:
+    // одиночная операция стоимостью в половину пересборки — регрессия; медленная машина
+    // и разовый шум — нет: база растёт вместе с машиной, минимум гасит спайк.
+    const budget = mountMs * 0.5
+    const minStatus = Math.min(...statusMs)
+    const minPush = Math.min(...pushMs)
+    const minPatch = Math.min(...patchMs)
+    expect(minStatus).toBeLessThan(budget)
+    expect(minPush).toBeLessThan(budget)
+    expect(minPatch).toBeLessThan(budget)
     console.log(
-      `[chat-render] n=1000 before≈status:N-scan/push:N-map; after status=${statusMs.toFixed(1)}ms touched=0; ` +
-        `push=${pushMs.toFixed(1)}ms created=1 touched=1; editLast=${patchMs.toFixed(1)}ms created=1 touched=1`,
+      `[chat-render] n=1000 mount=${mountMs.toFixed(1)}ms budget=${budget.toFixed(1)}ms; ` +
+        `status=${statusMs.map((x) => x.toFixed(1)).join('/')}ms; push=${pushMs.map((x) => x.toFixed(1)).join('/')}ms; ` +
+        `editLast=${patchMs.map((x) => x.toFixed(1)).join('/')}ms`,
     )
   })
 
