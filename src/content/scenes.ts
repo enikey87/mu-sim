@@ -69,8 +69,12 @@ const REDO = [
     left: 'Тогда пусть темнеет. На твоей совести.',
   },
 ]
+/** «Баран Борис» — единственный производитель `has.boris`, то есть единственный путь к концовке
+ * «Бараном» (`finale.boris = 'toyou'`). Ворота линии плюс «у игрока ещё нет»: иначе барана
+ * продолжали бы предлагать и после покупки (#752). */
+const baranBoris = gate(WORLD.boris, WORLD.baran, missing('has.boris'))({ n: 'баран Борис', v: 3000, p: 'Породистый! Умеет смотреть на Арарат.' })
 export const BARTER = [
-  needs('boris', 'baran')({ n: 'баран Борис', v: 3000, p: 'Породистый! Умеет смотреть на Арарат.' }),
+  baranBoris,
   gate(WORLD.baran, missing('arc.boris'))({ n: 'баран без имени', v: 3000, p: 'Откликается на «эй». Имя придумаешь сам.' }),
   { n: 'три коробки остатков плитки', v: 1500, p: 'Твоя же плитка! Ностальгия.' },
   { n: 'коньяк «Арарат», пять звёзд', v: 2000, p: 'Одна звезда уже выпита, но четыре осталось.' },
@@ -224,7 +228,16 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
 
     barter: {
       start: 'ask',
-      init: (rng, open) => { const b = open(BARTER); return { ...b[Math.floor(rng.random() * b.length)] } },
+      init: (rng, open) => {
+        // «Баран Борис» при открытых воротах идёт первым, а не по равному розыгрышу из ~13 товаров:
+        // при 0–2 показах барахолки за партию (перерыв 25 дней, конкуренция с другими сценами)
+        // случай до него не доходил ни разу — концовка «Бараном» была недостижима (#752).
+        // Иначе — обычный розыгрыш пула.
+        const baran = open([baranBoris])
+        if (baran.length) return { ...baran[0] }
+        const b = open(BARTER)
+        return { ...b[Math.floor(rng.random() * b.length)] }
+      },
       nodes: {
         ask: {
           a: [
