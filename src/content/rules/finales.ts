@@ -10,6 +10,8 @@ type R = Rule<ContentApi, GameEvent, Offer>
 
 const finale = (arc: string, f: Finale | null, when = f?.when ?? [], alt = ''): R => ({
   name: `Finale_${arc}_${f?.id ?? 'default'}${alt}`, event: 'ArcFinale', when: [eq('arc', arc), ...when], priority: 'cinematic',
+  // бонус финала — приоритет над другими подходящими финалами того же сериала, а не условие
+  ...(f?.bonus ? { bonus: f.bonus } : {}),
   respond: ({ game }) => game.playFinale(arc, f),
 })
 
