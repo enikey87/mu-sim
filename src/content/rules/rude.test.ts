@@ -246,9 +246,9 @@ describe('лестница грубости: ступени', () => {
     await game.afterTurn()
     expect(game.S.mem.polite).toBeUndefined()
   })
-  it('вендетта: 15 криков за игру и ни одного извинения — один раз; потом окрашивает ходы', async () => {
+  it('вендетта: 15-й крик за игру и ни одного извинения — один раз; потом окрашивает ходы (#742)', async () => {
     const { game } = makeGame()
-    game.S.mem['count.rude'] = 15
+    game.S.mem['count.rude'] = 14 // 15-й крик: счётчик в условии читается до remember текущего
     const { r, n } = await fire(game, 'rude')
     expect(r).toBe('Rude_Vendetta')
     expect(texts(game, n)).toEqual(expect.arrayContaining(all(T.VENDETTA)))
@@ -259,10 +259,20 @@ describe('лестница грубости: ступени', () => {
     for (let i = 0; i < 200 && !colored; i++) { game.S.stats.sent += 5; colored = game.rules.match({ event: 'AlikTurn' }, game.facts())?.name === 'Turn_Vendetta' }
     expect(colored).toBe(true)
   })
+  it('вендетта объявляется на 15-м крике — числе из шпаргалки (#742)', async () => {
+    const { game } = makeGame()
+    for (let i = 1; i <= 14; i++) {
+      const { r } = await fire(game, 'rude')
+      expect(r, `крик ${i} не объявляет вендетту`).not.toBe('Rude_Vendetta')
+      expect(game.S.mem['count.rude'], `счётчик после ${i}-го крика`).toBe(i)
+    }
+    expect((await fire(game, 'rude')).r).toBe('Rude_Vendetta')
+    expect(game.S.mem.vendetta).toBe(true)
+  })
   it('вендетта объявляется при холодной ссоре: 15 криков без единого извинения, жар не нужен', async () => {
     const { game } = makeGame()
     heat(game, 0)
-    game.S.mem['count.rude'] = 15
+    game.S.mem['count.rude'] = 14 // 15-й крик
     expect((await fire(game, 'rude')).r).toBe('Rude_Vendetta')
   })
   it('хоть раз извинился — вендетты не будет', async () => {
@@ -271,10 +281,10 @@ describe('лестница грубости: ступени', () => {
     Object.assign(game.S.mem, { 'count.rude': 15, 'count.sorry': 1 })
     expect((await fire(game, 'rude')).r).not.toBe('Rude_Vendetta')
   })
-  it('до 15 криков вендетты не будет: 14-й крик остаётся ступенью лестницы', async () => {
+  it('14-й крик вендетты не объявляет: она на 15-м, как и обещает шпаргалка (#742)', async () => {
     const { game } = makeGame()
     heat(game, 0)
-    game.S.mem['count.rude'] = 14
+    game.S.mem['count.rude'] = 13 // 14-й крик: счётчик в условии читается до remember текущего
     expect((await fire(game, 'rude')).r).not.toBe('Rude_Vendetta')
   })
 })

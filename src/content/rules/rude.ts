@@ -129,9 +129,10 @@ export const rudeRules: R[] = [
     name: 'Rude_Polite', event: 'PlayerMessage', when: [rude, is(polite)], bonus: 8, remember: [add(count.rude)],
     respond: async ({ game }) => { await game.say([line(game, 'POLITE_RUDE', T.POLITE_RUDE)]) },
   },
-  // финал — вендетта: серия криков за игру и ни одного извинения
+  // финал — вендетта: серия криков за игру и ни одного извинения.
+  // Порог читается до remember текущего крика, поэтому 14 здесь — это 15-й крик, число из шпаргалки (#742)
   {
-    name: 'Rude_Vendetta', event: 'PlayerMessage', when: [rude, gte(count.rude, 15), lte(count.sorry, 0)], bonus: 8, once: true, priority: 'cinematic',
+    name: 'Rude_Vendetta', event: 'PlayerMessage', when: [rude, gte(count.rude, 14), lte(count.sorry, 0)], bonus: 8, once: true, priority: 'cinematic',
     remember: [add(count.rude), set(vendetta, true)],
     respond: async ({ game }) => {
       await game.sticker({ e: '🗡️', c: 'Вендетта' })
