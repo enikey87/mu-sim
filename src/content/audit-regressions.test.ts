@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { alikTexts, makeGame } from '../test/helpers'
+import { alikTexts, makeGame, respondCtx } from '../test/helpers'
 import { ARCS } from './arcs'
 import { D, type When } from './excuses'
 import { CHORUS_LEGEND, LEGENDS } from './legends'
@@ -101,7 +101,7 @@ describe('регрессии первоначального аудита', () =>
     game.S.stats.sent = 20
     game.S.items.push('Угол конверта в бетоне')
     const rule = turnRules.find((candidate) => candidate.name === 'Turn_Memory')!
-    await rule.respond!(game.rules.ctx(game, rule, { event: 'AlikTurn' }, game.facts()))
+    await rule.respond!(respondCtx(rule, game, { event: 'AlikTurn' }, game.facts()))
     expect(game.S.msgs.findLast((m) => m.kind === 'text')).toMatchObject({ kind: 'text', text: expect.stringContaining('Угол конверта в бетоне') })
   })
 

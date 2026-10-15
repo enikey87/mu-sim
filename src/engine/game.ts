@@ -1385,9 +1385,6 @@ export class Game {
       return true
     })
   }
-  unfinishedArc(): string | undefined {
-    return Object.keys(this.S.arcs).find((id) => this.arcCanAdvance(id, true))
-  }
   /** Квест можно запустить из разговора: ещё не брали и условия слота выполнены. Без побочных эффектов. */
   questAllowed(id: string): boolean {
     if (this.S.rules.once['Quest_' + id]) return false
@@ -1490,7 +1487,6 @@ export class Game {
       quests: Object.keys(S.ach).filter((k) => k.startsWith('q_')).length,
       callbackReady: !!this.callbackCandidate(),
       lieOpen: !!lie, lieKind: lie?.kind ?? false, lieAlikOld: lie?.alikOld ?? false,
-      arcUnfinished: this.unfinishedArc(),
       deathCanAdvance: !!S.mem[memkeys.alikDead] && this.arcCanAdvance('alik_death', true),
       'ctx.type': c.type, 'ctx.amount': c.amount, 'ctx.s': c.s, 'ctx.shortTimey': c.s ? TIMEY.test(c.s) : false,
       'ctx.when': c.when, 'ctx.whenNever': c.whenNever,
