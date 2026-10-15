@@ -2,7 +2,8 @@
 // есть кнопка про этот праздник и деньги, Алик отвечает пулом праздника; вне окна и в эндгейме кнопки нет.
 import { describe, it, expect } from 'vitest'
 import { makeGame, alikTexts } from '../test/helpers'
-import { HOLIDAY_MONEY, P_HOLIDAY } from './holidays'
+import { HOLIDAY_MONEY, P_HOLIDAY, holidayOf } from './holidays'
+import { dateOf } from '../engine/time'
 import { alikDead, blocked, endgame } from './memkeys'
 import type { Game } from '../engine/game'
 
@@ -48,6 +49,37 @@ describe('деньги под праздником', () => {
       await game.fire('PlayerSays', { intent: 'holiday' })
       const answer = alikTexts(game.S.msgs.slice(n)).join(' ')
       expect(pool.some((l) => answer.includes(l)), `ответ не из пула праздника: ${answer}`).toBe(true)
+    }
+  })
+
+  it('Трндез и День строителя: кнопка про свой праздник, ответ из его пула', async () => {
+    const dayOn = (year: number, month: number, dom: number) => {
+      for (let day = 0; day < 900; day++) {
+        const d = dateOf(day)
+        if (d.getFullYear() === year && d.getMonth() + 1 === month && d.getDate() === dom) return day
+      }
+      throw new Error(`нет дня ${year}-${month}-${dom}`)
+    }
+    let builders = 0
+    for (let day = 0; day < 900; day++) {
+      const d = dateOf(day)
+      if (d.getFullYear() === 2027 && d.getMonth() === 7 && d.getDay() === 0 && holidayOf(day) === 'builders') builders = day
+    }
+    expect(builders).toBeGreaterThan(0)
+    for (const [day, button, reply] of [
+      [dayOn(2027, 2, 13), P_HOLIDAY.trndez, HOLIDAY_MONEY.trndez],
+      [builders, P_HOLIDAY.builders, HOLIDAY_MONEY.builders],
+    ] as const) {
+      const { game } = makeGame({ seed: 5 })
+      game.S.day = day
+      const rules = optHoliday(game)
+      expect(rules, `кнопка ${day}`).toHaveLength(1)
+      const c = rules[0].offer!(game.rules.ctx(game, rules[0], { event: 'BuildChoices' }, game.facts()))
+      expect(button).toContain(c?.text)
+      const n = game.S.msgs.length
+      await game.fire('PlayerSays', { intent: 'holiday' })
+      const answer = alikTexts(game.S.msgs.slice(n)).join(' ')
+      expect(reply.some((l) => answer.includes(l)), answer).toBe(true)
     }
   })
 })

@@ -106,7 +106,7 @@ export const DIRECT: Record<string, DirectCase> = {
     event: 'PlayerSays', facts: { intent: 'sorry' },
     setup: (g) => { blocked(g); g.S.mem['finale.rubik'] = 'karine' },
   },
-  Finale_boris_brigadir: { event: 'ArcFinale', facts: { arc: 'boris' }, setup: (g) => { g.S.mem['asked.boris'] = 6 } },
+  // Finale_boris_brigadir снят: после переноса открытки строителя из FWD выборки видят финал сами (7 партий). Путь — finales.test.ts.
   Finale_samvel_groom: { event: 'ArcFinale', facts: { arc: 'samvel' }, setup: (g) => { g.S.ach.saint = 1; g.S.mem['count.rude'] = 3 } },
   Finale_alik_death_sulk: { event: 'ArcFinale', facts: { arc: 'alik_death' }, setup: () => {} },
   Ending_family: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem['finale.samvel'] = 'groom' } },

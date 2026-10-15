@@ -268,3 +268,157 @@ describe('праздники', () => {
     expect(game.lines.eligible('FWD', FWD_HOLIDAY, game.lineFacts()).some((p) => p.text.includes(NY))).toBe(false)
   })
 })
+
+/** День календаря переписки: сдача 18.03.2026 — день 0. */
+function dayOn(year: number, month: number, dom: number): number {
+  for (let day = 0; day < 900; day++) {
+    const d = dateOf(day)
+    if (d.getFullYear() === year && d.getMonth() + 1 === month && d.getDate() === dom) return day
+  }
+  throw new Error(`нет дня ${year}-${month}-${dom}`)
+}
+
+/** Три дня окна Дня строителя в этом августе, по порядку. */
+function buildersWindow(year: number): number[] {
+  const days: number[] = []
+  for (let day = 0; day < 900; day++) {
+    const d = dateOf(day)
+    if (d.getFullYear() === year && d.getMonth() === 7 && holidayOf(day) === 'builders') days.push(day)
+  }
+  return days
+}
+
+describe('Трндез и День строителя', () => {
+  it('holidayOf: 12–14 февраля и второе воскресенье августа ±1; снаружи окна пусто', () => {
+    expect(holidayOf(dayOn(2027, 2, 11))).toBeUndefined()
+    expect(holidayOf(dayOn(2027, 2, 12))).toBe('trndez')
+    expect(holidayOf(dayOn(2027, 2, 13))).toBe('trndez')
+    expect(holidayOf(dayOn(2027, 2, 14))).toBe('trndez')
+    expect(holidayOf(dayOn(2027, 2, 15))).toBeUndefined()
+    // високосный февраль не сдвигает окно
+    expect(holidayOf(dayOn(2028, 2, 12))).toBe('trndez')
+    expect(holidayOf(dayOn(2028, 2, 14))).toBe('trndez')
+    expect(holidayOf(dayOn(2028, 2, 15))).toBeUndefined()
+
+    for (const year of [2026, 2027, 2028]) {
+      const window = buildersWindow(year)
+      expect(window, `${year}`).toHaveLength(3)
+      const [sat, sun, mon] = window
+      expect(dateOf(sat).getDay(), `${year} суббота`).toBe(6)
+      expect(dateOf(sun).getDay(), `${year} воскресенье`).toBe(0)
+      expect(dateOf(mon).getDay(), `${year} понедельник`).toBe(1)
+      expect(dateOf(sun).getDate(), `${year} второе воскресенье`).toBeGreaterThanOrEqual(8)
+      expect(dateOf(sun).getDate(), `${year} второе воскресенье`).toBeLessThanOrEqual(14)
+      expect(holidayOf(sat - 1), `${year} накануне`).toBeUndefined()
+      expect(holidayOf(mon + 1), `${year} после`).toBeUndefined()
+      expect(holidayOf(dayOn(year, 8, 29)), `${year} 29 августа`).toBeUndefined()
+    }
+  })
+
+  it('партия на 13 февраля и на второе воскресенье: факт, отмазка раньше обычной, поздравление один раз', async () => {
+    const holiday = HOLIDAY_EXCUSES.map((l) => spec(l).t)
+    const said = (game: ReturnType<typeof makeGame>['game'], from: number) =>
+      game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : []))
+
+    const { game } = makeGame({ seed: 3 })
+    game.S.day = dayOn(2027, 2, 13)
+    expect(game.facts().holiday).toBe('trndez')
+    const from = game.S.msgs.length
+    await game.excuseTurn()
+    expect(holiday, 'отмазка Трндеза, не обычная').toContain(said(game, from).join(' '))
+    expect(game.S.mem['holiday.greeted']).toBe('trndez@2027')
+    await game.excuseTurn()
+    expect(said(game, from).filter((t) => holiday.includes(t))).toHaveLength(1)
+
+    const sun = buildersWindow(2027)[1]
+    const { game: built } = makeGame({ seed: 3 })
+    built.S.day = sun
+    expect(built.facts().holiday).toBe('builders')
+    const fromB = built.S.msgs.length
+    await built.excuseTurn()
+    expect(said(built, fromB).join(' ')).toMatch(/строители строителям не платят/)
+    expect(built.S.mem['holiday.greeted']).toBe(`builders@${dateOf(sun).getFullYear()}`)
+
+    // ход с кануна: +1…3 дня попадают в окно, тайл поздравляет
+    for (const [eve, key] of [
+      [dayOn(2027, 2, 11), /^trndez@2027$/],
+      [buildersWindow(2027)[0] - 1, /^builders@2027$/],
+    ] as const) {
+      const { game: g } = makeGame({ seed: 1 })
+      g.S.day = eve
+      expect(g.facts().holiday).toBe(false)
+      await g.send({ text: 'Спасибо!', tone: 'polite' })
+      expect(holidayOf(g.S.day), `после хода с ${eve}`).toBe(key.source.startsWith('^trndez') ? 'trndez' : 'builders')
+      expect(String(g.S.mem['holiday.greeted'])).toMatch(key)
+      expect(g.S.msgs.some((m) => m.kind === 'text' && m.from === 'alik' && holiday.includes(m.text))).toBe(true)
+    }
+  })
+
+  it('строки знают день внутри окна; открытка и мама — в праздник, не накануне и не в эндгейме', () => {
+    const { game } = makeGame({ seed: 1 })
+    const excuses = (day: number, end = false) => {
+      game.S.day = day
+      if (end) game.S.mem[endgame.active] = true
+      else delete game.S.mem[endgame.active]
+      return game.lines.eligible('HOLIDAY', HOLIDAY_EXCUSES, game.lineFacts()).map((p) => p.text).join(' ')
+    }
+    expect(excuses(dayOn(2027, 2, 12))).toMatch(/на носу/)
+    expect(excuses(dayOn(2027, 2, 12))).not.toMatch(/Сегодня|прыгнули/)
+    expect(excuses(dayOn(2027, 2, 13))).toMatch(/Сегодня/)
+    expect(excuses(dayOn(2027, 2, 13))).not.toMatch(/на носу|прыгнули/)
+    expect(excuses(dayOn(2027, 2, 14))).toMatch(/прыгнули — деньги сгорели/)
+    expect(excuses(dayOn(2027, 2, 14))).not.toMatch(/Сегодня|на носу/)
+    expect(excuses(dayOn(2027, 2, 13), true)).toBe('')
+
+    const [sat, sun, mon] = buildersWindow(2027)
+    expect(excuses(sat)).toMatch(/на носу/)
+    expect(excuses(sat)).not.toMatch(/строители строителям|Акт праздника/)
+    expect(excuses(sun)).toMatch(/строители строителям не платят/)
+    expect(excuses(sun)).not.toMatch(/на носу|Акт праздника/)
+    expect(excuses(mon)).toMatch(/Акт праздника/)
+    expect(excuses(mon)).not.toMatch(/на носу|строители строителям/)
+    expect(excuses(sun, true)).toBe('')
+
+    const postcards = (day: number, end = false) => {
+      game.S.day = day
+      if (end) game.S.mem[endgame.active] = true
+      else delete game.S.mem[endgame.active]
+      return game.lines.eligible('FWD', [...FWD, ...FWD_HOLIDAY], game.lineFacts()).map((p) => p.text).join(' ')
+    }
+    const mama = (day: number, end = false) => {
+      game.S.day = day
+      if (end) game.S.mem[endgame.active] = true
+      else delete game.S.mem[endgame.active]
+      return game.lines.eligible('NOTIF', NOTIF, game.lineFacts())
+        .filter((p) => (p.spec as { app?: string }).app === 'Мама').map((p) => p.text).join(' ')
+    }
+    expect(postcards(dayOn(2027, 2, 12))).not.toMatch(/Трндез/)
+    expect(mama(dayOn(2027, 2, 12))).not.toMatch(/Трндез/)
+    expect(postcards(dayOn(2027, 2, 13))).toMatch(/Трндез/)
+    expect(mama(dayOn(2027, 2, 14))).toMatch(/Трндез/)
+    expect(postcards(dayOn(2027, 2, 13), true)).not.toMatch(/Трндез/)
+    expect(mama(dayOn(2027, 2, 13), true)).not.toMatch(/Трндез/)
+    expect(postcards(dayOn(2027, 2, 11))).not.toMatch(/Трндез/)
+
+    expect(postcards(sat)).not.toMatch(/Днём строителя/)
+    expect(mama(sat)).not.toMatch(/Днём строителя/)
+    expect(postcards(sun)).toMatch(/Днём строителя/)
+    expect(mama(mon)).toMatch(/Днём строителя/)
+    expect(postcards(sun, true)).not.toMatch(/Днём строителя/)
+    expect(mama(sun, true)).not.toMatch(/Днём строителя/)
+    expect(postcards(dayOn(2027, 8, 29))).not.toMatch(/Днём строителя/)
+  })
+
+  it('негативный контроль: снять гейт праздника с открытки — она звучит вне окна', () => {
+    const { game } = makeGame()
+    game.S.day = 184
+    const card = 'С Трндезом'
+    const pool = FWD_HOLIDAY.map((l) => {
+      const s = spec(l)
+      if (!s.t.includes(card)) return l
+      return { ...s, when: (s.when ?? []).filter((c) => !('key' in c && c.key === 'holiday')) }
+    })
+    expect(game.lines.eligible('FWD', pool, game.lineFacts()).some((p) => p.text.includes(card))).toBe(true)
+    expect(game.lines.eligible('FWD', FWD_HOLIDAY, game.lineFacts()).some((p) => p.text.includes(card))).toBe(false)
+  })
+})
