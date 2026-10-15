@@ -61,8 +61,10 @@ const worldFacts = (game: Game): Record<string, unknown> => {
 export const requiresKey = (c: Criterion, key: string): boolean =>
   c.op === 'all' ? (c.all ?? []).some((x) => requiresKey(x, key)) : c.key === key && (c.op === 'exist' || (c.op === '==' && c.value === true))
 
-/** Правила с гейтом `alik_dead`: оракул судит о реплике по этому списку, а не по имени. Считается по правилам партии — тест может снять гейт. */
-export const deathGated = (rules: readonly Rule<Game>[]): string[] => rules.filter((r) => (r.when ?? []).some((c) => requiresKey(c, alikDead))).map((r) => r.name).sort()
+/** Правила с гейтом `alik_dead`: оракул судит о реплике по этому списку, а не по имени. Считается по правилам партии — тест может снять гейт.
+ *  Параметр — структурный минимум (`name`, `when`): контентные правила типизированы узким `ContentApi`, и
+ *  `Rule<ContentApi>` не обязан быть совместим с `Rule<Game>` (проверка зависела от порядка файлов, #788). */
+export const deathGated = (rules: readonly Pick<Rule<Game>, 'name' | 'when'>[]): string[] => rules.filter((r) => (r.when ?? []).some((c) => requiresKey(c, alikDead))).map((r) => r.name).sort()
 export const DEATH_GATED: readonly string[] = deathGated(allRules)
 
 /** Ложные условия самой строки уведомления: `holds` — разбор выборщика, иначе именованные врут. */
