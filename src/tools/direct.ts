@@ -107,10 +107,6 @@ export const DIRECT: Record<string, DirectCase> = {
     // 15-й крик: порог в правиле читает счётчик до remember текущего крика (#742)
     setup: (g) => { g.S.mem['count.rude'] = 14; g.S.mem['count.sorry'] = 0 },
   },
-  Tone_MissRude: {
-    event: 'PlayerMessage', facts: { tone: 'polite' },
-    setup: (g) => { g.S.mem['count.rude'] = 20; g.S.mem.rudeAt = g.S.stats.sent - 10 },
-  },
   Says_sorry_blocked: {
     event: 'PlayerSays', facts: { intent: 'sorry' },
     setup: (g) => { blocked(g); g.S.mem['finale.rubik'] = 'karine' },
@@ -205,7 +201,6 @@ export const DIRECT: Record<string, DirectCase> = {
   // #795: розыгрыш сдвинулся — амнистия теперь играется во всех чужих семействах (`rules:stable`),
   // гейт видит её сам; запись снята
   // #703: правка пулов звонка сдвинула розыгрыш выборок — кафе и счёт из них ушли
-  Scene_meet: { event: 'PickScene', setup: (g) => { g.S.day = 215 } },
   Scene_invoice: { event: 'PickScene', setup: (g) => { g.S.day = 215 } },
   // #731: правка NAME_RE сдвинула розыгрыш выборок ещё раз — «заказчик жалуется» и «позвони заказчику» ушли из них
   Scene_customer: { event: 'PickScene', setup: (g) => { g.S.day = 210 } },

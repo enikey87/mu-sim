@@ -2,7 +2,7 @@
 // есть кнопка про этот праздник и деньги, Алик отвечает пулом праздника; вне окна и в эндгейме кнопки нет.
 import { describe, it, expect } from 'vitest'
 import { makeGame, alikTexts } from '../test/helpers'
-import { HOLIDAY_MONEY, P_HOLIDAY } from './holidays'
+import { HOLIDAY_MONEY, P_HOLIDAY, holidayOf, type Holiday } from './holidays'
 import { alikDead, blocked, endgame } from './memkeys'
 import type { Game } from '../engine/game'
 
@@ -41,13 +41,71 @@ describe('деньги под праздником', () => {
   })
 
   it('Алик отвечает пулом того праздника, который сейчас', async () => {
-    for (const [day, pool] of [[NY, HOLIDAY_MONEY.newYear], [M8, HOLIDAY_MONEY.march8]] as const) {
+    for (const [day, holiday] of [[NY, 'newYear'], [M8, 'march8']] as const) {
       const { game } = makeGame({ seed: 5 })
       game.S.day = day
+      // уместные строки — до ответа: сказанная строка из eligible уходит
+      const pool = game.lines.eligible('HOLIDAY_MONEY', HOLIDAY_MONEY[holiday], game.lineFacts()).map((p) => p.text)
+      expect(pool.length, 'в окне есть что ответить').toBeGreaterThan(0)
       const n = game.S.msgs.length
       await game.fire('PlayerSays', { intent: 'holiday' })
       const answer = alikTexts(game.S.msgs.slice(n)).join(' ')
-      expect(pool.some((l) => answer.includes(l)), `ответ не из пула праздника: ${answer}`).toBe(true)
+      expect(pool.some((t) => answer.includes(t)), `ответ не из пула праздника: ${answer}`).toBe(true)
     }
+  })
+})
+
+describe('деньги под праздником: день внутри окна (#802)', () => {
+  // Окно шире одного дня, и «С наступающим» 1 января — такой же неверный день, как «Год только начался»
+  // 30 декабря. Пул знает день, как HOLIDAY_EXCUSES (#255).
+  const moneyTexts = (g: Game, holiday: Holiday) =>
+    g.lines.eligible('HOLIDAY_MONEY', HOLIDAY_MONEY[holiday], g.lineFacts()).map((p) => p.text)
+
+  /** Уместные строки месяца окна: на свежей партии — сказанных ещё нет (eligible их не отдаёт). */
+  const textsAt = (day: number) => {
+    const { game } = makeGame()
+    game.S.day = day
+    return moneyTexts(game, holidayOf(day)!)
+  }
+
+  /** Ответ Алика на праздничную денежную кнопку — путь игрока. */
+  const answerAt = async (day: number) => {
+    const { game } = makeGame({ seed: 5 })
+    game.S.day = day
+    const n = game.S.msgs.length
+    await game.fire('PlayerSays', { intent: 'holiday' })
+    return alikTexts(game.S.msgs.slice(n)).join(' ')
+  }
+
+  it('1 января: про начавшийся год — «наступающим» только в декабре', async () => {
+    const texts = textsAt(NY)
+    expect(texts.some((t) => /наступающим/.test(t)), '1 января «наступающим» не у места').toBe(false)
+    expect(texts.some((t) => /Год только начался/.test(t)), 'начало года звучит').toBe(true)
+    expect(await answerAt(NY)).not.toMatch(/наступающим/)
+  })
+
+  it('НС: 30–31 декабря: «Год только начался» и «Первый день года» — не про декабрь', async () => {
+    for (const day of [NY - 2, NY - 1]) {
+      const texts = textsAt(day)
+      expect(texts.some((t) => /Год только начался|Первый день года/.test(t)), `день ${day}: январские строки в декабре`).toBe(false)
+      expect(texts.some((t) => /С наступающим/.test(t)), `день ${day}: «наступающее» есть`).toBe(true)
+    }
+  })
+
+  it('6–7 марта: подготовки — «С 8 Марта» звучит только с 8-го', async () => {
+    for (const day of [M8 - 2, M8 - 1]) {
+      const texts = textsAt(day)
+      expect(texts.some((t) => /^С 8 Марта/.test(t)), `день ${day}: поздравление до праздника`).toBe(false)
+      expect(texts.some((t) => /на носу/.test(t)), `день ${day}: подготовка звучит`).toBe(true)
+      expect(await answerAt(day)).not.toMatch(/^С 8 Марта/)
+    }
+  })
+
+  it('8–9 марта: поздравление уместно, «Сегодня» — только 8-го', async () => {
+    for (const day of [M8, M8 + 1]) {
+      expect(textsAt(day).some((t) => /^С 8 Марта/.test(t)), `день ${day}: поздравление на месте`).toBe(true)
+    }
+    expect(textsAt(M8).some((t) => /^Сегодня/.test(t)), '«сегодня» — 8-го').toBe(true)
+    expect(textsAt(M8 + 1).some((t) => /^Сегодня/.test(t)), '9-го «сегодня» мимо').toBe(false)
   })
 })
