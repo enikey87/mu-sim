@@ -4,6 +4,8 @@ import { needs, samvelLine, WORLD } from './world'
 import { finaleOf, lend50, met, moustacheKept } from './memkeys'
 
 export const ENDGAME_GROUP = 'ВЫПЛАТА ЗАКРЫТА ✅ (не выходить)'
+/** Первая строка эпилога: группа открывается после концовки — игрок видит, что это эпилог, а не «дальше» (#797). */
+export const EPILOGUE_BANNER = '—— Эпилог ——'
 
 export const ENDGAME_CHOICES: Choice[] = [
   { text: 'Где деньги?', tone: 'neutral', act: 'endgameMoney' },
