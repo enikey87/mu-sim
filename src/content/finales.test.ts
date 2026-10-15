@@ -160,6 +160,21 @@ describe('финалы сериалов: выбор', () => {
     }
     expect(noise).toBeGreaterThan(3)
   })
+  it('«Борис уходит к тебе» важнее «Бригадира»: предмет бьёт шесть вопросов (#759)', async () => {
+    for (const seed of [1, 2, 3, 4, 5]) {
+      const { game } = makeGame({ seed })
+      SETUP['boris.toyou'](game)
+      SETUP['boris.brigadir'](game)
+      toLast(game, 'boris')
+      await game.playArc('boris')
+      expect(game.S.mem['finale.boris'], `сид ${seed}`).toBe('toyou')
+    }
+    const { game } = makeGame({ seed: 1 })
+    SETUP['boris.brigadir'](game)
+    toLast(game, 'boris')
+    await game.playArc('boris')
+    expect(game.S.mem['finale.boris']).toBe('brigadir')
+  })
   it('жених: wedding.anush навсегда — через 8 дней свадебный ход жив (#328)', async () => {
     const { game } = makeGame()
     SETUP['samvel.groom'](game)
