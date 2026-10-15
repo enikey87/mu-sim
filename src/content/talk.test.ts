@@ -27,6 +27,32 @@ describe('ответ на только что прозвучавшее', () => {
     const next = await ask(game)
     expect(next?.text).not.toBe(c.text)
   })
+  // свип #786: «я сверху» правда только до финала — в финале Размик слезает
+  it('после финала Размика пара про «я сверху» не предлагается', async () => {
+    const { game } = makeGame()
+    game.S.ctx = { chorus: 'razmik' }
+    game.S.arcs.razmik = { i: 8, last: 0 } // линия окончена: eps.length серий
+    game.S.mem['finale.razmik'] = 'default'
+    const asked = new Set<string>()
+    for (let i = 0; i < 40; i++) { const c = talkOpt(game); if (c) asked.add(c.text); game.S.choices = null }
+    expect(asked, 'пара про высоту ушла вместе с краном').not.toContain('Размик, давайте вместе на него надавим')
+  })
+
+  it('НС: до финала пара про «я сверху» предлагается', async () => {
+    const { game } = makeGame()
+    game.S.arcs.razmik = { i: 2, last: 0 }
+    const asked = new Set<string>()
+    for (let i = 0; i < 40 && asked.size < 2; i++) {
+      game.S.ctx = { chorus: 'razmik' }
+      game.S.choices = null
+      const c = (await ask(game))!
+      expect(c).toBeDefined()
+      asked.add(c.text)
+      await game.send(c) // пара сказана — следующая итерация берёт другую
+    }
+    expect(asked).toContain('Размик, давайте вместе на него надавим')
+  })
+
   it('после реплики легенды — вопрос именно про неё', async () => {
     const { game } = makeGame()
     game.setLegend('safe_baby', 'nune')
