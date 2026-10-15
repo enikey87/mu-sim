@@ -272,6 +272,18 @@ describe('архив дела: свежий финал — не новость (
     return game
   }
 
+  it('класс, а не одна строка: у Рубика тот же повтор — и та же придержка', async () => {
+    const { game } = makeGame()
+    game.S.day = 290
+    toLast(game, 'rubik')
+    await game.playArc('rubik')
+    expect(game.S.mem['finale.rubik']).toBe('default')
+    game.S.day = 295 // как у Гарика: внутри окна свежести
+    const from = alikCount(game)
+    await enterGroup(game)
+    expect(since(game, from), 'свежий финал Рубика придерживается').not.toContain(archiveText('fin.rubik.default'))
+  })
+
   it('финал, прозвучавший днями раньше, группа новостью не объявляет', async () => {
     const game = await garikFinale(290, 295) // до выплаты прошли дни, но меньше окна
     const from = alikCount(game)
