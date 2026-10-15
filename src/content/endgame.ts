@@ -620,7 +620,7 @@ export const ENDGAME_ARCH: Entry<ArchiveLine>[] = [
   gate(eq(finaleOf('beton'), 'ledger'), WORLD.nune)({ slug: 'fin.beton.ledger', line: 'Нуне сверила выписки и уличила меня при всём объекте. Протокол подписан, денег нет.' }),
   gate(eq(finaleOf('beton'), 'default'))({ slug: 'fin.beton.default', line: 'Деньги в фундаменте признали неотделимым улучшением. Дом продан вместе с ними — улучшение уехало.' }),
 
-  gate(eq(finaleOf('samvel'), 'tamada'), WORLD.samvel)({ slug: 'fin.samvel.tamada', line: 'Ты был тамадой на свадьбе Самвела. Почёт не облагается налогом и не выплачивается деньгами.' }),
+  gate(eq(finaleOf('samvel'), 'tamada'), WORLD.samvel)({ slug: 'fin.samvel.tamada', line: 'Самвел записал тебя тамадой на следующую свадьбу. Почёт налогом не облагается и деньгами не выплачивается.' }),
   gate(eq(finaleOf('samvel'), 'groom'), WORLD.samvel)({ slug: 'fin.samvel.groom', line: 'Самвел выдал за тебя племянницу. Теперь ты родня, а в родне деньги не считают — это наш главный документ.' }),
   gate(eq(finaleOf('samvel'), 'default'), WORLD.samvel)({ slug: 'fin.samvel.default', line: 'Свадьба Самвела закончилась, и он женится снова. Состав гостей тот же, повод новый.' }),
 

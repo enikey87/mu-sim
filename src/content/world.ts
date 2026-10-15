@@ -1,7 +1,7 @@
 // Тексты для новых возможностей системы правил: обещания, которые наступают, хор персонажей,
 // состояния мира со сроком (свадьба, болезнь Бориса, «Алик умер»).
 import { type Criterion, type Line, type Entry, named, exists, is, eq, gte, ne, missing, set, gate } from './fact'
-import { cryptoHodl, garikConcrete, garikCut, grandpaDying, grantPaid, intro, karineKnowsDebt, karineThinksTax, met, mourning, nivaAway, nivaPlayer, nuneDekretOver, payday, saidFriday, saidTomorrow, alikShaved, wedding, collectorsRecruited, collectorsTurned, rubikBath } from './memkeys'
+import { cryptoHodl, garikConcrete, garikCut, garikDenied, grandpaDying, grantPaid, intro, karineKnowsDebt, karineThinksTax, met, mourning, nivaAway, nivaPlayer, nuneDekretOver, payday, saidFriday, saidTomorrow, alikShaved, wedding, collectorsRecruited, collectorsTurned, rubikBath } from './memkeys'
 import type { WhoId } from './ids'
 
 // Мир последователен: кто и что есть в истории и в каком оно положении — факты, их ставит серия (remember), ступень суда
@@ -177,7 +177,7 @@ export const MENTION_RE: Record<string, RegExp> = {
   taron: /Тарон/,
 }
 export const CHORUS: Record<string, Line[]> = {
-  garik: [needs('garikFree')('Я вообще-то рядом стою. Алик, скажи ему правду.'), 'Алик, опять ты про меня? Я даже не знаю, о чём речь.', needs('garikFree')('Привет. Я ничего не брал. Если что — я на свадьбе.'), 'Брат, не верь ему про меня. Верь про других.'],
+  garik: [needs('garikFree')('Я вообще-то рядом стою. Алик, скажи ему правду.'), 'Алик, опять ты про меня? Я даже не знаю, о чём речь.', needs('garikFree')({ t: 'Привет. Я ничего не брал. Если что — я на свадьбе.', remember: [set(garikDenied, true)] }), 'Брат, не верь ему про меня. Верь про других.'],
   karine: [
     'Алик, с кем ты опять переписываешься?',
     'Не слушайте его. Что бы он ни сказал про меня.',

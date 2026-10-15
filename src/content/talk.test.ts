@@ -5,6 +5,7 @@ import { CHORUS_TALK, MEMORY_TALK } from './talk'
 import { LEGENDS } from './legends'
 import type { Game } from '../engine/game'
 import { valueOf } from '../engine/rules'
+import type { Choice } from '../engine/state'
 
 const talkOpt = (g: Game) => g.buildChoices().find((c) => c.act === 'talk')
 async function ask(g: Game) {
@@ -42,5 +43,54 @@ describe('ответ на только что прозвучавшее', () => {
   it('у каждой легенды и каждого персонажа хора есть что спросить', () => {
     for (const [id, l] of Object.entries(LEGENDS)) expect(l.talk?.length, id).toBeGreaterThanOrEqual(2)
     for (const [who, p] of Object.entries(CHORUS_TALK)) expect(p.length, who).toBeGreaterThanOrEqual(2)
+  })
+})
+
+describe('Гарик: признание признаёт отрицание (#784)', () => {
+  /** Гарик сказал своё «ничего не брал» в этой партии — гоним хор, пока строка не выпадет. */
+  const hearDenial = async (game: Game): Promise<boolean> => {
+    game.S.mem['intro.garik'] = true
+    for (let i = 0; i < 60; i++) {
+      game.S.stats.sent += 20 // перерыв хора не помешает: он ходовой
+      game.alikMsg({ kind: 'text', from: 'alik', text: 'Это Гарик виноват.' })
+      const from = game.S.msgs.length
+      await game.afterTurn()
+      if (game.S.msgs.slice(from).some((m) => m.kind === 'text' && m.text.includes('ничего не брал'))) return true
+    }
+    return false
+  }
+  /** Кнопка-вопрос про перфоратор: у оффера есть шанс — перебираем кадры (как в jabs.test.ts). */
+  const askTaken = (game: Game): Choice | undefined => {
+    for (let i = 0; i < 20; i++) {
+      game.S.choices = null
+      const c = game.choices.find((x) => x.act === 'talk' && x.text === 'Гарик, а вы что-нибудь брали?')
+      if (c) return c
+    }
+    return undefined
+  }
+
+  it('отрицание было — ответ на колкость его признаёт, а не спорит с ним', async () => {
+    const { game } = makeGame({ seed: 11 })
+    expect(await hearDenial(game), 'Гарик не сказал отрицание — проверка была бы пустой').toBe(true)
+    expect(game.S.mem['garik.denied'], 'отрицание не записано фактом').toBe(true)
+    const q = askTaken(game)
+    expect(q, 'вопроса про перфоратор нет').toBeDefined()
+    const from = game.S.msgs.length
+    await game.send(q!)
+    const answer = game.S.msgs.slice(from).filter((m) => m.kind === 'text' && m.who === 'garik').map((m) => (m.kind === 'text' ? m.text : '')).join(' ')
+    expect(answer, `ответ не признаёт отрицание: ${answer}`).toMatch(/ничего не брал/)
+  })
+
+  it('отрицания не было — признание на него не ссылается', async () => {
+    const { game } = makeGame({ seed: 11 })
+    game.S.mem['intro.garik'] = true
+    game.S.ctx = { chorus: 'garik' }
+    expect(game.S.mem['garik.denied'], 'факта отрицания нет в свежей партии').toBeUndefined()
+    const q = askTaken(game)
+    expect(q, 'вопроса про перфоратор нет').toBeDefined()
+    const from = game.S.msgs.length
+    await game.send(q!)
+    const answer = game.S.msgs.slice(from).filter((m) => m.kind === 'text' && m.who === 'garik').map((m) => (m.kind === 'text' ? m.text : '')).join(' ')
+    expect(answer, `признание ссылается на несказанное отрицание: ${answer}`).not.toMatch(/сказал же/i)
   })
 })

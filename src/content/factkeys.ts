@@ -14,7 +14,7 @@ import { invoiceItems, invKey } from './scenes'
 import {
   ACTOR_KEYS, EVENT_KEYS, MEM_KEYS, type EventKey, type ActorKey,
   HEAT, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, evicted,
-  vendetta, court, courtVerdict, courtReferral, ritualCount, ritualCut, caughtCount, caughtAt, cryptoHodl,
+  vendetta, court, courtVerdict, courtReferral, ritualCount, ritualCut, caughtCount, caughtAt, garikDenied, cryptoHodl,
   bathAsked, mamaCalls, phoneKarine, karineKnowsDebt, karineThinksTax, alikShaved, moustacheKept, moustacheAskAt, alikDay, mooAt, sorryAt, rudeAt, thanksAt, topicRun, topicLast,
   legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway, nivaPlayer, carGone,
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, taxFrozen, taxThawed,
@@ -46,7 +46,7 @@ export type BillField = 'dueAt' | 'due' | 'unpaid' | 'streak'
 export type MemExactKey =
   | typeof HEAT | typeof blocked | typeof blockedHint | typeof statusHidden | typeof polite | typeof bloodGiven
   | typeof alikDead | typeof mourning | typeof evicted | typeof vendetta | typeof court | typeof courtVerdict
-  | typeof courtReferral | typeof ritualCount | typeof ritualCut | typeof caughtCount | typeof caughtAt | typeof cryptoHodl
+  | typeof courtReferral | typeof ritualCount | typeof ritualCut | typeof caughtCount | typeof caughtAt | typeof garikDenied | typeof cryptoHodl
   | typeof bathAsked | typeof mamaCalls | typeof phoneKarine | typeof karineKnowsDebt | typeof karineThinksTax | typeof alikShaved | typeof moustacheKept | typeof moustacheAskAt | typeof alikDay | typeof mooAt | typeof sorryAt
   | typeof rudeAt | typeof thanksAt | typeof topicRun | typeof topicLast | typeof legendPromiseAt
   | typeof legendId | typeof legendDay | typeof legendArc | typeof nextTransfer | typeof tileCornerRemoved
