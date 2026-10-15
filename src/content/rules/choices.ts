@@ -36,6 +36,8 @@ interface OfferSpec {
   slot?: string
   weight?: number
   odds?: number
+  /** Перерыв от показа: кнопку увидели — пауза пошла (штамп при сборке вариантов, game.ts). */
+  cooldown?: { turns?: number; days?: number }
 }
 
 const fromD = (game: ContentApi, key: string, map: Record<string, string> = {}) => {
@@ -66,6 +68,7 @@ const offer = (o: OfferSpec): R => ({
   slot: o.slot ?? o.name,
   weight: o.weight,
   odds: o.odds,
+  cooldown: o.cooldown,
   // пустой текст — нечего предложить (весь пул недавно показывали)
   offer: ({ game, facts }): Choice | null => { const text = o.text(game, facts); return text ? { text, tone: o.tone, act: o.act, arg: o.arg?.(game, facts) } : null },
 })
@@ -83,6 +86,7 @@ export const choiceRules: R[] = [
     name: 'CrewPaid',
     when: [is(crewPaid), missing(blocked), missing(alikDead)],
     act: 'crewPaid', tone: 'neutral', bonus: 4,
+    cooldown: { turns: 10 }, // иначе кнопка занимает слот в 94% кадров выбора до конца партии (#592 → #789)
     text: (g) => fromArr(g, 'P_CREW_PAID', P_CREW_PAID),
   }),
   // праздник в календаре переписки: деньги под ним, один вариант на окно (#585); в окне молчания — молчит
