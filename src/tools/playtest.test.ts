@@ -20,6 +20,17 @@ describe('плейтест', () => {
     expect(a.world.length).toBe(a.acts.length)
     expect(worldDump(a)).toEqual(expect.objectContaining({ seed: 4, frames: expect.any(Array) }))
   }, 60_000)
+  // #778: замер весов сцен должен быть в самом дампе, а не одноразовым зондом: счётчик PickScene по кадрам
+  it('дамп считает выпавшие сцены: ключи Scene_*, сумма равна числу выборов сцены в кадрах', async () => {
+    const p = await playtest(4, 80)
+    const scenes = (worldDump(p) as { scenes: Record<string, number> }).scenes
+    expect(Object.keys(scenes).length, 'ни одна сцена не выпала — проверка была бы пустой').toBeGreaterThan(0)
+    expect(Object.keys(scenes).every((n) => n.startsWith('Scene_'))).toBe(true)
+    const chosen = p.world.flatMap((f) => f.fired).filter((h) => h.event === 'PickScene').flatMap((h) => h.chosen).filter((n) => n.startsWith('Scene_'))
+    expect(Object.values(scenes).reduce((a, b) => a + b, 0)).toBe(chosen.length)
+    // счётчик не приписывает сцены другим событиям: ход Алика в кадре — не выбор сцены
+    expect(Object.values(scenes).reduce((a, b) => a + b, 0)).toBeLessThan(p.world.flatMap((f) => f.fired).length)
+  }, 60_000)
   it('расхождение с записью — ошибка, а не другая партия', async () => {
     const a = await playtest(4, 10)
     const acts = a.acts.map((x) => (x.kind === 'send' ? { ...x, offered: ['не то'] } : x))

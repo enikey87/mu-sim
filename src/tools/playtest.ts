@@ -222,6 +222,18 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
   return { seed, style, hour, acts, asides, world, game }
 }
 
+/** Сцены по кадрам партии: сколько раз каждая (`Scene_<id>`) выпала в `PickScene` — замер весов одной командой (#778). */
+export function sceneCounts(p: Played): Record<string, number> {
+  const scenes: Record<string, number> = {}
+  for (const f of p.world) {
+    for (const h of f.fired) {
+      if (h.event !== 'PickScene') continue
+      for (const name of h.chosen) if (name.startsWith('Scene_')) scenes[name] = (scenes[name] ?? 0) + 1
+    }
+  }
+  return scenes
+}
+
 /** Машиночитаемый лог фактов для оракула (рядом с seed-*.txt, не вместо). */
 export function worldDump(p: Played): object {
   const dead = p.world.filter((f) => f.mem.alik_dead).length
@@ -229,6 +241,8 @@ export function worldDump(p: Played): object {
   return {
     seed: p.seed,
     rules: { deathGated: deathGated(p.game.rules.all) },
+    // замер весов сцен одним прогоном: сцена → сколько раз выпала за партию (#778)
+    scenes: sceneCounts(p),
     coverage: {
       dead_frames: dead,
       had_mute: mutes,
