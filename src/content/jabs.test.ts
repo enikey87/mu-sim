@@ -72,23 +72,46 @@ const str = (v: unknown, out: string[] = []): string[] => {
   return out
 }
 
+/** Что источник реально говорит: текст реплик (`m`, `done`), закрывающих строк серии и форм клятвы.
+ *  Служебные поля (`state`, `fx`, ключи утверждений) окна не открывают — триггер, совпавший только с
+ *  ними, кнопку не покажет; корпус «любая строка структуры» такую смерть колкости прячет (#776). */
+const saidLines = (v: unknown, out: string[] = []): string[] => {
+  if (typeof v === 'string') { out.push(v); return out }
+  if (Array.isArray(v)) { for (const x of v) saidLines(x, out); return out }
+  if (!v || typeof v !== 'object') return out
+  const line = valueOf(v as Entry<unknown>)
+  if (typeof line === 'string') out.push(line)
+  else if (line !== v) saidLines(line, out) // вложенный Entry: gate(needs(...)) вокруг строки
+  else if (typeof (v as { t?: unknown }).t === 'string') out.push((v as { t: string }).t)
+  for (const k of ['m', 'done'] as const) { const x = (v as Record<string, unknown>)[k]; if (x !== undefined) saidLines(x, out) }
+  return out
+}
+
 describe('колкости (#738): триггер окна — данные, а не строка в предикате', () => {
-  it('каждый триггер находится в источнике своей пары: правка серии или формы красит тест', () => {
+  it('каждый триггер находится в сказанной строке источника своей пары: правка серии или формы красит тест', () => {
     expect(saidTriggers().length, 'триггеров не стало — проверка пустеет').toBeGreaterThanOrEqual(11)
     const seen: string[] = []
     const pairs: Array<[string, readonly Entry<TalkPair>[]]> = [...Object.entries(ARC_TALK), ['word', WORD_TALK]]
     for (const [arc, es] of pairs) {
       const source = arc === 'word'
-        ? str(OATH_FORMS)
-        : [...str(ARCS[arc]?.eps), ...str(FINALES[arc] ?? []), ...str((ARC_DONE as Record<string, unknown>)[arc])]
+        ? saidLines(OATH_FORMS)
+        : [...saidLines(ARCS[arc]?.eps), ...saidLines(FINALES[arc] ?? []), ...saidLines(ARC_DONE[arc] ?? [])]
+      expect(source.length, `${arc}: сказанных строк нет — сверять нечего`).toBeGreaterThan(0)
       for (const e of es) {
         const t = saidTrigger(valueOf(e)[2])
         if (!t) continue
         seen.push(t)
-        expect(source.some((s) => s.includes(t)), `триггер «${t}» (${arc}) не найден в источнике — правка текста умертвит колкость`).toBe(true)
+        expect(source.some((s) => s.includes(t)), `триггер «${t}» (${arc}) не найден в сказанных строках источника — правка текста умертвит колкость`).toBe(true)
       }
     }
-    expect(seen.sort(), 'реестр триггеров и предикаты расходятся').toEqual([...saidTriggers()].sort())
+    expect(seen.sort(), 'реестр триггеров и предикаты расходятся: новый триггер вне проверки источника').toEqual([...saidTriggers()].sort())
+  })
+
+  it('НС: служебная строка источника окна не открывает — корпус «любая строка структуры» врал бы', () => {
+    // `money_foundation` живёт в структуре серии (ключ утверждения), но не в репликах: триггер на неё
+    // прежний корпус (`str` — любая строка) принимал бы, нынешний — нет
+    const beton = [...saidLines(ARCS.beton.eps), ...saidLines(FINALES.beton ?? []), ...saidLines(ARC_DONE.beton ?? [])]
+    expect(beton.some((s) => s.includes('money_foundation')), 'ключ утверждения попал в сказанные строки').toBe(false)
   })
 
   it('регулярка окна легенды матчит строку своей легенды (#748)', () => {
