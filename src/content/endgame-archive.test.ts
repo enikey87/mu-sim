@@ -6,6 +6,7 @@ import {
   ENDGAME_ARCH, ENDGAME_ARCH_LIE, ENDGAME_FALLBACK, ENDGAME_FORMALITIES, ENDGAME_INTRO, ENDGAME_LEAVE,
   ENDGAME_MONEY, ENDGAME_OPEN, ENDGAME_VENDETTA, LEND50_ASK, LEND50_ASK_AGAIN, LEND50_MEMORY,
   LEND50_NO, LEND50_NUNE, LEND50_SERIOUS, LEND50_YES, ENDGAME_ALIK_BACK, ENDGAME_RETURNER_LINES,
+  ARCHIVE_FRESH_DAYS,
 } from './endgame'
 import { ARCS } from './arcs'
 import { FINALES, DEFAULT_FINALE } from './finales'
@@ -13,7 +14,7 @@ import { MEMORY } from './memory'
 import { CLAIMS, claimByKey } from './lies'
 import { during, set, saidText } from './fact'
 import { Gated, valueOf } from '../engine/rules'
-import { alikShaved, moustacheKept } from './memkeys'
+import { alikShaved, intro, moustacheKept } from './memkeys'
 import type { ClaimKey } from './ids'
 import type { Game } from '../engine/game'
 
@@ -141,6 +142,7 @@ describe('архив дела: ранние реплики называют св
     expect(partyA.S.mem['finale.grandpa']).toBe('revoke')
     await throwLie(partyA, 'money_dubai', 'money_noah')
     stakeKept(partyA)
+    partyA.S.day += ARCHIVE_FRESH_DAYS // финалы закрылись раньше окна: архив рассказывает их как новости группы
     const aForm = await enterGroup(partyA)
     const aMoney = await act(partyA, 'endgameMoney')
     const aLeave = await act(partyA, 'endgameLeave')
@@ -157,6 +159,7 @@ describe('архив дела: ранние реплики называют св
     expect(partyB.S.mem['finale.rubik']).toBe('karine')
     await throwLie(partyB, 'money_jar', 'money_wall')
     partyB.S.ach.shaved = partyB.S.day
+    partyB.S.day += ARCHIVE_FRESH_DAYS // как и у partyA: финалы старше окна свежести
     const bForm = await enterGroup(partyB)
     const bMoney = await act(partyB, 'endgameMoney')
     const bLeave = await act(partyB, 'endgameLeave')
@@ -196,6 +199,7 @@ describe('архив дела: ранние реплики называют св
       game.S.mem['asked.boris'] = 6
       toLast(game, 'boris')
       await game.playArc('boris')
+      game.S.day += ARCHIVE_FRESH_DAYS // финал старше окна свежести: архив имеет право рассказать его
       return game
     }
     const archived = await party()
@@ -250,5 +254,62 @@ describe('архив дела: ставка усами', () => {
     expect(game.S.mem[alikShaved]).toBeUndefined()
     game.S.ach.shaved = game.S.day
     expect(await enterGroup(game)).toBe(archiveText('stake.shaved'))
+  })
+})
+
+describe('архив дела: свежий финал — не новость (#771)', () => {
+  // Финал прозвучал в чате днями раньше — группа, объявляющая то же событие новостью, звучит
+  // вторым известием (раунд 48: финал Гарика 22 марта, архив 1 апреля — 9 дней). Строка о финале
+  // моложе ARCHIVE_FRESH_DAYS придерживается: её место занимает другой факт партии.
+  const garikFinale = async (at: number, open: number): Promise<Game> => {
+    const { game } = makeGame()
+    game.S.day = at
+    game.S.mem[intro('garik')] = true // иначе строке архива не хватит знакомства (WORLD.garik)
+    toLast(game, 'garik')
+    await game.playArc('garik')
+    expect(game.S.mem['finale.garik']).toBe('default')
+    game.S.day = open
+    return game
+  }
+
+  it('класс, а не одна строка: у Рубика тот же повтор — и та же придержка', async () => {
+    const { game } = makeGame()
+    game.S.day = 290
+    toLast(game, 'rubik')
+    await game.playArc('rubik')
+    expect(game.S.mem['finale.rubik']).toBe('default')
+    game.S.day = 295 // как у Гарика: внутри окна свежести
+    const from = alikCount(game)
+    await enterGroup(game)
+    expect(since(game, from), 'свежий финал Рубика придерживается').not.toContain(archiveText('fin.rubik.default'))
+  })
+
+  it('финал, прозвучавший днями раньше, группа новостью не объявляет', async () => {
+    const game = await garikFinale(290, 295) // до выплаты прошли дни, но меньше окна
+    const from = alikCount(game)
+    await enterGroup(game)
+    expect(since(game, from), 'свежий финал придерживается').not.toContain(archiveText('fin.garik.default'))
+    // строка не потеряна: окно прошло — архив рассказывает факт как прежде
+    const mid = alikCount(game)
+    game.S.day += ARCHIVE_FRESH_DAYS
+    await game.endgameFormality()
+    expect(since(game, mid)).toContain(archiveText('fin.garik.default'))
+  })
+
+  it('НС: финал старше окна группа объявляет — придержка про свежесть, не про всегда', async () => {
+    const game = await garikFinale(285, 300) // с финала прошло больше окна
+    const from = alikCount(game)
+    await enterGroup(game)
+    expect(since(game, from)).toContain(archiveText('fin.garik.default'))
+  })
+})
+
+describe('возвращатель группы: предлог не противоречит интро (#771)', () => {
+  // Интро партии: «объект принят, заказчик доволен» / «сдали» (STARTS, quests.ts) — конфликт партии
+  // про деньги за сданный объект. Возвращатель Гранта утверждал «объект не сдан» — против фактов.
+  it('Грант не утверждает «объект не сдан»: предлог говорит про оплату', () => {
+    const lines = Object.values(ENDGAME_RETURNER_LINES).flat()
+    expect(lines.filter((l) => /объект не сдан/i.test(l))).toEqual([])
+    expect(lines).toContain('По договору вы в группе до оплаты объекта. Объект сдан, оплата — нет. Вы в группе.')
   })
 })

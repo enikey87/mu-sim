@@ -123,6 +123,8 @@ export const doneAsked = <A extends string>(arc: A): `doneAsked.${A}` => `doneAs
 export const topic = <K extends string>(k: K): `topic.${K}` => `topic.${k}`
 export const topicMute = <K extends string>(k: K): `topicMute.${K}` => `topicMute.${k}`
 export const finaleOf = <A extends string>(arc: A): `finale.${A}` => `finale.${arc}`
+/** День, когда финал сериала прозвучал: архив группы придерживает свежий финал как новость (#771). */
+export const finaleAt = <A extends string>(arc: A): `finale.at.${A}` => `finale.at.${arc}`
 export const legendOf = <A extends string>(arc: A): `legend.of.${A}` => `legend.of.${arc}`
 export const wedding = <W extends string>(who: W): `wedding.${W}` => `wedding.${who}`
 /** Активная сцена Дня выплаты (id узла) — факт на доске мира. */
