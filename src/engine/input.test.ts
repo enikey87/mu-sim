@@ -211,22 +211,21 @@ describe('classifyUserInput', () => {
     expect(game.S.mem['asked.boris']).toBe(2)
   })
 
-  it('пять «Как там Нива?» на доигранной линии дают «Нива выбрала тебя»', async () => {
+  it('четыре «Как там Нива?» на доигранной линии дают «Нива выбрала тебя»', async () => {
     const { game } = makeGame({ seed: 1 })
     const last = ARCS.niva.eps.length - 1
     game.S.day = 5
     game.S.arcs.niva = { i: last, last: 5 }
-    for (let n = 0; n < 4; n++) {
+    for (let n = 0; n < 3; n++) {
       game.S.arcs.niva.last = game.S.day
       await game.send('Как там Нива?')
       expect(game.S.arcs.niva.i, `вопрос ${n + 1}`).toBe(last)
     }
-    expect(game.S.mem['asked.niva']).toBe(4)
-    expect(game.S.arcs.niva.i).toBe(last)
+    expect(game.S.mem['asked.niva']).toBe(3)
     expect(game.S.mem['finale.niva']).toBeUndefined()
     game.S.arcs.niva.last = game.S.day - 1
     await game.send('Как там Нива?')
-    expect(game.S.mem['asked.niva']).toBe(5)
+    expect(game.S.mem['asked.niva']).toBe(4)
     expect(game.S.mem['finale.niva']).toBe('chose')
   })
 })
