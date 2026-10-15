@@ -419,7 +419,7 @@ describe('концовки игры', () => {
       payday_default: [payday(false)],
       payday_coins: [contra, payday(true)],
       payday_lavash: [contra, async (g) => { g.S.mem['crypto.hodl'] = true }, payday(true)],
-      payday_niva: [async (g) => { g.S.mem['asked.niva'] = 5; toLast(g, 'niva'); await g.playArc('niva') }, payday(false)],
+      payday_niva: [async (g) => { g.S.mem['asked.niva'] = 4; toLast(g, 'niva'); await g.playArc('niva') }, payday(false)],
       payday_strasbourg: [async (g) => { g.S.mem.court = 5; await threat(g); expect(g.S.ach.strasbourg).toBeDefined() }, payday(false)],
       payday_notyou: [async (g) => { toLast(g, 'razmik'); await g.playArc('razmik'); g.S.mem['count.rude'] = 8 }, payday(false)],
       payday_real: [async (g) => { Object.assign(g.S.ach, { saint: 190, court: 200, q_hash: 1, q_mama: 1, q_goat: 1, q_parking: 1, q_photo: 1 }); g.S.mem.caught = 3 }, payday(false)],
@@ -507,7 +507,7 @@ describe('«Бараном»: баран Бориса — путём игрок�
 })
 
 describe('финалы по числу вопросов достижимы игроком (#753)', () => {
-  // Финалы вида «спрашивал 5/6 раз» упирались в размер пула `follow` (4 строки): вопрос про сериал
+  // Финалы вида «спрашивал 4/6 раз» упирались в размер пула `follow` (4 строки): вопрос про сериал
   // переставал предлагаться после четырёх формулировок, и `asked.*` не дотягивал до порога.
   // Здесь порог набирается настоящими нажатиями кнопки «как там X?».
   const askLine = async (game: Game, arc: string, need: number) => {
@@ -520,14 +520,24 @@ describe('финалы по числу вопросов достижимы иг�
     return asks
   }
 
-  it('«Нива выбрала тебя»: 5 вопросов кнопкой — порог шпаргалки набран, а не подставлен тестом', async () => {
+  it('«Нива выбрала тебя»: 4 вопроса кнопкой — порог шпаргалки набран, а не подставлен тестом (#763)', async () => {
     const { game } = makeGame()
     await game.playArc('niva') // линия началась
-    expect(await askLine(game, 'niva', 5)).toBeGreaterThanOrEqual(5)
-    expect(Number(game.S.mem['asked.niva'])).toBeGreaterThanOrEqual(5)
+    expect(await askLine(game, 'niva', 4)).toBeGreaterThanOrEqual(4)
+    expect(Number(game.S.mem['asked.niva'])).toBeGreaterThanOrEqual(4)
     toLast(game, 'niva')
     await game.playArc('niva')
     expect(game.S.mem['finale.niva'], 'частный финал, а не обычный «Не ищи»').toBe('chose')
+  })
+
+  it('НС: 3 вопроса кнопкой — порога 4 ещё нет, обычный финал «Не ищи» (#763)', async () => {
+    const { game } = makeGame()
+    await game.playArc('niva') // линия началась
+    expect(await askLine(game, 'niva', 3)).toBeGreaterThanOrEqual(3)
+    expect(Number(game.S.mem['asked.niva'])).toBe(3) // ровно три: четвёртый вопрос не задан
+    toLast(game, 'niva')
+    await game.playArc('niva')
+    expect(game.S.mem['finale.niva']).toBe('default')
   })
 
   it('«Бригадир»: 6 вопросов кнопкой — тот же класс условия', async () => {
