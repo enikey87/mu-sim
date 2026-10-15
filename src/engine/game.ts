@@ -33,6 +33,7 @@ import {
   ARCHIVE_FRESH_DAYS,
   ENDGAME_ARCH, ENDGAME_ARCH_LIE, ENDGAME_CHOICES, ENDGAME_FALLBACK, ENDGAME_FORMALITIES, ENDGAME_GROUP, ENDGAME_INTRO, ENDGAME_JUBILEES,
   ENDGAME_LEAVE, ENDGAME_MONEY, ENDGAME_MUTE, ENDGAME_OPEN, ENDGAME_RENAMES, ENDGAME_RETURNER_LINES, ENDGAME_RETURNERS, ENDGAME_VENDETTA, ENDGAME_ALIK_BACK,
+  EPILOGUE_BANNER,
   LEND50_ASK, LEND50_ASK_AGAIN, LEND50_CHOICES, LEND50_LINK, LEND50_MEMORY, LEND50_NO, LEND50_NUNE, LEND50_RENAME, LEND50_SERIOUS, LEND50_SYS, LEND50_YES,
 } from '../content/endgame'
 import { type Rng, mathRng, rndInt, shuffle, chance } from './rng'
@@ -1385,9 +1386,6 @@ export class Game {
       return true
     })
   }
-  unfinishedArc(): string | undefined {
-    return Object.keys(this.S.arcs).find((id) => this.arcCanAdvance(id, true))
-  }
   /** Квест можно запустить из разговора: ещё не брали и условия слота выполнены. Без побочных эффектов. */
   questAllowed(id: string): boolean {
     if (this.S.rules.once['Quest_' + id]) return false
@@ -1490,7 +1488,6 @@ export class Game {
       quests: Object.keys(S.ach).filter((k) => k.startsWith('q_')).length,
       callbackReady: !!this.callbackCandidate(),
       lieOpen: !!lie, lieKind: lie?.kind ?? false, lieAlikOld: lie?.alikOld ?? false,
-      arcUnfinished: this.unfinishedArc(),
       deathCanAdvance: !!S.mem[memkeys.alikDead] && this.arcCanAdvance('alik_death', true),
       'ctx.type': c.type, 'ctx.amount': c.amount, 'ctx.s': c.s, 'ctx.shortTimey': c.s ? TIMEY.test(c.s) : false,
       'ctx.when': c.when, 'ctx.whenNever': c.whenNever,
@@ -2445,6 +2442,10 @@ export class Game {
   /** Создание группы и вступление — по одному сообщению; маркер ставится только после полной цепочки. */
   private async deliverEndgameIntro(outcome: string): Promise<void> {
     const S = this.S
+    // группа открывается после концовки: игрок должен видеть, что это эпилог, а не безымянное «дальше» (#797)
+    this.sys(EPILOGUE_BANNER)
+    this.save()
+    await this.sleep(500)
     this.sys(`Алик создал группу «${ENDGAME_GROUP}»`)
     this.save()
     await this.sleep(500)
@@ -2489,6 +2490,9 @@ export class Game {
       if (m.kind === 'sys' && m.text === marker) { at = i; break }
     }
     if (at < 0) { this.stripIncompleteLend50(); return }
+    // баннер эпилога — первая строка вступления: обрыв после него снимается вместе с группой (#797)
+    const prev = this.S.msgs[at - 1]
+    if (prev && prev.kind === 'sys' && prev.text === EPILOGUE_BANNER) at--
     this.S.msgs.splice(at)
     this.touchMsgs(at)
   }

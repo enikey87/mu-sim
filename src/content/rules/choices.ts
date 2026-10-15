@@ -12,6 +12,7 @@ import { GROUP_Q } from '../misc'
 import { P_LIE } from '../lies'
 import { TOPICS } from '../topics'
 import { P_CREW_PAID } from '../crew'
+import { MONEY_ASK, moneyPlaceOf } from '../money-ask'
 import { P_HOLIDAY, type Holiday } from '../holidays'
 import { WORLD, SPEAKS } from '../world'
 import { fmtDayMonth, fmtDays } from '../../engine/time'
@@ -200,11 +201,6 @@ export const choiceRules: R[] = [
     // У `ArcDeath` эта связка была и раньше.
     text: (g, f) => { const key = 'F_' + f['ctx.arc']; const arr = ARCS[String(f['ctx.arc'])].follow; return g.freshPlayer(key, arr) ?? g.draw(key, arr) }, arg: (_g, f) => String(f['ctx.arc']),
   }),
-  offer({
-    name: 'ArcAny', slot: 'arc', when: [missing(alikDead), exists('arcUnfinished')], odds: 0.2, act: 'arc', tone: 'polite',
-    text: (g, f) => { const key = 'F_' + f.arcUnfinished; const arr = ARCS[String(f.arcUnfinished)].follow; return g.freshPlayer(key, arr) ?? g.draw(key, arr) }, arg: (_g, f) => String(f.arcUnfinished),
-  }),
-
   // дело в суде открыто — игрок может его продолжить (угроза двигает линию суда)
   offer({
     name: 'Court', when: [gte(court, 1), lte(court, 6)], odds: 0.35, tone: 'threat',
@@ -232,6 +228,15 @@ export const choiceRules: R[] = [
     })
   }),
   offer({ name: 'Cow', when: [is('mooFresh')], odds: 0.8, bonus: 2, tone: 'cow', text: (g) => fromD(g, 'P_COW') }),
+  // денежный вопрос — первичная контекстная кнопка (#795): пока открыта легенда денег, игрок спрашивает,
+  // где они сейчас. Место — из легенды (банк/фундамент/сейф/крипта/«Нива»), формулировки по месту не
+  // повторяются, слот свой: тема может стоять рядом, а не вместо. Ответ — следующая реплика той же легенды
+  // (`Says_money` в replies.ts), то есть вопрос ведёт сюжет денег, а не только отвечает на сказанное.
+  offer({
+    name: 'Money', slot: 'money', when: [exists('legend')], act: 'money', tone: 'neutral', bonus: 3, odds: 0.9,
+    text: (g, f) => { const place = moneyPlaceOf(f.legend); return place ? freshFromArr(g, 'MONEY_ASK_' + place, MONEY_ASK[place]) : '' },
+    arg: (_g, f) => String(f.legend),
+  }),
   // ответ по теме: игрок цепляется за то, что Алик только что сказал (после серии сериала — вопрос про сериал важнее)
   offer({
     name: 'Topic', when: [exists('ctx.topic'), missing('ctx.arc')], act: 'topic', tone: 'neutral', odds: 0.85,

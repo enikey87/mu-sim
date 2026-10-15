@@ -179,8 +179,28 @@ export const DIRECT: Record<string, DirectCase> = {
   // #762: барахолка получила вес 5 — на чужих семействах сидов (`rules:stable`) «смертный одр» и траурный
   // хор Карине падают до нуля; в выборках гейта они редкие (3 и 5 партий из 72), потому держим прямыми случаями
   Scene_deathbed: { event: 'PickScene', setup: (g) => { g.S.day = 250; g.S.mood = 3 } },
-  Chorus_karine_Dead: { event: 'Mentioned', target: 'karine', setup: (g) => { g.S.mem.alik_dead = true; g.S.mem['intro.karine'] = true } },
+  // #795: кнопки игрока (денежный вопрос вместо случайной кнопки про арку) сдвинули розыгрыш ещё раз —
+  // траурный хор Карине гейт теперь видит сам (7 партий из 72), а «Карине знакомится» из выборок ушло;
+  // её прямой случай занимает остальные сцены, иначе вес 1 среди ~20 делает проверку подбрасыванием монеты
+  Scene_wife: {
+    event: 'PickScene',
+    setup: (g) => {
+      g.S.mem['count.rude'] = 1 // ворота сцены: игрок уже грубил, Карине ещё не знакомы
+      for (const r of g.rules.all) {
+        if (r.event !== 'PickScene' || r.name === 'Scene_wife') continue
+        if (r.once) g.S.rules.once[r.name] = true
+        else g.S.rules.cooldown[r.name] = { turn: g.S.stats.sent, day: g.S.day }
+      }
+    },
+  },
   Quest_q_niva: { event: 'PickQuest', setup: (g) => { g.S.mem[legendId] = 'niva_stuck'; g.S.mem[legendDay] = g.S.day } },
+  // #795: денежная кнопка вместо случайной кнопки про арку сдвинула розыгрыш выборок — эти правила
+  // ушли из чужих семейств сидов (`rules:stable`); в выборках гейта они редкие, потому держим прямыми случаями
+  Ending_payday_niva: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'niva' } },
+  Payday_niva: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['finale.niva'] = 'chose' } },
+  Says_group: { event: 'PlayerSays', facts: { intent: 'group' } },
+  Scene_choice: { event: 'PickScene' },
+  Finale_niva_chose_or: { event: 'ArcFinale', facts: { arc: 'niva' }, setup: (g) => { g.S.mem['asked.niva'] = 5 } },
   // слияние #683+#684 ещё раз сместило розыгрыш: голосовое уходит из выборок на сплит-партиях
   Says_voice: { event: 'PlayerSays', facts: { intent: 'voice' } },
   // #762: «это когда?» на короткую реплику (`ctx.type` short) в 4 партиях из 72, а на семействе +6000 —
@@ -189,6 +209,8 @@ export const DIRECT: Record<string, DirectCase> = {
   // once встречного иска израсходован, иначе Hot (bonus 2) перебивает Hot_Again (bonus 1)
   Tone_Threat_Hot_Again: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.rules.once['Tone_Threat_Hot'] = true; g.S.mem[HEAT] = 2 } },
   // #681: новые сообщения в сериях сдвинули выборки ещё раз — амнистия при 5+ просроченных из них ушла
+  // #795: розыгрыш сдвинулся — амнистия теперь играется во всех чужих семействах (`rules:stable`),
+  // гейт видит её сам; запись снята
   // #703: правка пулов звонка сдвинула розыгрыш выборок — кафе и счёт из них ушли
   Scene_meet: { event: 'PickScene', setup: (g) => { g.S.day = 215 } },
   Scene_invoice: { event: 'PickScene', setup: (g) => { g.S.day = 215 } },

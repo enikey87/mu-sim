@@ -6,7 +6,7 @@ import type { Game } from '../engine/game'
 import type { Msg } from '../engine/state'
 import { uiOf, viewOf } from '../ui/view'
 import {
-  ENDGAME_CHOICES, ENDGAME_GROUP, ENDGAME_INTRO, ENDGAME_OPEN, LEND50_ASK, LEND50_ASK_AGAIN, LEND50_LINK,
+  ENDGAME_CHOICES, ENDGAME_GROUP, ENDGAME_INTRO, ENDGAME_OPEN, EPILOGUE_BANNER, LEND50_ASK, LEND50_ASK_AGAIN, LEND50_LINK,
   LEND50_LOCKED, LEND50_NO, LEND50_NUNE, LEND50_RENAME, LEND50_SERIOUS, LEND50_SYS, LEND50_YES,
 } from './endgame'
 
@@ -66,12 +66,14 @@ describe('«Займи 50»', () => {
     // залитая кнопка ответа — только «Перевёл» (#616)
     expect(game.choices.filter((c) => c.primary).map((c) => c.act)).toEqual(['lend50Yes'])
   })
-  it('вступление и формальности не перебиты: группа и первая реплика вступления — до просьбы', async () => {
+  it('вступление и формальности не перебиты: эпилог, группа и первая реплика вступления — до просьбы', async () => {
     const { game } = makeGame()
     const from = await enter(game)
     const t = texts(game, from)
-    expect(t[0]).toMatch(/создал группу «ВЫПЛАТА ЗАКРЫТА/)
-    expect(t[1]).toBe('Алик добавил вас')
+    // «—— Эпилог ——» — первая строка вступления (#797), группа открывается сразу за ней
+    expect(t[0]).toBe(EPILOGUE_BANNER)
+    expect(t[1]).toMatch(/создал группу «ВЫПЛАТА ЗАКРЫТА/)
+    expect(t[2]).toBe('Алик добавил вас')
     const ask = t.indexOf('Брат. Слушай сюда. Только не смейся.')
     expect(ask).toBeGreaterThan(t.indexOf('Алик добавил вас'))
     expect(ask).toBeGreaterThan(t.findIndex((x) => /Остаток выплачен|Французский оригинал|Деньги настоящие|Не хватает одной монеты/.test(x)))
