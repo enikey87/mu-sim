@@ -14,13 +14,20 @@ type R = Rule<ContentApi, GameEvent, Offer>
 
 // ---- выбор сцены (PickScene): раньше — случайно из колоды, теперь — по сюжету ----
 // Специфичность у всех 0 (выбор по весам), условия — ворота; после показа — перерыв 25 дней.
+// Исключение — барахолка: у неё свой вес и перерыв (см. sceneRules, #762).
 const scene = (id: string, when: R['when'] = [], weight: R['weight'] = 1): R => ({
   name: `Scene_${id}`, event: 'PickScene', when, specificity: 0, weight, cooldown: { days: 25 }, priority: 'cinematic',
   respond: ({ game }) => game.enterNode(id, game.scenes[id].start),
 })
 const eveningBoost = (f: Facts) => (f.period === 'evening' || f.period === 'friday' ? 3 : 1)
 export const sceneRules: R[] = [
-  scene('meet'), scene('card'), scene('barter'), scene('choice'),
+  scene('meet'), scene('card'),
+  // Барахолка — единственная сцена, которая торгует: товар (в том числе баран Бориса) идёт в счёт долга,
+  // и обмен должен быть обычным делом партии, а не редкостью. При весе 1 (как у прочих) и перерыве 25 дней
+  // сцена открывалась до Дня выплаты лишь в 13 из 40 направленных партий «за Бориса» (в 10–14 сидах из 24 —
+  // ни разу): приоритет товара из #752 срабатывал редко. Вес 5 и перерыв 12 — по замеру (#762): 30 из 40.
+  { ...scene('barter', [], 5), cooldown: { days: 12 } },
+  scene('choice'),
   { ...scene('redo'), once: true }, // «заказчик жалуется на плитку» — один раз: игрок уже съездил и проверил
   // истории, которые случаются один раз: «новый объект», «займи 5000», «если спросят — ты не работал», кредит
   { ...scene('newjob'), once: true },
