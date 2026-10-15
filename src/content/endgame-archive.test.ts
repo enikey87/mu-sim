@@ -354,6 +354,23 @@ describe('архив дела: свежий финал — не новость (
   })
 })
 
+describe('архив дела: тамада — назначение, а не прошедшая свадьба (#784)', () => {
+  it('строка называет приглашение Самвела, а не свершившееся тамадство', async () => {
+    const { game } = makeGame()
+    game.S.day = 300
+    game.S.mem['intro.samvel'] = true
+    game.S.ach.toast = game.S.day
+    toLast(game, 'samvel')
+    await game.playArc('samvel')
+    expect(game.S.mem['finale.samvel']).toBe('tamada')
+    game.S.day += ARCHIVE_FRESH_DAYS // финал старше окна: архив рассказывает его как новость
+    const line = await enterGroup(game)
+    expect(line).toBe(archiveText('fin.samvel.tamada'))
+    expect(line, 'архив утверждает свершившуюся свадьбу').not.toMatch(/был[аи]? тамадой|тамадой на свадьбе Самвела/i)
+    expect(line, 'строка не говорит о приглашении').toMatch(/записал тебя тамадой/)
+  })
+})
+
 describe('возвращатель группы: предлог не противоречит интро (#771)', () => {
   // Интро партии: «объект принят, заказчик доволен» / «сдали» (STARTS, quests.ts) — конфликт партии
   // про деньги за сданный объект. Возвращатель Гранта утверждал «объект не сдан» — против фактов.

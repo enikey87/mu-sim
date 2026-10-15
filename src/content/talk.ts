@@ -2,14 +2,16 @@
 // Пары «вопрос ↔ ответ» (p[i] ↔ a[i]), каждая один раз за игру. Пары по легендам денег — в legends.ts (talk).
 import { LEGENDS } from './legends'
 import { ARCS } from './arcs'
-import { type Entry, type FactOp, set } from './fact'
+import { type Entry, type FactOp, gate, is, set } from './fact'
 import { saidHas, stateGate, type TalkPair } from './said'
-import { needs } from './world'
-import { grantPaid } from './memkeys'
+import { needs, WORLD } from './world'
+import { garikDenied, grantPaid } from './memkeys'
 
 /** Игрок отвечает вмешавшемуся персонажу, отвечает сам персонаж. */
 export const CHORUS_TALK: Record<string, Entry<TalkPair>[]> = {
   garik: [
+    // признание ссылается на отрицание только тогда, когда Гарик его правда сказал (#784)
+    gate(WORLD.garikFree, is(garikDenied))(['Гарик, а вы что-нибудь брали?', 'Сказал же — ничего не брал. Ладно: перфоратор брал, он у меня дома. Деньги — нет. Деньги я бы вернул. Наверное.']),
     needs('garikFree')(['Гарик, а вы что-нибудь брали?', 'Я брал только перфоратор. Он у меня дома. Деньги — нет. Деньги я бы вернул. Наверное.']),
     ['Гарик, скажите честно: где деньги?', 'Честно? Честно я не знаю. Нечестно — тоже не знаю. Я вообще мало знаю, мне так спокойнее.'],
     ['Гарик, вы же тоже ждёте денег от Алика?', 'Я жду три года. Сначала злился, теперь просто жду. Как в очереди к врачу, только врач не придёт.'],
