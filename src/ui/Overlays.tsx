@@ -140,7 +140,7 @@ export function EndingScreen({ onReset }: { onReset: () => void }) {
           {v.finales.map((f) => <li key={f.id}>{f.title}: «{f.finale}»</li>)}
         </ul>
         <div className="ending-btns">
-          <button id="endingContinue" onClick={() => game.closeEnding()}>Играть дальше</button>
+          <button id="endingContinue" onClick={() => game.closeEnding()}>Эпилог</button>
           <button className="secondary" id="endingReset" onClick={onReset}>Начать заново</button>
         </div>
       </div>
