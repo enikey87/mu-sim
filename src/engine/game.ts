@@ -1652,7 +1652,10 @@ export class Game {
     for (const r of this.rules.collect({ event: 'BuildChoices' }, facts)) {
       if (out.length >= 2) break
       const c = r.offer?.(this.rules.ctx(this, r, { event: 'BuildChoices' }, facts))
-      if (c) out.push(c)
+      if (!c) continue
+      out.push(c)
+      // перерыв оффера считается от показа, а не от нажатия: кнопку увидели — пауза пошла (#789)
+      if (r.cooldown) this.rules.commit(r, { event: 'BuildChoices' })
     }
     const P2 = (a: string, b: string) => this.playerLine(() => `${this.draw(a, D[a])} ${this.draw(b, D[b])}`)
     const one = (key: string, arr: readonly Entry<string>[]) => this.playerLine(() => this.draw(key, arr))

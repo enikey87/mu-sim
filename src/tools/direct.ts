@@ -102,14 +102,26 @@ export const DIRECT: Record<string, DirectCase> = {
   // #762: барахолка получила вес 5 и перерыв 12 — выборки бота сдвинулись, и «Вендетта» с концовкой
   // теперь играются в 7+ партиях из 72: гейт видит их сам, прямые случаи сняты. Содержательные проверки
   // остались на месте (rude.test.ts — 15-й крик без извинений; finales.test.ts — концовка путём игрока).
+  // #789: перерыв кнопки упрёка сдвинул выборки бота ещё раз — «Вендетта» и её компания снова
+  // редки (0 партий в семействе +2000), и гейт просит прямой случай обратно. #762 снял их по той
+  // же причине, что и добавлял: гейт покрытия видит правило не в каждой среде.
+  Rude_Vendetta: {
+    event: 'PlayerMessage', facts: { tone: 'rude' },
+    // 15-й крик: порог в правиле читает счётчик до remember текущего крика (#742)
+    setup: (g) => { g.S.mem['count.rude'] = 14; g.S.mem['count.sorry'] = 0 },
+  },
+  Tone_MissRude: {
+    event: 'PlayerMessage', facts: { tone: 'polite' },
+    setup: (g) => { g.S.mem['count.rude'] = 20; g.S.mem.rudeAt = g.S.stats.sent - 10 },
+  },
   Says_sorry_blocked: {
     event: 'PlayerSays', facts: { intent: 'sorry' },
     setup: (g) => { blocked(g); g.S.mem['finale.rubik'] = 'karine' },
   },
-  Finale_boris_brigadir: { event: 'ArcFinale', facts: { arc: 'boris' }, setup: (g) => { g.S.mem['asked.boris'] = 6 } },
   Finale_samvel_groom: { event: 'ArcFinale', facts: { arc: 'samvel' }, setup: (g) => { g.S.ach.saint = 1; g.S.mem['count.rude'] = 3 } },
   Finale_alik_death_sulk: { event: 'ArcFinale', facts: { arc: 'alik_death' }, setup: () => {} },
   Ending_family: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem['finale.samvel'] = 'groom' } },
+  Ending_vendetta: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem.vendetta = true } },
   Ending_honest: {
     event: 'CheckEnding',
     setup: (g) => { g.S.day = 300; g.S.mem['finale.grant'] = 'ally' },
@@ -161,9 +173,8 @@ export const DIRECT: Record<string, DirectCase> = {
   // #577: после разрастания пулов звонка выборки перестали собирать и второе приглашение Арсена
   Court_Lawyer_Again: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem.court = 1; g.S.mem['intro.arsen'] = true } },
   // #683/#684: колкости и сплиты серий сдвинули розыгрыш выборок — правила держим прямыми случаями
-  Says_congrats: { event: 'PlayerSays', facts: { intent: 'congrats' } },
-  Says_wrong: { event: 'PlayerSays', facts: { intent: 'wrong' }, setup: (g) => { g.S.ctx = { wrong: true } } },
   Scene_lend: { event: 'PickScene', setup: (g) => { g.S.mood = 4 } }, // денег в свежей партии хватает (START_MONEY)
+  Scene_newjob: { event: 'PickScene' }, // ворот нет: сцена один раз за партию, выборки до неё не доходят
   Scene_loan: { event: 'PickScene', setup: (g) => { g.S.day = 230 } },
   // #762: барахолка получила вес 5 — на чужих семействах сидов (`rules:stable`) «смертный одр» и траурный
   // хор Карине падают до нуля; в выборках гейта они редкие (3 и 5 партий из 72), потому держим прямыми случаями
@@ -174,12 +185,10 @@ export const DIRECT: Record<string, DirectCase> = {
   Says_voice: { event: 'PlayerSays', facts: { intent: 'voice' } },
   // #762: «это когда?» на короткую реплику (`ctx.type` short) в 4 партиях из 72, а на семействе +6000 —
   // ни разу; прямой случай держит `rules:stable` зелёным (в CI этого гейта нет с #73)
-  Says_shortQ: { event: 'PlayerSays', facts: { intent: 'shortQ', arg: 'Завтра.' } },
   // апелляция на жаре: колкости растянули партии — угроза-повтор уходит из выборок (#683);
   // once встречного иска израсходован, иначе Hot (bonus 2) перебивает Hot_Again (bonus 1)
   Tone_Threat_Hot_Again: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.rules.once['Tone_Threat_Hot'] = true; g.S.mem[HEAT] = 2 } },
   // #681: новые сообщения в сериях сдвинули выборки ещё раз — амнистия при 5+ просроченных из них ушла
-  Scene_amnesty: { event: 'PickScene', setup: (g) => { for (let i = 0; i < 5; i++) g.recordPromise({ text: `завтра, раз ${i}`, d: 1 }); g.S.day += 5 } },
   // #703: правка пулов звонка сдвинула розыгрыш выборок — кафе и счёт из них ушли
   Scene_meet: { event: 'PickScene', setup: (g) => { g.S.day = 215 } },
   Scene_invoice: { event: 'PickScene', setup: (g) => { g.S.day = 215 } },
