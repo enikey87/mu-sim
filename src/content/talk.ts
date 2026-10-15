@@ -2,7 +2,7 @@
 // Пары «вопрос ↔ ответ» (p[i] ↔ a[i]), каждая один раз за игру. Пары по легендам денег — в legends.ts (talk).
 import { LEGENDS } from './legends'
 import { ARCS } from './arcs'
-import { type Entry, type FactOp, gate, is, set } from './fact'
+import { type Entry, type FactOp, exists, gate, gte, is, set } from './fact'
 import { saidHas, stateGate, type TalkPair } from './said'
 import { needs, WORLD } from './world'
 import { garikDenied, grantPaid } from './memkeys'
@@ -43,7 +43,7 @@ export const CHORUS_TALK: Record<string, Entry<TalkPair>[]> = {
   razmik: [
     // «наверху» — пока сериал не кончился: в финале Размик слезает
     ['Размик, как там наверху?', { t: 'Видно всё. Видно Алика. Видно, что денег нет. Видно Арарат — это единственное, что радует.', claims: ['no_money'] }, stateGate((g) => Number(g.facts()['arc.razmik'] ?? 0) < ARCS.razmik.eps.length)],
-    ['Размик, давайте вместе на него надавим', 'Давай. Ты снизу, я сверху. Он посередине. Ему не привыкать.'],
+    ['Размик, давайте вместе на него надавим', 'Давай. Ты снизу, я сверху. Он посередине. Ему не привыкать.', stateGate((g) => Number(g.facts()['arc.razmik'] ?? 0) < ARCS.razmik.eps.length)],
   ],
   rubik: [
     ['Рубик, запишите в протокол: он не платит', 'Записал. Пункт 48. Рядом с пунктом 12 «кафель подозрительно ровный». Оба нарушения.'],
@@ -86,7 +86,7 @@ export const ARC_TALK: Record<string, Entry<TalkPair>[]> = {
   ],
   razmik: [
     ['Очередь не по высоте.', 'Очередь трёхмерная, брат. Ты не в курсе.', saidHas('Логично?')],
-    needs('grant')(['Хочу последним. Но с деньгами.', 'Последний — это Грант. Он в Лос-Анджелесе.', saidHas('ты теперь первый')]),
+    gate(exists('arc.grant'), gte('arc.grant', 3))(['Хочу последним. Но с деньгами.', 'Последний — это Грант. Он в Лос-Анджелесе.', saidHas('ты теперь первый')]),
   ],
   alik_death: [
     ['Живые отдают при жизни.', 'При жизни отдают живые долги. Твой — закалённый.', saidHas('Живые отдают')],

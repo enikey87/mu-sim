@@ -452,6 +452,22 @@ describe('концовки игры', () => {
   })
 })
 
+describe('ответы «Как там…?» против фактов финала (#786)', () => {
+  // Свип класса «ретроспективная реплика утверждает то, чего не было в партии»: done-ответ обычного
+  // финала не может claim'ить факт чужого финала — «ты не пришёл» это `sulk` (asked ≤ 0).
+  it('обычный финал похорон: ответ не утверждает, что игрок не пришёл', async () => {
+    const { game } = makeGame()
+    game.S.day = 300
+    game.S.mem['asked.alik_death'] = 1 // иначе «Обиделся»: sulk требует asked ≤ 0
+    toLast(game, 'alik_death')
+    await game.playArc('alik_death')
+    expect(game.S.mem['finale.alik_death']).toBe('default')
+    const texts = game.arcDoneLines('alik_death').map((l) => valueOf(l)).map((x) => (typeof x === 'string' ? x : x.t))
+    expect(texts.join(' '), 'не приход игрока — факт только финала sulk').not.toMatch(/не пришёл/)
+    expect(texts.join(' ')).toMatch(/не видел/)
+  })
+})
+
 describe('«Бараном»: баран Бориса — путём игрока, а не лотереей (#752)', () => {
   // Единственный производитель `has.boris` — товар барахолки. Он брался равным розыгрышем из ~13
   // товаров, а барахолка при перерыве 25 дней и конкуренции с другими сценами открывалась 0–2 раза
