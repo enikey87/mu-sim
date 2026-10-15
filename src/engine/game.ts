@@ -9,7 +9,7 @@ import { QUEST_WHEN } from '../content/rules/world'
 import { LEGENDS } from '../content/legends'
 import { TOPICS, P_NEU_B_LATE, P_RUDE_BLOCKED, P_RUDE_POLITE, P_POL_POLITE, P_NIGHT, P_FRIDAY, P_MONEY, P_DESPERATE, DESPERATE_REPLY, MONEY_REPLY_POLITE, MONEY_REPLY_NEUTRAL, MONEY_REPLY_REGIMENT } from '../content/topics'
 import { FINALES, ENDINGS, DEFAULT_FINALE, paydayOutcome, type Finale, type PaydayId } from '../content/finales'
-import { ARCS, ARC_DONE, CAST, type Episode, GROUP, GROUP_OOPS, WRONG_TO, WRONG_WHAT, WRONG_OOPS } from '../content/arcs'
+import { ARCS, ARC_DONE, ARC_MENTIONS, CAST, type Episode, GROUP, GROUP_OOPS, WRONG_TO, WRONG_WHAT, WRONG_OOPS } from '../content/arcs'
 import * as L from '../content/life'
 import { ACH } from '../content/achievements'
 import { meet, speaks } from '../content/world'
@@ -1694,7 +1694,7 @@ export class Game {
     return (this.S.choices ??= this.buildChoices())
   }
 
-  classifyInput(text: string): ClassifiedInput { return classifyUserInput(text) }
+  classifyInput(text: string): ClassifiedInput { return classifyUserInput(text, ARC_MENTIONS) }
   /** Совместимый шорткат для тестов и отладки из консоли. */
   classify(text: string): Tone { return this.classifyInput(text).tone }
 
@@ -1730,7 +1730,7 @@ export class Game {
   private async sendTurn(opt: Choice | string): Promise<void> {
     const parsed = typeof opt === 'string' ? this.classifyInput(opt) : null
     const o: Choice = parsed
-      ? { text: opt as string, tone: parsed.tone, category: parsed.category, act: parsed.intent }
+      ? { text: opt as string, tone: parsed.tone, category: parsed.category, act: parsed.intent, arg: parsed.arg }
       : opt as Choice
     if (this.ui.busy || this.battery.dead || this.disposed || !o.text.trim()) return
     const S = this.S
