@@ -560,3 +560,83 @@ describe('финалы по числу вопросов достижимы иг�
     expect(Number(game.S.mem['asked.niva'])).toBe(2) // счётчик копится, серия — нет
   })
 })
+
+describe('«Бараном»: барахолка доходит до игрока до Дня выплаты (#762)', () => {
+  // При весе 1 (как у прочих сцен) и перерыве 25 дней барахолка открывалась до Дня выплаты лишь
+  // в 13 из 40 направленных партий «за Бориса» (в 10–14 сидах из 24 — ни разу), и товарный приоритет
+  // из #752 не успевал сработать. Вес 5 и перерыв 12 дней (src/content/rules/world.ts) — по тому же замеру.
+  // Здесь сам путь игрока: направленные партии до Дня выплаты и обмен бараном до экрана «Бараном».
+
+  /** Живая партия длиннее одного заряда телефона — иначе ходы после разряда молча не отправляются. */
+  const recharge = async (game: Game): Promise<boolean> => {
+    if (!game.battery.dead) return false
+    await game.battery.charge()
+    return true
+  }
+
+  /** Направленный игрок «за Бориса»: спрашивает про Бориса кнопкой, проходит сцены, играет до Дня выплаты. */
+  async function playToPayday(game: Game, maxTurns = 200): Promise<{ barter: number; payday: number | null }> {
+    await game.playArc('boris') // линия Бориса началась — ворота барана открыты
+    let barter = 0
+    game.rules.tracer = (t) => { if (t.chosen.length && t.event === 'PickScene' && t.chosen[0] === 'Scene_barter') barter++ }
+    let payday: number | null = null
+    for (let t = 0; t < maxTurns; t++) {
+      if (await recharge(game)) continue
+      if (game.S.mem.payday !== undefined || game.S.scene?.id === 'payday' || game.S.mem['payday.at'] !== undefined) { payday = game.S.day; break }
+      const opts = game.choices
+      if (game.S.scene) {
+        const sid = game.S.scene.id
+        const good = String((game.S.scene.vars as { n?: string }).n ?? '')
+        const go = sid === 'barter' ? (good.includes('Борис') ? 'take' : 'refuse') : opts[0]?.go
+        const c = go ? opts.find((x) => x.go === go) : undefined
+        if (c) await game.send(c)
+        else if (opts[0]) await game.send(opts[0])
+      } else {
+        const q = opts.find((c) => c.act === 'arc' && c.arg === 'boris')
+        await game.send(q ?? { text: 'Алик, ну как там?', tone: 'neutral' })
+      }
+      game.S.offlineDays = 0
+    }
+    return { barter, payday }
+  }
+
+  it('барахолка открывается до Дня выплаты на сидах, где прежний вес давал ноль', async () => {
+    for (const seed of [1, 2, 3]) {
+      const { game } = makeGame({ seed })
+      const r = await playToPayday(game)
+      expect(r.payday, `сид ${seed}: партия не дошла до Дня выплаты — проверка была бы пустой`).not.toBeNull()
+      expect(r.barter, `сид ${seed}: барахолка ни разу до Дня выплаты`).toBeGreaterThan(0)
+    }
+  }, 120_000)
+
+  it('обмен бараном доходит до экрана «Бараном»', async () => {
+    const { game } = makeGame({ seed: 1 })
+    await game.playArc('boris')
+    let bought = false
+    for (let t = 0; t < 200 && !bought; t++) {
+      if (await recharge(game)) continue
+      const opts = game.choices
+      if (game.S.scene?.id === 'barter') {
+        const baran = String((game.S.scene.vars as { n?: string }).n ?? '').includes('Борис')
+        const c = opts.find((x) => x.go === (baran ? 'take' : 'refuse'))
+        expect(c, baran ? 'Барахолка не предложила барана первым' : 'Барахолка: нет отказа').toBeDefined()
+        await game.send(c!)
+        bought = baran
+      } else if (game.S.scene) {
+        if (opts[0]) await game.send(opts[0])
+      } else {
+        // вопросов кнопкой нет нарочно: `asked.boris ≥ 6` включил бы «Бригадира» — это задача #759
+        await game.send({ text: 'Алик, ну как там?', tone: 'neutral' })
+      }
+      game.S.offlineDays = 0
+    }
+    expect(bought, 'барахолка так и не предложила барана').toBe(true)
+    expect(game.facts()['has.boris'], 'факт «Борис у игрока»').toBe(true)
+    toLast(game, 'boris')
+    await game.playArc('boris')
+    expect(game.S.mem['finale.boris']).toBe('toyou')
+    game.nextDay(Math.max(0, 320 - game.day))
+    await game.fire('CheckEnding')
+    expect(game.S.ending).toBe('ram')
+  }, 120_000)
+})
