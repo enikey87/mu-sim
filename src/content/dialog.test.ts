@@ -560,3 +560,34 @@ describe('несостыковки из плейтеста ботами, рау�
     expect((await ask()).join(' ')).toMatch(/отдал тебе «Ниву»/)
   })
 })
+
+describe('сцена примирения (#744)', () => {
+  const bubble = async (seed: number, gone: boolean, count: number) => {
+    const { game } = makeGame({ seed })
+    if (gone) game.S.mem['finale.rubik'] = 'karine'
+    game.S.mem['ritual.count'] = count
+    await game.enterNode('ritual', 'text')
+    return game.S.msgs.flatMap((m) => (m.kind === 'text' ? [{ who: m.who, text: m.text }] : []))
+  }
+
+  it('ушедшая Карине не одобряет мир: условие говорит мама', async () => {
+    for (const seed of [1, 2, 3, 4, 5]) {
+      const first = await bubble(seed, true, 0)
+      expect(first.some((m) => m.who === 'karine'), `сид ${seed}`).toBe(false)
+      expect(first.some((m) => m.who === 'mama' && /ванн/i.test(m.text)), `сид ${seed}`).toBe(true)
+      expect(first.some((m) => !m.who && m.text.includes('через маму')), `сид ${seed}`).toBe(true)
+      const again = await bubble(seed, true, 2)
+      expect(again.some((m) => m.who === 'karine'), `повтор, сид ${seed}`).toBe(false)
+      expect(again.some((m) => m.who === 'mama' && /ванн/i.test(m.text)), `повтор, сид ${seed}`).toBe(true)
+    }
+  })
+
+  it('Карине дома — мир одобряет она, как прежде', async () => {
+    const { game } = makeGame({ seed: 1 })
+    game.S.mem['intro.karine'] = true
+    await game.enterNode('ritual', 'text')
+    const spoken = game.S.msgs.flatMap((m) => (m.kind === 'text' ? [m] : []))
+    expect(spoken.some((m) => m.who === 'karine' && m.text.startsWith('Я одобрила мир'))).toBe(true)
+    expect(spoken.some((m) => m.who === 'mama')).toBe(false)
+  })
+})

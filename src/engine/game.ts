@@ -27,7 +27,7 @@ import type { GameEvent, Offer } from '../content/rules/events'
 import { CLAIMS, claimByKey, CALLBACK_OPEN, type Claim } from '../content/lies'
 import { CLAIM_LEDGER, activeClaim, claimKeyOf, closeEpisode, currentEpisode, publishClaim, publishRetraction, publishTransition, type EpisodeRec } from '../content/ledger'
 import { isWhoId, type ClaimKey } from '../content/ids'
-import { type Claimed, type LedgerEvent, type LineSpec as ContentLineSpec, type Said, saidClaims, saidJoin, saidText } from '../content/fact-types'
+import { type LedgerEvent, type LineSpec as ContentLineSpec, type Said, saidClaims, saidJoin, saidText } from '../content/fact-types'
 import * as memkeys from '../content/memkeys'
 import {
   ENDGAME_ARCH, ENDGAME_ARCH_LIE, ENDGAME_CHOICES, ENDGAME_FALLBACK, ENDGAME_FORMALITIES, ENDGAME_GROUP, ENDGAME_INTRO, ENDGAME_JUBILEES,
@@ -1638,7 +1638,7 @@ export class Game {
       const lieOpt = lie ? [lie] : []
       return [...lieOpt, ...(n.opts ?? []).map((o, i) => {
         const gen = (): string => {
-          const raw: string | Claimed = typeof o.t === 'function' ? o.t(S.scene!.vars) : Array.isArray(o.t) ? this.draw<string>(`${S.scene!.id}.${S.scene!.node}.o${i}`, o.t) : o.t
+          const raw = typeof o.t === 'function' ? o.t(S.scene!.vars) : Array.isArray(o.t) ? this.draw<string>(`${S.scene!.id}.${S.scene!.node}.o${i}`, o.t) : o.t
           return this.fillMoney(typeof raw === 'string' ? raw : raw.t)
         }
         const t = gen().length > 8 ? this.playerLine(gen) : gen()
@@ -2617,12 +2617,17 @@ export class Game {
     S.scene.node = nid
     const n = sc.nodes[nid]
     const v = S.scene.vars
-    const res = (x: Line): Said => {
+    const res = (x: Line): SayItem => {
       const r = typeof x === 'function' ? x(v) : x
-      return typeof r === 'string' ? this.fillMoney(r) : { ...r, t: this.fillMoney(r.t) }
+      if (typeof r === 'string') return this.fillMoney(r)
+      return { ...r, t: this.fillMoney(r.t) }
     }
-    const gen = (key: string, arr: Line | Entry<Line>[]): (() => Said) => () => res(Array.isArray(arr) ? this.draw(`${sid}.${nid}.${key}`, arr) : arr)
+    const gen = (key: string, arr: Line | Entry<Line>[]): (() => SayItem) => () => res(Array.isArray(arr) ? this.draw(`${sid}.${nid}.${key}`, arr) : arr)
     const variant = (key: string, arr: Entry<Line>[]) => this.uniq(gen(key, arr))
+    const asSaid = (x: SayItem): Said => {
+      if (typeof x === 'string') return x
+      return 'claims' in x && x.claims?.length ? { t: x.t, claims: x.claims } : x.t
+    }
 
     const fx = n.fx ?? {}
     const debtFx = !!(fx.debt || fx.barter || fx.invoice)
@@ -2650,8 +2655,8 @@ export class Game {
     if (n.sys && (!debtFx || debtMoved)) {
       await this.sleep(700)
       const s = gen('sys', n.sys)()
-      const m = this.sys(saidText(s))
-      this.noteSaidClaims(s, m.id, n.claimsWho)
+      const m = this.sys(saidText(asSaid(s)))
+      this.noteSaidClaims(asSaid(s), m.id, n.claimsWho)
     }
     // перевод не прошёл или долг запечатан — Алик не объявляет счёт, которого не было (#252, #266)
     if (n.a && (!pays || paid) && (!debtFx || debtMoved)) await this.say([n.who ? gen('a', n.a)() : variant('a', n.a)], false, n.who)
@@ -2667,8 +2672,8 @@ export class Game {
     if (n.sys2) {
       await this.sleep(700)
       const s = gen('sys2', n.sys2)()
-      const m = this.sys(saidText(s))
-      this.noteSaidClaims(s, m.id, n.claimsWho)
+      const m = this.sys(saidText(asSaid(s)))
+      this.noteSaidClaims(asSaid(s), m.id, n.claimsWho)
     }
     // шаг, собранный на лету (День выплаты); если шаг перевёл сцену в другой узел — дальше управляет он
     if (n.hook) { await PAYDAY_HOOKS[n.hook]?.(this); if (S.scene?.id !== sid || S.scene?.node !== nid) return }
