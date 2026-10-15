@@ -9,7 +9,7 @@ type TalkFn = (game: ContentApi, said: string) => boolean
  *  состояния партии. Рукописный предикат в слот не пройдёт по типу: маркер `cond`. */
 export type TalkCond =
   | (TalkFn & { readonly cond: 'state' })
-  | (TalkFn & { readonly cond: 'said'; readonly trigger: string })
+  | (TalkFn & { readonly cond: 'said'; readonly trigger: string; readonly flags?: string })
 /** Вопрос, ответ и (необязательно) когда вопрос уместен: по состоянию игры и по тому, что Алик только что сказал. */
 export type TalkPair = readonly [string, Said, TalkCond?]
 
@@ -24,9 +24,9 @@ export const saidHas = (t: string): TalkCond => {
   return Object.assign((_g: ContentApi, said: string): boolean => said.includes(t), { cond: 'said' as const, trigger: t })
 }
 /** Окно по регулярке (легенды: «тот свет», ванная Рубика): тот же слот с маркером; в реестр литеральных
- *  триггеров не идёт — источник у него регулярка, а не строка. */
+ *  триггеров не идёт. `flags` едут рядом с `source`: без них проверку нельзя собрать ту же регулярку. */
 export const saidMatch = (re: RegExp): TalkCond =>
-  Object.assign((_g: ContentApi, said: string): boolean => re.test(said), { cond: 'said' as const, trigger: re.source })
+  Object.assign((_g: ContentApi, said: string): boolean => re.test(said), { cond: 'said' as const, trigger: re.source, flags: re.flags })
 /** Гейт состояния пары (факты партии): тот же слот, но окно по сказанному он не открывает. */
 export const stateGate = (p: (game: ContentApi) => boolean): TalkCond =>
   Object.assign(p as TalkFn, { cond: 'state' as const })
