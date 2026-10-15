@@ -144,13 +144,13 @@ export const paydayRules: R[] = [
     name: 'Beat_Payday_Late', event: 'StoryBeat', when: [gte('day', 420), gte('sent', 150), missing(alikDead), missing(paydayScene), missing(pd.at)], bonus: 9, once: true, priority: 'cinematic',
     respond: ({ game }) => resumePayday(game),
   },
-  // иерархия исходов — бонусами специфичности, а не числом условий: real 4 > lavash 3 > coins 2 > niva/strasbourg/notyou 1 > default 0
+  // иерархия исходов — бонусами специфичности, а не числом условий: real 4 > lavash 3 > coins 2 = niva 2 > strasbourg/notyou 1 > default 0
   outcome('real', [is('ach.saint'), is('ach.court')], { bonus: 2 }),
-  // поймал великую отмазку — заслуга игрока: важнее исходов «по стилю партии» (одинаковая специфичность решалась бы случайно)
+  // поимка и «Нива выбрала тебя» — заслуга игрока: важнее исходов «по стилю партии»; между собой жребий допустим
   outcome('coins', [is(pd.caught)], { bonus: 1 }),
   outcome('lavash', [is(cryptoHodl)], { bonus: 2 }),
+  outcome('niva', [eq('finale.niva', 'chose')], { bonus: 1 }),
   // исходы «по стилю партии» — одной специфичности: подходит несколько — выбор случайный, а не всегда один
-  outcome('niva', [eq('finale.niva', 'chose')], { specificity: 1 }),
   outcome('strasbourg', [is('ach.strasbourg')], { specificity: 1 }),
   outcome('notyou', [exists('finale.razmik')], { specificity: 1 }),
   outcome('default', []),
