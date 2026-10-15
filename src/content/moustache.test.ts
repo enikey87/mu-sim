@@ -1,6 +1,6 @@
 // Ставка «сбрею усы» (docs/design/moustache.md): запись в журнале, исполнение в срок, факт ~40 дней.
 import { describe, it, expect, vi } from 'vitest'
-import { makeGame } from '../test/helpers'
+import { makeGame, respondCtx } from '../test/helpers'
 import { spec, valueOf } from './fact'
 import { OATH_FORMS } from './misc'
 import { WORLD, meet, PROMISE_MET, PROMISE_SHAVE, PROMISE_SHAVE_ASK, PROMISE_SHAVE_KEPT } from './world'
@@ -465,7 +465,8 @@ describe('ставка «усы»', () => {
         const draw = game.draw
         vi.spyOn(game, 'draw').mockImplementation(((k: string, arr: readonly Entry<unknown>[]) => (k === key ? valueOf(entry) : draw(k, arr))) as Game['draw'])
         const from = game.S.msgs.length
-        await rule.respond!(game.rules.ctx(game, rule, { event: event as 'PromiseDue' }, game.facts({ promise: 0 })))
+        // контекст ответа собирает общий мостик тестов: контентные правила узкие (`ContentApi`), движок — широкий
+        await rule.respond!(respondCtx(rule, game, { event: event as 'PromiseDue' }, game.facts({ promise: 0 })))
         const said = game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : []))[0]
         const prefix = (D.ADDR as Entry<string>[]).map(valueOf).filter((a) => said.startsWith(a + ', ')).sort((a, b) => b.length - a.length)[0]
         expect(prefix, said).toBeDefined()
