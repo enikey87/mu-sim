@@ -49,7 +49,6 @@ export const DIRECT: Record<string, DirectCase> = {
   Finale_beton_corner: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.ach.redo = 1 } },
   // два пойманных вранья: после #682 (тексты серий сдвинули поток розыгрышей) бот в выборках до него не доходит,
   // но в полной выборке финал звучал — случай прямой, не объяснение недостижимости
-  Finale_beton_ledger: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem.caught = 2 } },
   Finale_grant_ally: { event: 'ArcFinale', facts: { arc: 'grant' }, setup: (g) => { g.S.ach.customer = 1 } },
   Finale_razmik_shift_or: { event: 'ArcFinale', facts: { arc: 'razmik' }, setup: (g) => { g.S.ach.newjob = 1 } },
   Finale_garik_cutter: { event: 'ArcFinale', facts: { arc: 'garik' }, setup: (g) => { g.S.ach.newjob = 1 } },
@@ -77,14 +76,12 @@ export const DIRECT: Record<string, DirectCase> = {
     setup: (g) => { g.S.mem.blocked = true; g.S.mem['blocked.hint'] = true },
   },
   Says_via_mama: { event: 'PlayerSays', facts: { intent: 'via', arg: 'mama' } },
-  Ending_payday_lavash: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'lavash' } },
   Ending_ram: {
     event: 'CheckEnding',
     setup: (g) => { g.S.day = 300; g.S.mem['finale.boris'] = 'toyou' },
   },
   Finale_boris_toyou: { event: 'ArcFinale', facts: { arc: 'boris' }, setup: (g) => { g.S.items.push('баран Борис') } },
   Finale_niva_chose: { event: 'ArcFinale', facts: { arc: 'niva' }, setup: (g) => { g.S.items.push('«Нива» 1987 года') } },
-  Payday_lavash: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['crypto.hodl'] = true } },
   Phone_Karine_PlayerMessage: { event: 'PlayerMessage', facts: { tone: 'neutral' }, setup: (g) => { g.rules.applyOps([during('phone.karine', 1)], {}) } },
   Quiet_Blocked_AlikAway: { event: 'AlikAway', setup: (g) => { g.S.mem.blocked = true } },
   Quiet_PhoneKarine_AlikIdle: { event: 'AlikIdle', setup: (g) => { g.rules.applyOps([during('phone.karine', 1)], {}) } },
@@ -119,6 +116,7 @@ export const DIRECT: Record<string, DirectCase> = {
     setup: (g) => { blocked(g); g.S.mem['finale.rubik'] = 'karine' },
   },
   Finale_samvel_groom: { event: 'ArcFinale', facts: { arc: 'samvel' }, setup: (g) => { g.S.ach.saint = 1; g.S.mem['count.rude'] = 3 } },
+  Finale_boris_brigadir: { event: 'ArcFinale', facts: { arc: 'boris' }, setup: (g) => { g.S.mem['asked.boris'] = 6 } },
   Finale_alik_death_sulk: { event: 'ArcFinale', facts: { arc: 'alik_death' }, setup: () => {} },
   Ending_family: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem['finale.samvel'] = 'groom' } },
   Ending_vendetta: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem.vendetta = true } },
@@ -138,6 +136,7 @@ export const DIRECT: Record<string, DirectCase> = {
   Quiet_PaydayOpen_AlikAway: { event: 'AlikAway', setup: paydayOpen },
   Quiet_PaydayOpen_PeriodLine: { event: 'PeriodLine', setup: paydayOpen },
   Quiet_PaydayOpen_StoryBeat: { event: 'StoryBeat', setup: (g) => { paydayOpen(g); g.S.stats.sent = 5 } },
+  Quiet_PaydayOpen_PromiseDue: { event: 'PromiseDue', facts: { promise: 0 }, setup: (g) => { paydayOpen(g); g.recordPromise({ text: 'в пятницу', d: 1 }); g.S.day += 1 } },
   Away_ColdWar: { event: 'AlikAway', setup: offended },
   Quiet_Offended_AlikAway: { event: 'AlikAway', setup: offended },
   Due_StakeKept: {
@@ -172,7 +171,6 @@ export const DIRECT: Record<string, DirectCase> = {
   Quiet_Dead_PromiseDue: { event: 'PromiseDue', setup: dead },
   // #577: после разрастания пулов звонка выборки перестали собирать и второе приглашение Арсена
   Court_Lawyer_Again: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem.court = 1; g.S.mem['intro.arsen'] = true } },
-  // #683/#684: колкости и сплиты серий сдвинули розыгрыш выборок — правила держим прямыми случаями
   Scene_lend: { event: 'PickScene', setup: (g) => { g.S.mood = 4 } }, // денег в свежей партии хватает (START_MONEY)
   Scene_newjob: { event: 'PickScene' }, // ворот нет: сцена один раз за партию, выборки до неё не доходят
   Scene_loan: { event: 'PickScene', setup: (g) => { g.S.day = 230 } },
@@ -198,13 +196,8 @@ export const DIRECT: Record<string, DirectCase> = {
   // ушли из чужих семейств сидов (`rules:stable`); в выборках гейта они редкие, потому держим прямыми случаями
   Ending_payday_niva: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'niva' } },
   Payday_niva: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['finale.niva'] = 'chose' } },
-  Says_group: { event: 'PlayerSays', facts: { intent: 'group' } },
   Scene_choice: { event: 'PickScene' },
   Finale_niva_chose_or: { event: 'ArcFinale', facts: { arc: 'niva' }, setup: (g) => { g.S.mem['asked.niva'] = 5 } },
-  // слияние #683+#684 ещё раз сместило розыгрыш: голосовое уходит из выборок на сплит-партиях
-  Says_voice: { event: 'PlayerSays', facts: { intent: 'voice' } },
-  // #762: «это когда?» на короткую реплику (`ctx.type` short) в 4 партиях из 72, а на семействе +6000 —
-  // ни разу; прямой случай держит `rules:stable` зелёным (в CI этого гейта нет с #73)
   // апелляция на жаре: колкости растянули партии — угроза-повтор уходит из выборок (#683);
   // once встречного иска израсходован, иначе Hot (bonus 2) перебивает Hot_Again (bonus 1)
   Tone_Threat_Hot_Again: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.rules.once['Tone_Threat_Hot'] = true; g.S.mem[HEAT] = 2 } },
@@ -215,7 +208,6 @@ export const DIRECT: Record<string, DirectCase> = {
   Scene_meet: { event: 'PickScene', setup: (g) => { g.S.day = 215 } },
   Scene_invoice: { event: 'PickScene', setup: (g) => { g.S.day = 215 } },
   // #731: правка NAME_RE сдвинула розыгрыш выборок ещё раз — «заказчик жалуется» и «позвони заказчику» ушли из них
-  Scene_redo: { event: 'PickScene' },
   Scene_customer: { event: 'PickScene', setup: (g) => { g.S.day = 210 } },
   // #753: «карта» держалась прямым случаем, пока лотерея 72 партий её не задевала (3–5 из 60);
   // #762 (барахолка веса 5) сдвинула розыгрыш — правило играется в 7 партиях из 72, гейт видит его сам.

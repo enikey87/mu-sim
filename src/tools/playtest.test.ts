@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { is, missing } from '../engine/rules'
+import { is, missing, gte } from '../engine/rules'
 import { playtest, transcript, worldDump, deathGated, requiresKey, attachSpeechAttribution, notifFails } from './playtest'
 import { alikDead } from '../content/memkeys'
 import type { Game } from '../engine/game'
@@ -22,7 +22,15 @@ describe('плейтест', () => {
   }, 60_000)
   // #778: замер весов сцен должен быть в самом дампе, а не одноразовым зондом: счётчик PickScene по кадрам
   it('дамп считает выпавшие сцены: ключи Scene_*, сумма равна числу выборов сцены в кадрах', async () => {
-    const p = await playtest(4, 80)
+    // #789: перерыв кнопки упрёка сдвинул розыгрыш выборок, и естественная партия на 4 сидах может не
+    // дойти ни до одной сцены (Turn_Scene выигрывает ход Алика примерно в 11% случаев) — проверка
+    // агрегатора стала бы пустой. Правило-страховка даёт сцены: тест про дамп, не про частоту сцен.
+    const p = await playtest(4, 80, undefined, (g: Game) => {
+      g.rules.add({
+        name: 'Scene_Probe_Open', event: 'AlikTurn', when: [gte('sent', 3)], specificity: 10_000,
+        respond: ({ game }) => game.startScene(),
+      })
+    })
     const scenes = (worldDump(p) as { scenes: Record<string, number> }).scenes
     expect(Object.keys(scenes).length, 'ни одна сцена не выпала — проверка была бы пустой').toBeGreaterThan(0)
     expect(Object.keys(scenes).every((n) => n.startsWith('Scene_'))).toBe(true)
