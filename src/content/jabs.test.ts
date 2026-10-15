@@ -7,6 +7,7 @@ import { valueOf } from '../engine/rules'
 import type { Choice } from '../engine/state'
 import type { Entry } from './fact'
 import { ARC_TALK, WORD_TALK } from './talk'
+import { LEGENDS } from './legends'
 import { saidTriggers, saidTrigger, type TalkPair } from './said'
 import { ARCS, ARC_DONE } from './arcs'
 import { FINALES } from './finales'
@@ -88,5 +89,20 @@ describe('колкости (#738): триггер окна — данные, а 
       }
     }
     expect(seen.sort(), 'реестр триггеров и предикаты расходятся').toEqual([...saidTriggers()].sort())
+  })
+
+  it('регулярка окна легенды матчит строку своей легенды (#748)', () => {
+    let n = 0
+    for (const [id, legend] of Object.entries(LEGENDS)) {
+      const source = str(legend.lines)
+      for (const e of legend.talk ?? []) {
+        const cond = valueOf(e)[2]
+        if (!cond || cond.cond !== 'said' || cond.flags === undefined) continue
+        n++
+        const re = new RegExp(cond.trigger, cond.flags)
+        expect(source.some((s) => re.test(s)), `${id} /${cond.trigger}/${cond.flags} не матчит ни одну строку легенды`).toBe(true)
+      }
+    }
+    expect(n, 'регулярок не стало — проверка пустеет').toBeGreaterThanOrEqual(4)
   })
 })
