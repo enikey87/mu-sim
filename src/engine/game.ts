@@ -2211,6 +2211,10 @@ export class Game {
   async caught(line: string): Promise<void> {
     const ep = currentEpisode(this.S.ledger)
     if (ep) closeEpisode(this.S.ledger, ep.id, 'caught')
+    // день поимки: архив эндгейма придерживает строку о вранье, пойманном только что (#777) — та же
+    // свежесть, что у финала (`finale.at.*`, #771); счётчик `caught` растёт в remember правила, день
+    // знает только движок, поэтому пишется здесь — на самом событии поимки
+    this.S.mem[memkeys.caughtAt] = this.S.day
     const n = Number(this.S.mem[memkeys.caughtCount] ?? 0)
     this.unlock('liar')
     if (n >= 3) this.unlock('liar3')
@@ -2572,15 +2576,22 @@ export class Game {
       S.mem[memkeys.endgame.arch] = [...spoken].join(',')
       return said
     }
-    // пойманное враньё: своя реплика на эпизод, с say обеих его версий
-    for (const ep of S.ledger.episodes) {
-      if (ep.status !== 'caught') continue
-      const said = take(`lie.${ep.id}`, () => {
-        const pair = this.episodeLie(ep)
-        const tpl = this.decks.pick('ENDGAME_ARCH_LIE', ENDGAME_ARCH_LIE, this.lineFacts())
-        return pair && tpl ? this.X.fill(tpl, { old: pair.old.say, new: pair.new.say }) : null
-      })
-      if (said) return said
+    // пойманное враньё: своя реплика на эпизод, с say обеих его версий.
+    // Поимка моложе окна свежести — не новость: игрок только что поймал Алика, и группа звучала бы
+    // вторым известием (тот же класс, что свежий финал ниже). Её место занимает другой факт партии.
+    // Факта нет (старое сохранение до #777) → NaN → строка доступна, как прежде
+    const caughtAt = Number(S.mem[memkeys.caughtAt])
+    const lieFresh = Number.isFinite(caughtAt) && S.day - caughtAt < ARCHIVE_FRESH_DAYS
+    if (!lieFresh) {
+      for (const ep of S.ledger.episodes) {
+        if (ep.status !== 'caught') continue
+        const said = take(`lie.${ep.id}`, () => {
+          const pair = this.episodeLie(ep)
+          const tpl = this.decks.pick('ENDGAME_ARCH_LIE', ENDGAME_ARCH_LIE, this.lineFacts())
+          return pair && tpl ? this.X.fill(tpl, { old: pair.old.say, new: pair.new.say }) : null
+        })
+        if (said) return said
+      }
     }
     // финал сериала или ставка усами: факт объявляет гейт своей строки
     const fact = this.decks.pick('ENDGAME_ARCH', ENDGAME_ARCH, this.lineFacts(), {

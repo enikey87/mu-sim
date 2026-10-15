@@ -14,7 +14,7 @@ import { MEMORY } from './memory'
 import { CLAIMS, claimByKey } from './lies'
 import { during, set, saidText } from './fact'
 import { Gated, valueOf } from '../engine/rules'
-import { alikShaved, intro, moustacheKept } from './memkeys'
+import { alikShaved, caughtAt, intro, moustacheKept } from './memkeys'
 import type { ClaimKey } from './ids'
 import type { Game } from '../engine/game'
 
@@ -215,6 +215,8 @@ describe('архив дела: пойманное враньё', () => {
   it('поимка кнопкой игрока — реплика с say обеих версий', async () => {
     const { game } = makeGame()
     await throwLie(game, 'money_dubai', 'money_noah')
+    // поимка старше окна свежести (#777): придержка про свежесть, а не про сам факт поимки
+    game.S.day += ARCHIVE_FRESH_DAYS
     const line = await enterGroup(game)
     expect(line).toContain(CLAIMS.find((c) => c.key === 'money_dubai')!.say)
     expect(line).toContain(CLAIMS.find((c) => c.key === 'money_noah')!.say)
@@ -226,6 +228,54 @@ describe('архив дела: пойманное враньё', () => {
     game.alikMsg({ kind: 'text', from: 'alik', text: 'Точнее, деньги у Ноя.' }, ['money_noah' as ClaimKey])
     expect(game.S.ledger.episodes[0].status).toBe('open')
     expect(await enterGroup(game)).not.toContain(claimByKey('money_dubai')!.say)
+  })
+})
+
+describe('архив дела: свежая поимка — не новость (#777)', () => {
+  // Поимка за день-два до выплаты (плейтест 49: «Мешок мелочи» — поимка прямо перед Днём выплаты)
+  // означала, что группа объявляла её новостью сразу после концовки. Тот же класс, что свежий финал
+  // (#771): строка о вранье моложе ARCHIVE_FRESH_DAYS придерживается, её место занимает другой факт.
+  /** Партия с поимкой в день `at`, группа открыта в день `open`. */
+  const party = async (at: number, open: number): Promise<Game> => {
+    const { game } = makeGame()
+    game.S.day = at
+    await throwLie(game, 'money_dubai', 'money_noah')
+    expect(game.S.mem[caughtAt], 'день поимки записан самой поимкой').toBe(at)
+    game.S.day = open
+    return game
+  }
+  /** Реплика группы называет пойманное враньё этой партии. */
+  const namesLie = (line: string): boolean => line.includes(claimByKey('money_dubai')!.say)
+
+  it('поимка в окне свежести придерживается, а после окна звучит', async () => {
+    const game = await party(290, 295) // поимка была днями раньше, но ближе окна
+    const from = alikCount(game)
+    expect(namesLie(await enterGroup(game)), 'свежая поимка придерживается').toBe(false)
+    expect(since(game, from).some(namesLie), 'ни одной строки lie.*').toBe(false)
+    // строка не потеряна: окно прошло — архив рассказывает поимку как прежде
+    const mid = alikCount(game)
+    game.S.day += ARCHIVE_FRESH_DAYS
+    await game.endgameFormality()
+    expect(since(game, mid).some(namesLie)).toBe(true)
+  })
+
+  it('НС: поимка старше окна группа объявляет сразу — придержка про свежесть, не про всегда', async () => {
+    const game = await party(285, 300)
+    expect(namesLie(await enterGroup(game))).toBe(true)
+  })
+
+  it('класс, а не одна пара: другое пойманное враньё придерживается тем же окном', async () => {
+    const { game } = makeGame()
+    game.S.day = 290
+    await throwLie(game, 'grandpa_dead', 'grandpa_alive')
+    game.S.day = 295 // внутри окна свежести
+    expect(await enterGroup(game)).not.toContain(claimByKey('grandpa_dead')!.say)
+  })
+
+  it('старое сохранение без caughtAt: строку не придерживаем', async () => {
+    const game = await party(290, 295)
+    delete game.S.mem[caughtAt]
+    expect(namesLie(await enterGroup(game))).toBe(true)
   })
 })
 
