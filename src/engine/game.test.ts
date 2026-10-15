@@ -525,7 +525,10 @@ describe('Game: пачка непрочитанных подчиняется м�
     Object.assign(game.S.ach, { q_goat: 1, court: 1, q_hash: 1 })
     const choose = async (go: string) => { game.S.choices = null; const c = game.choices.find((x) => x.go === go); expect(c, go).toBeDefined(); await game.send(c!) }
     await game.enterNode('payday', 'announce')
-    await choose('witness'); await choose('share'); await choose('catch')
+    await choose('witness'); await choose('share')
+    // chose той же специфичности, что поимка (#760): тишина проверяется за экраном мешка, не за жребием
+    delete game.S.mem['finale.niva']
+    await choose('catch')
     await game.fire('CheckEnding')
     expect(game.S.ending).toBe('payday_coins')
     expect(game.S.mem['endgame.active']).toBeUndefined()
