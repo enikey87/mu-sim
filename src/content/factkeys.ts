@@ -72,7 +72,7 @@ export type FactKey =
   | `ctx.${CtxKey}`
   | `heard.${ClaimKey}` | `cb.${ClaimKey}`
   | `met.${WhoId}` | `intro.${WhoId}`
-  | `asked.${ArcId}` | `doneAsked.${ArcId}` | `finale.${ArcId}` | `legend.of.${ArcId}`
+  | `asked.${ArcId}` | `doneAsked.${ArcId}` | `finale.${ArcId}` | `finale.at.${ArcId}` | `legend.of.${ArcId}`
   | `topic.${TopicId}` | `topicMute.${TopicId}`
   | `wedding.${WeddingId}`
   | `bills.${BillPart}.${BillField}`
@@ -97,7 +97,7 @@ export const FAMILIES: Record<string, (rest: string) => boolean> = {
   'has.': setOf(HAS_KEYS), 'ctx.': setOf(CTX_KEYS),
   'heard.': claims, 'cb.': claims,
   'met.': who, 'intro.': who,
-  'asked.': arcs, 'doneAsked.': arcs, 'finale.': arcs, 'legend.of.': arcs,
+  'asked.': arcs, 'doneAsked.': arcs, 'finale.': arcs, 'finale.at.': arcs, 'legend.of.': arcs,
   'topic.': topics, 'topicMute.': topics,
   'inv.': items,
   'wedding.': (r) => Object.hasOwn(CAST, r) || r === 'anush',

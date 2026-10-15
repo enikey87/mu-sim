@@ -30,6 +30,7 @@ import { isWhoId, type ClaimKey } from '../content/ids'
 import { type LedgerEvent, type LineSpec as ContentLineSpec, type Said, saidClaims, saidJoin, saidText } from '../content/fact-types'
 import * as memkeys from '../content/memkeys'
 import {
+  ARCHIVE_FRESH_DAYS,
   ENDGAME_ARCH, ENDGAME_ARCH_LIE, ENDGAME_CHOICES, ENDGAME_FALLBACK, ENDGAME_FORMALITIES, ENDGAME_GROUP, ENDGAME_INTRO, ENDGAME_JUBILEES,
   ENDGAME_LEAVE, ENDGAME_MONEY, ENDGAME_MUTE, ENDGAME_OPEN, ENDGAME_RENAMES, ENDGAME_RETURNER_LINES, ENDGAME_RETURNERS, ENDGAME_VENDETTA, ENDGAME_ALIK_BACK,
   LEND50_ASK, LEND50_ASK_AGAIN, LEND50_CHOICES, LEND50_LINK, LEND50_MEMORY, LEND50_NO, LEND50_NUNE, LEND50_RENAME, LEND50_SERIOUS, LEND50_SYS, LEND50_YES,
@@ -2325,6 +2326,7 @@ export class Game {
     await this.playEpisode(ep, id)
     // реплики финала звучат в мире до него: «Нуне уволена. Из декрета» — пока она ещё в декрете
     this.S.mem[memkeys.finaleOf(id)] = f?.id ?? 'default'
+    this.S.mem[memkeys.finaleAt(id)] = this.S.day // день финала: по нему архив отличает свежий финал от старого (#771)
     if (f) this.unlock(`fin_${id}_${f.id}`)
   }
   finaleOf(id: string): Finale | undefined {
@@ -2581,7 +2583,18 @@ export class Game {
       if (said) return said
     }
     // финал сериала или ставка усами: факт объявляет гейт своей строки
-    const fact = this.decks.pick('ENDGAME_ARCH', ENDGAME_ARCH, this.lineFacts(), { eligible: (e) => !spoken.has(valueOf(e).slug) })
+    const fact = this.decks.pick('ENDGAME_ARCH', ENDGAME_ARCH, this.lineFacts(), {
+      // строка о финале, закрытом только что, — не новость: игрок читал его серии днями раньше,
+      // и группа звучала бы вторым известием (#771). Свежий финал придерживается: его место
+      // занимает другой факт партии, а когда окно прошло, строка звучит как прежде
+      eligible: (e) => {
+        const slug = valueOf(e).slug
+        if (spoken.has(slug)) return false
+        const arc = slug.startsWith('fin.') ? slug.split('.')[1] : undefined
+        const at = arc === undefined ? NaN : Number(S.mem[memkeys.finaleAt(arc)])
+        return !Number.isFinite(at) || S.day - at >= ARCHIVE_FRESH_DAYS
+      },
+    })
     return fact ? take(fact.slug, () => valueOf(fact.line)) : null
   }
 
