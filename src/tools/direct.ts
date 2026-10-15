@@ -118,7 +118,6 @@ export const DIRECT: Record<string, DirectCase> = {
   },
   Ending_vendetta: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem.vendetta = true } },
   Ending_payday_real: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'real' } },
-  Ending_payday_niva: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'niva' } },
   Tone_Thanks: { event: 'PlayerMessage', facts: { tone: 'polite', category: 'gratitude' } },
   Tone_Greeting: { event: 'PlayerMessage', facts: { tone: 'polite', category: 'greeting' } },
   Payday_real: {
@@ -127,7 +126,6 @@ export const DIRECT: Record<string, DirectCase> = {
       Object.assign(g.S.ach, { saint: 1, court: 1 })
     },
   },
-  Payday_niva: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['finale.niva'] = 'chose' } },
   Quiet_PaydayOpen_AlikAway: { event: 'AlikAway', setup: paydayOpen },
   Quiet_PaydayOpen_PeriodLine: { event: 'PeriodLine', setup: paydayOpen },
   Quiet_PaydayOpen_StoryBeat: { event: 'StoryBeat', setup: (g) => { paydayOpen(g); g.S.stats.sent = 5 } },
