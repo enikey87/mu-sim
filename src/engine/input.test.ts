@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { InputCategory, Tone } from './state'
 import { classifyUserInput } from './input'
+import { ARC_MENTIONS, ARCS } from '../content/arcs'
+import { makeGame } from '../test/helpers'
 
-const expectClass = (text: string, category: InputCategory, tone: Tone, intent?: 'request' | 'sorry' | 'moo') => {
-  expect(classifyUserInput(text)).toEqual({ category, tone, ...(intent ? { intent } : {}) })
+const mentions = ARC_MENTIONS
+const expectClass = (text: string, category: InputCategory, tone: Tone, intent?: 'request' | 'sorry' | 'moo' | 'arc', arg?: string) => {
+  expect(classifyUserInput(text, mentions)).toEqual({ category, tone, ...(intent ? { intent } : {}), ...(arg ? { arg } : {}) })
 }
 
 describe('classifyUserInput', () => {
@@ -170,5 +173,59 @@ describe('classifyUserInput', () => {
 
   it.each(['Подам иск', 'Направлю иск в суд'])('считает иск с глаголом угрозой «%s»', (text) => {
     expectClass(text, 'threat', 'threat')
+  })
+
+  it.each([
+    ['Как там Борис?', 'boris'],
+    ['как дела у барана', 'boris'],
+    ['Что там Нива?', 'niva'],
+    ['Как там Борис и Нуне?', 'boris'],
+  ] as const)('вопрос «%s» — к сериалу %s (#761)', (text, arg) => {
+    expectClass(text, 'neutral', 'neutral', 'arc', arg)
+  })
+
+  it.each([
+    'Передай Борису',
+    'Борис, привет',
+    'Нива красиво стоит',
+    'Когда Борис вернёт деньги?',
+  ])('имя без вопросной формы не вопрос к сериалу: «%s»', (text) => {
+    const r = classifyUserInput(text, mentions)
+    expect(r.intent).not.toBe('arc')
+  })
+
+  it('напечатанный «Как там Борис?» считает вопрос и двигает серию не чаще раза в день', async () => {
+    const { game } = makeGame({ seed: 1 })
+    game.S.day = 10
+    game.S.arcs.boris = { i: 1, last: 8 }
+    await game.send('Как там Борис?')
+    expect(game.S.mem['asked.boris']).toBe(1)
+    expect(game.S.arcs.boris.i).toBe(2)
+    // ход сам сдвигает календарь: повтор в день серии серию не двигает
+    game.S.arcs.boris.last = game.S.day
+    await game.send('Как там Борис?')
+    expect(game.S.mem['asked.boris']).toBe(2)
+    expect(game.S.arcs.boris.i).toBe(2)
+    await game.send('Передай Борису')
+    await game.send('Борис, привет')
+    expect(game.S.mem['asked.boris']).toBe(2)
+  })
+
+  it('четыре «Как там Нива?» на доигранной линии дают «Нива выбрала тебя»', async () => {
+    const { game } = makeGame({ seed: 1 })
+    const last = ARCS.niva.eps.length - 1
+    game.S.day = 5
+    game.S.arcs.niva = { i: last, last: 5 }
+    for (let n = 0; n < 3; n++) {
+      game.S.arcs.niva.last = game.S.day
+      await game.send('Как там Нива?')
+      expect(game.S.arcs.niva.i, `вопрос ${n + 1}`).toBe(last)
+    }
+    expect(game.S.mem['asked.niva']).toBe(3)
+    expect(game.S.mem['finale.niva']).toBeUndefined()
+    game.S.arcs.niva.last = game.S.day - 1
+    await game.send('Как там Нива?')
+    expect(game.S.mem['asked.niva']).toBe(4)
+    expect(game.S.mem['finale.niva']).toBe('chose')
   })
 })

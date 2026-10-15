@@ -3,7 +3,7 @@
 import { type Entry, type FactOp, type Criterion, type FactKey, type Said, set, gate, is, eq, missing, gte, lte } from './fact'
 import { type ClaimKey } from './ids'
 import type { LedgerEvent } from './fact-types'
-import { needs, meet, WORLD } from './world'
+import { needs, meet, WORLD, MENTION_RE } from './world'
 import { actSigned, alikDead, betonSet, borisMarried, collectorsRecruited, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantPaid, houseOnGarik, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikBath, sick, taxFrozen, wedding } from './memkeys'
 
 export type ArcMsg = Said | { w: string; t: string; claims?: LedgerEvent[]; remember?: FactOp[] } | { t: string; claims: LedgerEvent[]; remember?: FactOp[] }
@@ -329,6 +329,13 @@ export const GROUP: Record<string, Entry<Said>[]> = {
     needs('collectorsTurned')('Ваше дело в работе. Чай длинный, долг — тоже.'),
   ],
 };
+/** Имена сериалов для печатного «как там X»: хор, а если его нет — слово из каста («Нива»). */
+export const ARC_MENTIONS: ReadonlyArray<readonly [string, RegExp]> = Object.keys(ARCS).flatMap((id) => {
+  const re = MENTION_RE[id]
+  if (re) return [[id, re] as const]
+  const word = CAST[id]?.name.match(/[А-Яа-яЁё]{3,}/)?.[0]
+  return word ? [[id, new RegExp(word, 'i')] as const] : []
+})
 export const GROUP_OOPS = ['Ой. Не тот чат.', 'Брат, это не то, что ты думаешь.', 'Это я случайно.', 'Ара, удалите его кто-нибудь!'];
 export const GROUP_SEEN_A = ['Что видел? Там ничего не было.', 'Это была шутка. Групповая.', 'Это другой плиточник. У нас их много.', 'Это нейросеть писала, брат. Сейчас всё нейросеть.', 'Это была репетиция спектакля.', 'Ты не так понял, у нас так любовь выражают.'];
 export const GROUP_SEEN_B = ['Мы тебя очень уважаем.', needs('karineHome')(needs('karine')('Все тебя любят, особенно Карине.')), 'Забудь, брат.', 'Главное — дружба.', needs('garik')('Гарика я уже отругал.')];

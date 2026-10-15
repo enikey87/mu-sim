@@ -5,7 +5,9 @@ export interface ClassifiedInput {
   category: InputCategory
   tone: Tone
   /** Категории, для которых уже есть содержательная ветка PlayerSays. */
-  intent?: 'request' | 'sorry' | 'moo'
+  intent?: 'request' | 'sorry' | 'moo' | 'arc'
+  /** Сериал вопроса «как там X». */
+  arg?: string
 }
 
 const normalize = (text: string): string => text.trim().toLocaleLowerCase('ru-RU').replaceAll('ё', 'е')
@@ -88,8 +90,23 @@ const isShouting = (text: string): boolean => /[A-ZА-ЯЁ]{4,}/u.test(text) || 
 const isBenignShout = (tokens: readonly string[], shouting: boolean, askingMoney: boolean): boolean =>
   shouting && !askingMoney && tokens.length <= 2
 
-/** Детерминированная локальная классификация: без сети, модели и зависимости от состояния игры. */
-export function classifyUserInput(text: string): ClassifiedInput {
+/** Вопрос к сериалу: форма «как там / как дела у / что там» и первое имя в тексте. */
+const ARC_QUESTION = /(?:^|[^a-zа-я0-9])(?:как там|как дела у|что там)(?:$|[^a-zа-я0-9])/u
+const arcQuestion = (text: string, folded: string, mentions: ReadonlyArray<readonly [string, RegExp]>): string | undefined => {
+  if (!ARC_QUESTION.test(folded)) return undefined
+  let best: { id: string; at: number } | undefined
+  for (const [id, re] of mentions) {
+    const flags = re.flags.includes('i') ? re.flags : re.flags + 'i'
+    const m = new RegExp(re.source, flags).exec(text)
+    if (!m) continue
+    if (!best || m.index < best.at) best = { id, at: m.index }
+  }
+  return best?.id
+}
+
+/** Детерминированная локальная классификация: без сети, модели и зависимости от состояния игры.
+ *  `mentions` — имена сериалов; без них вопрос «как там X» остаётся нейтральным. */
+export function classifyUserInput(text: string, mentions: ReadonlyArray<readonly [string, RegExp]> = []): ClassifiedInput {
   const normalized = normalize(text)
   const folded = fold(text)
   const tokens = words(text)
@@ -121,6 +138,7 @@ export function classifyUserInput(text: string): ClassifiedInput {
     || /(?:^|\s)кто\s+мычит(?:$|[.!?,\s])/u.test(folded)
   const shouting = isShouting(text)
   const benignShout = isBenignShout(tokens, shouting, request)
+  const arc = arcQuestion(text, folded, mentions)
 
   let category: InputCategory = 'neutral'
   if (violentThreat) category = 'violent-threat'
@@ -143,13 +161,15 @@ export function classifyUserInput(text: string): ClassifiedInput {
     : negative || (shouting && !courteous && !benignShout) ? 'rude'
     : courteous ? 'polite'
     : 'neutral'
-  // Просьба о деньгах — отдельный intent даже при грубом тоне/оскорблении (жара идёт через тон).
+  // Просьба, извинение и «мууу» важнее вопроса к сериалу; сам вопрос тон не меняет.
+  const arcId = arc && category === 'neutral' ? arc : undefined
   const intent = category === 'apology' ? 'sorry'
     : category === 'cow' ? 'moo'
     : request && !['violent-threat', 'intimidation', 'threat'].includes(category) ? 'request'
+    : arcId ? 'arc'
     : undefined
 
-  return { category, tone, ...(intent ? { intent } : {}) }
+  return { category, tone, ...(intent ? { intent } : {}), ...(arcId ? { arg: arcId } : {}) }
 }
 
 export type LegalClaim = 'court' | 'police' | 'statement' | 'prosecutor' | 'lawyer' | 'collectors' | 'tax'
