@@ -78,7 +78,7 @@ export const FINALES: Record<string, Finale[]> = {
   ],
   niva: [
     {
-      id: 'chose', title: 'Нива выбрала тебя', when: [is('has.niva')], orWhen: [gte('asked.niva', 5)],
+      id: 'chose', title: 'Нива выбрала тебя', when: [is('has.niva')], orWhen: [gte('asked.niva', 4)],
       m: ['Брат, «Нива» уехала. Опять. Но записку оставила: «К нему».', { w: 'niva', t: 'Би-бип. Би-бип.' }, gate(is('ctx.debtMoved'))({ t: 'Посмотри у своего подъезда. В бардачке — 50 рублей. Это от меня. Она всегда была не моя, прости.', claims: [{ retract: 'money_niva' }] })],
       fx: { ach: 'arc_niva', pay: 50 }, sys: '«Нива» припарковалась у твоего подъезда. В бардачке 50 ₽.', item: '«Нива» (сама приехала)', remember: [set(nivaAway, false), set(nivaPlayer, true)],
       done: ['«Нива» у тебя? Передай, я не сержусь. Бензин за твой счёт.', 'Вчера видел «Ниву» у твоего подъезда. Сияет. Со мной она так не сияла.'],
