@@ -1,5 +1,6 @@
 // День выплаты: запуск, сборка из событий партии, дележ до 50 ₽, великая отмазка, поймать противоречие, исходы.
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
 import type { Criterion } from '../engine/rules'
@@ -59,6 +60,8 @@ describe('День выплаты', () => {
     game.S.choices = null
     // утром «Сейф открыли» / «Нива вернулась» — в отмазке это же место: есть что поймать
     expect(game.choices.find((c) => c.go === 'catch')!.text).toMatch(/^Стоп\. (Сегодня|Утром|Борис|«Нива»|Грант)/)
+    // chose той же специфичности, что поимка (#760): этот проход проверяет мешок, а не жребий двух заслуг
+    delete game.S.mem['finale.niva']
     const debt = game.S.debt
     await choose(game, 'catch')
     expect(game.S.mem.payday).toBe('coins')
@@ -154,6 +157,22 @@ describe('День выплаты', () => {
     expect(await pick((g) => { g.S.ach.strasbourg = 1 })).toBe('Payday_strasbourg')
     expect(await pick((g) => { g.S.mem['finale.razmik'] = 'default' })).toBe('Payday_notyou') // любой финал Размика, без счётчика криков
     expect(await pick((g) => { g.S.ach.saint = 1; g.S.ach.court = 1 })).toBe('Payday_real') // вежливость и суд — квесты и поимки не нужны
+  })
+  it('«Нивой» важнее стиля партии: финал chose бьёт Размика и Страсбург (#760)', async () => {
+    const pick = async (seed: number, setup: (g: Game) => void) => {
+      const { game } = makeGame({ seed })
+      setup(game)
+      return (await game.fire('PaydayOutcome'))?.name
+    }
+    for (const seed of [1, 2, 3, 4, 5]) {
+      expect(await pick(seed, (g) => { g.S.mem['finale.niva'] = 'chose'; g.S.mem['finale.razmik'] = 'default' }), `размик, сид ${seed}`).toBe('Payday_niva')
+      expect(await pick(seed, (g) => { g.S.mem['finale.niva'] = 'chose'; g.S.ach.strasbourg = 1 }), `страсбург, сид ${seed}`).toBe('Payday_niva')
+    }
+    // chose нет — «Не тебе», как прежде
+    expect(await pick(1, (g) => { g.S.mem['finale.razmik'] = 'default' })).toBe('Payday_notyou')
+    const hierarchy = '`real` (4) > `lavash` (3) > `coins` (2) = `niva` (2) > `strasbourg`/`notyou` (1) > `default` (0)'
+    expect(readFileSync('ENDINGS.md', 'utf8')).toContain(hierarchy)
+    expect(readFileSync('docs/design/endings-single-condition.md', 'utf8')).toContain(hierarchy)
   })
   it('в перекличке — только те, кого игрок встречал, и каждый один раз', async () => {
     const { game } = makeGame()

@@ -5,7 +5,7 @@
 
 Каждая концовка держится на одном-двумя фактам партии (docs/design/endings-single-condition.md);
 иерархия исходов Дня выплаты — бонусами специфичности, а не числом условий:
-`real` (4) > `lavash` (3) > `coins` (2) > `niva`/`strasbourg`/`notyou` (1) > `default` (0).
+`real` (4) > `lavash` (3) > `coins` (2) = `niva` (2) > `strasbourg`/`notyou` (1) > `default` (0).
 
 ## «Пятьдесят рублей» — почему выпадает всегда
 
