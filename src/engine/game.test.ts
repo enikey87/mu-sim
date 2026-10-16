@@ -1336,3 +1336,27 @@ describe('Game: реакция на сообщение игрока и исте�
     expect(deliveredReact, 'после истечения блока сообщение доставлено, а реакции нет — проверка пуста').toBeDefined()
   })
 })
+
+describe('Game: окно дословного повтора вариантов (#826)', () => {
+  // Спецификация ведущего: ни один вариант игрока не предлагается дословно второй раз в окне 20 ходов.
+  // Кнопки сцен (scene+go) мимо окна: это интерактивное состояние сцены — она ждёт ответа, и повтор
+  // кнопки «Беру!» на 13-й ход сцены — механика навигации, а не циклящийся пул реплик (#826 — про пулы).
+  it('ни один вариант игрока не предлагается дословно в окне 20 ходов: партия 300 ходов', async () => {
+    const { game } = makeGame({ seed: 128031 })
+    const offered: Array<{ turn: number; text: string }> = []
+    for (let t = 0; t < 300; t++) {
+      const cs = game.buildChoices()
+      for (const c of cs) if (!c.act && !('scene' in c)) offered.push({ turn: game.S.stats.sent, text: c.text })
+      if (cs[0]) await game.send(cs[0])
+      if (game.battery.dead) await game.battery.charge()
+      game.S.offlineDays = 0
+    }
+    const bad: string[] = []
+    for (let i = 0; i < offered.length; i++) {
+      for (let j = i + 1; j < offered.length && offered[j].turn - offered[i].turn < 20; j++) {
+        if (offered[j].text === offered[i].text) bad.push(`ходы ${offered[i].turn} и ${offered[j].turn}: «${offered[i].text}»`)
+      }
+    }
+    expect(bad.slice(0, 3)).toEqual([])
+  }, 120_000)
+})
