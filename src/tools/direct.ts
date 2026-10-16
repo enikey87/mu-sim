@@ -154,12 +154,13 @@ export const DIRECT: Record<string, DirectCase> = {
   Finale_razmik_shift: { event: 'ArcFinale', facts: { arc: 'razmik' }, setup: (g) => { g.S.ach.fence = 1 } },
   Finale_tile_lost: { event: 'ArcFinale', facts: { arc: 'tile' }, setup: (g) => { g.S.mem.court = 6 } },
   Says_sorry_blocked_boris: { event: 'PlayerSays', facts: { intent: 'sorry' }, setup: (g) => { blocked(g); g.S.arcs.boris = { i: 4, last: 0 } } },
+  // #806: follow-пулы арок сдвинули розыгрыш — голосовое уходит из семейства +4000, прямой случай вернули
+  Says_voice: { event: 'PlayerSays', facts: { intent: 'voice' } },
   // #576: звонок с объекта сдвинул розыгрыш выборок — сцена «если спросят» из них ушла; гейт по воротке угрозы
   Scene_tax: { event: 'PickScene', setup: (g) => { g.S.mem['count.threat'] = 1 } },
   // #679: разворот коллекторов сдвинул розыгрыш выборок — сцена амнистии ушла из них
   // с колкостями (#683) распухший журнал собирается ботами сам — случай снят по порогу гейта
   // #577: упрёк по звонку сдвинул розыгрыш ещё три правила — держим прямыми случаями
-  Says_condole_ctxrevived: { event: 'PlayerSays', facts: { intent: 'condole' }, setup: (g) => { g.S.ctx = { revived: true } } },
   Finale_rubik_default: { event: 'ArcFinale', facts: { arc: 'rubik' } },
   Finale_razmik_default: { event: 'ArcFinale', facts: { arc: 'razmik' } },
   Finale_beton_opened: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem['count.rude'] = 6; g.S.mem[HEAT] = 3 } },
@@ -203,7 +204,6 @@ export const DIRECT: Record<string, DirectCase> = {
   // #703: правка пулов звонка сдвинула розыгрыш выборок — кафе и счёт из них ушли
   Scene_invoice: { event: 'PickScene', setup: (g) => { g.S.day = 215 } },
   // #731: правка NAME_RE сдвинула розыгрыш выборок ещё раз — «заказчик жалуется» и «позвони заказчику» ушли из них
-  Scene_customer: { event: 'PickScene', setup: (g) => { g.S.day = 210 } },
   // #753: «карта» держалась прямым случаем, пока лотерея 72 партий её не задевала (3–5 из 60);
   // #762 (барахолка веса 5) сдвинула розыгрыш — правило играется в 7 партиях из 72, гейт видит его сам.
   // после #679/#681 бот в выборках до обычного финала коллекторов не доходит: держим прямым случаем
