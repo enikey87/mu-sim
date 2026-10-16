@@ -7,15 +7,16 @@ import { manualClock, realClock } from './clock'
 import { Game } from './game'
 import { seededRng } from './rng'
 import { SAVE_KEY, type PromiseRec, type Msg } from './state'
-import { fmtTime } from './time'
+import { dateOf, fmtDate, fmtTime } from './time'
 import { ARCS } from '../content/arcs'
 import { COLD_WAR } from '../content/rude'
 import { HEAT, bloodGiven } from '../content/memkeys'
 import { valueOf, spec, type Facts } from './rules'
 import type { GameEvent } from '../content/rules/events'
 import { MENTION_RE } from '../content/world'
-import { P_MONEY, P_DESPERATE } from '../content/topics'
+import { P_FRIDAY, P_MONEY, P_DESPERATE } from '../content/topics'
 import { BLOOD_PAY, FLOOR } from '../content/misc'
+import { PERIOD } from '../content/life'
 
 describe('Game: начало и ход', () => {
   it('новая игра: одна из завязок, 184-й день, 3–4 варианта реплик', () => {
@@ -405,6 +406,31 @@ describe('Game: возвращение после паузы', () => {
     game.tick(9 * 60) // переписка дошла до 11 утра — уже не «почему не спишь»
     expect(game.period()).toBe('day')
   })
+
+  it('реплика дня недели идёт от календаря: пятница — да, суббота и воскресенье рядом — нет (#814)', async () => {
+    // 25–27 декабря 2026: пятница, суббота, воскресенье — соседние дни вокруг даты из находки
+    const at = (y: number, m: number, d: number): number => Math.round((Date.UTC(y, m - 1, d) - Date.UTC(2026, 2, 18)) / 864e5)
+    const cases: Array<[number, number]> = [[at(2026, 12, 25), 5], [at(2026, 12, 26), 6], [at(2026, 12, 27), 0]]
+    for (const [day, dow] of cases) {
+      const { game } = makeGame({ hour: 19 })
+      game.S.day = day
+      expect(dateOf(day).getDay(), `${fmtDate(day)}: календарь теста`).toBe(dow)
+      const period = game.period()
+      expect(period, `${fmtDate(day)}: время суток`).toBe(dow === 5 ? 'friday' : 'evening')
+      // реплика Алика: строки пятничного пула звучат только в пятницу
+      const from = game.S.msgs.length
+      await game.periodLine(period)
+      const said = alikTexts(game.S.msgs.slice(from)).join(' | ')
+      const fridaySaid = PERIOD.friday!.map(valueOf).some((f) => said.includes(f.slice(0, 18)))
+      expect(fridaySaid, `${fmtDate(day)}: пятничная реплика Алика`).toBe(dow === 5)
+      // и предложенный игроку хвост «Пятница…» — по тому же календарю
+      const offered: string[] = []
+      for (let i = 0; i < 30; i++) offered.push(...game.buildChoices().map((c) => c.text))
+      const fridayOffered = P_FRIDAY.map(valueOf).some((f) => offered.some((t) => t.includes(f.slice(0, 18))))
+      expect(fridayOffered, `${fmtDate(day)}: пятничный вариант игрока`).toBe(dow === 5)
+    }
+  })
+
   it('короткая пауза и новая игра — без непрочитанных', () => {
     const { game } = makeGame({ away: 5 })
     expect(game.ui.unread).toBe(0)
