@@ -9,6 +9,8 @@ import { NOTIF } from './life'
 import { CONDOLE_REVIVED, GREET_A, FLOOR } from './misc'
 import { SPEND } from './life'
 import { WORLD, needs, meet } from './world'
+import { set } from './fact'
+import { nuneKeyPassed } from './memkeys'
 import { turnRules } from './rules/turn'
 import { valueOf, type Entry } from '../engine/rules'
 import { wedding, polite, blocked } from './memkeys'
@@ -56,6 +58,23 @@ describe('несостыковки из партии пользователя', 
     expect(range.some((m) => m.kind === 'text' && m.who === 'collectors')).toBe(true)
     expect(range.some((m) => m.kind === 'sys' && m.text.includes('удалил вас из группы'))).toBe(true) // ход доигран до конца
   })
+  // свип #786: строка группы не утверждает того, чего в партии нет
+  it('ключ от сейфа — только пока он у Нуне, кран на свадьбе — только когда он на свадьбе', async () => {
+    const { game } = makeGame()
+    const texts = (pool: readonly Entry<unknown>[]) => game.open(pool).map((x) => {
+      const v = valueOf(x)
+      return typeof v === 'string' ? v : (v as { t: string }).t
+    })
+    // ключ: строка «Ключ от сейфа у меня» живёт, пока ключ не ушёл (малыш Нуне проглотил)
+    expect(texts(GROUP.nune).some((t) => /Ключ от сейфа/.test(t)), 'ключ у Нуне — строка есть').toBe(true)
+    game.rules.applyOps([set(nuneKeyPassed, true)], {})
+    expect(texts(GROUP.nune).some((t) => /Ключ от сейфа/.test(t)), 'ключ ушёл — строки нет').toBe(false)
+    // кран: на свадьбу он встаёт с шестой серии Размика — до той «опять» не на что опереть
+    expect(texts(GROUP.mkrtich).some((t) => /Кран опять на свадьбу/.test(t)), 'до свадьбы строки нет').toBe(false)
+    game.S.arcs.razmik = { i: 6, last: 0 }
+    expect(texts(GROUP.mkrtich).some((t) => /Кран опять на свадьбу/.test(t)), 'на шестой серии кран на свадьбе').toBe(true)
+  })
+
   it('«Опять» на отправке номера карты звучит только со второго раза', async () => {
     const { game } = makeGame()
     const sysTexts = (n: number) => game.S.msgs.slice(n).flatMap((m) => (m.kind === 'sys' ? [m.text] : []))

@@ -161,7 +161,10 @@ export const replyRules: R[] = [
     respond: async ({ game, facts }) => {
       const pool = HOLIDAY_MONEY[String(facts.holiday) as Holiday]
       if (!pool) return false
-      await game.say([game.draw('HOLIDAY_MONEY', pool)])
+      // пул гейтится по дню окна (#802): line отдаёт текст уместной строки, не уместных нет — молчание
+      const text = game.line('HOLIDAY_MONEY', pool)
+      if (text === null) return false
+      await game.say([text])
       game.setCtx(null)
     },
   }),

@@ -126,6 +126,27 @@ describe('упрёк по звонку с объекта', () => {
     expect(sysMsgs(game).filter((t) => t === 'Пропущенный звонок: Тарон (объект)').length, 'звонок — один раз').toBe(1)
   })
 
+  // замер #592: оффер занимал слот в 94% кадров выбора после звонка — одна и та же кнопка десятки
+  // ходов подряд. Перерыв считается от показа: первое окно игрока за звонком — кнопка есть,
+  // дальше — не чаще раза в 10 ходов, потом снова.
+  it('перерыв: упрёк виден сразу за звонком и не чаще раза в 10 ходов (#789)', async () => {
+    const game = await afterCall()
+    const offered = () => game.rules.collect({ event: 'BuildChoices' }, game.facts()).some((r) => r.name === 'Opt_CrewPaid')
+    const inFrame = () => game.choices.some((c) => c.act === 'crewPaid')
+    await game.send({ text: 'Алик, что с деньгами?', tone: 'neutral' }) // первый ход игрока за звонком
+    expect(inFrame(), 'первое окно за звонком: кнопка в кадре игрока').toBe(true)
+    for (let turn = 2; turn <= 10; turn++) {
+      await game.send({ text: 'Алик, что с деньгами?', tone: 'neutral' })
+      expect(offered(), `ход ${turn} партии: оффер на перерыве`).toBe(false)
+      expect(inFrame(), `ход ${turn} партии: в кадре игрока её нет`).toBe(false)
+      expect(game.choices.length, 'перерыв не оставляет игрока без вариантов').toBeGreaterThan(0)
+    }
+    // перерыв прошёл: упрёк снова доступен и возвращается в кадр игрока
+    let turns = 0
+    while (turns++ < 20 && !inFrame()) await game.send({ text: 'Алик, что с деньгами?', tone: 'neutral' })
+    expect(inFrame(), 'перерыв прошёл — упрёк снова в кадре').toBe(true)
+  })
+
   // ревью раунда 45 (#703): упрёк и ответ ссылались на «пострадавших», которых звонок мог не назвать
   it('звонок без имён (вариант «плиточнику — в следующий раз») не открывает упрёков про штукатура, водителя, электрика, козла', async () => {
     const { game } = makeGame()
