@@ -193,7 +193,7 @@ export const DIRECT: Record<string, DirectCase> = {
   // ушли из чужих семейств сидов (`rules:stable`); в выборках гейта они редкие, потому держим прямыми случаями
   Ending_payday_niva: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'niva' } },
   Payday_niva: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['finale.niva'] = 'chose' } },
-  Scene_choice: { event: 'PickScene' },
+  // Scene_choice: с #821 срабатывает в выборках сам (7 партий при пороге 7) — прямой случай не нужен
   Finale_niva_chose_or: { event: 'ArcFinale', facts: { arc: 'niva' }, setup: (g) => { g.S.mem['asked.niva'] = 5 } },
   // апелляция на жаре: колкости растянули партии — угроза-повтор уходит из выборок (#683);
   // once встречного иска израсходован, иначе Hot (bonus 2) перебивает Hot_Again (bonus 1)

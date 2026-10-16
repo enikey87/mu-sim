@@ -253,6 +253,31 @@ describe('follow-строки оперируют только введённым
     }
     return out
   }
+  it('слова-отсылки на легенды звучат только когда легенда играла (#821)', () => {
+    // слово → чем партия его вводит: услышанное игроком утверждение о деньгах (шаг #813 — числа, шаг #821 — слова)
+    const LEGEND_WORDS: Array<[string, RegExp, string[]]> = [
+      ['фундамент', /фундамент/i, ['heard.money_foundation']],
+      ['сейф', /сейф/i, ['heard.money_safe']],
+      ['крипта', /крипт|коин/i, ['heard.money_crypto', 'ach.q_crypto', 'crypto.hodl']],
+    ]
+    const bad: string[] = []
+    let checked = 0
+    for (const [id, a] of Object.entries(ARCS)) {
+      for (const e of a.follow) {
+        const t = valueOf(e)
+        const when = e instanceof Gated ? flat(e.when) : []
+        for (const [word, re, markers] of LEGEND_WORDS) {
+          if (!re.test(t)) continue
+          checked++
+          const named = markers.some((m) => when.some((c) => String(c.key) === m))
+          const inCorpus = introduced(id, when).join(' ').toLowerCase().includes(word)
+          if (!named && !inCorpus) bad.push(`${id}: «${t}» говорит про ${word}, а ворота не знают этой легенды`)
+        }
+      }
+    }
+    expect(checked, 'слов-отсылок не стало — проверка пустеет').toBeGreaterThanOrEqual(5)
+    expect(bad).toEqual([])
+  })
   it('каждое число follow-строки названо серией или финалом, доступным её воротам', () => {
     const bad: string[] = []
     let checked = 0

@@ -7,6 +7,7 @@ import type { Choice } from '../engine/state'
 import { alikDead, blocked, crewPaid, endgame } from './memkeys'
 import { CREW_CALL, P_CREW_PAID, CREW_PAID } from './crew'
 import { SPEAKS, WORLD } from './world'
+import { CAST } from './arcs'
 import { is, set, valueOf } from './fact'
 import { sayFresh } from './rules/rude'
 
@@ -23,11 +24,20 @@ describe('звонок с объекта', () => {
     expect(game.canSpeak('taron'), 'на свежей партии Тарон не говорит').toBe(false)
   })
 
+  it('одна подпись: системная строка звонка называет Тарона так же, как контакт (#821)', async () => {
+    const { game } = makeGame()
+    game.S.day = 210
+    await game.fire('AlikIdle')
+    const call = sysMsgs(game).find((t) => t.startsWith('Пропущенный звонок:'))
+    expect(call, 'звонок объявлен').toBe(`Пропущенный звонок: ${CAST.taron.name}`)
+    // подпись не загадка: расшифровка идёт его же словами
+    expect(taronMsgs(game).map((m) => (m.kind === 'text' ? m.text : '')).join(' ')).toContain('чай носил')
+  })
   it('звонок в середине партии: строка системы, реплика Тарона, факт crew.paid', async () => {
     const { game } = makeGame()
     game.S.day = 210
     await game.fire('AlikIdle')
-    expect(sysMsgs(game), 'звонок объявляется пропущенным').toContain('Пропущенный звонок: Тарон (объект)')
+    expect(sysMsgs(game), 'звонок объявляется пропущенным').toContain('Пропущенный звонок: Тарон (чайнос)')
     const said = taronMsgs(game)
     expect(said.length, 'Тарон пишет сам — этим и входит в историю').toBe(1)
     expect(game.S.mem['intro.taron'], 'знакомство писал движок, не разметка').toBe(true)
@@ -53,7 +63,7 @@ describe('звонок с объекта', () => {
     await game.fire('AlikIdle')
     await game.fire('AlikIdle')
     expect(taronMsgs(game).length).toBe(1)
-    expect(sysMsgs(game).filter((t) => t === 'Пропущенный звонок: Тарон (объект)').length).toBe(1)
+    expect(sysMsgs(game).filter((t) => t === 'Пропущенный звонок: Тарон (чайнос)').length).toBe(1)
   })
 
   it('на первой неделе звонка нет: середина партии — гейт, а не случайность', async () => {
@@ -123,7 +133,7 @@ describe('упрёк по звонку с объекта', () => {
     }
     for (const a of answers) expect(CREW_PAID.some((l) => a.includes(l)), a).toBe(true)
     expect(answers[0], 'колода не зациклена на одной строке').not.toBe(answers[1])
-    expect(sysMsgs(game).filter((t) => t === 'Пропущенный звонок: Тарон (объект)').length, 'звонок — один раз').toBe(1)
+    expect(sysMsgs(game).filter((t) => t === 'Пропущенный звонок: Тарон (чайнос)').length, 'звонок — один раз').toBe(1)
   })
 
   // замер #592: оффер занимал слот в 94% кадров выбора после звонка — одна и та же кнопка десятки

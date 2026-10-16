@@ -5,7 +5,7 @@ import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
 import type { Criterion } from '../engine/rules'
 import { spec } from '../engine/rules/lines'
-import { CLAIMS, ROLL, type Claim } from './payday'
+import { CLAIMS, OUTCOME, ROLL, type Claim } from './payday'
 import { LEGENDS } from './legends'
 import { CLAIM_LEDGER } from './ledger'
 import { ARCS } from './arcs'
@@ -134,6 +134,14 @@ describe('День выплаты', () => {
     expect(CLAIM_LEDGER.lavash_rate_same.subject).toBe('money.rate')
     expect(CLAIM_LEDGER.lavash_rate_up.value).not.toBe(CLAIM_LEDGER.lavash_rate_same.value)
     expect(game.lie()?.kind, 'курс — предмет поимки').toBe('money')
+  })
+  it('кнопка-шутка звучит на следующий день и не поздравляет «с» прошедшим днём (#821)', () => {
+    for (const [id, o] of Object.entries(OUTCOME)) {
+      for (const b of o.button) {
+        expect(lineSpec(b).t, `${id}: кнопка поздравляет «с» днём, который уже прошёл`).not.toMatch(/[Сс] Днём выплаты/)
+      }
+    }
+    expect(lineSpec(OUTCOME.default!.button[0]!).t, 'день выплаты назван прошедшим').toMatch(/был День выплаты/)
   })
   it('бедная партия: общие источники и добор до 240 000, общие звенья отмазки', async () => {
     const { game } = makeGame()

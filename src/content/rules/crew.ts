@@ -22,7 +22,7 @@ export const crewRules: R[] = [
     when: [gte('day', CREW_CALL_MIN_DAY), missing(blocked), missing(alikDead), missing(endgame.active), missing('scene')],
     respond: async ({ game }) => {
       // пропущенный звонок с объекта — строка системы; Тарон пишет следом и этим входит в историю
-      game.sys('Пропущенный звонок: Тарон (объект)')
+      game.sys('Пропущенный звонок: Тарон (чайнос)')
       await game.sleep(600)
       await sayFresh(game, 'CREW_CALL', CREW_CALL)
       await game.sleep(300)
