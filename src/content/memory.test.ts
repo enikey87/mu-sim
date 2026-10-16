@@ -18,6 +18,13 @@ async function choose(game: Game, go: string) {
 }
 
 describe('память Алика', () => {
+
+  it('Арсен не «поступает» после дела: он уже был на втором курсе (#831)', () => {
+    const arsenal = MEMORY.filter((e) => /юрфак/.test(spec(e).t)).map((e) => spec(e).t)
+    expect(arsenal.length, 'строка про юрфак не найдена — проверка пустеет').toBeGreaterThan(0)
+    for (const t of arsenal) expect(t, `«${t}» подаёт поступление как следствие дела`).not.toMatch(/поступил/i)
+  })
+
   it('пулы без пустых реплик и повторов', () => {
     expect([...lintLines('MEMORY', MEMORY), ...lintLines('RUDE_AGAIN', RUDE_AGAIN), ...lintLines('SORRY_AGAIN', SORRY_AGAIN)]).toEqual([])
   })
