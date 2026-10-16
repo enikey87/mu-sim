@@ -5,7 +5,7 @@
 import type { Game } from '../engine/game'
 import type { Facts } from '../engine/rules'
 import { during } from '../engine/rules'
-import { HEAT, legendDay, legendId, nuneKeyPassed, sorryAt } from '../content/memkeys'
+import { caughtCount, HEAT, legendDay, legendId, nuneKeyPassed, sorryAt } from '../content/memkeys'
 
 export type DirectCase = { event: string; facts?: Facts; target?: string; setup?: (g: Game) => void }
 
@@ -151,16 +151,24 @@ export const DIRECT: Record<string, DirectCase> = {
   // #571: переразметка сроков («никогда» без числа) увела траектории выборок — пять правил держим прямыми случаями
   Scene_heir: { event: 'PickScene', setup: (g) => { g.S.arcs.grandpa = { i: 4, last: 0 }; g.S.arcs.boris = { i: 4, last: 0 } } },
   Chorus_garik_FedUp: { event: 'Mentioned', target: 'garik', setup: (g) => { g.S.mem['intro.garik'] = true; g.S.actors.garik = { interjections: 3 } } },
+  // #824: окно повтора сдвинуло розыгрыш — траурный хор Карине ушёл из семейства +2000, держим прямым случаем
+  Chorus_karine_Dead: { event: 'Mentioned', target: 'karine', setup: (g) => { dead(g); g.S.mem['intro.karine'] = true } },
   Finale_razmik_shift: { event: 'ArcFinale', facts: { arc: 'razmik' }, setup: (g) => { g.S.ach.fence = 1 } },
   Finale_tile_lost: { event: 'ArcFinale', facts: { arc: 'tile' }, setup: (g) => { g.S.mem.court = 6 } },
+  // #824: окно повтора сдвинуло розыгрыш — обычный финал плитки ушёл из выборок, держим прямым случаем
+  Finale_tile_default: { event: 'ArcFinale', facts: { arc: 'tile' } },
   Says_sorry_blocked_boris: { event: 'PlayerSays', facts: { intent: 'sorry' }, setup: (g) => { blocked(g); g.S.arcs.boris = { i: 4, last: 0 } } },
-  // #806: follow-пулы арок сдвинули розыгрыш — голосовое уходит из семейства +4000, прямой случай вернули
-  Says_voice: { event: 'PlayerSays', facts: { intent: 'voice' } },
+  // #824: окно повтора реплик игрока сдвинуло розыгрыш — голосовое теперь срабатывает во всех семействах само
+  // (было прямым случаем с #806, когда уходило из семейства +4000)
   // #576: звонок с объекта сдвинул розыгрыш выборок — сцена «если спросят» из них ушла; гейт по воротке угрозы
   Scene_tax: { event: 'PickScene', setup: (g) => { g.S.mem['count.threat'] = 1 } },
   // #679: разворот коллекторов сдвинул розыгрыш выборок — сцена амнистии ушла из них
   // с колкостями (#683) распухший журнал собирается ботами сам — случай снят по порогу гейта
   // #577: упрёк по звонку сдвинул розыгрыш ещё три правила — держим прямыми случаями
+  // #824: после слияния с #828 розыгрыш сдвинулся — голосовое снова уходит из семейства +4000, держим прямым случаем
+  Says_voice: { event: 'PlayerSays', facts: { intent: 'voice' } },
+  // #824: там же ушёл из семейства +6000 финал бетона «Настоящая ведомость» (порог поимок 2)
+  Finale_beton_ledger: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem[caughtCount] = 2 } },
   Finale_rubik_default: { event: 'ArcFinale', facts: { arc: 'rubik' } },
   Finale_razmik_default: { event: 'ArcFinale', facts: { arc: 'razmik' } },
   Finale_beton_opened: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem['count.rude'] = 6; g.S.mem[HEAT] = 3 } },
@@ -173,7 +181,7 @@ export const DIRECT: Record<string, DirectCase> = {
   Scene_loan: { event: 'PickScene', setup: (g) => { g.S.day = 230 } },
   // #762: барахолка получила вес 5 — на чужих семействах сидов (`rules:stable`) «смертный одр» и траурный
   // хор Карине падают до нуля; в выборках гейта они редкие (3 и 5 партий из 72), потому держим прямыми случаями
-  Scene_deathbed: { event: 'PickScene', setup: (g) => { g.S.day = 250; g.S.mood = 3 } },
+  // Scene_deathbed: с #824/#828 срабатывает в выборках сам (7 партий при пороге 7) — прямой случай не нужен
   // #795: кнопки игрока (денежный вопрос вместо случайной кнопки про арку) сдвинули розыгрыш ещё раз —
   // траурный хор Карине гейт теперь видит сам (7 партий из 72), а «Карине знакомится» из выборок ушло;
   // её прямой случай занимает остальные сцены, иначе вес 1 среди ~20 делает проверку подбрасыванием монеты
