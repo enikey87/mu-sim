@@ -12,32 +12,58 @@ const M8 = 355 // 8 марта: окно 8 Марта
 const PLAIN = 184 // обычный день
 
 const optHoliday = (g: Game) => g.rules.collect({ event: 'BuildChoices' }, g.facts()).filter((r) => r.name === 'Opt_Holiday')
+const holidayButton = (g: Game) => {
+  const rules = optHoliday(g)
+  if (rules.length === 0) return undefined
+  return rules[0].offer!(g.rules.ctx(g, rules[0], { event: 'BuildChoices' }, g.facts()))
+}
 
 describe('деньги под праздником', () => {
-  it('в окне кнопка есть и она про свой праздник, вне окна и в эндгейме — нет', () => {
-    for (const [day, pool] of [[NY, P_HOLIDAY.newYear], [M8, P_HOLIDAY.march8]] as const) {
+  it('кнопка есть до праздника и она про свой праздник; в день, вне окна и в эндгейме — нет', () => {
+    for (const [eve, feast, pool] of [[NY - 1, NY, P_HOLIDAY.newYear], [M8 - 1, M8, P_HOLIDAY.march8]] as const) {
       const { game } = makeGame()
-      game.S.day = day
+      game.S.day = eve
       const rules = optHoliday(game)
-      expect(rules, `окно ${day}`).toHaveLength(1)
-      const c = rules[0].offer!(game.rules.ctx(game, rules[0], { event: 'BuildChoices' }, game.facts()))
-      expect(pool, `кнопка ${day} — из пула праздника`).toContain(c?.text)
+      expect(rules, `канун ${eve}`).toHaveLength(1)
+      expect(pool, `кнопка ${eve} — из пула праздника`).toContain(holidayButton(game)?.text)
+
+      const { game: onDay } = makeGame()
+      onDay.S.day = feast
+      expect(holidayButton(onDay), `в день ${feast} слота нет`).toBeNull()
 
       const { game: plain } = makeGame()
       plain.S.day = PLAIN
       expect(optHoliday(plain), 'вне окна кнопки нет').toHaveLength(0)
 
       const { game: end } = makeGame()
-      end.S.day = day
+      end.S.day = eve
       end.rules.applyOps([{ key: endgame.active, op: '=', value: true }], {})
       expect(optHoliday(end), 'в эндгейме кнопки нет').toHaveLength(0)
 
       for (const [what, key] of [['окно смерти', alikDead], ['блок', blocked]] as const) {
         const { game: quiet } = makeGame()
-        quiet.S.day = day
+        quiet.S.day = eve
         quiet.rules.applyOps([{ key, op: '=', value: true }], {})
         expect(optHoliday(quiet), `в ${what} кнопки нет`).toHaveLength(0)
       }
+    }
+  })
+
+  it('31 декабря «Новый год на носу» есть, 1–3 января слота нет (#828)', () => {
+    const seen = new Set<string>()
+    for (let seed = 0; seed < 24; seed++) {
+      const { game } = makeGame({ seed })
+      game.S.day = NY - 1
+      const buttons = game.buildChoices().map((c) => c.text)
+      const hit = buttons.find((t) => P_HOLIDAY.newYear.some((p) => t.includes('Новый год на носу') || t.includes(p.slice(0, 16))))
+      if (hit) seen.add(hit)
+    }
+    expect([...seen].some((t) => t.includes('Новый год на носу')), `канун: ${[...seen].join(' | ')}`).toBe(true)
+    for (const day of [NY, NY + 1, NY + 2]) {
+      const { game } = makeGame()
+      game.S.day = day
+      expect(holidayButton(game), `день ${day}`).toBeNull()
+      expect(game.buildChoices().some((c) => /на носу/.test(c.text)), `путь игрока ${day}`).toBe(false)
     }
   })
 
@@ -69,21 +95,22 @@ describe('деньги под праздником', () => {
       if (d.getFullYear() === 2027 && d.getMonth() === 7 && d.getDay() === 0 && holidayOf(day) === 'builders') builders = day
     }
     expect(builders).toBeGreaterThan(0)
-    for (const [day, button, holiday] of [
-      [dayOn(2027, 2, 13), P_HOLIDAY.trndez, 'trndez'],
-      [builders, P_HOLIDAY.builders, 'builders'],
+    for (const [eve, feast, button, holiday] of [
+      [dayOn(2027, 2, 12), dayOn(2027, 2, 13), P_HOLIDAY.trndez, 'trndez'],
+      [builders - 1, builders, P_HOLIDAY.builders, 'builders'],
     ] as const) {
       const { game } = makeGame({ seed: 5 })
-      game.S.day = day
-      const rules = optHoliday(game)
-      expect(rules, `кнопка ${day}`).toHaveLength(1)
-      const c = rules[0].offer!(game.rules.ctx(game, rules[0], { event: 'BuildChoices' }, game.facts()))
-      expect(button).toContain(c?.text)
-      const pool = game.lines.eligible('HOLIDAY_MONEY', HOLIDAY_MONEY[holiday], game.lineFacts()).map((p) => p.text)
-      expect(pool.length, `в окне ${day} есть что ответить`).toBeGreaterThan(0)
-      const n = game.S.msgs.length
-      await game.fire('PlayerSays', { intent: 'holiday' })
-      const answer = alikTexts(game.S.msgs.slice(n)).join(' ')
+      game.S.day = eve
+      expect(optHoliday(game), `кнопка ${eve}`).toHaveLength(1)
+      expect(button).toContain(holidayButton(game)?.text)
+      const { game: onDay } = makeGame({ seed: 5 })
+      onDay.S.day = feast
+      expect(holidayButton(onDay), `в день ${feast} слота нет`).toBeNull()
+      const pool = onDay.lines.eligible('HOLIDAY_MONEY', HOLIDAY_MONEY[holiday], onDay.lineFacts()).map((p) => p.text)
+      expect(pool.length, `в окне ${feast} есть что ответить`).toBeGreaterThan(0)
+      const n = onDay.S.msgs.length
+      await onDay.fire('PlayerSays', { intent: 'holiday' })
+      const answer = alikTexts(onDay.S.msgs.slice(n)).join(' ')
       expect(pool.some((t) => answer.includes(t)), answer).toBe(true)
     }
   })
