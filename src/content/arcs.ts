@@ -123,7 +123,7 @@ export const ARCS: Record<string, Arc> = {
     title: 'Побег «Нивы»',
     follow: [
       'Есть новости про «Ниву»?',
-      gate(WORLD.nivaAway)('«Нива» уехала. Значит, деньги у меня в фундаменте, а не у Алика?'),
+      gate(WORLD.nivaAway, is('heard.money_foundation'))('«Нива» уехала. Значит, деньги у меня в фундаменте, а не у Алика?'),
       gate(WORLD.nivaPlayer)('«Нива» сама ко мне приехала? И в бардачке 50 — это мне или в долг?'),
       gate(eq('arc.niva', 5), WORLD.nivaAway)('«Нива» нашлась?'),
       gate(WORLD.nivaAway)('«Нива» мне всё звонит, а платить всё равно Алику.'),

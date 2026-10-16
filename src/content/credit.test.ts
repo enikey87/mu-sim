@@ -141,6 +141,16 @@ describe('кредитная лестница', () => {
     expect(game.S.money).toBe(500)
   })
 
+  it('мама помнит свой мотив: помидоры не росли, а не «чтобы ты дождался» (#821)', () => {
+    const motive = 'Помидоры всё равно не росли'
+    const card = MOM_HELPS.find((h) => h.id === 'dacha')
+    expect(card, 'карточка продажи дачи есть').toBeDefined()
+    expect(card!.text, 'карточка называет мотив мамы').toContain(motive)
+    const reminder = NOTIF.find((n) => n.app === 'Мама' && n.when?.some((c) => c.key === momHelp('dacha')))
+    expect(reminder, 'воспоминание о даче есть').toBeDefined()
+    expect(reminder!.t, 'воспоминание называет тот же мотив, а не чужой').toContain(motive)
+    expect(reminder!.t, 'чужого мотива в воспоминании нет').not.toMatch(/чтобы ты дождался/)
+  })
   it('мама вспоминает дачу через 30 дней после продажи ровно один раз (#447, #460)', async () => {
     const reminder = NOTIF.find((n) => n.app === 'Мама' && n.when?.some((c) => c.key === momHelp('dacha')))
     if (!reminder) throw new Error('Нет уведомления мамы о даче')
