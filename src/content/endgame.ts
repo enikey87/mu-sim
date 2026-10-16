@@ -600,9 +600,10 @@ export const ENDGAME_JUBILEES: Record<number, string> = {
 export interface ArchiveLine { slug: string; line: Said }
 
 /**
- * Сколько дней финал остаётся «сегодняшним»: строка архива о финале, закрытом раньше этого
- * окна, придерживается — игрок только что читал его серии, и группа, объявляющая то же событие
- * новостью, звучит вторым известием (#771: финал Гарика 22 марта, архив 1 апреля — 9 дней).
+ * Сколько дней финал остаётся «сегодняшним»: строка архива о финале, закрытом в окно этих дней
+ * (включительно), придерживается — игрок только что читал его серии, и группа, объявляющая то же
+ * событие новостью, звучит вторым известием (#771: финал Гарика 22 марта, архив 1 апреля — 9 дней;
+ * #832: вскрытие 31 мая, строка архива 10 июня — ровно 10-й день тоже в окне).
  */
 export const ARCHIVE_FRESH_DAYS = 10
 
@@ -615,7 +616,8 @@ export const ENDGAME_ARCH: Entry<ArchiveLine>[] = [
   gate(eq(finaleOf('boris'), 'toyou'), WORLD.boris)({ slug: 'fin.boris.toyou', line: 'Борис переехал к тебе, а алименты на него пришли ко мне. Подпиши опёку: ты теперь попечитель выплаты.' }),
   gate(eq(finaleOf('boris'), 'default'), WORLD.boris, is(taxFrozen))({ slug: 'fin.boris.default', line: 'Бориса забрали в налоговую свидетелем. Счета заморожены, выплата тоже. Формальность: подтвердить, что заморозка не помеха.' }),
 
-  gate(eq(finaleOf('beton'), 'opened'), WORLD.grant)({ slug: 'fin.beton.opened', line: 'Грант вскрыл угол отбойником и достал конверт. Толстый, но лёгкий по деньгам.' }),
+  // строка легальна только старше окна свежести — звучит воспоминанием, а не новостью (#832)
+  gate(eq(finaleOf('beton'), 'opened'), WORLD.grant)({ slug: 'fin.beton.opened', line: 'Помнишь, как Грант вскрыл угол отбойником и достал конверт? Толстый, но лёгкий по деньгам.' }),
   gate(eq(finaleOf('beton'), 'corner'), WORLD.mkrtich)({ slug: 'fin.beton.corner', line: 'Мкртич отбил для тебя кусок бетона с уголком конверта. Номинал не виден, зато трофей настоящий.' }),
   gate(eq(finaleOf('beton'), 'ledger'), WORLD.nune)({ slug: 'fin.beton.ledger', line: 'Нуне сверила выписки и уличила меня при всём объекте. Протокол подписан, денег нет.' }),
   gate(eq(finaleOf('beton'), 'default'))({ slug: 'fin.beton.default', line: 'Деньги в фундаменте признали неотделимым улучшением. Дом продан вместе с ними — улучшение уехало.' }),
@@ -638,7 +640,7 @@ export const ENDGAME_ARCH: Entry<ArchiveLine>[] = [
   gate(eq(finaleOf('alik_death'), 'default'))({ slug: 'fin.alik_death.default', line: 'Меня хоронили, а я живой. Поминки оплачены, возврату не подлежат — как и выплата.' }),
 
   gate(eq(finaleOf('garik'), 'cutter'), WORLD.garik)({ slug: 'fin.garik.cutter', line: 'Гарика достали перфоратором, и работал ты. Смета выросла, Гарик доволен.' }),
-  gate(eq(finaleOf('garik'), 'default'), WORLD.garik)({ slug: 'fin.garik.default', line: 'Гарика достали из фундамента, а он не хочет обратно. Там тихо и никто не просит денег.' }),
+  gate(eq(finaleOf('garik'), 'default'), WORLD.garik)({ slug: 'fin.garik.default', line: 'Помнишь, как Гарика доставали из фундамента? С тех пор он не хочет обратно: там тихо и никто не просит денег.' }),
 
   gate(eq(finaleOf('tile'), 'lost'))({ slug: 'fin.tile.lost', line: 'Суд решил, что ты должен заказчику за мою же плитку. Реквизиты мои — переводи, я передам.' }),
   gate(eq(finaleOf('tile'), 'default'))({ slug: 'fin.tile.default', line: 'Суд установил: виноват пол под плиткой, а клал его я. По этой линии мы квиты.' }),
