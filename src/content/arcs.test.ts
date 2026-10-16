@@ -133,7 +133,8 @@ describe('вопрос «уже случилось?» только перед с
     await followBefore('grant', 'Грант заплатил?', /заплатил|оплачено/, 'Что там заказчик?')
     await followBefore('razmik', 'Размик слез?', /Размик слез!/, 'Как там Размик?', { when: /лаваш/, has: 'Размик ещё на кране?' })
     await followBefore('niva', '«Нива» нашлась?', /«Нива» вернулась!/, 'Есть новости про «Ниву»?', { when: /Гюмри/, has: 'Где «Нива»?' })
-    await followBefore('samvel', 'Самвел ещё женится?', /Самвел женится снова/, 'Как там свадьба?')
+    // контрольная строка — без ворот: «Как там свадьба?» с #831 требует объявленной свадьбы (первую серию)
+    await followBefore('samvel', 'Самвел ещё женится?', /Самвел женится снова/, 'Тамада гуляет, а плачу я?')
   })
 })
 
@@ -144,7 +145,7 @@ describe('вопрос про развязку Самвела — только �
     const { game } = makeGame()
     for (const i of at()) {
       const lines = game.open(ARCS.samvel.follow)
-      expect(lines, `серия ${i}`).toContain('Как там свадьба?')
+      expect(lines, `серия ${i}`).toContain('Тамада гуляет, а плачу я?')
       if (i === 7) expect(lines, 'перед развязкой').toContain('Самвел ещё женится?')
       else expect(lines, `до развязки, серия ${i}`).not.toContain('Самвел ещё женится?')
       game.S.day += 5
@@ -288,6 +289,9 @@ describe('follow-строки оперируют только введённым
       { re: /(?<![а-яё])акт/i, arc: 'rubik', from: 7, inArc: 'rubik', why: 'акт обсуждают в 7-й серии rubik' },
       { re: /замороз|размороз/i, arc: 'rubik', from: 8, inArc: 'rubik', facts: [taxFrozen], why: 'заморозку называют 8-я серия rubik и факт tax.frozen' },
       { re: /к вдове|вдове/i, arc: 'alik_death', from: 5, inArc: 'alik_death', why: 'вдову называет 5-я серия alik_death («Самвел сделал предложение вдове»)' },
+      // события (пункты 1–2 #831): не только числа и слова-факты, но и названия событий
+      { re: /свадьб/i, arc: 'samvel', from: 1, inArc: 'samvel', why: 'свадьбу Самвела объявляет 1-я серия samvel' },
+      { re: /поминк|похорн|похорон/i, arc: 'alik_death', from: 1, inArc: 'alik_death', why: 'свои похороны и поминки Алик вводит 1-й серией alik_death' },
     ]
     const bad: string[] = []
     let checked = 0
