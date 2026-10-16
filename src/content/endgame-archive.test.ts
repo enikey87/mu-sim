@@ -14,7 +14,7 @@ import { MEMORY } from './memory'
 import { CLAIMS, claimByKey } from './lies'
 import { during, set, saidText } from './fact'
 import { Gated, valueOf } from '../engine/rules'
-import { alikShaved, caughtAt, intro, moustacheKept } from './memkeys'
+import { alikShaved, caughtAt, intro, moustacheKept, taxFrozen } from './memkeys'
 import type { ClaimKey } from './ids'
 import type { Game } from '../engine/game'
 
@@ -279,6 +279,53 @@ describe('архив дела: свежая поимка — не новость
   })
 })
 
+describe('архив дела: строка против факта финала (#786)', () => {
+  // Свип класса «ретроспективная реплика утверждает то, чего не было в партии»: строка архива
+  // пересказывает финал этой партии — и не может claim'ить исход, которого финал не дал.
+  it('финал Размика по умолчанию: архив говорит, что он слез, а не что он на кране', async () => {
+    const { game } = makeGame()
+    game.S.day = 300
+    toLast(game, 'razmik')
+    await game.playArc('razmik')
+    expect(game.S.mem['finale.razmik']).toBe('default')
+    game.S.day += ARCHIVE_FRESH_DAYS // финал старше окна: архив рассказывает его как новость
+    const line = await enterGroup(game)
+    expect(line).toBe(archiveText('fin.razmik.default'))
+    expect(line, 'в финале Размик слез, а не остался на кране').not.toMatch(/на кране|выше тебя/)
+    expect(line, 'архив называет исход финала: ты первый').toMatch(/первый в очереди/)
+  })
+
+  it('обычный финал похорон: архив не отменяет то, что в партии было', async () => {
+    const { game } = makeGame()
+    game.S.day = 300
+    game.S.mem['asked.alik_death'] = 1 // иначе «Обиделся»: sulk требует asked ≤ 0
+    toLast(game, 'alik_death')
+    await game.playArc('alik_death')
+    expect(game.S.mem['finale.alik_death']).toBe('default')
+    game.S.day += ARCHIVE_FRESH_DAYS
+    const line = await enterGroup(game)
+    expect(line).toBe(archiveText('fin.alik_death.default'))
+    expect(line, 'похороны в партии прошли — архив не отменяет их').not.toMatch(/[Пп]охороны отменились/)
+    expect(line).toMatch(/хоронили/)
+  })
+
+  it('строки про заморозку счётов гейтованы самой заморозкой: легенда frozen её снимает', () => {
+    for (const slug of ['fin.boris.default', 'fin.rubik.default']) {
+      const e = ENDGAME_ARCH.find((x) => valueOf(x).slug === slug)
+      expect(e, slug).toBeDefined()
+      const keys = (e instanceof Gated ? e.when : []).map((c) => c.key)
+      expect(keys, `${slug}: строка про замороженные счета живёт только под ней`).toContain(taxFrozen)
+    }
+  })
+
+  it('шаблоны пойманного вранья не про места: гейт пускает и дедушку с заказчиком', () => {
+    const joined = ENDGAME_ARCH_LIE.join(' ')
+    expect(joined, '«места» — только для пары про деньги; гейт шире').not.toMatch(/оба места|обоих местах|не в одном/)
+    expect(joined).toMatch(/Обе версии закрыты/)
+    expect(joined).toMatch(/в обеих версиях/)
+  })
+})
+
 describe('архив дела: ставка усами', () => {
   it('сбритая и спасённая — разные реплики, спасённая не утверждает, что усы сбриты', async () => {
     const saved = makeGame().game
@@ -351,6 +398,23 @@ describe('архив дела: свежий финал — не новость (
     const from = alikCount(game)
     await enterGroup(game)
     expect(since(game, from)).toContain(archiveText('fin.garik.default'))
+  })
+})
+
+describe('архив дела: тамада — назначение, а не прошедшая свадьба (#784)', () => {
+  it('строка называет приглашение Самвела, а не свершившееся тамадство', async () => {
+    const { game } = makeGame()
+    game.S.day = 300
+    game.S.mem['intro.samvel'] = true
+    game.S.ach.toast = game.S.day
+    toLast(game, 'samvel')
+    await game.playArc('samvel')
+    expect(game.S.mem['finale.samvel']).toBe('tamada')
+    game.S.day += ARCHIVE_FRESH_DAYS // финал старше окна: архив рассказывает его как новость
+    const line = await enterGroup(game)
+    expect(line).toBe(archiveText('fin.samvel.tamada'))
+    expect(line, 'архив утверждает свершившуюся свадьбу').not.toMatch(/был[аи]? тамадой|тамадой на свадьбе Самвела/i)
+    expect(line, 'строка не говорит о приглашении').toMatch(/записал тебя тамадой/)
   })
 })
 

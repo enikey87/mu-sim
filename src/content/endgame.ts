@@ -1,9 +1,11 @@
 import type { Choice } from '../engine/state'
 import { type Entry, type Line, type Said, eq, exists, gate, is } from './fact'
 import { needs, samvelLine, WORLD } from './world'
-import { finaleOf, lend50, met, moustacheKept } from './memkeys'
+import { finaleOf, lend50, met, moustacheKept, taxFrozen } from './memkeys'
 
 export const ENDGAME_GROUP = 'ВЫПЛАТА ЗАКРЫТА ✅ (не выходить)'
+/** Первая строка эпилога: группа открывается после концовки — игрок видит, что это эпилог, а не «дальше» (#797). */
+export const EPILOGUE_BANNER = '—— Эпилог ——'
 
 export const ENDGAME_CHOICES: Choice[] = [
   { text: 'Где деньги?', tone: 'neutral', act: 'endgameMoney' },
@@ -611,14 +613,14 @@ export const ARCHIVE_FRESH_DAYS = 10
 export const ENDGAME_ARCH: Entry<ArchiveLine>[] = [
   gate(eq(finaleOf('boris'), 'brigadir'), WORLD.boris)({ slug: 'fin.boris.brigadir', line: 'Борис теперь прораб и платит всем подряд. Ведомость закроем, заслуги припишем мне.' }),
   gate(eq(finaleOf('boris'), 'toyou'), WORLD.boris)({ slug: 'fin.boris.toyou', line: 'Борис переехал к тебе, а алименты на него пришли ко мне. Подпиши опёку: ты теперь попечитель выплаты.' }),
-  gate(eq(finaleOf('boris'), 'default'), WORLD.boris)({ slug: 'fin.boris.default', line: 'Бориса забрали в налоговую свидетелем. Счета заморожены, выплата тоже. Формальность: подтвердить, что заморозка не помеха.' }),
+  gate(eq(finaleOf('boris'), 'default'), WORLD.boris, is(taxFrozen))({ slug: 'fin.boris.default', line: 'Бориса забрали в налоговую свидетелем. Счета заморожены, выплата тоже. Формальность: подтвердить, что заморозка не помеха.' }),
 
   gate(eq(finaleOf('beton'), 'opened'), WORLD.grant)({ slug: 'fin.beton.opened', line: 'Грант вскрыл угол отбойником и достал конверт. Толстый, но лёгкий по деньгам.' }),
   gate(eq(finaleOf('beton'), 'corner'), WORLD.mkrtich)({ slug: 'fin.beton.corner', line: 'Мкртич отбил для тебя кусок бетона с уголком конверта. Номинал не виден, зато трофей настоящий.' }),
   gate(eq(finaleOf('beton'), 'ledger'), WORLD.nune)({ slug: 'fin.beton.ledger', line: 'Нуне сверила выписки и уличила меня при всём объекте. Протокол подписан, денег нет.' }),
   gate(eq(finaleOf('beton'), 'default'))({ slug: 'fin.beton.default', line: 'Деньги в фундаменте признали неотделимым улучшением. Дом продан вместе с ними — улучшение уехало.' }),
 
-  gate(eq(finaleOf('samvel'), 'tamada'), WORLD.samvel)({ slug: 'fin.samvel.tamada', line: 'Ты был тамадой на свадьбе Самвела. Почёт не облагается налогом и не выплачивается деньгами.' }),
+  gate(eq(finaleOf('samvel'), 'tamada'), WORLD.samvel)({ slug: 'fin.samvel.tamada', line: 'Самвел записал тебя тамадой на следующую свадьбу. Почёт налогом не облагается и деньгами не выплачивается.' }),
   gate(eq(finaleOf('samvel'), 'groom'), WORLD.samvel)({ slug: 'fin.samvel.groom', line: 'Самвел выдал за тебя племянницу. Теперь ты родня, а в родне деньги не считают — это наш главный документ.' }),
   gate(eq(finaleOf('samvel'), 'default'), WORLD.samvel)({ slug: 'fin.samvel.default', line: 'Свадьба Самвела закончилась, и он женится снова. Состав гостей тот же, повод новый.' }),
 
@@ -633,7 +635,7 @@ export const ENDGAME_ARCH: Entry<ArchiveLine>[] = [
 
   gate(eq(finaleOf('alik_death'), 'will'))({ slug: 'fin.alik_death.will', line: 'На моих поминках зачитали завещание: кредит в банке теперь твой. Наследство принято, платите сами.' }),
   gate(eq(finaleOf('alik_death'), 'sulk'))({ slug: 'fin.alik_death.sulk', line: 'Мои похороны прошли без тебя. Я обиделся посмертно, срок действия обиды неизвестен.' }),
-  gate(eq(finaleOf('alik_death'), 'default'))({ slug: 'fin.alik_death.default', line: 'Похороны отменились: я живой. Поминки оплачены, возврату не подлежат — как и выплата.' }),
+  gate(eq(finaleOf('alik_death'), 'default'))({ slug: 'fin.alik_death.default', line: 'Меня хоронили, а я живой. Поминки оплачены, возврату не подлежат — как и выплата.' }),
 
   gate(eq(finaleOf('garik'), 'cutter'), WORLD.garik)({ slug: 'fin.garik.cutter', line: 'Гарика достали перфоратором, и работал ты. Смета выросла, Гарик доволен.' }),
   gate(eq(finaleOf('garik'), 'default'), WORLD.garik)({ slug: 'fin.garik.default', line: 'Гарика достали из фундамента, а он не хочет обратно. Там тихо и никто не просит денег.' }),
@@ -646,12 +648,12 @@ export const ENDGAME_ARCH: Entry<ArchiveLine>[] = [
 
   gate(eq(finaleOf('rubik'), 'bribe'), WORLD.rubik)({ slug: 'fin.rubik.bribe', line: 'Рубик вычислил взяткодателя, и это ты. Я заплатил за тебя и вычел из долга — по-братски.' }),
   gate(eq(finaleOf('rubik'), 'karine'), WORLD.karine)({ slug: 'fin.rubik.karine', line: 'Карине ушла к Рубику, акт подписан, деньги у неё. Спрашивай у неё — она всё проверяет.' }),
-  gate(eq(finaleOf('rubik'), 'default'), WORLD.rubik)({ slug: 'fin.rubik.default', line: 'Рубик, оказывается, из налоговой: проверял не плитку, а меня. Счета заморожены, деньги холодные.' }),
+  gate(eq(finaleOf('rubik'), 'default'), WORLD.rubik, is(taxFrozen))({ slug: 'fin.rubik.default', line: 'Рубик, оказывается, из налоговой: проверял не плитку, а меня. Счета заморожены, деньги холодные.' }),
 
   gate(eq(finaleOf('razmik'), 'union'), WORLD.razmik)({ slug: 'fin.razmik.union', line: 'Размик собрал профсоюз кредиторов. Взносов нет — у кредиторов денег нет.' }),
   gate(eq(finaleOf('razmik'), 'swap'), WORLD.razmik, WORLD.crane)({ slug: 'fin.razmik.swap', line: 'Размик уступил тебе кран: говорит, тебе нужнее. Голодовка с понедельника, лаваш подаю лично.' }),
   gate(eq(finaleOf('razmik'), 'shift'), WORLD.razmik)({ slug: 'fin.razmik.shift', line: 'Ты отработал смену в кабине крана вместо Размика. Оплата потом, всё вместе.' }),
-  gate(eq(finaleOf('razmik'), 'default'), WORLD.razmik, WORLD.crane)({ slug: 'fin.razmik.default', line: 'Размик на кране и первый в очереди: он выше тебя. Логика железная.' }),
+  gate(eq(finaleOf('razmik'), 'default'), WORLD.razmik, WORLD.crane)({ slug: 'fin.razmik.default', line: 'Размик слез с крана — и ты теперь первый в очереди. Денег нет, зато очередь твоя.' }),
 
   gate(eq(finaleOf('collectors'), 'intern'), WORLD.collectors)({ slug: 'fin.collectors.intern', line: 'Коллекторы взяли тебя на стажировку. Учат взыскивать с меня профессионально — три чая за смену.' }),
   gate(eq(finaleOf('collectors'), 'default'), WORLD.collectors)({ slug: 'fin.collectors.default', line: 'Коллекторы теперь взыскивают с меня в твою пользу. Работают медленно: чай длинный, долг — тоже.' }),
@@ -667,12 +669,12 @@ export const ENDGAME_ARCH: Entry<ArchiveLine>[] = [
  * ({old} и {new} подставляет игра). Открытый, объяснённый и отозванный эпизод реплики не даёт.
  */
 export const ENDGAME_ARCH_LIE: string[] = [
-  'Ты меня поймал: {old} и {new}. Оба места закрыты, деньги — в акте.',
+  'Ты меня поймал: {old} и {new}. Обе версии закрыты, деньги — в акте.',
   'Значит, {old} и {new}. Зафиксировано, подписано, оплачено не будет.',
   'В твоём журнале {old} и {new}. В моём — одно: «в процессе».',
   'Ты сам видел: {old}. Потом сам видел: {new}. Свидетелей больше, чем денег.',
   'Поймал на двух версиях: {old} и {new}. Обе подтверждены, поэтому обе недействительны.',
   'Я слышу упрёк: {old}, а потом {new}. Журнал полон, деньги пусты.',
-  'Ладно, поймал: {old} и {new}. Деньги были в обоих местах, поэтому не в одном.',
+  'Ладно, поймал: {old} и {new}. Деньги были в обеих версиях, поэтому ни в одной.',
   'По журналу выходит: {old}, а потом {new}. Я в журнале ничего не подделывал, брат.',
 ]

@@ -12,6 +12,7 @@ import { GROUP_Q } from '../misc'
 import { P_LIE } from '../lies'
 import { TOPICS } from '../topics'
 import { P_CREW_PAID } from '../crew'
+import { MONEY_ASK, moneyPlaceOf } from '../money-ask'
 import { P_HOLIDAY, type Holiday } from '../holidays'
 import { WORLD, SPEAKS } from '../world'
 import { fmtDayMonth, fmtDays } from '../../engine/time'
@@ -35,6 +36,8 @@ interface OfferSpec {
   slot?: string
   weight?: number
   odds?: number
+  /** Перерыв от показа: кнопку увидели — пауза пошла (штамп при сборке вариантов, game.ts). */
+  cooldown?: { turns?: number; days?: number }
 }
 
 const fromD = (game: ContentApi, key: string, map: Record<string, string> = {}) => {
@@ -65,6 +68,7 @@ const offer = (o: OfferSpec): R => ({
   slot: o.slot ?? o.name,
   weight: o.weight,
   odds: o.odds,
+  cooldown: o.cooldown,
   // пустой текст — нечего предложить (весь пул недавно показывали)
   offer: ({ game, facts }): Choice | null => { const text = o.text(game, facts); return text ? { text, tone: o.tone, act: o.act, arg: o.arg?.(game, facts) } : null },
 })
@@ -82,6 +86,7 @@ export const choiceRules: R[] = [
     name: 'CrewPaid',
     when: [is(crewPaid), missing(blocked), missing(alikDead)],
     act: 'crewPaid', tone: 'neutral', bonus: 4,
+    cooldown: { turns: 10 }, // иначе кнопка занимает слот в 94% кадров выбора до конца партии (#592 → #789)
     text: (g) => fromArr(g, 'P_CREW_PAID', P_CREW_PAID),
   }),
   // праздник в календаре переписки: деньги под ним, один вариант на окно (#585); в окне молчания — молчит
@@ -196,11 +201,6 @@ export const choiceRules: R[] = [
     // У `ArcDeath` эта связка была и раньше.
     text: (g, f) => { const key = 'F_' + f['ctx.arc']; const arr = ARCS[String(f['ctx.arc'])].follow; return g.freshPlayer(key, arr) ?? g.draw(key, arr) }, arg: (_g, f) => String(f['ctx.arc']),
   }),
-  offer({
-    name: 'ArcAny', slot: 'arc', when: [missing(alikDead), exists('arcUnfinished')], odds: 0.2, act: 'arc', tone: 'polite',
-    text: (g, f) => { const key = 'F_' + f.arcUnfinished; const arr = ARCS[String(f.arcUnfinished)].follow; return g.freshPlayer(key, arr) ?? g.draw(key, arr) }, arg: (_g, f) => String(f.arcUnfinished),
-  }),
-
   // дело в суде открыто — игрок может его продолжить (угроза двигает линию суда)
   offer({
     name: 'Court', when: [gte(court, 1), lte(court, 6)], odds: 0.35, tone: 'threat',
@@ -228,6 +228,15 @@ export const choiceRules: R[] = [
     })
   }),
   offer({ name: 'Cow', when: [is('mooFresh')], odds: 0.8, bonus: 2, tone: 'cow', text: (g) => fromD(g, 'P_COW') }),
+  // денежный вопрос — первичная контекстная кнопка (#795): пока открыта легенда денег, игрок спрашивает,
+  // где они сейчас. Место — из легенды (банк/фундамент/сейф/крипта/«Нива»), формулировки по месту не
+  // повторяются, слот свой: тема может стоять рядом, а не вместо. Ответ — следующая реплика той же легенды
+  // (`Says_money` в replies.ts), то есть вопрос ведёт сюжет денег, а не только отвечает на сказанное.
+  offer({
+    name: 'Money', slot: 'money', when: [exists('legend')], act: 'money', tone: 'neutral', bonus: 3, odds: 0.9,
+    text: (g, f) => { const place = moneyPlaceOf(f.legend); return place ? freshFromArr(g, 'MONEY_ASK_' + place, MONEY_ASK[place]) : '' },
+    arg: (_g, f) => String(f.legend),
+  }),
   // ответ по теме: игрок цепляется за то, что Алик только что сказал (после серии сериала — вопрос про сериал важнее)
   offer({
     name: 'Topic', when: [exists('ctx.topic'), missing('ctx.arc')], act: 'topic', tone: 'neutral', odds: 0.85,

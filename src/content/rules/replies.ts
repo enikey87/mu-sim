@@ -11,6 +11,7 @@ import { D, low, cap } from '../excuses'
 import { GREET_A, WHEN_COND, SWING } from '../misc'
 import { type TalkKind, talkPairs, talkId, TALK_REMEMBER } from '../talk'
 import { saidClaims, saidText, type Said } from '../fact'
+import { LEGENDS } from '../legends'
 import { ARCS, NO_NEWS_A, NO_NEWS_B, GROUP_SEEN_A, GROUP_SEEN_B, WRONG_A, WRONG_B } from '../arcs'
 import * as L from '../life'
 import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, PROMISE_PENCIL, PROMISE_FAR } from '../misc'
@@ -90,6 +91,19 @@ export const replyRules: R[] = [
     },
   }),
 
+  // вопрос «где деньги сейчас» (#795): Алик продолжает ту же легенду — следующая её реплика; легенда
+  // исчерпана (все реплики сказаны) — обычная отмазка, как у `Opt_Arc` с пулом `follow`
+  says('money', {
+    respond: async ({ game, facts }) => {
+      const legend = String(facts.arg ?? '')
+      const l = LEGENDS[legend]
+      if (!l) return false
+      const p = game.linePicked('LEG_' + legend, l.lines)
+      if (!p) return game.excuseTurn()
+      game.markTopical(await game.say([{ t: p.text, claims: p.spec.claims ?? [] }]))
+      game.setCtx({ ...(game.ctx ?? {}), legend })
+    },
+  }),
   simple('photo', (g) => g.uniq(g.X.photo)),
   simple('voice', (g) => g.uniq(g.X.cow)),
   simple('voiceText', (g) => g.pair('VOICE_A', D.VOICE_A, 'VOICE_B', D.VOICE_B)),
@@ -147,7 +161,10 @@ export const replyRules: R[] = [
     respond: async ({ game, facts }) => {
       const pool = HOLIDAY_MONEY[String(facts.holiday) as Holiday]
       if (!pool) return false
-      await game.say([game.draw('HOLIDAY_MONEY', pool)])
+      // пул гейтится по дню окна (#802): line отдаёт текст уместной строки, не уместных нет — молчание
+      const text = game.line('HOLIDAY_MONEY', pool)
+      if (text === null) return false
+      await game.say([text])
       game.setCtx(null)
     },
   }),

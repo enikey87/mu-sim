@@ -13,7 +13,7 @@ import type { Game } from '../engine/game'
 import { introOf, uiOf } from './view'
 import { introDateLine, introVowLine, LINE_MS, FADE_MS } from './Intro'
 import { enable, GAME_HOST } from '../analytics/metrics'
-import { LEND50_LINK, LEND50_SYS } from '../content/endgame'
+import { EPILOGUE_BANNER, LEND50_LINK, LEND50_SYS } from '../content/endgame'
 import { adoptPlatform, webPlatform } from '../platform'
 
 function renderApp(game: Game, onReset = vi.fn()) {
@@ -603,7 +603,7 @@ describe('App', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     fireEvent.click(within(end).getByText('Начать заново'))
     expect(onReset).toHaveBeenCalled()
-    act(() => fireEvent.click(within(end).getByText('Играть дальше')))
+    act(() => fireEvent.click(within(end).getByText('Эпилог')))
     expect(screen.queryByRole('dialog', { name: /Породнились/ })).toBeNull()
     expect(document.querySelector('.phone-surface')).not.toHaveAttribute('inert')
     fireEvent.click(screen.getByTitle('Обещания и ачивки'))
@@ -611,6 +611,29 @@ describe('App', () => {
     expect(within(dialog).getByText(/финал «Жених»/)).toBeInTheDocument()
     expect(within(dialog).getByText('Породнились')).toBeInTheDocument()
     expect(within(dialog).getByText('1/14')).toBeInTheDocument()
+  })
+
+  it('после концовки кнопка ведёт в «Эпилог»: строка «—— Эпилог ——» перед группой, и только одна (#797)', async () => {
+    const { game } = makeGame()
+    game.S.day = 340
+    game.S.mem.payday = 'default'
+    await game.fire('CheckEnding')
+    renderApp(game)
+    const end = screen.getByRole('dialog')
+    // основная кнопка продолжения называет то, куда игрок идёт, а не «дальше»
+    expect(within(end).getByText('Эпилог')).toBeInTheDocument()
+    await act(async () => { fireEvent.click(within(end).getByText('Эпилог')) })
+    await act(async () => { await flush() })
+    const lines = game.S.msgs.flatMap((m) => (m.kind === 'text' || m.kind === 'sys' ? [m.text] : []))
+    const banner = lines.indexOf(EPILOGUE_BANNER)
+    expect(banner, 'строки «—— Эпилог ——» в ленте нет').toBeGreaterThanOrEqual(0)
+    expect(lines[banner + 1], 'группа открывается сразу после баннера').toContain('Алик создал группу')
+    // вступление выдаётся один раз: повторное закрытие концовки баннер не дублирует
+    game.S.ending = 'payday_default'
+    await game.closeEnding()
+    await flush()
+    const after = game.S.msgs.filter((m) => m.kind === 'sys' && m.text === EPILOGUE_BANNER)
+    expect(after, '«—— Эпилог ——» прозвучал дважды').toHaveLength(1)
   })
 
   it('концовка закрывает открытое досье', async () => {
@@ -665,7 +688,7 @@ describe('App', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Скопировано')
   })
 
-  it('отмазка — главный блок карточки: не цитата под абзацем, копирование на нём, «Играть дальше» — основная кнопка', async () => {
+  it('отмазка — главный блок карточки: не цитата под абзацем, копирование на нём, «Эпилог» — основная кнопка', async () => {
     const { game } = makeGame()
     game.S.day = 340
     Object.assign(game.S.mem, { payday: 'coins', 'payday.chain': 'Эти пятьдесят рублей лежали в сейфе.' })
@@ -691,10 +714,10 @@ describe('App', () => {
     expect(block!.contains(copy)).toBe(true)
     expect(copy!.textContent).toBe('Скопировать великую отмазку')
 
-    // «Играть дальше» остаётся залитой кнопкой внизу, «Начать заново» — обычной
+    // «Эпилог» остаётся залитой кнопкой внизу, «Начать заново» — обычной
     const cont = end.querySelector('#endingContinue')!
     const reset = end.querySelector('#endingReset')!
-    expect(cont.textContent).toBe('Играть дальше')
+    expect(cont.textContent).toBe('Эпилог')
     expect(cont.classList.contains('secondary')).toBe(false)
     expect(reset.textContent).toBe('Начать заново')
     expect(reset.classList.contains('secondary')).toBe(true)

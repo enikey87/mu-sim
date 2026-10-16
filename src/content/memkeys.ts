@@ -26,6 +26,8 @@ export const courtReferral = 'court.referral'
 export const ritualCount = 'ritual.count'
 export const ritualCut = 'ritual.cut'
 export const caughtCount = 'caught'
+/** Гарик сам сказал «ничего не брал»: признание в колкости ссылается на это отрицание, а не спорит с ним (#784). */
+export const garikDenied = 'garik.denied'
 /** День последней поимки на лжи: по нему архив эндгейма отличает свежую поимку от старой (#777).
  *  Имя — по правилу фактов-дней (`mooAt`, `sorryAt`, `thanksAt`): `caught.at` попал бы в легаси-пространство
  *  `caught.<пара утверждений>` и в сторож «новая партия не пишет старые ключи» (`lies.test.ts`). */
@@ -167,7 +169,7 @@ export const EVENT_KEY_LIST = [
   'moneyNormal', 'moneyLow', 'moneyBottom', 'paymentDueTomorrow',
   'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sorrySwing', 'promiseLive', 'promisePassed', 'promiseStake',
   'period', 'night', 'offline', 'scene', 'sinceAlik', 'lateCount', 'arcAvailable',
-  'arcsStarted', 'arcsDone', 'quests', 'callbackReady', 'lieOpen', 'lieKind', 'lieAlikOld', 'arcUnfinished', 'deathCanAdvance', 'collectorsCanAdvance',
+  'arcsStarted', 'arcsDone', 'quests', 'callbackReady', 'lieOpen', 'lieKind', 'lieAlikOld', 'deathCanAdvance', 'collectorsCanAdvance',
   'intent', 'tone', 'arg', 'category', 'arc', 'argArcDone', 'greet', 'promise', 'somedayCount', momDachaDays,
 ] as const
 export type EventKey = (typeof EVENT_KEY_LIST)[number]
@@ -179,7 +181,7 @@ export const ACTOR_KEYS: ReadonlySet<string> = new Set(ACTOR_KEY_LIST)
 
 export const MEM_KEYS: ReadonlySet<string> = new Set([
   HEAT, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, evicted, vendetta, court, courtVerdict,
-  ritualCount, ritualCut, caughtCount, caughtAt, cryptoHodl, bathAsked, mamaCalls, phoneKarine, karineKnowsDebt, karineThinksTax, alikShaved, moustacheKept, moustacheAskAt, alikDay, mooAt, sorryAt, courtReferral,
+  ritualCount, ritualCut, caughtCount, caughtAt, garikDenied, cryptoHodl, bathAsked, mamaCalls, phoneKarine, karineKnowsDebt, karineThinksTax, alikShaved, moustacheKept, moustacheAskAt, alikDay, mooAt, sorryAt, courtReferral,
   rudeAt, thanksAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway, nivaPlayer, carGone,
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday,
