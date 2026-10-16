@@ -10,7 +10,7 @@ export const COUNTER_ID = ''
 export const POSTHOG_KEY = ''
 
 /** Ключ сайта Umami. Пусто — приёмник молчит; вписывает автор. */
-export const UMAMI_KEY = ''
+export const UMAMI_KEY = '61b6d936-045b-40c3-a021-f20c63d10359'
 
 /** Хост, на котором приёмники включаются: localhost, превью и e2e молчат. */
 export const GAME_HOST = 'enikey87.github.io'

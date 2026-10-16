@@ -28,7 +28,7 @@ describe('счётчик Метрики: молчит, пока не выпол�
 
   it('счётчик не включается: пустой номер, чужой хост, ?debug, ?fast', () => {
     const cases: Array<[string, Parameters<typeof enable>[0]]> = [
-      ['пустой номер', { host: GAME_HOST, search: '', id: '' }],
+      ['пустой номер', { host: GAME_HOST, search: '', id: '', posthogKey: '', umamiKey: '' }],
       ['localhost', { host: 'localhost', search: '', id: '12345' }],
       ['vite preview', { host: '127.0.0.1:4173', search: '', id: '12345' }],
       ['?debug', { host: GAME_HOST, search: search('debug'), id: '12345' }],
