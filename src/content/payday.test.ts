@@ -112,6 +112,26 @@ describe('День выплаты', () => {
     expect((await game.fire('StoryBeat'))?.name).not.toBe('Beat_Payday')
     expect(game.S.scene).toBeNull()
   })
+  it('переводы 50 ₽ вычитаются один раз: суд и выплата считают от одного долга (#832)', async () => {
+    const { game } = makeGame()
+    const base = game.debt
+    await game.transfer()
+    await game.transfer()
+    expect(game.debt, 'два перевода — ровно минус сто').toBe(base - 100)
+    // суд идёт своим счётом и долг не переписывает: база остаётся той же
+    game.S.mem.court = 3
+    expect(game.debt, 'суд не двигает базис долга').toBe(base - 100)
+    // выплата называет ровно текущий долг, а не другой базис
+    const debt = game.debt
+    const n = game.S.msgs.length
+    game.S.ach.saint = 1
+    game.S.ach.court = 1
+    expect((await game.fire('PaydayOutcome'))?.name).toBe('Payday_real')
+    const sys = game.S.msgs.slice(n).filter((m) => m.kind === 'sys').map((m) => m.text).join(' ')
+    expect(sys, 'выплата назвала не тот базис').toContain(`${debt.toLocaleString('ru-RU')} ₽`)
+    expect(game.debt, 'долг закрыт выплатой').toBe(0)
+  })
+
   it('Самвел не объявляет себя хозяином свадьбы до серии со свадьбой (#831)', () => {
     const line = ROLL.find((e) => valueOf(e).t.includes('хозяин свадьбы'))
     expect(line, 'строка Самвела не найдена — проверка пустеет').toBeDefined()
