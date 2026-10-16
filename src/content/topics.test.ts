@@ -253,8 +253,10 @@ describe('ответ по теме', () => {
     game.alikMsg({ kind: 'text', from: 'alik', text: 'Борис заболел. Съел смету.', topical: true })
     game.S.ctx = { arc: 'boris' }
     game.S.arcs.boris = { i: 2, last: game.S.day - 1 } // серия была вчера — сегодня по вопросу будет новая
-    expect(offered(game, (c) => c.act === 'topic')).toBe(false)
+    // вопрос про сериал — первым делом: пул follow мал, и окно повтора (#826) держит показанную
+    // формулировку до конца хода — проверка порядка («важнее темы») от порядка проверок не зависит
     expect(offered(game, (c) => c.act === 'arc')).toBe(true)
+    expect(offered(game, (c) => c.act === 'topic')).toBe(false)
   })
 })
 
@@ -285,8 +287,9 @@ describe('«Мууу» и корова', () => {
     game.S.mem['wedding.anush'] = true
     game.alikMsg({ kind: 'text', from: 'alik', text: 'Свадьба — пятый день. Я уже не помню, чья.', topical: true })
     expect(game.topicOfLast()).toBe('wedding')
-    expect(offered(game, (c) => /А мне когда\?|Меня позовёте/.test(c.text))).toBe(false)
+    // «Ануш» — первым делом: пул темы мал, и окно повтора (#826) держит показанный вопрос до конца хода
     expect(offered(game, (c) => /Ануш уже дома/.test(c.text))).toBe(true)
+    expect(offered(game, (c) => /А мне когда\?|Меня позовёте/.test(c.text))).toBe(false)
   })
 })
 

@@ -533,13 +533,37 @@ export class Game {
     // «Эм… <то, что игрок только что отправил>» — не перефразировка, а эхо: такие варианты не предлагаем
     const recent = this.S.msgs.slice(-40).flatMap((m) => (m.kind === 'text' && m.from === 'me' ? [m.text] : []))
     const echo = (t: string) => recent.some((r) => t !== r && (t.endsWith(r) || t.startsWith(r)))
+    // окно дословного повтора (#826): показанный в предыдущих ходах текст перерисовывается до 8 карт;
+    // если колода вся в окне — слот не молчит: возвращается последняя карта, как раньше — повторы
+    // уже сказанного с префиксом живут именно этим фолбэком (#731)
     let t = ''
-    for (let i = 0; i < 8; i++) { t = this.seen.pickFresh(gen, this.playerDecor); if (!this.shown.has(t) && !echo(t)) break }
-    this.shown.add(t)
-    if (this.shown.size > 60) this.shown.delete(this.shown.values().next().value!)
+    for (let i = 0; i < 8; i++) {
+      t = this.seen.pickFresh(gen, this.playerDecor)
+      if (!this.recentOffer(t) && !echo(t)) break
+    }
+    this.rememberShown(t)
     return t
   }
   private shown = new Set<string>()
+  /** Ход показа варианта: окно дословного повтора считается по ходам, а не по размеру набора (#826). */
+  private shownAt = new Map<string, number>()
+  /** Вариант предлагался в окне дословного повтора — включая перестройки текущего хода (#826). */
+  private recentOffer(t: string): boolean {
+    const at = this.shownAt.get(t)
+    return at !== undefined && this.S.stats.sent - at < PLAYER_REPEAT_TURNS
+  }
+  private rememberShown(t: string): void {
+    this.shown.add(t)
+    // переустановка в конец: окно считается по ходам показа, а Map итерируется по вставке
+    this.shownAt.delete(t)
+    this.shownAt.set(t, this.S.stats.sent)
+    // подавление живёт ровно окно: устаревшие записи не держат recentOffer и вылетают из головы
+    for (const [k, at] of this.shownAt) {
+      if (this.S.stats.sent - at < PLAYER_REPEAT_TURNS) break
+      this.shownAt.delete(k)
+      this.shown.delete(k)
+    }
+  }
   /** Ход, в котором уже была серия (две серии разных сериалов подряд — каша). */
   private arcAt = -1
   /** Ход, в котором игроку показывали строку пула: дословный повтор — не раньше PLAYER_REPEAT_TURNS ходов (#824). */
@@ -550,12 +574,13 @@ export class Game {
    */
   freshPlayer(key: string, arr: readonly Entry<string>[]): string | null {
     const remember = (t: string): string => {
-      this.shown.add(t)
-      if (this.shown.size > 60) this.shown.delete(this.shown.values().next().value!)
+      this.rememberShown(t)
       this.playerSaid.set(t, this.S.stats.sent)
       return t
     }
     const fresh = this.decks.pick(key, arr, this.lineFacts(), { eligible: (e) => !this.shown.has(valueOf(e)) && !this.seen.has(valueOf(e)) })
+    // показанное держится окном ходов (#826): записи вылетают не по числу, а по возрасту —
+    // дословный повтор пула молчит все PLAYER_REPEAT_TURNS, как и у слотов выше
     if (fresh !== null) return remember(fresh)
     // повтор — самая давняя по показу открытая строка пула, без жребия: так окно не тратит розыгрыш.
     // Ворота строки проверяются и здесь: повтор не имеет права вернуть закрытую строку (#824)
@@ -1697,7 +1722,8 @@ export class Game {
       const tail = period === 'night' && this.chance(0.5) ? this.freshPlayer('P_NIGHT', P_NIGHT)
         : period === 'friday' && this.chance(0.5) ? this.freshPlayer('P_FRIDAY', P_FRIDAY)
         : S.day >= 300 && this.chance(0.4) ? this.freshPlayer('P_NEU_B_LATE', P_NEU_B_LATE) : null
-      out.push({ text: tail ? `${this.draw('P_NEU_A', D.P_NEU_A)} ${tail}` : P2('P_NEU_A', 'P_NEU_B'), tone: 'neutral' })
+      // хвост решён один раз (шансы периода не перекидываются на перерисовках), текст — под окном (#826)
+      out.push({ text: tail ? this.playerLine(() => `${this.draw('P_NEU_A', D.P_NEU_A)} ${tail}`) : P2('P_NEU_A', 'P_NEU_B'), tone: 'neutral' })
       }
     }
     if (S.mem[memkeys.blocked]) out.push({ text: one('P_RUDE_BLOCKED', P_RUDE_BLOCKED), tone: 'rude' })
