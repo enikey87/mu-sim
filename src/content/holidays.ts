@@ -25,6 +25,19 @@ export function holidayOf(day: number): Holiday | undefined {
   }
 }
 
+/** Предпраздничная часть окна: кнопка игрока только до дня праздника (#828).
+ *  Само окно `holidayOf` (отмазки, поздравление, открытка) не сужается. */
+export function holidayBefore(day: number): boolean {
+  const h = holidayOf(day)
+  if (!h) return false
+  const d = dateOf(day)
+  const dom = d.getDate()
+  if (h === 'newYear') return d.getMonth() === 11
+  if (h === 'trndez') return dom === 12
+  if (h === 'march8') return dom < 8
+  return dom < secondSundayOfAugust(d.getFullYear())
+}
+
 /** Праздники и сезоны, на которые Алик ссылается сроком: по календарю считается горизонт. */
 export type HolidayRef = 'navasard' | 'vardavar' | 'easter' | 'winter' | 'apricots'
 const FIXED: Record<Exclude<HolidayRef, 'easter' | 'vardavar'>, [month: number, dom: number]> = {
