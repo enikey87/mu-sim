@@ -6,7 +6,7 @@ import { LEGENDS } from './legends'
 import { holidayDays, type HolidayRef } from './holidays'
 import { sick, wedding } from './memkeys'
 import { valueOf, type Entry } from './fact'
-import { dueIn, fmtDayMonth, HANDOVER } from '../engine/time'
+import { dateOf, dueIn, fmtDayMonth, HANDOVER } from '../engine/time'
 import type { Game } from '../engine/game'
 
 /** До ближайшей даты — не больше года; Пасха гуляет на 35 дней, и Вардавар вместе с ней. */
@@ -127,7 +127,8 @@ describe('факты контекста: род и горизонт', () => {
     expect(ctx(dodge).days).toBe(dueIn({ weekday: 5, plus: 3 }, dodge.S.day)) // поздняя из двух дат
 
     const nextWeek = await said(byText('на следующей неделе, в начале или в конце'))
-    expect(ctx(nextWeek)).toEqual({ kind: 'dodge', days: 13, horizon: 'far' }) // поздняя дата — оценка, а не d: 7
+    // конец следующей недели — по дню недели, а не постоянной оценкой: у пятничного обещания это 9, не 13 (#809)
+    expect(ctx(nextWeek)).toEqual({ kind: 'dodge', days: dueIn({ week: true, next: true }, nextWeek.S.day), horizon: 'far' })
 
     const moon = await said(byText('после полнолуния'))
     expect(ctx(moon)).toEqual({ kind: 'event', days: 15, horizon: 'far' })
@@ -140,6 +141,20 @@ describe('факты контекста: род и горизонт', () => {
     const later = await said(byText('после Навасарда'), (g) => { g.S.day += 30 })
     expect(ctx(later).days).not.toBe(ctx(nav).days) // тот же праздник в другой день партии — другая даль
     expect(ctx(later).days).toBe(holidayDays('navasard', later.S.day))
+  })
+
+  it('«на следующей неделе»: счётчик не перелезает конец следующей недели (#809)', async () => {
+    const term = byText('на следующей неделе, в начале или в конце')
+    // пятница 16.10.2026: до конца следующей недели 9 дней, до её начала (понедельник) — 3
+    const friday = dayOf(2026, 10, 16)
+    expect(dateOf(friday).getDay(), 'день теста — не пятница').toBe(5)
+    const days = ctx(await said(term, (g) => { g.S.day = friday })).days!
+    expect(days, `счётчик ${days} перелез за конец следующей недели`).toBeLessThanOrEqual(9)
+    expect(days, `счётчик ${days} не дотянул до начала следующей недели`).toBeGreaterThan(3)
+    // воскресенье 18.10.2026: «следующая неделя» кончается ближайшим воскресеньем — через 7 дней
+    const sunday = dayOf(2026, 10, 18)
+    expect(dateOf(sunday).getDay(), 'день теста — не воскресенье').toBe(0)
+    expect(ctx(await said(term, (g) => { g.S.day = sunday })).days).toBe(7)
   })
 
   it.each([[7, 'near'], [8, 'far'], [30, 'far'], [31, 'veryFar']] as const)('порог: срок через %i дн. — %s', async (n, horizon) => {

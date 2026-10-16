@@ -326,8 +326,9 @@ const WHEN: Entry<When>[] = [
   { t: 'после полнолуния', d: 15, kind: 'event', est: 15 },
   { t: 'в четверг после обеда, но до ужина', d: 3, kind: 'clear', due: { weekday: 4 } }, { t: 'через пять минут', d: 0, kind: 'clear' },
   { t: 'когда Арарат вернут', d: null, kind: 'never' }, { t: 'сегодня вечером', d: 0, kind: 'clear' },
-  // поздняя из двух дат — конец следующей недели: от 7 до 13 дней, берём верхнюю
-  { t: 'на следующей неделе, в начале или в конце', d: 7, kind: 'dodge', est: 13 },
+  // «на следующей неделе»: окно — от начала следующей (7 дней) до её конца; конец считает по дню недели
+  // (`due`), а не оценкой 13 — иначе счётчик называл день за пределами обещанной недели (#809)
+  { t: 'на следующей неделе, в начале или в конце', d: 7, kind: 'dodge', due: { week: true, next: true } },
   needs('dekretNow')(needs('nune')({ t: 'как Нуне из декрета выйдет', d: null, kind: 'never', condition: nuneDekretOver })),
   gate(exists('arc.beton'), missing(betonSet))({ t: 'как бетон застынет', d: null, kind: 'never', condition: betonSet }),
   { t: 'после приёмки второго этажа', d: null, kind: 'never' }, gate(missing(actSigned))({ t: 'как акт подпишут', d: null, kind: 'never', condition: actSigned }),
