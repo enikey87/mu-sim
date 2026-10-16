@@ -114,8 +114,8 @@ export type LieKind = 'money' | 'grandpa' | 'customer'
 export type AwayKind = 'text' | 'sticker' | 'fwd' | 'deleted' | 'voice' | 'transfer' | 'excuse' | 'formality' | 'coldWar'
 
 const POOR_REPEAT_DAYS = 14
-/** Окно дословного повтора реплик игрока, в ходах: та же формулировка не раньше (#824). */
-const PLAYER_REPEAT_TURNS = 10
+/** Окно дословного повтора реплик игрока, в ходах: та же формулировка не раньше (#824, шире по #826). */
+const PLAYER_REPEAT_TURNS = 20
 /** Минимум сообщений игрока между клятвами легенды — одна защита на все пути (#179). */
 const LEGEND_VOW_GAP = 8
 /** Пороги цели `milestone`: сколько сообщений игрока отправлено (docs/design/analytics.md). */
