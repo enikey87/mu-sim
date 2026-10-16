@@ -122,7 +122,9 @@ export type TopicId =
   | 'cosmic'
 
 export type ClaimKey =
-  'money_jar'
+  'lavash_rate_same'
+  | 'lavash_rate_up'
+  | 'money_jar'
   | 'money_dubai'
   | 'money_noah'
   | 'money_wife'

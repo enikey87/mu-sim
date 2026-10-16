@@ -6,8 +6,10 @@ import type { Game } from '../engine/game'
 import type { Criterion } from '../engine/rules'
 import { spec } from '../engine/rules/lines'
 import { CLAIMS, ROLL, type Claim } from './payday'
+import { LEGENDS } from './legends'
+import { CLAIM_LEDGER } from './ledger'
 import { ARCS } from './arcs'
-import { valueOf, type Entry } from './fact'
+import { spec as lineSpec, valueOf, type Entry } from './fact'
 
 const texts = (g: Game, n = 0) => g.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' || m.kind === 'sys' ? [m.text] : []))
 const choose = async (g: Game, go: string) => { g.S.choices = null; const c = g.choices.find((x) => x.go === go); expect(c, go).toBeDefined(); await g.send(c!) }
@@ -109,6 +111,29 @@ describe('День выплаты', () => {
     game.S.day = 500
     expect((await game.fire('StoryBeat'))?.name).not.toBe('Beat_Payday')
     expect(game.S.scene).toBeNull()
+  })
+  it('с живым hodl утро не продаёт коины, а исход отдаёт лаваш; хвастовство о курсе помечено (#815)', async () => {
+    const { game } = makeGame()
+    game.S.day = 420
+    game.S.mem['crypto.hodl'] = true
+    await game.enterNode('payday', 'announce')
+    await choose(game, 'witness')
+    const morning = texts(game).join('\n')
+    // hodl жив: обменяна часть, остальное остаётся в коине
+    expect(morning).toContain('Остальное держу')
+    expect(morning).not.toMatch(/[Пп]родал весь/)
+    // хвастовство о курсе из легенды прозвучало в партии — это утверждение Алика, а не описание мира
+    const boast = LEGENDS.crypto.lines.map((l) => lineSpec(l)).find((x) => (x.claims ?? []).includes('lavash_rate_up'))
+    expect(boast, 'хвастовство о курсе помечено claims').toBeDefined()
+    await game.say([{ t: boast!.t, claims: ['lavash_rate_up'] }])
+    // исход при живом hodl — лавашом, и курс в нём честный, 1:1
+    expect((await game.fire('PaydayOutcome'))?.name).toBe('Payday_lavash')
+    expect(texts(game).join('\n')).toContain('Курс: 1 LAV = 1 лаваш')
+    // обе версии — про один предмет, значит игрок может поймать Алика на курсе
+    expect(CLAIM_LEDGER.lavash_rate_up.subject).toBe('money.rate')
+    expect(CLAIM_LEDGER.lavash_rate_same.subject).toBe('money.rate')
+    expect(CLAIM_LEDGER.lavash_rate_up.value).not.toBe(CLAIM_LEDGER.lavash_rate_same.value)
+    expect(game.lie()?.kind, 'курс — предмет поимки').toBe('money')
   })
   it('бедная партия: общие источники и добор до 240 000, общие звенья отмазки', async () => {
     const { game } = makeGame()
