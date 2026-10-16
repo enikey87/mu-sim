@@ -4,6 +4,8 @@ import { makeGame, alikTexts } from '../test/helpers'
 import { ARCS } from './arcs'
 import { FINALES } from './finales'
 import { valueOf } from './fact'
+import { Gated, type Criterion } from '../engine/rules'
+import { ARC_DONE } from './arcs'
 import { grantPaid, houseOnGarik, intro, taxFrozen } from './memkeys'
 
 const lineText = (m: unknown) => (typeof m === 'string' ? m : (m as { t: string }).t)
@@ -201,5 +203,70 @@ describe('панч серии по факту другой арки (#681)', () 
     const from = game.S.msgs.length
     await game.playEpisode({ ...ARCS.boris.eps[4], m: bare }, 'boris')
     expect(alikTexts(game.S.msgs.slice(from))).toContain(insert)
+  })
+})
+
+describe('follow-строки оперируют только введёнными фактами (#813)', () => {
+  /** Числа строки без разделителей: «8 000» → 8000. */
+  const numbers = (t: string): string[] => (t.match(/\d[\d\s\u00A0]*\d|\d/g) ?? []).map((n) => n.replace(/[\s\u00A0]/g, ''))
+  /** Сказанные строки значения — как `saidLines` из #783: реплики, sys, предмет, done. */
+  const said = (v: unknown, out: string[] = []): string[] => {
+    if (typeof v === 'string') { out.push(v); return out }
+    if (Array.isArray(v)) { for (const x of v) said(x, out); return out }
+    if (v && typeof v === 'object') {
+      const line = valueOf(v as Entry<string>)
+      if (typeof line === 'string') out.push(line)
+      else if (line !== v) said(line, out)
+      else if (typeof (v as { t?: unknown }).t === 'string') out.push((v as { t: string }).t)
+      for (const k of ['m', 'sys', 'item', 'done'] as const) { const x = (v as Record<string, unknown>)[k]; if (x !== undefined) said(x, out) }
+    }
+    return out
+  }
+  const flat = (cs: readonly Criterion[]): Criterion[] => cs.flatMap((c) => (c.op === 'all' ? flat(c.all ?? []) : [c]))
+  /** Числа, известные игроку вне сериала: 50 ₽ — обычный перевод Алика (`nextTransfer`), он в партии с первого дня. */
+  const GAME_WIDE = ['50']
+  /** Что партия успела сказать к состоянию ворот строки: серии по воротам; финал — только если ворота его называют. */
+  const introduced = (id: string, when: readonly Criterion[]): string[] => {
+    const arc = ARCS[id]
+    const out: string[] = []
+    const cs = flat(when)
+    // серии этого сериала — всегда: вопрос задают, пока сериал идёт
+    for (const ep of arc.eps) out.push(...said(ep))
+    // ворота называют другую серию или её номер: добираем её серии
+    for (const c of cs) {
+      const key = String(c.key)
+      if (!key.startsWith('arc.') || c.op === '!exist') continue
+      const arcId = key.slice(4)
+      if (arcId === 'done' || arcId === id) continue
+      const n = Number(c.value)
+      const eps = (c.op === '==' || c.op === '<=') && Number.isFinite(n) ? (ARCS[arcId]?.eps ?? []).slice(0, n + 1) : ARCS[arcId]?.eps ?? []
+      for (const ep of eps) out.push(...said(ep))
+    }
+    // финал: свои реплики — только под воротами о финале (иначе его в партии ещё не было)
+    for (const c of cs) {
+      const key = String(c.key)
+      if (!key.startsWith('finale.')) continue
+      const arcId = key.slice(7)
+      if (arcId !== id) continue
+      const wanted = c.op === '==' ? String(c.value) : undefined
+      for (const f of FINALES[id] ?? []) if (!wanted || f.id === wanted) out.push(...said(f), ...said(ARC_DONE[id] ?? []))
+    }
+    return out
+  }
+  it('каждое число follow-строки названо серией или финалом, доступным её воротам', () => {
+    const bad: string[] = []
+    let checked = 0
+    for (const [id, a] of Object.entries(ARCS)) {
+      for (const e of a.follow) {
+        const t = valueOf(e)
+        const nums = numbers(t)
+        if (!nums.length) continue
+        checked++
+        const corpus = introduced(id, e instanceof Gated ? e.when : []).join(' ').replace(/[\s\u00A0]/g, '')
+        for (const n of nums) if (!corpus.includes(n) && !GAME_WIDE.includes(n)) bad.push(`${id}: «${t}» называет ${n} — партия к этим воротам её не вводила`)
+      }
+    }
+    expect(checked, 'чисел в follow-строках не стало — проверка пустеет').toBeGreaterThanOrEqual(8)
+    expect(bad).toEqual([])
   })
 })
