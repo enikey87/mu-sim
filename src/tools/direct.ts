@@ -23,6 +23,8 @@ const offended = (g: Game) => { g.S.mem[HEAT] = 1; g.S.ctx = { offended: true } 
 
 export const DIRECT: Record<string, DirectCase> = {
   Tone_Cow: { event: 'PlayerMessage', facts: { tone: 'cow' } },
+  // #826: окно повтора шире (#824 был 10 ходов, стал 20) сдвинуло розыгрыш — тон в блоке ушёл из выборок
+  Tone_WhileBlocked: { event: 'PlayerMessage', setup: (g) => { blocked(g) } },
   Says_catchLie_lieKind_grandpa: { event: 'PlayerSays', facts: { intent: 'catchLie' }, setup: (g) => { g.noteClaims(['grandpa_dead']); g.noteClaims(['grandpa_alive']) } },
   // #426: sys-claim Гранта («всё заплатил») противоречит «заказчик мне не платит» — бот ловит это сам, 34 партии
   Turn_BorisSick: { event: 'AlikTurn', setup: (g) => { g.S.arcs.boris = { i: 2, last: 0 }; g.S.actors.boris = { sick: true } } },
