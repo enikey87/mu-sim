@@ -50,7 +50,7 @@ export const SOURCES_TOPUP = 'Остальное добрал сам: занял
 /** Кто в сборе: перекличка персонажей, которых игрок встречал. who — ключ CAST. */
 export interface Call extends LineSpec { who: string }
 export const ROLL: Entry<Call>[] = [
-  { who: 'samvel', t: 'Я как хозяин свадьбы объявляю выплату открытой! Тост будет потом. Длинный.', when: [is(met('samvel'))], prio: 1 },
+  { who: 'samvel', t: 'Я как хозяин свадьбы объявляю выплату открытой! Тост будет потом. Длинный.', when: [is(met('samvel')), gte('arc.samvel', 1)], prio: 1 },
   needs('karineHome')({ who: 'karine', t: 'Я приехала проследить. Двадцать лет жду, когда он кому-то заплатит.', when: [is(met('karine'))], prio: 1 }),
   needs('borisWrites')({ who: 'boris', t: 'Бее. (Борис пришёл в галстуке.)', when: [is(met('boris'))], prio: 1 }),
   needs('dekret')({ who: 'nune', t: 'Я из декрета. С ведомостью. Все расписываются.', when: [is(met('nune'))], prio: 1 }),

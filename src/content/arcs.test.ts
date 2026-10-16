@@ -287,6 +287,7 @@ describe('follow-строки оперируют только введённым
       { re: /штраф/i, arc: 'rubik', from: 3, inArc: 'rubik', why: '«штраф» Рубик произносит в 3-й серии' },
       { re: /(?<![а-яё])акт/i, arc: 'rubik', from: 7, inArc: 'rubik', why: 'акт обсуждают в 7-й серии rubik' },
       { re: /замороз|размороз/i, arc: 'rubik', from: 8, inArc: 'rubik', facts: [taxFrozen], why: 'заморозку называют 8-я серия rubik и факт tax.frozen' },
+      { re: /к вдове|вдове/i, arc: 'alik_death', from: 5, inArc: 'alik_death', why: 'вдову называет 5-я серия alik_death («Самвел сделал предложение вдове»)' },
     ]
     const bad: string[] = []
     let checked = 0
