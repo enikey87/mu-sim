@@ -246,21 +246,29 @@ describe('Game: начало и ход', () => {
     }
     expect(new Set(mine).size).toBe(mine.length)
   })
-  it('вопрос про сериал: свежие формулировки первыми, исчерпанный пул — повторяемый (#753)', () => {
+  it('вопрос про сериал: свежие формулировки первыми, исчерпанный пул — только за окном в ходах (#753, #824, #826)', () => {
     // Зачем: счётчик `asked.*` упирался в размер пула `follow` (4 строки) — вопрос про сериал
     // пропадал после четырёх формулировок, и финал вида «спрашивал 5 раз» был недостижим.
-    // Теперь пустая выдача не считается: пока есть свежая формулировка — она, потом — повтор.
+    // #824 добавил окно: исчерпанный пул возвращает ту же формулировку не раньше PLAYER_REPEAT_TURNS
+    // ходов, поэтому вопрос молчит, а не повторяется дословно в соседнем ходе.
     const { game } = makeGame()
     game.S.arcs.tile = { i: 2, last: 0 }
     game.S.ctx = { arc: 'tile' }
-    const texts: (string | undefined)[] = []
-    for (let i = 0; i < 8; i++) {
-      texts.push(game.buildChoices().find((item) => item.act === 'arc' && item.arg === 'tile')?.text)
+    const ask = () => game.buildChoices().find((item) => item.act === 'arc' && item.arg === 'tile')?.text
+    const fresh: string[] = []
+    for (let i = 0; i < 40; i++) {
+      const t = ask()
+      if (!t) break
+      fresh.push(t)
     }
-    const fresh = texts.slice(0, 4).filter((t): t is string => !!t)
-    expect(new Set(fresh).size, 'первые четыре — свежие, без повторов').toBe(fresh.length)
-    expect(texts.slice(4).every((t) => !!t), 'после исчерпания пула вопрос всё ещё предлагается').toBe(true)
-    expect(texts.slice(4).some((t) => fresh.includes(t!)), 'повтор — из того же пула').toBe(true)
+    expect(fresh.length, 'открытые формулировки пула показаны все').toBeGreaterThanOrEqual(4)
+    expect(new Set(fresh).size, 'формулировки свежие, без повторов').toBe(fresh.length)
+    expect(ask(), 'в том же ходе пул не повторяется').toBeFalsy()
+    game.S.stats.sent += 10
+    expect(ask(), 'и до окна тоже').toBeFalsy()
+    game.S.stats.sent += 10
+    const again = ask()
+    expect(again && fresh.includes(again), 'за окном возвращается та же формулировка из пула').toBe(true)
   })
   it('терпение кончается — «полежал на полу»', async () => {
     const { game } = makeGame()

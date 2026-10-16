@@ -278,6 +278,37 @@ describe('follow-строки оперируют только введённым
     expect(checked, 'слов-отсылок не стало — проверка пустеет').toBeGreaterThanOrEqual(5)
     expect(bad).toEqual([])
   })
+  it('слова-факты follow-строки названы сериями, пройденными к вопросу (#824)', () => {
+    // словарь: слово → сериал и число пройденных серий, после которых слово прозвучало (#813 числа, #821 легенды, #824 факты)
+    // inArc — слово принадлежит этому сериалу: чужой «акт» Нуне или чужое «завещание» Алика проверяются своими воротами
+    const FACT_WORDS: Array<{ re: RegExp; arc: string; from: number; inArc?: string; facts?: string[]; why: string }> = [
+      { re: /завещани|наследств/i, arc: 'grandpa', from: 4, inArc: 'grandpa', why: 'завещание и раскладку называет 4-я серия grandpa' },
+      { re: /хоспис|шаурмичн/i, arc: 'grandpa', from: 6, inArc: 'grandpa', why: 'хоспис и шаурмичная — последняя серия grandpa' },
+      { re: /штраф/i, arc: 'rubik', from: 3, inArc: 'rubik', why: '«штраф» Рубик произносит в 3-й серии' },
+      { re: /(?<![а-яё])акт/i, arc: 'rubik', from: 7, inArc: 'rubik', why: 'акт обсуждают в 7-й серии rubik' },
+      { re: /замороз|размороз/i, arc: 'rubik', from: 8, inArc: 'rubik', facts: [taxFrozen], why: 'заморозку называют 8-я серия rubik и факт tax.frozen' },
+      { re: /к вдове|вдове/i, arc: 'alik_death', from: 5, inArc: 'alik_death', why: 'вдову называет 5-я серия alik_death («Самвел сделал предложение вдове»)' },
+    ]
+    const bad: string[] = []
+    let checked = 0
+    for (const [id, a] of Object.entries(ARCS)) {
+      for (const e of a.follow) {
+        const t = valueOf(e)
+        const when = e instanceof Gated ? flat(e.when) : []
+        for (const w of FACT_WORDS) {
+          if (w.inArc && w.inArc !== id) continue
+          if (!w.re.test(t)) continue
+          checked++
+          const byArc = when.some((c) => String(c.key) === `arc.${w.arc}` && ['>=', '=='].includes(c.op) && Number(c.value) >= w.from)
+          const byFact = (w.facts ?? []).some((k) => when.some((c) => String(c.key) === k))
+          if (!byArc && !byFact) bad.push(`${id}: «${t}» — ${w.why}, а ворота этого не требуют`)
+        }
+      }
+    }
+    expect(checked, 'слов-фактов не стало — проверка пустеет').toBeGreaterThanOrEqual(5)
+    expect(bad).toEqual([])
+  })
+
   it('каждое число follow-строки названо серией или финалом, доступным её воротам', () => {
     const bad: string[] = []
     let checked = 0

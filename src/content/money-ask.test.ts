@@ -6,6 +6,7 @@ import { makeGame } from '../test/helpers'
 import { MONEY_ASK, MONEY_PLACES, moneyPlaceOf, type MoneyPlace } from './money-ask'
 import { LEGENDS } from './legends'
 import { valueOf, isOpen } from '../engine/rules'
+import { taxFrozen } from './memkeys'
 import type { Choice } from '../engine/state'
 import type { Game } from '../engine/game'
 
@@ -36,6 +37,16 @@ describe('денежный вопрос: корпус (#795)', () => {
     // легенда не про деньги — места нет
     expect(moneyPlaceOf('garik')).toBeUndefined()
     expect(moneyPlaceOf(undefined)).toBeUndefined()
+  })
+
+  it('«разморозка» спрашивается только по факту заморозки (#824)', () => {
+    // слово «разморозка» предполагает замороженные счета: без факта tax.frozen вариант — фантомный
+    const { game } = makeGame()
+    const bank = MONEY_ASK.bank.filter((e) => /замороз|размороз/i.test(valueOf(e)))
+    expect(bank.length, 'строк про заморозку не стало — проверка пустеет').toBeGreaterThanOrEqual(2)
+    for (const e of bank) expect(isOpen(e, game.lineFacts()), `без факта заморозки: «${valueOf(e)}»`).toBe(false)
+    game.S.mem[taxFrozen] = true
+    for (const e of bank) expect(isOpen(e, game.lineFacts()), `с фактом заморозки: «${valueOf(e)}»`).toBe(true)
   })
 
   it('случайной кнопки «как там X?» по неозвученной арке нет', () => {

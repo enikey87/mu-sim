@@ -13,7 +13,7 @@ import { P_LIE } from '../lies'
 import { TOPICS } from '../topics'
 import { P_CREW_PAID } from '../crew'
 import { MONEY_ASK, moneyPlaceOf } from '../money-ask'
-import { P_HOLIDAY, type Holiday } from '../holidays'
+import { P_HOLIDAY, holidayBefore, type Holiday } from '../holidays'
 import { WORLD, SPEAKS } from '../world'
 import { fmtDayMonth, fmtDays } from '../../engine/time'
 import { HEAT, alikDead, alikShaved, moustacheAskAt, blocked, court, mourning, phoneKarine, crewPaid, endgame } from '../memkeys'
@@ -89,12 +89,17 @@ export const choiceRules: R[] = [
     cooldown: { turns: 10 }, // иначе кнопка занимает слот в 94% кадров выбора до конца партии (#592 → #789)
     text: (g) => fromArr(g, 'P_CREW_PAID', P_CREW_PAID),
   }),
-  // праздник в календаре переписки: деньги под ним, один вариант на окно (#585); в окне молчания — молчит
+  // праздник в календаре переписки: деньги под ним, один вариант на окно (#585); в окне молчания — молчит.
+  // Слот только до дня: «на носу» 1 января — праздник уже прошёл (#828). Пул и окно Алика те же.
   offer({
     name: 'Holiday',
     when: [ne('holiday', false), missing(endgame.active), missing(alikDead), missing(blocked)],
     act: 'holiday', tone: 'neutral', bonus: 4,
-    text: (g, facts) => { const pool = P_HOLIDAY[facts.holiday as Holiday]; return pool ? fromArr(g, `P_HOLIDAY.${String(facts.holiday)}`, pool) : '' },
+    text: (g, facts) => {
+      if (!holidayBefore(g.day)) return ''
+      const pool = P_HOLIDAY[facts.holiday as Holiday]
+      return pool ? fromArr(g, `P_HOLIDAY.${String(facts.holiday)}`, pool) : ''
+    },
   }),
   // извиниться после грубости
   offer({ name: 'Sorry', when: [is('ctx.offended')], act: 'sorry', tone: 'polite', bonus: 5, text: (g) => fromD(g, 'P_SORRY') }),
@@ -188,7 +193,7 @@ export const choiceRules: R[] = [
 
   // сериалы: про текущий — всегда, про любой незаконченный — иногда
   offer({
-    // единственный выход из смерти: вопрос не исчезает, даже если все недавно показывали
+    // единственный выход из смерти: вопрос не исчезает, даже если все недавно показывали (исключение из окна #824)
     name: 'ArcDeath', slot: 'arc', when: [is(alikDead), is('deathCanAdvance')], act: 'arc', tone: 'polite', bonus: 5,
     text: (g) => g.freshPlayer('F_alik_death', ARCS.alik_death.follow) ?? g.draw('F_alik_death', ARCS.alik_death.follow), arg: () => 'alik_death',
   }),
@@ -199,7 +204,8 @@ export const choiceRules: R[] = [
     // после четырёх формулировок пула `follow`, и счётчики `asked.*` упираются в размер пула —
     // финалы вида «спрашивал 5 раз» (`asked.niva`, `asked.boris`) недостижимы (#753).
     // У `ArcDeath` эта связка была и раньше.
-    text: (g, f) => { const key = 'F_' + f['ctx.arc']; const arr = ARCS[String(f['ctx.arc'])].follow; return g.freshPlayer(key, arr) ?? g.draw(key, arr) }, arg: (_g, f) => String(f['ctx.arc']),
+    // окно повтора (#824): пока все формулировки пула в последних PLAYER_REPEAT_TURNS ходах, вопрос молчит, а не повторяется дословно
+    text: (g, f) => { const key = 'F_' + f['ctx.arc']; const arr = ARCS[String(f['ctx.arc'])].follow; return g.freshPlayer(key, arr) ?? '' }, arg: (_g, f) => String(f['ctx.arc']),
   }),
   // дело в суде открыто — игрок может его продолжить (угроза двигает линию суда)
   offer({

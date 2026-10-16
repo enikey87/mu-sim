@@ -25,21 +25,40 @@ export function holidayOf(day: number): Holiday | undefined {
   }
 }
 
+/** Предпраздничная часть окна: кнопка игрока только до дня праздника (#828).
+ *  Само окно `holidayOf` (отмазки, поздравление, открытка) не сужается. */
+export function holidayBefore(day: number): boolean {
+  const h = holidayOf(day)
+  if (!h) return false
+  const d = dateOf(day)
+  const dom = d.getDate()
+  if (h === 'newYear') return d.getMonth() === 11
+  if (h === 'trndez') return dom === 12
+  if (h === 'march8') return dom < 8
+  return dom < secondSundayOfAugust(d.getFullYear())
+}
+
 /** Праздники и сезоны, на которые Алик ссылается сроком: по календарю считается горизонт. */
 export type HolidayRef = 'navasard' | 'vardavar' | 'easter' | 'winter' | 'apricots'
 const FIXED: Record<Exclude<HolidayRef, 'easter' | 'vardavar'>, [month: number, dom: number]> = {
   navasard: [8, 11], winter: [12, 1], apricots: [7, 1],
 }
-// Пасха — григорианский компут (армянская церковь перешла на него в 1924-м); Вардавар — через 98 дней после неё
+/** Сдвиг юлианского календаря против нашего: 1900–2099 — 13 дней. */
+const JULIAN_SHIFT = 13
+/**
+ * Пасха — юлианский (православный) компут, а не григорианский (#827): армянская церковь держит пасхалию
+ * по юлианскому календарю, поэтому перевод на григорианские даты в 1924-м касается дня празднования, а не
+ * расчёта. Юлианская дата переводится в наш календарь прибавкой 13 дней; Пасха 2027 — 2 мая, не 28 марта.
+ * Вардавар — через 98 дней после неё.
+ */
 function easterOf(year: number): Date {
-  const a = year % 19, b = Math.floor(year / 100), c = year % 100
-  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3)
-  const h = (19 * a + b - d - g + 15) % 30
-  const i = Math.floor(c / 4), k = c % 4
-  const l = (32 + 2 * e + 2 * i - h - k) % 7
-  const m = Math.floor((a + 11 * h + 22 * l) / 451)
-  const n = h + l - 7 * m + 114
-  return new Date(year, Math.floor(n / 31) - 1, (n % 31) + 1)
+  // алгоритм Меёса для юлианской Пасхи: результат — дата по юлианскому календарю
+  const a = year % 4, b = year % 7, c = year % 19
+  const d = (19 * c + 15) % 30
+  const e = (2 * a + 4 * b - d + 34) % 7
+  const month = Math.floor((d + e + 114) / 31)
+  const day = ((d + e + 114) % 31) + 1
+  return new Date(year, month - 1, day + JULIAN_SHIFT)
 }
 /** Сколько дней от `day` до ближайшего наступления праздника или сезона (0 — сегодня). */
 export function holidayDays(ref: HolidayRef, day: number): number {

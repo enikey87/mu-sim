@@ -83,11 +83,14 @@ describe('разметка сроков', () => {
 
 describe('календарь праздников и сезонов', () => {
   it('Пасха и Вардавар по годам партии, сезоны по датам; сказанный в разные дни — разная даль', () => {
-    const easter26 = dayOf(2026, 4, 5)
+    // Пасха юлианская (#827): 2026 — 12 апреля, 2027 — 2 мая, 2028 — 16 апреля (сверено с календарём)
+    const easter26 = dayOf(2026, 4, 12)
     expect(holidayDays('easter', easter26)).toBe(0)
     expect(holidayDays('easter', easter26 - 3)).toBe(3)
-    expect(holidayDays('easter', easter26 + 1)).toBe(dayOf(2027, 3, 28) - (easter26 + 1)) // 2027-й: 28 марта
-    expect(holidayDays('vardavar', dayOf(2026, 7, 12))).toBe(0) // Пасха + 98
+    expect(holidayDays('easter', easter26 + 1)).toBe(dayOf(2027, 5, 2) - (easter26 + 1)) // 2027-й: 2 мая
+    expect(holidayDays('easter', dayOf(2028, 4, 16)), '2028-й').toBe(0)
+    expect(holidayDays('easter', dayOf(2027, 3, 28)), 'католическая дата 2027-го').toBeGreaterThan(30)
+    expect(holidayDays('vardavar', dayOf(2026, 7, 19))).toBe(0) // Пасха + 98
     expect(holidayDays('navasard', dayOf(2026, 8, 1))).toBe(10)
     expect(holidayDays('navasard', dayOf(2026, 8, 12))).toBeGreaterThan(300)
     const seasons: Array<[HolidayRef, number, number]> = [['winter', 12, 1], ['apricots', 7, 1]]

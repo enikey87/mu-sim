@@ -5,7 +5,7 @@ import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
 import type { Criterion } from '../engine/rules'
 import { spec } from '../engine/rules/lines'
-import { CLAIMS, OUTCOME, ROLL, type Claim } from './payday'
+import { CLAIMS, MORNING_CONTRA, OUTCOME, ROLL, SOURCES, type Claim } from './payday'
 import { LEGENDS } from './legends'
 import { CLAIM_LEDGER } from './ledger'
 import { ARCS } from './arcs'
@@ -112,6 +112,27 @@ describe('День выплаты', () => {
     expect((await game.fire('StoryBeat'))?.name).not.toBe('Beat_Payday')
     expect(game.S.scene).toBeNull()
   })
+  it('Самвел не объявляет себя хозяином свадьбы до серии со свадьбой (#831)', () => {
+    const line = ROLL.find((e) => valueOf(e).t.includes('хозяин свадьбы'))
+    expect(line, 'строка Самвела не найдена — проверка пустеет').toBeDefined()
+    const when = spec(line!).when ?? []
+    expect(when.some((c) => String(c.key) === 'arc.samvel' && c.op === '>=' && Number(c.value) >= 1), 'нет ворот по серии, где свадьба объявлена').toBe(true)
+  })
+
+  it('противоречие утра не выдаёт старое событие за сегодняшнее (#832)', () => {
+    // утро о конверте говорит как о воспоминании («Помнишь конверт из фундамента?»), поэтому «сегодня же
+    // фундамент вскрыли» — ложь: вскрытие было в финале бетона, днями раньше
+    const beton = MORNING_CONTRA.find((c) => c.morning.test('Помнишь конверт из фундамента? У него было двойное дно. 40 000 — чьи, не знаю, теперь наши.'))
+    expect(beton, 'ворота этого противоречия не сработали — проверка была бы пустой').toBeDefined()
+    expect(beton!.say, 'старое вскрытие подано как сегодняшнее').not.toMatch(/сегодня/i)
+    // там, где утро само объявляет сегодняшнюю новость, «сегодня» уместно
+    const safe = MORNING_CONTRA.find((c) => c.morning.test('Сейф открыли! Второй ключ нашёлся — у малыша в игрушках. Внутри 120 000 и соска.'))
+    expect(safe!.say).toMatch(/сегодня/i)
+    // и каждый блок morning-контра опирается на настоящую строку утра этой партии
+    const morning = SOURCES.map((e) => valueOf(e).t).join('\n')
+    for (const c of MORNING_CONTRA) expect(c.morning.test(morning), `нет строки утра под ${c.morning}`).toBe(true)
+  })
+
   it('с живым hodl утро не продаёт коины, а исход отдаёт лаваш; хвастовство о курсе помечено (#815)', async () => {
     const { game } = makeGame()
     game.S.day = 420

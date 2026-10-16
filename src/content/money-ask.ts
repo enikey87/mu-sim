@@ -1,9 +1,10 @@
 // Место денег в партии (#795): пока открыта легенда денег, игрок спрашивает о нынешнем месте — банк,
 // фундамент, сейф, крипта, «Нива». Место берётся из открытой легенды (`LEGENDS`), формулировки — по месту
 // и без повторов (`freshPlayer` + реестр пулов кнопок #491), ответ — следующая реплика той же легенды.
-import { type Entry } from './fact'
+import { type Entry, gate, is } from './fact'
 import { needs } from './world'
 import { registerPlayerPool } from './player-pools'
+import { taxFrozen } from './memkeys'
 
 /** Чьи легенды к какому месту относятся: банк (счета), фундамент, сейф, крипта, «Нива». */
 export const MONEY_PLACES = {
@@ -23,9 +24,9 @@ export const moneyPlaceOf = (legend: unknown): MoneyPlace | undefined =>
 /** Вопрос игрока о том, где деньги сейчас: пул на место, не меньше пяти формулировок. */
 export const MONEY_ASK: Record<MoneyPlace, Entry<string>[]> = {
   bank: registerPlayerPool('MONEY_ASK_bank', [
-    'Алик, счета всё ещё заморожены?',
-    'Когда разморозят мои деньги?',
-    'Разморозка не сдвинулась?',
+    gate(is(taxFrozen))('Алик, счета всё ещё заморожены?'),
+    gate(is(taxFrozen))('Когда разморозят мои деньги?'),
+    gate(is(taxFrozen))('Разморозка не сдвинулась?'),
     'Деньги всё ещё в банке?',
     'Банк ещё держит деньги?',
   ]),
