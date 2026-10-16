@@ -9,7 +9,7 @@ import { seededRng } from './rng'
 import { SAVE_KEY, type PromiseRec, type Msg } from './state'
 import { dateOf, fmtDate, fmtTime } from './time'
 import { ARCS } from '../content/arcs'
-import { COLD_WAR } from '../content/rude'
+import { COLD_WAR, NOT_DELIVERED } from '../content/rude'
 import { HEAT, bloodGiven } from '../content/memkeys'
 import { valueOf, spec, type Facts } from './rules'
 import type { GameEvent } from '../content/rules/events'
@@ -1289,5 +1289,50 @@ describe('Game: пачка непрочитанных называет прос�
       expect(sys?.text).toBe('Пока телефон заряжался — непрочитанные сообщения')
       expect(game.ui.title).toMatch(/^\(\d+\) Алик, где деньги\?$/)
     }
+  })
+})
+
+describe('Game: реакция на сообщение игрока и истечение блока (#831)', () => {
+  const myMsg = (game: Game, from: number): Extract<Msg, { kind: 'text' }> | undefined =>
+    game.S.msgs.slice(from).find((m): m is Extract<Msg, { kind: 'text' }> => m.kind === 'text' && m.from === 'me')
+  const notDelivered = (game: Game, from: number): boolean =>
+    game.S.msgs.slice(from).some((m) => m.kind === 'sys' && m.text === NOT_DELIVERED)
+
+  // Находка раунда 57 («реакция Алика в чёрном списке», партия 131117): 23 сент — блок, 25 сент —
+  // «не доставлено», 27 сент — реакция 🙄. Разбор по коду: реакции рисуются в одном месте
+  // (game.ts, за сторожем !alikSilent()), а блок Rude_Block ставится с forDays: 4 — он истекает
+  // молча на смене дня (settle в nextDay). К утру 27 сент блок уже снят, сообщение доставлено
+  // (строки «не доставлено» в прогоне нет) — реакция легитимна. Тест закрепляет обе половины.
+  it('в блоке реакции нет («не доставлено» есть); после истечения блока сообщение доставлено — реакция появляется', async () => {
+    const { game } = makeGame({ seed: 5 })
+    game.chance = () => true // шанс реакции (0.18) форсирован: сторож проверяется сам, а не везением генератора
+    // блок — через настоящую лестницу грубости: Rude_Block (rude, heat ≥ 3) ставит blocked на 4 дня
+    game.S.mem[HEAT] = 3
+    const d0 = game.S.day
+    await game.send({ text: 'Алик, ты вор!', tone: 'rude' })
+    expect(game.S.mem.blocked, 'блок не наступил — проверка пуста').toBe(true)
+
+    let deliveredDay: number | null = null
+    let deliveredReact: string | undefined
+    for (let i = 0; i < 12 && deliveredDay === null; i++) {
+      game.S.offlineDays = 0
+      if (game.battery.dead) await game.battery.charge()
+      const from = game.S.msgs.length
+      const dayBefore = game.S.day
+      await game.send({ text: 'ну что там', tone: 'neutral' })
+      const mine = myMsg(game, from)
+      expect(mine, 'своя реплика не в ленте').toBeTruthy()
+      const inBlock = dayBefore < d0 + 4 // restore в расписании на d0+4: settle снимает блок при дне ≥ d0+4
+      expect(notDelivered(game, from), `ход ${i} (день ${dayBefore}, блок до ${d0 + 4}): «не доставлено» должно совпадать с блоком`).toBe(inBlock)
+      if (inBlock) {
+        expect(mine!.react, `ход ${i}: реакция на недоставленное сообщение`).toBeUndefined()
+      } else {
+        deliveredDay = dayBefore
+        deliveredReact = mine!.react
+      }
+    }
+    expect(deliveredDay, 'блок не истёк за 12 ходов — сообщение так и не доставлено').not.toBeNull()
+    expect(deliveredDay).toBeGreaterThanOrEqual(d0 + 4)
+    expect(deliveredReact, 'после истечения блока сообщение доставлено, а реакции нет — проверка пуста').toBeDefined()
   })
 })
