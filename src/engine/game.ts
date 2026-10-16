@@ -114,6 +114,8 @@ export type LieKind = 'money' | 'grandpa' | 'customer'
 export type AwayKind = 'text' | 'sticker' | 'fwd' | 'deleted' | 'voice' | 'transfer' | 'excuse' | 'formality' | 'coldWar'
 
 const POOR_REPEAT_DAYS = 14
+/** Окно дословного повтора реплик игрока, в ходах: та же формулировка не раньше (#824). */
+const PLAYER_REPEAT_TURNS = 10
 /** Минимум сообщений игрока между клятвами легенды — одна защита на все пути (#179). */
 const LEGEND_VOW_GAP = 8
 /** Пороги цели `milestone`: сколько сообщений игрока отправлено (docs/design/analytics.md). */
@@ -540,13 +542,28 @@ export class Game {
   private shown = new Set<string>()
   /** Ход, в котором уже была серия (две серии разных сериалов подряд — каша). */
   private arcAt = -1
-  /** Свежая реплика игрока из пула или null, если весь пул недавно показывали или отправляли. */
+  /** Ход, в котором игроку показывали строку пула: дословный повтор — не раньше PLAYER_REPEAT_TURNS ходов (#824). */
+  private playerSaid = new Map<string, number>()
+  /**
+   * Свежая реплика игрока из пула; исчерпанный пул отдаёт повтор только за окном в ходах, иначе null.
+   * Раньше повтор выдавал `draw` у вызывающего — та же формулировка возвращалась на следующий день (#824).
+   */
   freshPlayer(key: string, arr: readonly Entry<string>[]): string | null {
-    const t = this.decks.pick(key, arr, this.lineFacts(), { eligible: (e) => !this.shown.has(valueOf(e)) && !this.seen.has(valueOf(e)) })
-    if (t === null) return null
-    this.shown.add(t)
-    if (this.shown.size > 60) this.shown.delete(this.shown.values().next().value!)
-    return t
+    const remember = (t: string): string => {
+      this.shown.add(t)
+      if (this.shown.size > 60) this.shown.delete(this.shown.values().next().value!)
+      this.playerSaid.set(t, this.S.stats.sent)
+      return t
+    }
+    const fresh = this.decks.pick(key, arr, this.lineFacts(), { eligible: (e) => !this.shown.has(valueOf(e)) && !this.seen.has(valueOf(e)) })
+    if (fresh !== null) return remember(fresh)
+    // повтор — самая давняя по показу открытая строка пула, без жребия: так окно не тратит розыгрыш.
+    // Ворота строки проверяются и здесь: повтор не имеет права вернуть закрытую строку (#824)
+    const at = (t: string) => this.playerSaid.get(t) ?? -1e9
+    const ready = arr.filter((e) => isOpen(e, this.lineFacts()) && !this.seen.has(valueOf(e)))
+      .filter((e) => this.S.stats.sent - at(valueOf(e)) >= PLAYER_REPEAT_TURNS)
+    if (!ready.length) return null
+    return remember(valueOf(ready.reduce((a, b) => (at(valueOf(b)) < at(valueOf(a)) ? b : a))))
   }
   /**
    * Бедность: свежие без повторов; исчерпанный пул молчит, пока строку не отпустит POOR_REPEAT_DAYS,

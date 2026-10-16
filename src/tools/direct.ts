@@ -151,11 +151,17 @@ export const DIRECT: Record<string, DirectCase> = {
   // #571: переразметка сроков («никогда» без числа) увела траектории выборок — пять правил держим прямыми случаями
   Scene_heir: { event: 'PickScene', setup: (g) => { g.S.arcs.grandpa = { i: 4, last: 0 }; g.S.arcs.boris = { i: 4, last: 0 } } },
   Chorus_garik_FedUp: { event: 'Mentioned', target: 'garik', setup: (g) => { g.S.mem['intro.garik'] = true; g.S.actors.garik = { interjections: 3 } } },
+  // #824: окно повтора сдвинуло розыгрыш — траурный хор Карине ушёл из семейства +2000, держим прямым случаем
+  Chorus_karine_Dead: { event: 'Mentioned', target: 'karine', setup: (g) => { dead(g); g.S.mem['intro.karine'] = true } },
   Finale_razmik_shift: { event: 'ArcFinale', facts: { arc: 'razmik' }, setup: (g) => { g.S.ach.fence = 1 } },
   Finale_tile_lost: { event: 'ArcFinale', facts: { arc: 'tile' }, setup: (g) => { g.S.mem.court = 6 } },
+  // #824: окно повтора сдвинуло розыгрыш — обычный финал плитки ушёл из выборок, держим прямым случаем
+  Finale_tile_default: { event: 'ArcFinale', facts: { arc: 'tile' } },
   Says_sorry_blocked_boris: { event: 'PlayerSays', facts: { intent: 'sorry' }, setup: (g) => { blocked(g); g.S.arcs.boris = { i: 4, last: 0 } } },
-  // #806: follow-пулы арок сдвинули розыгрыш — голосовое уходит из семейства +4000, прямой случай вернули
-  Says_voice: { event: 'PlayerSays', facts: { intent: 'voice' } },
+  // #824: то же окно увело отклик на «воскрес» из семейства +2000 — держим прямым случаем
+  Says_condole_ctxrevived: { event: 'PlayerSays', facts: { intent: 'condole' }, setup: (g) => { g.S.ctx = { revived: true } } },
+  // #824: окно повтора реплик игрока сдвинуло розыгрыш — голосовое теперь срабатывает во всех семействах само
+  // (было прямым случаем с #806, когда уходило из семейства +4000)
   // #576: звонок с объекта сдвинул розыгрыш выборок — сцена «если спросят» из них ушла; гейт по воротке угрозы
   Scene_tax: { event: 'PickScene', setup: (g) => { g.S.mem['count.threat'] = 1 } },
   // #679: разворот коллекторов сдвинул розыгрыш выборок — сцена амнистии ушла из них

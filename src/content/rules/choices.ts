@@ -188,7 +188,7 @@ export const choiceRules: R[] = [
 
   // сериалы: про текущий — всегда, про любой незаконченный — иногда
   offer({
-    // единственный выход из смерти: вопрос не исчезает, даже если все недавно показывали
+    // единственный выход из смерти: вопрос не исчезает, даже если все недавно показывали (исключение из окна #824)
     name: 'ArcDeath', slot: 'arc', when: [is(alikDead), is('deathCanAdvance')], act: 'arc', tone: 'polite', bonus: 5,
     text: (g) => g.freshPlayer('F_alik_death', ARCS.alik_death.follow) ?? g.draw('F_alik_death', ARCS.alik_death.follow), arg: () => 'alik_death',
   }),
@@ -199,7 +199,8 @@ export const choiceRules: R[] = [
     // после четырёх формулировок пула `follow`, и счётчики `asked.*` упираются в размер пула —
     // финалы вида «спрашивал 5 раз» (`asked.niva`, `asked.boris`) недостижимы (#753).
     // У `ArcDeath` эта связка была и раньше.
-    text: (g, f) => { const key = 'F_' + f['ctx.arc']; const arr = ARCS[String(f['ctx.arc'])].follow; return g.freshPlayer(key, arr) ?? g.draw(key, arr) }, arg: (_g, f) => String(f['ctx.arc']),
+    // окно повтора (#824): пока все формулировки пула в последних PLAYER_REPEAT_TURNS ходах, вопрос молчит, а не повторяется дословно
+    text: (g, f) => { const key = 'F_' + f['ctx.arc']; const arr = ARCS[String(f['ctx.arc'])].follow; return g.freshPlayer(key, arr) ?? '' }, arg: (_g, f) => String(f['ctx.arc']),
   }),
   // дело в суде открыто — игрок может его продолжить (угроза двигает линию суда)
   offer({
