@@ -2620,14 +2620,16 @@ export class Game {
     // финал сериала или ставка усами: факт объявляет гейт своей строки
     const fact = this.decks.pick('ENDGAME_ARCH', ENDGAME_ARCH, this.lineFacts(), {
       // строка о финале, закрытом только что, — не новость: игрок читал его серии днями раньше,
-      // и группа звучала бы вторым известием (#771). Свежий финал придерживается: его место
-      // занимает другой факт партии, а когда окно прошло, строка звучит как прежде
+      // и группа звучала бы вторым известием (#771). Окно держит финал все ARCHIVE_FRESH_DAYS дней
+      // включительно: день 10 — всё ещё «только что» для эпилога (партия 131117: вскрытие 31 мая,
+      // строка архива 10 июня — прозвучала новостью, #832). Его место занимает другой факт партии,
+      // а когда окно прошло, строка звучит как прежде
       eligible: (e) => {
         const slug = valueOf(e).slug
         if (spoken.has(slug)) return false
         const arc = slug.startsWith('fin.') ? slug.split('.')[1] : undefined
         const at = arc === undefined ? NaN : Number(S.mem[memkeys.finaleAt(arc)])
-        return !Number.isFinite(at) || S.day - at >= ARCHIVE_FRESH_DAYS
+        return !Number.isFinite(at) || S.day - at > ARCHIVE_FRESH_DAYS
       },
     })
     return fact ? take(fact.slug, () => valueOf(fact.line)) : null

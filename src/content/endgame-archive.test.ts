@@ -39,6 +39,9 @@ const alikCount = (game: Game): number => alikTexts(game.S.msgs).length
 /** Новые реплики Алика после `from`. */
 const since = (game: Game, from: number): string[] => alikTexts(game.S.msgs).slice(from)
 
+/** На день после окна свежести (#832): финал в окне держится все 10 дней включительно. */
+const PAST_WINDOW = ARCHIVE_FRESH_DAYS + 1
+
 /** Реплики вступления и просьбы «займи 50»: группа ещё говорит не от себя. */
 const OPENING = new Set([
   ...ENDGAME_OPEN, ...Object.values(ENDGAME_INTRO), ENDGAME_VENDETTA, ENDGAME_FALLBACK,
@@ -142,7 +145,7 @@ describe('архив дела: ранние реплики называют св
     expect(partyA.S.mem['finale.grandpa']).toBe('revoke')
     await throwLie(partyA, 'money_dubai', 'money_noah')
     stakeKept(partyA)
-    partyA.S.day += ARCHIVE_FRESH_DAYS // финалы закрылись раньше окна: архив рассказывает их как новости группы
+    partyA.S.day += PAST_WINDOW // финалы старше окна: архив рассказывает их как новости группы
     const aForm = await enterGroup(partyA)
     const aMoney = await act(partyA, 'endgameMoney')
     const aLeave = await act(partyA, 'endgameLeave')
@@ -159,7 +162,7 @@ describe('архив дела: ранние реплики называют св
     expect(partyB.S.mem['finale.rubik']).toBe('karine')
     await throwLie(partyB, 'money_jar', 'money_wall')
     partyB.S.ach.shaved = partyB.S.day
-    partyB.S.day += ARCHIVE_FRESH_DAYS // как и у partyA: финалы старше окна свежести
+    partyB.S.day += PAST_WINDOW // как и у partyA: финалы старше окна свежести
     const bForm = await enterGroup(partyB)
     const bMoney = await act(partyB, 'endgameMoney')
     const bLeave = await act(partyB, 'endgameLeave')
@@ -199,7 +202,7 @@ describe('архив дела: ранние реплики называют св
       game.S.mem['asked.boris'] = 6
       toLast(game, 'boris')
       await game.playArc('boris')
-      game.S.day += ARCHIVE_FRESH_DAYS // финал старше окна свежести: архив имеет право рассказать его
+      game.S.day += PAST_WINDOW // финал старше окна свежести: архив имеет право рассказать его
       return game
     }
     const archived = await party()
@@ -288,7 +291,7 @@ describe('архив дела: строка против факта финала
     toLast(game, 'razmik')
     await game.playArc('razmik')
     expect(game.S.mem['finale.razmik']).toBe('default')
-    game.S.day += ARCHIVE_FRESH_DAYS // финал старше окна: архив рассказывает его как новость
+    game.S.day += PAST_WINDOW // финал старше окна: архив рассказывает его как новость
     const line = await enterGroup(game)
     expect(line).toBe(archiveText('fin.razmik.default'))
     expect(line, 'в финале Размик слез, а не остался на кране').not.toMatch(/на кране|выше тебя/)
@@ -302,7 +305,7 @@ describe('архив дела: строка против факта финала
     toLast(game, 'alik_death')
     await game.playArc('alik_death')
     expect(game.S.mem['finale.alik_death']).toBe('default')
-    game.S.day += ARCHIVE_FRESH_DAYS
+    game.S.day += PAST_WINDOW
     const line = await enterGroup(game)
     expect(line).toBe(archiveText('fin.alik_death.default'))
     expect(line, 'похороны в партии прошли — архив не отменяет их').not.toMatch(/[Пп]охороны отменились/)
@@ -399,6 +402,50 @@ describe('архив дела: свежий финал — не новость (
     await enterGroup(game)
     expect(since(game, from)).toContain(archiveText('fin.garik.default'))
   })
+
+  // #832: партия 131117 — вскрытие 31 мая, строка архива 10 июня: ровно 10-й день оказался
+  // за границей (>=) и прозвучал новостью. Окно держит все 10 дней включительно, релиз — на 11-й.
+  it('ровно 10-й день — ещё окно: строка придерживается, на 11-й звучит', async () => {
+    const game = await garikFinale(290, 290)
+    await enterGroup(game) // вход в группу двигает день — дальше формальности зовём напрямую
+    game.S.day = 290 + ARCHIVE_FRESH_DAYS // ровно 10-й день с финала
+    const from = alikCount(game)
+    await game.endgameFormality()
+    expect(since(game, from), 'финал в окне (10-й день включительно) — не новость группы').not.toContain(archiveText('fin.garik.default'))
+    game.S.day += 1 // 11-й день: окно прошло
+    const mid = alikCount(game)
+    await game.endgameFormality()
+    expect(since(game, mid), 'после окна строка звучит как прежде').toContain(archiveText('fin.garik.default'))
+  })
+})
+
+describe('архив дела: строка старше окна — воспоминание, а не новость (#832)', () => {
+  // Строка fin.* легальна только старше окна свежести — к этому моменту событие не новость,
+  // и строка обязана читать как воспоминание (партия 131117: «Гарика достали из фундамента…»
+  // 17 июня и «Грант вскрыл угол…» 10 июня звучали телеграфной новостью).
+  const oldParty = async (): Promise<Game> => {
+    const { game } = makeGame()
+    game.S.day = 270
+    game.S.mem[intro('garik')] = true
+    game.S.mem[intro('grant')] = true // строке бетона нужно знакомство с Грантом (WORLD.grant)
+    await game.playFinale('beton', FINALES.beton.find((f) => f.id === 'opened')!)
+    expect(game.S.mem['finale.beton']).toBe('opened')
+    toLast(game, 'garik')
+    await game.playArc('garik')
+    expect(game.S.mem['finale.garik']).toBe('default')
+    game.S.day += PAST_WINDOW
+    return game
+  }
+  it('вскрытие и Гарик подаются за окном — обе строки в форме воспоминания', async () => {
+    const game = await oldParty()
+    await enterGroup(game)
+    await game.endgameFormality()
+    const said = alikTexts(game.S.msgs)
+    expect(said.some((t) => t.includes(archiveText('fin.beton.opened'))), 'строка вскрытия прозвучала').toBe(true)
+    expect(said.some((t) => t.includes(archiveText('fin.garik.default'))), 'строка Гарика прозвучала').toBe(true)
+    expect(archiveText('fin.beton.opened'), 'вскрытие — воспоминание').toMatch(/Помнишь, как Грант/)
+    expect(archiveText('fin.garik.default'), 'Гарик — воспоминание').toMatch(/Помнишь, как Гарика/)
+  })
 })
 
 describe('архив дела: тамада — назначение, а не прошедшая свадьба (#784)', () => {
@@ -410,7 +457,7 @@ describe('архив дела: тамада — назначение, а не п
     toLast(game, 'samvel')
     await game.playArc('samvel')
     expect(game.S.mem['finale.samvel']).toBe('tamada')
-    game.S.day += ARCHIVE_FRESH_DAYS // финал старше окна: архив рассказывает его как новость
+    game.S.day += PAST_WINDOW // финал старше окна: архив рассказывает его как новость
     const line = await enterGroup(game)
     expect(line).toBe(archiveText('fin.samvel.tamada'))
     expect(line, 'архив утверждает свершившуюся свадьбу').not.toMatch(/был[аи]? тамадой|тамадой на свадьбе Самвела/i)
