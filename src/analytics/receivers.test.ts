@@ -1,6 +1,6 @@
 // #653: второй приёмник целей — PostHog. #656: третий — Umami. Клиенты подставные, живой сети прогон не трогает.
 import { describe, it, expect, beforeEach } from 'vitest'
-import { enable, firstGesture, isOn, track, GAME_HOST, POSTHOG_KEY, COUNTER_ID, UMAMI_KEY } from './metrics'
+import { enable, firstGesture, isOn, track, GAME_HOST } from './metrics'
 import type { Goal } from './metrics'
 
 type YmCall = [number, string, ...unknown[]]
@@ -79,11 +79,9 @@ describe('два приёмника за одним track (#653)', () => {
     expect(ph).toHaveLength(0)
   })
 
-  it('оба ключа пусты — тишина, тегов нет, модуль выключен', () => {
+  it('все ключи пусты — тишина, тегов нет, модуль выключен', () => {
     const { ym, ph } = setup()
-    expect(COUNTER_ID).toBe('')
-    expect(POSTHOG_KEY).toBe('')
-    expect(enable({ host: GAME_HOST, search: '', id: '', posthogKey: '' })).toBe(false)
+    expect(enable({ host: GAME_HOST, search: '', id: '', posthogKey: '', umamiKey: '' })).toBe(false)
     expect(isOn()).toBe(false)
     firstGesture()
     track('ending', { id: 'family' })
@@ -232,8 +230,14 @@ describe('Umami: третий приёмник (#656, #676)', () => {
     expect(ym).toContainEqual([4242, 'reachGoal', 'ending', { id: 'family' }])
   })
 
-  it('ключ Umami пустой в константе — приёмник молчит, остальные живут', () => {
-    expect(UMAMI_KEY).toBe('')
+  it('ключ Umami пустой — приёмник молчит, остальные живут (механизм, состояние констант не охраняется)', () => {
+    const { ym, ph } = setup()
+    enable({ host: GAME_HOST, search: '', id: '12345', posthogKey: 'ph_key', umamiKey: '' })
+    firstGesture()
+    track('ending', { id: 'family' })
+    expect(umScripts()).toHaveLength(0)
+    expect(ym).toContainEqual([12345, 'reachGoal', 'ending', { id: 'family' }])
+    expect(ph.some((c) => c[0] === 'capture' && c[1] === 'ending')).toBe(true)
   })
 
   it('автосбор выключен, тег один, просмотр один', () => {
