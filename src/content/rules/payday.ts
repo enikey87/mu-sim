@@ -110,7 +110,8 @@ const outcome = (id: string, when: R['when'], extra: Partial<R> = {}): R => ({
     await game.sleep(900)
     // «перевёл {sum}» — ровно то, что осталось «к выплате» после всех долей, а не 240 000 из воздуха
     if (o.sys) game.sys(o.sys.replace('{debt}', fmt(game.debt)).replace('{sum}', fmt(Number(game.mem()[pd.sum] ?? game.debt))))
-    for (const l of game.open(o.lines)) await game.say([typeof l === 'string' ? l : { w: l[0], t: l[1] }])
+    // строка исхода — реплика или пара [кто, текст]; объект с `claims` идёт как есть (утверждение о курсе, #815)
+    for (const l of game.open(o.lines)) await game.say([typeof l === 'string' ? l : Array.isArray(l) ? { w: l[0], t: l[1] } : { t: l.t, claims: l.claims ?? [] }])
     // долг меняем до печати выплаты: после paydayScene adjustDebt уже не пустит
     if (id === 'real' || id === 'coins') { game.adjustMoney(game.debt, 'День выплаты'); game.adjustDebt(-game.debt) }
     if (id === 'lavash') { game.adjustDebt(-game.debt); game.giveItem('Лаваш × 240 000') }
