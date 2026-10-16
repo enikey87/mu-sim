@@ -156,6 +156,32 @@ describe('несостыковки из партии пользователя', 
     const got = Array.from({ length: 40 }, floor)
     expect(got.some((t) => /микроволновку/.test(t))).toBe(false)
   })
+  it('«Логично…» в займе — не перевод: деньги уходят только с «перевожу»', async () => {
+    const { game } = makeGame()
+    setMoney(game, 20000)
+    const debt = game.S.debt
+    await game.enterNode('lend', 'reverse')
+    game.S.choices = null
+    const neutral = game.choices.find((c) => c.text.includes('Логично'))
+    expect(neutral, 'кнопка есть').toBeDefined()
+    await game.send(neutral!)
+    expect(game.S.debt).toBe(debt)
+    expect(game.S.ach.lend).toBeUndefined()
+    expect(game.S.msgs.some((m) => m.kind === 'sys' && /Вы перевели Алику/.test(m.text))).toBe(false)
+    expect(texts(game).join(' ')).toMatch(/не подпись/)
+
+    const { game: yes } = makeGame()
+    setMoney(yes, 20000)
+    const before = yes.S.debt
+    await yes.enterNode('lend', 'ask')
+    yes.S.choices = null
+    const pay = yes.choices.find((c) => /перевожу 5000/i.test(c.text))
+    expect(pay, 'явное согласие есть').toBeDefined()
+    await yes.send(pay!)
+    expect(yes.S.debt).toBe(before + 5000)
+    expect(yes.S.ach.lend).toEqual(expect.any(Number))
+    expect(yes.S.msgs.some((m) => m.kind === 'sys' && /Вы перевели Алику/.test(m.text))).toBe(true)
+  })
   it('займ 5000: деньги уходят с карты; нет 5000 на карте — Алик не просит', async () => {
     const { game } = makeGame()
     setMoney(game, 3000)
