@@ -61,7 +61,7 @@ export type Due =
   | { monthEnd: number }
   | { newYear: true }
   | { quarter: true }
-  | { week: true }
+  | { week: true; next?: true }
 export function dueIn(due: Due, day: number): number {
   const now = dateOf(day)
   const until = (to: Date) => Math.max(1, Math.round((to.getTime() - now.getTime()) / 864e5))
@@ -74,5 +74,8 @@ export function dueIn(due: Due, day: number): number {
   if ('monthEnd' in due) return endOf(now.getMonth() + due.monthEnd, 1)
   if ('newYear' in due) return until(new Date(now.getFullYear() + 1, 0, 1))
   if ('quarter' in due) return endOf(Math.floor(now.getMonth() / 3) * 3 + 2, 3)
-  return (7 - now.getDay()) % 7 || 7
+  // «до конца недели» — ближайшее воскресенье (обещанное в воскресенье — следующее);
+  // «на следующей неделе» — конец следующей недели, считая по дню недели, а не постоянной оценкой (#809)
+  const toSunday = (7 - now.getDay()) % 7
+  return due.next ? toSunday + 7 : toSunday || 7
 }
