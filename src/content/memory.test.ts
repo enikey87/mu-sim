@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest'
 import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
 import { MEMORY } from './memory'
+import { LEGENDS } from './legends'
 import { RUDE_AGAIN, SORRY_AGAIN } from './misc'
 import { lintLines, spec } from '../engine/rules'
 import { ARCS } from './arcs'
@@ -19,10 +20,20 @@ async function choose(game: Game, go: string) {
 
 describe('память Алика', () => {
 
-  it('Арсен не «поступает» после дела: он уже был на втором курсе (#831)', () => {
+  it('Арсен не «поступает» и не «выпускается» после дела: он на втором курсе (#831, #842)', () => {
+    // биография Арсена названа легендой суда: «фактически — не знает, он на втором курсе»
+    const law = LEGENDS.beton_law
+    const lawText = [...law.lines.map((l) => spec(l).t), ...(law.talk ?? []).flat()].join(' ')
+    expect(lawText, 'легенда о втором курсе пропала — проверка пустеет').toMatch(/второ[йм] курс/i)
     const arsenal = MEMORY.filter((e) => /юрфак/.test(spec(e).t)).map((e) => spec(e).t)
     expect(arsenal.length, 'строка про юрфак не найдена — проверка пустеет').toBeGreaterThan(0)
-    for (const t of arsenal) expect(t, `«${t}» подаёт поступление как следствие дела`).not.toMatch(/поступил/i)
+    for (const t of arsenal) {
+      expect(t, `«${t}» подаёт поступление как следствие дела`).not.toMatch(/поступил/i)
+      // диплом за месяцы после второго курса — противоречие самому себе
+      expect(t, `«${t}» объявляет учёбу законченной, а Арсен на втором курсе`).not.toMatch(/доучил|закончил|выпустил|получил диплом/i)
+    }
+    // и наоборот: незавершённость названа прямо
+    expect(arsenal.join(' '), 'нет формулировки про незаконченную учёбу').toMatch(/досдаёт|учится/i)
   })
 
   it('пулы без пустых реплик и повторов', () => {
