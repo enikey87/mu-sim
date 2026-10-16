@@ -3,6 +3,7 @@
 import { describe, it, expect } from 'vitest'
 import { makeGame, alikTexts } from '../test/helpers'
 import { HOLIDAY_MONEY, P_HOLIDAY, holidayOf, type Holiday } from './holidays'
+import { dateOf } from '../engine/time'
 import { alikDead, blocked, endgame } from './memkeys'
 import type { Game } from '../engine/game'
 
@@ -52,6 +53,74 @@ describe('деньги под праздником', () => {
       const answer = alikTexts(game.S.msgs.slice(n)).join(' ')
       expect(pool.some((t) => answer.includes(t)), `ответ не из пула праздника: ${answer}`).toBe(true)
     }
+  })
+
+  it('Трндез и День строителя: кнопка про свой праздник, ответ из его пула', async () => {
+    const dayOn = (year: number, month: number, dom: number) => {
+      for (let day = 0; day < 900; day++) {
+        const d = dateOf(day)
+        if (d.getFullYear() === year && d.getMonth() + 1 === month && d.getDate() === dom) return day
+      }
+      throw new Error(`нет дня ${year}-${month}-${dom}`)
+    }
+    let builders = 0
+    for (let day = 0; day < 900; day++) {
+      const d = dateOf(day)
+      if (d.getFullYear() === 2027 && d.getMonth() === 7 && d.getDay() === 0 && holidayOf(day) === 'builders') builders = day
+    }
+    expect(builders).toBeGreaterThan(0)
+    for (const [day, button, holiday] of [
+      [dayOn(2027, 2, 13), P_HOLIDAY.trndez, 'trndez'],
+      [builders, P_HOLIDAY.builders, 'builders'],
+    ] as const) {
+      const { game } = makeGame({ seed: 5 })
+      game.S.day = day
+      const rules = optHoliday(game)
+      expect(rules, `кнопка ${day}`).toHaveLength(1)
+      const c = rules[0].offer!(game.rules.ctx(game, rules[0], { event: 'BuildChoices' }, game.facts()))
+      expect(button).toContain(c?.text)
+      const pool = game.lines.eligible('HOLIDAY_MONEY', HOLIDAY_MONEY[holiday], game.lineFacts()).map((p) => p.text)
+      expect(pool.length, `в окне ${day} есть что ответить`).toBeGreaterThan(0)
+      const n = game.S.msgs.length
+      await game.fire('PlayerSays', { intent: 'holiday' })
+      const answer = alikTexts(game.S.msgs.slice(n)).join(' ')
+      expect(pool.some((t) => answer.includes(t)), answer).toBe(true)
+    }
+  })
+
+  it('Трндез и День строителя: денежный ответ знает день окна', () => {
+    const textsAt = (day: number) => {
+      const { game } = makeGame()
+      game.S.day = day
+      const holiday = holidayOf(day) as Holiday
+      return game.lines.eligible('HOLIDAY_MONEY', HOLIDAY_MONEY[holiday], game.lineFacts()).map((p) => p.text).join(' ')
+    }
+    const feb = (dom: number) => {
+      for (let day = 0; day < 900; day++) {
+        const d = dateOf(day)
+        if (d.getFullYear() === 2027 && d.getMonth() === 1 && d.getDate() === dom) return day
+      }
+      throw new Error(`нет ${dom} февраля`)
+    }
+    expect(textsAt(feb(12))).toMatch(/на носу/)
+    expect(textsAt(feb(12))).not.toMatch(/Сегодня|прыгнули/)
+    expect(textsAt(feb(13))).toMatch(/Сегодня/)
+    expect(textsAt(feb(13))).not.toMatch(/на носу|прыгнули/)
+    expect(textsAt(feb(14))).toMatch(/прыгнули/)
+    expect(textsAt(feb(14))).not.toMatch(/Сегодня|на носу/)
+
+    const window: number[] = []
+    for (let day = 0; day < 900; day++) {
+      const d = dateOf(day)
+      if (d.getFullYear() === 2027 && d.getMonth() === 7 && holidayOf(day) === 'builders') window.push(day)
+    }
+    const [sat, sun, mon] = window
+    expect(textsAt(sat)).toMatch(/на носу/)
+    expect(textsAt(sat)).not.toMatch(/строители строителям|Акт праздника/)
+    expect(textsAt(sun)).toMatch(/строители строителям не платят/)
+    expect(textsAt(sun)).not.toMatch(/на носу|Акт праздника/)
+    expect(textsAt(mon)).toMatch(/Акт праздника/)
+    expect(textsAt(mon)).not.toMatch(/на носу|строители строителям/)
   })
 })
 

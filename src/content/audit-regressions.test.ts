@@ -19,7 +19,7 @@ import { MEMORY } from './memory'
 import * as TALK from './talk'
 import * as RUDE from './rude'
 import * as MISC from './misc'
-import { FWD, NOTIF, PERIOD } from './life'
+import { FWD, FWD_HOLIDAY, NOTIF, PERIOD } from './life'
 import { ARC_DONE, GROUP } from './arcs'
 import { LEGAL_CLAIMS, legalClaim, type LegalClaim } from '../engine/input'
 import { threatClaim } from './memkeys'
@@ -260,9 +260,12 @@ describe('регрессии раунда 16', () => {
     expect(JSON.stringify(CLAIMS)).not.toMatch(/Вы сомневались/)
     const landlord = NOTIF.find((n) => /Жду до пятницы/.test(n.t))!
     expect((landlord.when ?? []).every((c) => test(c, { dow: 5 }))).toBe(false)
-    const builder = FWD.find((f) => /Днём строителя/.test(JSON.stringify(valueOf(f))))!
+    expect(FWD.some((f) => /Днём строителя/.test(JSON.stringify(valueOf(f))))).toBe(false)
+    const builder = FWD_HOLIDAY.find((f) => /Днём строителя/.test(JSON.stringify(valueOf(f))))!
+    expect(isOpen(builder, { month: 8, dom: 9 })).toBe(false)
     expect(isOpen(builder, { month: 8, dom: 29 })).toBe(false)
-    expect(isOpen(builder, { month: 8, dom: 9 })).toBe(true)
+    expect(isOpen(builder, { holiday: 'builders', dow: 0 })).toBe(true)
+    expect(isOpen(builder, { holiday: 'builders', dow: 6 })).toBe(false)
     const { game } = makeGame()
     expect(game.facts().dom).toBe(dateOf(game.S.day).getDate())
   })
