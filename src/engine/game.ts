@@ -1439,6 +1439,8 @@ export class Game {
       this.notify(n.icon, n.app, p.text, { event: 'life' })
     }
     if (p.spec.remember) this.rules.applyOps(p.spec.remember, {})
+    // окно реакции на событие (#927): карточка запомнила ход, в котором пришла
+    if (n.stamp) this.S.mem[n.stamp] = this.S.stats.sent
   }
   // ---------- телефон: что Game делает по событиям Battery ----------
   private onPhoneDead(): void {
@@ -1544,6 +1546,11 @@ export class Game {
       'ctx.topic': this.topicOfLast(),
       // «Мууу» прозвучало после последнего сообщения игрока — только тогда про корову и спрашивают
       mooFresh: S.mem[memkeys.mooAt] === S.stats.sent,
+      // заметные системные события (#927): реакция живёт ход события и 1–3 хода после него
+      ramPhotoFresh: S.stats.sent - Number(S.mem[memkeys.ramPhotoAt] ?? -99) <= 3,
+      borisSaleFresh: S.stats.sent - Number(S.mem[memkeys.borisSaleAt] ?? -99) <= 3,
+      vacancyFresh: S.stats.sent - Number(S.mem[memkeys.vacancyAt] ?? -99) <= 3,
+      avitoReviewFresh: S.stats.sent - Number(S.mem[memkeys.avitoReviewAt] ?? -99) <= 3,
       sinceRude: S.stats.sent - Number(S.mem[memkeys.rudeAt] ?? -99),
       // без штампа звонка — далеко: «кто звонил» без имени закрыто (#928)
       sinceCrew: S.stats.sent - Number(S.mem[memkeys.crewPaidAt] ?? -99),
@@ -1936,6 +1943,8 @@ export class Game {
         this.rules.applyOps(meet('baran'), {})
         this.sys('Алик Воздухонесян сменил фото профиля. На фото — баран')
         this.unlock('ram')
+        // окно реакции на событие (#927): фото-баран и три хода после него
+        S.mem[memkeys.ramPhotoAt] = S.stats.sent
       }
       // подпись профиля — молчание: alikSilent + эндгейм; «скрыл» только в живом блоке (#223/#257).
       // «смерть»: Карине один раз меняет статус из того же пула (#353)
