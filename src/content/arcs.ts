@@ -305,7 +305,7 @@ export const ARCS: Record<string, Arc> = {
       'Как там Гарик?',
       gate(is(garikConcrete))('Мой долг под Гариком и домом — а платит Алик?'),
       gate(is(garikConcrete))('Алик, что с Гариком? Бетон-то деньги держит.'),
-      gate(is(garikConcrete))('Гарик через трубочку передал: конверт в фундаменте. И кто теперь должен?'),
+      gate(is(garikConcrete), gte('arc.garik', 2), gte('arc.beton', 1))('Гарик через трубочку передал: конверт в фундаменте. И кто теперь должен?'),
       gate(is(garikConcrete))('Гарик ещё в фундаменте?'),
       gate(is(garikConcrete))('Гарик в фундаменте, деньги в бетоне. И всё это на мне?'),
       gate(eq('arc.garik', 5), is(garikConcrete))('Гарика достали?'),

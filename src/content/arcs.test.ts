@@ -6,7 +6,7 @@ import { FINALES } from './finales'
 import { valueOf } from './fact'
 import { Gated, type Criterion } from '../engine/rules'
 import { ARC_DONE } from './arcs'
-import { grantPaid, houseOnGarik, intro, taxFrozen } from './memkeys'
+import { garikConcrete, grantPaid, houseOnGarik, intro, taxFrozen } from './memkeys'
 
 const lineText = (m: unknown) => (typeof m === 'string' ? m : (m as { t: string }).t)
 
@@ -122,6 +122,38 @@ describe('связка Гарик×бетон (#680)', () => {
     const bare = 'Гарик говорит, удобно: тёплый и шуршит.'
     expect(game.open([bare])).toEqual([bare])
     expect(game.open(ARCS.garik.eps[2].m).map((m) => (typeof m === 'string' ? m : m.t))).not.toContain(bare)
+  })
+})
+
+describe('цитата про конверт Гарика — после трубочки и бетона (#881)', () => {
+  const LINE = 'Гарик через трубочку передал: конверт в фундаменте. И кто теперь должен?'
+
+  it('до серии с трубочкой вопроса нет; после неё, если бетон уже был, — есть', async () => {
+    const { game } = makeGame()
+    // Гарик уже в фундаменте, бетон уже сыграл: проверка держит номер серии Гарика, не знакомство
+    game.S.mem[garikConcrete] = true
+    game.S.mem[intro('garik')] = true
+    game.S.arcs.beton = { i: 1, last: 0 }
+    const pool = () => game.open(ARCS.garik.follow)
+    expect(pool(), 'до серий Гарика').not.toContain(LINE)
+    expect(pool()).toContain('Гарик ещё в фундаменте?')
+    game.S.day += 5
+    await game.playArc('garik')
+    expect(game.S.arcs.garik.i, 'серия «застыл»').toBe(1)
+    expect(pool(), 'трубочки ещё нет').not.toContain(LINE)
+    game.S.day += 5
+    await game.playArc('garik')
+    expect(game.S.arcs.garik.i, 'трубочка выведена').toBe(2)
+    expect(pool(), 'новость про конверт уже может прозвучать').toContain(LINE)
+  })
+
+  it('без бетона конверт не цитируется и после трубочки', () => {
+    const { game } = makeGame()
+    game.S.mem[garikConcrete] = true
+    game.S.mem[intro('garik')] = true
+    game.S.arcs.garik = { i: 2, last: 0 }
+    expect(game.open(ARCS.garik.follow)).not.toContain(LINE)
+    expect(game.open(ARCS.garik.follow)).toContain('Гарик ещё в фундаменте?')
   })
 })
 
