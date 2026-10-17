@@ -541,6 +541,16 @@ export class Game {
       t = this.seen.pickFresh(gen, this.playerDecor)
       if (!this.recentOffer(t) && !echo(t)) break
     }
+    // колода вся в окне — слот не молчит (#731), но между сообщениями это уже не дословный повтор (#833)
+    const at = this.shownAt.get(t)
+    if (this.recentOffer(t) && at !== undefined && this.S.stats.sent > at) {
+      const raw = t
+      for (let i = 0; i < PLAYER_SUFFIX.length; i++) {
+        const alt = raw + this.draw('PSUF', PLAYER_SUFFIX)
+        if (!this.recentOffer(alt) && !echo(alt)) { t = alt; break }
+      }
+      for (let i = 0; i < 4 && this.recentOffer(t); i++) t += this.draw('PSUF', PLAYER_SUFFIX)
+    }
     this.rememberShown(t)
     return t
   }
@@ -599,8 +609,7 @@ export class Game {
     const fresh = this.decks.pick(key, arr, this.lineFacts(), { eligible: (e) => !this.shown.has(poorText(valueOf(e))) && !this.seen.has(poorText(valueOf(e))) })
     if (fresh !== null) {
       const text = poorText(fresh)
-      this.shown.add(text)
-      if (this.shown.size > 60) this.shown.delete(this.shown.values().next().value!)
+      this.rememberShown(text)
       this.S.poorSaid[text] = this.S.day
       return { value: fresh, text }
     }
@@ -614,9 +623,18 @@ export class Game {
     // отметка на исходной строке тоже: иначе самая старая так и остаётся самой старой, и пул
     // перефразирует её одну, а не идёт по кругу
     this.S.poorSaid[poorText(raw)] = this.S.day
-    // суффикс, а не префикс: строка обязана остаться узнаваемой как реплика своего пула
-    const rephrase = (x: string): string => x + this.draw('PSUF', PLAYER_SUFFIX)
-    const t = this.seen.pickFresh(() => rephrase(poorText(raw)), rephrase)
+    // суффикс, а не префикс: строка обязана остаться узнаваемой как реплика своего пула.
+    // полный текст тоже в окне 20 ходов: иначе один и тот же хвост возвращается дословно (#833)
+    const base = poorText(raw)
+    let t = base
+    for (let i = 0; i < PLAYER_SUFFIX.length; i++) {
+      t = base + this.draw('PSUF', PLAYER_SUFFIX)
+      if (!this.recentOffer(t)) break
+    }
+    // восемь хвостов кончаются раньше окна: следующий хвост клеится к уже занятому, а не повторяет его
+    for (let i = 0; i < 4 && this.recentOffer(t); i++) t += this.draw('PSUF', PLAYER_SUFFIX)
+    this.rememberShown(base)
+    this.rememberShown(t)
     this.S.poorSaid[t] = this.S.day
     return { value: raw, text: t }
   }
