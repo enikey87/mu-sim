@@ -80,6 +80,34 @@ const api = (seed = 1, tier = 0) => {
   return make(<T>(k: string, a: readonly Entry<T>[], nr?: boolean) => decks.draw(k, a.map(valueOf), nr), () => tier, seededRng(seed + 1))
 }
 
+describe('строки по живой рецензии №2 (#922)', () => {
+  it('старые строки ушли из исходников', () => {
+    for (const line of [
+      'Бетон, кстати, правда обиделся',
+      'Я в него верю, значит, и ты',
+      'А при чём тут приданое и мои деньги?',
+      '«Мууу» — это по-аликовски «завтра»',
+      'Это срок из Аликовой философии',
+      'Опять я. Опять 50',
+    ]) expect(allSource, line).not.toContain(line)
+  })
+  it('новые строки на месте', () => {
+    for (const line of [
+      'Бетон, кстати, на Алика обиделся. Я его понимаю.',
+      'Я в него верю, верь и ты.',
+      'Вы говорили — приданое. А при чём тут мои деньги?',
+      '«Мууу» — это по-коровьи «завтра».',
+      'Это просто из философии. Переводу не подлежит.',
+      'Брат, займи 50. До четверга. Алик Воздухонесян, надёжный заёмщик, справки у мамы.',
+    ]) expect(allSource, line).toContain(line)
+  })
+  it('хоровой пул Мкртича не помнит удалённую арку про бетон (#922)', () => {
+    const pool = GROUP.mkrtich.map((e) => saidText(valueOf(e))).join(' ')
+    expect(pool, 'следа «обиделся» без причины нет').not.toContain('правда обиделся')
+    expect(pool, 'обида названа — на кого').toContain('на Алика обиделся')
+  })
+})
+
 describe('scenes', () => {
   const scenes = makeScenes(api())
   it('every start node and every option target exists', () => {
