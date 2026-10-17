@@ -20,6 +20,7 @@ import { HEAT, alikDead, alikShaved, intro, moustacheAskAt, blocked, court, mour
 import { requirePlayerPool } from '../player-pools'
 import {
   P_VIA_BORIS, P_VIA_KARINE, P_VIA_MAMA, P_MOO, P_MOUSTACHE, P_COURT, P_COLLECTORS_DEBUT,
+  P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY,
 } from './player-choice-pools'
 
 type R = Rule<ContentApi, GameEvent, Offer>
@@ -130,6 +131,11 @@ export const choiceRules: R[] = [
       return text ? { text, tone: 'neutral' as const, act: 'moustacheAsk' } : null
     },
   },
+
+  // заметные системные события (#927): 1–2 варианта-реакции, пока свежо событие — ход и три после
+  offer({ name: 'RamPhoto', when: [is('ramPhotoFresh')], act: 'ramPhoto', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_RAM_PHOTO', P_RAM_PHOTO) }),
+  offer({ name: 'BorisSale', when: [is('borisSaleFresh')], act: 'borisSale', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_BORIS_SALE', P_BORIS_SALE) }),
+  offer({ name: 'Vacancy', when: [is('vacancyFresh')], act: 'vacancy', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_VACANCY', P_VACANCY) }),
 
   // ответ на то, ЧТО прислал Алик
   offer({ name: 'Photo', when: [eq('ctx.type', 'photo')], act: 'photo', tone: 'neutral', bonus: 3, text: (g) => fromD(g, 'P_PHOTO') }),
