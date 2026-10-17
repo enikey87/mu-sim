@@ -3,8 +3,9 @@ import { describe, it, expect, vi } from 'vitest'
 import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
 import { NOTIF } from './life'
-import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW } from './rules/player-choice-pools'
-import { BORIS_SALE } from './world'
+import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE } from './rules/player-choice-pools'
+import { BORIS_SALE, RUBIK_ASK, KETTLE } from './world'
+import { ARCS } from './arcs'
 import { valueOf } from './fact'
 
 const AD = 'Новое объявление рядом: «Продаю барана Бориса, торг, умеет писать».'
@@ -112,5 +113,51 @@ describe('реакции на системные события (#927)', () => {
       await g.fire('PlayerSays', { intent: act })
       expect(has(g, act), `${act}: после ответа окно закрыто`).toBe(false)
     }
+  })
+})
+
+describe('реакции: вопрос Рубика и чайник (#953)', () => {
+  const has = (game: Game, act: string) => game.buildChoices().some((c) => c.act === act)
+
+  it('прямой вопрос Рубика: кнопки в окне, после ответа окно закрыто', async () => {
+    const { game } = makeGame()
+    expect(has(game, 'rubikAsk'), 'до вопроса кнопки нет').toBe(false)
+    await game.playEpisode(ARCS.rubik.eps[2], 'rubik')
+    const at = Number(game.S.mem['rubik.askAt'])
+    expect(at, 'реплика не штампанула ход').toBe(game.S.stats.sent)
+    expect(has(game, 'rubikAsk'), 'ход события — кнопка есть').toBe(true)
+    const rubikText = game.buildChoices().find((c) => c.act === 'rubikAsk')!.text.toLowerCase()
+    expect(P_RUBIK_ASK.some((t) => rubikText.includes(t.slice(0, 12).toLowerCase())), rubikText).toBe(true)
+    game.S.stats.sent = at + 3
+    expect(has(game, 'rubikAsk'), 'третий ход после события — ещё окно').toBe(true)
+    game.S.stats.sent = at + 4
+    expect(has(game, 'rubikAsk'), 'вне окна — кнопки нет').toBe(false)
+    game.S.stats.sent = at
+    const from = game.S.msgs.length
+    await game.fire('PlayerSays', { intent: 'rubikAsk' })
+    const said = game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : []))
+    expect(said.some((t) => RUBIK_ASK.map(valueOf).includes(t)), 'ответ не из пула').toBe(true)
+    expect(has(game, 'rubikAsk'), 'после ответа окно закрыто').toBe(false)
+  })
+
+  it('выигрыш чайника: кнопки в окне, после ответа окно закрыто', async () => {
+    const { game } = makeGame()
+    expect(has(game, 'kettle'), 'до выигрыша кнопки нет').toBe(false)
+    await game.enterNode('q_lottery', 'draw')
+    const at = Number(game.S.mem['lottery.kettleAt'])
+    expect(at, 'реплика кума не штампанула ход').toBe(game.S.stats.sent)
+    expect(has(game, 'kettle'), 'ход события — кнопка есть').toBe(true)
+    const kettleText = game.buildChoices().find((c) => c.act === 'kettle')!.text.toLowerCase()
+    expect(P_KETTLE.some((t) => kettleText.includes(t.slice(0, 12).toLowerCase())), kettleText).toBe(true)
+    game.S.stats.sent = at + 3
+    expect(has(game, 'kettle'), 'третий ход после события — ещё окно').toBe(true)
+    game.S.stats.sent = at + 4
+    expect(has(game, 'kettle'), 'вне окна — кнопки нет').toBe(false)
+    game.S.stats.sent = at
+    const from = game.S.msgs.length
+    await game.fire('PlayerSays', { intent: 'kettle' })
+    const said = game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : []))
+    expect(said.some((t) => KETTLE.map(valueOf).includes(t)), 'ответ не из пула').toBe(true)
+    expect(has(game, 'kettle'), 'после ответа окно закрыто').toBe(false)
   })
 })

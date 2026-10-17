@@ -107,7 +107,7 @@ export const REVIVED = /встал|встаёт|воскрес|вернулас�
 /** Повод поздравить (иначе «Поздравляю!» на «зуб мудрости растёт» звучит невпопад). */
 export const FESTIVE = /свадьб|крестин|юбилей|обручен|день рождения|отмечаем|обмываем|празд|родился|поступил|выпускн|сватовств|помолвк|открыва|открыли|приехал|вернулся|урожа|отелилась|правнук|первое слово|дочку выдают/
 
-export type SayItem = Said | { w: string; t: string; claims?: LedgerEvent[] }
+export type SayItem = Said | { w?: string; t: string; claims?: LedgerEvent[]; stamp?: string }
 /** Тема эпизода противоречия — выбирает предметный ответ Алика. */
 export type LieKind = 'money' | 'grandpa' | 'customer'
 /** Что пришло, пока игрока не было: виды сообщений пачки непрочитанных. */
@@ -1551,6 +1551,8 @@ export class Game {
       borisSaleFresh: S.stats.sent - Number(S.mem[memkeys.borisSaleAt] ?? -99) <= 3,
       vacancyFresh: S.stats.sent - Number(S.mem[memkeys.vacancyAt] ?? -99) <= 3,
       avitoReviewFresh: S.stats.sent - Number(S.mem[memkeys.avitoReviewAt] ?? -99) <= 3,
+      rubikAskFresh: S.stats.sent - Number(S.mem[memkeys.rubikAskAt] ?? -99) <= 3,
+      kettleFresh: S.stats.sent - Number(S.mem[memkeys.kettleAt] ?? -99) <= 3,
       sinceRude: S.stats.sent - Number(S.mem[memkeys.rudeAt] ?? -99),
       // без штампа звонка — далеко: «кто звонил» без имени закрыто (#928)
       sinceCrew: S.stats.sent - Number(S.mem[memkeys.crewPaidAt] ?? -99),
@@ -2389,6 +2391,7 @@ export class Game {
     const m = this.open(ep.m)
     // факт пишет строка, которая его утверждает: remember строки применяется, только если строка звучала (#588)
     for (const x of m) if (typeof x !== 'string' && 'remember' in x && x.remember) this.rules.applyOps(x.remember, {})
+    for (const x of m) if (typeof x !== 'string' && 'stamp' in x && x.stamp) this.S.mem[x.stamp] = this.S.stats.sent
     if (ep.remember) this.rules.applyOps(ep.remember, {})
     if (this.S.ctx) {
       delete this.S.ctx.debtMoved
@@ -2803,7 +2806,11 @@ export class Game {
       this.noteSaidClaims(asSaid(s), m.id, n.claimsWho)
     }
     // перевод не прошёл или долг запечатан — Алик не объявляет счёт, которого не было (#252, #266)
-    if (n.a && (!pays || paid) && (!debtFx || debtMoved)) await this.say([n.who ? gen('a', n.a)() : variant('a', n.a)], false, n.who)
+    if (n.a && (!pays || paid) && (!debtFx || debtMoved)) {
+      const line = n.who ? gen('a', n.a)() : variant('a', n.a)
+      if (typeof line !== 'string' && 'stamp' in line && line.stamp) this.S.mem[line.stamp] = this.S.stats.sent
+      await this.say([line], false, n.who)
+    }
     if (n.doc) {
       await this.typingFor(2000, 'отправляет документ…')
       this.alikMsg({ kind: 'doc', from: 'alik', title: `АКТ ВЗАИМОЗАЧЁТА № ${100 + this.rnd(900)}`, rows: v.rows, total: v.total })
