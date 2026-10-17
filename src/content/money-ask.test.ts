@@ -3,9 +3,10 @@
 // случайной кнопки «как там X?» по неозвученной арке больше нет.
 import { describe, it, expect } from 'vitest'
 import { makeGame } from '../test/helpers'
-import { MONEY_ASK, MONEY_PLACES, moneyPlaceOf, type MoneyPlace } from './money-ask'
+import { MONEY_ASK, MONEY_PLACES, MONEY_ASK_TURNS, moneyPlaceOf, type MoneyPlace } from './money-ask'
 import { LEGENDS } from './legends'
-import { valueOf, isOpen } from '../engine/rules'
+import { valueOf, isOpen, Gated } from '../engine/rules'
+import type { Entry } from './fact'
 import { taxFrozen, nivaBack, intro } from './memkeys'
 import type { Choice } from '../engine/state'
 import type { Game } from '../engine/game'
@@ -109,6 +110,7 @@ describe('денежный вопрос: первичная кнопка (#795)'
     const lines = LEGENDS.crypto.lines.map((l) => valueOf(l)).map((l) => (typeof l === 'string' ? l : l.t))
     const said: string[] = []
     for (let i = 0; i < lines.length; i++) {
+      game.S.stats.sent += MONEY_ASK_TURNS + 1 // между вопросами проходят ходы: окно свежести (#952)
       const money = findMoney(frame(game))
       expect(money, 'кнопка денег исчезла, пока легенда открыта').toBeDefined()
       const from = game.S.msgs.length
@@ -119,10 +121,42 @@ describe('денежный вопрос: первичная кнопка (#795)'
     }
     expect(new Set(said).size, 'реплики легенды повторяются').toBe(lines.length)
     // пул легенды исчерпан — кнопка не молчит: обычная отмазка (прецедент `Opt_Arc` с пулом `follow`)
+    game.S.stats.sent += MONEY_ASK_TURNS + 1
     const money = findMoney(frame(game))
     expect(money, 'кнопка денег исчезла после исчерпания легенды').toBeDefined()
     const from = game.S.msgs.length
     await game.send(money!)
     expect(game.S.msgs.slice(from).some((m) => m.kind === 'text' && m.from === 'alik')).toBe(true)
+  })
+})
+
+describe('окно свежести ответа (#952): состояние не переспрашивают', () => {
+  /** Легенда каждого места для партии теста. */
+  const LEGEND_OF: Record<MoneyPlace, string> = { bank: 'frozen', beton: 'beton_money', safe: 'safe_wrongkey', crypto: 'crypto', niva: 'niva_stuck' }
+  const windowed = (e: Entry<string>): e is Gated<string> => e instanceof Gated && e.when.some((c) => c.key === 'sinceMoneyAsk')
+
+  it('после ответа Алика вопросы-состояния молчат окно во всех пулах, вопросы-действия остаются', async () => {
+    for (const p of places) {
+      const game = withLegend(LEGEND_OF[p])
+      if (p === 'bank') game.S.mem[taxFrozen] = true
+      if (p === 'safe') game.S.mem[intro('nune')] = true // вопрос про возвращение Нуне — под знакомством
+      if (p === 'niva') game.S.mem[intro('niva')] = true // «Нива» у Алика — nivaHome по умолчанию
+      const before = game.open(MONEY_ASK[p])
+      const state = MONEY_ASK[p].filter(windowed).map(valueOf)
+      const actions = before.filter((t) => !state.includes(t))
+      if (p === 'beton') expect(actions.length, 'в бетоне нет вопросов-действий — проверять нечего').toBeGreaterThan(0)
+      expect(state.length, `${p}: вопросов-состояний не стало — проверка пустеет`).toBeGreaterThan(0)
+      expect(before.length, `${p}: до ответа нечего спрашивать`).toBeGreaterThan(0)
+      expect(before.some((t) => state.includes(t)), `${p}: до ответа состояние не открыто — проверка пустеет`).toBe(true)
+      const money = findMoney(frame(game))
+      expect(money, `${p}: кнопки денег нет`).toBeDefined()
+      await game.send(money!)
+      const inWindow = game.open(MONEY_ASK[p])
+      for (const t of state) expect(inWindow, `${p}: в окне переспрос «${t}»`).not.toContain(t)
+      for (const t of actions) expect(inWindow, `${p}: вопрос-действие «${t}» ушёл`).toContain(t)
+      expect(inWindow.length, `${p}: окно ничего не закрыло`).toBeLessThan(before.length)
+      game.S.stats.sent += MONEY_ASK_TURNS + 1
+      expect(game.open(MONEY_ASK[p]), `${p}: окно прошло — состояние вернулось`).toEqual(before)
+    }
   })
 })

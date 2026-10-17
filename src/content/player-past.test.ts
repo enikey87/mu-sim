@@ -139,12 +139,14 @@ function corpus(): Item[] {
   return out
 }
 
-/** Шаблон корпуса совпадает с текстом кнопки (подстановки {t}/{old}/…). */
+/** Шаблон корпуса совпадает с текстом кнопки (подстановки {t}/{old}/…). Игрок украшает реплику
+ *  префиксом («Алик, а помните…» — первая буква строчная) или суффиксом (« 😢»), поэтому шаблон
+ *  ищем внутри текста и без учёта регистра, а не по краям. */
 const matchesTemplate = (template: string, text: string): boolean => {
   if (template === text) return true
   if (!/\{[a-z]+\}/i.test(template)) return false
   const esc = template.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\\{[a-z]+\\\}/gi, '.*')
-  return new RegExp('^' + esc + '$').test(text)
+  return new RegExp(esc, 'i').test(text)
 }
 
 describe('реплика игрока о своём прошлом', () => {
@@ -191,6 +193,10 @@ describe('реплика игрока о своём прошлом', () => {
     // точное / шаблон / длинная основа пула (playerDecor клеит префикс/суффикс; короткие «Алик.»/«Нет» не считаются покрытием)
     const covered = (text: string) =>
       templates.some((t) => text === t || matchesTemplate(t, text) || (t.length >= 12 && text.includes(t)))
+    // НК детектора: шаблон корпуса с украшением — покрыт, строка вне корпуса — нет (#918: суффикс « 😢» ломал якорь)
+    expect(covered('А помните «верну всё до рубля, завтра»? Это было 24 сентября. 😢'), 'шаблон с суффиксом').toBe(true)
+    expect(covered('Алик, а помните «верну всё до рубля, завтра»? Это было 24 сентября.'), 'префикс и строчная первая').toBe(true)
+    expect(covered('Алик, я вам уже это говорил в прошлый раз. 🙏'), 'строка вне корпуса').toBe(false)
     const missing: string[] = []
     const runs: Array<{ seed: number; prep: (g: Game) => void }> = [
       ...[1, 2, 3].map((seed) => ({ seed, prep: () => {} })),

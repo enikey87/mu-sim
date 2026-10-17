@@ -1554,6 +1554,7 @@ export class Game {
       sinceRude: S.stats.sent - Number(S.mem[memkeys.rudeAt] ?? -99),
       // без штампа звонка — далеко: «кто звонил» без имени закрыто (#928)
       sinceCrew: S.stats.sent - Number(S.mem[memkeys.crewPaidAt] ?? -99),
+      sinceMoneyAsk: S.stats.sent - Number(S.mem[memkeys.moneyAskAt] ?? -99),
       // сколько раз игрок извинялся за последние 6 ходов («крик → мир → крик → мир»)
       sorrySwing: String(S.mem[memkeys.sorryAt] ?? '').split(',').filter((n) => n && S.stats.sent - Number(n) <= 6).length,
       // температура ссоры не уходит ниже нуля (после примирения ещё тикают отложенные «остывания»)
