@@ -88,4 +88,29 @@ describe('реакции на системные события (#927)', () => {
     expect(P_VACANCY.length).toBeGreaterThan(0)
     expect(P_AVITO_REVIEW.length).toBeGreaterThan(0)
   })
+
+  it('ответ на реакцию потребляет событие: вариант больше не предлагается, строка пула не повторяется (#918)', async () => {
+    const has = (game: Game, act: string) => game.buildChoices().some((c) => c.act === act)
+    // фото-баран — настоящим событием хода
+    const { game } = makeGame()
+    game.S.stats.sent = 24
+    await game.send('привет')
+    expect(game.S.ram, 'фото-баран не сработал — проверка пустеет').toBe(true)
+    expect(has(game, 'ramPhoto'), 'вариант на ход события есть').toBe(true)
+    await game.fire('PlayerSays', { intent: 'ramPhoto' })
+    expect(has(game, 'ramPhoto'), 'после ответа окно закрыто: второй реплики из того же пула нет').toBe(false)
+    // объявление Бориса, вакансия и отзыв Авито
+    for (const [card, act, prep] of [
+      [AD, 'borisSale', (g: Game) => { g.S.mem['intro.baran'] = true; g.S.arcs.boris = { i: 4, last: 0 } }],
+      [VACANCY_CARD, 'vacancy', () => {}],
+      [REVIEW_CARD, 'avitoReview', () => {}],
+    ] as Array<[string, string, (g: Game) => void]>) {
+      const g = makeGame().game
+      prep(g)
+      showCard(g, card)
+      expect(has(g, act), `${act}: вариант на ход события есть`).toBe(true)
+      await g.fire('PlayerSays', { intent: act })
+      expect(has(g, act), `${act}: после ответа окно закрыто`).toBe(false)
+    }
+  })
 })

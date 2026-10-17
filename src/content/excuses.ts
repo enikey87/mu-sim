@@ -9,7 +9,7 @@ import { needs, WORLD } from './world'
 import { selfConflict } from './ledger'
 import { sold } from './credit'
 import type { LedgerEvent } from './fact-types'
-import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, collectorsRecruited, count, evicted, finaleOf, grantPaid, met, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, sick, taxThawed, threatClaim, tileCornerRemoved, wedding, whenYears } from './memkeys'
+import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, collectorsRecruited, count, evicted, finaleOf, grantPaid, met, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, saidKonak, sick, taxThawed, threatClaim, tileCornerRemoved, wedding, whenYears } from './memkeys'
 
 // draw(key, arr) выдаёт уместный сейчас элемент «из колоды» (без повторов до конца колоды); noRefill — после исчерпания null
 export type DrawFn = <T = unknown>(key: string, arr: readonly Entry<T>[], noRefill?: boolean, eligible?: (e: Entry<T>) => boolean) => T
@@ -692,7 +692,8 @@ D.P_WHEN_NEVER = [
   // (#919) колёса: легенд-специфичная риторика при живой легенде niva_back
   gate(eq('ctx.when', WHEELS))('И сколько ещё колёс ты продашь, прежде чем деньги найдутся?'),
   gate(ne('ctx.when', WHEELS))('Алик, «{t}» — это не срок.'),
-  gate(missing(whenYears))(WHEN_YEARS),
+  // «Лет двадцать?» — эхо сравнения с коньяком: без него Алик числа не называл (#918)
+  gate(missing(whenYears), is(saidKonak))(WHEN_YEARS),
 ];
 D.PROMISE_OK = ['Не подведу, брат.', 'Вот и договорились.', 'Записывай, записывай. Я тоже записал.', 'Жди. Ожидание — это тоже работа.', 'Правильно. Главное — верить.'];
 D.P_WHY_REL = ['А при чём тут {n}?', 'Алик, а {n} тут каким боком?', 'Ну а я тут при чём, если {n}?', 'Алик, при чём тут {n}? Должны мне вы.'];
