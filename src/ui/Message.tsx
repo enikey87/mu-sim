@@ -3,6 +3,8 @@ import type { Msg } from '../engine/state'
 import { useGame, useGameApi } from './useGame'
 import { PhotoSvg } from './PhotoSvg'
 import { copyText } from './Overlays'
+import { ReviewBadge, useReview } from './Review'
+import { annotatable } from './review'
 import { platform } from '../platform'
 
 /** Счётчик рендеров Message — только в test. */
@@ -46,7 +48,7 @@ const linkified = (text: string) => text.split(/(https?:\/\/\S+)/).map((part, i)
 
 /** Смешную реплику можно унести в буфер: долгое удержание и контекстное меню — один и тот же жест (#634).
  *  Палец уехал или жест отпущён раньше срока — копирования нет; воспроизведение голосового остаётся нажатием. */
-function usePressToCopy(text: string | null, game: ReturnType<typeof useGameApi>) {
+function usePressToCopy(text: string | null, game: ReturnType<typeof useGameApi>, onAnnotate?: () => void) {
   const timer = useRef<number | null>(null)
   const from = useRef<{ id: number; x: number; y: number } | null>(null)
 
@@ -62,6 +64,8 @@ function usePressToCopy(text: string | null, game: ReturnType<typeof useGameApi>
     from.current = { id: e.pointerId, x: e.clientX, y: e.clientY }
     timer.current = window.setTimeout(() => {
       timer.current = null
+      // режим рецензирования (#872): долгий тап на сообщении открывает меню заметки, а не копирование
+      if (onAnnotate) return onAnnotate()
       if (!text) return
       void copyText(text).then((ok) => game.flash(ok ? 'Скопировано' : 'Не удалось скопировать'))
     }, LONG_PRESS_MS)
@@ -78,6 +82,8 @@ function usePressToCopy(text: string | null, game: ReturnType<typeof useGameApi>
   /** Контекстное меню на пузыре копирует; на своём, удалённом, голосовом, системной строке и карточке — молчит. */
   const onContextMenu = (e: ReactMouseEvent) => {
     e.preventDefault()
+    // стандартное меню браузера гасится только в режиме рецензирования (#872): там правый клик — заметка
+    if (onAnnotate) return onAnnotate()
     if (!text) return
     void copyText(text).then((ok) => game.flash(ok ? 'Скопировано' : 'Не удалось скопировать'))
   }
@@ -89,9 +95,12 @@ function usePressToCopy(text: string | null, game: ReturnType<typeof useGameApi>
 export const Message = memo(function Message({ m }: { m: Msg }) {
   if (import.meta.env.MODE === 'test') messageRenderStats.count++
   const game = useGameApi()
-  // жест копирования считаем до ранних возвратов: хуки — одни и те же на каждом рендере
+  const review = useReview()
+  const note = review?.noteOf(m.id)
+  // жест считаем до ранних возвратов: хуки — одни и те же на каждом рендере
   const copyable = copyableTextOf(m)
-  const press = usePressToCopy(copyable, game)
+  const annotate = review?.enabled && annotatable(m) ? () => review.menu(m) : undefined
+  const press = usePressToCopy(copyable, game, annotate)
   if (m.kind === 'sep') return <div className="sep">{m.text}</div>
   if (m.kind === 'sys') return <div className={'sys' + (m.unread ? ' unread' : '')}>{linkified(m.text)}</div>
   if (m.kind === 'lend50') return platform().externalPay ? <Lend50Card m={m} /> : null
@@ -118,6 +127,7 @@ export const Message = memo(function Message({ m }: { m: Msg }) {
         {(m.kind === 'text' && m.edited ? 'изменено ' : '') + (m.time ?? '') + (m.from === 'me' ? ' ✓✓' : '')}
       </div>
       {m.kind === 'text' && m.react && <div className="react">{m.react}</div>}
+      {note && review && <ReviewBadge note={note} onEdit={() => review.edit(note.id)} />}
     </div>
   )
 })

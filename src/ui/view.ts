@@ -7,6 +7,7 @@ import { ENDINGS, type EndingId } from '../content/finales'
 import { STARTS } from '../content/quests'
 import { alikShaved, caughtCount, payday } from '../content/memkeys'
 import { fmtDate } from '../engine/time'
+import { reviewStamp, reviewTranscript, type ReviewSession } from './review'
 
 /** Граница между движком и интерфейсом: единственный модуль UI, который знает устройство S и ключей памяти.
  *  Компоненты получают фасад GameUi и плоский снимок; контент и memkeys не импортируют (страж — view.test.ts). */
@@ -42,7 +43,7 @@ export function uiOf(g: Game): GameUi {
     ui, battery,
     subscribe: g.subscribe, getVersion: g.getVersion, getMsgsEpoch: g.getMsgsEpoch, getMsgsDirtyFrom: g.getMsgsDirtyFrom, ackMsgsDirty: g.ackMsgsDirty,
     get choices() { return g.choices }, get clockText() { return g.clockText }, get gameDate() { return g.gameDate },
-    send: (o) => g.send(o), answerJob: (id, answer) => g.answerJob(id, answer), answerCard: (id, pick) => g.answerCard(id, pick), canMirror: () => g.canMirror(), playVoice: (m) => g.playVoice(m), castOf: (who) => g.castOf(who),
+    send: (o) => sendWithReview(g, o), answerJob: (id, answer) => g.answerJob(id, answer), answerCard: (id, pick) => g.answerCard(id, pick), canMirror: () => g.canMirror(), playVoice: (m) => g.playVoice(m), castOf: (who) => g.castOf(who),
     flash: (t, ms) => g.flash(t, ms), closeEnding: () => g.closeEnding(), dismissNotif: () => g.dismissNotif(),
     toggleMute: () => g.toggleMute(), gesture: () => g.gesture(), onVisibility: (h) => g.onVisibility(h), reset: () => g.reset(),
     introDone: () => g.introDone(),
@@ -169,6 +170,44 @@ export const viewOf = (u: GameUi): View => {
 /** Лента — единственное, что не в снимке: инкрементальный канал MessageList читает сам массив
  *  (тот же объект, что и раньше; windowing и dirtyFrom считаются по нему в Chat). */
 export const feedMsgs = (u: GameUi): Msg[] => realOf(u).S.msgs
+
+// --- режим живого рецензирования (#872): граница с движком здесь, потому что транскрипту нужны S.msgs ---
+
+/** Показ вариантов перед отправкой: экспорт рецензии восстанавливает, из чего выбирал игрок. */
+const reviewOffers = new WeakMap<Game, Map<number, string[]>>()
+
+/** Отправка с записью показа: список вариантов снимается до хода (send его гасит), подпись — по id сообщения. */
+export function sendWithReview(g: Game, o: Parameters<Game['send']>[0]): Promise<void> {
+  const list = g.choices.map((c) => c.text)
+  const at = g.S.msgs.length
+  const remember = () => {
+    const mine = g.S.msgs.slice(at).find((m) => m.kind === 'text' && m.from === 'me')
+    if (!mine || !list.length) return
+    const byMsg = reviewOffers.get(g) ?? new Map<number, string[]>()
+    byMsg.set(mine.id, list)
+    reviewOffers.set(g, byMsg)
+  }
+  return g.send(o).then(() => { remember() })
+}
+
+/** Из чего выбирал игрок в этом сообщении: пусто — сообщение пришло мимо выбора варианта. */
+export const reviewOffersOf = (g: Game): ReadonlyMap<number, readonly string[]> => reviewOffers.get(g) ?? new Map()
+
+/** Шапка экспорта: партия на момент выгрузки. `build` — из `VITE_BUILD`, если сборка его задала. */
+export function reviewSessionOf(g: Game, started: Date): ReviewSession {
+  return {
+    started: reviewStamp(started),
+    day: g.S.day,
+    turns: g.S.stats.sent,
+    build: String(import.meta.env.VITE_BUILD ?? ''),
+    endings: Object.keys(g.S.endings),
+  }
+}
+
+/** Полная переписка партии для экспорта: тот же формат, что у плейтест-дампов (tools/playtest.ts). */
+export function reviewTranscriptOf(g: Game, offers: ReadonlyMap<number, readonly string[]>): string {
+  return reviewTranscript(g.S.msgs, offers, (who) => (who ? g.castOf(who)?.name ?? who : 'Алик'))
+}
 
 export type IntroView = {
   /** Короткое обещание завязки — факт из STARTS.vow, то же, что входит в первое сообщение Алика. */

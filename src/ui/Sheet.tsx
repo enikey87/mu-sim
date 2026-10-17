@@ -4,6 +4,7 @@ import { fmtDate } from '../engine/time'
 import { useModal } from './useModal'
 import { viewOf, type PromiseRow } from './view'
 import { TrackNote } from './TrackNote'
+import { useReview } from './Review'
 
 /** Значок записи журнала: свой у каждого состояния (docs/design/promise-amnesty.md). */
 const due = (p: PromiseRow) => (p.due === null ? '' : ` ${fmtDate(p.due)}`)
@@ -23,6 +24,7 @@ const mark = (p: PromiseRow) => MARK[p.state](p)
 export function Sheet({ onClose, onReset }: { onClose: () => void; onReset: () => void }) {
   const game = useGame()
   const v = viewOf(game)
+  const review = useReview()
   const dialogRef = useRef<HTMLDivElement>(null)
   useModal({
     active: true,
@@ -96,6 +98,19 @@ export function Sheet({ onClose, onReset }: { onClose: () => void; onReset: () =
           ))}
         </div>
         <TrackNote />
+        {review && (
+          <>
+            <h3>Рецензирование</h3>
+            <div className="review-row">
+              <button id="reviewToggle" className={review.enabled ? 'review-on' : ''} onClick={review.toggle}>
+                Рецензирование: {review.enabled ? 'вкл' : 'выкл'}
+              </button>
+              <button id="reviewExport" onClick={review.exportNow} disabled={review.notes.length === 0}>
+                Экспорт рецензии{review.notes.length ? ` (${review.notes.length})` : ''}
+              </button>
+            </div>
+          </>
+        )}
         <button className="danger" id="resetBtn" onClick={onReset}>Начать заново</button>
       </div>
     </div>
