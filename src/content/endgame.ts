@@ -650,7 +650,8 @@ export const ENDGAME_ARCH: Entry<ArchiveLine>[] = [
 
   gate(eq(finaleOf('rubik'), 'bribe'), WORLD.rubik)({ slug: 'fin.rubik.bribe', line: 'Рубик вычислил взяткодателя, и это ты. Я заплатил за тебя и вычел из долга — по-братски.' }),
   gate(eq(finaleOf('rubik'), 'karine'), WORLD.karine)({ slug: 'fin.rubik.karine', line: 'Карине ушла к Рубику, акт подписан, деньги у неё. Спрашивай у неё — она всё проверяет.' }),
-  gate(eq(finaleOf('rubik'), 'default'), WORLD.rubik, is(taxFrozen))({ slug: 'fin.rubik.default', line: 'Рубик, оказывается, из налоговой: проверял не плитку, а меня. Счета заморожены, деньги холодные.' }),
+  // эпилог — продолжение, а не новость во второй раз (#914): рамка открытия тут переобъявляла развязку
+  gate(eq(finaleOf('rubik'), 'default'), WORLD.rubik, is(taxFrozen))({ slug: 'fin.rubik.default', line: 'Рубик из налоговой подтвердил: счета всё ещё заморожены. Шлёт лучи.' }),
 
   gate(eq(finaleOf('razmik'), 'union'), WORLD.razmik)({ slug: 'fin.razmik.union', line: 'Размик собрал профсоюз кредиторов. Взносов нет — у кредиторов денег нет.' }),
   gate(eq(finaleOf('razmik'), 'swap'), WORLD.razmik, WORLD.crane)({ slug: 'fin.razmik.swap', line: 'Размик уступил тебе кран: говорит, тебе нужнее. Голодовка с понедельника, лаваш подаю лично.' }),

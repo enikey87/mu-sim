@@ -80,6 +80,15 @@ const api = (seed = 1, tier = 0) => {
   return make(<T>(k: string, a: readonly Entry<T>[], nr?: boolean) => decks.draw(k, a.map(valueOf), nr), () => tier, seededRng(seed + 1))
 }
 
+describe('эпилог Рубика не переобъявляет развязку (#914)', () => {
+  it('в endgame.ts нет «оказывается» про налоговую и есть продолжение', () => {
+    const src = sources['./endgame.ts'] ?? ''
+    expect(src.length, 'файл endgame.ts найден').toBeGreaterThan(1000)
+    expect(src, 'эпилог не переобъявляет открытие').not.toContain('оказывается')
+    expect(src, 'продолжение на месте').toContain('Рубик из налоговой подтвердил')
+  })
+})
+
 describe('строки по живой рецензии №2 (#922)', () => {
   it('старые строки ушли из исходников', () => {
     for (const line of [
