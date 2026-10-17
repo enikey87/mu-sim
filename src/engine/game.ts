@@ -609,6 +609,20 @@ export class Game {
     if (!ready.length) return null
     return remember(valueOf(ready.reduce((a, b) => (at(valueOf(b)) < at(valueOf(a)) ? b : a))))
   }
+  /** Окно не отпустило ни одной строки, а вопрос молчать не может: самая давняя открытая, даже уже отправленная (#880). */
+  oldestShown(arr: readonly Entry<string>[]): string {
+    const at = (t: string) => this.playerSaid.get(t) ?? -1e9
+    const open = arr.filter((e) => isOpen(e, this.lineFacts()))
+    const line = valueOf(open.reduce((a, b) => (at(valueOf(b)) < at(valueOf(a)) ? b : a)))
+    const shown = at(line)
+    this.playerSaid.set(line, this.S.stats.sent)
+    // внутри окна — не дословно: иначе строка уходит и возвращается раньше 20 ходов (#833)
+    if (shown !== -1e9 && this.S.stats.sent > shown && this.S.stats.sent - shown < PLAYER_REPEAT_TURNS) {
+      return line + this.draw('PSUF', PLAYER_SUFFIX)
+    }
+    this.rememberShown(line)
+    return line
+  }
   /**
    * Бедность: свежие без повторов; исчерпанный пул молчит, пока строку не отпустит POOR_REPEAT_DAYS,
    * а отпущенную перефразирует — сказанное слово в слово не возвращается (#184/#240).
@@ -3104,7 +3118,7 @@ export type ContentApi = Pick<Game,
   | 'lie' | 'caught' | 'callback'
   // колоды и реплики
   | 'draw' | 'open' | 'uniq' | 'pair' | 'line' | 'linePicked' | 'lines' | 'seen' | 'decks' | 'X'
-  | 'addrSaidLine' | 'playerLine' | 'freshPlayer' | 'offeredInWindow' | 'rememberShown' | 'rnd' | 'chance' | 'bagOf' | 'restoreBag'
+  | 'addrSaidLine' | 'playerLine' | 'freshPlayer' | 'oldestShown' | 'offeredInWindow' | 'rememberShown' | 'rnd' | 'chance' | 'bagOf' | 'restoreBag'
   // контекст последней реплики
   | 'ctx' | 'setCtx'
   // режимы
