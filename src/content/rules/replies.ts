@@ -18,7 +18,7 @@ import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, PROMISE_PENCIL,
 import { CREW_PAID } from '../crew'
 import { HOLIDAY_MONEY, type Holiday } from '../holidays'
 import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_THIRD, LIE_NOCRED } from '../lies'
-import { HEAT, alikShaved, moustacheAskAt, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, topic, topicLast, topicMute, topicRun } from '../memkeys'
+import { HEAT, alikShaved, moustacheAskAt, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, stateAt, topic, topicLast, topicMute, topicRun } from '../memkeys'
 import type { ArcId, TopicId } from '../ids'
 import { PROMISE_SHAVE_ASK } from '../world'
 
@@ -210,7 +210,10 @@ export const replyRules: R[] = [
     respond: async ({ game, facts }) => {
       const i = Number(facts.arg)
       game.promiseAsked(i)
-      const r = game.uniq(game.X.prev)
+      // дата цитаты против дня болезни Бориса: отмазка «тогда Борис заболел» не ставит событие раньше самого барана (#859)
+      const made = game.promiseAt(i)?.made
+      const illAt = Number(game.mem()[stateAt(sick, 'boris')])
+      const r = game.uniq(() => game.X.prev({ made, illAt: Number.isFinite(illAt) ? illAt : undefined }))
       game.recordPromise(r.p)
       await game.say([r.text])
       game.setCtx(game.ctxFromPromise(r.p))
