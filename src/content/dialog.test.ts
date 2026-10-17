@@ -372,7 +372,7 @@ describe('несостыковки из плейтеста ботами, рау�
     await game.playArc('niva')
     await game.playArc('niva') // «завелась и уехала»
     expect(game.open(lines)).toEqual(['Гарик передаёт привет из фундамента.'])
-    for (let i = 0; i < 5; i++) { game.S.day += 5; await game.playArc('garik') } // до «Гарика достали!»
+    for (let i = 0; i < 6; i++) { game.S.day += 5; await game.playArc('garik') } // до «Гарика достали!» (серий семь)
     expect(game.open(lines)).toContain('Я в шашлычной у Гарика.')
   })
   it('«Алик умер» — и на крик отвечает не Алик', async () => {
