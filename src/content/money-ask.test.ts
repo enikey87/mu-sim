@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest'
 import { makeGame } from '../test/helpers'
 import { MONEY_ASK, MONEY_PLACES, MONEY_ASK_TURNS, moneyPlaceOf, type MoneyPlace } from './money-ask'
+import { ARCS } from './arcs'
 import { LEGENDS } from './legends'
 import { valueOf, isOpen, Gated } from '../engine/rules'
 import type { Entry } from './fact'
@@ -12,6 +13,8 @@ import type { Choice } from '../engine/state'
 import type { Game } from '../engine/game'
 
 const places = Object.keys(MONEY_PLACES) as MoneyPlace[]
+/** Вопрос-состояние: несёт окно свежести своего места (#955/#962). */
+const windowed = (e: Entry<string>): e is Gated<string> => e instanceof Gated && e.when.some((c) => c.key.startsWith('sinceMoneyAsk.'))
 
 /** Кадры выбора в партии: варианты строятся заново, как на каждом ходу игрока. */
 const frame = (game: Game): Choice[] => { game.S.choices = null; return game.choices }
@@ -133,12 +136,11 @@ describe('денежный вопрос: первичная кнопка (#795)'
 describe('окно свежести ответа (#952): состояние не переспрашивают', () => {
   /** Легенда каждого места для партии теста. */
   const LEGEND_OF: Record<MoneyPlace, string> = { bank: 'frozen', beton: 'beton_money', safe: 'safe_wrongkey', crypto: 'crypto', niva: 'niva_stuck' }
-  const windowed = (e: Entry<string>): e is Gated<string> => e instanceof Gated && e.when.some((c) => c.key === 'sinceMoneyAsk')
 
   it('после ответа Алика вопросы-состояния молчат окно во всех пулах, вопросы-действия остаются', async () => {
     for (const p of places) {
       const game = withLegend(LEGEND_OF[p])
-      if (p === 'bank') game.S.mem[taxFrozen] = true
+      if (p === 'bank') game.S.mem[taxFrozen] = true // вопросы про заморозку — под фактом заморозки
       if (p === 'safe') game.S.mem[intro('nune')] = true // вопрос про возвращение Нуне — под знакомством
       if (p === 'niva') game.S.mem[intro('niva')] = true // «Нива» у Алика — nivaHome по умолчанию
       const before = game.open(MONEY_ASK[p])
@@ -157,6 +159,42 @@ describe('окно свежести ответа (#952): состояние не
       expect(inWindow.length, `${p}: окно ничего не закрыло`).toBeLessThan(before.length)
       game.S.stats.sent += MONEY_ASK_TURNS + 1
       expect(game.open(MONEY_ASK[p]), `${p}: окно прошло — состояние вернулось`).toEqual(before)
+    }
+  })
+})
+
+describe('объявление места потребляет окно своего места (#962)', () => {
+  /** Серия-объявление места: легенда арки и есть объявление. */
+  const announcements: Array<[string, string]> = [
+    ['grandpa', 'grandpa_deposit'],
+    ['rubik', 'frozen'],
+    ['niva', 'niva_stuck'],
+  ]
+
+  it('свежее объявление закрывает state-вопросы своего места, чужие места не трогает', async () => {
+    for (const [arc, legend] of announcements) {
+      const place = moneyPlaceOf(legend)
+      expect(place, `${legend}: место не узнаётся`).toBeDefined()
+      const { game } = makeGame()
+      game.S.mem[intro('niva')] = true // «Нива» у Алика: пул места виден до объявления
+      const state = MONEY_ASK[place!].filter(windowed).map(valueOf)
+      expect(state.length, `${place}: вопросов-состояний не стало — проверка пустеет`).toBeGreaterThan(0)
+      const openState = state.filter((t) => game.open(MONEY_ASK[place!]).includes(t))
+      expect(openState.length, `${place}: до объявления состояние не открыто — проверка пустеет`).toBeGreaterThan(0)
+      const others = places.filter((p) => p !== place).map((p) => [p, game.open(MONEY_ASK[p])] as const)
+      const idx = ARCS[arc].eps.findIndex((ep) => ep.legend === legend)
+      expect(idx, `${arc}: серии с легендой ${legend} нет`).toBeGreaterThanOrEqual(0)
+      await game.playEpisode(ARCS[arc].eps[idx], arc)
+      // объявление прозвучало настоящим путём: в ближайших блоках state-вопросов этого места нет
+      for (let i = 0; i < 30; i++) {
+        const money = frame(game).find((c) => c.act === 'money')
+        if (money) expect(state, `${place}: в блоке переспрос «${money.text}»`).not.toContain(money.text)
+      }
+      const after = game.open(MONEY_ASK[place!])
+      for (const t of state) expect(after, `${place}: объявление не закрыло «${t}»`).not.toContain(t)
+      for (const [p, open] of others) expect(game.open(MONEY_ASK[p]), `${p} затронуто объявлением ${place}`).toEqual(open)
+      game.S.stats.sent += MONEY_ASK_TURNS + 1
+      for (const t of openState) expect(game.open(MONEY_ASK[place!]), `${place}: окно прошло — «${t}» не вернулось`).toContain(t)
     }
   })
 })

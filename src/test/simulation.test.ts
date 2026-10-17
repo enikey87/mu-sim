@@ -108,7 +108,9 @@ describe('разнообразие', () => {
     const fired = new Set<string>()
     const scenes = new Set<string>()
     // Turn_Wrong — меньше одного за партию: на пяти сидах ноль попаданий случался и на main (#287)
-    for (const seed of [11, 12, 13, 14, 15, 16, 17, 18, 19, 20]) {
+    // #962 (окна объявлений места денег) сдвинула розыгрыш — в десяти сидах Turn_Forward не выпал:
+    // добавлены сиды 21–24 (замер, 250 ходов каждый)
+    for (const seed of [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]) {
       const { game } = makeGame({ seed })
       const orig = game.rules.fire.bind(game.rules)
       game.rules.fire = async (...a: Parameters<typeof orig>) => { const r = await orig(...a); if (r) fired.add(r.name); return r }

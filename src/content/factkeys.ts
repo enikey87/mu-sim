@@ -9,6 +9,7 @@ import { ACH } from './achievements'
 import { CLAIMS } from './lies'
 import { TOPICS } from './topics'
 import { EXTRAS } from './world'
+import { MONEY_PLACES, type MoneyPlace } from './money-ask'
 import type { AchId, ArcId, CastId, ClaimKey, TopicId, WhoId } from './ids'
 import { invoiceItems, invKey } from './scenes'
 import {
@@ -58,7 +59,7 @@ export type MemExactKey =
   | typeof lightOff | typeof netRation | typeof phoneWarn | typeof holidayGreeted
   | typeof creditStage | typeof creditOffer | typeof creditBroke | typeof momDone | typeof creditDeclined | typeof moneyPoor | typeof collectorsRecruited
   | typeof collectorsTurned
-  | typeof criticalAt | typeof creditOfferSum | typeof crewPaid | typeof crewPaidAt | typeof moneyAskAt | typeof rubikBath | typeof whenYears
+  | typeof criticalAt | typeof creditOfferSum | typeof crewPaid | typeof crewPaidAt | typeof moneyAskAt[keyof typeof moneyAskAt] | typeof rubikBath | typeof whenYears
   | typeof ramPhotoAt | typeof borisSaleAt | typeof vacancyAt | typeof avitoReviewAt
   | typeof rubikAskAt | typeof kettleAt | typeof lawyerAt | typeof collectorsAskAt | typeof internAt | typeof rubikHoleAt
   | typeof payday[keyof typeof payday] | typeof count[keyof typeof count]
@@ -77,6 +78,7 @@ export type FactKey =
   | `asked.${ArcId}` | `doneAsked.${ArcId}` | `finale.${ArcId}` | `finale.at.${ArcId}` | `legend.of.${ArcId}`
   | `state.at.${string}` // день состояния серии (#859): ключ состояния и доска персонажа; рантайм-сторож в FAMILIES
   | `topic.${TopicId}` | `topicMute.${TopicId}`
+  | `sinceMoneyAsk.${MoneyPlace}`
   | `wedding.${WeddingId}`
   | `bills.${BillPart}.${BillField}`
   | `sold.${ThingId}` | `mom.${MomId}` | `mom.done` | typeof momDachaAt | typeof momDachaDays
@@ -93,6 +95,7 @@ const topics = setOf(Object.keys(TOPICS))
 const who = setOf([...Object.keys(CAST), ...EXTRAS])
 const states = setOf(Object.values(ARCS).flatMap((a) => a.eps.flatMap((e) => (e.state ? [e.state.key] : []))))
 const items = setOf(invoiceItems(30).map((r) => invKey(valueOf(r)[0]).slice('inv.'.length)))
+const moneyPlaces = setOf(Object.keys(MONEY_PLACES))
 
 /** Семейство: префикс → допустимый остаток. */
 export const FAMILIES: Record<string, (rest: string) => boolean> = {
@@ -104,6 +107,8 @@ export const FAMILIES: Record<string, (rest: string) => boolean> = {
   'asked.': arcs, 'doneAsked.': arcs, 'finale.': arcs, 'finale.at.': arcs, 'legend.of.': arcs,
   // день включения состояния серии (#859): ключ состояния (`wedding.samvel`) или ключ + доска персонажа (`sick.boris`)
   'state.at.': (r) => states(r) || (r.includes('.') && states(r.slice(0, r.lastIndexOf('.'))) && who(r.slice(r.lastIndexOf('.') + 1))),
+  // окно свежести места денег (#962): вопрос или объявление штампует ход своего места
+  'sinceMoneyAsk.': moneyPlaces,
   'topic.': topics, 'topicMute.': topics,
   'inv.': items,
   'wedding.': (r) => Object.hasOwn(CAST, r) || r === 'anush',
