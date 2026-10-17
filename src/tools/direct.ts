@@ -5,7 +5,7 @@
 import type { Game } from '../engine/game'
 import type { Facts } from '../engine/rules'
 import { during } from '../engine/rules'
-import { caughtCount, HEAT, legendDay, legendId, nuneKeyPassed, sorryAt } from '../content/memkeys'
+import { HEAT, legendDay, legendId, nuneKeyPassed, sorryAt } from '../content/memkeys'
 
 export type DirectCase = { event: string; facts?: Facts; target?: string; setup?: (g: Game) => void }
 
@@ -183,7 +183,8 @@ export const DIRECT: Record<string, DirectCase> = {
   // #824: после слияния с #828 розыгрыш сдвинулся — голосовое снова уходит из семейства +4000, держим прямым случаем
   Says_voice: { event: 'PlayerSays', facts: { intent: 'voice' } },
   // #824: там же ушёл из семейства +6000 финал бетона «Настоящая ведомость» (порог поимок 2)
-  Finale_beton_ledger: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem[caughtCount] = 2 } },
+  // #889: перекалибровка вариантов бетона сдвинула розыгрыш — финал срабатывает в выборках сам
+  // (8 партий при пороге 7) — прямой случай не нужен, гейт видит его без подсказки
   // #826: расширение тоновых пулов сдвинуло розыгрыш — отклик на «воскрес» ушёл из семейства +6000
   Says_condole_ctxrevived: { event: 'PlayerSays', facts: { intent: 'condole' }, setup: (g) => { g.S.ctx = { revived: true } } },
   Finale_rubik_default: { event: 'ArcFinale', facts: { arc: 'rubik' } },
