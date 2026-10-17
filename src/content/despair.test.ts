@@ -126,7 +126,7 @@ describe('отчаяние от бедности', () => {
       { level: 'low', ask: 'Списание завтра', reply: /списани[ея]|завтра/i, due: true },
       { level: 'bottom', ask: 'Я ПРОДАМ ПЛИТКУ', reply: /плитк/i },
       { level: 'bottom', ask: 'УЖЕ ПРОДАЛ ПЛИТКУ', reply: /плитк/i, soldTile: true },
-      { level: 'bottom', ask: 'банк прислал соболезнования', reply: /соболезн/i },
+      { level: 'bottom', ask: 'банк прислал списание', reply: /списани/i },
       { level: 'bottom', ask: 'Банкомат посмотрел', reply: /банкомат/i },
     ] as const
     for (const c of cases) {

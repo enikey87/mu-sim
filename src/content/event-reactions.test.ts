@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
 import { NOTIF } from './life'
-import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE } from './rules/player-choice-pools'
+import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK } from './rules/player-choice-pools'
 import { BORIS_SALE, RUBIK_ASK, KETTLE } from './world'
 import { ARCS } from './arcs'
 import { FINALES } from './finales'
@@ -162,6 +162,19 @@ describe('прямые вопросы и первые сообщения (#958):
     expect(has(game, 'rubikHole'), 'без вопроса варианта нет').toBe(false)
     await game.playEpisode(ARCS.rubik.eps[3], 'rubik')
     await answered(game, 'rubikHole')
+  })
+
+  it('ответ про коллекторов держит только то, что они писали до вопроса (#970)', async () => {
+    const pool = P_COLLECTORS_ASK.map(valueOf).join(' ')
+    // приглашение и стажировка — только финал арки: в окне вопроса их быть не должно
+    expect(pool, 'приглашение/стажировка в окне вопроса').not.toMatch(/стажировк|зовут к себе|три чая/i)
+    expect(pool).toMatch(/где он|поручител|должны/i)
+    // настоящий прогон: дебют коллекторов звучит до вопроса Алика — вопрос и кнопки держатся
+    const { game } = makeGame()
+    await game.playEpisode(ARCS.collectors.eps[0], 'collectors')
+    await game.playEpisode(ARCS.collectors.eps[1], 'collectors')
+    expect(game.open(P_COLLECTORS_ASK).length, 'пул окна пуст — проверка пустеет').toBeGreaterThan(0)
+    expect(has(game, 'collectorsAsk'), 'окно вопроса открыто').toBe(true)
   })
 })
 

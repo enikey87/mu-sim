@@ -5,7 +5,8 @@ import { valueOf } from '../engine/rules'
 import { Gated } from './fact'
 import { needs } from './world'
 import { wedding } from './memkeys'
-import { TOPICS, P_RUDE_BLOCKED, P_RUDE_POLITE, TOPIC_OBSESSED, P_NIGHT } from './topics'
+import { TOPICS, P_RUDE_BLOCKED, P_RUDE_POLITE, TOPIC_OBSESSED, P_NIGHT, DESPERATE_PAIRS } from './topics'
+import { NOTIF } from './life'
 import { D, make, type DrawFn } from './excuses'
 import type { Game } from '../engine/game'
 
@@ -320,5 +321,17 @@ describe('общие реплики по стадии игры', () => {
     game.S.mem.blocked = false
     game.S.mem.polite = true
     expect(P_RUDE_POLITE).toContain(fresh(game).find((c) => c.tone === 'rude')!.text)
+  })
+})
+
+describe('«соболезнования» — только от настоящей карточки банка (#970)', () => {
+  it('фантомной карточки нет: списание вместо неё, и карточка повторяемая', () => {
+    const { ask, answer } = DESPERATE_PAIRS.condolences
+    expect(ask, 'банк не присылал соболезнований — такой карточки нет').not.toMatch(/прислал соболезнован/i)
+    expect(ask, 'настоящее списание — карточка, которая есть в любой партии').toMatch(/списани/i)
+    expect(answer).toMatch(/списани/i)
+    const bank = NOTIF.filter((n) => n.app === 'Банк' && /списани/i.test(n.t))
+    expect(bank.length, 'карточка «Списание» пропала — проверка пустеет').toBeGreaterThan(0)
+    expect(bank.some((n) => n.repeat), 'без repeat она не «в любой партии»').toBe(true)
   })
 })

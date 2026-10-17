@@ -6,7 +6,8 @@ import type { Game } from '../engine/game'
 import type { Choice } from '../engine/state'
 import { alikDead, blocked, crewPaid, crewPaidAt, endgame } from './memkeys'
 import { CREW_CALL, CREW_FRESH_TURNS, P_CREW_PAID, CREW_PAID } from './crew'
-import { SPEAKS, WORLD } from './world'
+import { P_CREW_CALL } from './rules/player-choice-pools'
+import { CREW_CALL_B, SPEAKS, WORLD } from './world'
 import { CAST } from './arcs'
 import { is, set, valueOf } from './fact'
 import { sayFresh } from './rules/rude'
@@ -97,6 +98,20 @@ describe('звонок с объекта', () => {
       expect(taronMsgs(game), `в окне «${what}» звонка нет`).toHaveLength(0)
       expect(game.S.mem[crewPaid], `в окне «${what}» факт звонка не пишется`).toBeUndefined()
     }
+  })
+})
+
+describe('окно отклика на звонок — только общее всех вариантов (#970)', () => {
+  it('ни одного слова, которое называет лишь один из вариантов звонка', () => {
+    const window = [
+      ...P_CREW_CALL.map(valueOf),
+      ...CREW_CALL_B.map((e) => { const v = valueOf(e); return typeof v === 'string' ? v : v.t }),
+    ].join(' ')
+    // ведомость и козёл — только второй вариант звонка, Мкртич и «по спискам» — третий
+    expect(window, 'вариативные слова в пуле окна').not.toMatch(/ведомост|козл|Мкртич|сено|штукатур|электрик|водител/i)
+    // общее звонка осталось: всех рассчитали, а игрока — нет; звонил Тарон
+    expect(window).toMatch(/рассчитал|получил/i)
+    expect(window).toMatch(/звон|сообщ|напис/i)
   })
 })
 
