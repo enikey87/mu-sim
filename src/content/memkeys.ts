@@ -99,6 +99,12 @@ export const payday = {
   at: 'payday.at', sum: 'payday.sum', chain: 'payday.chain', caught: 'payday.caught',
   morning: 'payday.morning', contra: 'payday.contra', doubt: 'payday.doubt', refused: 'payday.refused',
   resume: 'payday.resume',
+  /** Подводка (#893): день первого штриха — линия признаков началась. */
+  lead: 'payday.lead',
+  /** Сколько штрихов подводки сыграно (анонс выплаты ждёт двух). */
+  signs: 'payday.signs',
+  /** Штрих уже звучал сегодня: один штрих в день (during, 1 день). */
+  signToday: 'payday.signToday',
 } as const
 
 export const count = {
