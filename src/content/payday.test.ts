@@ -8,6 +8,7 @@ import { spec } from '../engine/rules/lines'
 import { CLAIMS, MORNING_CONTRA, OUTCOME, ROLL, SOURCES, type Claim } from './payday'
 import { LEGENDS } from './legends'
 import { CLAIM_LEDGER } from './ledger'
+import { bathAsked } from './memkeys'
 import { ARCS } from './arcs'
 import { spec as lineSpec, valueOf, type Entry } from './fact'
 
@@ -287,6 +288,15 @@ describe('День выплаты', () => {
     const out = texts(game, n).join('\n')
     expect(out).toMatch(/родня услышала «по рублю»/)
     expect(out).toMatch(/К выплате: 180\s500 ₽/) // 239 000 − 39 000 − 19 500
+  })
+  it('доля Карине за ванную не называет обещания игрока: условие мира назвала она сама (#862)', () => {
+    const { game } = makeGame()
+    // так доля и появляется: ритуал примирения, ветка «текстом» — Карине объявляет своё условие.
+    // Игрок при этом мог отказаться от допработы ванной, и обещания в партии не было
+    game.S.mem[bathAsked] = true
+    const bath = game.lines.eligible('PD_CLAIM', CLAIMS, game.lineFacts()).filter((p) => /ванн/i.test(p.text))
+    expect(bath.length, 'доля за ванную не выпала — проверка пустеет').toBe(1)
+    expect(bath[0].text, '«вы обещали» — обещания игрок не давал').not.toMatch(/обещал|договор|соглас/i)
   })
   it('доля Самвела уместна только по факту его линии, а не по знакомству от чужой реплики (#701)', () => {
     const { game } = makeGame()

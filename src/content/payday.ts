@@ -69,7 +69,7 @@ export const ROLL: Entry<Call>[] = [
 export interface Claim extends LineSpec { who: string; cut: number }
 export const CLAIMS: Entry<Claim>[] = [
   gate(samvelLine)({ who: 'samvel', t: 'Сначала — подарок молодым. Какие молодые — неважно, свадьба всегда идёт.', cut: 50000 }),
-  needs('karineHome')({ who: 'karine', t: 'Ванная. Вы обещали переложить ванную. Считаю по рыночной. С плиткой.', when: [is(bathAsked)], cut: 60000 }),
+  needs('karineHome')({ who: 'karine', t: 'Ванная. Я мир одобрила при условии: переложите нам ванную. Считаю по рыночной. С плиткой.', when: [is(bathAsked)], cut: 60000 }),
   gate(missing(met('goar')))({ who: 'goar', t: 'Это тётя Гоар. Коза — моя. А кто будет платить за мою козу? Кого-то четыре часа снимали с крыши — её или вас, я уже не помню, но четыре часа помню. Моральный ущерб — козе.', when: [is('ach.q_goat')], prio: 2, cut: 60000 }),
   gate(is(met('goar')))({ who: 'goar', t: 'А кто будет платить за мою козу? Кого-то четыре часа снимали с крыши — её или вас, я уже не помню, но четыре часа помню. Моральный ущерб — козе.', when: [is('ach.q_goat')], prio: 2, cut: 60000 }),
   gate(missing(met('goar')))({ who: 'goar', t: 'Это тётя Гоар. А сервиз? За него мне зачли шесть тысяч. Я пересчитала — сорок пять. Значит, тридцать девять сверху.', when: [is('ach.q_tamada')], prio: 2, cut: 39000 }),
