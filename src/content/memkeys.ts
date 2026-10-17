@@ -167,6 +167,8 @@ export const collectorsTurned = 'collectors.turned'
 export const whenYears = 'when.years'
 /** Звонок с объекта состоялся: «всех рассчитали, кроме игрока» (#325, docs/design/crew-call.md). */
 export const crewPaid = 'crew.paid'
+/** Ход звонка: «кто звонил» без имени живёт только несколько ходов после него (#928). */
+export const crewPaidAt = 'crew.paidAt'
 /** Рубик остался жить на объекте и спит в ванной (#590): до этой серии про ванную не говорят. */
 export const rubikBath = 'rubik.bath'
 /** Заметные системные события с окном реакции (#927): ход события для «свежих» фактов. */
@@ -183,7 +185,7 @@ export const interjections = 'interjections'
 export const EVENT_KEY_LIST = [
   'day', 'dow', 'month', 'dom', 'holiday', 'sent', 'moo', 'tier', 'mood', 'patience', 'money', 'debt', 'fifty', 'paid',
   'moneyNormal', 'moneyLow', 'moneyBottom', 'paymentDueTomorrow',
-  'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sorrySwing', 'promiseLive', 'promisePassed', 'promiseStake',
+  'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sinceCrew', 'sorrySwing', 'promiseLive', 'promisePassed', 'promiseStake',
   'ramPhotoFresh', 'borisSaleFresh', 'vacancyFresh', 'avitoReviewFresh',
   'period', 'night', 'offline', 'scene', 'sinceAlik', 'lateCount', 'arcAvailable',
   'arcsStarted', 'arcsDone', 'quests', 'callbackReady', 'lieOpen', 'lieKind', 'lieAlikOld', 'deathCanAdvance', 'collectorsCanAdvance',
@@ -203,7 +205,7 @@ export const MEM_KEYS: ReadonlySet<string> = new Set([
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday,
   lightOff, netRation, phoneWarn, holidayGreeted,
-  creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, collectorsTurned, criticalAt, creditOfferSum, momDachaAt, crewPaid, rubikBath, whenYears,
+  creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, collectorsTurned, criticalAt, creditOfferSum, momDachaAt, crewPaid, crewPaidAt, rubikBath, whenYears,
   ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt,
   ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lend50),
 ])
