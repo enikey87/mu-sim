@@ -61,7 +61,7 @@ export function App({ game, onReset, debug = false, intro = false, introGate = f
     optionNote: (text) => notes.find((n) => isOptionNote(n) && n.turn === game.S.stats.sent && n.target.text === text),
     edit: (id) => {
       const n = notes.find((x) => x.id === id)
-      if (n) setDraft({ msg: n.msg, day: n.day, turn: n.turn, target: n.target, note: n.note, type: n.type, severity: n.severity, editId: n.id })
+      if (n) setDraft({ msg: n.msg, day: n.day, turn: n.turn, target: n.target, note: n.note, type: n.type, editId: n.id })
     },
     toggle: () => setReviewOn((v) => !v),
     exportNow: () => {
@@ -78,7 +78,7 @@ export function App({ game, onReset, debug = false, intro = false, introGate = f
   }), [reviewOn, notes, game])
 
   const saveDraft = (d: ReviewDraft) => {
-    const note: ReviewNote = { id: d.editId ?? nextNoteId(notes), msg: d.msg, day: d.day, turn: d.turn, type: d.type, severity: d.severity, target: d.target, note: d.note }
+    const note: ReviewNote = { id: d.editId ?? nextNoteId(notes), msg: d.msg, day: d.day, turn: d.turn, type: d.type, target: d.target, note: d.note }
     const next = d.editId === undefined ? [...notes, note] : notes.map((n) => (n.id === d.editId ? note : n))
     setNotes(next)
     saveNotes(next)
@@ -99,7 +99,7 @@ export function App({ game, onReset, debug = false, intro = false, introGate = f
               onNote={() => {
                 // у заметки о варианте категория по умолчанию — «плохой_вариант» (#878)
                 const option = menuFor.target.kind === 'answer_option'
-                setDraft({ ...menuFor, note: '', type: option ? 'плохой_вариант' : 'несостыковка', severity: 'medium' })
+                setDraft({ ...menuFor, note: '', type: option ? 'плохой_вариант' : 'несостыковка' })
                 setMenuFor(null)
               }}
               onClose={() => setMenuFor(null)}

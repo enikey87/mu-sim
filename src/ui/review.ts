@@ -4,7 +4,6 @@
 import type { Msg } from '../engine/state'
 
 export type ReviewCategory = 'несостыковка' | 'плохой_вариант' | 'строка_на_переделку' | 'идея'
-export type ReviewSeverity = 'high' | 'medium' | 'low'
 /** Типы сообщений, которые можно аннотировать: типы из ТЗ #872; `scene_button` — кнопка сцены, не сообщение ленты. */
 export type ReviewTargetKind = 'player_choice' | 'answer_option' | 'alik_message' | 'system' | 'notification' | 'scene_button' | 'transfer' | 'voice' | 'photo'
 
@@ -17,7 +16,6 @@ export interface ReviewNote {
   day: number
   turn: number
   type: ReviewCategory
-  severity: ReviewSeverity
   target: ReviewTarget
   note: string
 }
@@ -33,7 +31,6 @@ export const CATEGORIES: ReadonlyArray<{ id: ReviewCategory; icon: string; title
   { id: 'строка_на_переделку', icon: '🔵', title: 'Строка на переделку' },
   { id: 'идея', icon: '💡', title: 'Идея' },
 ]
-export const SEVERITIES: readonly ReviewSeverity[] = ['high', 'medium', 'low']
 export const categoryIcon = (t: ReviewCategory): string => CATEGORIES.find((c) => c.id === t)?.icon ?? '🔴'
 
 /** `?review` (можно `?review=1`) включает режим; без параметра интерфейс обычный. */
