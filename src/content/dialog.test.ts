@@ -636,3 +636,34 @@ describe('сцена примирения (#744)', () => {
     expect(spoken.some((m) => m.who === 'mama')).toBe(false)
   })
 })
+
+describe('реакции на щекотливые темы (#923, заметка 8)', () => {
+  it('на ревность/болезнь/смерть «лайк» не выпадает — грустный пул', async () => {
+    const sad = new Set(['😢', '😔', '🙁', '😟'])
+    let reactions = 0
+    for (let seed = 1; seed <= 32 && reactions < 3; seed++) {
+      const { game } = makeGame({ seed })
+      await game.send({ text: 'Алик, Рубик ухаживает за Карине?', tone: 'neutral' })
+      const mine = [...game.S.msgs].reverse().find((m) => m.kind === 'text' && m.from === 'me')
+      if (mine?.kind === 'text' && mine.react) {
+        reactions++
+        expect(sad.has(mine.react), `реакция на щекотливую тему: ${mine.react}`).toBe(true)
+      }
+    }
+    expect(reactions, 'реакции были — проверка не пустая').toBeGreaterThanOrEqual(3)
+  })
+  it('на обычную вежливость реакция живёт в прежнем пуле (лайк возможен)', async () => {
+    const politePool = ['🙏', '❤️', '🥰', '👍']
+    let reactions = 0
+    for (let seed = 1; seed <= 32 && reactions < 3; seed++) {
+      const { game } = makeGame({ seed })
+      await game.send({ text: 'Алик, доброе утро! Как объект?', tone: 'polite' })
+      const mine = [...game.S.msgs].reverse().find((m) => m.kind === 'text' && m.from === 'me')
+      if (mine?.kind === 'text' && mine.react) {
+        reactions++
+        expect(politePool.includes(mine.react), `реакция из вежливого пула: ${mine.react}`).toBe(true)
+      }
+    }
+    expect(reactions, 'реакции были — проверка не пустая').toBeGreaterThanOrEqual(3)
+  })
+})
