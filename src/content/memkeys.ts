@@ -180,6 +180,8 @@ export const ramPhotoAt = 'ram.photoAt'
 export const borisSaleAt = 'boris.saleAt'
 export const vacancyAt = 'vacancy.at'
 export const avitoReviewAt = 'avito.reviewAt'
+export const rubikAskAt = 'rubik.askAt'
+export const kettleAt = 'lottery.kettleAt'
 
 /** Ключи досок персонажей (S.actors), не мира. */
 export const sick = 'sick'
@@ -190,7 +192,7 @@ export const EVENT_KEY_LIST = [
   'day', 'dow', 'month', 'dom', 'holiday', 'sent', 'moo', 'tier', 'mood', 'patience', 'money', 'debt', 'fifty', 'paid',
   'moneyNormal', 'moneyLow', 'moneyBottom', 'paymentDueTomorrow',
   'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sinceCrew', 'sinceMoneyAsk', 'sorrySwing', 'promiseLive', 'promisePassed', 'promiseStake',
-  'ramPhotoFresh', 'borisSaleFresh', 'vacancyFresh', 'avitoReviewFresh',
+  'ramPhotoFresh', 'borisSaleFresh', 'vacancyFresh', 'avitoReviewFresh', 'rubikAskFresh', 'kettleFresh',
   'period', 'night', 'offline', 'scene', 'sinceAlik', 'lateCount', 'arcAvailable',
   'arcsStarted', 'arcsDone', 'quests', 'callbackReady', 'lieOpen', 'lieKind', 'lieAlikOld', 'deathCanAdvance', 'collectorsCanAdvance',
   'intent', 'tone', 'arg', 'category', 'arc', 'argArcDone', 'greet', 'promise', 'somedayCount', momDachaDays,
@@ -210,6 +212,6 @@ export const MEM_KEYS: ReadonlySet<string> = new Set([
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday, saidKonak,
   lightOff, netRation, phoneWarn, holidayGreeted,
   creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, collectorsTurned, criticalAt, creditOfferSum, momDachaAt, crewPaid, crewPaidAt, moneyAskAt, rubikBath, whenYears,
-  ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt,
+  ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt,
   ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lend50),
 ])

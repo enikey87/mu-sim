@@ -14,7 +14,7 @@ import { P_HOLIDAY, type Holiday } from './holidays'
 import { ENDGAME_CHOICES, LEND50_CHOICES } from './endgame'
 import {
   P_VIA_BORIS, P_VIA_KARINE, P_VIA_MAMA, P_MOO, P_MOUSTACHE, P_COURT,
-  P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW,
+  P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE,
 } from './rules/player-choice-pools'
 
 /** Строковый пул кнопки (Entry допускает gate и объекты с .t). */
@@ -88,6 +88,8 @@ put('P_RAM_PHOTO', P_RAM_PHOTO)
 put('P_BORIS_SALE', P_BORIS_SALE)
 put('P_VACANCY', P_VACANCY)
 put('P_AVITO_REVIEW', P_AVITO_REVIEW)
+put('P_RUBIK_ASK', P_RUBIK_ASK)
+put('P_KETTLE', P_KETTLE)
 put('P_COURT', P_COURT)
 
 // сцена choice: кнопки — вся колода CONSTR/ABSURD

@@ -13,7 +13,7 @@ import { HEAT, bathAsked, blocked, cardSent, grantPaid, intro, karineKnowsDebt, 
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- форма переменных задаётся сценой
 export type Vars = Record<string, any>
-export type Line = string | Claimed | { w: string; t: string } | ((v: Vars) => string | Claimed)
+export type Line = string | Claimed | { w: string; t: string } | { t: string; stamp?: string } | ((v: Vars) => string | Claimed)
 export interface SceneOpt { t: Line | Entry<string>[]; go: string | null; tone?: 'polite' | 'neutral' | 'rude' }
 export interface SceneFx {
   days?: number; debt?: number; money?: number; mood?: number; ach?: string; barter?: boolean; invoice?: boolean
