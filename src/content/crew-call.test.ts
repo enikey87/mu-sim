@@ -4,8 +4,8 @@ import { describe, it, expect } from 'vitest'
 import { makeGame, alikTexts } from '../test/helpers'
 import type { Game } from '../engine/game'
 import type { Choice } from '../engine/state'
-import { alikDead, blocked, crewPaid, endgame } from './memkeys'
-import { CREW_CALL, P_CREW_PAID, CREW_PAID } from './crew'
+import { alikDead, blocked, crewPaid, crewPaidAt, endgame } from './memkeys'
+import { CREW_CALL, CREW_FRESH_TURNS, P_CREW_PAID, CREW_PAID } from './crew'
 import { SPEAKS, WORLD } from './world'
 import { CAST } from './arcs'
 import { is, set, valueOf } from './fact'
@@ -128,7 +128,7 @@ describe('упрёк по звонку с объекта', () => {
     const n = game.S.msgs.length
     await game.fire('PlayerSays', { intent: 'crewPaid' })
     const answer = alikTexts(game.S.msgs.slice(n)).join(' ')
-    expect(CREW_PAID.some((l) => answer.includes(l)), `ответ не из пула: ${answer}`).toBe(true)
+    expect(CREW_PAID.some((l) => answer.includes(valueOf(l))), `ответ не из пула: ${answer}`).toBe(true)
   })
 
   it('упрёк повторяем: второй отвечает другой строкой, звонок не объявляется снова', async () => {
@@ -139,7 +139,7 @@ describe('упрёк по звонку с объекта', () => {
       await game.fire('PlayerSays', { intent: 'crewPaid' })
       answers.push(alikTexts(game.S.msgs.slice(n)).join(' '))
     }
-    for (const a of answers) expect(CREW_PAID.some((l) => a.includes(l)), a).toBe(true)
+    for (const a of answers) expect(CREW_PAID.some((l) => a.includes(valueOf(l))), a).toBe(true)
     expect(answers[0], 'колода не зациклена на одной строке').not.toBe(answers[1])
     expect(sysMsgs(game).filter((t) => t === 'Пропущенный звонок: Тарон (чайнос)').length, 'звонок — один раз').toBe(1)
   })
@@ -219,15 +219,32 @@ describe('упрёк по звонку с объекта', () => {
     game.S.day = 210
     await sayFresh(game, 'CREW_CALL', [CREW_CALL[2]])
     game.rules.applyOps([set(crewPaid, true)], {})
-    for (const l of CREW_PAID) expect(l, l).not.toMatch(/штукатур|водител|электрик|козл/i)
+    for (const l of CREW_PAID) expect(valueOf(l), valueOf(l)).not.toMatch(/штукатур|водител|электрик|козл/i)
     // мутация «субъектный ответ на чужой упрёк» невозможна: субъектных ответов в пуле нет
     for (let i = 0; i < 5; i++) {
       const n = game.S.msgs.length
       await game.fire('PlayerSays', { intent: 'crewPaid' })
       const answer = alikTexts(game.S.msgs.slice(n)).join(' ')
-      expect(CREW_PAID.some((l) => answer.includes(l)), answer).toBe(true)
+      expect(CREW_PAID.some((l) => answer.includes(valueOf(l))), answer).toBe(true)
       expect(answer).not.toMatch(/штукатур|водител|электрик|козл/i)
     }
+  })
+
+  it('«кто звонил» и «спроси у него» звучат только несколько ходов после звонка (#928)', async () => {
+    const caller = 'Спроси у того, кто звонил. Он всё видел и всё перепутал. Перепутал — значит, и не видел.'
+    const tea = 'Я чаем рассчитался. Он согласился, он чайный человек. Спроси у него — он подтвердит.'
+    const game = await afterCall()
+    expect(game.S.mem[crewPaidAt], 'звонок пишет свой ход').toBe(game.S.stats.sent)
+    const heard = new Set<string>()
+    for (let i = 0; i < CREW_PAID.length * 2 && !(heard.has(caller) && heard.has(tea)); i++) heard.add(game.draw('CREW_PAID', CREW_PAID))
+    expect(heard.has(caller), 'в окне строка про звонившего звучит').toBe(true)
+    expect(heard.has(tea), 'в окне «спроси у него» звучит').toBe(true)
+    game.S.stats.sent += CREW_FRESH_TURNS + 1
+    const late = game.open(CREW_PAID)
+    expect(late, 'вне окна звонивший без имени молчит').not.toContain(caller)
+    expect(late, 'вне окна «спроси у него» молчит').not.toContain(tea)
+    expect(late.length, 'остальной пул жив').toBeGreaterThan(0)
+    expect(late).toContain('У каждого своя очередь: кто кладёт, кто возит, кто носит чай. Твоя просто длинная.')
   })
 
   it('в окне блокировки и смерти упрёка нет', async () => {

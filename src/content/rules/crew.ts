@@ -4,7 +4,7 @@
 import type { ContentApi } from '../../engine/game'
 import { type Rule, gte, missing, set } from '../fact'
 import type { GameEvent, Offer } from './events'
-import { alikDead, blocked, crewPaid, endgame } from '../memkeys'
+import { alikDead, blocked, crewPaid, crewPaidAt, endgame } from '../memkeys'
 import { CREW_CALL } from '../crew'
 import { meet } from '../world'
 import { sayFresh } from './rude'
@@ -20,7 +20,7 @@ export const crewRules: R[] = [
     remember: meet('taron'),
     // гейты — факты мира: середина партии, нет блокировки, смерти Алика, эндгейма и открытой сцены
     when: [gte('day', CREW_CALL_MIN_DAY), missing(blocked), missing(alikDead), missing(endgame.active), missing('scene')],
-    respond: async ({ game }) => {
+    respond: async ({ game, facts }) => {
       // пропущенный звонок с объекта — строка системы; Тарон пишет следом и этим входит в историю
       game.sys('Пропущенный звонок: Тарон (чайнос)')
       await game.sleep(600)
@@ -28,7 +28,7 @@ export const crewRules: R[] = [
       await game.sleep(300)
       // дальше на звонок опираются упрёки игрока и ответы Алика (#577) — факт пишется там же,
       // где звонок состоялся
-      game.applyFacts([set(crewPaid, true)])
+      game.applyFacts([set(crewPaid, true), set(crewPaidAt, Number(facts.sent))])
     },
   },
 ]
