@@ -363,6 +363,34 @@ describe('День выплаты', () => {
     expect(out).toMatch(/родня услышала «по рублю»/)
     expect(out).toMatch(/К выплате: 180\s500 ₽/) // 239 000 − 39 000 − 19 500
   })
+  it('отказ делиться: Гоар называет фактическое списание, а не номинал 39 000 (#913)', async () => {
+    const { game } = makeGame()
+    afterFeast(game)
+    await game.enterNode('payday', 'announce')
+    await choose(game, 'bag')
+    const n = game.S.msgs.length
+    await choose(game, 'refuse')
+    const goar = game.S.msgs.slice(n).find((m) => m.kind === 'text' && m.who === 'goar' && /сервиз/.test(m.text))
+    expect(goar?.kind, 'реплики про сервиз нет — проверка пустеет').toBe('text')
+    if (goar?.kind !== 'text') return
+    const named = Number(goar.text.replace(/[^\d]/g, ''))
+    const i = game.S.msgs.indexOf(goar)
+    const pay = (from: number, dir: -1 | 1): number | undefined => {
+      for (let k = from; k >= 0 && k < game.S.msgs.length; k += dir) {
+        const m = game.S.msgs[k]
+        const hit = m.kind === 'sys' && m.text.match(/К выплате: ([\d\s\u00a0\u202f]+) ₽/)
+        if (hit) return Number(hit[1].replace(/\D/g, ''))
+      }
+      return undefined
+    }
+    const before = pay(i - 1, -1)
+    const after = pay(i + 1, 1)
+    expect(before, 'до реплики нет суммы').toEqual(expect.any(Number))
+    expect(after, 'после реплики нет суммы').toEqual(expect.any(Number))
+    expect(named, goar.text).toBe(before! - after!)
+    expect(named, 'номинал 39 000 при отказе — не то списание').not.toBe(39000)
+    expect(goar.text).not.toMatch(/тридцать девять|сорок пять/)
+  })
   it('баран передан игроку: доля Бориса не срезает выплату и называет, кто им пользовался (#856)', () => {
     const { game } = makeGame()
     game.S.arcs.boris = { i: 8, last: 0 }
