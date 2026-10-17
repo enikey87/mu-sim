@@ -1563,9 +1563,45 @@ describe('режим рецензирования (#872)', () => {
     expect(screen.getByLabelText(/^Заметка 1: несостыковка$/)).toBeInTheDocument()
     const stored = JSON.parse(sessionStorage.getItem('review_notes') ?? '[]')
     expect(stored, 'заметка в sessionStorage, а не в сохранении игры').toHaveLength(1)
-    expect(stored[0]).toMatchObject({ id: 1, msg: 2, type: 'несостыковка', severity: 'medium', note: 'Сейф ещё не введён — откуда игрок знает' })
+    expect(stored[0]).toMatchObject({ id: 1, msg: 2, type: 'несостыковка', note: 'Сейф ещё не введён — откуда игрок знает' })
     expect(stored[0].target.kind).toBe('alik_message')
     expect(stored[0].target.who).toBe('alik')
+  })
+
+  it('модалка без выбора важности (#894): заметка сохраняется без клика по важности, radio «Важность» в DOM нет', async () => {
+    sessionStorage.clear()
+    at('/?review')
+    const { game } = makeGame({ seed: 2 })
+    renderApp(game)
+    await act(async () => { fireEvent.contextMenu(alikBubble()) })
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /Заметка/ })) })
+    await act(async () => { fireEvent.change(screen.getByLabelText('Текст заметки'), { target: { value: 'текст и категория — всё' } }) })
+    // ни группы «Важность», ни её radio — сохранение работает сразу после текста и категории
+    expect(screen.queryByRole('radiogroup', { name: 'Важность' })).toBeNull()
+    expect(screen.queryAllByRole('radio', { name: /^(high|medium|low)$/ })).toHaveLength(0)
+    await act(async () => { fireEvent.click(screen.getByText('Сохранить')) })
+    const stored = JSON.parse(sessionStorage.getItem('review_notes') ?? '[]')
+    expect(stored, 'заметка сохранена без шага важности').toHaveLength(1)
+    expect('severity' in stored[0], 'severity у новых заметок не пишется').toBe(false)
+  })
+
+  it('старая заметка с severity читается без падения (#894): лишнее поле игнорируется', async () => {
+    sessionStorage.clear()
+    at('/?review')
+    sessionStorage.setItem('review_notes', JSON.stringify([{
+      id: 1, msg: 2, day: 1, turn: 0, type: 'несостыковка', severity: 'high',
+      target: { kind: 'alik_message', text: 'Отмазка', offered: [], who: 'alik' },
+      note: 'старая заметка с важностью',
+    }]))
+    const { game } = makeGame({ seed: 2 })
+    renderApp(game)
+    expect(document.querySelector('.review-badge'), 'бейдж старой заметки на месте').toBeInTheDocument()
+    // правка старой заметки: модалка открывается, сохранение пишет заметку уже без severity
+    await act(async () => { fireEvent.click(document.querySelector('.review-badge')!) })
+    await act(async () => { fireEvent.click(screen.getByText('Сохранить')) })
+    const stored = JSON.parse(sessionStorage.getItem('review_notes') ?? '[]')
+    expect(stored[0].note).toBe('старая заметка с важностью')
+    expect('severity' in stored[0], 'после правки severity больше не пишется').toBe(false)
   })
 
   it('экспорт: структура по ТЗ и полный транскрипт партии', async () => {

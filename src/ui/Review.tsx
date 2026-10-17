@@ -2,7 +2,7 @@
 // Состояние заметок держит App (у него живая игра); здесь — только представление и общий доступ к нему.
 import { createContext, useContext, useRef, useState } from 'react'
 import type { Msg } from '../engine/state'
-import { CATEGORIES, SEVERITIES, categoryIcon, type ReviewCategory, type ReviewNote, type ReviewSeverity, type ReviewTarget } from './review'
+import { CATEGORIES, categoryIcon, type ReviewCategory, type ReviewNote, type ReviewTarget } from './review'
 import { useModal } from './useModal'
 
 /** Черновик заметки: что аннотируем и чем это было в партии. */
@@ -13,7 +13,6 @@ export interface ReviewDraft {
   target: ReviewTarget
   note: string
   type: ReviewCategory
-  severity: ReviewSeverity
   /** id правимой заметки: бейдж открывает модалку в режиме правки. */
   editId?: number
 }
@@ -49,12 +48,11 @@ export function ReviewMenu({ onNote, onClose }: { onNote: () => void; onClose: (
   )
 }
 
-/** Модалка заметки: текст, категория, важность; «Сохранить» пишет заметку, «Отмена» — ничего не меняет. */
+/** Модалка заметки: текст и категория (#894 — важность оператор не выбирает); «Сохранить» пишет заметку, «Отмена» — ничего не меняет. */
 export function ReviewModal({ draft, onSave, onCancel }: { draft: ReviewDraft; onSave: (d: ReviewDraft) => void; onCancel: () => void }) {
   const ref = useRef<HTMLDivElement>(null)
   const [note, setNote] = useState(draft.note)
   const [type, setType] = useState<ReviewCategory>(draft.type)
-  const [severity, setSeverity] = useState<ReviewSeverity>(draft.severity)
   useModal({ active: true, dialogRef: ref, onEscape: onCancel })
 
   return (
@@ -76,15 +74,8 @@ export function ReviewModal({ draft, onSave, onCancel }: { draft: ReviewDraft; o
             </button>
           ))}
         </div>
-        <div className="review-chips" role="radiogroup" aria-label="Важность">
-          {SEVERITIES.map((s) => (
-            <button key={s} type="button" role="radio" aria-checked={severity === s} className={'review-chip' + (severity === s ? ' on' : '')} onClick={() => setSeverity(s)}>
-              {s}
-            </button>
-          ))}
-        </div>
         <div className="review-actions">
-          <button type="button" className="review-save" onClick={() => onSave({ ...draft, note, type, severity })}>Сохранить</button>
+          <button type="button" className="review-save" onClick={() => onSave({ ...draft, note, type })}>Сохранить</button>
           <button type="button" className="review-cancel" onClick={onCancel}>Отмена</button>
         </div>
       </div>
@@ -98,7 +89,7 @@ export function ReviewBadge({ note, onEdit }: { note: ReviewNote; onEdit: () => 
     <button
       type="button"
       className="review-badge"
-      title={`${note.type} · ${note.severity}`}
+      title={note.type}
       aria-label={`Заметка ${note.id}: ${note.type}`}
       onClick={onEdit}
     >
