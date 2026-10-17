@@ -4,11 +4,30 @@ import { makeGame } from '../test/helpers'
 import { valueOf } from '../engine/rules'
 import { Gated } from './fact'
 import { needs } from './world'
+import { wedding } from './memkeys'
 import { TOPICS, P_RUDE_BLOCKED, P_RUDE_POLITE, TOPIC_OBSESSED, P_NIGHT } from './topics'
 import { D, make, type DrawFn } from './excuses'
 import type { Game } from '../engine/game'
 
 /** Словарь цитат: регулярки rneed всех тем — то, что игра уже считает «словами Алика». Ведётся не руками: он и есть rneed. */
+describe('подарочные деньги и конверты — только по введённой свадебной линии (#886)', () => {
+  it('без свадьбы Ануш строк нет, с живой свадьбой — есть; общие строки свободны', () => {
+    const { game } = makeGame()
+    const p = () => game.open(TOPICS.wedding.p)
+    const r = () => game.open(TOPICS.wedding.r)
+    // триггер темы ловит любое «свадьба» (кортеж, водолаз) — подарочных денег в мире ещё нет
+    expect(p(), 'без свадьбы — вопроса про подарочные нет').not.toContain('Может, из подарочных денег?')
+    expect(r(), 'без свадьбы — конвертов нет').not.toContain('Свадьба к свадьбе! Конверты не бесконечные!')
+    expect(r(), 'без свадьбы — подарков нет').not.toContain('Я приду на эту свадьбу и заберу подарки!!!')
+    expect(p(), 'общая строка остаётся свободной').toContain('Сколько у вас родственников вообще?')
+    // свадьба Ануш: подарочная линия идёт
+    game.rules.applyOps([{ key: wedding('anush'), op: '=', value: true, forDays: 8, scope: 'world' }], {})
+    expect(p(), 'живая свадьба — вопрос про подарочные есть').toContain('Может, из подарочных денег?')
+    expect(r(), 'живая свадьба — конверты есть').toContain('Свадьба к свадьбе! Конверты не бесконечные!')
+    expect(r(), 'живая свадьба — подарки есть').toContain('Я приду на эту свадьбу и заберу подарки!!!')
+  })
+})
+
 const CITE_WORDS = Object.values(TOPICS).flatMap((t) => Object.values(t.rneed ?? {}))
 /** Узкие исключения: слово матчит словарь цитат, но цитатой не является — причина у каждого (#739). */
 const NOT_A_CITE: Record<string, string[]> = {
