@@ -138,12 +138,8 @@ export const DIRECT: Record<string, DirectCase> = {
   Quiet_PaydayOpen_AlikAway: { event: 'AlikAway', setup: paydayOpen },
   Quiet_PaydayOpen_PeriodLine: { event: 'PeriodLine', setup: paydayOpen },
   Quiet_PaydayOpen_StoryBeat: { event: 'StoryBeat', setup: (g) => { paydayOpen(g); g.S.stats.sent = 5 } },
-  // #927 (реакции на системные события сдвинули розыгрыш) — правило ушло из выборок, прямой случай вернулся.
-  // До этого случай снимали (#889: в CI правило играло в 8 партиях, порог 7) — качели гейта решает замер.
-  Quiet_PaydayOpen_PromiseDue: {
-    event: 'PromiseDue', facts: { promise: 0 },
-    setup: (g) => { paydayOpen(g); g.recordPromise({ text: 'завтра', d: 1 }); g.S.day += 1 },
-  },
+  // #918 (гейт эха «Лет двадцать?») вместе с #920 сдвинул розыгрыш обратно — гейт снова видит
+  // Quiet_PaydayOpen_PromiseDue сам (8 партий при пороге 7), прямой случай снят (#927 его возвращал)
   // #833: хвост окна свежести сдвинул розыгрыш — Quiet_PaydayOpen_PromiseDue в 7 партиях (порог 7), гейт видел сам;
   // #882 (фраза-срок про свадьбу) сдвинул розыгрыш обратно — правило ушло из выборок, случай вернулся
   // #889: перекалибровка вариантов бетона сдвинула розыгрыш снова — в CI правило в 8 партиях (порог 7),
@@ -178,6 +174,8 @@ export const DIRECT: Record<string, DirectCase> = {
   Chorus_garik_FedUp: { event: 'Mentioned', target: 'garik', setup: (g) => { g.S.mem['intro.garik'] = true; g.S.actors.garik = { interjections: 3 } } },
   // #824: окно повтора сдвинуло розыгрыш — траурный хор Карине ушёл из семейства +2000, держали прямым случаем
   // #920: варианты предложения и козы сдвинули розыгрыш — Chorus_karine_Dead в 8 партиях (порог 7), гейт видит сам
+  // #918 (гейт эха «Лет двадцать?») сдвинул розыгрыш обратно — хор ушёл из выборок, случай вернулся
+  Chorus_karine_Dead: { event: 'Mentioned', target: 'karine', setup: (g) => { dead(g); g.S.mem['intro.karine'] = true } },
   Finale_razmik_shift: { event: 'ArcFinale', facts: { arc: 'razmik' }, setup: (g) => { g.S.ach.fence = 1 } },
   Finale_tile_lost: { event: 'ArcFinale', facts: { arc: 'tile' }, setup: (g) => { g.S.mem.court = 6 } },
   // #824: окно повтора сдвинуло розыгрыш — обычный финал плитки ушёл из выборок, держим прямым случаем
@@ -201,7 +199,7 @@ export const DIRECT: Record<string, DirectCase> = {
   // порог 7) — прямой случай не нужен
   // #826: расширение тоновых пулов сдвинуло розыгрыш — отклик на «воскрес» ушёл из семейства +6000
   Says_condole_ctxrevived: { event: 'PlayerSays', facts: { intent: 'condole' }, setup: (g) => { g.S.ctx = { revived: true } } },
-  Finale_rubik_default: { event: 'ArcFinale', facts: { arc: 'rubik' } },
+  // #918: сдвиг розыгрыша вернул обычный финал Рубика в выборки (8 партий при пороге 7) — случай снят
   Finale_razmik_default: { event: 'ArcFinale', facts: { arc: 'razmik' } },
   Finale_beton_opened: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem['count.rude'] = 6; g.S.mem[HEAT] = 3 } },
   // #585: праздничная кнопка сдвинула выборки — тишина на наступившем сроке ушла из них
