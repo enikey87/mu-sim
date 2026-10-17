@@ -201,6 +201,27 @@ describe('факты контекста: род и горизонт', () => {
     expect(ctx(sickBoris).days).toBe(10)
   })
 
+  it('фраза-срок про свадьбу звучит только пока свадьба идёт (#882)', () => {
+    const pool = (g: Game) => g.open(D.WHEN as Entry<When>[]).map((w) => w.t)
+    const { game } = makeGame()
+    expect(pool(game), 'свадьбы нет — фразы нет').not.toContain('сразу после свадьбы')
+    expect(pool(game), 'свадьбы нет — фразы нет').not.toContain('как свадьба закончится')
+    // живая свадьба Бориса открывает свою формулировку и не открывает чужую
+    game.rules.applyOps([{ key: wedding('boris'), op: '=', value: true, forDays: 8, scope: 'world' }], {})
+    expect(pool(game)).toContain('сразу после свадьбы')
+    expect(pool(game), 'свадьба Размика — своя фраза').not.toContain('как свадьба закончится')
+    // и наоборот: свадьба Размика
+    const { game: razmik } = makeGame()
+    razmik.rules.applyOps([{ key: wedding('razmik'), op: '=', value: true, forDays: 8, scope: 'world' }], {})
+    expect(pool(razmik)).toContain('как свадьба закончится')
+    expect(pool(razmik)).not.toContain('сразу после свадьбы')
+    // свадьба Самвела конца не имеет: общий срок её не берёт и фраз не открывает (#571)
+    const { game: samvel } = makeGame()
+    samvel.rules.applyOps([{ key: wedding('samvel'), op: '=', value: true, forDays: 8, scope: 'world' }], {})
+    expect(pool(samvel)).not.toContain('сразу после свадьбы')
+    expect(pool(samvel)).not.toContain('как свадьба закончится')
+  })
+
   it('срок легенды: настоящий setLegend и клятва → род, оценка и остаток свадьбы', async () => {
     const { game } = makeGame()
     game.setLegend('boris_receipts', 'nune')
