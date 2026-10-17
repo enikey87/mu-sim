@@ -81,6 +81,12 @@ describe('память Алика', () => {
     game.S.arcs.boris = { i: 4, last: 0 }
     expect(game.line('MEMORY', MEMORY)).toMatch(/Борис/)
   })
+  it('конверт у Гарика: нашёл и сидит на нём — отдаст в торге или при достании (#908)', () => {
+    const news = MEMORY.filter((e) => /конверт/.test(spec(e).t)).map((e) => spec(e).t)
+    expect(news.length, 'новость про конверт не найдена — проверка пустеет').toBe(1)
+    expect(news[0], 'Гарик нашёл конверт и держит его').toMatch(/нашёл.*сидит на нём/)
+    expect(news[0], 'старое «фундамент не выпускает» ушло: он держит конверт сам').not.toMatch(/фундамент не выпускает/)
+  })
   it('у каждой реплики памяти есть условие', () => {
     for (const l of MEMORY) expect(spec(l).when?.length, spec(l).t).toBeGreaterThan(0)
   })
