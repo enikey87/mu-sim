@@ -1,7 +1,7 @@
 // Кнопки игрока на срок обещания по роду и горизонту (docs/design/deadline-replies.md, MVP 2, #164): пулы, матрица по всем срокам, дата срока.
 import { describe, it, expect, vi } from 'vitest'
 import { makeGame } from '../test/helpers'
-import { D, type When } from './excuses'
+import { D, WHEN_YEARS, type When } from './excuses'
 import { LEGENDS } from './legends'
 import { valueOf, type Entry } from './fact'
 import { test as holds } from '../engine/rules'
@@ -52,14 +52,15 @@ describe('пулы кнопок на срок', () => {
       expect(pool(k).length, k).toBeGreaterThanOrEqual(3)
       for (const s of pool(k)) expect(s, `${k}: ${s}`).not.toMatch(/по-русски/i)
     }
+    for (const k of ['P_WHEN_CALENDAR', 'P_WHEN_EVENT']) for (const s of pool(k)) expect(s, `${k}: ${s}`).not.toMatch(/по-русски/i)
     for (const k of Object.keys(D).filter((x) => x.startsWith('P_WHEN'))) for (const s of pool(k)) expect(s, `${k}: ${s}`).not.toMatch(/с \{date\}/)
   })
 
   it('дата и дни стоят только там, где есть факт: {date} — у пула с датой, {days} — у далёких', () => {
     for (const s of pool('P_WHEN_OK')) expect(s).toContain('{date}')
-    for (const k of ['P_WHEN', 'P_WHEN_OK_EVENT', 'P_WHEN_PENCIL', 'P_WHEN_FAR', 'P_WHEN_NEVER']) for (const s of pool(k)) expect(s, `${k}: ${s}`).not.toContain('{date}')
+    for (const k of ['P_WHEN', 'P_WHEN_OK_EVENT', 'P_WHEN_PENCIL', 'P_WHEN_FAR', 'P_WHEN_NEVER', 'P_WHEN_CALENDAR', 'P_WHEN_EVENT']) for (const s of pool(k)) expect(s, `${k}: ${s}`).not.toContain('{date}')
     for (const k of ['P_WHEN_PENCIL', 'P_WHEN_FAR']) for (const s of pool(k)) expect(s, `${k}: ${s}`).toContain('{days}')
-    for (const k of ['P_WHEN', 'P_WHEN_OK', 'P_WHEN_OK_EVENT', 'P_WHEN_NEVER']) for (const s of pool(k)) expect(s, `${k}: ${s}`).not.toContain('{days}')
+    for (const k of ['P_WHEN', 'P_WHEN_OK', 'P_WHEN_OK_EVENT', 'P_WHEN_NEVER', 'P_WHEN_CALENDAR', 'P_WHEN_EVENT']) for (const s of pool(k)) expect(s, `${k}: ${s}`).not.toContain('{days}')
   })
 })
 
@@ -158,6 +159,63 @@ describe('дата в кнопке — срок, а не день обещани
   })
 })
 
+/** Тексты кнопок срока, которые buildChoices реально показывает. */
+async function shownWhen(w: When, tune?: (g: Game) => void, n = 80): Promise<string[]> {
+  const g = await said(w)
+  tune?.(g)
+  const shown = new Set<string>()
+  for (let i = 0; i < n; i++) {
+    g.S.choices = null
+    for (const c of g.buildChoices()) if (c.act?.startsWith('promise')) shown.add(c.text)
+  }
+  expect(shown.size, w.t).toBeGreaterThan(0)
+  return [...shown]
+}
+
+describe('риторика по роду: календарь — праздник, событие — «при чём», «никогда» — без календаря', () => {
+  it('в пуле «никогда» нет календаря и хвоста «Это ответ.»; «Лет двадцать?» — строка игрока', () => {
+    for (const s of pool('P_WHEN_NEVER')) {
+      expect(s, s).not.toMatch(/календарь/i)
+      expect(s, s).not.toMatch(/Это ответ\./)
+    }
+    expect(pool('P_WHEN_NEVER')).toContain(WHEN_YEARS)
+    expect(pool('P_WHEN_CALENDAR').join(' ')).toMatch(/календарь/i)
+    expect(pool('P_WHEN_EVENT').join(' ')).toMatch(/при чём/i)
+    expect(pool('P_WHEN_EVENT').join(' ')).not.toMatch(/календарь/i)
+  })
+
+  it('срок-событие и «никогда» не предлагают календарь; близкий праздник — предлагает', async () => {
+    for (const term of ['после футбола', 'как Гарика достанем', 'после таможни', 'когда рак на Арагаце свистнет']) {
+      for (const text of await shownWhen(byText(term))) expect(text, `${term}: ${text}`).not.toMatch(/календарь/i)
+    }
+    const event = await shownWhen(byText('после футбола'))
+    expect(event.some((t) => /при чём тут/i.test(t)), event.join(' | ')).toBe(true)
+    const holiday = await shownWhen(byText('после Навасарда'), (g) => {
+      const at = g.S.ctx?.whenAt
+      expect(at, 'у праздника нет дня горизонта').toEqual(expect.any(Number))
+      g.S.day = at! - 3
+      expect(g.facts()['ctx.whenKind']).toBe('holiday')
+      expect(g.facts()['ctx.whenHorizon']).toBe('near')
+    })
+    expect(holiday.some((t) => /календарь/i.test(t)), holiday.join(' | ')).toBe(true)
+  })
+
+  it('«как ключ выйдет» — шутка про малыша, не «когда-нибудь» и не МЧС', async () => {
+    const tune = (g: Game) => {
+      g.recordPromise({ text: 'когда-нибудь', d: null })
+      g.recordPromise({ text: 'потом', d: null })
+      expect(g.facts().somedayCount).toBeGreaterThanOrEqual(2)
+    }
+    const texts = await shownWhen(byText('как ключ выйдет'), tune)
+    expect(texts.some((t) => /малыша ключом вниз/.test(t)), texts.join(' | ')).toBe(true)
+    for (const text of texts) {
+      expect(text, text).not.toMatch(/когда-нибудь/)
+      expect(text, text).not.toMatch(/МЧС/)
+      expect(text, text).not.toMatch(/календарь/i)
+    }
+  })
+})
+
 describe('игрок видит кнопки настоящим путём', () => {
   it.each(['как отопление дадут', 'как снег в горах сойдёт'])('«%s» → только ирония из пула «никогда»', async (term) => {
     const g = await said(byText(term))
@@ -177,7 +235,7 @@ describe('игрок видит кнопки настоящим путём', () 
   it('Алик называет срок → в слоте «срок» кнопки только из пулов, что положены роду и горизонту', async () => {
     const cases: Array<[string, string[], string]> = [
       ['завтра', ['P_WHEN_OK', 'P_WHEN'], 'близкий ясный срок'],
-      ['после футбола', ['P_WHEN_OK_EVENT', 'P_WHEN'], 'близкое событие'],
+      ['после футбола', ['P_WHEN_OK_EVENT', 'P_WHEN_EVENT'], 'близкое событие'],
       ['после полнолуния', ['P_WHEN_PENCIL'], 'далёкий: 15 дней'],
       ['до Нового года', ['P_WHEN_FAR'], 'очень далёкий'],
       ['когда рак на Арагаце свистнет', ['P_WHEN_NEVER'], '«никогда»'],

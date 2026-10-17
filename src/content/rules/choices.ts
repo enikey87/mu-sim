@@ -4,7 +4,7 @@ import type { ContentApi } from '../../engine/game'
 import type { Choice, Tone } from '../../engine/state'
 import { type Rule, type Facts, type Criterion, type Entry, eq, ne, is, exists, missing, gt, gte, lte, isOpen, valueOf } from '../fact'
 import type { GameEvent, Offer } from './events'
-import { D, cap } from '../excuses'
+import { D, cap, WHEN_YEARS } from '../excuses'
 import { talkPairs, talkId } from '../talk'
 import { ARCS, WRONG_Q } from '../arcs'
 import * as L from '../life'
@@ -151,12 +151,30 @@ export const choiceRules: R[] = [
     const args = (f: Facts) => ({ t: String(f['ctx.when']), T: cap(String(f['ctx.when'])), date: String(f['ctx.whenDate'] ?? ''), days: fmtDays(Number(f['ctx.whenDays'] ?? 0)) })
     const when = (o: Pick<OfferSpec, 'name' | 'when' | 'act' | 'tone' | 'weight' | 'arg' | 'text'>) => offer({ slot: 'when', specificity: 3, bonus: 1, ...o })
     const near = [...term, eq('ctx.whenHorizon', 'near')]
+    const askPool = (f: Facts): string =>
+      f['ctx.whenKind'] === 'holiday' ? 'P_WHEN_CALENDAR' : f['ctx.whenKind'] === 'event' ? 'P_WHEN_EVENT' : 'P_WHEN'
     return [
       when({ name: 'WhenOk', when: near, weight: 0.4, act: 'promiseOk', tone: 'polite', text: (g, f) => fromD(g, f['ctx.whenDate'] ? 'P_WHEN_OK' : 'P_WHEN_OK_EVENT', args(f)) }),
-      when({ name: 'WhenCheck', when: near, weight: 0.6, act: 'promiseCheck', tone: 'neutral', text: (g, f) => fromD(g, 'P_WHEN', args(f)), arg: (_g, f) => String(f['ctx.when']) }),
+      when({ name: 'WhenCheck', when: near, weight: 0.6, act: 'promiseCheck', tone: 'neutral', text: (g, f) => fromD(g, askPool(f), args(f)), arg: (_g, f) => String(f['ctx.when']) }),
       when({ name: 'WhenPencil', when: [...term, eq('ctx.whenHorizon', 'far')], act: 'promisePencil', tone: 'neutral', text: (g, f) => fromD(g, 'P_WHEN_PENCIL', args(f)) }),
       when({ name: 'WhenFar', when: [...term, eq('ctx.whenHorizon', 'veryFar')], act: 'promiseFar', tone: 'neutral', text: (g, f) => fromD(g, 'P_WHEN_FAR', args(f)), arg: (_g, f) => String(f['ctx.when']) }),
-      ...(['never', 'absurd'] as const).map((kind) => when({ name: `When_${kind}`, when: [...term, eq('ctx.whenKind', kind)], act: 'promiseNever', tone: 'neutral', text: (g, f) => fromD(g, 'P_WHEN_NEVER', args(f)), arg: (_g, f) => String(f['ctx.when']) })),
+      ...(['never', 'absurd'] as const).map((kind) => {
+        let years = false
+        return when({
+          name: `When_${kind}`, when: [...term, eq('ctx.whenKind', kind)], act: 'promiseNever', tone: 'neutral',
+          text: (g, f) => {
+            const map = args(f)
+            years = false
+            requirePlayerPool('D.P_WHEN_NEVER', D.P_WHEN_NEVER)
+            return g.playerLine(() => {
+              const raw = g.X.fill(g.draw('P_WHEN_NEVER', D.P_WHEN_NEVER), map)
+              if (raw === WHEN_YEARS) years = true
+              return raw
+            })
+          },
+          arg: (_g, f) => (years ? 'years' : String(f['ctx.when'])),
+        })
+      }),
     ]
   })(),
 
