@@ -6,7 +6,7 @@ import { messageRenderStats, LONG_PRESS_MS } from './Message'
 import { messageListRenderStats, messageListBuildStats } from './Chat'
 import { DEBT_MS } from './Header'
 import { makeGame, setMoney, memStorage, flush } from '../test/helpers'
-import { SAVE_KEY, loadState, DEBT0 } from '../engine/state'
+import { SAVE_KEY, loadState, DEBT0, type Msg } from '../engine/state'
 import { nextTransfer } from '../content/memkeys'
 import { fmtDate } from '../engine/time'
 import type { Game } from '../engine/game'
@@ -1534,5 +1534,109 @@ describe('долг в шапке доезжает до новой суммы (#6
     expect(debtText()).not.toMatch(/240\s000 ₽/) // долг в этот момент едет
     expect(document.querySelector('#paydaySum')?.textContent).toMatch(/К выплате: 120\s000 ₽/)
     expect(document.getElementById('days')!.textContent).toBe(String(game.S.day))
+  })
+})
+
+// Режим живого рецензирования (#872): заметки на сообщениях и экспорт JSON с транскриптом.
+describe('режим рецензирования (#872)', () => {
+  const at = (search: string) => window.history.replaceState({}, '', search)
+  const alikBubble = () => document.querySelector('.msg.alik') as HTMLElement
+
+  /** Заметка через интерфейс: правый клик → меню → «Заметка» → текст → категория → сохранить. */
+  async function note(msg: HTMLElement, text: string, category = 'Несостыковка') {
+    await act(async () => { fireEvent.contextMenu(msg) })
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /Заметка/ })) })
+    await act(async () => { fireEvent.change(screen.getByLabelText('Текст заметки'), { target: { value: text } }) })
+    await act(async () => { fireEvent.click(screen.getByRole('radio', { name: new RegExp(category) })) })
+    await act(async () => { fireEvent.click(screen.getByText('Сохранить')) })
+  }
+
+  afterEach(() => { sessionStorage.clear(); at('/') })
+
+  it('?review: правый клик → меню → заметка сохранена, бейдж виден', async () => {
+    sessionStorage.clear()
+    at('/?review')
+    const { game } = makeGame({ seed: 2 })
+    renderApp(game)
+    await note(alikBubble(), 'Сейф ещё не введён — откуда игрок знает')
+    expect(document.querySelector('.review-badge'), 'бейдж на сообщении').toBeInTheDocument()
+    expect(screen.getByLabelText(/^Заметка 1: несостыковка$/)).toBeInTheDocument()
+    const stored = JSON.parse(sessionStorage.getItem('review_notes') ?? '[]')
+    expect(stored, 'заметка в sessionStorage, а не в сохранении игры').toHaveLength(1)
+    expect(stored[0]).toMatchObject({ id: 1, msg: 2, type: 'несостыковка', severity: 'medium', note: 'Сейф ещё не введён — откуда игрок знает' })
+    expect(stored[0].target.kind).toBe('alik_message')
+    expect(stored[0].target.who).toBe('alik')
+  })
+
+  it('экспорт: структура по ТЗ и полный транскрипт партии', async () => {
+    sessionStorage.clear()
+    at('/?review')
+    const { game } = makeGame({ seed: 2 })
+    renderApp(game)
+    await note(alikBubble(), 'первая')
+    // ход через варианты: только такой ход знает, из чего игрок выбирал
+    await act(async () => { fireEvent.click(document.querySelector('.choices button:not(.rude)') as HTMLButtonElement) })
+    const me = [...document.querySelectorAll('.msg.me')].at(-1) as HTMLElement
+    expect(me, 'у игрока есть своя реплика — иначе вариантов в экспорте не проверить').toBeTruthy()
+    await note(me, 'вторая', 'Идея')
+
+    let blob: Blob | null = null
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: (b: Blob) => { blob = b; return 'blob:review' } })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: () => {} })
+    await act(async () => { fireEvent.click(document.getElementById('infoBtn')!) })
+    await act(async () => { fireEvent.click(document.getElementById('reviewExport')!) })
+
+    const dump = JSON.parse(await blob!.text())
+    expect(Object.keys(dump)).toEqual(['session', 'notes', 'transcript'])
+    expect(dump.session).toMatchObject({ day: game.S.day, turns: game.S.stats.sent, endings: [] })
+    expect(typeof dump.session.started).toBe('string')
+    expect(dump.session.exported).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
+    expect(dump.notes.map((n: { type: string }) => n.type)).toEqual(['несостыковка', 'идея'])
+    // транскрипт: разделители дней, имена и варианты игрока с ▶
+    expect(dump.transcript).toMatch(/—— .+ ——/)
+    expect(dump.transcript).toContain('Алик: ')
+    expect(dump.transcript).toContain('Я: ')
+    expect(dump.transcript).toMatch(/\n {4}варианты:\n {4}.*▶ /)
+    // и полный текст: реплика игрока из экспорта есть в партии
+    const mine = game.S.msgs.find((m): m is Extract<Msg, { kind: 'text' }> => m.kind === 'text' && m.from === 'me')!
+    expect(dump.transcript).toContain(mine.text)
+  })
+
+  it('заметки переживают перезагрузку в той же сессии', async () => {
+    sessionStorage.clear()
+    at('/?review')
+    const storage = memStorage()
+    const { unmount } = renderApp(makeGame({ seed: 2, storage }).game)
+    await note(alikBubble(), 'переживёт перезагрузку')
+    unmount()
+    // перезагрузка: та же sessionStorage и то же сохранение игры — сообщения те же, бейдж на месте
+    renderApp(makeGame({ storage }).game)
+    expect(document.querySelector('.review-badge'), 'заметка вернулась из sessionStorage').toBeInTheDocument()
+    expect(JSON.parse(sessionStorage.getItem('review_notes') ?? '[]')).toHaveLength(1)
+  })
+
+  it('без ?review интерфейс обычный: ни меню, ни бейджей', async () => {
+    sessionStorage.clear()
+    at('/')
+    const { game } = makeGame({ seed: 2 })
+    renderApp(game)
+    expect(document.querySelector('.review-badge')).toBeNull()
+    await act(async () => { fireEvent.contextMenu(alikBubble()) })
+    expect(document.querySelector('.review-menu'), 'меню рецензента без режима не открывается').toBeNull()
+    expect(sessionStorage.getItem('review_notes')).toBeNull()
+  })
+
+  it('режим включается кнопкой в досье — без перезагрузки', async () => {
+    sessionStorage.clear()
+    at('/')
+    const { game } = makeGame({ seed: 2 })
+    renderApp(game)
+    await act(async () => { fireEvent.click(document.getElementById('infoBtn')!) })
+    expect(document.getElementById('reviewToggle')?.textContent).toContain('выкл')
+    await act(async () => { fireEvent.click(document.getElementById('reviewToggle')!) })
+    expect(document.getElementById('reviewToggle')?.textContent).toContain('вкл')
+    await act(async () => { fireEvent.click(document.getElementById('closeSheet')!) })
+    await act(async () => { fireEvent.contextMenu(alikBubble()) })
+    expect(document.querySelector('.review-menu'), 'режим включён — меню работает').toBeInTheDocument()
   })
 })
