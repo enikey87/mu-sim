@@ -12,6 +12,19 @@ import { dateOf } from '../engine/time'
 const PAID_IN_TEXT = /(?:Штраф|Списание)\s+([\d\s\u00a0]+)\s*₽/i
 const parseRub = (s: string) => Number(s.replace(/\s|\u00a0/g, ''))
 
+describe('владение Борисом: карточка Авито (#856)', () => {
+  const AD = 'Новое объявление рядом: «Продаю барана Бориса, торг, умеет писать».'
+  it('после передачи барана игроку объявление Алика о продаже не приходит', () => {
+    const { game } = makeGame()
+    game.S.mem['intro.baran'] = true
+    game.S.arcs.boris = { i: 4, last: 0 }
+    const ads = () => game.lines.eligible('NOTIF', NOTIF, game.lineFacts()).map((p) => p.text)
+    expect(ads(), 'до передачи объявление уместно').toContain(AD)
+    game.S.items.push('баран Борис') // has.boris — так его ставит барахолка
+    expect(ads(), 'баран передан игроку — продаёт его уже не Алик').not.toContain(AD)
+  })
+})
+
 describe('карточки ленты и суммы (#488)', () => {
   it('NOTIF: сумма «штраф/списание» совпадает с charge или spend', () => {
     const paid = NOTIF.filter((n) => PAID_IN_TEXT.test(n.t))
