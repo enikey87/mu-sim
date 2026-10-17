@@ -14,11 +14,11 @@ import { saidClaims, saidText, type Said } from '../fact'
 import { LEGENDS } from '../legends'
 import { ARCS, NO_NEWS_A, NO_NEWS_B, GROUP_SEEN_A, GROUP_SEEN_B, WRONG_A, WRONG_B } from '../arcs'
 import * as L from '../life'
-import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, PROMISE_PENCIL, PROMISE_FAR, PROMISE_YEARS } from '../misc'
+import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, PROMISE_PENCIL, PROMISE_FAR, PROMISE_YEARS, KONAK_LINE } from '../misc'
 import { CREW_PAID } from '../crew'
 import { HOLIDAY_MONEY, type Holiday } from '../holidays'
 import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_THIRD, LIE_NOCRED } from '../lies'
-import { HEAT, alikShaved, moustacheAskAt, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, stateAt, topic, topicLast, topicMute, topicRun, whenYears } from '../memkeys'
+import { HEAT, alikShaved, avitoReviewAt, borisSaleAt, moustacheAskAt, ramPhotoAt, vacancyAt, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, saidKonak, stateAt, topic, topicLast, topicMute, topicRun, whenYears } from '../memkeys'
 import type { ArcId, TopicId } from '../ids'
 import { PROMISE_SHAVE_ASK, RAM_PHOTO, BORIS_SALE, VACANCY, AVITO_REVIEW } from '../world'
 
@@ -149,7 +149,12 @@ export const replyRules: R[] = [
     respond: async ({ game, facts }) => {
       const t = String(facts['ctx.when'] ?? '')
       const days = fmtDays(Number(facts['ctx.whenDays'] ?? 0))
-      await game.say([game.uniq(() => game.X.fill(game.draw(key, pool), { t, T: cap(t), days }))])
+      // сравнение с коньяком — источник эха «Лет двадцать?» (#918): факт ставит та же реплика, что и обещает его;
+      // сравнение — с сырым текстом из колоды, декор Алика его не касается
+      let raw = ''
+      const line = game.uniq(() => (raw = game.X.fill(game.draw(key, pool), { t, T: cap(t), days })))
+      if (raw === KONAK_LINE) game.applyFacts([set(saidKonak, true)])
+      await game.say([line])
       game.setCtx(null)
     },
   })),
@@ -163,28 +168,33 @@ export const replyRules: R[] = [
       game.setCtx(null)
     },
   }),
-  // реакции на заметные системные события (#927): ответ — колода своего события, без повторов подряд
+  // реакции на заметные системные события (#927): ответ — колода своего события, без повторов подряд.
+  // Ответ событие потребляет: окно закрывается, иначе вариант живёт ещё ходы и Алик повторяет строку пула (#918)
   says('ramPhoto', {
     respond: async ({ game }) => {
       await game.say([game.draw('RAM_PHOTO', RAM_PHOTO)])
+      game.clearFact(ramPhotoAt)
       game.setCtx(null)
     },
   }),
   says('borisSale', {
     respond: async ({ game }) => {
       await game.say([game.draw('BORIS_SALE', BORIS_SALE)])
+      game.clearFact(borisSaleAt)
       game.setCtx(null)
     },
   }),
   says('vacancy', {
     respond: async ({ game }) => {
       await game.say([game.draw('VACANCY', VACANCY)])
+      game.clearFact(vacancyAt)
       game.setCtx(null)
     },
   }),
   says('avitoReview', {
     respond: async ({ game }) => {
       await game.say([game.draw('AVITO_REVIEW', AVITO_REVIEW)])
+      game.clearFact(avitoReviewAt)
       game.setCtx(null)
     },
   }),

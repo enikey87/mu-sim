@@ -1,10 +1,10 @@
 // Место денег в партии (#795): пока открыта легенда денег, игрок спрашивает о нынешнем месте — банк,
 // фундамент, сейф, крипта, «Нива». Место берётся из открытой легенды (`LEGENDS`), формулировки — по месту
 // и без повторов (`freshPlayer` + реестр пулов кнопок #491), ответ — следующая реплика той же легенды.
-import { type Entry, gate, is } from './fact'
+import { type Entry, gate, is, missing } from './fact'
 import { needs } from './world'
 import { registerPlayerPool } from './player-pools'
-import { taxFrozen } from './memkeys'
+import { taxFrozen, nivaBack } from './memkeys'
 
 /** Чьи легенды к какому месту относятся: банк (счета), фундамент, сейф, крипта, «Нива». */
 export const MONEY_PLACES = {
@@ -56,11 +56,15 @@ export const MONEY_ASK: Record<MoneyPlace, Entry<string>[]> = {
     'Курс вырос или упал?',
   ]),
   niva: registerPlayerPool('MONEY_ASK_niva', [
-    // «Нива» упоминается под своим положением (nivaHome/nivaAway), иначе упоминание — догадка
-    needs('niva', 'nivaHome')('Алик, «Нива» ещё у тебя?'),
+    // «Нива» упоминается под своим положением (nivaHome/nivaAway), иначе упоминание — догадка;
+    // после возвращения бардачок пуст, колёса на продаже — вопрос «деньги в Ниве» закрыт (#919)
+    needs('niva', 'nivaHome')(gate(missing(nivaBack))('Алик, «Нива» ещё у тебя?')),
     needs('niva', 'nivaAway')('Где сейчас «Нива»?'),
     needs('niva', 'nivaAway')('«Нива» не вернулась?'),
-    needs('niva', 'nivaHome')('Деньги всё ещё в «Ниве»?'),
-    needs('niva', 'nivaHome')('«Нива» стоит или поехала?'),
+    needs('niva', 'nivaHome')(gate(missing(nivaBack))('Деньги всё ещё в «Ниве»?')),
+    needs('niva', 'nivaHome')(gate(missing(nivaBack))('«Нива» стоит или поехала?')),
+    // колёсная ветка: «Нива» вернулась без денег, но с колёсами на продажу (#919)
+    needs('niva')(gate(is(nivaBack))('Колёса всё ещё продаются?')),
+    needs('niva')(gate(is(nivaBack))('Покупатель на колёса нашёлся?')),
   ]),
 }
