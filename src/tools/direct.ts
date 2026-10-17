@@ -52,6 +52,8 @@ export const DIRECT: Record<string, DirectCase> = {
   // частные финалы — условия как у игрока (finales.test.ts SETUP)
   Finale_beton_opened_or: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem.court = 5 } },
   Finale_beton_corner: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.ach.redo = 1 } },
+  // #927 (реакции на системные события; слияние с новой main сдвинуло розыгрыш): в семье +2000 правило упало до нуля
+  Finale_beton_ledger: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem.caught = 2 } },
   // два пойманных вранья: после #682 (тексты серий сдвинули поток розыгрышей) бот в выборках до него не доходит,
   // но в полной выборке финал звучал — случай прямой, не объяснение недостижимости
   Finale_grant_ally: { event: 'ArcFinale', facts: { arc: 'grant' }, setup: (g) => { g.S.ach.customer = 1 } },
@@ -136,6 +138,12 @@ export const DIRECT: Record<string, DirectCase> = {
   Quiet_PaydayOpen_AlikAway: { event: 'AlikAway', setup: paydayOpen },
   Quiet_PaydayOpen_PeriodLine: { event: 'PeriodLine', setup: paydayOpen },
   Quiet_PaydayOpen_StoryBeat: { event: 'StoryBeat', setup: (g) => { paydayOpen(g); g.S.stats.sent = 5 } },
+  // #927 (реакции на системные события сдвинули розыгрыш) — правило ушло из выборок, прямой случай вернулся.
+  // До этого случай снимали (#889: в CI правило играло в 8 партиях, порог 7) — качели гейта решает замер.
+  Quiet_PaydayOpen_PromiseDue: {
+    event: 'PromiseDue', facts: { promise: 0 },
+    setup: (g) => { paydayOpen(g); g.recordPromise({ text: 'завтра', d: 1 }); g.S.day += 1 },
+  },
   // #833: хвост окна свежести сдвинул розыгрыш — Quiet_PaydayOpen_PromiseDue в 7 партиях (порог 7), гейт видел сам;
   // #882 (фраза-срок про свадьбу) сдвинул розыгрыш обратно — правило ушло из выборок, случай вернулся
   // #889: перекалибровка вариантов бетона сдвинула розыгрыш снова — в CI правило в 8 партиях (порог 7),
@@ -168,8 +176,8 @@ export const DIRECT: Record<string, DirectCase> = {
   // его часто (порог 7), гейт скажет «снять» — тогда запись уйдёт, как Says_voice в #887
   Says_via_mama: { event: 'PlayerSays', facts: { intent: 'via', arg: 'mama' } },
   Chorus_garik_FedUp: { event: 'Mentioned', target: 'garik', setup: (g) => { g.S.mem['intro.garik'] = true; g.S.actors.garik = { interjections: 3 } } },
-  // #824: окно повтора сдвинуло розыгрыш — траурный хор Карине ушёл из семейства +2000, держим прямым случаем
-  Chorus_karine_Dead: { event: 'Mentioned', target: 'karine', setup: (g) => { dead(g); g.S.mem['intro.karine'] = true } },
+  // #824: окно повтора сдвинуло розыгрыш — траурный хор Карине ушёл из семейства +2000, держали прямым случаем
+  // #920: варианты предложения и козы сдвинули розыгрыш — Chorus_karine_Dead в 8 партиях (порог 7), гейт видит сам
   Finale_razmik_shift: { event: 'ArcFinale', facts: { arc: 'razmik' }, setup: (g) => { g.S.ach.fence = 1 } },
   Finale_tile_lost: { event: 'ArcFinale', facts: { arc: 'tile' }, setup: (g) => { g.S.mem.court = 6 } },
   // #824: окно повтора сдвинуло розыгрыш — обычный финал плитки ушёл из выборок, держим прямым случаем
@@ -198,6 +206,11 @@ export const DIRECT: Record<string, DirectCase> = {
   Finale_beton_opened: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem['count.rude'] = 6; g.S.mem[HEAT] = 3 } },
   // #585: праздничная кнопка сдвинула выборки — тишина на наступившем сроке ушла из них
   // #890: риторика срока по роду сдвинула розыгрыш — Quiet_Dead_PromiseDue в 7 партиях (порог 7), гейт видит сам
+  // #927 (реакции на системные события сдвинули розыгрыш): в семье +4000 правило упало до нуля — случай вернулся
+  Quiet_Dead_PromiseDue: {
+    event: 'PromiseDue', facts: { promise: 0 },
+    setup: (g) => { dead(g); g.recordPromise({ text: 'завтра', d: 1 }); g.S.day += 1 },
+  },
   // #577: после разрастания пулов звонка выборки перестали собирать и второе приглашение Арсена
   Court_Lawyer_Again: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem.court = 1; g.S.mem['intro.arsen'] = true } },
   Scene_lend: { event: 'PickScene', setup: (g) => { g.S.mood = 4 } }, // денег в свежей партии хватает (START_MONEY)
