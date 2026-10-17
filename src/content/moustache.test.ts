@@ -5,6 +5,7 @@ import { spec, valueOf } from './fact'
 import { OATH_FORMS } from './misc'
 import { WORLD, meet, PROMISE_MET, PROMISE_SHAVE, PROMISE_SHAVE_ASK, PROMISE_SHAVE_KEPT } from './world'
 import { alikDead, alikShaved, endgame, moustacheKept, nuneKeyPassed } from './memkeys'
+import { P_MOUSTACHE } from './rules/player-choice-pools'
 import { D, low } from './excuses'
 import { promiseRules } from './rules/world'
 import type { Entry } from './fact'
@@ -411,6 +412,9 @@ describe('ставка «усы»', () => {
     const { game } = makeGame()
     const hasAsk = () => game.buildChoices().some((c) => c.act === 'moustacheAsk')
     expect(hasAsk()).toBe(false)
+    // как настоящий производитель (Due_StakeShave): факт ставки + ачивка дня бритья — нить жива (#921)
+    game.S.day = 10
+    game.S.ach.shaved = 9
     game.S.mem[alikShaved] = true
     expect(hasAsk()).toBe(true)
     const choice = game.buildChoices().find((c) => c.act === 'moustacheAsk')!
@@ -425,10 +429,34 @@ describe('ставка «усы»', () => {
     expect(hasAsk()).toBe(true)
   })
 
+  it('строки кнопки «как усы?» сами якорят нить: в каждой и усы, и деньги (#921)', () => {
+    expect(P_MOUSTACHE.length).toBeGreaterThan(0)
+    for (const t of P_MOUSTACHE) {
+      expect(t, `«${t}» — без усов`).toMatch(/ус/i)
+      expect(t, `«${t}» — без денег или долга`).toMatch(/долг|денег|деньг/i)
+    }
+  })
+
+  it('нить выдыхается: до 30 дней после бритья кнопка есть, с 31-го — нет (#921)', () => {
+    const { game } = makeGame()
+    game.S.day = 100
+    game.S.mem[alikShaved] = true
+    const hasAsk = () => game.buildChoices().some((c) => c.act === 'moustacheAsk')
+    // день бритья: нить ещё не началась — первый вопрос назавтра (счётчику нужен день события)
+    game.S.ach.shaved = 100
+    expect(hasAsk(), 'в день бритья кнопка ещё не звучит').toBe(false)
+    game.S.ach.shaved = 70
+    expect(hasAsk(), 'на 30-й день нить ещё жива').toBe(true)
+    game.S.ach.shaved = 69
+    expect(hasAsk(), 'нить выдохлась').toBe(false)
+  })
+
   it('NC: без alik.shaved Opt_Moustache закрыт (#352)', () => {
     const { game } = makeGame()
     const rule = game.rules.all.find((r) => r.name === 'Opt_Moustache')!
     const onlyMine = { skip: new Set(game.rules.all.filter((r) => r.name !== 'Opt_Moustache').map((r) => r.name)) }
+    game.S.day = 10
+    game.S.ach.shaved = 9 // окно живо: без него правило закрыто и окном 30 дней (#921)
     delete game.S.mem[alikShaved]
     expect(game.rules.match({ event: 'BuildChoices' }, game.facts(), onlyMine)?.name).not.toBe('Opt_Moustache')
     game.S.mem[alikShaved] = true
