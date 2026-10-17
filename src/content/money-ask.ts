@@ -6,10 +6,10 @@ import { needs } from './world'
 import { registerPlayerPool } from './player-pools'
 import { taxFrozen, nivaBack } from './memkeys'
 
-/** Ходов после ответа Алика о месте денег: столько вопросы-состояния молчат, чтобы не переспрашивать подтверждённое (#952, образец окна #928/#936). */
+/** Ходов после ответа Алика или его объявления о месте денег: столько вопросы-состояния этого места молчат (#952/#962, образец окна #928/#936). */
 export const MONEY_ASK_TURNS = 20
-/** Вопрос о состоянии места («всё ещё», «не вскрывали», «целый») — молчит окно после ответа; вопросы-действия и срока окна не знают. */
-const state = <T>(e: Entry<T>): Entry<T> => gate(gt('sinceMoneyAsk', MONEY_ASK_TURNS))(e)
+/** Вопрос о состоянии места: молчит окно своего места после ответа на вопрос или свежего объявления (#955/#962); вопросы-действия и срока окна не знают. */
+const state = <T>(place: MoneyPlace, e: Entry<T>): Entry<T> => gate(gt(`sinceMoneyAsk.${place}`, MONEY_ASK_TURNS))(e)
 
 /** Чьи легенды к какому месту относятся: банк (счета), фундамент, сейф, крипта, «Нива». */
 export const MONEY_PLACES = {
@@ -29,48 +29,48 @@ export const moneyPlaceOf = (legend: unknown): MoneyPlace | undefined =>
 /** Вопрос игрока о том, где деньги сейчас: пул на место, не меньше пяти формулировок. */
 export const MONEY_ASK: Record<MoneyPlace, Entry<string>[]> = {
   bank: registerPlayerPool('MONEY_ASK_bank', [
-    gate(is(taxFrozen))(state('Алик, счета всё ещё заморожены?')),
+    gate(is(taxFrozen))(state('bank', 'Алик, счета всё ещё заморожены?')),
     // «когда» — не переспрос состояния: срок живёт и в окне (#952)
     gate(is(taxFrozen))('Когда разморозят мои деньги?'),
-    gate(is(taxFrozen))(state('Разморозка не сдвинулась?')),
-    state('Деньги всё ещё в банке?'),
-    state('Банк ещё держит деньги?'),
+    gate(is(taxFrozen))(state('bank', 'Разморозка не сдвинулась?')),
+    state('bank', 'Деньги всё ещё в банке?'),
+    state('bank', 'Банк ещё держит деньги?'),
   ]),
   beton: registerPlayerPool('MONEY_ASK_beton', [
-    state('Деньги всё ещё в фундаменте?'),
-    state('Алик, фундамент не вскрывали?'),
+    state('beton', 'Деньги всё ещё в фундаменте?'),
+    state('beton', 'Алик, фундамент не вскрывали?'),
     // триггер действия, а не только вопрос о состоянии (#889): предложение достать — в духе «с перфоратором»
     'Может, всё-таки достанем деньги из фундамента?',
-    state('Дом стоит на моих деньгах?'),
+    state('beton', 'Дом стоит на моих деньгах?'),
     // живая линия бетона: доля дома, а не ещё один вопрос «где» (#920)
     'Раз дом на моих деньгах — мне должна часть дома. Хотя бы комната. Угловая.',
-    state('Фундамент ещё целый?'),
-    state('Под фундаментом всё лежит?'),
+    state('beton', 'Фундамент ещё целый?'),
+    state('beton', 'Под фундаментом всё лежит?'),
   ]),
   safe: registerPlayerPool('MONEY_ASK_safe', [
-    state('Алик, сейф ещё закрыт?'),
-    state('Что с ключом от сейфа?'),
-    needs('nune')(state('Нуне с ключом не вернулась?')),
-    state('Что там с ключом от сейфа?'),
-    state('Деньги из сейфа достали?'),
+    state('safe', 'Алик, сейф ещё закрыт?'),
+    state('safe', 'Что с ключом от сейфа?'),
+    needs('nune')(state('safe', 'Нуне с ключом не вернулась?')),
+    state('safe', 'Что там с ключом от сейфа?'),
+    state('safe', 'Деньги из сейфа достали?'),
   ]),
   crypto: registerPlayerPool('MONEY_ASK_crypto', [
-    state('Алик, крипта ещё жива?'),
-    state('Курс лаваша сегодня смотрел?'),
-    state('Сколько лавашей в моём коине?'),
-    state('Мои деньги всё ещё в «Лаваш-коине»?'),
-    state('Курс вырос или упал?'),
+    state('crypto', 'Алик, крипта ещё жива?'),
+    state('crypto', 'Курс лаваша сегодня смотрел?'),
+    state('crypto', 'Сколько лавашей в моём коине?'),
+    state('crypto', 'Мои деньги всё ещё в «Лаваш-коине»?'),
+    state('crypto', 'Курс вырос или упал?'),
   ]),
   niva: registerPlayerPool('MONEY_ASK_niva', [
     // «Нива» упоминается под своим положением (nivaHome/nivaAway), иначе упоминание — догадка;
     // после возвращения бардачок пуст, колёса на продаже — вопрос «деньги в Ниве» закрыт (#919)
-    needs('niva', 'nivaHome')(gate(missing(nivaBack))(state('Алик, «Нива» ещё у тебя?'))),
-    needs('niva', 'nivaAway')(state('Где сейчас «Нива»?')),
-    needs('niva', 'nivaAway')(state('«Нива» не вернулась?')),
-    needs('niva', 'nivaHome')(gate(missing(nivaBack))(state('Деньги всё ещё в «Ниве»?'))),
-    needs('niva', 'nivaHome')(gate(missing(nivaBack))(state('«Нива» стоит или поехала?'))),
+    needs('niva', 'nivaHome')(gate(missing(nivaBack))(state('niva', 'Алик, «Нива» ещё у тебя?'))),
+    needs('niva', 'nivaAway')(state('niva', 'Где сейчас «Нива»?')),
+    needs('niva', 'nivaAway')(state('niva', '«Нива» не вернулась?')),
+    needs('niva', 'nivaHome')(gate(missing(nivaBack))(state('niva', 'Деньги всё ещё в «Ниве»?'))),
+    needs('niva', 'nivaHome')(gate(missing(nivaBack))(state('niva', '«Нива» стоит или поехала?'))),
     // колёсная ветка: «Нива» вернулась без денег, но с колёсами на продажу (#919)
-    needs('niva')(gate(is(nivaBack))(state('Колёса всё ещё продаются?'))),
-    needs('niva')(gate(is(nivaBack))(state('Покупатель на колёса нашёлся?'))),
+    needs('niva')(gate(is(nivaBack))(state('niva', 'Колёса всё ещё продаются?'))),
+    needs('niva')(gate(is(nivaBack))(state('niva', 'Покупатель на колёса нашёлся?'))),
   ]),
 }

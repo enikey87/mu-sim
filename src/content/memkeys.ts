@@ -171,8 +171,11 @@ export const whenYears = 'when.years'
 export const crewPaid = 'crew.paid'
 /** Ход звонка: «кто звонил» без имени живёт только несколько ходов после него (#928). */
 export const crewPaidAt = 'crew.paidAt'
-/** Ход ответа Алика на вопрос о месте денег: вопросы-состояния молчат окно после него (#952). */
-export const moneyAskAt = 'money.askAt'
+/** Ход ответа игрока или объявления о месте денег: state-вопросы этого места молчат окно после него (#952/#955, объявления — #962). */
+export const moneyAskAt = {
+  bank: 'money.askAt.bank', beton: 'money.askAt.beton', safe: 'money.askAt.safe',
+  crypto: 'money.askAt.crypto', niva: 'money.askAt.niva',
+} as const
 /** Рубик остался жить на объекте и спит в ванной (#590): до этой серии про ванную не говорят. */
 export const rubikBath = 'rubik.bath'
 /** Заметные системные события с окном реакции (#927): ход события для «свежих» фактов. */
@@ -200,7 +203,7 @@ export const interjections = 'interjections'
 export const EVENT_KEY_LIST = [
   'day', 'dow', 'month', 'dom', 'holiday', 'sent', 'moo', 'tier', 'mood', 'patience', 'money', 'debt', 'fifty', 'paid',
   'moneyNormal', 'moneyLow', 'moneyBottom', 'paymentDueTomorrow',
-  'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sinceCrew', 'sinceMoneyAsk', 'sorrySwing', 'promiseLive', 'promisePassed', 'promiseStake',
+  'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sinceCrew', 'sorrySwing', 'promiseLive', 'promisePassed', 'promiseStake',
   'ramPhotoFresh', 'borisSaleFresh', 'vacancyFresh', 'avitoReviewFresh', 'rubikAskFresh', 'kettleFresh',
   'lawyerFresh', 'collectorsAskFresh', 'internFresh', 'rubikHoleFresh', 'countersuitFresh',
   'period', 'night', 'offline', 'scene', 'sinceAlik', 'lateCount', 'arcAvailable',
@@ -221,7 +224,7 @@ export const MEM_KEYS: ReadonlySet<string> = new Set([
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday, saidKonak,
   lightOff, netRation, phoneWarn, holidayGreeted,
-  creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, collectorsTurned, criticalAt, creditOfferSum, momDachaAt, crewPaid, crewPaidAt, moneyAskAt, rubikBath, whenYears,
+  creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, collectorsTurned, criticalAt, creditOfferSum, momDachaAt, crewPaid, crewPaidAt, rubikBath, whenYears, ...Object.values(moneyAskAt),
   ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt, countersuitAt,
   ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lend50),
 ])

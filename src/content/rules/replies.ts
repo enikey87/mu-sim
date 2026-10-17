@@ -12,6 +12,7 @@ import { GREET_A, WHEN_COND, SWING } from '../misc'
 import { type TalkKind, talkPairs, talkId, TALK_REMEMBER } from '../talk'
 import { saidClaims, saidText, type Said } from '../fact'
 import { LEGENDS } from '../legends'
+import { moneyPlaceOf } from '../money-ask'
 import { ARCS, NO_NEWS_A, NO_NEWS_B, GROUP_SEEN_A, GROUP_SEEN_B, WRONG_A, WRONG_B } from '../arcs'
 import * as L from '../life'
 import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, PROMISE_PENCIL, PROMISE_FAR, PROMISE_YEARS, KONAK_LINE } from '../misc'
@@ -99,7 +100,8 @@ export const replyRules: R[] = [
       const l = LEGENDS[legend]
       if (!l) return false
       // вопрос прозвучал и получает ответ: вопросы-состояния того же места молчат окно свежести (#952)
-      game.applyFacts([set(moneyAskAt, Number(facts.sent))])
+      const place = moneyPlaceOf(legend)
+      if (place) game.applyFacts([set(moneyAskAt[place], Number(facts.sent))])
       const p = game.linePicked('LEG_' + legend, l.lines)
       if (!p) return game.excuseTurn()
       game.markTopical(await game.say([{ t: p.text, claims: p.spec.claims ?? [] }]))

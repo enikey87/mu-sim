@@ -173,8 +173,9 @@ describe('«Лет двадцать?» — пара со своим ответо
     expect(years!.arg).toBe('years')
     const n = g.S.msgs.length
     await g.send(years!)
-    const sharp = alikTexts(g.S.msgs.slice(n)).join(' ')
-    expect(sharp).toBe(PROMISE_YEARS)
+    const lines = alikTexts(g.S.msgs.slice(n))
+    expect(lines[0], 'первый ответ на кнопку — колкая строка').toBe(PROMISE_YEARS)
+    const sharp = lines.join(' ')
     expect(sharp, 'тычка игроку в ответе нет (#918)').not.toMatch(/Ты — нет/)
     expect(from(PROMISE_NEVER, sharp)).toBe(false)
     expect(g.mem()['when.years'], 'факт «уже спросил»').toBe(true)
