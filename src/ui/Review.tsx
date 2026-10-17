@@ -10,6 +10,7 @@ export interface ReviewDraft {
   msg?: number
   day: number
   turn: number
+  meAt?: number
   target: ReviewTarget
   note: string
   type: ReviewCategory
@@ -91,7 +92,7 @@ export function ReviewBadge({ note, onEdit }: { note: ReviewNote; onEdit: () => 
       className="review-badge"
       title={note.type}
       aria-label={`Заметка ${note.id}: ${note.type}`}
-      onClick={onEdit}
+      onClick={(e) => { e.stopPropagation(); onEdit() }}
     >
       {categoryIcon(note.type)} {note.id}
     </button>

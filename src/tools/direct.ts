@@ -79,7 +79,6 @@ export const DIRECT: Record<string, DirectCase> = {
     event: 'PlayerSays', facts: { intent: 'sorry' },
     setup: (g) => { g.S.mem.blocked = true; g.S.mem['blocked.hint'] = true },
   },
-  Says_via_mama: { event: 'PlayerSays', facts: { intent: 'via', arg: 'mama' } },
   Ending_ram: {
     event: 'CheckEnding',
     setup: (g) => { g.S.day = 300; g.S.mem['finale.boris'] = 'toyou' },
@@ -174,8 +173,8 @@ export const DIRECT: Record<string, DirectCase> = {
   // с колкостями (#683) распухший журнал собирается ботами сам — случай снят по порогу гейта
   // #577: упрёк по звонку сдвинул розыгрыш ещё три правила — держим прямыми случаями
   // #824: после слияния с #828 розыгрыш сдвинулся — голосовое снова уходит из семейства +4000, держим прямым случаем
-  // #889: та же перекалибровка вернула голосовое в выборки (7 партий при пороге 7) — прямой случай снят;
-  // на чужих семействах (+2000/+4000/+6000) правило играет (2–4 партии), нулей второй гейт не видит
+  // #889: та же перекалибровка вернула голосовое в выборки (7 партий при пороге 7) — прямой случай снят
+  // (снята и стороной #890); на чужих семействах (+2000/+4000/+6000) правило играет (2–4 партии), нулей второй гейт не видит
   // #824: там же ушёл из семейства +6000 финал бетона «Настоящая ведомость» (порог поимок 2)
   // #889: перекалибровка вариантов бетона сдвинула розыгрыш — финал срабатывает в выборках сам
   // (8 партий при пороге 7) — прямой случай не нужен, гейт видит его без подсказки
@@ -185,7 +184,7 @@ export const DIRECT: Record<string, DirectCase> = {
   Finale_razmik_default: { event: 'ArcFinale', facts: { arc: 'razmik' } },
   Finale_beton_opened: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem['count.rude'] = 6; g.S.mem[HEAT] = 3 } },
   // #585: праздничная кнопка сдвинула выборки — тишина на наступившем сроке ушла из них
-  Quiet_Dead_PromiseDue: { event: 'PromiseDue', setup: dead },
+  // #890: риторика срока по роду сдвинула розыгрыш — Quiet_Dead_PromiseDue в 7 партиях (порог 7), гейт видит сам
   // #577: после разрастания пулов звонка выборки перестали собирать и второе приглашение Арсена
   Court_Lawyer_Again: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem.court = 1; g.S.mem['intro.arsen'] = true } },
   Scene_lend: { event: 'PickScene', setup: (g) => { g.S.mood = 4 } }, // денег в свежей партии хватает (START_MONEY)

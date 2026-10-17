@@ -1,6 +1,8 @@
 // Целостность контента: ссылки сцен, ачивки, словари, генератор отмазок.
 import { describe, it, expect } from 'vitest'
 import { make, D } from './excuses'
+import { LEGENDS } from './legends'
+import { makeGame } from '../test/helpers'
 import { makeScenes, type Line } from './scenes'
 import { ARCS, ARC_DONE, CAST, GROUP } from './arcs'
 import { ACH } from './achievements'
@@ -11,6 +13,43 @@ import { Decks } from '../engine/deck'
 import { seededRng } from '../engine/rng'
 import { Gated, valueOf, type Entry } from '../engine/rules'
 import { saidText } from './fact'
+
+describe('живая рецензия №1: точечные правки (#891)', () => {
+  it('старые строки ушли из исходников', () => {
+    for (const line of ['Долг Гарика под домом', 'Мой вопрос рассматривает ООН', 'мы философствуем', 'просто достать Гарика']) {
+      expect(allSource, line).not.toContain(line)
+    }
+  })
+  it('новые строки на месте', () => {
+    for (const line of [
+      'Мой долг под Гариком и домом — а платит Алик?',
+      'Твой вопрос про деньги рассматривает ООН',
+      'Мы не злимся.',
+      'Может, спросить Гарика? Он же код знает',
+      'с него и спросишь, я подскажу, где он',
+    ]) expect(allSource, line).toContain(line)
+  })
+  it('Тарон рисуется на старых эмодзи-шрифтах: ☕, а не чайник из Unicode 13.0 (#891)', () => {
+    expect(CAST.taron.emoji).toBe('☕')
+    expect(allSource).not.toContain('🫖')
+  })
+  it('срок легенды бетона указывает на Гранта: «я свободен» и обещание вернуть самому не спорят (#891)', () => {
+    expect(LEGENDS.beton_law.until.t).toContain('с него и спросишь')
+    expect(LEGENDS.beton_law.until.t).not.toContain('что должен тебе')
+  })
+  it('в легенде кода Гарика спрашивают, а не достают (#891)', () => {
+    const talk = (LEGENDS.garik.talk ?? []).map(valueOf).flat().join(' ')
+    expect(talk).toContain('Может, спросить Гарика? Он же код знает')
+    expect(talk).not.toContain('достать Гарика')
+  })
+  it('follow-строка Гарика про долг — под гейтом бетона (#891)', () => {
+    const { game } = makeGame()
+    const line = 'Мой долг под Гариком и домом — а платит Алик?'
+    expect(game.open(ARCS.garik.follow), 'до фундамента строки нет').not.toContain(line)
+    game.S.mem['garik.concrete'] = true
+    expect(game.open(ARCS.garik.follow), 'бетон введён — строка есть').toContain(line)
+  })
+})
 
 const sources = import.meta.glob(['../**/*.ts', '../**/*.tsx', '!../**/*.test.*'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>
 const allSource = Object.values(sources).join('\n')

@@ -1757,6 +1757,87 @@ describe('рецензирование вариантов ответа (#878)', 
     expect(note.turn).toBeLessThan(game.S.stats.sent)
   })
 
+  it('клик по бейджу варианта открывает правку и не отправляет реплику (#901)', async () => {
+    sessionStorage.clear()
+    at('/?review')
+    const { game } = makeGame({ seed: 2 })
+    renderApp(game)
+    const btn = choices()[1]!
+    await act(async () => { fireEvent.contextMenu(btn) })
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /Заметка/ })) })
+    await act(async () => { fireEvent.click(screen.getByText('Сохранить')) })
+    const sent = game.S.stats.sent
+    const mine = () => game.S.msgs.filter((m) => m.kind === 'text' && m.from === 'me').length
+    const before = mine()
+    const badge = btn.querySelector('.review-badge')
+    expect(badge, 'бейдж на варианте').toBeTruthy()
+    await act(async () => { fireEvent.click(badge!) })
+    expect(screen.getByRole('dialog', { name: 'Заметка рецензента' }), 'правка открыта').toBeInTheDocument()
+    expect(game.S.stats.sent, 'ход не ушёл').toBe(sent)
+    expect(mine(), 'в ленте нет новой реплики игрока').toBe(before)
+  })
+
+  const exportDump = async () => {
+    let blob: Blob | null = null
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: (b: Blob) => { blob = b; return 'blob:review' } })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: () => {} })
+    await act(async () => { fireEvent.click(document.getElementById('infoBtn')!) })
+    await act(async () => { fireEvent.click(document.getElementById('reviewExport')!) })
+    return JSON.parse(await blob!.text()) as { notes: Array<{ chosen: boolean | null; target: { kind: string; text: string } }> }
+  }
+
+  it('chosen: true — игрок отправил этот вариант, и допработа между заметкой и выбором не сбивает якорь (#901)', async () => {
+    sessionStorage.clear()
+    at('/?review')
+    const { game } = makeGame({ seed: 2 })
+    const first = renderApp(game)
+    const btn = choices()[1]!
+    await act(async () => { fireEvent.contextMenu(btn) })
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /Заметка/ })) })
+    await act(async () => { fireEvent.click(screen.getByText('Сохранить')) })
+    await act(async () => { fireEvent.click(btn) })
+    const direct = await exportDump()
+    const directNote = direct.notes.find((n) => n.target.kind === 'answer_option')
+    expect(directNote?.chosen, 'выбранный вариант отмечен').toBe(true)
+    first.unmount()
+
+    sessionStorage.clear()
+    const { game: drifted } = makeGame({ seed: 2 })
+    renderApp(drifted)
+    const btn2 = choices()[1]!
+    const optionText2 = btn2.textContent!.replace(/\s*\d+$/, '').trim()
+    const picked2 = drifted.choices.find((c) => c.text === optionText2)!
+    await act(async () => { fireEvent.contextMenu(btn2) })
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /Заметка/ })) })
+    await act(async () => { fireEvent.click(screen.getByText('Сохранить')) })
+    const sent = drifted.S.stats.sent
+    await act(async () => { await drifted.job() })
+    const job = drifted.S.msgs.findLast((m) => m.kind === 'job')!
+    await act(async () => { await drifted.answerJob(job.id, false) })
+    expect(drifted.S.stats.sent, 'ответ допработы — не ход').toBe(sent)
+    await act(async () => { await drifted.send(picked2) })
+    const dump = await exportDump()
+    const note = dump.notes.find((n) => n.target.text === optionText2)
+    expect(note?.chosen, 'допработа между заметкой и выбором не сдвигает отметку').toBe(true)
+  })
+
+  it('старая заметка варианта с якорем turn читается без падения (#901)', async () => {
+    sessionStorage.clear()
+    at('/?review')
+    sessionStorage.setItem('review_notes', JSON.stringify([{
+      id: 1, day: 1, turn: 0, type: 'плохой_вариант',
+      target: { kind: 'answer_option', text: 'НЕ_ТОТ_ТЕКСТ', offered: [], who: 'me' },
+      note: 'старая заметка только с ходом',
+    }]))
+    const { game } = makeGame({ seed: 2 })
+    renderApp(game)
+    const dump = await exportDump()
+    const note = dump.notes.find((n) => n.target.kind === 'answer_option')
+    expect(note, 'заметка в экспорте').toBeTruthy()
+    // якорь turn: сравнение с mine[0], репликой завязки, а не со слотом следующего хода
+    expect(note!.chosen).toBe(false)
+  })
+
   it('без ?review меню на вариантах нет', async () => {
     sessionStorage.clear()
     at('/')

@@ -236,6 +236,41 @@ describe('ответы Алика (PlayerSays)', () => {
     expect(oneOf(PREV_MANY.map(frag), t.join(' '))).toBe(true)
     expect(game.S.promises[0].asked).toBe(true)
   })
+  it('два вопроса про фундамент в одном блоке не стоят (#887)', () => {
+    const { game } = makeGame()
+    // деньги — в фундаменте: и общий вопрос про деньги, и follow бетона спрашивают про одно и то же
+    game.setLegend('beton_money', 'beton')
+    game.S.arcs.beton = { i: 1, last: -99 }
+    game.S.ctx = { arc: 'beton' }
+    let money = 0
+    let arc = 0
+    for (let i = 0; i < 40; i++) {
+      game.S.choices = null
+      const cs = game.buildChoices()
+      const foundation = cs.filter((c) => /фундамент|бетон/i.test(c.text))
+      expect(foundation.length, `блок ${i}: вопросов про фундамент — ${foundation.map((c) => c.text).join(' + ')}`).toBeLessThanOrEqual(1)
+      if (cs.some((c) => c.act === 'money')) money++
+      if (cs.some((c) => c.act === 'arc' && c.arg === 'beton')) arc++
+    }
+    // проверка не пустая: оба пула претендовали на блок (вопрос про деньги — чаще, он и забирает тему)
+    expect(money, 'вопрос про деньги ни разу не выпал').toBeGreaterThan(0)
+    expect(arc, 'вопрос про бетон ни разу не выпал').toBeGreaterThan(0)
+  })
+
+  it('дебют коллекторов: в том же ходу есть вариант про них, вне окна — нет (#888)', () => {
+    const { game } = makeGame()
+    const DEBUT = /Кто вы и при чём тут я|Поручитель\? Он и мне должен|Алик, за мной пришли/
+    const has = () => game.buildChoices().some((c) => DEBUT.test(c.text))
+    expect(has(), 'до дебюта коллекторов в истории нет — и варианта нет').toBe(false)
+    // дебют сыграл: серия представила коллекторов, окно — до следующей серии
+    game.S.mem['intro.collectors'] = true
+    game.S.arcs.collectors = { i: 1, last: 0 }
+    expect(has(), 'окно дебюта: вопрос про них есть').toBe(true)
+    // следующая серия закрывает окно: коллекторы не селятся в общих пулах навсегда
+    game.S.arcs.collectors = { i: 2, last: 0 }
+    expect(has(), 'окно закрыто — варианта нет').toBe(false)
+  })
+
   it('отмазка «тогда Борис заболел» — только для цитат не раньше болезни Бориса (#859)', async () => {
     const { game } = makeGame()
     // серия болезни Бориса: баран появляется в истории и движок пишет день состояния

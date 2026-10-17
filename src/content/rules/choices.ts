@@ -4,7 +4,7 @@ import type { ContentApi } from '../../engine/game'
 import type { Choice, Tone } from '../../engine/state'
 import { type Rule, type Facts, type Criterion, type Entry, eq, ne, is, exists, missing, gt, gte, lte, isOpen, valueOf } from '../fact'
 import type { GameEvent, Offer } from './events'
-import { D, cap } from '../excuses'
+import { D, cap, WHEN_YEARS } from '../excuses'
 import { talkPairs, talkId } from '../talk'
 import { ARCS, WRONG_Q } from '../arcs'
 import * as L from '../life'
@@ -16,10 +16,10 @@ import { MONEY_ASK, moneyPlaceOf } from '../money-ask'
 import { P_HOLIDAY, holidayBefore, type Holiday } from '../holidays'
 import { WORLD, SPEAKS } from '../world'
 import { fmtDayMonth, fmtDays } from '../../engine/time'
-import { HEAT, alikDead, alikShaved, moustacheAskAt, blocked, court, mourning, phoneKarine, crewPaid, endgame } from '../memkeys'
+import { HEAT, alikDead, alikShaved, intro, moustacheAskAt, blocked, court, mourning, phoneKarine, crewPaid, endgame } from '../memkeys'
 import { requirePlayerPool } from '../player-pools'
 import {
-  P_VIA_BORIS, P_VIA_KARINE, P_VIA_MAMA, P_MOO, P_MOUSTACHE, P_COURT,
+  P_VIA_BORIS, P_VIA_KARINE, P_VIA_MAMA, P_MOO, P_MOUSTACHE, P_COURT, P_COLLECTORS_DEBUT,
 } from './player-choice-pools'
 
 type R = Rule<ContentApi, GameEvent, Offer>
@@ -31,6 +31,8 @@ interface OfferSpec {
   tone: Tone
   text: (game: ContentApi, facts: Facts) => string
   arg?: (game: ContentApi, facts: Facts) => string | number | undefined
+  /** Тема вопроса для дедупа блока (#887): два про одно и то же в одной сборке не стоят. */
+  topic?: (game: ContentApi, facts: Facts) => string | undefined
   bonus?: number
   specificity?: number
   slot?: string
@@ -39,6 +41,10 @@ interface OfferSpec {
   /** Перерыв от показа: кнопку увидели — пауза пошла (штамп при сборке вариантов, game.ts). */
   cooldown?: { turns?: number; days?: number }
 }
+
+/** Тема вопроса: место денег и тема игрока называют ту же тему, что арка (#887) — иначе два вопроса об одном. */
+const MONEY_TOPIC: Record<string, string> = { beton: 'arc:beton' }
+const TOPIC_ARC: Record<string, string> = { beton: 'arc:beton', wedding: 'arc:samvel', ram: 'arc:boris', niva: 'arc:niva' }
 
 const fromD = (game: ContentApi, key: string, map: Record<string, string> = {}) => {
   requirePlayerPool(`D.${key}`, D[key])
@@ -70,7 +76,10 @@ const offer = (o: OfferSpec): R => ({
   odds: o.odds,
   cooldown: o.cooldown,
   // пустой текст — нечего предложить (весь пул недавно показывали)
-  offer: ({ game, facts }): Choice | null => { const text = o.text(game, facts); return text ? { text, tone: o.tone, act: o.act, arg: o.arg?.(game, facts) } : null },
+  offer: ({ game, facts }): Choice | null => {
+    const text = o.text(game, facts)
+    return text ? { text, tone: o.tone, act: o.act, arg: o.arg?.(game, facts), topic: o.topic?.(game, facts) } : null
+  },
 })
 
 export const choiceRules: R[] = [
@@ -151,12 +160,30 @@ export const choiceRules: R[] = [
     const args = (f: Facts) => ({ t: String(f['ctx.when']), T: cap(String(f['ctx.when'])), date: String(f['ctx.whenDate'] ?? ''), days: fmtDays(Number(f['ctx.whenDays'] ?? 0)) })
     const when = (o: Pick<OfferSpec, 'name' | 'when' | 'act' | 'tone' | 'weight' | 'arg' | 'text'>) => offer({ slot: 'when', specificity: 3, bonus: 1, ...o })
     const near = [...term, eq('ctx.whenHorizon', 'near')]
+    const askPool = (f: Facts): string =>
+      f['ctx.whenKind'] === 'holiday' ? 'P_WHEN_CALENDAR' : f['ctx.whenKind'] === 'event' ? 'P_WHEN_EVENT' : 'P_WHEN'
     return [
       when({ name: 'WhenOk', when: near, weight: 0.4, act: 'promiseOk', tone: 'polite', text: (g, f) => fromD(g, f['ctx.whenDate'] ? 'P_WHEN_OK' : 'P_WHEN_OK_EVENT', args(f)) }),
-      when({ name: 'WhenCheck', when: near, weight: 0.6, act: 'promiseCheck', tone: 'neutral', text: (g, f) => fromD(g, 'P_WHEN', args(f)), arg: (_g, f) => String(f['ctx.when']) }),
+      when({ name: 'WhenCheck', when: near, weight: 0.6, act: 'promiseCheck', tone: 'neutral', text: (g, f) => fromD(g, askPool(f), args(f)), arg: (_g, f) => String(f['ctx.when']) }),
       when({ name: 'WhenPencil', when: [...term, eq('ctx.whenHorizon', 'far')], act: 'promisePencil', tone: 'neutral', text: (g, f) => fromD(g, 'P_WHEN_PENCIL', args(f)) }),
       when({ name: 'WhenFar', when: [...term, eq('ctx.whenHorizon', 'veryFar')], act: 'promiseFar', tone: 'neutral', text: (g, f) => fromD(g, 'P_WHEN_FAR', args(f)), arg: (_g, f) => String(f['ctx.when']) }),
-      ...(['never', 'absurd'] as const).map((kind) => when({ name: `When_${kind}`, when: [...term, eq('ctx.whenKind', kind)], act: 'promiseNever', tone: 'neutral', text: (g, f) => fromD(g, 'P_WHEN_NEVER', args(f)), arg: (_g, f) => String(f['ctx.when']) })),
+      ...(['never', 'absurd'] as const).map((kind) => {
+        let years = false
+        return when({
+          name: `When_${kind}`, when: [...term, eq('ctx.whenKind', kind)], act: 'promiseNever', tone: 'neutral',
+          text: (g, f) => {
+            const map = args(f)
+            years = false
+            requirePlayerPool('D.P_WHEN_NEVER', D.P_WHEN_NEVER)
+            return g.playerLine(() => {
+              const raw = g.X.fill(g.draw('P_WHEN_NEVER', D.P_WHEN_NEVER), map)
+              if (raw === WHEN_YEARS) years = true
+              return raw
+            })
+          },
+          arg: (_g, f) => (years ? 'years' : String(f['ctx.when'])),
+        })
+      }),
     ]
   })(),
 
@@ -192,6 +219,13 @@ export const choiceRules: R[] = [
   }),
 
   // сериалы: про текущий — всегда, про любой незаконченный — иногда
+  // дебют коллекторов (#888): в окне их первой серии у игрока есть вопрос про них самих.
+  // Окно закрывает сама серия: следующий эпизод двигает arc.collectors, и вопрос уходит вместе с окном
+  offer({
+    name: 'CollectorsDebut', slot: 'arc', when: [is(intro('collectors')), eq('arc.collectors', 1)], act: 'arc', tone: 'polite', bonus: 2,
+    text: (g) => g.freshPlayer('F_collectors_debut', P_COLLECTORS_DEBUT) ?? g.draw('F_collectors_debut', P_COLLECTORS_DEBUT),
+    arg: () => 'collectors',
+  }),
   offer({
     // единственный выход из смерти: вопрос не исчезает, даже если все недавно показывали (исключение из окна #824)
     name: 'ArcDeath', slot: 'arc', when: [is(alikDead), is('deathCanAdvance')], act: 'arc', tone: 'polite', bonus: 5,
@@ -206,6 +240,7 @@ export const choiceRules: R[] = [
     // У `ArcDeath` эта связка была и раньше.
     // окно повтора (#824): пока все формулировки пула в последних PLAYER_REPEAT_TURNS ходах, вопрос молчит, а не повторяется дословно
     text: (g, f) => { const key = 'F_' + f['ctx.arc']; const arr = ARCS[String(f['ctx.arc'])].follow; return g.freshPlayer(key, arr) ?? '' }, arg: (_g, f) => String(f['ctx.arc']),
+    topic: (_g, f) => `arc:${String(f['ctx.arc'])}`,
   }),
   // дело в суде открыто — игрок может его продолжить (угроза двигает линию суда)
   offer({
@@ -246,6 +281,7 @@ export const choiceRules: R[] = [
   offer({
     name: 'Money', slot: 'money', when: [exists('legend')], act: 'money', tone: 'neutral', bonus: 3, odds: 0.9,
     text: (g, f) => { const place = moneyPlaceOf(f.legend); return place ? freshFromArr(g, 'MONEY_ASK_' + place, MONEY_ASK[place]) : '' },
+    topic: (_g, f) => { const place = moneyPlaceOf(f.legend); return place ? MONEY_TOPIC[place] : undefined },
     arg: (_g, f) => String(f.legend),
   }),
   // ответ по теме: игрок цепляется за то, что Алик только что сказал (после серии сериала — вопрос про сериал важнее)
@@ -263,6 +299,7 @@ export const choiceRules: R[] = [
           return q ?? ''
         },
         arg: () => arg,
+        topic: (_g: ContentApi, f: Facts) => TOPIC_ARC[String(f['ctx.topic'])],
       }
     })(),
   }),
