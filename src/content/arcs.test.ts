@@ -169,6 +169,31 @@ describe('хребет Гарика: конверт-мотив и признан
     expect(ep1, 'официальная версия «застыл» остаётся').toMatch(/застыл/)
   })
 
+  it('мотив конверта пишет факт на доску, а бетон после не признаётся с нуля (#933)', async () => {
+    // Гарик раньше бетона: мотив звучит и пишет heard.money_foundation (claims)
+    const { game } = makeGame()
+    const from = game.S.msgs.length
+    await game.playArc('garik')
+    const said = alikTexts(game.S.msgs.slice(from)).join(' ')
+    expect(said, 'мотив звучит у Гарика').toContain('Я туда твои деньги уронил')
+    expect(game.facts()['heard.money_foundation'], 'история конверта записана на доску').toBe(true)
+    // бетон после: не «признание с нуля», а деталь к известному
+    const from2 = game.S.msgs.length
+    await game.playArc('beton')
+    const said2 = alikTexts(game.S.msgs.slice(from2)).join(' ')
+    expect(said2, 'признания с нуля нет').not.toContain('я нёс тебе деньги')
+    expect(said2, 'вместо него деталь').toContain('ведро было прораба Мкртича')
+  })
+
+  it('в нормальном порядке (бетон первым) рассказ бетона не меняется (#933)', async () => {
+    const { game } = makeGame()
+    const from = game.S.msgs.length
+    await game.playArc('beton')
+    const said = alikTexts(game.S.msgs.slice(from)).join(' ')
+    expect(said, 'признание с нуля осталось').toContain('я нёс тебе деньги')
+    expect(game.facts()['heard.money_foundation'], 'факт записан бетоном').toBe(true)
+  })
+
   it('серия признания существует: Гарик говорит сам, до неё Алик держит версию «застрял»', () => {
     const { game } = makeGame()
     const eps = ARCS.garik.eps
@@ -254,6 +279,30 @@ describe('вопрос «уже случилось?» только перед с
     await followBefore('niva', '«Нива» нашлась?', /«Нива» вернулась!/, 'Есть новости про «Ниву»?', { when: /Гюмри/, has: 'Где «Нива»?' })
     // контрольная строка — без ворот: «Как там свадьба?» с #831 требует объявленной свадьбы (первую серию)
     await followBefore('samvel', 'Самвел ещё женится?', /Самвел женится снова/, 'Тамада гуляет, а плачу я?')
+  })
+})
+
+describe('follow Бориса и остальных арок: строка с фактом серии — под гейтом (#926)', () => {
+  it('серия болезни не играла — «смету съел» нет; сыграла — кнопка перед ней', async () => {
+    await followBefore('boris', 'Что нового у Бориса? Смету он съел, а долг всё висит.', /Съел смету/, 'Как там Борис? Шерсть-то ладно, а деньги когда?')
+  })
+  it('«профессия» — факт серии про прораба: раньше её кнопки нет', async () => {
+    await followBefore('boris', 'Алик, как Борис-то? Профессия у него серьёзная, а денег у меня всё нет.', /прораб/, 'Как там Борис? Шерсть-то ладно, а деньги когда?')
+  })
+  it('«с того света» — факт серии «пишу с того света»: раньше её кнопки нет', async () => {
+    await followBefore('alik_death', 'Как вы там, Алик? С того света переводов не шлют?', /Пишу с того света/, 'Алик, вы живы? Живой — значит должник. Мёртвый — нет.')
+  })
+  it('«Размик слез, а долг растёт» — после финала арки, не раньше', async () => {
+    // кнопка после финала: до слеза строка отсутствует, слез — появляется (и после развязки остаётся)
+    const { game } = makeGame()
+    const pool = () => game.open(ARCS.razmik.follow)
+    const LINE = 'Размик слез, а долг растёт. Я всё ещё первый в очереди?'
+    game.S.arcs.razmik = { i: 0, last: 0 }
+    expect(pool(), 'до арки строки нет').not.toContain(LINE)
+    game.S.day += 5
+    await game.playArc('razmik')
+    game.S.arcs.razmik = { i: 8, last: 0 }
+    expect(pool(), 'финал сыгран — строка есть').toContain(LINE)
   })
 })
 

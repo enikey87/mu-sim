@@ -24,7 +24,8 @@ const offended = (g: Game) => { g.S.mem[HEAT] = 1; g.S.ctx = { offended: true } 
 export const DIRECT: Record<string, DirectCase> = {
   Tone_Cow: { event: 'PlayerMessage', facts: { tone: 'cow' } },
   // #826: окно повтора шире (#824 был 10 ходов, стал 20) сдвинуло розыгрыш — тон в блоке ушёл из выборок
-  Tone_WhileBlocked: { event: 'PlayerMessage', setup: (g) => { blocked(g) } },
+  // #926: гейты follow Бориса сдвинули розыгрыш обратно — тон в блоке снова в выборках (7 партий,
+  // порог 7) — прямой случай снят
   Says_catchLie_lieKind_grandpa: { event: 'PlayerSays', facts: { intent: 'catchLie' }, setup: (g) => { g.noteClaims(['grandpa_dead']); g.noteClaims(['grandpa_alive']) } },
   // #426: sys-claim Гранта («всё заплатил») противоречит «заказчик мне не платит» — бот ловит это сам, 34 партии
   Turn_BorisSick: { event: 'AlikTurn', setup: (g) => { g.S.arcs.boris = { i: 2, last: 0 }; g.S.actors.boris = { sick: true } } },
@@ -166,6 +167,10 @@ export const DIRECT: Record<string, DirectCase> = {
   Scene_heir: { event: 'PickScene', setup: (g) => { g.S.arcs.grandpa = { i: 4, last: 0 }; g.S.arcs.boris = { i: 4, last: 0 } } },
   // гейт на чужих семействах (#434): в семье +2000 сцена заказчика не выпадала ни разу — прямой случай держит
   Scene_customer: { event: 'PickScene', setup: (g) => { g.S.day = 210 } },
+  // гейт на чужих семействах (#434): в семье +6000 счёт-подтверждение не выпадал — прямой случай держит
+  Scene_invoice: { event: 'PickScene', setup: (g) => { g.S.day = 216 } },
+  // в семье +4000 не выпадал племянник (Арсен ещё не представлен) — прямой случай держит
+  Scene_nephew: { event: 'PickScene' },
   // гейт на чужих семействах (#434): в семье +2000 «через маму» не выпадало; если выборки снова увидят
   // его часто (порог 7), гейт скажет «снять» — тогда запись уйдёт, как Says_voice в #887
   Says_via_mama: { event: 'PlayerSays', facts: { intent: 'via', arg: 'mama' } },
@@ -191,6 +196,8 @@ export const DIRECT: Record<string, DirectCase> = {
   // #824: там же ушёл из семейства +6000 финал бетона «Настоящая ведомость» (порог поимок 2)
   // #889: перекалибровка вариантов бетона сдвинула розыгрыш — финал срабатывает в выборках сам
   // (8 партий при пороге 7) — прямой случай не нужен, гейт видит его без подсказки
+  // #926: гейты follow Бориса сдвинули розыгрыш — Tone_WhileBlocked в выборках сам (7 партий,
+  // порог 7) — прямой случай не нужен
   // #826: расширение тоновых пулов сдвинуло розыгрыш — отклик на «воскрес» ушёл из семейства +6000
   Says_condole_ctxrevived: { event: 'PlayerSays', facts: { intent: 'condole' }, setup: (g) => { g.S.ctx = { revived: true } } },
   Finale_rubik_default: { event: 'ArcFinale', facts: { arc: 'rubik' } },
