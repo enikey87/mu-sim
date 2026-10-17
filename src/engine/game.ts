@@ -562,7 +562,16 @@ export class Game {
     const at = this.shownAt.get(t)
     return at !== undefined && this.S.stats.sent - at < PLAYER_REPEAT_TURNS
   }
-  private rememberShown(t: string): void {
+  /**
+   * Строка предлагалась в окне дословного повтора, но не в этом же ходу (#857): сборка вариантов
+   * зовётся несколько раз за ход, и собственный показ в текущем ходу повтором не считается (#826).
+   */
+  offeredInWindow = (t: string): boolean => {
+    const at = this.shownAt.get(t)
+    return at !== undefined && this.S.stats.sent > at && this.S.stats.sent - at < PLAYER_REPEAT_TURNS
+  }
+  /** Вариант показан игроку: окно дословного повтора помнит показ (пулы, собирающие строку сами, #857). */
+  rememberShown(t: string): void {
     this.shown.add(t)
     // переустановка в конец: окно считается по ходам показа, а Map итерируется по вставке
     this.shownAt.delete(t)
@@ -3090,7 +3099,7 @@ export type ContentApi = Pick<Game,
   | 'lie' | 'caught' | 'callback'
   // колоды и реплики
   | 'draw' | 'open' | 'uniq' | 'pair' | 'line' | 'linePicked' | 'lines' | 'seen' | 'decks' | 'X'
-  | 'addrSaidLine' | 'playerLine' | 'freshPlayer' | 'rnd' | 'chance' | 'bagOf' | 'restoreBag'
+  | 'addrSaidLine' | 'playerLine' | 'freshPlayer' | 'offeredInWindow' | 'rememberShown' | 'rnd' | 'chance' | 'bagOf' | 'restoreBag'
   // контекст последней реплики
   | 'ctx' | 'setCtx'
   // режимы
