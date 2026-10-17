@@ -42,7 +42,7 @@ export function StatusBar() {
     <div className="statusbar">
       <span id="clock">{game.clockText}</span>
       <span id="gameDate">{game.gameDate}</span>
-      <span>📶 <span id="bat" className={low ? 'low' : ''}>{game.battery.level}% {low ? '🪫' : '🔋'}</span></span>
+      <span>📶 <span id="bat" className={low ? 'low' : ''}>{game.battery.level}% {low ? '⚠️' : '🔋'}</span></span>
     </div>
   )
 }
