@@ -169,6 +169,31 @@ describe('хребет Гарика: конверт-мотив и признан
     expect(ep1, 'официальная версия «застыл» остаётся').toMatch(/застыл/)
   })
 
+  it('мотив конверта пишет факт на доску, а бетон после не признаётся с нуля (#933)', async () => {
+    // Гарик раньше бетона: мотив звучит и пишет heard.money_foundation (claims)
+    const { game } = makeGame()
+    const from = game.S.msgs.length
+    await game.playArc('garik')
+    const said = alikTexts(game.S.msgs.slice(from)).join(' ')
+    expect(said, 'мотив звучит у Гарика').toContain('Я туда твои деньги уронил')
+    expect(game.facts()['heard.money_foundation'], 'история конверта записана на доску').toBe(true)
+    // бетон после: не «признание с нуля», а деталь к известному
+    const from2 = game.S.msgs.length
+    await game.playArc('beton')
+    const said2 = alikTexts(game.S.msgs.slice(from2)).join(' ')
+    expect(said2, 'признания с нуля нет').not.toContain('я нёс тебе деньги')
+    expect(said2, 'вместо него деталь').toContain('ведро было прораба Мкртича')
+  })
+
+  it('в нормальном порядке (бетон первым) рассказ бетона не меняется (#933)', async () => {
+    const { game } = makeGame()
+    const from = game.S.msgs.length
+    await game.playArc('beton')
+    const said = alikTexts(game.S.msgs.slice(from)).join(' ')
+    expect(said, 'признание с нуля осталось').toContain('я нёс тебе деньги')
+    expect(game.facts()['heard.money_foundation'], 'факт записан бетоном').toBe(true)
+  })
+
   it('серия признания существует: Гарик говорит сам, до неё Алик держит версию «застрял»', () => {
     const { game } = makeGame()
     const eps = ARCS.garik.eps
