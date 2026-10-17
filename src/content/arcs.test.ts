@@ -6,7 +6,7 @@ import { FINALES } from './finales'
 import { valueOf } from './fact'
 import { Gated, type Criterion } from '../engine/rules'
 import { ARC_DONE } from './arcs'
-import { garikConcrete, grantPaid, houseOnGarik, intro, taxFrozen } from './memkeys'
+import { garikConcrete, garikCut, grantPaid, houseOnGarik, intro, taxFrozen } from './memkeys'
 
 const lineText = (m: unknown) => (typeof m === 'string' ? m : (m as { t: string }).t)
 
@@ -52,7 +52,7 @@ describe('гейты реплик серии до её remember (#450)', () => {
     const { game } = makeGame()
     game.S.mem[houseOnGarik] = true
     const from = game.S.msgs.length
-    await game.playEpisode(ARCS.garik.eps[5], 'garik')
+    await game.playEpisode(ARCS.garik.eps[6], 'garik')
     expect(alikTexts(game.S.msgs.slice(from)).some((line) => line.includes('Дом просел на два сантиметра'))).toBe(true)
     expect(game.S.mem[houseOnGarik]).toBe(false)
   })
@@ -60,7 +60,7 @@ describe('гейты реплик серии до её remember (#450)', () => {
   it('финал Гарика без дома не выдумывает просадку', async () => {
     const { game } = makeGame()
     const from = game.S.msgs.length
-    await game.playEpisode(ARCS.garik.eps[5], 'garik')
+    await game.playEpisode(ARCS.garik.eps[6], 'garik')
     expect(alikTexts(game.S.msgs.slice(from)).some((line) => line.includes('Дом просел'))).toBe(false)
     expect(alikTexts(game.S.msgs.slice(from)).some((line) => line.includes('Гарика достали!'))).toBe(true)
     expect(game.S.mem[houseOnGarik]).toBe(false)
@@ -154,6 +154,66 @@ describe('цитата про конверт Гарика — после тру�
     game.S.arcs.garik = { i: 2, last: 0 }
     expect(game.open(ARCS.garik.follow)).not.toContain(LINE)
     expect(game.open(ARCS.garik.follow)).toContain('Гарик ещё в фундаменте?')
+  })
+})
+
+describe('хребет Гарика: конверт-мотив и признание «я спрятался» (#907)', () => {
+  const textsOf = (game: ReturnType<typeof makeGame>['game'], ep: (typeof ARCS.garik)['eps'][number]): string[] =>
+    game.open(ep.m).map((m) => (typeof m === 'string' ? m : m.t))
+
+  it('эп. 1 называет конверт игрока как причину: Алик сам послал Гарика', () => {
+    const { game } = makeGame()
+    const ep1 = textsOf(game, ARCS.garik.eps[0]).join(' ')
+    expect(ep1, 'конверт — причина попадания в бетон').toMatch(/конверт/i)
+    expect(ep1, 'Алик послал Гарика, а не «бетон схватился» сам').toMatch(/послал Гарика/)
+    expect(ep1, 'официальная версия «застыл» остаётся').toMatch(/застыл/)
+  })
+
+  it('серия признания существует: Гарик говорит сам, до неё Алик держит версию «застрял»', () => {
+    const { game } = makeGame()
+    const eps = ARCS.garik.eps
+    const confession = eps.findIndex((ep) => textsOf(game, ep).some((t) => /Я не застрял\. Я спрятался/.test(t)))
+    expect(confession, 'серия признания есть').toBeGreaterThan(0)
+    // говорит сам Гарик, не Алик пересказом
+    const own = textsOf(game, eps[confession]).some((t) => t.includes('Я не застрял. Я спрятался.'))
+    expect(own, 'реплика признания — голос самого Гарика').toBe(true)
+    // до признания — «застыл» как официальная версия; после признания Алик её держит
+    expect(textsOf(game, eps[0]).join(' ')).toMatch(/застыл/)
+    expect(textsOf(game, eps[confession]).join(' '), 'Алик держит версию после признания').toMatch(/Он путает/)
+    // реплика «Алик мне тоже должен» переехала в признание из приветствия
+    expect(textsOf(game, eps[4]).join(' '), 'в приветствии «тоже должен» больше нет').not.toMatch(/тоже должен/)
+    expect(textsOf(game, eps[confession]).join(' ')).toMatch(/он мне должен/)
+    // признание до развязки «достали»
+    expect(confession, 'признание — не финал').toBeLessThan(eps.length - 1)
+  })
+
+  it('трубочка и розетка — одна серия; общее число серий выросло на одну', () => {
+    const { game } = makeGame()
+    const eps = ARCS.garik.eps
+    const straw = eps.findIndex((ep) => textsOf(game, ep).some((t) => t.includes('трубочку')))
+    expect(straw, 'серия с трубочкой есть').toBeGreaterThan(0)
+    expect(textsOf(game, eps[straw]).some((t) => t.includes('розетку')), 'розетка — в той же серии').toBe(true)
+    expect(eps.length, 'серий семь: было шесть, добавлено признание').toBe(7)
+    // Гарик пишет сам только после серии с интернетом (SPEAKS): признание позже блога
+    const blog = eps.findIndex((ep) => textsOf(game, ep).some((t) => t.includes('Жизнь в основании')))
+    const confession = eps.findIndex((ep) => textsOf(game, ep).some((t) => /Я спрятался/.test(t)))
+    expect(confession, 'признание — после интернета').toBeGreaterThan(blog)
+  })
+
+  it('в партии признание звучит голосом Гарика после блога', async () => {
+    const { game } = makeGame()
+    for (let i = 0; i < 6; i++) {
+      game.S.day += 5
+      const from = game.S.msgs.length
+      await game.playArc('garik')
+      const slice = game.S.msgs.slice(from)
+      const said = slice.find((m) => m.kind === 'text' && m.who === 'garik' && m.text.startsWith('Я не застрял.'))
+      if (said) {
+        expect(game.S.mem[garikCut], 'к моменту признания интернет уже был').toBe(false)
+        return
+      }
+    }
+    expect.fail('признание не прозвучало за арку')
   })
 })
 
