@@ -18,7 +18,7 @@ import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, PROMISE_PENCIL,
 import { CREW_PAID } from '../crew'
 import { HOLIDAY_MONEY, type Holiday } from '../holidays'
 import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_THIRD, LIE_NOCRED } from '../lies'
-import { HEAT, alikShaved, moustacheAskAt, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, stateAt, topic, topicLast, topicMute, topicRun } from '../memkeys'
+import { HEAT, alikShaved, moustacheAskAt, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, stateAt, topic, topicLast, topicMute, topicRun, whenYears } from '../memkeys'
 import type { ArcId, TopicId } from '../ids'
 import { PROMISE_SHAVE_ASK } from '../world'
 
@@ -138,6 +138,7 @@ export const replyRules: R[] = [
     },
   }, [eq('ctx.whenKind', 'event')]),
   says('promiseNever', {
+    remember: [set(whenYears, true)],
     respond: async ({ game }) => {
       await game.say([PROMISE_YEARS])
       game.setCtx(null)

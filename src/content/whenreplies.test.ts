@@ -1,7 +1,7 @@
 // Ответ Алика на кнопку срока, которую нажал игрок (docs/design/deadline-replies.md, MVP 3, #165): у каждой кнопки свой ответ, ни один не противоречит нажатому.
 import { describe, it, expect, vi } from 'vitest'
 import { makeGame, alikTexts } from '../test/helpers'
-import { D, cap, type When } from './excuses'
+import { D, cap, WHEN_YEARS, type When } from './excuses'
 import { LEGENDS } from './legends'
 import { PROMISE_NEVER, PROMISE_PENCIL, PROMISE_FAR, PROMISE_YEARS, WHEN_COND } from './misc'
 import { valueOf, test as holds, type Entry } from '../engine/rules'
@@ -156,6 +156,8 @@ describe('«Лет двадцать?» — пара со своим ответо
     const sharp = alikTexts(g.S.msgs.slice(n)).join(' ')
     expect(sharp).toBe(PROMISE_YEARS)
     expect(from(PROMISE_NEVER, sharp)).toBe(false)
+    expect(g.mem()['when.years'], 'факт «уже спросил»').toBe(true)
+    expect(g.open(D.P_WHEN_NEVER), 'факт закрывает строку').not.toContain(WHEN_YEARS)
     g.S.ctx = g.ctxFromPromise({ ...byText('после таможни'), text: 'после таможни — отдам' })
     const m = g.S.msgs.length
     await g.send(other!)

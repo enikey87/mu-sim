@@ -9,7 +9,7 @@ import { needs, WORLD } from './world'
 import { selfConflict } from './ledger'
 import { sold } from './credit'
 import type { LedgerEvent } from './fact-types'
-import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, collectorsRecruited, count, evicted, finaleOf, grantPaid, met, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, sick, taxThawed, threatClaim, tileCornerRemoved, wedding } from './memkeys'
+import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, collectorsRecruited, count, evicted, finaleOf, grantPaid, met, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, sick, taxThawed, threatClaim, tileCornerRemoved, wedding, whenYears } from './memkeys'
 
 // draw(key, arr) выдаёт уместный сейчас элемент «из колоды» (без повторов до конца колоды); noRefill — после исчерпания null
 export type DrawFn = <T = unknown>(key: string, arr: readonly Entry<T>[], noRefill?: boolean, eligible?: (e: Entry<T>) => boolean) => T
@@ -688,7 +688,7 @@ D.P_WHEN_NEVER = [
   gate(gte('somedayCount', 2), ne('ctx.when', KEY_OUT))('Записал «{t}» в «когда-нибудь». Там уже тесно.'),
   gate(eq('ctx.when', KEY_OUT))('А если малыша ключом вниз? Аккуратно.'),
   'Алик, «{t}» — это не срок.',
-  WHEN_YEARS,
+  gate(missing(whenYears))(WHEN_YEARS),
 ];
 D.PROMISE_OK = ['Не подведу, брат.', 'Вот и договорились.', 'Записывай, записывай. Я тоже записал.', 'Жди. Ожидание — это тоже работа.', 'Правильно. Главное — верить.'];
 D.P_WHY_REL = ['А при чём тут {n}?', 'Алик, а {n} тут каким боком?', 'Ну а я тут при чём, если {n}?', 'Алик, при чём тут {n}? Должны мне вы.'];
