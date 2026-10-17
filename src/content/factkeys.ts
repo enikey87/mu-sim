@@ -19,7 +19,7 @@ import {
   legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway, nivaPlayer, carGone,
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, threatClaim, nuneKeyPassed, nuneDekretOver, grandpaDying,
-  betonSet, cardSent, saidTomorrow, saidFriday, payday, count, endgame, holidayGreeted, lend50,
+  betonSet, cardSent, saidTomorrow, saidFriday, saidKonak, payday, count, endgame, holidayGreeted, lend50,
   paydayScene, lightOff, netRation, phoneWarn, creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited,
   collectorsTurned,
   criticalAt, creditOfferSum, crewPaid, crewPaidAt, rubikBath, whenYears, ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt,
@@ -54,7 +54,7 @@ export type MemExactKey =
   | typeof razmikMarried
   | typeof borisSmetaReady | typeof taxFrozen | typeof taxThawed | typeof actSigned | typeof grantPaid
   | typeof rubikFined | typeof threatClaim | typeof nuneKeyPassed | typeof nuneDekretOver | typeof grandpaDying
-  | typeof betonSet | typeof cardSent | typeof saidTomorrow | typeof saidFriday | typeof paydayScene
+  | typeof betonSet | typeof cardSent | typeof saidTomorrow | typeof saidFriday | typeof saidKonak | typeof paydayScene
   | typeof lightOff | typeof netRation | typeof phoneWarn | typeof holidayGreeted
   | typeof creditStage | typeof creditOffer | typeof creditBroke | typeof momDone | typeof creditDeclined | typeof moneyPoor | typeof collectorsRecruited
   | typeof collectorsTurned
