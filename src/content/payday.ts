@@ -80,7 +80,9 @@ export const CLAIMS: Entry<Claim>[] = [
   { who: 'judge', t: 'Судебные издержки. Хаш, коньяк, мантия в химчистку.', when: [is('ach.court')], prio: 1, cut: 25000 },
   needs('dekret')(gate(missing(met('nune')))({ who: 'nune', t: 'Здравствуйте. Я Нуне. Я в декрете. А налог с выплаты — это святое.', cut: 30000 })),
   needs('dekret')(gate(is(met('nune')))({ who: 'nune', t: 'Налог с выплаты. Я из декрета, но налог — это святое.', cut: 30000 })),
-  gate(gte('arc.boris', 8))({ who: 'boris', t: 'Бее. (Борис требует сено. За весь срок службы прорабом.)', when: [is(met('boris'))], prio: 1, cut: 20000 }),
+  gate(gte('arc.boris', 8), missing('has.boris'))({ who: 'boris', t: 'Бее. (Борис требует сено. За весь срок службы прорабом.)', when: [is(met('boris'))], prio: 1, cut: 20000 }),
+  // баран передан игроку (барахолка): служил он Алику, с Алика и сено — доля не срезает выплату (#856)
+  gate(gte('arc.boris', 8), is('has.boris'))({ who: 'boris', t: 'Бее. (Борис требует сено. Он живёт у вас, а прорабом служил Алику — пусть Алик и кормит.)', when: [is(met('boris'))], prio: 1, cut: 0 }),
   gate(missing(met('mama')))({ who: 'mama', t: 'Это мама Алика. Мы с вами не переписывались. А мне на лекарства.', cut: 25000 }),
   gate(is(met('mama')))({ who: 'mama', t: 'А мне на лекарства. Я из-за вас обоих поседела. Ещё раз.', cut: 25000 }),
 ]

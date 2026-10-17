@@ -6,6 +6,7 @@ import { ACH } from './achievements'
 import { FINALES, ENDINGS, DEFAULT_FINALE } from './finales'
 import type { Game } from '../engine/game'
 import { valueOf } from '../engine/rules'
+import { NOTIF } from './life'
 import type { Episode } from './arcs'
 
 const lines = (ep: Pick<Episode, 'm'>) => ep.m.map(valueOf).map((m) => (typeof m === 'string' ? m : m.t))
@@ -655,6 +656,9 @@ describe('«Бараном»: барахолка доходит до игрок�
     }
     expect(bought, 'барахолка так и не предложила барана').toBe(true)
     expect(game.facts()['has.boris'], 'факт «Борис у игрока»').toBe(true)
+    // направленный прогон: после «Получено: баран Борис» объявление Алика о продаже не приходит (#856)
+    const ads = game.lines.eligible('NOTIF', NOTIF, game.lineFacts()).map((p) => p.text)
+    expect(ads, 'баран у игрока — Алик его больше не продаёт').not.toContain('Новое объявление рядом: «Продаю барана Бориса, торг, умеет писать».')
     toLast(game, 'boris')
     await game.playArc('boris')
     expect(game.S.mem['finale.boris']).toBe('toyou')
