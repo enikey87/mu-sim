@@ -1,6 +1,6 @@
 import { type Entry, type LineSpec, type Said, gate, gte, lte, eq, ne, is, missing, set } from './fact'
 import { needs, WORLD } from './world'
-import { bloodGiven, borisSaleAt, count, endgame, evicted, paydayScene, vacancyAt, wedding } from './memkeys'
+import { avitoReviewAt, bloodGiven, borisSaleAt, count, endgame, evicted, paydayScene, vacancyAt, wedding } from './memkeys'
 import { sold, momHelp, momDachaDays } from './credit'
 import { billStreak } from './bills'
 
@@ -127,7 +127,7 @@ export const NOTIF: Notif[] = [
   { icon: '👩', app: 'Мама', t: 'Видела передачу про таких, как твой Алик. Там тоже не заплатили.' },
   { icon: '👩', app: 'Мама', t: 'Может, вернёшься домой? Тут тоже есть плитка.' },
   { icon: '🛒', app: 'Авито', t: 'Отзывы об «Алик Стройка под ключ» скрыты по жалобе владельца. Всех 48.' },
-  { icon: '🛒', app: 'Авито', t: 'Алик Воздухонесян оставил вам отзыв: «Хороший парень, терпеливый» ⭐⭐⭐⭐⭐' },
+  { icon: '🛒', app: 'Авито', t: 'Алик Воздухонесян оставил вам отзыв: «Хороший парень, терпеливый» ⭐⭐⭐⭐⭐', stamp: avitoReviewAt },
   // баран передан игроку (барахолка) — объявление Алика о продаже больше не его (#856)
   { icon: '🛒', app: 'Авито', t: 'Новое объявление рядом: «Продаю барана Бориса, торг, умеет писать».', when: [WORLD.baran, gte('arc.boris', 4), missing('has.boris')], stamp: borisSaleAt },
   { icon: '🏛', app: 'Госуслуги', t: 'Штраф 500 ₽: парковка у объекта Алика.', charge: 500, when: [is('has.car'), ...moneyOpen] },

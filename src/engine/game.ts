@@ -1550,6 +1550,7 @@ export class Game {
       ramPhotoFresh: S.stats.sent - Number(S.mem[memkeys.ramPhotoAt] ?? -99) <= 3,
       borisSaleFresh: S.stats.sent - Number(S.mem[memkeys.borisSaleAt] ?? -99) <= 3,
       vacancyFresh: S.stats.sent - Number(S.mem[memkeys.vacancyAt] ?? -99) <= 3,
+      avitoReviewFresh: S.stats.sent - Number(S.mem[memkeys.avitoReviewAt] ?? -99) <= 3,
       sinceRude: S.stats.sent - Number(S.mem[memkeys.rudeAt] ?? -99),
       // сколько раз игрок извинялся за последние 6 ходов («крик → мир → крик → мир»)
       sorrySwing: String(S.mem[memkeys.sorryAt] ?? '').split(',').filter((n) => n && S.stats.sent - Number(n) <= 6).length,

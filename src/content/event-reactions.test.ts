@@ -3,12 +3,13 @@ import { describe, it, expect, vi } from 'vitest'
 import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
 import { NOTIF } from './life'
-import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY } from './rules/player-choice-pools'
+import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW } from './rules/player-choice-pools'
 import { BORIS_SALE } from './world'
 import { valueOf } from './fact'
 
 const AD = 'Новое объявление рядом: «Продаю барана Бориса, торг, умеет писать».'
 const VACANCY_CARD = 'Новая вакансия: плиточник, оплата сразу! Работодатель: Алик В.'
+const REVIEW_CARD = 'Алик Воздухонесян оставил вам отзыв: «Хороший парень, терпеливый» ⭐⭐⭐⭐⭐'
 
 /** Показать конкретную карточку настоящим производителем (randomNotif), а не присваиванием факта. */
 const showCard = (game: Game, text: string) => {
@@ -68,9 +69,23 @@ describe('реакции на системные события (#927)', () => {
     expect(has(), 'вне окна — варианта нет').toBe(false)
   })
 
+  it('отзыв Авито «терпеливый»: вариант в блоке в окне и уходит после', () => {
+    const { game } = makeGame()
+    showCard(game, REVIEW_CARD)
+    const at = Number(game.S.mem['avito.reviewAt'])
+    expect(at).toBe(game.S.stats.sent)
+    const has = () => game.buildChoices().some((c) => c.act === 'avitoReview')
+    expect(has(), 'ход события — вариант есть').toBe(true)
+    game.S.stats.sent = at + 3
+    expect(has(), 'третий ход после события — ещё окно').toBe(true)
+    game.S.stats.sent = at + 4
+    expect(has(), 'вне окна — варианта нет').toBe(false)
+  })
+
   it('пулы реакций и ответов не пусты (#927)', () => {
     expect(P_RAM_PHOTO.length).toBeGreaterThan(0)
     expect(P_BORIS_SALE.length).toBeGreaterThan(0)
     expect(P_VACANCY.length).toBeGreaterThan(0)
+    expect(P_AVITO_REVIEW.length).toBeGreaterThan(0)
   })
 })

@@ -135,6 +135,12 @@ export const DIRECT: Record<string, DirectCase> = {
   Quiet_PaydayOpen_AlikAway: { event: 'AlikAway', setup: paydayOpen },
   Quiet_PaydayOpen_PeriodLine: { event: 'PeriodLine', setup: paydayOpen },
   Quiet_PaydayOpen_StoryBeat: { event: 'StoryBeat', setup: (g) => { paydayOpen(g); g.S.stats.sent = 5 } },
+  // #927 (реакции на системные события сдвинули розыгрыш) — правило ушло из выборок, прямой случай вернулся.
+  // До этого случай снимали (#889: в CI правило играло в 8 партиях, порог 7) — качели гейта решает замер.
+  Quiet_PaydayOpen_PromiseDue: {
+    event: 'PromiseDue', facts: { promise: 0 },
+    setup: (g) => { paydayOpen(g); g.recordPromise({ text: 'завтра', d: 1 }); g.S.day += 1 },
+  },
   // #833: хвост окна свежести сдвинул розыгрыш — Quiet_PaydayOpen_PromiseDue в 7 партиях (порог 7), гейт видел сам;
   // #882 (фраза-срок про свадьбу) сдвинул розыгрыш обратно — правило ушло из выборок, случай вернулся
   // #889: перекалибровка вариантов бетона сдвинула розыгрыш снова — в CI правило в 8 партиях (порог 7),
@@ -190,6 +196,11 @@ export const DIRECT: Record<string, DirectCase> = {
   Finale_beton_opened: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem['count.rude'] = 6; g.S.mem[HEAT] = 3 } },
   // #585: праздничная кнопка сдвинула выборки — тишина на наступившем сроке ушла из них
   // #890: риторика срока по роду сдвинула розыгрыш — Quiet_Dead_PromiseDue в 7 партиях (порог 7), гейт видит сам
+  // #927 (реакции на системные события сдвинули розыгрыш): в семье +4000 правило упало до нуля — случай вернулся
+  Quiet_Dead_PromiseDue: {
+    event: 'PromiseDue', facts: { promise: 0 },
+    setup: (g) => { dead(g); g.recordPromise({ text: 'завтра', d: 1 }); g.S.day += 1 },
+  },
   // #577: после разрастания пулов звонка выборки перестали собирать и второе приглашение Арсена
   Court_Lawyer_Again: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem.court = 1; g.S.mem['intro.arsen'] = true } },
   Scene_lend: { event: 'PickScene', setup: (g) => { g.S.mood = 4 } }, // денег в свежей партии хватает (START_MONEY)

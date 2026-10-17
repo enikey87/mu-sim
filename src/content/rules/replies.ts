@@ -20,7 +20,7 @@ import { HOLIDAY_MONEY, type Holiday } from '../holidays'
 import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_THIRD, LIE_NOCRED } from '../lies'
 import { HEAT, alikShaved, moustacheAskAt, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, stateAt, topic, topicLast, topicMute, topicRun, whenYears } from '../memkeys'
 import type { ArcId, TopicId } from '../ids'
-import { PROMISE_SHAVE_ASK, RAM_PHOTO, BORIS_SALE, VACANCY } from '../world'
+import { PROMISE_SHAVE_ASK, RAM_PHOTO, BORIS_SALE, VACANCY, AVITO_REVIEW } from '../world'
 
 type R = Rule<ContentApi, GameEvent, Offer>
 const says = (intent: string, rest: Partial<R> & Pick<R, 'respond'>, extra: R['when'] = []): R => ({
@@ -179,6 +179,12 @@ export const replyRules: R[] = [
   says('vacancy', {
     respond: async ({ game }) => {
       await game.say([game.draw('VACANCY', VACANCY)])
+      game.setCtx(null)
+    },
+  }),
+  says('avitoReview', {
+    respond: async ({ game }) => {
+      await game.say([game.draw('AVITO_REVIEW', AVITO_REVIEW)])
       game.setCtx(null)
     },
   }),
