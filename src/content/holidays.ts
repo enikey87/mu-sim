@@ -39,9 +39,9 @@ export function holidayBefore(day: number): boolean {
 }
 
 /** Праздники и сезоны, на которые Алик ссылается сроком: по календарю считается горизонт. */
-export type HolidayRef = 'navasard' | 'vardavar' | 'easter' | 'winter' | 'apricots' | 'fullmoon'
+export type HolidayRef = 'navasard' | 'vardavar' | 'easter' | 'winter' | 'apricots' | 'fullmoon' | 'spring'
 const FIXED: Record<Exclude<HolidayRef, 'easter' | 'vardavar' | 'fullmoon'>, [month: number, dom: number]> = {
-  navasard: [8, 11], winter: [12, 1], apricots: [7, 1],
+  navasard: [8, 11], winter: [12, 1], apricots: [7, 1], spring: [3, 1],
 }
 /**
  * Пасха — григорианский компут (#861): армянская церковь празднует её в один день с западной

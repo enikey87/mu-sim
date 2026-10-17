@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { makeGame } from '../test/helpers'
 import { D, type When, type WhenKind } from './excuses'
+import * as L from './life'
 import { LEGENDS } from './legends'
 import { holidayDays, type HolidayRef } from './holidays'
 import { sick, wedding } from './memkeys'
@@ -237,15 +238,20 @@ describe('факты контекста: род и горизонт', () => {
     expect(ctx(wed)).toEqual({ kind: 'event', days: 3, horizon: 'near' }) // остаток свадьбы, а не оценка 5
   })
 
-  it('правка «завтра» → «завтрашней весной» пишет срок рода «никогда» без горизонта', async () => {
+  it('правка «завтра» пишет род из разметки термина: «завтрашней весной» — сезон с горизонтом (#923)', async () => {
     const { game } = makeGame()
     const m = game.push({ kind: 'text', from: 'alik', text: 'В среду утром — всё отдам.' })
     const p: When & { text: string } = { text: 'в среду утром — всё отдам', t: 'в среду утром', d: 3, kind: 'clear' }
     game.recordPromise(p)
     game.S.ctx = game.ctxFromPromise(p)
     expect(ctx(game).kind).toBe('clear')
+    // рисуем конкретный термин: подменяем выбор пула правок
+    const spring = (L.EDIT_WHEN as Entry<When>[]).map(valueOf).find((w) => w.t === 'завтрашней весной')!
+    vi.spyOn(game, 'draw').mockImplementation(((key: string) => (key === 'EDIT_WHEN' ? spring : '')) as unknown as typeof game.draw)
     await game.editLast(m, p)
-    expect(ctx(game)).toEqual({ kind: 'never', days: undefined, horizon: undefined })
+    expect(ctx(game)).toEqual({ kind: 'holiday', days: expect.any(Number), horizon: expect.any(String) })
+    expect(ctx(game).days, 'горизонт по календарю весны есть').toBeGreaterThan(0)
+    vi.restoreAllMocks()
   })
 
   it('ctx.whenDate — дата срока, и только у ясного срока и увёртки', async () => {

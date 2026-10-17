@@ -48,11 +48,31 @@ describe('живая рецензия №1: точечные правки (#891)
     expect(game.open(ARCS.garik.follow), 'до фундамента строки нет').not.toContain(line)
     game.S.mem['garik.concrete'] = true
     expect(game.open(ARCS.garik.follow), 'бетон введён — строка есть').toContain(line)
-  })
+   })
 })
 
 const sources = import.meta.glob(['../**/*.ts', '../**/*.tsx', '!../**/*.test.*'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>
 const allSource = Object.values(sources).join('\n')
+
+describe('тойфу-глифы: в исходниках нет эмодзи свежих Unicode (#923, заметка 18)', () => {
+  // Символы блока U+1F900–1FAFF приходят из Unicode 11–14: часть (🥲 🪙 🪫 🫓 🫖) не рисуется
+  // старыми эмодзи-шрифтами. Новый глиф из блока — сначала сюда в белый список, иначе сторож красный.
+  // 🥖 (E3, 2016) — замена лаваша 🫓 (E14).
+  const allowed = new Set(['🤔', '🤝', '🤦', '🤬', '🤷', '🥂', '🥃', '🥧', '🥰', '🦅', '🧑', '🧔', '🧮', '🧱', '🩸', '🥖'])
+  it('весь контент и движок — на поддерживаемых глифах', () => {
+    const fresh = new Set<string>()
+    for (const ch of allSource) {
+      const cp = ch.codePointAt(0) ?? 0
+      if (cp >= 0x1f900 && cp <= 0x1faff && !allowed.has(ch)) fresh.add(ch)
+    }
+    expect([...fresh], 'замените на поддерживаемый глиф или внесите в белый список осознанно').toEqual([])
+  })
+  it('замены заметки 18 на месте: 😢 вместо 🥲, монеты — без глифа Unicode 13', () => {
+    expect(allSource).toContain(' 😢')
+    expect(allSource).not.toContain('🥲')
+    expect(allSource).not.toContain('🪙')
+  })
+})
 
 const api = (seed = 1, tier = 0) => {
   const decks = new Decks({}, seededRng(seed))
