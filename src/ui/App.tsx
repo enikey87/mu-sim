@@ -42,7 +42,7 @@ export function App({ game, onReset, debug = false, intro = false, introGate = f
   // --- режим живого рецензирования (#872): заметки в sessionStorage, партия не тронута ---
   const [reviewOn, setReviewOn] = useState(() => reviewRequested(window.location.search))
   const [notes, setNotes] = useState<ReviewNote[]>(() => loadNotes())
-  const [menuFor, setMenuFor] = useState<{ msg?: number; day: number; turn: number; target: ReviewTarget } | null>(null)
+  const [menuFor, setMenuFor] = useState<{ msg?: number; day: number; turn: number; meAt?: number; target: ReviewTarget } | null>(null)
   const [draft, setDraft] = useState<ReviewDraft | null>(null)
   const started = useRef(new Date())
 
@@ -56,17 +56,18 @@ export function App({ game, onReset, debug = false, intro = false, introGate = f
     },
     menuChoice: (text) => {
       // якорь варианта — (ход, текст): пересборка вариантов за ход заметку не теряет (#878)
-      setMenuFor({ day: game.S.day, turn: game.S.stats.sent, target: { kind: 'answer_option', text: text.slice(0, TARGET_TEXT_MAX), offered: game.choices.map((c) => c.text), who: 'me' } })
+      const meAt = game.S.msgs.filter((m) => m.kind === 'text' && m.from === 'me').length
+      setMenuFor({ day: game.S.day, turn: game.S.stats.sent, meAt, target: { kind: 'answer_option', text: text.slice(0, TARGET_TEXT_MAX), offered: game.choices.map((c) => c.text), who: 'me' } })
     },
     optionNote: (text) => notes.find((n) => isOptionNote(n) && n.turn === game.S.stats.sent && n.target.text === text),
     edit: (id) => {
       const n = notes.find((x) => x.id === id)
-      if (n) setDraft({ msg: n.msg, day: n.day, turn: n.turn, target: n.target, note: n.note, type: n.type, editId: n.id })
+      if (n) setDraft({ msg: n.msg, day: n.day, turn: n.turn, meAt: n.meAt, target: n.target, note: n.note, type: n.type, editId: n.id })
     },
     toggle: () => setReviewOn((v) => !v),
     exportNow: () => {
       // отметка выбора считается из партии: заметка о варианте знает, отправил ли игрок ровно этот текст (#878)
-      const marked = notes.map((n) => (isOptionNote(n) ? { ...n, chosen: reviewChoiceOf(game.S.msgs, n) } : n))
+      const marked = notes.map((n) => (isOptionNote(n) ? { ...n, chosen: reviewChoiceOf(game.S.msgs, n, game.S.stats.sent) } : n))
       const dump = reviewDump(reviewSessionOf(game, started.current), marked, reviewTranscriptOf(game, reviewOffersOf(game)))
       const url = URL.createObjectURL(new Blob([JSON.stringify(dump, null, 2)], { type: 'application/json' }))
       const a = document.createElement('a')
@@ -78,7 +79,7 @@ export function App({ game, onReset, debug = false, intro = false, introGate = f
   }), [reviewOn, notes, game])
 
   const saveDraft = (d: ReviewDraft) => {
-    const note: ReviewNote = { id: d.editId ?? nextNoteId(notes), msg: d.msg, day: d.day, turn: d.turn, type: d.type, target: d.target, note: d.note }
+    const note: ReviewNote = { id: d.editId ?? nextNoteId(notes), msg: d.msg, day: d.day, turn: d.turn, meAt: d.meAt, type: d.type, target: d.target, note: d.note }
     const next = d.editId === undefined ? [...notes, note] : notes.map((n) => (n.id === d.editId ? note : n))
     setNotes(next)
     saveNotes(next)

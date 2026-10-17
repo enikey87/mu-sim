@@ -15,6 +15,8 @@ export interface ReviewNote {
   msg?: number
   day: number
   turn: number
+  /** Длина «me» на момент меню. Завязка и допработа — тоже «me», но не ход (#901). */
+  meAt?: number
   type: ReviewCategory
   target: ReviewTarget
   note: string
@@ -138,13 +140,14 @@ export function reviewTranscript(
 /** Заметка о варианте ответа: якорь — ход и текст варианта, а не сообщение (варианты пересобираются за ход, #878). */
 export const isOptionNote = (n: ReviewNote): boolean => n.target.kind === 'answer_option'
 
-/** Отметка выбора для заметки о варианте: следующим ходом игрок отправил ровно этот текст? null — ход ещё не сделан. */
-export function reviewChoiceOf(msgs: readonly Msg[], note: ReviewNote): boolean | null {
+/** Следующий ход отправил этот текст? null — хода ещё нет. Без meAt — прежний якорь turn. */
+export function reviewChoiceOf(msgs: readonly Msg[], note: ReviewNote, sent = 0): boolean | null {
   if (!isOptionNote(note)) return null
   const mine = msgs.filter((m): m is Extract<Msg, { kind: 'text' }> => m.kind === 'text' && m.from === 'me')
-  // note.turn — счётчик ходов на момент заметки, то есть до отправки: выбор игрока — следующий его ход
-  const sent = mine[note.turn]
-  return sent ? sent.text === note.target.text : null
+  // «me» без хода (завязка, допработа) сдвигают слот на ту же разницу
+  const index = note.meAt === undefined ? note.turn : note.turn + mine.length - sent
+  const hit = mine[index]
+  return hit ? hit.text === note.target.text : null
 }
 
 export interface ReviewSession { started: string; day: number; turns: number; build: string; endings: string[] }
