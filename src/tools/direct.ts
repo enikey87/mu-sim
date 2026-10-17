@@ -145,6 +145,11 @@ export const DIRECT: Record<string, DirectCase> = {
   // #882 (фраза-срок про свадьбу) сдвинул розыгрыш обратно — правило ушло из выборок, случай вернулся
   // #889: перекалибровка вариантов бетона сдвинула розыгрыш снова — в CI правило в 8 партиях (порог 7),
   // случай снят; на чужих семействах (+2000/+4000/+6000) правило играет, нулей второй гейт не видит
+  // #964 (встречный иск) вместе с #962 сдвинули розыгрыш — в семье +2000 правило упало до нуля, случай вернулся
+  Quiet_PaydayOpen_PromiseDue: {
+    event: 'PromiseDue', facts: { promise: 0 },
+    setup: (g) => { paydayOpen(g); g.recordPromise({ text: 'завтра', d: 1 }); g.S.day += 1 },
+  },
   Away_ColdWar: { event: 'AlikAway', setup: offended },
   Quiet_Offended_AlikAway: { event: 'AlikAway', setup: offended },
   Due_StakeKept: {
