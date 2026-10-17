@@ -79,7 +79,6 @@ export const DIRECT: Record<string, DirectCase> = {
     event: 'PlayerSays', facts: { intent: 'sorry' },
     setup: (g) => { g.S.mem.blocked = true; g.S.mem['blocked.hint'] = true },
   },
-  Says_via_mama: { event: 'PlayerSays', facts: { intent: 'via', arg: 'mama' } },
   Ending_ram: {
     event: 'CheckEnding',
     setup: (g) => { g.S.day = 300; g.S.mem['finale.boris'] = 'toyou' },
@@ -181,7 +180,6 @@ export const DIRECT: Record<string, DirectCase> = {
   // с колкостями (#683) распухший журнал собирается ботами сам — случай снят по порогу гейта
   // #577: упрёк по звонку сдвинул розыгрыш ещё три правила — держим прямыми случаями
   // #824: после слияния с #828 розыгрыш сдвинулся — голосовое снова уходит из семейства +4000, держим прямым случаем
-  Says_voice: { event: 'PlayerSays', facts: { intent: 'voice' } },
   // #824: там же ушёл из семейства +6000 финал бетона «Настоящая ведомость» (порог поимок 2)
   Finale_beton_ledger: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem[caughtCount] = 2 } },
   // #826: расширение тоновых пулов сдвинуло розыгрыш — отклик на «воскрес» ушёл из семейства +6000

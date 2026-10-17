@@ -31,6 +31,8 @@ interface OfferSpec {
   tone: Tone
   text: (game: ContentApi, facts: Facts) => string
   arg?: (game: ContentApi, facts: Facts) => string | number | undefined
+  /** Тема вопроса для дедупа блока (#887): два про одно и то же в одной сборке не стоят. */
+  topic?: (game: ContentApi, facts: Facts) => string | undefined
   bonus?: number
   specificity?: number
   slot?: string
@@ -39,6 +41,10 @@ interface OfferSpec {
   /** Перерыв от показа: кнопку увидели — пауза пошла (штамп при сборке вариантов, game.ts). */
   cooldown?: { turns?: number; days?: number }
 }
+
+/** Тема вопроса: место денег и тема игрока называют ту же тему, что арка (#887) — иначе два вопроса об одном. */
+const MONEY_TOPIC: Record<string, string> = { beton: 'arc:beton' }
+const TOPIC_ARC: Record<string, string> = { beton: 'arc:beton', wedding: 'arc:samvel', ram: 'arc:boris', niva: 'arc:niva' }
 
 const fromD = (game: ContentApi, key: string, map: Record<string, string> = {}) => {
   requirePlayerPool(`D.${key}`, D[key])
@@ -70,7 +76,10 @@ const offer = (o: OfferSpec): R => ({
   odds: o.odds,
   cooldown: o.cooldown,
   // пустой текст — нечего предложить (весь пул недавно показывали)
-  offer: ({ game, facts }): Choice | null => { const text = o.text(game, facts); return text ? { text, tone: o.tone, act: o.act, arg: o.arg?.(game, facts) } : null },
+  offer: ({ game, facts }): Choice | null => {
+    const text = o.text(game, facts)
+    return text ? { text, tone: o.tone, act: o.act, arg: o.arg?.(game, facts), topic: o.topic?.(game, facts) } : null
+  },
 })
 
 export const choiceRules: R[] = [
@@ -213,6 +222,7 @@ export const choiceRules: R[] = [
     // У `ArcDeath` эта связка была и раньше.
     // окно повтора (#824): пока все формулировки пула в последних PLAYER_REPEAT_TURNS ходах, вопрос молчит, а не повторяется дословно
     text: (g, f) => { const key = 'F_' + f['ctx.arc']; const arr = ARCS[String(f['ctx.arc'])].follow; return g.freshPlayer(key, arr) ?? '' }, arg: (_g, f) => String(f['ctx.arc']),
+    topic: (_g, f) => `arc:${String(f['ctx.arc'])}`,
   }),
   // дело в суде открыто — игрок может его продолжить (угроза двигает линию суда)
   offer({
@@ -253,6 +263,7 @@ export const choiceRules: R[] = [
   offer({
     name: 'Money', slot: 'money', when: [exists('legend')], act: 'money', tone: 'neutral', bonus: 3, odds: 0.9,
     text: (g, f) => { const place = moneyPlaceOf(f.legend); return place ? freshFromArr(g, 'MONEY_ASK_' + place, MONEY_ASK[place]) : '' },
+    topic: (_g, f) => { const place = moneyPlaceOf(f.legend); return place ? MONEY_TOPIC[place] : undefined },
     arg: (_g, f) => String(f.legend),
   }),
   // ответ по теме: игрок цепляется за то, что Алик только что сказал (после серии сериала — вопрос про сериал важнее)
@@ -270,6 +281,7 @@ export const choiceRules: R[] = [
           return q ?? ''
         },
         arg: () => arg,
+        topic: (_g: ContentApi, f: Facts) => TOPIC_ARC[String(f['ctx.topic'])],
       }
     })(),
   }),
