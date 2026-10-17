@@ -186,6 +186,9 @@ export const DIRECT: Record<string, DirectCase> = {
   // его часто (порог 7), гейт скажет «снять» — тогда запись уйдёт, как Says_voice в #887
   Says_via_mama: { event: 'PlayerSays', facts: { intent: 'via', arg: 'mama' } },
   // #958: прямые вопросы и первые сообщения сдвинули розыгрыш — голосовое и «выбери отмазку сам» ушли из выборок
+  // #964: гейты разошлись — в выборках CI правило не сработало ни разу (запись нужна), а на чужих
+  // семействах играет во всех (8/7/8 при пороге 7, запись «устарела»); одна строка не может быть и там
+  // и там — держим запись (арбитр — CI), конфликт гейтов заведён в #949
   Says_voice: { event: 'PlayerSays', facts: { intent: 'voice' } },
   Scene_choice: {
     event: 'PickScene',
@@ -218,6 +221,8 @@ export const DIRECT: Record<string, DirectCase> = {
   // (8 партий при пороге 7) — прямой случай не нужен, гейт видит его без подсказки
   // #926: гейты follow Бориса сдвинули розыгрыш — Tone_WhileBlocked в выборках сам (7 партий,
   // порог 7) — прямой случай не нужен
+  // #964 (встречный иск) сдвинул розыгрыш — в семье +6000 правило упало до нуля, случай вернулся
+  Tone_WhileBlocked: { event: 'PlayerMessage', setup: (g) => { blocked(g) } },
   // #826: расширение тоновых пулов сдвинуло розыгрыш — отклик на «воскрес» ушёл из семейства +6000
   Says_condole_ctxrevived: { event: 'PlayerSays', facts: { intent: 'condole' }, setup: (g) => { g.S.ctx = { revived: true } } },
   Finale_rubik_default: { event: 'ArcFinale', facts: { arc: 'rubik' } },
@@ -244,6 +249,18 @@ export const DIRECT: Record<string, DirectCase> = {
   // обычная сцена «жена» стала редкой в выборках, случай держали прямым (свой setup подавлял соседние сцены)
   // #889: перекалибровка вариантов бетона сдвинула розыгрыш — сцена снова в выборках CI
   // (7 партий при пороге 7) — прямой случай не нужен, гейт видит её без подсказки
+  // #964 (встречный иск) сдвинул розыгрыш — в семье +6000 сцена упала до нуля, случай вернулся
+  Scene_wife: {
+    event: 'PickScene',
+    setup: (g) => {
+      g.S.mem['count.rude'] = 1 // ворота сцены: игрок уже грубил, Карине ещё не знакомы
+      for (const r of g.rules.all) {
+        if (r.event !== 'PickScene' || r.name === 'Scene_wife') continue
+        if (r.once) g.S.rules.once[r.name] = true
+        else g.S.rules.cooldown[r.name] = { turn: g.S.stats.sent, day: g.S.day }
+      }
+    },
+  },
   Quest_q_niva: { event: 'PickQuest', setup: (g) => { g.S.mem[legendId] = 'niva_stuck'; g.S.mem[legendDay] = g.S.day } },
   // #795: денежная кнопка вместо случайной кнопки про арку сдвинула розыгрыш выборок — эти правила
   // ушли из чужих семейств сидов (`rules:stable`); в выборках гейта они редкие, потому держим прямыми случаями

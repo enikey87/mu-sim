@@ -15,7 +15,7 @@ import { ENDGAME_CHOICES, LEND50_CHOICES } from './endgame'
 import {
   P_VIA_BORIS, P_VIA_KARINE, P_VIA_MAMA, P_MOO, P_MOUSTACHE, P_COURT,
   P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE,
-  P_CREW_CALL, P_LAWYER, P_COLLECTORS_ASK, P_INTERN, P_HOLE,
+  P_CREW_CALL, P_LAWYER, P_COLLECTORS_ASK, P_INTERN, P_HOLE, P_COUNTERSUIT,
 } from './rules/player-choice-pools'
 
 /** Строковый пул кнопки (Entry допускает gate и объекты с .t). */
@@ -96,6 +96,7 @@ put('P_LAWYER', P_LAWYER)
 put('P_COLLECTORS_ASK', P_COLLECTORS_ASK)
 put('P_INTERN', P_INTERN)
 put('P_HOLE', P_HOLE)
+put('P_COUNTERSUIT', P_COUNTERSUIT)
 put('P_COURT', P_COURT)
 
 // сцена choice: кнопки — вся колода CONSTR/ABSURD

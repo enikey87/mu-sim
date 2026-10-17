@@ -8,7 +8,7 @@ import type { GameEvent, Offer } from './events'
 import { WORLD, speaks } from '../world'
 import * as T from '../rude'
 import { RUDE_AGAIN } from '../misc'
-import { HEAT, blocked, blockedHint, count, mamaCalls, phoneKarine, polite, ritualCount, statusHidden, vendetta } from '../memkeys'
+import { HEAT, blocked, blockedHint, count, countersuitAt, mamaCalls, phoneKarine, polite, ritualCount, statusHidden, vendetta } from '../memkeys'
 
 type R = Rule<ContentApi, GameEvent, Offer>
 const rude = eq('tone', 'rude')
@@ -148,7 +148,12 @@ export const rudeRules: R[] = [
   {
     name: 'Tone_Threat_Hot', event: 'PlayerMessage', when: [eq('tone', 'threat'), gte(HEAT, 2)], bonus: 2, once: true,
     remember: [add(count.threat), set(HEAT, 0)],
-    respond: async ({ game }) => { for (const [w, said] of T.COUNTERSUIT) await game.say([w === 'alik' ? said : { w, t: saidText(said), claims: saidClaims(said) }]); game.unlock('countersuit') },
+    respond: async ({ game, facts }) => {
+      for (const [w, said] of T.COUNTERSUIT) await game.say([w === 'alik' ? said : { w, t: saidText(said), claims: saidClaims(said) }])
+      game.unlock('countersuit')
+      // встречный иск — заметное событие с окном отклика (#964): ход и три после
+      game.applyFacts([set(countersuitAt, Number(facts.sent))])
+    },
   },
   {
     // встречный иск уже был — теперь апелляции; суд немного остужает

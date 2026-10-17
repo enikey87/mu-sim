@@ -4,10 +4,10 @@ import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
 import { NOTIF } from './life'
 import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE } from './rules/player-choice-pools'
-import { BORIS_SALE, RUBIK_ASK, KETTLE } from './world'
+import { BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B } from './world'
 import { ARCS } from './arcs'
 import { FINALES } from './finales'
-import { court } from './memkeys'
+import { court, HEAT } from './memkeys'
 import { valueOf } from './fact'
 
 const AD = 'Новое объявление рядом: «Продаю барана Бориса, торг, умеет писать».'
@@ -162,6 +162,30 @@ describe('прямые вопросы и первые сообщения (#958):
     expect(has(game, 'rubikHole'), 'без вопроса варианта нет').toBe(false)
     await game.playEpisode(ARCS.rubik.eps[3], 'rubik')
     await answered(game, 'rubikHole')
+  })
+})
+
+describe('встречный иск (#964): окно отклика', () => {
+  it('после встречного иска кнопки в окне, ответ закрывает окно', async () => {
+    const { game } = makeGame()
+    const has = () => { game.S.choices = null; return game.buildChoices().some((c) => c.act === 'countersuitAsk') }
+    expect(has(), 'без иска кнопки нет').toBe(false)
+    game.S.mem[HEAT] = 2
+    const fired = await game.fire('PlayerMessage', { tone: 'threat' })
+    expect(fired?.name, 'встречный иск не сработал — проверка пустеет').toBe('Tone_Threat_Hot')
+    const at = Number(game.S.mem['countersuit.at'])
+    expect(at, 'последовательность не штампанула ход').toBe(game.S.stats.sent)
+    expect(has(), 'ход события — кнопка есть').toBe(true)
+    game.S.stats.sent = at + 3
+    expect(has(), 'третий ход после события — ещё окно').toBe(true)
+    game.S.stats.sent = at + 4
+    expect(has(), 'вне окна — кнопки нет').toBe(false)
+    game.S.stats.sent = at
+    const from = game.S.msgs.length
+    await game.fire('PlayerSays', { intent: 'countersuitAsk' })
+    const said = game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : []))
+    expect(said.some((t) => COUNTERSUIT_B.map(valueOf).includes(t)), 'ответ не из пула').toBe(true)
+    expect(has(), 'после ответа окно закрыто').toBe(false)
   })
 })
 
