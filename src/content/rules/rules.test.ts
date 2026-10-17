@@ -6,6 +6,7 @@ import type { Game } from '../../engine/game'
 import type { Choice, Ctx } from '../../engine/state'
 import { D } from '../excuses'
 import { ARCS, ARC_DONE } from '../arcs'
+import { sick, stateAt } from '../memkeys'
 import { saidText } from '../fact'
 import { RUDE_AGAIN, SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, SWING } from '../misc'
 
@@ -234,6 +235,26 @@ describe('ответы Алика (PlayerSays)', () => {
     const t = await reply(game, { text: 'Вы обещали…', tone: 'neutral', act: 'prev', arg: 0 })
     expect(oneOf(PREV_MANY.map(frag), t.join(' '))).toBe(true)
     expect(game.S.promises[0].asked).toBe(true)
+  })
+  it('отмазка «тогда Борис заболел» — только для цитат не раньше болезни Бориса (#859)', async () => {
+    const { game } = makeGame()
+    // серия болезни Бориса: баран появляется в истории и движок пишет день состояния
+    game.S.arcs.boris = { i: 1, last: game.S.day - 1 }
+    await game.playArc('boris')
+    const illDay = game.S.day
+    expect(Number(game.mem()[stateAt(sick, 'boris')]), 'день болезни Бориса записан серией').toBe(illDay)
+    // колода PREV_B отдаёт ровно строку про Бориса: проверяем гейт даты, а не удачу перетасовки
+    const BORIS_ILL = 'тогда Борис заболел.'
+    const at = D.PREV_B.findIndex((e: unknown) => valueOf(e) === BORIS_ILL)
+    expect(at, 'строка про Бориса — в пуле PREV_B').toBeGreaterThanOrEqual(0)
+    const ask = async (made: number) => {
+      game.S.promises.push({ t: 'завтра', made, due: made + 1 })
+      game.S.bags.PREV_B = { n: D.PREV_B.length, left: [at], last: -1 }
+      const t = await reply(game, { text: 'Вы обещали…', tone: 'neutral', act: 'prev', arg: game.S.promises.length - 1 })
+      return t.join(' ')
+    }
+    expect(await ask(illDay - 3), 'цитата от 17 октября — барана ещё нет').not.toContain(BORIS_ILL)
+    expect(await ask(illDay), 'цитата не раньше болезни — отмазка выпадает').toContain(BORIS_ILL)
   })
   it('ирония на срок «никогда» — честный ответ в образе', async () => {
     const { game } = makeGame()

@@ -73,6 +73,7 @@ export type FactKey =
   | `heard.${ClaimKey}` | `cb.${ClaimKey}`
   | `met.${WhoId}` | `intro.${WhoId}`
   | `asked.${ArcId}` | `doneAsked.${ArcId}` | `finale.${ArcId}` | `finale.at.${ArcId}` | `legend.of.${ArcId}`
+  | `state.at.${string}` // день состояния серии (#859): ключ состояния и доска персонажа; рантайм-сторож в FAMILIES
   | `topic.${TopicId}` | `topicMute.${TopicId}`
   | `wedding.${WeddingId}`
   | `bills.${BillPart}.${BillField}`
@@ -88,6 +89,7 @@ const ach = setOf(Object.keys(ACH))
 const claims = setOf(CLAIMS.map((c) => c.key))
 const topics = setOf(Object.keys(TOPICS))
 const who = setOf([...Object.keys(CAST), ...EXTRAS])
+const states = setOf(Object.values(ARCS).flatMap((a) => a.eps.flatMap((e) => (e.state ? [e.state.key] : []))))
 const items = setOf(invoiceItems(30).map((r) => invKey(valueOf(r)[0]).slice('inv.'.length)))
 
 /** Семейство: префикс → допустимый остаток. */
@@ -98,6 +100,8 @@ export const FAMILIES: Record<string, (rest: string) => boolean> = {
   'heard.': claims, 'cb.': claims,
   'met.': who, 'intro.': who,
   'asked.': arcs, 'doneAsked.': arcs, 'finale.': arcs, 'finale.at.': arcs, 'legend.of.': arcs,
+  // день включения состояния серии (#859): ключ состояния (`wedding.samvel`) или ключ + доска персонажа (`sick.boris`)
+  'state.at.': (r) => states(r) || (r.includes('.') && states(r.slice(0, r.lastIndexOf('.'))) && who(r.slice(r.lastIndexOf('.') + 1))),
   'topic.': topics, 'topicMute.': topics,
   'inv.': items,
   'wedding.': (r) => Object.hasOwn(CAST, r) || r === 'anush',

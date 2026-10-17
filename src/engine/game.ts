@@ -2353,6 +2353,8 @@ export class Game {
     // после выплаты долг запечатан: adjustDebt откажет в любой ветке — серия не двигает и календарь (#189)
     if (ep.item) this.S.items.push(ep.item)
     if (ep.state) this.rules.applyOps([{ key: ep.state.key, op: '=', value: true, forDays: ep.state.days, scope: ep.state.actor ? 'target' : 'world' }], { target: ep.state.actor })
+    // день включения состояния: по нему отмазки сверяют дату цитаты с событием мира («тогда Борис заболел», #859)
+    if (ep.state) this.S.mem[memkeys.stateAt(ep.state.key, ep.state.actor)] = this.S.day
     if (ep.fx?.days && !refused) this.nextDay(ep.fx.days)
     if (ep.sys && (!debtFx || debtMoved)) { await this.sleep(500); this.sys(ep.sys) }
     if (ep.fx?.ach) this.unlock(ep.fx.ach)

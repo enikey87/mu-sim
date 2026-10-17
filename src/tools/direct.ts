@@ -29,6 +29,8 @@ export const DIRECT: Record<string, DirectCase> = {
   // #426: sys-claim Гранта («всё заплатил») противоречит «заказчик мне не платит» — бот ловит это сам, 34 партии
   Turn_BorisSick: { event: 'AlikTurn', setup: (g) => { g.S.arcs.boris = { i: 2, last: 0 }; g.S.actors.boris = { sick: true } } },
   Opt_Cow: { event: 'BuildChoices', setup: (g) => { g.S.mem.mooAt = g.S.stats.sent } },
+  // гейт на чужих семействах: в семье +4000 бот не доходит до предложения «через Бориса» (4/0/4) — прямой случай держит гейт
+  Opt_Via_boris: { event: 'BuildChoices', setup: (g) => { blocked(g); g.S.arcs.boris = { i: 4, last: 0 } } },
   Away_Offline: { event: 'AlikAway', setup: (g) => { g.S.offlineDays = 2 } },
   Turn_WhileDead: { event: 'AlikTurn', setup: (g) => { g.S.mem.alik_dead = true } },
   // гарантия первой серии (#636): к 12-му сообщению шанс Turn_ArcFirst мог промахнуться всю посадку
