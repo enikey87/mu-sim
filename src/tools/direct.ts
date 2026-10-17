@@ -136,7 +136,18 @@ export const DIRECT: Record<string, DirectCase> = {
   Quiet_PaydayOpen_AlikAway: { event: 'AlikAway', setup: paydayOpen },
   Quiet_PaydayOpen_PeriodLine: { event: 'PeriodLine', setup: paydayOpen },
   Quiet_PaydayOpen_StoryBeat: { event: 'StoryBeat', setup: (g) => { paydayOpen(g); g.S.stats.sent = 5 } },
-  // #833: хвост окна свежести сдвинул розыгрыш — Quiet_PaydayOpen_PromiseDue в 7 партиях (порог 7), гейт видит сам
+  // #833: хвост окна свежести сдвинул розыгрыш — Quiet_PaydayOpen_PromiseDue в 7 партиях (порог 7), гейт видел сам;
+  // #882 (фраза-срок про свадьбу) сдвинул розыгрыш обратно — правило ушло из выборок, случай вернулся
+  Quiet_PaydayOpen_PromiseDue: {
+    event: 'PromiseDue', facts: { promise: 0 },
+    setup: (g) => {
+      g.S.mem.payday = 'default'
+      g.S.ending = 'payday_default'
+      g.S.endings.payday_default = g.S.day
+      g.recordPromise({ text: 'в пятницу', d: 1 })
+      g.S.day += 1
+    },
+  },
   Away_ColdWar: { event: 'AlikAway', setup: offended },
   Quiet_Offended_AlikAway: { event: 'AlikAway', setup: offended },
   Due_StakeKept: {

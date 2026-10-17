@@ -201,14 +201,16 @@ describe('classifyUserInput', () => {
     await game.send('Как там Борис?')
     expect(game.S.mem['asked.boris']).toBe(1)
     expect(game.S.arcs.boris.i).toBe(2)
-    // ход сам сдвигает календарь: повтор в день серии серию не двигает
-    game.S.arcs.boris.last = game.S.day
-    await game.send('Как там Борис?')
-    expect(game.S.mem['asked.boris']).toBe(2)
-    expect(game.S.arcs.boris.i).toBe(2)
+    // «Передай Борису» и «Борис, привет» — не вопрос: счётчик не растёт
     await game.send('Передай Борису')
     await game.send('Борис, привет')
+    expect(game.S.mem['asked.boris']).toBe(1)
+    // повтор в день серии серию не двигает — правилом, без хода: ход сам сдвигает календарь (#882 сдвинул розыгрыш)
+    game.S.arcs.boris.last = game.S.day
+    const i = game.S.arcs.boris.i
+    await game.fire('PlayerSays', { intent: 'arc', arg: 'boris' })
     expect(game.S.mem['asked.boris']).toBe(2)
+    expect(game.S.arcs.boris.i, 'в тот же день серия не двигается').toBe(i)
   })
 
   it('четыре «Как там Нива?» на доигранной линии дают «Нива выбрала тебя»', async () => {
