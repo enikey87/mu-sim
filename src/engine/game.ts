@@ -189,7 +189,7 @@ export class Game {
     if (this.S.mem[momHelp('dacha')] && this.S.mem[momDachaAt] == null) this.S.mem[momDachaAt] = this.S.day
     // колбеки батареи — в узком хосте, а не в публичном интерфейсе Game: game.dead() путался бы со смертью Алика
     this.battery = new Battery(this.S, {
-      low: (level) => this.notify('🪫', 'Система', `Низкий заряд батареи: ${level}%`, { event: 'battery' }),
+      low: (level) => this.notify('⚠️', 'Система', `Низкий заряд батареи: ${level}%`, { event: 'battery' }),
       dead: () => this.onPhoneDead(),
       chargeDone: () => this.onPhoneCharged(),
       sleep: (ms) => this.sleep(ms),
@@ -1883,7 +1883,10 @@ export class Game {
       if (!o.scene && !this.alikSilent() && this.chance(0.18) && mine.kind === 'text') {
         await this.sleep(600)
         if (this.disposed) return
-        this.replaceMsg(mine, { react: this.draw('R_' + tone, L.REACT[tone] ?? L.REACT.neutral) })
+        // щекотливая тема (ревность, болезнь, смерть) — грустный пул вместо лайка (#923, заметка 8)
+        const touchy = L.TOUCHY_RE.test(mine.text) && tone !== 'rude' && tone !== 'threat'
+        const pool = touchy ? L.REACT.sad ?? L.REACT.neutral : L.REACT[tone] ?? L.REACT.neutral
+        this.replaceMsg(mine, { react: this.draw(touchy ? 'R_touchy' : 'R_' + tone, pool) })
         this.audio.vibrate(20)
         this.emit()
         reactOnly = !o.act && tone !== 'rude' && tone !== 'threat' && !S.scene && this.chance(0.3)
@@ -2048,7 +2051,7 @@ export class Game {
     return { when: p.t, whenNever: p.d == null, whenMade: this.S.day, whenDue: due, whenKind: p.kind, whenAt: this.horizonAt(p, due) }
   }
   /** Абсолютный день горизонта: срок по дате (у увёртки — поздняя из двух), событие — остаток идущего состояния или оценка, праздник — календарь; «никогда» и абсурд — нет. */
-  private horizonAt(p: Promise3, due: number | null): number | undefined {
+  private horizonAt(p: When, due: number | null): number | undefined {
     const day = this.S.day
     switch (p.kind) {
       case 'clear': return due ?? undefined
@@ -2212,7 +2215,8 @@ export class Game {
   async editLast(m: Msg | undefined, p?: Promise3): Promise<void> {
     if (!m || m.kind !== 'text') return
     await this.sleep(1800)
-    const w = this.draw('EDIT_WHEN', L.EDIT_WHEN)
+    const term = this.draw('EDIT_WHEN', L.EDIT_WHEN)
+    const w = term.t
     // срок может стоять в начале фразы с заглавной — ищем без учёта регистра, регистр сохраняем
     const at = p ? m.text.toLowerCase().indexOf(p.t.toLowerCase()) : -1
     let text = m.text
@@ -2220,9 +2224,14 @@ export class Game {
       const orig = m.text.slice(at, at + p.t.length)
       const repl = orig[0] !== orig[0].toLowerCase() ? cap(w) : w
       text = m.text.slice(0, at) + repl + m.text.slice(at + p.t.length)
+      // род и горизонт правленого срока — от разметки термина (#923): «в следующем году» — дата, а не «никогда»
+      const due = term.d == null ? null : this.S.day + (term.due ? dueIn(term.due, this.S.day) : term.d)
       const rec = this.S.promises[this.S.promises.length - 1]
-      if (rec && rec.t.includes(p.t)) { rec.t = rec.t.replace(p.t, w); rec.due = null }
-      this.S.ctx = { ...this.S.ctx, when: w, whenNever: true, whenKind: 'never', whenAt: undefined, whenMade: this.S.day, whenDue: null }
+      if (rec && rec.t.includes(p.t)) {
+        rec.t = rec.t.replace(p.t, w)
+        rec.due = due // журнал хранит абсолютную дату срока: у «когда-нибудь» её нет
+      }
+      this.S.ctx = { ...this.S.ctx, when: w, whenNever: due == null, whenKind: term.kind, whenAt: this.horizonAt(term, due), whenMade: this.S.day, whenDue: due }
     } else {
       text = m.text.replace(/[.!]?$/, this.draw('EDIT_SUFFIX', L.EDIT_SUFFIX) + '.')
     }

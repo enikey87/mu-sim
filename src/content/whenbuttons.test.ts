@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { makeGame } from '../test/helpers'
 import { D, WHEN_YEARS, type When } from './excuses'
+import * as L from './life'
 import { LEGENDS } from './legends'
 import { valueOf, type Entry } from './fact'
 import { test as holds } from '../engine/rules'
@@ -251,5 +252,41 @@ describe('игрок видит кнопки настоящим путём', () 
       expect(shown.size, what).toBeGreaterThan(0)
       for (const text of shown) expect(pools.some((k) => fromPool(k, text)), `${what}: ${text}`).toBe(true)
     }
+  })
+})
+
+describe('правки обещаний: род у каждого термина EDIT_WHEN (#923)', () => {
+  const editTerms = (): When[] => (L.EDIT_WHEN as Entry<When>[]).map(valueOf)
+
+  it('у каждого термина правки есть род; «в следующем году» — ясный срок на 1 января', () => {
+    for (const w of editTerms()) expect(typeof w.kind, w.t).toBe('string')
+    const year = editTerms().find((w) => w.t === 'в следующем году')!
+    expect(year.kind, 'следующий год — наступающая дата, а не «никогда»').toBe('clear')
+    expect(year.due, 'горизонт — 1 января следующего года').toEqual({ newYear: true })
+    expect(editTerms().find((w) => w.t === 'когда-нибудь')!.kind).toBe('never')
+    expect(editTerms().find((w) => w.t === 'после следующей свадьбы')!.kind).toBe('event')
+  })
+
+  it('после правки род на доске, и на «в следующем году» риторика «никогда» не собирается', async () => {
+    const year = editTerms().find((w) => w.t === 'в следующем году')!
+    const neverPhrases = [/по-русски это «никогда»/, /это не срок/, new RegExp(WHEN_YEARS)]
+    let drawn = 0
+    for (let seed = 1; seed <= 48 && drawn < 3; seed++) {
+      const { game } = makeGame({ seed })
+      const m = game.push({ kind: 'text', from: 'alik', text: 'В среду утром — всё отдам.' })
+      const p: When & { text: string } = { text: 'в среду утром — всё отдам', t: 'в среду утром', d: 3, kind: 'clear' }
+      game.recordPromise(p)
+      game.S.ctx = game.ctxFromPromise(p)
+      await game.editLast(m, p)
+      if (game.S.ctx?.when !== year.t) continue
+      drawn++
+      expect(game.S.ctx.whenKind, 'род правленого срока — из разметки').toBe('clear')
+      expect(game.S.ctx.whenDue, 'дата срока на доске').not.toBeNull()
+      const texts = game.buildChoices().map((c) => c.text)
+      for (const re of neverPhrases) {
+        expect(texts.some((t) => re.test(t)), `риторика «никогда» на ясном сроке: ${texts.join(' | ')}`).toBe(false)
+      }
+    }
+    expect(drawn, 'термин был нарисован — проверка не пустая').toBeGreaterThan(0)
   })
 })
