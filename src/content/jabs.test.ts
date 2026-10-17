@@ -6,7 +6,8 @@ import { makeGame } from '../test/helpers'
 import { valueOf } from '../engine/rules'
 import type { Choice } from '../engine/state'
 import type { Entry } from './fact'
-import { ARC_TALK, WORD_TALK } from './talk'
+import { ARC_TALK, MEMORY_TALK, WORD_TALK } from './talk'
+import { MEMORY } from './memory'
 import { LEGENDS } from './legends'
 import { saidTriggers, saidTrigger, type TalkPair } from './said'
 import { ARCS, ARC_DONE } from './arcs'
@@ -91,11 +92,13 @@ describe('колкости (#738): триггер окна — данные, а 
   it('каждый триггер находится в сказанной строке источника своей пары: правка серии или формы красит тест', () => {
     expect(saidTriggers().length, 'триггеров не стало — проверка пустеет').toBeGreaterThanOrEqual(11)
     const seen: string[] = []
-    const pairs: Array<[string, readonly Entry<TalkPair>[]]> = [...Object.entries(ARC_TALK), ['word', WORD_TALK]]
+    const pairs: Array<[string, readonly Entry<TalkPair>[]]> = [...Object.entries(ARC_TALK), ['word', WORD_TALK], ['memory', MEMORY_TALK]]
     for (const [arc, es] of pairs) {
       const source = arc === 'word'
         ? saidLines(OATH_FORMS)
-        : [...saidLines(ARCS[arc]?.eps), ...saidLines(FINALES[arc] ?? []), ...saidLines(ARC_DONE[arc] ?? [])]
+        : arc === 'memory'
+          ? saidLines(MEMORY)
+          : [...saidLines(ARCS[arc]?.eps), ...saidLines(FINALES[arc] ?? []), ...saidLines(ARC_DONE[arc] ?? [])]
       expect(source.length, `${arc}: сказанных строк нет — сверять нечего`).toBeGreaterThan(0)
       for (const e of es) {
         const t = saidTrigger(valueOf(e)[2])
