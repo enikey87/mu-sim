@@ -7,6 +7,7 @@ import { MIRROR, MIRROR_AGAIN, MIRROR_OPEN, MIRROR_REPLY, type Mirror } from '..
 import { PAYDAY_HOOKS } from '../content/rules/payday'
 import { QUEST_WHEN } from '../content/rules/world'
 import { LEGENDS } from '../content/legends'
+import { moneyPlaceOf } from '../content/money-ask'
 import { TOPICS, P_NEU_B_LATE, P_RUDE_BLOCKED, P_RUDE_POLITE, P_POL_POLITE, P_NIGHT, P_FRIDAY, P_MONEY, P_DESPERATE, DESPERATE_REPLY, MONEY_REPLY_POLITE, MONEY_REPLY_NEUTRAL, MONEY_REPLY_REGIMENT } from '../content/topics'
 import { FINALES, ENDINGS, DEFAULT_FINALE, paydayOutcome, type Finale, type PaydayId } from '../content/finales'
 import { ARCS, ARC_DONE, ARC_MENTIONS, CAST, type Episode, GROUP, GROUP_OOPS, WRONG_TO, WRONG_WHAT, WRONG_OOPS } from '../content/arcs'
@@ -1561,7 +1562,8 @@ export class Game {
       sinceRude: S.stats.sent - Number(S.mem[memkeys.rudeAt] ?? -99),
       // без штампа звонка — далеко: «кто звонил» без имени закрыто (#928)
       sinceCrew: S.stats.sent - Number(S.mem[memkeys.crewPaidAt] ?? -99),
-      sinceMoneyAsk: S.stats.sent - Number(S.mem[memkeys.moneyAskAt] ?? -99),
+      // свежесть места денег у каждого места своя (#962): вопрос игрока или объявление штампует своё
+      ...Object.fromEntries(Object.entries(memkeys.moneyAskAt).map(([p, k]) => [`sinceMoneyAsk.${p}`, S.stats.sent - Number(S.mem[k] ?? -99)])),
       // сколько раз игрок извинялся за последние 6 ходов («крик → мир → крик → мир»)
       sorrySwing: String(S.mem[memkeys.sorryAt] ?? '').split(',').filter((n) => n && S.stats.sent - Number(n) <= 6).length,
       // температура ссоры не уходит ниже нуля (после примирения ещё тикают отложенные «остывания»)
@@ -2380,7 +2382,12 @@ export class Game {
     await this.playEpisode(ep, id)
   }
   async playEpisode(ep: Episode, arc?: string): Promise<void> {
-    if (ep.legend !== undefined) this.setLegend(ep.legend, arc)
+    if (ep.legend !== undefined) {
+      this.setLegend(ep.legend, arc)
+      // объявление места денег потребляет окно свежести своего места (#962): state-вопросы не переспрашивают сказанное
+      const place = moneyPlaceOf(ep.legend)
+      if (place) this.S.mem[memkeys.moneyAskAt[place]] = this.S.stats.sent
+    }
     // серия без своей легенды возвращает легенду своего сериала: свадьба идёт — значит, деньги «после свадьбы»; гейт клятвы возврат не открывает (#327)
     else if (arc && this.S.mem[memkeys.legendOf(arc)]) this.setLegend(String(this.S.mem[memkeys.legendOf(arc)]), arc, false)
     // Строки о вычете/доплате сами требуют факт успешного сдвига; после отбора строк он не утекает в контекст кнопок.
