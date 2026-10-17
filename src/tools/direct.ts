@@ -164,6 +164,11 @@ export const DIRECT: Record<string, DirectCase> = {
   },
   // #571: переразметка сроков («никогда» без числа) увела траектории выборок — пять правил держим прямыми случаями
   Scene_heir: { event: 'PickScene', setup: (g) => { g.S.arcs.grandpa = { i: 4, last: 0 }; g.S.arcs.boris = { i: 4, last: 0 } } },
+  // гейт на чужих семействах (#434): в семье +2000 сцена заказчика не выпадала ни разу — прямой случай держит
+  Scene_customer: { event: 'PickScene', setup: (g) => { g.S.day = 210 } },
+  // гейт на чужих семействах (#434): в семье +2000 «через маму» не выпадало; если выборки снова увидят
+  // его часто (порог 7), гейт скажет «снять» — тогда запись уйдёт, как Says_voice в #887
+  Says_via_mama: { event: 'PlayerSays', facts: { intent: 'via', arg: 'mama' } },
   Chorus_garik_FedUp: { event: 'Mentioned', target: 'garik', setup: (g) => { g.S.mem['intro.garik'] = true; g.S.actors.garik = { interjections: 3 } } },
   // #824: окно повтора сдвинуло розыгрыш — траурный хор Карине ушёл из семейства +2000, держим прямым случаем
   Chorus_karine_Dead: { event: 'Mentioned', target: 'karine', setup: (g) => { dead(g); g.S.mem['intro.karine'] = true } },
