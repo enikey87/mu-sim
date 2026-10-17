@@ -339,6 +339,8 @@ const WHEN: Entry<When>[] = [
   { t: 'как отопление дадут', d: null, kind: 'never' },
   gate(gte('month', 3), lte('month', 10))({ t: 'к зиме', d: null, kind: 'holiday', holiday: 'winter' }), { t: 'к Пасхе', d: null, kind: 'holiday', holiday: 'easter' },
   { t: 'как объект в Абовяне сдадим', d: null, kind: 'never' },
+  // источник эха «Лет двадцать?» (#918): срок про коньяк и двадцать лет, эхо ссылается на сказанное
+  { t: 'как коньяк — лет двадцать', d: null, kind: 'never' },
   { t: 'когда налоговая уйдёт', d: null, kind: 'never' }, needs('nivaHome')(needs('niva')({ t: 'после техосмотра «Нивы»', d: null, kind: 'never' })),
   { t: 'в конце квартала', d: 45, kind: 'clear', due: { quarter: true } },
   needs('samvel')({ t: 'как дядя Самвел проснётся', d: 1, kind: 'never' }), { t: 'после футбола', d: 1, kind: 'event', est: 1 },
@@ -688,7 +690,8 @@ D.P_WHEN_NEVER = [
   gate(gte('somedayCount', 2), ne('ctx.when', KEY_OUT))('Записал «{t}» в «когда-нибудь». Там уже тесно.'),
   gate(eq('ctx.when', KEY_OUT))('А если малыша ключом вниз? Аккуратно.'),
   'Алик, «{t}» — это не срок.',
-  gate(missing(whenYears))(WHEN_YEARS),
+  // эхо «Лет двадцать?» — только когда срок и правда был про коньяк и двадцать лет (#918)
+  gate(missing(whenYears), matches('ctx.when', /коньяк/i))(WHEN_YEARS),
 ];
 D.PROMISE_OK = ['Не подведу, брат.', 'Вот и договорились.', 'Записывай, записывай. Я тоже записал.', 'Жди. Ожидание — это тоже работа.', 'Правильно. Главное — верить.'];
 D.P_WHY_REL = ['А при чём тут {n}?', 'Алик, а {n} тут каким боком?', 'Ну а я тут при чём, если {n}?', 'Алик, при чём тут {n}? Должны мне вы.'];

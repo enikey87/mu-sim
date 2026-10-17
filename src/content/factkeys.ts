@@ -102,7 +102,8 @@ export const FAMILIES: Record<string, (rest: string) => boolean> = {
   'met.': who, 'intro.': who,
   'asked.': arcs, 'doneAsked.': arcs, 'finale.': arcs, 'finale.at.': arcs, 'legend.of.': arcs,
   // день включения состояния серии (#859): ключ состояния (`wedding.samvel`) или ключ + доска персонажа (`sick.boris`)
-  'state.at.': (r) => states(r) || (r.includes('.') && states(r.slice(0, r.lastIndexOf('.'))) && who(r.slice(r.lastIndexOf('.') + 1))),
+  'state.at.': (r) => states(r) || (r.startsWith('wedding.') && Object.hasOwn(CAST, r.slice('wedding.'.length))) || r === 'wedding.anush'
+    || (r.includes('.') && states(r.slice(0, r.lastIndexOf('.'))) && who(r.slice(r.lastIndexOf('.') + 1))),
   'topic.': topics, 'topicMute.': topics,
   'inv.': items,
   'wedding.': (r) => Object.hasOwn(CAST, r) || r === 'anush',

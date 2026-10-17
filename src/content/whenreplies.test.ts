@@ -135,9 +135,24 @@ describe('матрица: каждая кнопка каждого срока �
   })
 })
 
+describe('«Лет двадцать?» — только после срока про коньяк (#918)', () => {
+  it('never-срок без коньяка эха не открывает, с коньяком — открывает', () => {
+    const { game } = makeGame()
+    const pool = () => game.open(D.P_WHEN_NEVER)
+    game.S.ctx = game.ctxFromPromise({ t: 'после таможни', d: null, kind: 'never', text: 'после таможни' })
+    expect(pool(), 'без коньяка в сроке — эха нет').not.toContain(WHEN_YEARS)
+    game.S.ctx = game.ctxFromPromise({ t: 'как коньяк — лет двадцать', d: null, kind: 'never', text: 'как коньяк — лет двадцать' })
+    expect(pool(), 'срок про коньяк — эхо ссылается на сказанное').toContain(WHEN_YEARS)
+  })
+  it('ответ на эхо не тычет игроку: «Ты — нет» убрано', () => {
+    expect(PROMISE_YEARS).not.toContain('Ты — нет')
+  })
+})
+
 describe('«Лет двадцать?» — пара со своим ответом', () => {
   it('кнопка зовёт колкий ответ, а соседняя ирония — общий пул', async () => {
-    const g = await said(byText('после таможни'))
+    // #918: эхо «Лет двадцать?» — только у срока про коньяк и двадцать лет
+    const g = await said(byText('как коньяк — лет двадцать'))
     let years = undefined as ReturnType<Game['buildChoices']>[number] | undefined
     let other = undefined as ReturnType<Game['buildChoices']>[number] | undefined
     for (let i = 0; i < 80 && (!years || !other); i++) {
