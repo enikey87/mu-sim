@@ -6,7 +6,7 @@ import { makeGame } from '../test/helpers'
 import { MONEY_ASK, MONEY_PLACES, moneyPlaceOf, type MoneyPlace } from './money-ask'
 import { LEGENDS } from './legends'
 import { valueOf, isOpen } from '../engine/rules'
-import { taxFrozen } from './memkeys'
+import { taxFrozen, nivaBack, intro } from './memkeys'
 import type { Choice } from '../engine/state'
 import type { Game } from '../engine/game'
 
@@ -37,6 +37,22 @@ describe('денежный вопрос: корпус (#795)', () => {
     // легенда не про деньги — места нет
     expect(moneyPlaceOf('garik')).toBeUndefined()
     expect(moneyPlaceOf(undefined)).toBeUndefined()
+  })
+
+  it('колёсная ветка (#919): после возвращения вопросы про колёса, «деньги в Ниве» закрыт', () => {
+    const { game } = makeGame()
+    game.S.mem[intro('niva')] = true
+    game.S.mem[nivaBack] = true
+    const open = MONEY_ASK.niva.filter((e) => isOpen(e, game.lineFacts())).map(valueOf)
+    expect(open, 'колёсный вопрос открыт').toContain('Колёса всё ещё продаются?')
+    expect(open).toContain('Покупатель на колёса нашёлся?')
+    expect(open, 'бардачок пуст — старого вопроса нет').not.toContain('Деньги всё ещё в «Ниве»?')
+    // до возвращения — наоборот: колёс нет, вопрос про бардачок открыт
+    const fresh = makeGame().game
+    fresh.S.mem[intro('niva')] = true
+    const before = MONEY_ASK.niva.filter((e) => isOpen(e, fresh.lineFacts())).map(valueOf)
+    expect(before.some((t) => t.startsWith('Колёса')), 'до возвращения колёсных вопросов нет').toBe(false)
+    expect(before).toContain('Деньги всё ещё в «Ниве»?')
   })
 
   it('«разморозка» спрашивается только по факту заморозки (#824)', () => {
