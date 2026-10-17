@@ -14,7 +14,7 @@ import { saidClaims, saidText, type Said } from '../fact'
 import { LEGENDS } from '../legends'
 import { ARCS, NO_NEWS_A, NO_NEWS_B, GROUP_SEEN_A, GROUP_SEEN_B, WRONG_A, WRONG_B } from '../arcs'
 import * as L from '../life'
-import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, PROMISE_PENCIL, PROMISE_FAR } from '../misc'
+import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, PROMISE_PENCIL, PROMISE_FAR, PROMISE_YEARS } from '../misc'
 import { CREW_PAID } from '../crew'
 import { HOLIDAY_MONEY, type Holiday } from '../holidays'
 import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_THIRD, LIE_NOCRED } from '../lies'
@@ -137,6 +137,12 @@ export const replyRules: R[] = [
       game.setCtx(null)
     },
   }, [eq('ctx.whenKind', 'event')]),
+  says('promiseNever', {
+    respond: async ({ game }) => {
+      await game.say([PROMISE_YEARS])
+      game.setCtx(null)
+    },
+  }, [eq('arg', 'years')]),
   // карандаш, горизонт и ирония на «никогда» — у каждой кнопки свой акт и свой пул
   ...([['promisePencil', 'PROMISE_PENCIL', PROMISE_PENCIL], ['promiseFar', 'PROMISE_FAR', PROMISE_FAR], ['promiseNever', 'PROMISE_NEVER', PROMISE_NEVER]] as const).map(([act, key, pool]) => says(act, {
     respond: async ({ game, facts }) => {

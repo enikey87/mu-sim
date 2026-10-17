@@ -1,7 +1,7 @@
 // Словари и генератор отмазок Алика Воздухонесяна.
 import { type Rng, mathRng } from '../engine/rng'
 import type { Due } from '../engine/time'
-import { type Entry, type Said, saidClaims, saidJoin, saidMap, saidText, valueOf, gate, eq, gte, lt, lte, matches, missing, exists, is, of } from './fact'
+import { type Entry, type Said, saidClaims, saidJoin, saidMap, saidText, valueOf, gate, eq, ne, gte, lt, lte, matches, missing, exists, is, of } from './fact'
 import type { LegalClaim } from '../engine/input'
 import type { HolidayRef } from './holidays'
 import { isWhoId, type WhoId } from './ids'
@@ -677,7 +677,19 @@ D.P_WHEN_OK = ['Запомнил: «{t}» — {date}. Не подведите.',
 D.P_WHEN_OK_EVENT = ['Запомнил: «{t}». Не подведите.', '«{T}» — жду. Как случится — напишите.', 'Записал: «{t}». Жду.'];
 D.P_WHEN_PENCIL = ['«{T}» — это {days}, Алик. Записываю. Карандашом.', 'Хорошо, «{t}». Это {days}, но я запишу. Карандашом.', '«{T}» — {days} ждать. Записал. Аккуратно, стирается.'];
 D.P_WHEN_FAR = ['«{T}»? Это {days}, Алик.', 'Алик, «{t}» — это {days}. Вы сами в это верите?', '«{T}» — {days}. Я столько долгов не помню, Алик.'];
-D.P_WHEN_NEVER = ['«{T}» — по-русски это «никогда», Алик.', gate(gte('somedayCount', 2))('Записал «{t}» в «когда-нибудь». Там уже тесно.'), 'Алик, «{t}» — это не срок. Это ответ.', '«{T}»… Алик, вы календарь видели?'];
+D.P_WHEN_CALENDAR = ['«{T}»… Алик, вы календарь видели?'];
+D.P_WHEN_EVENT = ['А при чём тут «{t}»?', '«{T}»? А я при чём?'];
+// число называет игрок; в ответах Алика его нет
+export const WHEN_YEARS = 'Лет двадцать?'
+// срок легенды малыша: «когда-нибудь» мимо; МЧС уже в talk этой легенды
+const KEY_OUT = 'как ключ выйдет'
+D.P_WHEN_NEVER = [
+  '«{T}» — по-русски это «никогда», Алик.',
+  gate(gte('somedayCount', 2), ne('ctx.when', KEY_OUT))('Записал «{t}» в «когда-нибудь». Там уже тесно.'),
+  gate(eq('ctx.when', KEY_OUT))('А если малыша ключом вниз? Аккуратно.'),
+  'Алик, «{t}» — это не срок.',
+  WHEN_YEARS,
+];
 D.PROMISE_OK = ['Не подведу, брат.', 'Вот и договорились.', 'Записывай, записывай. Я тоже записал.', 'Жди. Ожидание — это тоже работа.', 'Правильно. Главное — верить.'];
 D.P_WHY_REL = ['А при чём тут {n}?', 'Алик, а {n} тут каким боком?', 'Ну а я тут при чём, если {n}?', 'Алик, при чём тут {n}? Должны мне вы.'];
 // соболезнуют умершему: дедушка только «умирает», а траур у него — тоже
