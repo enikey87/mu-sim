@@ -5,10 +5,10 @@ import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
 import type { Criterion } from '../engine/rules'
 import { spec } from '../engine/rules/lines'
-import { CLAIMS, MORNING_CONTRA, OUTCOME, ROLL, SOURCES, type Claim } from './payday'
+import { CLAIMS, LEAD, MORNING_CONTRA, OUTCOME, ROLL, SOURCES, type Claim, type Lead } from './payday'
 import { LEGENDS } from './legends'
 import { CLAIM_LEDGER } from './ledger'
-import { bathAsked } from './memkeys'
+import { bathAsked, garikCut, met, nuneDekretOver } from './memkeys'
 import { ARCS } from './arcs'
 import { spec as lineSpec, valueOf, type Entry } from './fact'
 
@@ -22,12 +22,20 @@ const rich = (g: Game) => {
 }
 
 describe('День выплаты', () => {
-  it('запускается сюжетным ходом только в третьем акте: 330+ день и 3 законченных сериала', async () => {
+  it('запускается сюжетным ходом только в третьем акте: 330+ день и 3 законченных сериала, после двух штрихов подводки (#893)', async () => {
     const { game } = makeGame()
     game.S.day = 340
-    game.S.stats.sent = 20
-    for (let i = 0; i < 5; i++) expect((await game.fire('StoryBeat'))?.name).not.toBe('Beat_Payday')
+    // без серии не открываем ничего: сюжетный ход в этой части теста не играется (#893 — scene-floor не мешает)
+    game.S.stats.sent = 0
+    for (let i = 0; i < 5; i++) expect((await game.fire('StoryBeat'))?.name ?? '').not.toMatch(/^Beat_Payday/)
     rich(game)
+    // линии сошлись — третий акт предваряет подводка: два штриха в разные дни, и только потом анонс
+    expect((await game.fire('StoryBeat'))?.name).toBe('Beat_PaydayLead_First')
+    expect(game.S.mem['payday.signs']).toBe(1)
+    game.nextDay(1)
+    expect((await game.fire('StoryBeat'))?.name).toBe('Beat_PaydayLead_Second')
+    expect(game.S.mem['payday.signs']).toBe(2)
+    game.nextDay(1)
     expect((await game.fire('StoryBeat'))?.name).toBe('Beat_Payday')
     expect(game.S.scene?.id).toBe('payday')
     expect(game.S.ach.payday).toBeDefined()
@@ -37,12 +45,12 @@ describe('День выплаты', () => {
     game.S.day = 340
     const done = (id: string) => ({ i: ARCS[id].eps.length, last: 0 })
     Object.assign(game.S.arcs, { nune: done('nune'), boris: done('boris'), collectors: done('collectors') })
-    const payday = () => game.rules.collect({ event: 'StoryBeat' }, game.facts()).some((r) => r.name === 'Beat_Payday')
+    const lead = () => game.rules.collect({ event: 'StoryBeat' }, game.facts()).some((r) => r.name === 'Beat_PaydayLead_First')
     expect(game.facts().arcsDone).toBe(2)
-    expect(payday()).toBe(false)
+    expect(lead()).toBe(false)
     game.S.arcs.grant = done('grant')
     expect(game.facts().arcsDone).toBe(3)
-    expect(payday()).toBe(true) // не пустая проверка: третий сюжетный сериал выплату открывает
+    expect(lead()).toBe(true) // не пустая проверка: третий сюжетный сериал подводку открывает
   })
   it('полный проход: утро из событий партии → 240 000 → дележ → 50 ₽ → великая отмазка → поймал → мешок мелочи', async () => {
     const { game } = makeGame()
@@ -199,6 +207,9 @@ describe('День выплаты', () => {
     const { game } = makeGame()
     game.S.day = 430
     game.S.stats.sent = 200
+    expect(late(game), 'подводка не сыграна — третьему акту рано (#893)').toBe(false)
+    game.S.mem['payday.lead'] = 428
+    game.S.mem['payday.signs'] = 2
     expect(late(game)).toBe(true)
     game.S.mem['payday.at'] = 400
     expect(late(game)).toBe(false)
@@ -211,6 +222,10 @@ describe('День выплаты', () => {
     game.S.day = 340
     game.S.stats.sent = 200
     rich(game)
+    expect((await game.fire('StoryBeat'))?.name).toBe('Beat_PaydayLead_First')
+    game.nextDay(1)
+    expect((await game.fire('StoryBeat'))?.name).toBe('Beat_PaydayLead_Second')
+    game.nextDay(1)
     expect((await game.fire('StoryBeat'))?.name).toBe('Beat_Payday')
     expect(game.S.scene?.id).toBe('payday')
     // игрок жмёт реплику с актом («поймать на лжи») посреди сцены — сцена прерывается
@@ -221,6 +236,53 @@ describe('День выплаты', () => {
     await choose(game, 'bag')
     await choose(game, 'share')
     expect(String(game.S.mem['payday.chain']).length).toBeGreaterThan(80)
+  })
+  // #893: приёмка — штрихи подводки звучат за 2–3 дня до выплаты, по одному в день, раньше третьего акта их нет
+  it('подводка: два штриха за два дня до анонса, один в день, и только в третьем акте (#893)', async () => {
+    const { game } = makeGame()
+    rich(game)
+    // все сериалы закрыты: в этом окне сюжетный ход не открывает сцену и штрихи не глушит scene-floor
+    const done = (id: string) => ({ i: ARCS[id].eps.length, last: 0 })
+    Object.assign(game.S.arcs, Object.fromEntries(Object.keys(ARCS).map((id) => [id, done(id)])))
+    // раньше третьего акта штрихов нет
+    game.S.day = 329
+    expect((await game.fire('StoryBeat'))?.name ?? '').not.toMatch(/^Beat_PaydayLead/)
+    expect(game.S.mem['payday.signs']).toBeUndefined()
+    // линии сошлись: первый штрих, второй ждёт своего дня — в тот же день его нет
+    game.S.day = 340
+    expect((await game.fire('StoryBeat'))?.name).toBe('Beat_PaydayLead_First')
+    expect(game.S.mem['payday.signs']).toBe(1)
+    expect((await game.fire('StoryBeat'))?.name ?? '', 'второй штрих в тот же день').not.toBe('Beat_PaydayLead_Second')
+    expect(game.S.mem['payday.signs']).toBe(1)
+    const sign1Day = game.S.day
+    game.nextDay(1)
+    expect((await game.fire('StoryBeat'))?.name).toBe('Beat_PaydayLead_Second')
+    expect(game.S.mem['payday.signs']).toBe(2)
+    const sign2Day = game.S.day
+    game.nextDay(1)
+    expect((await game.fire('StoryBeat'))?.name).toBe('Beat_Payday')
+    // выплата — «завтра» после анонса: от дня первого штриха до неё три дня, от второго — два
+    const at = Number(game.S.mem['payday.at'])
+    expect(at).toBe(game.S.day + 1)
+    expect(at - sign1Day).toBe(3)
+    expect(at - sign2Day).toBe(2)
+  })
+  // #893: штрихи линий — по фактам идущих линий; чужие голоса молчат (как в пулах Дня выплаты)
+  it('штрих Нуне — только с идущим декретом, Гарик — только на связи и со своей линией (#893)', () => {
+    const { game } = makeGame()
+    const who = () => game.lines.eligible('PD_LEAD', LEAD, game.lineFacts()).map((p) => (p.spec as Lead).w)
+    expect(who(), 'общие штрихи Алика — в любой партии').toEqual([undefined, undefined, undefined])
+    game.S.arcs.nune = { i: 1, last: 0 }
+    game.S.mem[met('nune')] = true
+    expect(who()).toContain('nune')
+    game.S.mem[nuneDekretOver] = true
+    expect(who(), 'декрет кончился — свой штрих Нуне молчит').not.toContain('nune')
+    delete game.S.mem[nuneDekretOver]
+    game.S.arcs.garik = { i: 1, last: 0 }
+    game.S.mem[met('garik')] = true
+    expect(who()).toContain('garik')
+    game.S.mem[garikCut] = true
+    expect(who(), 'Гарик без связи — его штрих молчит').not.toContain('garik')
   })
   it('исходы по стилю партии: частный побеждает', async () => {
     const pick = async (setup: (g: Game) => void) => { const { game } = makeGame(); setup(game); return (await game.fire('PaydayOutcome'))?.name }

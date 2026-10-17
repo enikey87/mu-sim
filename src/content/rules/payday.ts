@@ -1,8 +1,8 @@
 // День выплаты: шаги сцены (hook) собираются из событий партии; исход выбирают правила PaydayOutcome.
 import type { ContentApi } from '../../engine/game'
-import { type Rule, eq, gte, is, exists, missing, set } from '../fact'
+import { type Rule, eq, gte, is, exists, missing, set, during, lt } from '../fact'
 import type { GameEvent, Offer } from './events'
-import { SOURCES, SOURCES_TOPUP, ROLL, CLAIMS, GRAND, GRAND_FALLBACK, SLOTS, CONTRADICTIONS, MORNING_CONTRA, OUTCOME, type Source, type Call, type Claim } from '../payday'
+import { SOURCES, SOURCES_TOPUP, ROLL, CLAIMS, GRAND, GRAND_FALLBACK, SLOTS, CONTRADICTIONS, MORNING_CONTRA, OUTCOME, LEAD, type Source, type Call, type Claim, type Lead } from '../payday'
 import { alikDead, cryptoHodl, payday as pd, paydayScene } from '../memkeys'
 import { samvelLine } from '../world'
 
@@ -133,16 +133,44 @@ const resumePayday = (game: ContentApi): Promise<void> => {
   return game.resumeNode('payday', String(at))
 }
 
+/** Штрих подводки: реплика из LEAD, день первого штриха и счёт — в памяти (#893).
+ *  Записи после say: тик внутри мог перейти на следующий день, «один штрих в день» идёт от дня реплики. */
+async function sayLead(game: ContentApi, first: boolean): Promise<boolean> {
+  const p = game.linePicked('PD_LEAD', LEAD)
+  if (!p) return false
+  const w = (p.spec as Lead).w
+  await game.say([w ? { w, t: p.text } : p.text])
+  game.applyFacts(first
+    ? [set(pd.lead, game.day), set(pd.signs, 1), during(pd.signToday, 1, true)]
+    : [set(pd.signs, 2)])
+  return true
+}
+
 export const paydayRules: R[] = [
-  // запуск: третий акт — когда сошлись линии (3+ законченных сериала после 330-го дня) или просто поздно
+  // подводка (#893): перед анонсом — два штриха из идущих линий, по одному в день. Пути повторяют
+  // пути анонса: раньше третьего акта штрихов нет, а объявление выплаты — не раньше двух штрихов.
   {
-    name: 'Beat_Payday', event: 'StoryBeat', when: [gte('day', 330), gte('arcsDone', 3), missing(paydayScene), missing(pd.at), missing(alikDead)], bonus: 10, once: true, priority: 'cinematic',
+    name: 'Beat_PaydayLead_First', event: 'StoryBeat', when: [gte('day', 330), gte('arcsDone', 3), missing(pd.lead), missing(pd.at), missing(paydayScene), missing(alikDead)],
+    priority: 'chatter', respond: ({ game }) => sayLead(game, true),
+  },
+  {
+    name: 'Beat_PaydayLead_Late', event: 'StoryBeat', when: [gte('day', 420), gte('sent', 150), missing(pd.lead), missing(pd.at), missing(paydayScene), missing(alikDead)],
+    priority: 'chatter', respond: ({ game }) => sayLead(game, true),
+  },
+  {
+    name: 'Beat_PaydayLead_Second', event: 'StoryBeat', when: [exists(pd.lead), lt(pd.signs, 2), missing(pd.signToday), missing(pd.at), missing(paydayScene), missing(alikDead)],
+    priority: 'chatter', respond: ({ game }) => sayLead(game, false),
+  },
+  // запуск: третий акт — когда сошлись линии (3+ законченных сериала после 330-го дня) или просто поздно,
+  // но только после подводки: два штриха уже сыграны
+  {
+    name: 'Beat_Payday', event: 'StoryBeat', when: [gte('day', 330), gte('arcsDone', 3), missing(paydayScene), missing(pd.at), missing(alikDead), gte(pd.signs, 2)], bonus: 10, once: true, priority: 'cinematic',
     respond: ({ game }) => resumePayday(game),
   },
   // условия Дня выплаты — в when, а не в respond: промолчавшее правило остаётся в пуле (разовый шанс
   // не тратится) и после выплаты перехватывало бы каждый StoryBeat, ничего не говоря
   {
-    name: 'Beat_Payday_Late', event: 'StoryBeat', when: [gte('day', 420), gte('sent', 150), missing(alikDead), missing(paydayScene), missing(pd.at)], bonus: 9, once: true, priority: 'cinematic',
+    name: 'Beat_Payday_Late', event: 'StoryBeat', when: [gte('day', 420), gte('sent', 150), missing(alikDead), missing(paydayScene), missing(pd.at), gte(pd.signs, 2)], bonus: 9, once: true, priority: 'cinematic',
     respond: ({ game }) => resumePayday(game),
   },
   // иерархия исходов — бонусами специфичности, а не числом условий: real 4 > lavash 3 > coins 2 = niva 2 > strasbourg/notyou 1 > default 0
