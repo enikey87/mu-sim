@@ -63,10 +63,13 @@ export const PAYDAY_HOOKS: Record<string, (game: ContentApi) => Promise<void>> =
       const p = game.linePicked('PD_CLAIM', CLAIMS, { filter: (l) => !took.has((l as Claim).who) })
       if (!p) break
       took.add((p.spec as Claim).who)
-      await game.say([{ w: (p.spec as Claim).who, t: p.text }])
-      sum = Math.max(50, sum - (p.spec as Claim).cut)
+      const nominal = (p.spec as Claim).cut
+      let next = Math.max(50, sum - nominal)
       // отказал делиться — берут вдвое: родня слышит «по рублю»
-      if (game.mem()[pd.refused]) sum = Math.max(50, sum - Math.round((p.spec as Claim).cut / 2))
+      if (game.mem()[pd.refused]) next = Math.max(50, next - Math.round(nominal / 2))
+      const text = p.text.includes('{cut}') ? game.X.fill(p.text, { cut: fmt(sum - next) }) : p.text
+      await game.say([{ w: (p.spec as Claim).who, t: text }])
+      sum = next
       await money(game, sum)
     }
     // остаток уходит не «сам собой», а с объяснением — иначе арифметика видна и не сходится
