@@ -43,7 +43,8 @@ export const CAST: Record<string, { name: string; color: string; emoji: string }
   razmik: { name: 'Крановщик Размик 🏗️', color: '#c46a1d', emoji: '🏗️' },
   rubik: { name: 'Инспектор Рубик', color: '#4a5d7e', emoji: '🔍' },
   collectors: { name: 'Коллекторы «Деньги-Ара»', color: '#5a4a3a', emoji: '🍵' },
-  taron: { name: 'Тарон (чайнос)', color: '#8a7355', emoji: '🫖' },
+  // ☕ вместо чайника-эмодзи из Unicode 13.0 (2020): тот не рисуется на старых шрифтах — оператор видел квадрат (#891)
+  taron: { name: 'Тарон (чайнос)', color: '#8a7355', emoji: '☕' },
 };
 
 export const ARCS: Record<string, Arc> = {
@@ -302,7 +303,7 @@ export const ARCS: Record<string, Arc> = {
     minDay: 200,
     follow: [
       'Как там Гарик?',
-      gate(is(garikConcrete))('Долг Гарика под домом, а платить Алик будет?'),
+      gate(is(garikConcrete))('Мой долг под Гариком и домом — а платит Алик?'),
       gate(is(garikConcrete))('Алик, что с Гариком? Бетон-то деньги держит.'),
       gate(is(garikConcrete))('Гарик через трубочку передал: конверт в фундаменте. И кто теперь должен?'),
       gate(is(garikConcrete))('Гарик ещё в фундаменте?'),
@@ -376,7 +377,7 @@ export const ARCS: Record<string, Arc> = {
       {
         remember: meet('collectors'),
         m: [
-          { w: 'collectors', t: 'Здравствуйте. Мы из МФО «Деньги-Ара». Вы нам должны. Мы не злимся — мы философствуем.' },
+          { w: 'collectors', t: 'Здравствуйте. Мы из МФО «Деньги-Ара». Вы нам должны. Мы не злимся.' },
           { w: 'collectors', t: 'В договоре поручитель — Алик Воздухонесян. Поручитель — почти друг. Где он?' },
         ],
       },
