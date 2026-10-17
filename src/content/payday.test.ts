@@ -162,6 +162,18 @@ describe('День выплаты', () => {
     for (const c of MORNING_CONTRA) expect(c.morning.test(morning), `нет строки утра под ${c.morning}`).toBe(true)
   })
 
+  // #909: доля Гарика — аренда за хранение денег и доля экскурсий, а не «копил, пока сидел»
+  it('источник Гарика переозвучен под новый голос: аренда и экскурсии, сумма прежняя', () => {
+    const garik = SOURCES.filter((e) => valueOf(e).t.includes('Гарик принёс'))
+    expect(garik.length, 'строка Гарика в источниках одна').toBe(1)
+    const t = valueOf(garik[0]!).t
+    expect(t).toMatch(/аренд/i)
+    expect(t).toMatch(/экскурс/i)
+    expect(t).toMatch(/честный человек/)
+    expect(t, 'старой формулировки нет').not.toMatch(/копил, пока сидел/i)
+    expect(valueOf(garik[0]!).amount).toBe(25000)
+  })
+
   it('с живым hodl утро не продаёт коины, а исход отдаёт лаваш; хвастовство о курсе помечено (#815)', async () => {
     const { game } = makeGame()
     game.S.day = 420

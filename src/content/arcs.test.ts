@@ -6,6 +6,7 @@ import { FINALES } from './finales'
 import { valueOf } from './fact'
 import { Gated, type Criterion } from '../engine/rules'
 import { ARC_DONE } from './arcs'
+import { CHORUS } from './world'
 import { garikConcrete, garikCut, grantPaid, houseOnGarik, intro, taxFrozen } from './memkeys'
 
 const lineText = (m: unknown) => (typeof m === 'string' ? m : (m as { t: string }).t)
@@ -154,6 +155,37 @@ describe('цитата про конверт Гарика — после тру�
     game.S.arcs.garik = { i: 2, last: 0 }
     expect(game.open(ARCS.garik.follow)).not.toContain(LINE)
     expect(game.open(ARCS.garik.follow)).toContain('Гарик ещё в фундаменте?')
+  })
+})
+
+describe('блог Гарика: аренда за показ и доля экскурсий (#909)', () => {
+  const RENT = /Экскурсии Гранта теперь заходят/
+  it('серия блога связывает его с экскурсиями: аренда и делёж кассы при живых экскурсиях, без них — только гэг', () => {
+    const { game } = makeGame()
+    game.S.mem[intro('garik')] = true
+    game.S.arcs.garik = { i: 3, last: 0 }
+    const texts = () => game.open(ARCS.garik.eps[3].m).map((m) => (typeof m === 'string' ? m : m.t)).join(' ')
+    expect(texts(), 'гэг про подписчиков остался').toMatch(/Сорок тысяч подписчиков/)
+    expect(texts(), 'без экскурсий экономики нет').not.toMatch(RENT)
+    game.S.arcs.beton = { i: 7, last: 0 }
+    game.S.mem[intro('grant')] = true
+    expect(texts(), 'аренда за показ').toMatch(RENT)
+    expect(texts()).toMatch(/касса делится/)
+  })
+})
+
+describe('хор Гарика: новый голос не спорит с признанием (#909)', () => {
+  it('после достания реплики не говорят «в фундаменте», а голос — прячется, торгуется, платит', () => {
+    const { game } = makeGame()
+    game.S.mem[intro('garik')] = true
+    game.S.arcs.garik = { i: ARCS.garik.eps.length, last: 0 } // линия пройдена: Гарика достали
+    const texts = game.open(CHORUS.garik).map((l) => (typeof l === 'string' ? l : l.t))
+    expect(texts.length, 'проверка пустеет: хор Гарика закрыт').toBeGreaterThan(0)
+    const all = texts.join(' ')
+    expect(all, 'Гарик снова «в фундаменте»').not.toMatch(/фундамент/i)
+    expect(all, 'прячется').toMatch(/не видел/)
+    expect(all, 'торгуется').toMatch(/по тарифу/)
+    expect(all, 'платит').toMatch(/платил/)
   })
 })
 
