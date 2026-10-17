@@ -20,7 +20,7 @@ import { HOLIDAY_MONEY, type Holiday } from '../holidays'
 import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_THIRD, LIE_NOCRED } from '../lies'
 import { HEAT, alikShaved, moustacheAskAt, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, stateAt, topic, topicLast, topicMute, topicRun, whenYears } from '../memkeys'
 import type { ArcId, TopicId } from '../ids'
-import { PROMISE_SHAVE_ASK } from '../world'
+import { PROMISE_SHAVE_ASK, RAM_PHOTO, BORIS_SALE, VACANCY, AVITO_REVIEW } from '../world'
 
 type R = Rule<ContentApi, GameEvent, Offer>
 const says = (intent: string, rest: Partial<R> & Pick<R, 'respond'>, extra: R['when'] = []): R => ({
@@ -160,6 +160,31 @@ export const replyRules: R[] = [
   says('crewPaid', {
     respond: async ({ game }) => {
       await game.say([game.draw('CREW_PAID', CREW_PAID)])
+      game.setCtx(null)
+    },
+  }),
+  // реакции на заметные системные события (#927): ответ — колода своего события, без повторов подряд
+  says('ramPhoto', {
+    respond: async ({ game }) => {
+      await game.say([game.draw('RAM_PHOTO', RAM_PHOTO)])
+      game.setCtx(null)
+    },
+  }),
+  says('borisSale', {
+    respond: async ({ game }) => {
+      await game.say([game.draw('BORIS_SALE', BORIS_SALE)])
+      game.setCtx(null)
+    },
+  }),
+  says('vacancy', {
+    respond: async ({ game }) => {
+      await game.say([game.draw('VACANCY', VACANCY)])
+      game.setCtx(null)
+    },
+  }),
+  says('avitoReview', {
+    respond: async ({ game }) => {
+      await game.say([game.draw('AVITO_REVIEW', AVITO_REVIEW)])
       game.setCtx(null)
     },
   }),

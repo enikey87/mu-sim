@@ -1,7 +1,7 @@
 import { type Entry, type LineSpec, type Said, gate, gte, lte, eq, ne, is, missing, set } from './fact'
 import { type When } from './excuses'
 import { needs, WORLD } from './world'
-import { bloodGiven, count, endgame, evicted, paydayScene, wedding } from './memkeys'
+import { avitoReviewAt, bloodGiven, borisSaleAt, count, endgame, evicted, paydayScene, vacancyAt, wedding } from './memkeys'
 import { sold, momHelp, momDachaDays } from './credit'
 import { billStreak } from './bills'
 
@@ -128,7 +128,7 @@ export const VOICE = [
 
 // Уведомления телефона — реплики пула, как у Hades: каждое один раз, если не repeat; у событий — условия и последствия
 // (выселили — хозяин больше не спрашивает про квартиру). spend — трата с карты: {spend}, {what}, {money}.
-export interface Notif extends LineSpec { icon: string; app: string; spend?: true; /** Уже случившееся списание: сумма уходит с карты при показе. */ charge?: number }
+export interface Notif extends LineSpec { icon: string; app: string; spend?: true; /** Уже случившееся списание: сумма уходит с карты при показе. */ charge?: number; /** Окно реакции (#927): ключ, в который карточка запишет ход события. */ stamp?: string }
 const often = { repeat: true, cooldown: { turns: 40 } }
 export const NOTIF: Notif[] = [
   { icon: '🏦', app: 'Банк', t: 'Списание {spend} ₽. {what}. Баланс: {money} ₽', spend: true, when: [...moneyOpen], repeat: true, cooldown: { turns: 8 } },
@@ -142,16 +142,16 @@ export const NOTIF: Notif[] = [
   { icon: '👩', app: 'Мама', t: 'Видела передачу про таких, как твой Алик. Там тоже не заплатили.' },
   { icon: '👩', app: 'Мама', t: 'Может, вернёшься домой? Тут тоже есть плитка.' },
   { icon: '🛒', app: 'Авито', t: 'Отзывы об «Алик Стройка под ключ» скрыты по жалобе владельца. Всех 48.' },
-  { icon: '🛒', app: 'Авито', t: 'Алик Воздухонесян оставил вам отзыв: «Хороший парень, терпеливый» ⭐⭐⭐⭐⭐' },
+  { icon: '🛒', app: 'Авито', t: 'Алик Воздухонесян оставил вам отзыв: «Хороший парень, терпеливый» ⭐⭐⭐⭐⭐', stamp: avitoReviewAt },
   // баран передан игроку (барахолка) — объявление Алика о продаже больше не его (#856)
-  { icon: '🛒', app: 'Авито', t: 'Новое объявление рядом: «Продаю барана Бориса, торг, умеет писать».', when: [WORLD.baran, gte('arc.boris', 4), missing('has.boris')] },
+  { icon: '🛒', app: 'Авито', t: 'Новое объявление рядом: «Продаю барана Бориса, торг, умеет писать».', when: [WORLD.baran, gte('arc.boris', 4), missing('has.boris')], stamp: borisSaleAt },
   { icon: '🏛', app: 'Госуслуги', t: 'Штраф 500 ₽: парковка у объекта Алика.', charge: 500, when: [is('has.car'), ...moneyOpen] },
   { icon: '🏛', app: 'Госуслуги', t: 'Ваша угроза зарегистрирована как заявление «Алик не платит». Срок рассмотрения — 1473 дня.', when: [gte(count.threat, 1)] },
   { icon: '🌤', app: 'Погода', t: 'Ереван +32°. Идеальная погода, чтобы бетон застыл. Не застынет.', when: [gte('month', 6), lte('month', 8)] },
   { icon: '🌤', app: 'Погода', t: '+3° и дождь. Хорошая погода, чтобы ждать.', when: [gte('month', 10)] },
   { icon: '🏠', app: 'Хозяин квартиры', t: 'Когда за квартиру?', when: [missing(evicted)], ...often },
   { icon: '🏠', app: 'Хозяин квартиры', t: 'Жду до пятницы. Пятница — это не Аликова пятница.', when: [missing(evicted), ne('dow', 5)] },
-  { icon: '💼', app: 'hh.ru', t: 'Новая вакансия: плиточник, оплата сразу! Работодатель: Алик В.' },
+  { icon: '💼', app: 'hh.ru', t: 'Новая вакансия: плиточник, оплата сразу! Работодатель: Алик В.', stamp: vacancyAt },
   { icon: '💼', app: 'hh.ru', t: 'Вакансия: плиточник, 150 000 ₽, оплата каждую пятницу. Откликнуться?' },
   { icon: '🧑', app: 'Серёга', t: 'Ну что, заплатил твой Алик?', ...often }, { icon: '🧑', app: 'Серёга', t: 'Братан, займи до зарплаты. А, у тебя ж тоже нет.' },
   { icon: '📺', app: 'Новости', t: 'В Ереване бетон отказался застывать. Эксперты разводят руками.' },
