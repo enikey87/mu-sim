@@ -21,7 +21,7 @@ import { requirePlayerPool } from '../player-pools'
 import {
   P_VIA_BORIS, P_VIA_KARINE, P_VIA_MAMA, P_MOO, P_MOUSTACHE, P_COURT, P_COLLECTORS_DEBUT,
   P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE,
-  P_CREW_CALL, P_LAWYER, P_COLLECTORS_ASK, P_INTERN, P_HOLE,
+  P_CREW_CALL, P_LAWYER, P_COLLECTORS_ASK, P_INTERN, P_HOLE, P_COUNTERSUIT,
 } from './player-choice-pools'
 
 type R = Rule<ContentApi, GameEvent, Offer>
@@ -146,6 +146,8 @@ export const choiceRules: R[] = [
   offer({ name: 'CollectorsAsk', when: [is('collectorsAskFresh')], act: 'collectorsAsk', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_COLLECTORS_ASK', P_COLLECTORS_ASK) }),
   offer({ name: 'InternOffer', when: [is('internFresh')], act: 'internOffer', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_INTERN', P_INTERN) }),
   offer({ name: 'RubikHole', when: [is('rubikHoleFresh')], act: 'rubikHole', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_HOLE', P_HOLE) }),
+  // встречный иск — заметное событие с окном отклика (#964): ход и три после
+  offer({ name: 'Countersuit', when: [is('countersuitFresh')], act: 'countersuitAsk', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_COUNTERSUIT', P_COUNTERSUIT) }),
 
   // ответ на то, ЧТО прислал Алик
   offer({ name: 'Photo', when: [eq('ctx.type', 'photo')], act: 'photo', tone: 'neutral', bonus: 3, text: (g) => fromD(g, 'P_PHOTO') }),

@@ -19,9 +19,9 @@ import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, PROMISE_PENCIL,
 import { CREW_PAID } from '../crew'
 import { HOLIDAY_MONEY, type Holiday } from '../holidays'
 import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_THIRD, LIE_NOCRED } from '../lies'
-import { HEAT, alikShaved, avitoReviewAt, borisSaleAt, collectorsAskAt, crewPaidAt, internAt, kettleAt, lawyerAt, moneyAskAt, moustacheAskAt, ramPhotoAt, rubikAskAt, rubikHoleAt, vacancyAt, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, saidKonak, stateAt, topic, topicLast, topicMute, topicRun, whenYears } from '../memkeys'
+import { HEAT, alikShaved, avitoReviewAt, borisSaleAt, collectorsAskAt, countersuitAt, crewPaidAt, internAt, kettleAt, lawyerAt, moneyAskAt, moustacheAskAt, ramPhotoAt, rubikAskAt, rubikHoleAt, vacancyAt, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, saidKonak, stateAt, topic, topicLast, topicMute, topicRun, whenYears } from '../memkeys'
 import type { ArcId, TopicId } from '../ids'
-import { PROMISE_SHAVE_ASK, RAM_PHOTO, BORIS_SALE, VACANCY, AVITO_REVIEW, RUBIK_ASK, KETTLE, CREW_CALL_B, LAWYER_B, COLLECTORS_ASK_B, INTERN_B, HOLE_B } from '../world'
+import { PROMISE_SHAVE_ASK, RAM_PHOTO, BORIS_SALE, VACANCY, AVITO_REVIEW, RUBIK_ASK, KETTLE, CREW_CALL_B, LAWYER_B, COLLECTORS_ASK_B, INTERN_B, HOLE_B, COUNTERSUIT_B } from '../world'
 
 type R = Rule<ContentApi, GameEvent, Offer>
 const says = (intent: string, rest: Partial<R> & Pick<R, 'respond'>, extra: R['when'] = []): R => ({
@@ -249,6 +249,13 @@ export const replyRules: R[] = [
     respond: async ({ game }) => {
       await game.say([game.draw('HOLE_B', HOLE_B)])
       game.clearFact(rubikHoleAt)
+      game.setCtx(null)
+    },
+  }),
+  says('countersuitAsk', {
+    respond: async ({ game }) => {
+      await game.say([game.draw('COUNTERSUIT_B', COUNTERSUIT_B)])
+      game.clearFact(countersuitAt)
       game.setCtx(null)
     },
   }),
