@@ -294,7 +294,8 @@ describe('«Займи 50»', () => {
     const { game: g2 } = makeGame({ storage })
     await enter(g2)
     const t = texts(g2)
-    expect(t).toContain('Опять я. Опять 50. Это уже традиция, брат.')
+    // #922: вторая просьба — явная заявка («займи 50, до четверга»), а не «опять я, опять 50»
+    expect(t).toContain('Брат, займи 50. До четверга. Алик Воздухонесян, надёжный заёмщик, справки у мамы.')
     expect(t).not.toContain('Брат. Слушай сюда. Только не смейся.')
     expect(alikBeforeCard(g2).at(-1)).toBe('Верну. Ты меня знаешь.')
     expect(alikBeforeCard(g2).length).toBeLessThanOrEqual(3)
