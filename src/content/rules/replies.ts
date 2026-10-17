@@ -18,7 +18,7 @@ import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, PROMISE_PENCIL,
 import { CREW_PAID } from '../crew'
 import { HOLIDAY_MONEY, type Holiday } from '../holidays'
 import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_THIRD, LIE_NOCRED } from '../lies'
-import { HEAT, alikShaved, avitoReviewAt, borisSaleAt, kettleAt, moustacheAskAt, ramPhotoAt, rubikAskAt, vacancyAt, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, saidKonak, stateAt, topic, topicLast, topicMute, topicRun, whenYears } from '../memkeys'
+import { HEAT, alikShaved, avitoReviewAt, borisSaleAt, kettleAt, moneyAskAt, moustacheAskAt, ramPhotoAt, rubikAskAt, vacancyAt, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, saidKonak, stateAt, topic, topicLast, topicMute, topicRun, whenYears } from '../memkeys'
 import type { ArcId, TopicId } from '../ids'
 import { PROMISE_SHAVE_ASK, RAM_PHOTO, BORIS_SALE, VACANCY, AVITO_REVIEW, RUBIK_ASK, KETTLE } from '../world'
 
@@ -98,6 +98,8 @@ export const replyRules: R[] = [
       const legend = String(facts.arg ?? '')
       const l = LEGENDS[legend]
       if (!l) return false
+      // вопрос прозвучал и получает ответ: вопросы-состояния того же места молчат окно свежести (#952)
+      game.applyFacts([set(moneyAskAt, Number(facts.sent))])
       const p = game.linePicked('LEG_' + legend, l.lines)
       if (!p) return game.excuseTurn()
       game.markTopical(await game.say([{ t: p.text, claims: p.spec.claims ?? [] }]))
