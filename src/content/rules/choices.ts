@@ -2,7 +2,7 @@
 // Берутся два самых приоритетных (специфичность + bonus); из одного слота — только одна.
 import type { ContentApi } from '../../engine/game'
 import type { Choice, Tone } from '../../engine/state'
-import { type Rule, type Facts, type Criterion, type Entry, eq, ne, is, exists, missing, gt, gte, lte, isOpen, valueOf } from '../fact'
+import { type Rule, type Facts, type Criterion, type Entry, eq, ne, is, exists, missing, gt, gte, lte, isOpen, valueOf, sinceWithin } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { D, cap, WHEN_YEARS } from '../excuses'
 import { talkPairs, talkId } from '../talk'
@@ -119,9 +119,10 @@ export const choiceRules: R[] = [
   offer({ name: 'Via_mama', slot: 'via', when: [is(blocked)], act: 'via', arg: () => 'mama', tone: 'polite', bonus: 6, text: (g) => plainFromArr(g, 'P_VIA_MAMA', P_VIA_MAMA) }),
   offer({ name: 'Moo', when: [is('ctx.offended'), gte(HEAT, 1)], odds: 0.5, act: 'moo', tone: 'neutral', bonus: 4, text: (g) => fromArr(g, 'P_MOO', P_MOO) }),
 
-  // пока усы отрастают — подколоть Алика (#352); не чаще раза в 5 дней после вопроса
+  // пока усы отрастают — подколоть Алика (#352); не чаще раза в 5 дней после вопроса,
+  // и только пока нить жива: с 31-го дня после бритья кнопка уходит (#921)
   {
-    name: 'Opt_Moustache', event: 'BuildChoices', when: [is(alikShaved)], bonus: 2,
+    name: 'Opt_Moustache', event: 'BuildChoices', when: [is(alikShaved), ...sinceWithin('shaved', 30)], bonus: 2,
     slot: 'moustache',
     offer: ({ game }) => {
       if (game.day - Number(game.mem()[moustacheAskAt] ?? -99) < 5) return null
