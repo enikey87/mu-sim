@@ -1715,10 +1715,15 @@ export class Game {
     // контекстные варианты — правила события BuildChoices (самые специфичные первыми)
     const facts = this.facts()
     const out: Choice[] = []
+    // тема блока (#887): два вопроса про одно и то же (фундамент и follow бетона) в одной сборке не стоят —
+    // повтор темы пропускаем, слот занимает следующий пул; общее число вариантов не меняется
+    const topics = new Set<string>()
     for (const r of this.rules.collect({ event: 'BuildChoices' }, facts)) {
       if (out.length >= 2) break
       const c = r.offer?.(this.rules.ctx(this, r, { event: 'BuildChoices' }, facts))
       if (!c) continue
+      if (c.topic && topics.has(c.topic)) continue
+      if (c.topic) topics.add(c.topic)
       out.push(c)
       // перерыв оффера считается от показа, а не от нажатия: кнопку увидели — пауза пошла (#789)
       if (r.cooldown) this.rules.commit(r, { event: 'BuildChoices' })

@@ -104,6 +104,8 @@ export interface Choice {
   category?: InputCategory
   act?: string
   arg?: string | number
+  /** Тема вопроса: два варианта про одно и то же в одном блоке не стоят (#887). Ставит контент. */
+  topic?: string
   scene?: string
   go?: string | null
   /** Залитая кнопка — только у ответа «Перевёл» в просьбе «займи 50» (#616). */
