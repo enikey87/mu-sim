@@ -4,9 +4,9 @@ import { type Entry, type FactOp, type Criterion, type FactKey, type Said, set, 
 import { type ClaimKey } from './ids'
 import type { LedgerEvent } from './fact-types'
 import { needs, meet, WORLD, MENTION_RE } from './world'
-import { actSigned, alikDead, betonSet, borisMarried, collectorsRecruited, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantPaid, houseOnGarik, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, sick, taxFrozen, wedding } from './memkeys'
+import { actSigned, alikDead, betonSet, borisMarried, collectorsAskAt, collectorsRecruited, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantPaid, houseOnGarik, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, rubikHoleAt, sick, taxFrozen, wedding } from './memkeys'
 
-export type ArcMsg = Said | { w: string; t: string; claims?: LedgerEvent[]; remember?: FactOp[]; stamp?: string } | { t: string; claims: LedgerEvent[]; remember?: FactOp[] }
+export type ArcMsg = Said | { w: string; t: string; claims?: LedgerEvent[]; remember?: FactOp[]; stamp?: string } | { t: string; claims: LedgerEvent[]; remember?: FactOp[]; stamp?: string }
 export interface Episode {
   /** Сообщения серии; с needs — только уместные. */
   m: Entry<ArcMsg>[]
@@ -227,7 +227,7 @@ export const ARCS: Record<string, Arc> = {
       { m: ['На объект приехал инспектор Рубик. Посмотрел на твою плитку и сказал: «Так ровно без взятки не кладут». Ищет, кто дал. Пока не найдёт — деньги стоят.'], then: 'promise', legend: 'inspect' },
       { m: ['Рубик проверяет уровнем. Уровень показывает идеально. Рубик уровню не верит. Вызвал из Еревана второй уровень. Государственный, с печатью.'] },
       { m: [{ w: 'rubik', t: 'Молодой человек, это вы клали? Сознайтесь, кому дали. Суммы меня не интересуют. Хотя интересуют. Найду виновного — штраф выпишу, как полагается.', stamp: rubikAskAt }] },
-      { m: ['Рубик взял образец твоей плитки на экспертизу. Отколол. Прямо из середины. Экспертиза в Москве, сроков не называют. Пока — дырка. Заказчик в ярости, не платит.', 'Дырку заделаешь? Только не ровно, брат. Ровно — опять заподозрят.'] },
+      { m: ['Рубик взял образец твоей плитки на экспертизу. Отколол. Прямо из середины. Экспертиза в Москве, сроков не называют. Пока — дырка. Заказчик в ярости, не платит.', { t: 'Дырку заделаешь? Только не ровно, брат. Ровно — опять заподозрят.', claims: [], stamp: rubikHoleAt }] },
       { remember: [set(rubikBath, true)], m: ['Рубик остался жить на объекте. Не уедет, говорит, пока не найдёт взяткодателя. Спит в ванной, на твоей плитке. Хвалит — прохладная.', 'Говорит, задержится: ищет, кто дал взятку, а заодно привык.'] },
       { remember: meet('karine'), m: ['Жена, Карине, носит Рубику обед. Третью неделю. Рубик поправился на пять кило и прислал ей стихи. Я начинаю нервничать. Акт — тоже.'], then: 'promise', legend: 'inspect_karine' },
       { m: [{ w: 'karine', t: 'Алик, Рубик сделал мне предложение. Акт подпишет, если соглашусь. Ради плиточника, может, и соглашусь.' }, 'Брат, ты же не хочешь, чтобы из-за твоих денег распалась семья? Скажи, что подождёшь.'], then: 'promise' },
@@ -390,7 +390,7 @@ export const ARCS: Record<string, Arc> = {
       '«Деньги-Ара» — три чашки чая? И всё это в мой долг?',
       'Коллекторы на объекте расселись: чай длинный, долг тоже.',
       gate(missing(collectorsRecruited))('Коллектор говорит: плати. Я отвечаю: деньги у Алика.'),
-      gate(is(collectorsRecruited))('Они звонят и помогают? А долг от этого не растёт?'),
+      gate(is(collectorsRecruited))('Они у тебя работают. И помогают? А долг от этого не растёт?'),
       gate(is(collectorsTurned))('Теперь они работают на меня? И отчего долг всё равно растёт?'),
       needs('taron')('Коллекторы и Тарон заодно? У них что, своя бухгалтерия?'),
     ],
@@ -406,7 +406,7 @@ export const ARCS: Record<string, Arc> = {
         m: [
           { w: 'collectors', t: 'Мы узнали: Алик должен вам больше, чем вы — нам.' },
           { w: 'collectors', t: 'Это уже не долг. Это диалектика.' },
-          'Брат, тебе коллекторы пишут? Скажи, я в отпуске. Внутреннем. Без интернета и без денег.',
+          { t: 'Брат, тебе коллекторы пишут? Скажи, я в отпуске. Внутреннем. Без интернета и без денег.', claims: [], stamp: collectorsAskAt },
         ],
       },
       {

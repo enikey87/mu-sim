@@ -185,6 +185,15 @@ export const DIRECT: Record<string, DirectCase> = {
   // гейт на чужих семействах (#434): в семье +2000 «через маму» не выпадало; если выборки снова увидят
   // его часто (порог 7), гейт скажет «снять» — тогда запись уйдёт, как Says_voice в #887
   Says_via_mama: { event: 'PlayerSays', facts: { intent: 'via', arg: 'mama' } },
+  // #958: прямые вопросы и первые сообщения сдвинули розыгрыш — голосовое и «выбери отмазку сам» ушли из выборок
+  Says_voice: { event: 'PlayerSays', facts: { intent: 'voice' } },
+  Scene_choice: {
+    event: 'PickScene',
+    setup: (g) => {
+      const now = { turn: g.S.stats.sent, day: g.S.day }
+      for (const r of g.rules.all) if (r.event === 'PickScene' && r.name !== 'Scene_choice') g.S.rules.cooldown[r.name] = now
+    },
+  },
   Chorus_garik_FedUp: { event: 'Mentioned', target: 'garik', setup: (g) => { g.S.mem['intro.garik'] = true; g.S.actors.garik = { interjections: 3 } } },
   // #824: окно повтора сдвинуло розыгрыш — траурный хор Карине ушёл из семейства +2000, держали прямым случаем
   // #920: варианты предложения и козы сдвинули розыгрыш — Chorus_karine_Dead в 8 партиях (порог 7), гейт видит сам

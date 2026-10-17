@@ -5,7 +5,7 @@
 import { type Criterion, type Entry, is, gte, lte, eq, set, gate, missing } from './fact'
 import type { Episode } from './arcs'
 import { needs, meet } from './world'
-import { HEAT, caughtCount, count, court, garikConcrete, grantPaid, houseOnGarik, intro, karineKnowsDebt, nivaAway, nivaPlayer, paydayScene, rubikFined, tileCornerRemoved, vendetta, wedding, endgame } from './memkeys'
+import { HEAT, caughtCount, count, court, garikConcrete, grantPaid, houseOnGarik, internAt, intro, karineKnowsDebt, nivaAway, nivaPlayer, paydayScene, rubikFined, tileCornerRemoved, vendetta, wedding, endgame } from './memkeys'
 
 export interface Finale extends Episode {
   id: string
@@ -164,7 +164,7 @@ export const FINALES: Record<string, Finale[]> = {
     {
       // перекрывает серию-разворот, если игрок кричал на Алика (#679): коллекторы берут его в команду
       id: 'intern', title: 'Стажёр-коллектор', when: [gte(count.rude, 6)],
-      m: [{ w: 'collectors', t: 'Мы прослушали ваш разговор с Аликом. Профессионально. Приходите к нам. Стажировка — три чая.' }],
+      m: [{ w: 'collectors', t: 'Мы прослушали ваш разговор с Аликом. Профессионально. Приходите к нам. Стажировка — три чая.', stamp: internAt }],
       fx: { ach: 'arc_collectors' },
       sys: 'Вам предложена должность: стажёр-коллектор «Деньги-Ара». Оплата: процент.',
       done: ['Стажировка идёт. Чай наливают, долги слушают. Тебя хвалят.', 'Меня уже взыскивают по-настоящему. Ты научился быстро.'],

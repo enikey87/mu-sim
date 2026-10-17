@@ -6,6 +6,8 @@ import { NOTIF } from './life'
 import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE } from './rules/player-choice-pools'
 import { BORIS_SALE, RUBIK_ASK, KETTLE } from './world'
 import { ARCS } from './arcs'
+import { FINALES } from './finales'
+import { court } from './memkeys'
 import { valueOf } from './fact'
 
 const AD = 'Новое объявление рядом: «Продаю барана Бориса, торг, умеет писать».'
@@ -113,6 +115,53 @@ describe('реакции на системные события (#927)', () => {
       await g.fire('PlayerSays', { intent: act })
       expect(has(g, act), `${act}: после ответа окно закрыто`).toBe(false)
     }
+  })
+})
+
+describe('прямые вопросы и первые сообщения (#958): окно отклика', () => {
+  const has = (game: Game, act: string) => { game.S.choices = null; return game.buildChoices().some((c) => c.act === act) }
+  const answered = async (game: Game, act: string) => {
+    expect(has(game, act), `${act}: варианта нет на ходу события`).toBe(true)
+    await game.fire('PlayerSays', { intent: act })
+    expect(has(game, act), `${act}: после ответа окно не закрылось`).toBe(false)
+  }
+
+  it('первое сообщение Тарона: отклик в окне звонка, после ответа закрыт', async () => {
+    const { game } = makeGame()
+    expect(has(game, 'crewCall'), 'без звонка варианта нет').toBe(false)
+    game.S.day = 210
+    await game.fire('AlikIdle')
+    await answered(game, 'crewCall')
+  })
+
+  it('первое сообщение Арсена-юриста: отклик про суд, после ответа закрыт', async () => {
+    const { game } = makeGame()
+    expect(has(game, 'lawyerAsk'), 'без угрозы судом варианта нет').toBe(false)
+    game.S.mem[court] = 1
+    await game.fire('PlayerMessage', { tone: 'threat' })
+    expect(game.S.mem['intro.arsen'], 'Арсен вошёл в историю своим сообщением').toBe(true)
+    await answered(game, 'lawyerAsk')
+  })
+
+  it('вопрос Алика «тебе коллекторы пишут?»: отклик есть, после ответа окно закрыто', async () => {
+    const { game } = makeGame()
+    expect(has(game, 'collectorsAsk'), 'без вопроса варианта нет').toBe(false)
+    await game.playEpisode(ARCS.collectors.eps[1], 'collectors')
+    await answered(game, 'collectorsAsk')
+  })
+
+  it('предложение стажировки «Деньги-Ара»: принять/отклонить, после ответа окно закрыто', async () => {
+    const { game } = makeGame()
+    expect(has(game, 'internOffer'), 'без предложения варианта нет').toBe(false)
+    await game.playFinale('collectors', FINALES.collectors.find((f) => f.id === 'intern')!)
+    await answered(game, 'internOffer')
+  })
+
+  it('вопрос «дырку заделаешь?»: отклик в окне, после ответа закрыт', async () => {
+    const { game } = makeGame()
+    expect(has(game, 'rubikHole'), 'без вопроса варианта нет').toBe(false)
+    await game.playEpisode(ARCS.rubik.eps[3], 'rubik')
+    await answered(game, 'rubikHole')
   })
 })
 

@@ -1553,6 +1553,11 @@ export class Game {
       avitoReviewFresh: S.stats.sent - Number(S.mem[memkeys.avitoReviewAt] ?? -99) <= 3,
       rubikAskFresh: S.stats.sent - Number(S.mem[memkeys.rubikAskAt] ?? -99) <= 3,
       kettleFresh: S.stats.sent - Number(S.mem[memkeys.kettleAt] ?? -99) <= 3,
+      // прямые вопросы и первые сообщения персонажей (#958): отклик в ближайшем блоке — ход и три после
+      lawyerFresh: S.stats.sent - Number(S.mem[memkeys.lawyerAt] ?? -99) <= 3,
+      collectorsAskFresh: S.stats.sent - Number(S.mem[memkeys.collectorsAskAt] ?? -99) <= 3,
+      internFresh: S.stats.sent - Number(S.mem[memkeys.internAt] ?? -99) <= 3,
+      rubikHoleFresh: S.stats.sent - Number(S.mem[memkeys.rubikHoleAt] ?? -99) <= 3,
       sinceRude: S.stats.sent - Number(S.mem[memkeys.rudeAt] ?? -99),
       // без штампа звонка — далеко: «кто звонил» без имени закрыто (#928)
       sinceCrew: S.stats.sent - Number(S.mem[memkeys.crewPaidAt] ?? -99),
