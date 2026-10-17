@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { makeGame } from '../test/helpers'
 import { D, WHEN_YEARS, type When } from './excuses'
+import { saidConyak } from './memkeys'
 import * as L from './life'
 import { LEGENDS } from './legends'
 import { valueOf, type Entry } from './fact'
@@ -174,12 +175,15 @@ async function shownWhen(w: When, tune?: (g: Game) => void, n = 80): Promise<str
 }
 
 describe('риторика по роду: календарь — праздник, событие — «при чём», «никогда» — без календаря', () => {
-  it('в пуле «никогда» нет календаря и хвоста «Это ответ.»; «Лет двадцать?» — строка игрока', () => {
+  it('в пуле «никогда» нет календаря и хвоста «Это ответ.»; «Лет двадцать?» — строка игрока после коньячной строки (#918)', () => {
     for (const s of pool('P_WHEN_NEVER')) {
       expect(s, s).not.toMatch(/календарь/i)
       expect(s, s).not.toMatch(/Это ответ\./)
     }
-    expect(pool('P_WHEN_NEVER')).toContain(WHEN_YEARS)
+    const { game } = makeGame()
+    expect(game.open(D.P_WHEN_NEVER), 'без коньячной строки эха нет').not.toContain(WHEN_YEARS)
+    game.S.mem[saidConyak] = true
+    expect(game.open(D.P_WHEN_NEVER), 'после коньячной строки эхо есть').toContain(WHEN_YEARS)
     expect(pool('P_WHEN_CALENDAR').join(' ')).toMatch(/календарь/i)
     expect(pool('P_WHEN_EVENT').join(' ')).toMatch(/при чём/i)
     expect(pool('P_WHEN_EVENT').join(' ')).not.toMatch(/календарь/i)

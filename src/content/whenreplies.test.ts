@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { makeGame, alikTexts } from '../test/helpers'
 import { D, cap, WHEN_YEARS, type When } from './excuses'
+import { saidConyak } from './memkeys'
 import { LEGENDS } from './legends'
 import { PROMISE_NEVER, PROMISE_PENCIL, PROMISE_FAR, PROMISE_YEARS, WHEN_COND } from './misc'
 import { valueOf, test as holds, type Entry } from '../engine/rules'
@@ -136,8 +137,9 @@ describe('матрица: каждая кнопка каждого срока �
 })
 
 describe('«Лет двадцать?» — пара со своим ответом', () => {
-  it('кнопка зовёт колкий ответ, а соседняя ирония — общий пул', async () => {
-    const g = await said(byText('после таможни'))
+  it('кнопка зовёт свой ответ, а соседняя ирония — общий пул', async () => {
+    // эхо живёт после коньячной строки (#918): свой тест про гейт — ниже, здесь тема — пара
+    const g = await said(byText('после таможни'), (game) => { game.S.mem[saidConyak] = true })
     let years = undefined as ReturnType<Game['buildChoices']>[number] | undefined
     let other = undefined as ReturnType<Game['buildChoices']>[number] | undefined
     for (let i = 0; i < 80 && (!years || !other); i++) {
@@ -164,6 +166,24 @@ describe('«Лет двадцать?» — пара со своим ответо
     const plain = alikTexts(g.S.msgs.slice(m)).join(' ')
     expect(plain).not.toBe(PROMISE_YEARS)
     expect(from(PROMISE_NEVER, plain), plain).toBe(true)
+  })
+
+  it('эхо «Лет двадцать?» живёт только после коньячной строки Алика; ответ смягчён (#918)', async () => {
+    // без коньяка эха нет — даже на «никогда»-сроке
+    const bare = await said(byText('после таможни'))
+    expect(bare.open(D.P_WHEN_NEVER), 'без коньячной строки эха нет').not.toContain(WHEN_YEARS)
+    // Алик сам говорит «Как коньяк» настоящим ответом PROMISE_NEVER — эхо опирается на эту метафору
+    const { game } = makeGame()
+    vi.spyOn(game.X, 'promise').mockImplementation(() => ({ text: 'после таможни — отдам', ...byText('после таможни') }))
+    await game.promiseLine()
+    game.S.ctx = game.ctxFromPromise({ ...byText('после таможни'), text: 'после таможни — отдам' })
+    const draw = game.draw
+    vi.spyOn(game, 'draw').mockImplementation(((k: string, arr: readonly Entry<unknown>[]) => (k === 'PROMISE_NEVER' ? 'Не торопи срок, брат. Он созревает. Как коньяк.' : draw(k, arr))) as Game['draw'])
+    await game.fire('PlayerSays', { intent: 'promiseNever' })
+    expect(game.mem()['said.conyak'], 'коньячная строка ставит факт').toBe(true)
+    expect(game.open(D.P_WHEN_NEVER), 'после коньячной строки эхо есть').toContain(WHEN_YEARS)
+    // ответ смягчён — без тычка игроку
+    expect(PROMISE_YEARS).not.toMatch(/Ты — нет/)
   })
 })
 

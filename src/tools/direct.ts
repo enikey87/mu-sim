@@ -161,8 +161,9 @@ export const DIRECT: Record<string, DirectCase> = {
   Scene_customer: { event: 'PickScene', setup: (g) => { g.S.day = 210 } },
   // гейт на чужих семействах (#434): в семье +6000 счёт-подтверждение не выпадал — прямой случай держит
   Scene_invoice: { event: 'PickScene', setup: (g) => { g.S.day = 216 } },
-  // в семье +4000 не выпадал племянник (Арсен ещё не представлен) — прямой случай держит
-  Scene_nephew: { event: 'PickScene' },
+  // #918 (гейт «Лет двадцать?» сдвинул розыгрыш): реакция на голосовое ушла из выборок — прямой случай держит;
+  // снят Scene_nephew — гейт снова видит его сам (7 партий при пороге 7)
+  Says_voice: { event: 'PlayerSays', facts: { intent: 'voice' } },
   // гейт на чужих семействах (#434): в семье +2000 «через маму» не выпадало; если выборки снова увидят
   // его часто (порог 7), гейт скажет «снять» — тогда запись уйдёт, как Says_voice в #887
   Says_via_mama: { event: 'PlayerSays', facts: { intent: 'via', arg: 'mama' } },
