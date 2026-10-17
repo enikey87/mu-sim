@@ -5,7 +5,7 @@
 import type { Game } from '../engine/game'
 import type { Facts } from '../engine/rules'
 import { during } from '../engine/rules'
-import { caughtCount, HEAT, legendDay, legendId, nuneKeyPassed, sorryAt } from '../content/memkeys'
+import { HEAT, legendDay, legendId, nuneKeyPassed, sorryAt } from '../content/memkeys'
 
 export type DirectCase = { event: string; facts?: Facts; target?: string; setup?: (g: Game) => void }
 
@@ -137,16 +137,8 @@ export const DIRECT: Record<string, DirectCase> = {
   Quiet_PaydayOpen_StoryBeat: { event: 'StoryBeat', setup: (g) => { paydayOpen(g); g.S.stats.sent = 5 } },
   // #833: хвост окна свежести сдвинул розыгрыш — Quiet_PaydayOpen_PromiseDue в 7 партиях (порог 7), гейт видел сам;
   // #882 (фраза-срок про свадьбу) сдвинул розыгрыш обратно — правило ушло из выборок, случай вернулся
-  Quiet_PaydayOpen_PromiseDue: {
-    event: 'PromiseDue', facts: { promise: 0 },
-    setup: (g) => {
-      g.S.mem.payday = 'default'
-      g.S.ending = 'payday_default'
-      g.S.endings.payday_default = g.S.day
-      g.recordPromise({ text: 'в пятницу', d: 1 })
-      g.S.day += 1
-    },
-  },
+  // #889: перекалибровка вариантов бетона сдвинула розыгрыш снова — в CI правило в 8 партиях (порог 7),
+  // случай снят; на чужих семействах (+2000/+4000/+6000) правило играет, нулей второй гейт не видит
   Away_ColdWar: { event: 'AlikAway', setup: offended },
   Quiet_Offended_AlikAway: { event: 'AlikAway', setup: offended },
   Due_StakeKept: {
@@ -175,7 +167,8 @@ export const DIRECT: Record<string, DirectCase> = {
   Finale_razmik_shift: { event: 'ArcFinale', facts: { arc: 'razmik' }, setup: (g) => { g.S.ach.fence = 1 } },
   Finale_tile_lost: { event: 'ArcFinale', facts: { arc: 'tile' }, setup: (g) => { g.S.mem.court = 6 } },
   // #824: окно повтора сдвинуло розыгрыш — обычный финал плитки ушёл из выборок, держим прямым случаем
-  Finale_tile_default: { event: 'ArcFinale', facts: { arc: 'tile' } },
+  // #889: перекалибровка вариантов бетона сдвинула розыгрыш — финал плитки снова в выборках
+  // (7 партий при пороге 7) — прямой случай не нужен, гейт видит его без подсказки
   Says_sorry_blocked_boris: { event: 'PlayerSays', facts: { intent: 'sorry' }, setup: (g) => { blocked(g); g.S.arcs.boris = { i: 4, last: 0 } } },
   // #824: окно повтора реплик игрока сдвинуло розыгрыш — голосовое теперь срабатывает во всех семействах само
   // (было прямым случаем с #806, когда уходило из семейства +4000)
@@ -185,8 +178,11 @@ export const DIRECT: Record<string, DirectCase> = {
   // с колкостями (#683) распухший журнал собирается ботами сам — случай снят по порогу гейта
   // #577: упрёк по звонку сдвинул розыгрыш ещё три правила — держим прямыми случаями
   // #824: после слияния с #828 розыгрыш сдвинулся — голосовое снова уходит из семейства +4000, держим прямым случаем
+  // #889: та же перекалибровка вернула голосовое в выборки (7 партий при пороге 7) — прямой случай снят
+  // (снята и стороной #890); на чужих семействах (+2000/+4000/+6000) правило играет (2–4 партии), нулей второй гейт не видит
   // #824: там же ушёл из семейства +6000 финал бетона «Настоящая ведомость» (порог поимок 2)
-  Finale_beton_ledger: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem[caughtCount] = 2 } },
+  // #889: перекалибровка вариантов бетона сдвинула розыгрыш — финал срабатывает в выборках сам
+  // (8 партий при пороге 7) — прямой случай не нужен, гейт видит его без подсказки
   // #826: расширение тоновых пулов сдвинуло розыгрыш — отклик на «воскрес» ушёл из семейства +6000
   Says_condole_ctxrevived: { event: 'PlayerSays', facts: { intent: 'condole' }, setup: (g) => { g.S.ctx = { revived: true } } },
   Finale_rubik_default: { event: 'ArcFinale', facts: { arc: 'rubik' } },
@@ -202,20 +198,10 @@ export const DIRECT: Record<string, DirectCase> = {
   // #762: барахолка получила вес 5 — на чужих семействах сидов (`rules:stable`) «смертный одр» и траурный
   // хор Карине падают до нуля; в выборках гейта они редкие (3 и 5 партий из 72), потому держим прямыми случаями
   // Scene_deathbed: с #824/#828 срабатывает в выборках сам (7 партий при пороге 7) — прямой случай не нужен
-  // #795: кнопки игрока (денежный вопрос вместо случайной кнопки про арку) сдвинули розыгрыш ещё раз —
-  // траурный хор Карине гейт теперь видит сам (7 партий из 72), а «Карине знакомится» из выборок ушло;
-  // её прямой случай занимает остальные сцены, иначе вес 1 среди ~20 делает проверку подбрасыванием монеты
-  Scene_wife: {
-    event: 'PickScene',
-    setup: (g) => {
-      g.S.mem['count.rude'] = 1 // ворота сцены: игрок уже грубил, Карине ещё не знакомы
-      for (const r of g.rules.all) {
-        if (r.event !== 'PickScene' || r.name === 'Scene_wife') continue
-        if (r.once) g.S.rules.once[r.name] = true
-        else g.S.rules.cooldown[r.name] = { turn: g.S.stats.sent, day: g.S.day }
-      }
-    },
-  },
+  // #795: кнопки игрока (денежный вопрос вместо случайной кнопки про арку) сдвинули розыгрыш —
+  // обычная сцена «жена» стала редкой в выборках, случай держали прямым (свой setup подавлял соседние сцены)
+  // #889: перекалибровка вариантов бетона сдвинула розыгрыш — сцена снова в выборках CI
+  // (7 партий при пороге 7) — прямой случай не нужен, гейт видит её без подсказки
   Quest_q_niva: { event: 'PickQuest', setup: (g) => { g.S.mem[legendId] = 'niva_stuck'; g.S.mem[legendDay] = g.S.day } },
   // #795: денежная кнопка вместо случайной кнопки про арку сдвинула розыгрыш выборок — эти правила
   // ушли из чужих семейств сидов (`rules:stable`); в выборках гейта они редкие, потому держим прямыми случаями
