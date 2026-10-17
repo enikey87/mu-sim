@@ -156,6 +156,8 @@ export class Game {
   private notifWall: WallTimer | null = null
   /** Пока на экране одно уведомление, следующие ждут — иначе кредит затирает «недостаточно средств». */
   private notifQueue: Notif[] = []
+  /** Оффер после продажи, отложенный до конца answerCard: карточка результата в ленте раньше оффера (#972). */
+  private pendingSellOffer?: string
   private idleCount = 0
   private seq = 1
   private resetting = false
@@ -1042,7 +1044,8 @@ export class Game {
     this.adjustMoney(amount, receipt.startsWith('кредиту ') ? `Кредит ${receipt.slice('кредиту '.length)}` : `Кредит: ${receipt}`)
     this.scheduleCredits()
   }
-  sellThing(id?: ThingId): void {
+  /** Продажа вещи со дна. `deferOffer` — оффер «остаток всё ещё критический» ждёт конца хода: результат в ленте раньше оффера (#972). */
+  sellThing(id?: ThingId, deferOffer = false): void {
     if (this.moneySealed() || !this.S.mem[creditOffer]) return
     const thing = id ? THINGS.find((t) => t.id === id) : nextThing(this.S.mem)
     if (!thing || this.S.mem[sold(thing.id)]) return
@@ -1055,7 +1058,11 @@ export class Game {
     delete this.S.mem[memkeys.creditOfferSum]
     this.adjustMoney(got, 'Авито')
     // продажа могла не вытащить со дна — снова предложить, с этой причиной (ход игрока, не падение — без перерыва)
-    if (this.moneyLevel() === 'bottom') this.maybeCreditOffer('Продано, а остаток всё ещё критический')
+    if (this.moneyLevel() === 'bottom') {
+      // позднее нажатие: результат уйдёт отдельной карточкой — оффер ждёт её и встаёт в ленте после (#972)
+      if (deferOffer) this.pendingSellOffer = 'Продано, а остаток всё ещё критический'
+      else this.maybeCreditOffer('Продано, а остаток всё ещё критический')
+    }
   }
   /** «Нива» у игрока: финал «Нива выбрала тебя» (#256) или бартер (#530) — предмет в инвентаре. */
   private nivaAtPlayer(): boolean {
@@ -1090,7 +1097,8 @@ export class Game {
         result = `${loan.id === 'micro' ? 'Микрозайм' : 'Кредит'} взят: +${this.rub(this.S.money - before)}. Баланс: ${this.rub(this.S.money)}`
       } else if (pick === 'sell' && m.offer.sell && thing) {
         const before = this.S.money
-        this.sellThing(thing.id)
+        // оффер «Продано, а остаток…» сбросится после карточки результата: иначе он ссылается на продажу снизу (#972)
+        this.sellThing(thing.id, true)
         if (!this.S.mem[sold(thing.id)]) return
         result = `${this.thingDone(thing)}. +${this.rub(this.S.money - before)}. Баланс: ${this.rub(this.S.money)}`
       } else if (pick === 'later') {
@@ -1110,6 +1118,12 @@ export class Game {
           this.replaceMsg(cur, { answered: true, result, lines: unseen.length ? unseen : undefined })
         }
         if (result !== 'Не сейчас') this.markBankShown()
+      }
+      // отложенный продажей оффер: в ленте после карточки результата, на которую он ссылается (#972)
+      if (this.pendingSellOffer) {
+        const why = this.pendingSellOffer
+        this.pendingSellOffer = undefined
+        this.maybeCreditOffer(why)
       }
       // уровень денег сменился — варианты отчаяния уходят сразу, не через ход
       if (!this.ui.busy) this.S.choices = this.buildChoices()

@@ -355,3 +355,30 @@ describe('вторая карточка недели не повторяет у�
     expect(game.S.bank?.lines['-Связь'], 'буфер недели не теряет уже показанное').toEqual({ sum: 800, n: 2 })
   })
 })
+
+// порядок ленты: результат действия раньше карточки, которая на него ссылается (#972)
+describe('поздняя продажа: результат раньше оффера, который она спавнит (#972)', () => {
+  it('нажатие «Продать» на карточке прошлого дня: результат в ленте выше «Продано, а остаток…»', () => {
+    const { game } = makeGame()
+    game.S.mem[creditStage] = 2 // следующая ступень — микрозайм, как в форме 96002
+    setMoney(game, 420)
+    game.chargeBill('phone') // дно: карточка с кнопкой «Продать»
+    const offer = cards(game, 'Банк').at(-1)!
+    expect(offer.offer?.sell, 'на карточке есть «Продать»').toBeTruthy()
+    game.S.day += 3 // карточка прошлого дня: результат уйдёт отдельной карточкой
+    const seen = new Set(game.S.msgs.map((m) => m.id))
+    game.answerCard(offer.id, 'sell')
+    const fresh = cards(game, 'Банк').filter((c) => !seen.has(c.id))
+    const resultAt = fresh.findIndex((c) => /Баланс:/.test(c.text))
+    const offerAt = fresh.findIndex((c) => c.text.startsWith('Продано, а остаток всё ещё критический'))
+    expect(resultAt, 'карточка результата продажи есть').toBeGreaterThanOrEqual(0)
+    expect(offerAt, 'оффер «Продано, а остаток…» есть').toBeGreaterThanOrEqual(0)
+    expect(resultAt, 'результат раньше оффера, который на него ссылается').toBeLessThan(offerAt)
+    // балансы в порядке чтения растут: продажа называет меньший, ответ на оффер — больший
+    const saleBal = num(fresh[resultAt].text, /Баланс: ([\d\s]+) ₽/)
+    game.answerCard(fresh[offerAt].id, 'take')
+    const taken = cards(game, 'Банк').find((c) => c.id === fresh[offerAt].id)!
+    const takenBal = num(taken.result!, /Баланс: ([\d\s]+) ₽/)
+    expect(saleBal, 'числа в порядке чтения').toBeLessThan(takenBal)
+  })
+})
