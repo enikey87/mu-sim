@@ -134,7 +134,7 @@ export const DIRECT: Record<string, DirectCase> = {
   Quiet_PaydayOpen_AlikAway: { event: 'AlikAway', setup: paydayOpen },
   Quiet_PaydayOpen_PeriodLine: { event: 'PeriodLine', setup: paydayOpen },
   Quiet_PaydayOpen_StoryBeat: { event: 'StoryBeat', setup: (g) => { paydayOpen(g); g.S.stats.sent = 5 } },
-  Quiet_PaydayOpen_PromiseDue: { event: 'PromiseDue', facts: { promise: 0 }, setup: (g) => { paydayOpen(g); g.recordPromise({ text: 'в пятницу', d: 1 }); g.S.day += 1 } },
+  // #833: хвост окна свежести сдвинул розыгрыш — Quiet_PaydayOpen_PromiseDue в 7 партиях (порог 7), гейт видит сам
   Away_ColdWar: { event: 'AlikAway', setup: offended },
   Quiet_Offended_AlikAway: { event: 'AlikAway', setup: offended },
   Due_StakeKept: {
@@ -214,7 +214,7 @@ export const DIRECT: Record<string, DirectCase> = {
   // #795: розыгрыш сдвинулся — амнистия теперь играется во всех чужих семействах (`rules:stable`),
   // гейт видит её сам; запись снята
   // #703: правка пулов звонка сдвинула розыгрыш выборок — кафе и счёт из них ушли
-  Scene_invoice: { event: 'PickScene', setup: (g) => { g.S.day = 215 } },
+  // #833: хвост окна свежести сдвинул розыгрыш — Scene_invoice в 8 партиях (порог 7), гейт видит сам
   // #731: правка NAME_RE сдвинула розыгрыш выборок ещё раз — «заказчик жалуется» и «позвони заказчику» ушли из них
   // #753: «карта» держалась прямым случаем, пока лотерея 72 партий её не задевала (3–5 из 60);
   // #762 (барахолка веса 5) сдвинула розыгрыш — правило играется в 7 партиях из 72, гейт видит его сам.
