@@ -182,6 +182,14 @@ export const vacancyAt = 'vacancy.at'
 export const avitoReviewAt = 'avito.reviewAt'
 export const rubikAskAt = 'rubik.askAt'
 export const kettleAt = 'lottery.kettleAt'
+/** Первое сообщение Арсена-юриста (#958): ход входа в историю — окно отклика. */
+export const lawyerAt = 'court.lawyerAt'
+/** Прямой вопрос Алика «тебе коллекторы пишут?» (#958): ход вопроса. */
+export const collectorsAskAt = 'collectors.askAt'
+/** Предложение стажировки «Деньги-Ара» (#958): ход предложения. */
+export const internAt = 'collectors.internAt'
+/** Вопрос про дырку от образца плитки (#958): ход вопроса. */
+export const rubikHoleAt = 'rubik.holeAt'
 
 /** Ключи досок персонажей (S.actors), не мира. */
 export const sick = 'sick'
@@ -193,6 +201,7 @@ export const EVENT_KEY_LIST = [
   'moneyNormal', 'moneyLow', 'moneyBottom', 'paymentDueTomorrow',
   'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sinceCrew', 'sinceMoneyAsk', 'sorrySwing', 'promiseLive', 'promisePassed', 'promiseStake',
   'ramPhotoFresh', 'borisSaleFresh', 'vacancyFresh', 'avitoReviewFresh', 'rubikAskFresh', 'kettleFresh',
+  'lawyerFresh', 'collectorsAskFresh', 'internFresh', 'rubikHoleFresh',
   'period', 'night', 'offline', 'scene', 'sinceAlik', 'lateCount', 'arcAvailable',
   'arcsStarted', 'arcsDone', 'quests', 'callbackReady', 'lieOpen', 'lieKind', 'lieAlikOld', 'deathCanAdvance', 'collectorsCanAdvance',
   'intent', 'tone', 'arg', 'category', 'arc', 'argArcDone', 'greet', 'promise', 'somedayCount', momDachaDays,
@@ -212,6 +221,6 @@ export const MEM_KEYS: ReadonlySet<string> = new Set([
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday, saidKonak,
   lightOff, netRation, phoneWarn, holidayGreeted,
   creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, collectorsTurned, criticalAt, creditOfferSum, momDachaAt, crewPaid, crewPaidAt, moneyAskAt, rubikBath, whenYears,
-  ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt,
+  ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt,
   ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lend50),
 ])

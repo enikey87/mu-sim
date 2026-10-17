@@ -6,7 +6,7 @@ import type { GameEvent, Offer } from './events'
 import { COURT, COURT_AFTER, COURT_LAWYER_AGAIN, COURT_VERDICT_AFTER_LETTER } from '../quests'
 import { THREAT_AGAIN } from '../misc'
 import { meet } from '../world'
-import { count, court, courtReferral, intro, paydayScene, threatClaim } from '../memkeys'
+import { count, court, courtReferral, intro, lawyerAt, paydayScene, threatClaim } from '../memkeys'
 
 type R = Rule<ContentApi, GameEvent, Offer>
 const threat = eq('tone', 'threat')
@@ -44,7 +44,12 @@ export const courtRules: R[] = [
   {
     name: 'Court_Lawyer', event: 'PlayerMessage', when: [threat, eq(court, 1), missing(intro('arsen'))], bonus: 1,
     remember: [add(count.threat), add(court), ...meet('arsen')],
-    respond: async ({ game }) => { game.unlock('memory'); await saySaid(game, referred(game, COURT[1])) },
+    respond: async ({ game, facts }) => {
+      game.unlock('memory')
+      await saySaid(game, referred(game, COURT[1]))
+      // первое сообщение Арсена — окно отклика (#958)
+      game.applyFacts([set(lawyerAt, Number(facts.sent))])
+    },
   },
   {
     name: 'Court_Lawyer_Again', event: 'PlayerMessage', when: [threat, eq(court, 1), is(intro('arsen'))], bonus: 1,
