@@ -24,6 +24,7 @@ import {
   paydayScene, lightOff, netRation, phoneWarn, creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited,
   collectorsTurned,
   criticalAt, creditOfferSum, crewPaid, crewPaidAt, moneyAskAt, rubikBath, whenYears, ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt, countersuitAt,
+  debutWho, debutAt,
 } from './memkeys'
 import { momDachaAt, momDachaDays, type LoanId, type MomId, type ThingId } from './credit'
 import { valueOf } from '../engine/rules'
@@ -56,6 +57,7 @@ export type MemExactKey =
   | typeof borisSmetaReady | typeof taxFrozen | typeof taxThawed | typeof actSigned | typeof grantPaid
   | typeof rubikFined | typeof threatClaim | typeof nuneKeyPassed | typeof nuneDekretOver | typeof grandpaDying
   | typeof betonSet | typeof cardSent | typeof saidTomorrow | typeof saidFriday | typeof saidKonak | typeof paydayScene
+  | typeof debutWho | typeof debutAt
   | typeof lightOff | typeof netRation | typeof phoneWarn | typeof holidayGreeted
   | typeof creditStage | typeof creditOffer | typeof creditBroke | typeof momDone | typeof creditDeclined | typeof moneyPoor | typeof collectorsRecruited
   | typeof collectorsTurned
@@ -74,7 +76,7 @@ export type FactKey =
   | `has.${HasKey}`
   | `ctx.${CtxKey}`
   | `heard.${ClaimKey}` | `cb.${ClaimKey}`
-  | `met.${WhoId}` | `intro.${WhoId}`
+  | `met.${WhoId}` | `intro.${WhoId}` | `wrote.${WhoId}`
   | `asked.${ArcId}` | `doneAsked.${ArcId}` | `finale.${ArcId}` | `finale.at.${ArcId}` | `legend.of.${ArcId}`
   | `state.at.${string}` // день состояния серии (#859): ключ состояния и доска персонажа; рантайм-сторож в FAMILIES
   | `topic.${TopicId}` | `topicMute.${TopicId}`
@@ -109,6 +111,8 @@ export const FAMILIES: Record<string, (rest: string) => boolean> = {
   'state.at.': (r) => states(r) || (r.includes('.') && states(r.slice(0, r.lastIndexOf('.'))) && who(r.slice(r.lastIndexOf('.') + 1))),
   // окно свежести места денег (#962): вопрос или объявление штампует ход своего места
   'sinceMoneyAsk.': moneyPlaces,
+  // дебют участника (#973): «писал ли уже» — маркер первого сообщения
+  'wrote.': who,
   'topic.': topics, 'topicMute.': topics,
   'inv.': items,
   'wedding.': (r) => Object.hasOwn(CAST, r) || r === 'anush',
