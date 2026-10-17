@@ -7,7 +7,7 @@ import { useModal } from './useModal'
 
 /** Черновик заметки: что аннотируем и чем это было в партии. */
 export interface ReviewDraft {
-  msg: number
+  msg?: number
   day: number
   turn: number
   target: ReviewTarget
@@ -24,6 +24,10 @@ export interface ReviewApi {
   noteOf: (msg: number) => ReviewNote | undefined
   /** Правый клик или долгий тап: мини-меню сообщения. */
   menu: (m: Msg) => void
+  /** Правый клик или долгий тап на кнопке варианта: меню заметки о варианте (#878). */
+  menuChoice: (text: string) => void
+  /** Бейдж варианта: заметка этого хода про этот текст (#878) — пересборка вариантов её не теряет. */
+  optionNote: (text: string) => ReviewNote | undefined
   /** Клик по бейджу: правка заметки. */
   edit: (id: number) => void
   toggle: () => void
