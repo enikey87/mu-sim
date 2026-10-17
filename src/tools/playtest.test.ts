@@ -9,6 +9,24 @@ import { alikDead } from '../content/memkeys'
 import type { Game } from '../engine/game'
 import type { Rule } from '../engine/rules'
 
+describe('фон-мычание в расшифровке (#876)', () => {
+  it('каждое мычание партии — строкой в расшифровке, и выше кнопки «Му…», которую оно породило', async () => {
+    // юнит-драйвер: ищем партию, где бот слышал «Мууу» (сид 146117 из находки не воспроизводится — розыгрыш сдвинут)
+    let p: Awaited<ReturnType<typeof playtest>> | null = null
+    for (const seed of [1, 2, 3, 5, 8, 13, 21]) {
+      const played = await playtest(seed, 150)
+      if (played.game.S.stats.moo > 0) { p = played; break }
+    }
+    expect(p, 'ни в одной партии не мычали — проверка пустеет').toBeTruthy()
+    const t = transcript(p!)
+    const asides = t.match(/\(на фоне кто-то протяжно/g)?.length ?? 0
+    // мычания приходят и из фоллоу-апов правил: замер вокруг runTimers их не видел (#876)
+    expect(asides, 'фон-строчек столько же, сколько мычаний партии').toBe(p!.game.S.stats.moo)
+    const btn = t.indexOf('Му. (Это значит')
+    if (btn >= 0) expect(t.lastIndexOf('(на фоне кто-то протяжно', btn), 'мычание выше кнопки «Му…»').toBeGreaterThan(-1)
+  }, 180_000)
+})
+
 describe('плейтест', () => {
   it('тот же seed — та же партия; запись действий проигрывается в ту же переписку', async () => {
     const a = await playtest(4, 80)
