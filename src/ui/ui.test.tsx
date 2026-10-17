@@ -1640,3 +1640,94 @@ describe('режим рецензирования (#872)', () => {
     expect(document.querySelector('.review-menu'), 'режим включён — меню работает').toBeInTheDocument()
   })
 })
+
+// Заметка на невыбранном варианте ответа (#878): якорь — (ход, текст варианта), а не сообщение.
+describe('рецензирование вариантов ответа (#878)', () => {
+  const at = (search: string) => window.history.replaceState({}, '', search)
+  const choices = () => [...document.querySelectorAll('.choices button:not(.locked)')] as HTMLButtonElement[]
+
+  afterEach(() => { sessionStorage.clear(); at('/') })
+
+  it('правый клик на невыбранном варианте → заметка «плохой_вариант», бейдж на кнопке', async () => {
+    sessionStorage.clear()
+    at('/?review')
+    const { game } = makeGame({ seed: 2 })
+    renderApp(game)
+    const btns = choices()
+    expect(btns.length, 'варианты есть').toBeGreaterThan(1)
+    const btn = btns[1]!
+    const optionText = btn.textContent!.trim() // текст варианта до бейджа
+    await act(async () => { fireEvent.contextMenu(btn) })
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /Заметка/ })) })
+    expect(screen.getByRole('radio', { name: /Плохой вариант/ }), 'категория по умолчанию — плохой_вариант').toHaveAttribute('aria-checked', 'true')
+    await act(async () => { fireEvent.change(screen.getByLabelText('Текст заметки'), { target: { value: 'вариант не в тему' } }) })
+    await act(async () => { fireEvent.click(screen.getByText('Сохранить')) })
+    const badge = btn.querySelector('.review-badge')
+    expect(badge, 'бейдж на самой кнопке варианта').toBeInTheDocument()
+    const stored = JSON.parse(sessionStorage.getItem('review_notes') ?? '[]')
+    expect(stored[0]).toMatchObject({ type: 'плохой_вариант', turn: game.S.stats.sent })
+    expect(stored[0].msg, 'у заметки о варианте нет id сообщения').toBeUndefined()
+    expect(stored[0].target).toMatchObject({ kind: 'answer_option', text: optionText, who: 'me' })
+    expect(stored[0].target.offered.length, 'полный пул показа').toBeGreaterThan(1)
+  })
+
+  it('пересборка вариантов внутри хода бейдж не теряет', async () => {
+    sessionStorage.clear()
+    at('/?review')
+    const { game } = makeGame({ seed: 2 })
+    renderApp(game)
+    const text = choices()[1]!.textContent!
+    await act(async () => { fireEvent.contextMenu(choices()[1]!) })
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /Заметка/ })) })
+    await act(async () => { fireEvent.click(screen.getByText('Сохранить')) })
+    // пересборка, как её делает движок посреди хода (#657/#826): пул пересобирается и может не вернуть вариант
+    const pool = game.choices.slice()
+    const optionText = text.replace(/\s*\d+$/, '').trim()
+    await act(async () => { game.S.choices = null; game.emit() })
+    if (!choices().some((b) => b.textContent?.startsWith(optionText))) {
+      // вариант исчез — возвращаем его тем же текстом: заметка держится за (ход, текст), а не за позицию
+      await act(async () => { game.S.choices = pool; game.emit() })
+    }
+    const again = choices().find((b) => b.textContent?.startsWith(optionText))
+    expect(again, 'вариант с тем же текстом вернулся').toBeTruthy()
+    expect(again!.querySelector('.review-badge'), 'бейдж вернулся на тот же вариант').toBeInTheDocument()
+  })
+
+  it('после отправки хода экспорт содержит заметку с пулом и отметкой выбора', async () => {
+    sessionStorage.clear()
+    at('/?review')
+    const { game } = makeGame({ seed: 2 })
+    renderApp(game)
+    const btn = choices()[1]!
+    const optionText = btn.textContent!.replace(/\s*\d+$/, '').trim()
+    await act(async () => { fireEvent.contextMenu(btn) })
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /Заметка/ })) })
+    await act(async () => { fireEvent.change(screen.getByLabelText('Текст заметки'), { target: { value: 'этот вариант лишний' } }) })
+    await act(async () => { fireEvent.click(screen.getByText('Сохранить')) })
+    // выбираем другой вариант — заметка о невыбранном
+    const other = choices().find((b) => !b.textContent?.startsWith(optionText))!
+    await act(async () => { fireEvent.click(other) })
+
+    let blob: Blob | null = null
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: (b: Blob) => { blob = b; return 'blob:review' } })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: () => {} })
+    await act(async () => { fireEvent.click(document.getElementById('infoBtn')!) })
+    await act(async () => { fireEvent.click(document.getElementById('reviewExport')!) })
+    const dump = JSON.parse(await blob!.text())
+    const note = dump.notes.find((n: { target: { kind: string } }) => n.target.kind === 'answer_option')
+    expect(note, 'заметка о варианте в экспорте').toBeTruthy()
+    expect(note.target.offered.length, 'полный пул показа').toBeGreaterThan(1)
+    expect(note.chosen, 'отметка выбора: вариант не выбран').toBe(false)
+    expect(note.turn).toBeLessThan(game.S.stats.sent)
+  })
+
+  it('без ?review меню на вариантах нет', async () => {
+    sessionStorage.clear()
+    at('/')
+    const { game } = makeGame({ seed: 2 })
+    renderApp(game)
+    await act(async () => { fireEvent.contextMenu(choices()[1]!) })
+    expect(document.querySelector('.review-menu')).toBeNull()
+    expect(document.querySelector('.review-badge')).toBeNull()
+  })
+})

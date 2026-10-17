@@ -6,13 +6,14 @@ import type { Msg } from '../engine/state'
 export type ReviewCategory = 'несостыковка' | 'плохой_вариант' | 'строка_на_переделку' | 'идея'
 export type ReviewSeverity = 'high' | 'medium' | 'low'
 /** Типы сообщений, которые можно аннотировать: типы из ТЗ #872; `scene_button` — кнопка сцены, не сообщение ленты. */
-export type ReviewTargetKind = 'player_choice' | 'alik_message' | 'system' | 'notification' | 'scene_button' | 'transfer' | 'voice' | 'photo'
+export type ReviewTargetKind = 'player_choice' | 'answer_option' | 'alik_message' | 'system' | 'notification' | 'scene_button' | 'transfer' | 'voice' | 'photo'
 
 export interface ReviewTarget { kind: ReviewTargetKind; text: string; offered: string[]; who: string }
 export interface ReviewNote {
   id: number
-  /** id сообщения ленты: по нему бейдж находит свою заметку (в ТЗ связь описана словами «привязана к сообщению»). */
-  msg: number
+  /** id сообщения ленты: по нему бейдж находит свою заметку (в ТЗ связь описана словами «привязана к сообщению»).
+   *  У заметки о варианте ответа id нет — её якорь (ход, текст варианта) (#878). */
+  msg?: number
   day: number
   turn: number
   type: ReviewCategory
@@ -135,6 +136,18 @@ export function reviewTranscript(
     out.push(reviewLine(m, nameOf))
   })
   return out.join('\n')
+}
+
+/** Заметка о варианте ответа: якорь — ход и текст варианта, а не сообщение (варианты пересобираются за ход, #878). */
+export const isOptionNote = (n: ReviewNote): boolean => n.target.kind === 'answer_option'
+
+/** Отметка выбора для заметки о варианте: следующим ходом игрок отправил ровно этот текст? null — ход ещё не сделан. */
+export function reviewChoiceOf(msgs: readonly Msg[], note: ReviewNote): boolean | null {
+  if (!isOptionNote(note)) return null
+  const mine = msgs.filter((m): m is Extract<Msg, { kind: 'text' }> => m.kind === 'text' && m.from === 'me')
+  // note.turn — счётчик ходов на момент заметки, то есть до отправки: выбор игрока — следующий его ход
+  const sent = mine[note.turn]
+  return sent ? sent.text === note.target.text : null
 }
 
 export interface ReviewSession { started: string; day: number; turns: number; build: string; endings: string[] }

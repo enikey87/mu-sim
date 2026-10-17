@@ -1,13 +1,40 @@
-import { useRef, useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { useGame } from './useGame'
 import { viewOf } from './view'
+import { ReviewBadge, useReview } from './Review'
+import type { ReviewNote } from './review'
+import { LONG_PRESS_MS } from './Message'
 
 /** Сколько «?» на скрытой кнопке: 2–4, стабильно по индексу. */
 const MARKS = [3, 2, 4, 3, 2, 4]
 
+/** Долгое нажатие на варианте — то же, что правый клик: заметка о варианте (#878). */
+function useOptionPress(onAnnotate?: () => void) {
+  const timer = useRef<number | null>(null)
+  const from = useRef<{ id: number; x: number; y: number } | null>(null)
+  const stop = () => {
+    if (timer.current !== null) window.clearTimeout(timer.current)
+    timer.current = null
+    from.current = null
+  }
+  const onPointerDown = (e: ReactPointerEvent) => {
+    if (!onAnnotate || e.pointerType === 'mouse') return
+    stop()
+    from.current = { id: e.pointerId, x: e.clientX, y: e.clientY }
+    timer.current = window.setTimeout(() => { timer.current = null; onAnnotate() }, LONG_PRESS_MS)
+  }
+  const onPointerMove = (e: ReactPointerEvent) => {
+    const start = from.current
+    if (!start || start.id !== e.pointerId) return
+    if (Math.abs(e.clientX - start.x) > 12 || Math.abs(e.clientY - start.y) > 12) stop()
+  }
+  return { onPointerDown, onPointerMove, onPointerUp: stop, onPointerCancel: stop }
+}
+
 /** Варианты реплик: контекстные подсвечены, грубые — красным. Пока Алик отвечает — дёргающиеся «?», чтобы не раскрыть варианты. */
 export function Choices() {
   const game = useGame()
+  const review = useReview()
   const locked = game.ui.busy || game.battery.dead
   // Ряд заморожен на весь ход мира: пересборка вариантов посреди хода (сцена, эндгейм, серия) меняла число «?»,
   // добавляла/убирала кнопки и перезапускала анимацию — ряд мигал (#657). Число берём с последнего кадра без busy:
@@ -26,15 +53,40 @@ export function Choices() {
             </button>
           ))
         : game.choices.map((o, i) => (
-            <button
+            <ChoiceButton
               key={i + o.text}
+              text={o.text}
               className={[o.tone === 'rude' ? 'rude' : '', o.scene || o.act ? 'ctx' : '', o.primary ? 'primary' : ''].join(' ').trim()}
-              onClick={() => void game.send(o)}
-            >
-              {o.text}
-            </button>
+              note={review?.optionNote(o.text)}
+              onSend={() => void game.send(o)}
+              onAnnotate={review?.enabled ? () => review.menuChoice(o.text) : undefined}
+              onEdit={review ? (id: number) => review.edit(id) : undefined}
+            />
           ))}
     </div>
+  )
+}
+
+/** Кнопка варианта: обычная реплика плюс (в режиме рецензирования) меню заметки и бейдж (#878). */
+function ChoiceButton({ text, className, note, onSend, onAnnotate, onEdit }: {
+  text: string
+  className: string
+  note?: ReviewNote
+  onSend: () => void
+  onAnnotate?: () => void
+  onEdit?: (id: number) => void
+}) {
+  const press = useOptionPress(onAnnotate)
+  return (
+    <button
+      className={className}
+      onClick={onSend}
+      onContextMenu={onAnnotate ? (e) => { e.preventDefault(); onAnnotate() } : undefined}
+      {...press}
+    >
+      {text}
+      {note && onEdit && <ReviewBadge note={note} onEdit={() => onEdit(note.id)} />}
+    </button>
   )
 }
 
