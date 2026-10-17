@@ -162,17 +162,6 @@ export const DIRECT: Record<string, DirectCase> = {
   Scene_invoice: { event: 'PickScene', setup: (g) => { g.S.day = 216 } },
   // в семье +4000 не выпадал племянник (Арсен ещё не представлен) — прямой случай держит
   Scene_nephew: { event: 'PickScene' },
-  // и в семье +2000 не выпадал экран выплаты с событием срока — прямой случай держит (#190)
-  Quiet_PaydayOpen_PromiseDue: {
-    event: 'PromiseDue', facts: { promise: 0 },
-    setup: (g) => {
-      g.S.mem.payday = 'default'
-      g.S.ending = 'payday_default'
-      g.S.endings.payday_default = g.S.day
-      g.recordPromise({ text: 'в пятницу', d: 1 })
-      g.S.day += 1
-    },
-  },
   // гейт на чужих семействах (#434): в семье +2000 «через маму» не выпадало; если выборки снова увидят
   // его часто (порог 7), гейт скажет «снять» — тогда запись уйдёт, как Says_voice в #887
   Says_via_mama: { event: 'PlayerSays', facts: { intent: 'via', arg: 'mama' } },
