@@ -206,6 +206,8 @@ export const DIRECT: Record<string, DirectCase> = {
   Says_condole_ctxrevived: { event: 'PlayerSays', facts: { intent: 'condole' }, setup: (g) => { g.S.ctx = { revived: true } } },
   Finale_rubik_default: { event: 'ArcFinale', facts: { arc: 'rubik' } },
   Finale_razmik_default: { event: 'ArcFinale', facts: { arc: 'razmik' } },
+  // #918 (гейт эха «Лет двадцать?» сдвинул розыгрыш): в семье +6000 правило упало до нуля — прямой случай держит
+  Finale_tile_default: { event: 'ArcFinale', facts: { arc: 'tile' } },
   Finale_beton_opened: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem['count.rude'] = 6; g.S.mem[HEAT] = 3 } },
   // #585: праздничная кнопка сдвинула выборки — тишина на наступившем сроке ушла из них
   // #890: риторика срока по роду сдвинула розыгрыш — Quiet_Dead_PromiseDue в 7 партиях (порог 7), гейт видит сам
