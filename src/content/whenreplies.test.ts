@@ -1,9 +1,9 @@
 // Ответ Алика на кнопку срока, которую нажал игрок (docs/design/deadline-replies.md, MVP 3, #165): у каждой кнопки свой ответ, ни один не противоречит нажатому.
 import { describe, it, expect, vi } from 'vitest'
 import { makeGame, alikTexts } from '../test/helpers'
-import { D, cap, type When } from './excuses'
+import { D, cap, WHEN_YEARS, type When } from './excuses'
 import { LEGENDS } from './legends'
-import { PROMISE_NEVER, PROMISE_PENCIL, PROMISE_FAR, WHEN_COND } from './misc'
+import { PROMISE_NEVER, PROMISE_PENCIL, PROMISE_FAR, PROMISE_YEARS, WHEN_COND } from './misc'
 import { valueOf, test as holds, type Entry } from '../engine/rules'
 import { fmtDays } from '../engine/time'
 import type { Game } from '../engine/game'
@@ -66,6 +66,7 @@ describe('пулы ответов', () => {
 
   it('ирония «никогда» получает ответ в образе: «Никогда — это тоже срок»', () => {
     expect(PROMISE_NEVER.map(valueOf)).toContain('Никогда — это тоже срок, брат. Самый надёжный.')
+    expect(PROMISE_NEVER.map(valueOf).join('\n')).not.toMatch(/лет двадцать/i)
   })
 })
 
@@ -88,7 +89,11 @@ describe('матрица: каждая кнопка каждого срока �
         else expect(isOk, `${at}: «не подведу» на кнопку, которая не согласие`).toBe(false)
         if (rule === 'Opt_WhenPencil') expect([isPencil, isFar, isNever, isCond], at).toEqual([true, false, false, false])
         if (rule === 'Opt_WhenFar') expect([isFar, isPencil, isNever, isCond], at).toEqual([true, false, false, false])
-        if (rule === 'Opt_When_never' || rule === 'Opt_When_absurd') expect([isNever, isPencil, isFar, isCond], at).toEqual([true, false, false, false])
+        if (rule === 'Opt_When_never' || rule === 'Opt_When_absurd') {
+          const isYears = text === PROMISE_YEARS
+          expect([isNever || isYears, isPencil, isFar, isCond], at).toEqual([true, false, false, false])
+          expect(isNever && isYears, `${at}: ответ «лет двадцать» не из общего пула`).toBe(false)
+        }
         if (rule === 'Opt_WhenCheck') {
           // событие — про само событие, остальные — клятва с тем же сроком
           if (w.kind === 'event') expect([isCond, isNever, isPencil, isFar], at).toEqual([true, false, false, false])
@@ -127,6 +132,38 @@ describe('матрица: каждая кнопка каждого срока �
       if (line!.includes('{days}')) { withDays++; expect(text, text).toContain('100 дней') }
     }
     expect(withDays, 'ни одной фразы с числом дней за 20 партий — проверка пустеет').toBeGreaterThan(0)
+  })
+})
+
+describe('«Лет двадцать?» — пара со своим ответом', () => {
+  it('кнопка зовёт колкий ответ, а соседняя ирония — общий пул', async () => {
+    const g = await said(byText('после таможни'))
+    let years = undefined as ReturnType<Game['buildChoices']>[number] | undefined
+    let other = undefined as ReturnType<Game['buildChoices']>[number] | undefined
+    for (let i = 0; i < 80 && (!years || !other); i++) {
+      g.S.choices = null
+      for (const c of g.buildChoices()) {
+        if (c.act !== 'promiseNever') continue
+        if (/лет двадцать\?/i.test(c.text)) years = c
+        else other = c
+      }
+    }
+    expect(years, 'кнопки «Лет двадцать?» нет').toBeDefined()
+    expect(years!.arg).toBe('years')
+    expect(other, 'кроме «Лет двадцать?» в пуле ничего нет').toBeDefined()
+    const n = g.S.msgs.length
+    await g.send(years!)
+    const sharp = alikTexts(g.S.msgs.slice(n)).join(' ')
+    expect(sharp).toBe(PROMISE_YEARS)
+    expect(from(PROMISE_NEVER, sharp)).toBe(false)
+    expect(g.mem()['when.years'], 'факт «уже спросил»').toBe(true)
+    expect(g.open(D.P_WHEN_NEVER), 'факт закрывает строку').not.toContain(WHEN_YEARS)
+    g.S.ctx = g.ctxFromPromise({ ...byText('после таможни'), text: 'после таможни — отдам' })
+    const m = g.S.msgs.length
+    await g.send(other!)
+    const plain = alikTexts(g.S.msgs.slice(m)).join(' ')
+    expect(plain).not.toBe(PROMISE_YEARS)
+    expect(from(PROMISE_NEVER, plain), plain).toBe(true)
   })
 })
 
