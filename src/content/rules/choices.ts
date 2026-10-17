@@ -225,10 +225,15 @@ export const choiceRules: R[] = [
         const sub = kind === 'memory' || kind === 'word' ? '' : String(f['ctx.' + kind])
         const said = g.msgsView().slice(-6).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : [])).join(' ')
         const facts = g.lineFacts()
-        const i = talkPairs(kind, sub).findIndex((e, j) => !g.lines.has(talkId(kind, sub, j)) && isOpen(e, facts) && (valueOf(e)[2]?.(g, said) ?? true))
+        // окно дословного повтора (#857): показанный вопрос не возвращается дословно 20 ходов — пока окно
+        // держит одну пару, берём следующую открытую; контекст живёт дольше окна, поэтому вопрос не пропадает
+        const i = talkPairs(kind, sub).findIndex((e, j) => !g.lines.has(talkId(kind, sub, j)) && isOpen(e, facts)
+          && (valueOf(e)[2]?.(g, said) ?? true) && !g.offeredInWindow(valueOf(e)[0]))
         if (i < 0) return ''
         arg = `${kind}|${sub}|${i}`
-        return valueOf(talkPairs(kind, sub)[i])[0]
+        const q = valueOf(talkPairs(kind, sub)[i])[0]
+        g.rememberShown(q)
+        return q
       },
       arg: () => arg,
     })

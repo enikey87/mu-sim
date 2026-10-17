@@ -72,6 +72,30 @@ describe('ответ на только что прозвучавшее', () => {
   })
 })
 
+describe('окно дословного повтора для talk-вопроса (#857)', () => {
+  it('неотвеченный вопрос не возвращается дословно 20 ходов, а за окном — возвращается', () => {
+    const { game } = makeGame()
+    game.S.ctx = { chorus: 'karine' }
+    // сборка внутри хода может не выпасть по шансу (0.8) — повторяем её в том же ходу:
+    // показ в текущем ходу повтором не считается (#826), поэтому вопрос не подменяется сам собой
+    const at = (advance: number): string | undefined => {
+      game.S.stats.sent += advance
+      for (let i = 0; i < 30; i++) {
+        game.S.choices = null
+        const c = game.buildChoices().find((x) => x.act === 'talk')
+        if (c) return c.text
+      }
+      return undefined
+    }
+    const first = at(0)
+    expect(first, 'вопрос Карине не выпал — проверка пустеет').toBeTruthy()
+    // партия 140117: тот же вопрос предложили снова через 3 хода игрока
+    for (const step of [1, 2, 6, 9]) expect(at(step), `через ${step} ходов`).not.toBe(first)
+    // 20 ходов прошло — пара не нажата, контекст жив: вопрос возвращается
+    expect(at(2), 'за окном вопрос не вернулся').toBe(first)
+  })
+})
+
 describe('Гарик: признание признаёт отрицание (#784)', () => {
   /** Гарик сказал своё «ничего не брал» в этой партии — гоним хор, пока строка не выпадет. */
   const hearDenial = async (game: Game): Promise<boolean> => {
