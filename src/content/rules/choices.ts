@@ -16,10 +16,10 @@ import { MONEY_ASK, moneyPlaceOf } from '../money-ask'
 import { P_HOLIDAY, holidayBefore, type Holiday } from '../holidays'
 import { WORLD, SPEAKS } from '../world'
 import { fmtDayMonth, fmtDays } from '../../engine/time'
-import { HEAT, alikDead, alikShaved, moustacheAskAt, blocked, court, mourning, phoneKarine, crewPaid, endgame } from '../memkeys'
+import { HEAT, alikDead, alikShaved, intro, moustacheAskAt, blocked, court, mourning, phoneKarine, crewPaid, endgame } from '../memkeys'
 import { requirePlayerPool } from '../player-pools'
 import {
-  P_VIA_BORIS, P_VIA_KARINE, P_VIA_MAMA, P_MOO, P_MOUSTACHE, P_COURT,
+  P_VIA_BORIS, P_VIA_KARINE, P_VIA_MAMA, P_MOO, P_MOUSTACHE, P_COURT, P_COLLECTORS_DEBUT,
 } from './player-choice-pools'
 
 type R = Rule<ContentApi, GameEvent, Offer>
@@ -192,6 +192,13 @@ export const choiceRules: R[] = [
   }),
 
   // сериалы: про текущий — всегда, про любой незаконченный — иногда
+  // дебют коллекторов (#888): в окне их первой серии у игрока есть вопрос про них самих.
+  // Окно закрывает сама серия: следующий эпизод двигает arc.collectors, и вопрос уходит вместе с окном
+  offer({
+    name: 'CollectorsDebut', slot: 'arc', when: [is(intro('collectors')), eq('arc.collectors', 1)], act: 'arc', tone: 'polite', bonus: 2,
+    text: (g) => g.freshPlayer('F_collectors_debut', P_COLLECTORS_DEBUT) ?? g.draw('F_collectors_debut', P_COLLECTORS_DEBUT),
+    arg: () => 'collectors',
+  }),
   offer({
     // единственный выход из смерти: вопрос не исчезает, даже если все недавно показывали (исключение из окна #824)
     name: 'ArcDeath', slot: 'arc', when: [is(alikDead), is('deathCanAdvance')], act: 'arc', tone: 'polite', bonus: 5,

@@ -236,6 +236,20 @@ describe('ответы Алика (PlayerSays)', () => {
     expect(oneOf(PREV_MANY.map(frag), t.join(' '))).toBe(true)
     expect(game.S.promises[0].asked).toBe(true)
   })
+  it('дебют коллекторов: в том же ходу есть вариант про них, вне окна — нет (#888)', () => {
+    const { game } = makeGame()
+    const DEBUT = /Кто вы и при чём тут я|Поручитель\? Он и мне должен|Алик, за мной пришли/
+    const has = () => game.buildChoices().some((c) => DEBUT.test(c.text))
+    expect(has(), 'до дебюта коллекторов в истории нет — и варианта нет').toBe(false)
+    // дебют сыграл: серия представила коллекторов, окно — до следующей серии
+    game.S.mem['intro.collectors'] = true
+    game.S.arcs.collectors = { i: 1, last: 0 }
+    expect(has(), 'окно дебюта: вопрос про них есть').toBe(true)
+    // следующая серия закрывает окно: коллекторы не селятся в общих пулах навсегда
+    game.S.arcs.collectors = { i: 2, last: 0 }
+    expect(has(), 'окно закрыто — варианта нет').toBe(false)
+  })
+
   it('отмазка «тогда Борис заболел» — только для цитат не раньше болезни Бориса (#859)', async () => {
     const { game } = makeGame()
     // серия болезни Бориса: баран появляется в истории и движок пишет день состояния
