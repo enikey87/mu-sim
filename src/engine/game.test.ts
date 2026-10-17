@@ -7,11 +7,13 @@ import { manualClock, realClock } from './clock'
 import { Game } from './game'
 import { seededRng } from './rng'
 import { SAVE_KEY, type PromiseRec, type Msg } from './state'
-import { dateOf, fmtDate, fmtTime } from './time'
+import { dateOf, dueIn, fmtDate, fmtTime } from './time'
 import { ARCS } from '../content/arcs'
 import { COLD_WAR, NOT_DELIVERED } from '../content/rude'
 import { HEAT, bloodGiven } from '../content/memkeys'
-import { valueOf, spec, type Facts } from './rules'
+import { valueOf, spec, type Facts, type Entry } from './rules'
+import { type When } from '../content/excuses'
+import * as L from '../content/life'
 import type { GameEvent } from '../content/rules/events'
 import { MENTION_RE } from '../content/world'
 import { P_FRIDAY, P_MONEY, P_DESPERATE } from '../content/topics'
@@ -805,7 +807,7 @@ describe('Game: мелочи', () => {
     expect(game.S.tier).toBe(1)
     expect(game.S.msgs.some((m) => m.kind === 'sys' && /международный/.test(m.text))).toBe(true)
   })
-  it('правка обещания меняет срок и в журнале', async () => {
+  it('правка обещания меняет срок и в журнале по разметке термина', async () => {
     const { game } = makeGame()
     const m = game.push({ kind: 'text', from: 'alik', text: 'В среду утром — всё отдам.' })
     game.recordPromise({ text: 'в среду утром — всё отдам', d: 3 })
@@ -813,7 +815,11 @@ describe('Game: мелочи', () => {
     const edited = game.S.msgs.find((x) => x.id === m.id)
     expect(edited?.kind === 'text' && edited.edited).toBe(true)
     expect(edited?.kind === 'text' && edited.text).not.toMatch(/среду утром/)
-    expect(game.S.promises.at(-1)!.due).toBeNull()
+    // род и горизонт правленого срока — из разметки термина (#923): журнал хранит абсолютную дату
+    const rec = game.S.promises.at(-1)!
+    const term = (L.EDIT_WHEN as Entry<When>[]).map(valueOf).find((w) => rec.t.includes(w.t))
+    expect(term, 'заменённый срок — из пула правок').toBeTruthy()
+    expect(rec.due).toBe(term!.d == null ? null : game.S.day + (term!.due ? dueIn(term!.due, game.S.day) : term!.d))
   })
   it('«Мууу» появляется и исчезает, звук отключается', () => {
     const clock = manualClock()
