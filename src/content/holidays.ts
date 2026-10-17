@@ -39,32 +39,60 @@ export function holidayBefore(day: number): boolean {
 }
 
 /** Праздники и сезоны, на которые Алик ссылается сроком: по календарю считается горизонт. */
-export type HolidayRef = 'navasard' | 'vardavar' | 'easter' | 'winter' | 'apricots'
-const FIXED: Record<Exclude<HolidayRef, 'easter' | 'vardavar'>, [month: number, dom: number]> = {
+export type HolidayRef = 'navasard' | 'vardavar' | 'easter' | 'winter' | 'apricots' | 'fullmoon'
+const FIXED: Record<Exclude<HolidayRef, 'easter' | 'vardavar' | 'fullmoon'>, [month: number, dom: number]> = {
   navasard: [8, 11], winter: [12, 1], apricots: [7, 1],
 }
-/** Сдвиг юлианского календаря против нашего: 1900–2099 — 13 дней. */
-const JULIAN_SHIFT = 13
 /**
- * Пасха — юлианский (православный) компут, а не григорианский (#827): армянская церковь держит пасхалию
- * по юлианскому календарю, поэтому перевод на григорианские даты в 1924-м касается дня празднования, а не
- * расчёта. Юлианская дата переводится в наш календарь прибавкой 13 дней; Пасха 2027 — 2 мая, не 28 марта.
- * Вардавар — через 98 дней после неё.
+ * Пасха — григорианский компут (#861): армянская церковь празднует её в один день с западной
+ * (2026 — 5 апреля, 2027 — 28 марта; юлианские 12 апреля и 2 мая — православные, не армянские).
+ * Вардавар — через 98 дней после неё: 2026 — 12 июля, 2027 — 4 июля.
  */
 function easterOf(year: number): Date {
-  // алгоритм Меёса для юлианской Пасхи: результат — дата по юлианскому календарю
-  const a = year % 4, b = year % 7, c = year % 19
-  const d = (19 * c + 15) % 30
-  const e = (2 * a + 4 * b - d + 34) % 7
-  const month = Math.floor((d + e + 114) / 31)
-  const day = ((d + e + 114) % 31) + 1
-  return new Date(year, month - 1, day + JULIAN_SHIFT)
+  // алгоритм Меёса (Jones/Butcher) для григорианской Пасхи
+  const a = year % 19, b = Math.floor(year / 100), c = year % 100
+  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3)
+  const h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4
+  const l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451)
+  const month = Math.floor((h + l - 7 * m + 114) / 31)
+  return new Date(year, month - 1, ((h + l - 7 * m + 114) % 31) + 1)
+}
+
+/** Юлианская дата полнолуния по Меёсу (Astronomical Algorithms, гл. 49): k — номер лунации от 2000-го, дробный. */
+function fullMoonJde(k: number): number {
+  const rad = Math.PI / 180
+  const T = k / 1236.85
+  const E = 1 - 0.002516 * T - 0.0000074 * T * T
+  const M = (2.5534 + 29.1053567 * k - 0.0000014 * T * T) * rad
+  const P = (201.5643 + 385.81693528 * k + 0.0107582 * T * T) * rad
+  const F = (160.7108 + 390.67050284 * k - 0.0016118 * T * T) * rad
+  const O = (124.7746 - 1.56375588 * k + 0.0020672 * T * T) * rad
+  const sin = Math.sin
+  const c = -0.40614 * sin(P) + 0.17302 * E * sin(M) + 0.01614 * sin(2 * P) + 0.01043 * sin(2 * F)
+    + 0.00734 * E * sin(P - M) - 0.00515 * E * sin(P + M) + 0.00209 * E * E * sin(2 * M)
+    - 0.00111 * sin(P - 2 * F) - 0.00057 * sin(P + 2 * F) + 0.00056 * E * sin(2 * P + M)
+    - 0.00042 * sin(3 * P) + 0.00042 * E * sin(M + 2 * F) + 0.00038 * E * sin(M - 2 * F)
+    - 0.00024 * E * sin(2 * P - M) - 0.00017 * sin(O)
+  return 2451550.09766 + 29.530588861 * k + 0.00015437 * T * T + c
+}
+
+/** Ближайшее полнолуние не раньше `from`; дата — по UTC, как в астрономических календарях (#861). */
+function nextFullMoon(from: Date): Date {
+  const want = Date.UTC(from.getFullYear(), from.getMonth(), from.getDate())
+  let k = Math.floor((want / 864e5 + 2440587.5 - 2451550.1) / 29.530588861) - 1
+  for (;;) {
+    const at = new Date((fullMoonJde(k + 0.5) - 2440587.5) * 864e5)
+    const y = at.getUTCFullYear(), m = at.getUTCMonth(), d = at.getUTCDate()
+    if (Date.UTC(y, m, d) >= want) return new Date(y, m, d)
+    k += 1
+  }
 }
 /** Сколько дней от `day` до ближайшего наступления праздника или сезона (0 — сегодня). */
 export function holidayDays(ref: HolidayRef, day: number): number {
   const from = dateOf(day)
   const between = (to: Date) => Math.round((Date.UTC(to.getFullYear(), to.getMonth(), to.getDate()) - Date.UTC(from.getFullYear(), from.getMonth(), from.getDate())) / 864e5)
   const at = (year: number): Date => {
+    if (ref === 'fullmoon') return nextFullMoon(from)
     if (ref === 'easter' || ref === 'vardavar') {
       const d = easterOf(year)
       if (ref === 'vardavar') d.setDate(d.getDate() + 98)

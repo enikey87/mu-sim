@@ -74,7 +74,9 @@ describe('число дней в кнопке — из факта, со скло
     expect(b.length).toBeGreaterThan(0)
     for (const x of b) expect(x.text, x.text).toContain('21 день')
     const far = await said(byText('после полнолуния'))
-    for (const x of buttons(far)) expect(x.text, x.text).toContain('15 дней')
+    // полнолуние — календарь (#861): число в кнопке — из реальной даты, а не из оценки 15
+    const moonDays = fmtDays(Number(far.facts()['ctx.whenDays'] ?? -1))
+    for (const x of buttons(far)) expect(x.text, x.text).toContain(moonDays)
   })
 })
 

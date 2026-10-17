@@ -83,22 +83,34 @@ describe('разметка сроков', () => {
 
 describe('календарь праздников и сезонов', () => {
   it('Пасха и Вардавар по годам партии, сезоны по датам; сказанный в разные дни — разная даль', () => {
-    // Пасха юлианская (#827): 2026 — 12 апреля, 2027 — 2 мая, 2028 — 16 апреля (сверено с календарём)
-    const easter26 = dayOf(2026, 4, 12)
+    // Пасха григорианская (#861): 2026 — 5 апреля, 2027 — 28 марта, 2028 — 16 апреля
+    // (календарь армянской церкви: западная дата, а не православная 12 апреля / 2 мая)
+    const easter26 = dayOf(2026, 4, 5)
     expect(holidayDays('easter', easter26)).toBe(0)
     expect(holidayDays('easter', easter26 - 3)).toBe(3)
-    expect(holidayDays('easter', easter26 + 1)).toBe(dayOf(2027, 5, 2) - (easter26 + 1)) // 2027-й: 2 мая
+    expect(holidayDays('easter', easter26 + 1)).toBe(dayOf(2027, 3, 28) - (easter26 + 1)) // 2027-й: 28 марта
     expect(holidayDays('easter', dayOf(2028, 4, 16)), '2028-й').toBe(0)
-    expect(holidayDays('easter', dayOf(2027, 3, 28)), 'католическая дата 2027-го').toBeGreaterThan(30)
-    expect(holidayDays('vardavar', dayOf(2026, 7, 19))).toBe(0) // Пасха + 98
+    expect(holidayDays('easter', dayOf(2027, 5, 2)), 'юлианская (православная) дата 2027-го').toBeGreaterThan(30)
+    expect(holidayDays('vardavar', dayOf(2026, 7, 12))).toBe(0) // Пасха + 98: 12 июля 2026
+    expect(holidayDays('vardavar', dayOf(2027, 7, 4))).toBe(0) // реальный Вардавар 2027
     expect(holidayDays('navasard', dayOf(2026, 8, 1))).toBe(10)
     expect(holidayDays('navasard', dayOf(2026, 8, 12))).toBeGreaterThan(300)
     const seasons: Array<[HolidayRef, number, number]> = [['winter', 12, 1], ['apricots', 7, 1]]
     for (const [ref, m, d] of seasons) expect(holidayDays(ref, dayOf(2027, m, d) - 10), ref).toBe(10)
   })
 
+  it('полнолуние — реальная дата астрономического календаря, а не оценка «через две недели» (#861)', () => {
+    // 15 мая 2027: ближайшее полнолуние — 20 мая, а не «через 13 дней»
+    expect(holidayDays('fullmoon', dayOf(2027, 5, 15))).toBe(5)
+    expect(holidayDays('fullmoon', dayOf(2027, 5, 20))).toBe(0)
+    expect(holidayDays('fullmoon', dayOf(2027, 5, 21))).toBe(dayOf(2027, 6, 19) - dayOf(2027, 5, 21))
+    // полнолуния 2027-го (астрономический календарь, даты по UTC): все двенадцать — по дням партии
+    const moons: Array<[number, number]> = [[1, 22], [2, 20], [3, 22], [4, 20], [5, 20], [6, 19], [7, 18], [8, 17], [9, 15], [10, 15], [11, 14], [12, 13]]
+    for (const [m, d] of moons) expect(holidayDays('fullmoon', dayOf(2027, m, d)), `${d}.${String(m).padStart(2, '0')}.2027`).toBe(0)
+  })
+
   it('каждая ссылка отвечает на любой день партии числом от 0 до года с запасом на переходящие даты', () => {
-    const refs: HolidayRef[] = ['navasard', 'vardavar', 'easter', 'winter', 'apricots']
+    const refs: HolidayRef[] = ['navasard', 'vardavar', 'easter', 'winter', 'apricots', 'fullmoon']
     for (const ref of refs) for (let day = 150; day < 150 + 800; day += 7) {
       const n = holidayDays(ref, day)
       expect(n >= 0 && n <= MAX_AHEAD, `${ref} / день ${day}: ${n}`).toBe(true)
@@ -134,7 +146,9 @@ describe('факты контекста: род и горизонт', () => {
     expect(ctx(nextWeek)).toEqual({ kind: 'dodge', days: dueIn({ week: true, next: true }, nextWeek.S.day), horizon: 'far' })
 
     const moon = await said(byText('после полнолуния'))
-    expect(ctx(moon)).toEqual({ kind: 'event', days: 15, horizon: 'far' })
+    // полнолуние — календарь, а не оценка «через две недели» (#861): даль — по реальной дате
+    expect(ctx(moon).kind).toBe('holiday')
+    expect(ctx(moon).days).toBe(holidayDays('fullmoon', moon.S.day))
 
     // срок без конца в мире (кран) горизонт не даёт вовсе: кнопка — ирония из «никогда» (#571)
     expect(ctx(await said(byText('как Размик с крана слезет')))).toEqual({ kind: 'never', days: undefined, horizon: undefined })
