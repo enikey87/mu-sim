@@ -12,6 +12,8 @@ import { type Criterion, type Rule } from '../engine/rules'
 import type { Choice, Msg, NewMsg, PhoneEvent } from '../engine/state'
 
 export type Style = 'curious' | 'polite' | 'hothead'
+/** Фон-мычание в расшифровке: одна формулировка на все мычания партии (#876). */
+export const MOO_ASIDE = '(на фоне кто-то протяжно: «Мууууу»)'
 export const STYLES: Style[] = ['curious', 'polite', 'hothead']
 const HOURS = [14, 20, 9, 2, 17, 12]
 
@@ -136,6 +138,14 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
   game.rules.tracer = (t) => {
     if (t.chosen.length) firedBuf.push({ event: t.event, chosen: [...t.chosen] })
   }
+  // фон-мычание ловится на самом `moo`, а не замером вокруг runTimers (#876): «Мууу» приходит и из
+  // фоллоу-апов правил (`then === 'moo'`), и из прямых вызовов; позиция — на момент мычания, поэтому
+  // строчка встаёт выше блока вариантов, который это мычание породило
+  const moo = game.moo.bind(game)
+  game.moo = () => {
+    moo()
+    asides.push({ at: game.S.msgs.length, text: MOO_ASIDE })
+  }
   const notifBuf: WorldFrame['notif'] = []
   const notify = game.notify.bind(game)
   game.notify = (icon, app, text, card) => {
@@ -216,9 +226,7 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
       asides.push({ at: game.S.msgs.length, text: `(экран концовки: «${e?.title ?? ending}». Игрок закрыл экран)` })
       await game.closeEnding() // как игрок: закрыть экран итогов — после Дня выплаты это включает эндгейм
     }
-    const moo = game.S.stats.moo
     clock.runTimers() // «Мууу» и прочее отложенное
-    if (game.S.stats.moo > moo) asides.push({ at: game.S.msgs.length, text: '(на фоне кто-то протяжно: «Мууууу»)' })
     snap(k)
   }
   return { seed, style, hour, acts, asides, world, game }
