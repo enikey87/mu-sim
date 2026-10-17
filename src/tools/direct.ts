@@ -174,6 +174,14 @@ export const DIRECT: Record<string, DirectCase> = {
   // #952 (окно свежести денежного вопроса) сдвинуло розыгрыш — Scene_nephew в 8 партиях (порог 7),
   // гейт видит сам, запись снята
   // #953: окна вопроса Рубика и чайника сдвинули розыгрыш — Scene_nephew в 7 партиях (порог 7), гейт видит сам
+  // #953 вместе с #952: сцена «кафе» ни разу не дошла до экрана концовки — соседи на перерыве, остаётся она
+  Scene_meet: {
+    event: 'PickScene',
+    setup: (g) => {
+      const now = { turn: g.S.stats.sent, day: g.S.day }
+      for (const r of g.rules.all) if (r.event === 'PickScene' && r.name !== 'Scene_meet') g.S.rules.cooldown[r.name] = now
+    },
+  },
   // гейт на чужих семействах (#434): в семье +2000 «через маму» не выпадало; если выборки снова увидят
   // его часто (порог 7), гейт скажет «снять» — тогда запись уйдёт, как Says_voice в #887
   Says_via_mama: { event: 'PlayerSays', facts: { intent: 'via', arg: 'mama' } },
@@ -205,8 +213,8 @@ export const DIRECT: Record<string, DirectCase> = {
   Says_condole_ctxrevived: { event: 'PlayerSays', facts: { intent: 'condole' }, setup: (g) => { g.S.ctx = { revived: true } } },
   Finale_rubik_default: { event: 'ArcFinale', facts: { arc: 'rubik' } },
   Finale_razmik_default: { event: 'ArcFinale', facts: { arc: 'razmik' } },
-  // #918 (гейт эха «Лет двадцать?» сдвинул розыгрыш): в семье +6000 правило упало до нуля — прямой случай держит
-  Finale_tile_default: { event: 'ArcFinale', facts: { arc: 'tile' } },
+  // #918 (гейт эха «Лет двадцать?» сдвинул розыгрыш): в семье +6000 правило упало до нуля — прямой случай держал
+  // #953 вместе с #952: обычный финал плитки снова в выборках (7 партий, порог 7) — гейт видит сам
   Finale_beton_opened: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem['count.rude'] = 6; g.S.mem[HEAT] = 3 } },
   // #585: праздничная кнопка сдвинула выборки — тишина на наступившем сроке ушла из них
   // #890: риторика срока по роду сдвинула розыгрыш — Quiet_Dead_PromiseDue в 7 партиях (порог 7), гейт видит сам
