@@ -178,6 +178,40 @@ describe('прямые вопросы и первые сообщения (#958):
   })
 })
 
+describe('дебюты участников через rude/хор (#973)', () => {
+  const has = (game: Game, act: string) => { game.S.choices = null; return game.buildChoices().some((c) => c.act === act) }
+  /** Первое сообщение персонажа настоящим путём: rude-семья (Арсен) или хор (Самвел, Борис). */
+  const debutCases: Array<[string, string, string, (g: Game) => Promise<void>]> = [
+    ['arsen', 'debutArsen', 'Арсен', async (g) => { g.S.mem['intro.arsen'] = true; g.S.mem[HEAT] = 1; await g.fire('PlayerMessage', { tone: 'rude' }) }],
+    ['samvel', 'debutSamvel', 'Самвел', async (g) => {
+      g.S.mem['intro.samvel'] = true
+      for (let i = 0; i < 60; i++) { await g.fire('Mentioned', {}, { target: 'samvel' }); if (g.S.msgs.some((m) => m.kind === 'text' && m.who === 'samvel')) return }
+      expect.fail('Самвел не заговорил в хоре')
+    }],
+    ['boris', 'debutBoris', 'Борис', async (g) => {
+      g.S.arcs.boris = { i: 4, last: 0 }
+      for (let i = 0; i < 60; i++) { await g.fire('Mentioned', {}, { target: 'boris' }); if (g.S.msgs.some((m) => m.kind === 'text' && m.who === 'boris')) return }
+      expect.fail('Борис не заговорил в хоре')
+    }],
+  ]
+
+  it.each(debutCases)('первое сообщение %s: окно на дебюте, чужой ход закрыт, ответ потребляет, повтор не открывает', async (who, act, name, debut) => {
+    const { game } = makeGame()
+    expect(has(game, act), `${name}: до дебюта окна нет`).toBe(false)
+    await debut(game)
+    expect(has(game, act), `${name}: окно на ходу первого сообщения`).toBe(true)
+    game.S.stats.sent += 4
+    expect(has(game, act), `${name}: окно чужого хода (>3)`).toBe(false)
+    game.S.stats.sent -= 4
+    expect(has(game, act), `${name}: свежесть вернулась`).toBe(true)
+    await game.fire('PlayerSays', { intent: act })
+    expect(has(game, act), `${name}: после ответа окно закрыто`).toBe(false)
+    // повторное сообщение персонажа окно не открывает
+    await game.say([{ w: who, t: `${name}: второе сообщение` }])
+    expect(has(game, act), `${name}: повторное сообщение окна не открыло`).toBe(false)
+  })
+})
+
 describe('встречный иск (#964): окно отклика', () => {
   it('после встречного иска кнопки в окне, ответ закрывает окно', async () => {
     const { game } = makeGame()

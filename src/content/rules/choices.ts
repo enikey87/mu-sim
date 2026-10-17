@@ -22,6 +22,7 @@ import {
   P_VIA_BORIS, P_VIA_KARINE, P_VIA_MAMA, P_MOO, P_MOUSTACHE, P_COURT, P_COLLECTORS_DEBUT,
   P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE,
   P_CREW_CALL, P_LAWYER, P_COLLECTORS_ASK, P_INTERN, P_HOLE, P_COUNTERSUIT,
+  P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_BORIS,
 } from './player-choice-pools'
 
 type R = Rule<ContentApi, GameEvent, Offer>
@@ -146,6 +147,11 @@ export const choiceRules: R[] = [
   offer({ name: 'CollectorsAsk', when: [is('collectorsAskFresh')], act: 'collectorsAsk', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_COLLECTORS_ASK', P_COLLECTORS_ASK) }),
   offer({ name: 'InternOffer', when: [is('internFresh')], act: 'internOffer', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_INTERN', P_INTERN) }),
   offer({ name: 'RubikHole', when: [is('rubikHoleFresh')], act: 'rubikHole', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_HOLE', P_HOLE) }),
+  // дебюты участников (#973): первое сообщение персонажа — ход и три после, пул — только у тех, у кого 2+ строки.
+  // bonus 5: на rude-пути окно конкурирует с извинением (6) и мычанием (6) — дебют должен попадать в блок
+  offer({ name: 'DebutArsen', when: [is('debutFresh'), eq('debutWho', 'arsen')], act: 'debutArsen', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_DEBUT_ARSEN', P_DEBUT_ARSEN) }),
+  offer({ name: 'DebutSamvel', when: [is('debutFresh'), eq('debutWho', 'samvel')], act: 'debutSamvel', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_DEBUT_SAMVEL', P_DEBUT_SAMVEL) }),
+  offer({ name: 'DebutBoris', when: [is('debutFresh'), eq('debutWho', 'boris')], act: 'debutBoris', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_DEBUT_BORIS', P_DEBUT_BORIS) }),
   // встречный иск — заметное событие с окном отклика (#964): ход и три после
   offer({ name: 'Countersuit', when: [is('countersuitFresh')], act: 'countersuitAsk', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_COUNTERSUIT', P_COUNTERSUIT) }),
 

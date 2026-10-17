@@ -176,6 +176,12 @@ export const moneyAskAt = {
   bank: 'money.askAt.bank', beton: 'money.askAt.beton', safe: 'money.askAt.safe',
   crypto: 'money.askAt.crypto', niva: 'money.askAt.niva',
 } as const
+
+/** Первое сообщение участника в партии (#973): кто и на каком ходу — окно отклика на дебют. */
+export const debutWho = 'debut.who'
+export const debutAt = 'debut.at'
+/** Участник уже писал сам: повторные сообщения окно дебюта не открывают (#973). */
+export const wrote = (who: string) => `wrote.${who}` as const
 /** Рубик остался жить на объекте и спит в ванной (#590): до этой серии про ванную не говорят. */
 export const rubikBath = 'rubik.bath'
 /** Заметные системные события с окном реакции (#927): ход события для «свежих» фактов. */
@@ -204,6 +210,7 @@ export const EVENT_KEY_LIST = [
   'day', 'dow', 'month', 'dom', 'holiday', 'sent', 'moo', 'tier', 'mood', 'patience', 'money', 'debt', 'fifty', 'paid',
   'moneyNormal', 'moneyLow', 'moneyBottom', 'paymentDueTomorrow',
   'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sinceCrew', 'sorrySwing', 'promiseLive', 'promisePassed', 'promiseStake',
+  'debutWho', 'debutFresh',
   'ramPhotoFresh', 'borisSaleFresh', 'vacancyFresh', 'avitoReviewFresh', 'rubikAskFresh', 'kettleFresh',
   'lawyerFresh', 'collectorsAskFresh', 'internFresh', 'rubikHoleFresh', 'countersuitFresh',
   'period', 'night', 'offline', 'scene', 'sinceAlik', 'lateCount', 'arcAvailable',
@@ -224,7 +231,7 @@ export const MEM_KEYS: ReadonlySet<string> = new Set([
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday, saidKonak,
   lightOff, netRation, phoneWarn, holidayGreeted,
-  creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, collectorsTurned, criticalAt, creditOfferSum, momDachaAt, crewPaid, crewPaidAt, rubikBath, whenYears, ...Object.values(moneyAskAt),
+  creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, collectorsTurned, criticalAt, creditOfferSum, momDachaAt, crewPaid, crewPaidAt, rubikBath, whenYears, ...Object.values(moneyAskAt), debutWho, debutAt,
   ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt, countersuitAt,
   ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lend50),
 ])

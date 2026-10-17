@@ -1220,7 +1220,15 @@ export class Game {
 
   alikMsg<M extends NewMsg>(m: M, claims?: readonly LedgerEvent[]): Msg {
     // персонаж написал сам — он в истории (intro) и игрок его встречал (met, для переклички в День выплаты)
-    if (m.kind === 'text' && m.who) { this.S.mem[memkeys.met(m.who)] = true; this.S.mem[memkeys.intro(m.who)] = true }
+    if (m.kind === 'text' && m.who) {
+      // первое сообщение участника штампует ход дебюта — окно отклика (#973); повторные окно не открывают
+      if (!this.S.mem[memkeys.wrote(m.who)]) {
+        this.S.mem[memkeys.wrote(m.who)] = true
+        this.S.mem[memkeys.debutWho] = m.who
+        this.S.mem[memkeys.debutAt] = this.S.stats.sent
+      }
+      this.S.mem[memkeys.met(m.who)] = true; this.S.mem[memkeys.intro(m.who)] = true
+    }
     this.tick(1 + this.rnd(3))
     const msg = this.noteAlik(this.push({ from: 'alik', time: fmtTime(this.S.clock), ...m } as NewMsg), claims)
     this.audio.beep()
@@ -1579,6 +1587,9 @@ export class Game {
       sinceCrew: S.stats.sent - Number(S.mem[memkeys.crewPaidAt] ?? -99),
       // свежесть места денег у каждого места своя (#962): вопрос игрока или объявление штампует своё
       ...Object.fromEntries(Object.entries(memkeys.moneyAskAt).map(([p, k]) => [`sinceMoneyAsk.${p}`, S.stats.sent - Number(S.mem[k] ?? -99)])),
+      // дебют участника (#973): окно отклика на первое сообщение — ход и три после
+      debutWho: String(S.mem[memkeys.debutWho] ?? ''),
+      debutFresh: S.stats.sent - Number(S.mem[memkeys.debutAt] ?? -99) <= 3,
       // сколько раз игрок извинялся за последние 6 ходов («крик → мир → крик → мир»)
       sorrySwing: String(S.mem[memkeys.sorryAt] ?? '').split(',').filter((n) => n && S.stats.sent - Number(n) <= 6).length,
       // температура ссоры не уходит ниже нуля (после примирения ещё тикают отложенные «остывания»)
