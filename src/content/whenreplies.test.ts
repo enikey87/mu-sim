@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { makeGame, alikTexts } from '../test/helpers'
 import { D, cap, WHEN_YEARS, type When } from './excuses'
 import { LEGENDS } from './legends'
-import { PROMISE_NEVER, PROMISE_PENCIL, PROMISE_FAR, PROMISE_YEARS, WHEN_COND } from './misc'
+import { PROMISE_NEVER, PROMISE_PENCIL, PROMISE_FAR, PROMISE_YEARS, WHEN_COND, KONAK_LINE } from './misc'
 import { valueOf, test as holds, type Entry } from '../engine/rules'
 import { fmtDays } from '../engine/time'
 import type { Game } from '../engine/game'
@@ -136,25 +136,46 @@ describe('матрица: каждая кнопка каждого срока �
 })
 
 describe('«Лет двадцать?» — пара со своим ответом', () => {
-  it('кнопка зовёт колкий ответ, а соседняя ирония — общий пул', async () => {
-    const g = await said(byText('после таможни'))
-    let years = undefined as ReturnType<Game['buildChoices']>[number] | undefined
-    let other = undefined as ReturnType<Game['buildChoices']>[number] | undefined
-    for (let i = 0; i < 80 && (!years || !other); i++) {
+  /** Алик называет сравнение с коньяком настоящим путём: игрок жмёт кнопку «никогда», пока ирония не выпадет (#918). */
+  const konak = async (g: Game): Promise<void> => {
+    const fresh = () => { g.S.ctx = g.ctxFromPromise({ ...byText('после таможни'), text: 'после таможни — отдам' }) }
+    for (let i = 0; i < 80; i++) {
+      if (!g.S.ctx) fresh()
       g.S.choices = null
-      for (const c of g.buildChoices()) {
-        if (c.act !== 'promiseNever') continue
-        if (/лет двадцать\?/i.test(c.text)) years = c
-        else other = c
-      }
+      const c = g.choices.find((x) => x.act === 'promiseNever')
+      if (!c) { fresh(); continue }
+      const n = g.S.msgs.length
+      await g.send(c)
+      if (alikTexts(g.S.msgs.slice(n)).join(' ').includes(KONAK_LINE)) { fresh(); return }
+      fresh()
+    }
+    expect.fail('Алик не сравнил срок с коньяком за 80 кнопок')
+  }
+
+  it('кнопка ждёт сравнение с коньяком, зовёт колкий ответ, а соседняя ирония — общий пул', async () => {
+    const g = await said(byText('после таможни'))
+    expect(g.open(D.P_WHEN_NEVER), 'без сравнения с коньяком эхо осиротело бы').not.toContain(WHEN_YEARS)
+    // соседняя ирония — из пула и до коньяка: пока колода не разобрана, кнопка находится всегда
+    let other = undefined as ReturnType<Game['buildChoices']>[number] | undefined
+    for (let i = 0; i < 80 && !other; i++) {
+      g.S.choices = null
+      for (const c of g.buildChoices()) if (c.act === 'promiseNever' && !/лет двадцать\?/i.test(c.text)) other = c
+    }
+    expect(other, 'кроме «Лет двадцать?» в пуле ничего нет').toBeDefined()
+    await konak(g)
+    expect(g.open(D.P_WHEN_NEVER), 'после сравнения с коньяком эхо вернулось').toContain(WHEN_YEARS)
+    let years = undefined as ReturnType<Game['buildChoices']>[number] | undefined
+    for (let i = 0; i < 80 && !years; i++) {
+      g.S.choices = null
+      for (const c of g.buildChoices()) if (c.act === 'promiseNever' && /лет двадцать\?/i.test(c.text)) years = c
     }
     expect(years, 'кнопки «Лет двадцать?» нет').toBeDefined()
     expect(years!.arg).toBe('years')
-    expect(other, 'кроме «Лет двадцать?» в пуле ничего нет').toBeDefined()
     const n = g.S.msgs.length
     await g.send(years!)
     const sharp = alikTexts(g.S.msgs.slice(n)).join(' ')
     expect(sharp).toBe(PROMISE_YEARS)
+    expect(sharp, 'тычка игроку в ответе нет (#918)').not.toMatch(/Ты — нет/)
     expect(from(PROMISE_NEVER, sharp)).toBe(false)
     expect(g.mem()['when.years'], 'факт «уже спросил»').toBe(true)
     expect(g.open(D.P_WHEN_NEVER), 'факт закрывает строку').not.toContain(WHEN_YEARS)
