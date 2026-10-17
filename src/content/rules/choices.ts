@@ -229,7 +229,7 @@ export const choiceRules: R[] = [
   offer({
     // единственный выход из смерти: вопрос не исчезает, даже если все недавно показывали (исключение из окна #824)
     name: 'ArcDeath', slot: 'arc', when: [is(alikDead), is('deathCanAdvance')], act: 'arc', tone: 'polite', bonus: 5,
-    text: (g) => g.freshPlayer('F_alik_death', ARCS.alik_death.follow) ?? g.draw('F_alik_death', ARCS.alik_death.follow), arg: () => 'alik_death',
+    text: (g) => g.freshPlayer('F_alik_death', ARCS.alik_death.follow) ?? g.oldestShown(ARCS.alik_death.follow), arg: () => 'alik_death',
   }),
   offer({
     // вопрос про сериал — только если он к чему-то приведёт (иначе «Как Нуне?» трижды подряд → «пока без новостей»)

@@ -157,6 +157,33 @@ describe('цитата про конверт Гарика — после тру�
   })
 })
 
+describe('повтор вопроса о похоронах — самая давняя строка, не колода (#880)', () => {
+  it('через 3 хода после отправки всего пула звучит строка, показанная раньше окна', async () => {
+    const { game } = makeGame()
+    game.S.day = 250
+    await game.playArc('alik_death')
+    game.S.day += 5
+    await game.playArc('alik_death')
+    expect(game.S.arcs.alik_death.i).toBe(2)
+    const pool = ARCS.alik_death.follow
+    const open = () => game.open(pool)
+    game.S.stats.sent = 0
+    const early = [game.freshPlayer('F_alik_death', pool), game.freshPlayer('F_alik_death', pool)]
+    expect(early.every(Boolean), 'две строки показаны задолго до окна').toBe(true)
+    for (const t of early) game.seen.mark(t!)
+    game.S.stats.sent = 30
+    while (game.freshPlayer('F_alik_death', pool) !== null) { /* остальные — в этом ходе */ }
+    for (const t of open()) game.seen.mark(t)
+    game.S.stats.sent = 34
+    game.S.day += 1
+    // одинаковый возраст: берётся та, что раньше в пуле, а не следующая карта колоды
+    const old = open().find((t) => early.includes(t))!
+    const offered = game.buildChoices().find((c) => c.act === 'arc' && c.arg === 'alik_death')
+    expect(offered, 'вопрос смерти не молчит').toBeTruthy()
+    expect(offered!.text, 'берётся показ старше 20 ходов, не только что отправленный').toBe(old)
+  })
+})
+
 describe('вопрос «уже случилось?» только перед серией, которая отвечает (#589)', () => {
   it('до развязки кнопки нет; когда следующая серия — она, кнопка есть', async () => {
     await followBefore('garik', 'Гарика достали?', /Гарика достали!/, 'Как там Гарик?', { when: /трубочку/, has: 'Гарик ещё в фундаменте?' })
