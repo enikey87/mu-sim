@@ -290,3 +290,17 @@ describe('правки обещаний: род у каждого термина
     expect(drawn, 'термин был нарисован — проверка не пустая').toBeGreaterThan(0)
   })
 })
+
+describe('колёсное обещание «Нивы» — легенд-специфичная риторика (#919)', () => {
+  it('на «как новые колёса продадим» своя строка, генерик «никогда» закрыт', async () => {
+    const g = await said({ t: 'как новые колёса продадим', d: null, kind: 'never' })
+    const texts: string[] = []
+    for (let i = 0; i < 20; i++) {
+      g.S.choices = null
+      for (const c of g.buildChoices()) if (c.act?.startsWith('promise')) texts.push(c.text)
+    }
+    expect(texts.length, 'кнопки срока строятся — проверка не пустая').toBeGreaterThan(0)
+    expect(texts.some((t) => t.includes('сколько ещё колёс')), `своя риторика: ${texts.join(' | ')}`).toBe(true)
+    expect(texts.filter((t) => /по-русски это «никогда»|это не срок/.test(t)), `генерик-never закрыт: ${texts.join(' | ')}`).toEqual([])
+  })
+})
