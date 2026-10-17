@@ -207,6 +207,39 @@ describe('панч серии по факту другой арки (#681)', () 
   })
 })
 
+describe('follow-вопросы бетона не называют развязку раньше её серии (#858)', () => {
+  const ARSEN = 'Арсен бумаги разобрал: Грант теперь мне должен. А платит всё равно Алик?'
+  const GOAR = 'Тётя Гоар по углам гадает. А деньги мои куда уйдут?'
+
+  it('«Арсен бумаги разобрал» — после eps[3], «Гоар гадает» — после eps[5]', async () => {
+    const { game } = makeGame()
+    // герои введены заранее: вопрос держит номер серии, а не знакомство (иначе проверка была бы пустой)
+    for (const who of ['arsen', 'grant', 'goar']) game.S.mem[`intro.${who}`] = true
+    const pool = () => game.open(ARCS.beton.follow)
+    game.S.arcs.beton = { i: 3, last: -99 }
+    expect(pool(), 'перед развязкой (идёт eps[3])').not.toContain(ARSEN)
+    expect(pool(), 'до гадания').not.toContain(GOAR)
+    game.S.day += 5
+    await game.playArc('beton') // eps[3]: «мой племянник Арсен изучил вопрос по бумагам… теперь тебе должен Грант»
+    expect(pool(), 'развязка вышла — вопрос уместен').toContain(ARSEN)
+    expect(pool(), 'Гоар ещё не гадала').not.toContain(GOAR)
+    game.S.day += 5
+    await game.playArc('beton') // eps[4]
+    game.S.day += 5
+    await game.playArc('beton') // eps[5]: «Тётя Гоар погадала на кофейной гуще…»
+    expect(pool(), 'гадание вышло — вопрос уместен').toContain(GOAR)
+  })
+
+  // негативный контроль: та же строка без gate открыта и до развязки — значит, вопрос убирает именно номер серии
+  it('снятие номера серии возвращает вопрос: строка без gate видна до развязки', () => {
+    const { game } = makeGame()
+    for (const who of ['arsen', 'grant']) game.S.mem[`intro.${who}`] = true
+    game.S.arcs.beton = { i: 3, last: -99 }
+    const bare = [...ARCS.beton.follow.slice(0, 3), ARSEN] as Entry<string>[]
+    expect(game.open(bare)).toContain(ARSEN)
+  })
+})
+
 describe('follow-строки оперируют только введёнными фактами (#813)', () => {
   /** Числа строки без разделителей: «8 000» → 8000. */
   const numbers = (t: string): string[] => (t.match(/\d[\d\s\u00A0]*\d|\d/g) ?? []).map((n) => n.replace(/[\s\u00A0]/g, ''))
