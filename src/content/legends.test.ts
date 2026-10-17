@@ -4,7 +4,7 @@ import { makeGame } from '../test/helpers'
 import { ARCS } from './arcs'
 import { LEGENDS, CHORUS_LEGEND } from './legends'
 import { meet } from './world'
-import { spec, lintLines } from '../engine/rules'
+import { spec, lintLines, valueOf } from '../engine/rules'
 import type { Game } from '../engine/game'
 
 const texts = (g: Game, n: number) => g.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' ? [m.text] : []))
@@ -299,5 +299,45 @@ describe('легенда денег', () => {
     const n = vows(game, until)
     await game.excuseTurn() // пауза ещё не прошла
     expect(vows(game, until)).toBe(n)
+  })
+})
+
+describe('торг за код: Гарик торгуется после признания (#908)', () => {
+  // арка играется путём игрока: признание «Я спрятался» — шестая серия (после блога, #907)
+  const played = async (eps: number) => {
+    const { game } = makeGame()
+    for (let i = 0; i < eps; i++) { game.S.day += 5; await game.playArc('garik') }
+    expect(game.S.arcs.garik.i, `сыграно серий: ${eps}`).toBe(eps)
+    const confessed = game.S.msgs.some((m) => m.kind === 'text' && m.text.includes('Я спрятался'))
+    return { game, confessed }
+  }
+  const ask = (q: string) => LEGENDS.garik.talk!.find((e) => valueOf(e)[0] === q)!
+  const tradeLines = LEGENDS.garik.lines.filter((l) => spec(l).when?.some((c) => c.key === 'arc.garik'))
+
+  it('до признания торга нет, после — раунд торгов открыт', async () => {
+    expect(tradeLines.length, 'раундов торгов нет — проверка пустеет').toBeGreaterThan(0)
+    const before = await played(5)
+    expect(before.confessed, 'признания ещё не было').toBe(false)
+    expect(before.game.open([ask('И что Гарик хочет за код?')]), 'до признания торга нет').toEqual([])
+    expect(before.game.open(tradeLines), 'строк торгов до признания нет').toEqual([])
+    const after = await played(6)
+    expect(after.confessed, 'шестая серия — признание').toBe(true)
+    expect(after.game.open([ask('И что Гарик хочет за код?')]), 'раунд открыт после признания').toHaveLength(1)
+    expect(after.game.open(tradeLines), 'строки торгов открыты').toHaveLength(tradeLines.length)
+  })
+
+  it('в раунде: вопрос игрока → условие Гарика → ответ Алика-посредника', async () => {
+    const { game } = await played(6)
+    const round = game.open([ask('И что Гарик хочет за код?')])[0]
+    expect(round?.[0], 'вопрос задаёт игрок').toBe('И что Гарик хочет за код?')
+    expect(round?.[1], 'Алик называет условие Гарика').toMatch(/хаш/)
+    const last = game.open([ask('Он вообще код назовёт?')])[0]
+    expect(last?.[1], 'финальная цена — подписка на блог').toMatch(/подписк/)
+    expect(game.open(tradeLines).map((l) => spec(l).t).join(' '), 'Алик — раздражённый посредник').toMatch(/не торгуйся с бетоном/)
+  })
+
+  it('официальная версия до признания осталась: вопрос «спросить Гарика» открыт', async () => {
+    const before = await played(5)
+    expect(before.game.open([ask('Может, спросить Гарика? Он же код знает')]), 'старый вопрос не потерян').toHaveLength(1)
   })
 })
