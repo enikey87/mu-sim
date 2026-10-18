@@ -7,6 +7,7 @@ import { AlikOffline } from './criteria'
 import { IDLE } from '../life'
 import { MEMORY } from '../memory'
 import { LEGENDS } from '../legends'
+import { moneyPlaceOf, stampMoneyPlace } from '../money-ask'
 import { count, creditBroke, endgame, payday, polite, thanksAt, vendetta, nivaPlayer, alikDead } from '../memkeys'
 import { GREET, GREET_MORNING, GREET_NIGHT, THANKS, THANKS_THIRD } from '../misc'
 
@@ -76,7 +77,15 @@ export const storyRules: R[] = [
   // легенда денег продолжается и между «обычными» ходами
   {
     name: 'Beat_Legend', event: 'StoryBeat', when: [exists('legend')], specificity: 0, odds: 0.12, cooldown: { turns: 5 }, priority: 'chatter',
-    respond: async ({ game, facts }) => { const p = game.linePicked('LEG_' + facts.legend, LEGENDS[String(facts.legend)].lines); if (!p) return false; game.markTopical(await game.say([{ t: p.text, claims: p.spec.claims ?? [] }])); game.setCtx({ ...(game.ctx ?? {}), legend: String(facts.legend) }) },
+    respond: async ({ game, facts }) => {
+      const p = game.linePicked('LEG_' + facts.legend, LEGENDS[String(facts.legend)].lines)
+      if (!p) return false
+      // легенда места прозвучала — его state-вопросы молчат окно (#981)
+      const place = moneyPlaceOf(String(facts.legend))
+      if (place) stampMoneyPlace(game, place, Number(facts.sent))
+      game.markTopical(await game.say([{ t: p.text, claims: p.spec.claims ?? [] }]))
+      game.setCtx({ ...(game.ctx ?? {}), legend: String(facts.legend) })
+    },
   },
   { name: 'Beat_Memory', event: 'StoryBeat', when: [gte('sent', 10)], specificity: 0, odds: 0.08, cooldown: { turns: 6 }, priority: 'chatter', respond: async ({ game }) => { const t = game.line('MEMORY', MEMORY); if (!t) return false; await game.say([t]); game.unlock('memory'); game.setCtx({ ...(game.ctx ?? {}), memory: true }) } },
   { name: 'Beat_Quest', event: 'StoryBeat', when: [gte('sent', 6)], specificity: 0, odds: 0.06, cooldown: { turns: 8 }, priority: 'chatter', respond: ({ game }) => game.fire('PickQuest').then((r) => !!r) },
@@ -119,6 +128,9 @@ export const turnRules: R[] = [
     respond: async ({ game, facts }) => {
       const p = game.linePicked('LEG_' + facts.legend, LEGENDS[String(facts.legend)].lines)
       if (!p) return game.excuseTurn()
+      // легенда места прозвучала — его state-вопросы молчат окно (#981)
+      const place = moneyPlaceOf(String(facts.legend))
+      if (place) stampMoneyPlace(game, place, Number(facts.sent))
       game.markTopical(await game.say([{ t: p.text, claims: p.spec.claims ?? [] }]))
       game.setCtx({ ...(game.ctx ?? {}), legend: String(facts.legend) }) // можно переспросить именно про это
       if (game.chance(0.6)) await game.promiseLine(undefined, true)

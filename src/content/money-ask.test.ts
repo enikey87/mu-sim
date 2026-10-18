@@ -8,7 +8,8 @@ import { ARCS } from './arcs'
 import { LEGENDS } from './legends'
 import { valueOf, isOpen, Gated } from '../engine/rules'
 import type { Entry } from './fact'
-import { taxFrozen, nivaBack, intro } from './memkeys'
+import { taxFrozen, nivaBack, intro, moneyAskAt, legendPromiseAt } from './memkeys'
+import { meet } from './world'
 import type { Choice } from '../engine/state'
 import type { Game } from '../engine/game'
 
@@ -196,5 +197,128 @@ describe('объявление места потребляет окно свое
       game.S.stats.sent += MONEY_ASK_TURNS + 1
       for (const t of openState) expect(game.open(MONEY_ASK[place!]), `${place}: окно прошло — «${t}» не вернулось`).toContain(t)
     }
+  })
+})
+
+describe('follow-пул бетона и посторонние подтверждения места (#981)', () => {
+  /** State-вопросы бетона в обоих пулах: money-ask и follow арки. */
+  const stateLines = () => ({
+    ask: MONEY_ASK.beton.filter(windowed).map(valueOf),
+    follow: ARCS.beton.follow.filter(windowed).map(valueOf),
+  })
+  /** Подтверждение места закрыло state-вопросы обоих пулов; за окном они вернулись, действия не тронуты. */
+  const expectWindow = (game: Game) => {
+    const { ask, follow } = stateLines()
+    expect(ask.length, 'вопросов-состояний money-ask не стало — проверка пустеет').toBeGreaterThan(0)
+    expect(follow.length, 'state-вопросов follow не стало — проверка пустеет').toBe(3)
+    for (const t of ask) expect(game.open(MONEY_ASK.beton), `money-ask в окне: «${t}»`).not.toContain(t)
+    for (const t of follow) expect(game.open(ARCS.beton.follow), `follow в окне: «${t}»`).not.toContain(t)
+    // вопросы-действия окно не знают (#955/#981)
+    expect(game.open(MONEY_ASK.beton)).toContain('Может, всё-таки достанем деньги из фундамента?')
+    game.S.stats.sent += MONEY_ASK_TURNS + 1
+    for (const t of ask) expect(game.open(MONEY_ASK.beton), `money-ask за окном: «${t}»`).toContain(t)
+    for (const t of follow) expect(game.open(ARCS.beton.follow), `follow за окном: «${t}»`).toContain(t)
+  }
+
+  it('ответ money-ask закрывает state-вопросы и в follow-пуле: кнопка арки их не предлагает', async () => {
+    const game = withLegend('beton_money')
+    const { follow } = stateLines()
+    expect(game.open(ARCS.beton.follow), 'до ответа state-вопросы follow открыты').toEqual(expect.arrayContaining(follow))
+    const money = findMoney(frame(game))
+    expect(money, 'кнопки денег нет').toBeDefined()
+    await game.send(money!)
+    // кнопка арки в окне: пул отдаёт открытую соседнюю строку (Арсен), но не state-вопросы.
+    // Легенда закрыта — оффер Money не занимает тему арки (#887), вопрос арки виден сам
+    delete game.S.mem['legend.id']
+    game.S.arcs.beton = { i: 4, last: -99 }
+    game.S.mem[intro('arsen')] = true
+    game.S.mem[intro('grant')] = true
+    game.setCtx({ arc: 'beton' })
+    let shown = 0
+    for (let i = 0; i < 30; i++) {
+      const arc = frame(game).find((c) => c.act === 'arc')
+      if (!arc) continue
+      shown++
+      expect(follow, `follow в окне: «${arc.text}»`).not.toContain(arc.text)
+    }
+    expect(shown, 'кнопка арки ни разу не предложена — проверка пустеет').toBeGreaterThan(0)
+    expectWindow(game)
+  })
+
+  it('ход Алика по линии легенды бетона подтверждает место (#981)', async () => {
+    const { game } = makeGame({ seed: 5 })
+    let fired = false
+    for (let i = 0; i < 80 && !fired; i++) {
+      game.setLegend('beton_money', 'beton')
+      game.S.arcs.beton = { i: 1, last: game.S.day } // сериалы сегодня молчат: ходит только линия легенды
+      game.S.stats.sent += 3 // перерыв Turn_Legend — 2 хода
+      game.S.mem[legendPromiseAt] = game.S.stats.sent // клятва под паузой: проверяем штамп самого хода по линии
+      fired = (await game.fire('AlikTurn'))?.name === 'Turn_Legend'
+      game.S.scene = null
+    }
+    expect(fired, 'Turn_Legend не сыграл — проверка пустеет').toBe(true)
+    expect(game.S.mem[moneyAskAt.beton], 'ход по линии места не штампует').toBe(game.S.stats.sent)
+    expectWindow(game)
+  })
+
+  it('бит легенды между ходами подтверждает место (#981)', async () => {
+    const { game } = makeGame({ seed: 5 })
+    let fired = false
+    for (let i = 0; i < 150 && !fired; i++) {
+      game.setLegend('beton_money', 'beton')
+      game.S.arcs.beton = { i: 1, last: game.S.day }
+      game.S.stats.sent += 5 // перерыв Beat_Legend — 5 ходов
+      delete game.S.mem[moneyAskAt.beton] // штамп только этого хода — иначе прошлый прогон маскирует
+      fired = (await game.fire('StoryBeat'))?.name === 'Beat_Legend'
+    }
+    expect(fired, 'Beat_Legend не сыграл — проверка пустеет').toBe(true)
+    expect(game.S.mem[moneyAskAt.beton], 'бит легенды места не штампует').toBe(game.S.stats.sent)
+    expectWindow(game)
+  })
+
+  it('ответ на вопрос о легенде подтверждает место (#981)', async () => {
+    const game = withLegend('beton_money')
+    game.S.ctx = { legend: 'beton_money' }
+    let talk: Choice | undefined
+    for (let i = 0; i < 30 && !talk; i++) talk = frame(game).find((c) => c.act === 'talk')
+    expect(talk, 'кнопки-вопроса о легенде нет').toBeDefined()
+    // на ходу ответа бит легенды молчит: иначе НК «снять штамп ответа» маскируется соседним источником
+    game.S.rules.cooldown['Beat_Legend'] = { turn: game.S.stats.sent, day: game.S.day }
+    await game.send(talk!)
+    expect(game.S.mem[moneyAskAt.beton], 'ответ легенды места не штампует').toBe(game.S.stats.sent)
+    expectWindow(game)
+  })
+
+  it('напоминание сроком легенды подтверждает место (#981)', async () => {
+    const game = withLegend('beton_money')
+    await game.excuseTurn()
+    const until = LEGENDS.beton_money.until.t
+    expect(game.S.msgs.some((m) => m.kind === 'text' && m.text.includes(until)), 'напоминание не прозвучало — проверка пустеет').toBe(true)
+    expect(game.S.mem[moneyAskAt.beton], 'напоминание места не штампует').toBe(game.S.stats.sent)
+    expectWindow(game)
+  })
+
+  it('напоминание в пачке «пока тебя не было» подтверждает место (#981)', async () => {
+    const game = withLegend('beton_money')
+    await game.awayMsg('excuse')
+    const until = LEGENDS.beton_money.until.t
+    expect(game.S.msgs.some((m) => m.kind === 'text' && m.text.includes(until)), 'напоминание не прозвучало — проверка пустеет').toBe(true)
+    expect(game.S.mem[moneyAskAt.beton], 'напоминание пачки не штампует').toBe(game.S.stats.sent)
+    expectWindow(game)
+  })
+
+  it('хор в рамках легенды места подтверждает место (#981)', async () => {
+    const { game } = makeGame({ seed: 4 })
+    game.rules.applyOps(meet('karine'), {})
+    let fired = false
+    for (let i = 0; i < 80 && !fired; i++) {
+      game.setLegend('beton_money', 'beton')
+      game.S.stats.sent += 13 // перерыв хора — 12 ходов
+      delete game.S.mem[moneyAskAt.beton]
+      fired = (await game.fire('Mentioned', {}, { target: 'karine' }))?.name === 'Chorus_karine'
+    }
+    expect(fired, 'Chorus_karine не сыграл — проверка пустеет').toBe(true)
+    expect(game.S.mem[moneyAskAt.beton], 'хор в рамках легенды места не штампует').toBe(game.S.stats.sent)
+    expectWindow(game)
   })
 })

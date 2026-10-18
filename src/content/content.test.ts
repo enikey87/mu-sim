@@ -172,7 +172,10 @@ describe('scenes', () => {
 
 describe('arcs and cast', () => {
   it('у каждого сериала есть вопрос «Как там…?», уместный при любом положении', () => {
-    for (const [id, a] of Object.entries(ARCS)) expect(a.follow.some((f) => !(f instanceof Gated)), id).toBe(true)
+    // «при любом положении» — без гейта или под одним окном свежести места (#981): окно открывается
+    // само по ходам. Гейты мира (факты серий, знакомства) строку из партии убирают — их не считаем.
+    const anyTime = (f: Entry<string>) => !(f instanceof Gated) || f.when.every((c) => c.key.startsWith('sinceMoneyAsk.'))
+    for (const [id, a] of Object.entries(ARCS)) expect(a.follow.some(anyTime), id).toBe(true)
   })
   it('arcs are well-formed, last episode unlocks an existing achievement, done-lines exist', () => {
     for (const [id, a] of Object.entries(ARCS)) {

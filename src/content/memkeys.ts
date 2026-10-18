@@ -171,7 +171,7 @@ export const whenYears = 'when.years'
 export const crewPaid = 'crew.paid'
 /** Ход звонка: «кто звонил» без имени живёт только несколько ходов после него (#928). */
 export const crewPaidAt = 'crew.paidAt'
-/** Ход ответа игрока или объявления о месте денег: state-вопросы этого места молчат окно после него (#952/#955, объявления — #962). */
+/** Ход подтверждения места денег — ответ игроку, объявление, легенда, напоминание или хор (#952/#955, объявления — #962, остальные источники — #981): state-вопросы этого места молчат окно после него. */
 export const moneyAskAt = {
   bank: 'money.askAt.bank', beton: 'money.askAt.beton', safe: 'money.askAt.safe',
   crypto: 'money.askAt.crypto', niva: 'money.askAt.niva',

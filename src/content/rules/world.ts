@@ -9,6 +9,7 @@ import { PROMISE_DUE, PROMISE_DUE_COSMIC, PROMISE_DUE_KEPT, PROMISE_MET, PROMISE
 import { alikDead, alikShaved, blocked, count, endgame, grantPaid, interjections, intro, met, mourning, moustacheKept, payday, sick } from '../memkeys'
 import { JournalForAmnesty } from './criteria'
 import { low } from '../excuses'
+import { moneyPlaceOf, stampMoneyPlace } from '../money-ask'
 
 type R = Rule<ContentApi, GameEvent, Offer>
 
@@ -136,9 +137,13 @@ export const promiseRules: R[] = [
 
 // ---- хор (Mentioned, target — упомянутый персонаж) ----
 const speaks = (who: string) => { const criterion = speaksCriterion(who); return criterion ? [criterion] : [] }
-const chorusResponse = (who: string, pool: readonly Line[]): R['respond'] => async ({ game }) => {
+const chorusResponse = (who: string, pool: readonly Line[]): R['respond'] => async ({ game, facts }) => {
   const p = game.linePicked('CH_' + who, pool)
   if (!p) return false // новых реплик нет — молчит
+  // реплика хора в рамках легенды места — подтверждение места: его state-вопросы молчат окно (#981)
+  const legend = p.spec.when?.find((c) => c.key === 'legend' && c.op === '==')?.value
+  const place = moneyPlaceOf(legend)
+  if (place) stampMoneyPlace(game, place, Number(facts.sent))
   await game.say([{ w: who, t: p.text, claims: p.spec.claims ?? [] }])
   game.setCtx({ ...(game.ctx ?? {}), chorus: who }) // можно ответить самому персонажу
 }

@@ -246,6 +246,9 @@ export const DIRECT: Record<string, DirectCase> = {
   },
   // #577: после разрастания пулов звонка выборки перестали собирать и второе приглашение Арсена
   Court_Lawyer_Again: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem.court = 1; g.S.mem['intro.arsen'] = true } },
+  // #981 (окна follow-пула бетона и штампы легенды места) сдвинул розыгрыш — ответ окну дебюта Арсена (#973)
+  // ушёл из выборок, держим прямым случаем
+  Says_lawyerAsk: { event: 'PlayerSays', facts: { intent: 'lawyerAsk' } },
   Scene_lend: { event: 'PickScene', setup: (g) => { g.S.mood = 4 } }, // денег в свежей партии хватает (START_MONEY)
   // Scene_newjob: с #826 срабатывает в выборках сам (8 партий при пороге 7) — прямой случай не нужен
   Scene_loan: { event: 'PickScene', setup: (g) => { g.S.day = 230 } },

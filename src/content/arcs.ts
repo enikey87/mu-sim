@@ -5,6 +5,7 @@ import { type ClaimKey } from './ids'
 import type { LedgerEvent } from './fact-types'
 import { needs, meet, WORLD, MENTION_RE } from './world'
 import { actSigned, alikDead, betonSet, borisMarried, collectorsAskAt, collectorsRecruited, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantPaid, houseOnGarik, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, rubikHoleAt, sick, taxFrozen, wedding } from './memkeys'
+import { stateQuestion } from './money-ask'
 
 export type ArcMsg = Said | { w: string; t: string; claims?: LedgerEvent[]; remember?: FactOp[]; stamp?: string } | { t: string; claims: LedgerEvent[]; remember?: FactOp[]; stamp?: string }
 export interface Episode {
@@ -82,9 +83,10 @@ export const ARCS: Record<string, Arc> = {
   beton: {
     title: 'Деньги в фундаменте',
     follow: [
-      'Деньги ещё в фундаменте или их кому-то отписали?',
-      'Алик, как там мои деньги в бетоне — стоят или застыли?',
-      'Алик, что с фундаментом? Долг мой там же лежит?',
+      // state-вопросы места несут то же окно, что money-ask (#981): только что подтверждённое место не переспрашивается
+      stateQuestion('beton', 'Деньги ещё в фундаменте или их кому-то отписали?'),
+      stateQuestion('beton', 'Алик, как там мои деньги в бетоне — стоят или застыли?'),
+      stateQuestion('beton', 'Алик, что с фундаментом? Долг мой там же лежит?'),
       // вопросы не называют развязку раньше серии (#858): бумаги Арсена и нового должника сообщает eps[3],
       // гадание Гоар — eps[5]; после своей серии вопрос — законное продолжение (eps[4] отвечает Грантом)
       gate(WORLD.arsen, WORLD.grant, eq('arc.beton', 4))('Арсен бумаги разобрал: Грант теперь мне должен. А платит всё равно Алик?'),

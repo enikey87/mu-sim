@@ -12,14 +12,14 @@ import { GREET_A, WHEN_COND, SWING } from '../misc'
 import { type TalkKind, talkPairs, talkId, TALK_REMEMBER } from '../talk'
 import { saidClaims, saidText, type Said } from '../fact'
 import { LEGENDS } from '../legends'
-import { moneyPlaceOf } from '../money-ask'
+import { moneyPlaceOf, stampMoneyPlace } from '../money-ask'
 import { ARCS, NO_NEWS_A, NO_NEWS_B, GROUP_SEEN_A, GROUP_SEEN_B, WRONG_A, WRONG_B } from '../arcs'
 import * as L from '../life'
 import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, PROMISE_PENCIL, PROMISE_FAR, PROMISE_YEARS, KONAK_LINE } from '../misc'
 import { CREW_PAID } from '../crew'
 import { HOLIDAY_MONEY, type Holiday } from '../holidays'
 import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_THIRD, LIE_NOCRED } from '../lies'
-import { HEAT, alikShaved, avitoReviewAt, borisSaleAt, collectorsAskAt, countersuitAt, crewPaidAt, debutAt, internAt, kettleAt, lawyerAt, moneyAskAt, moustacheAskAt, ramPhotoAt, rubikAskAt, rubikHoleAt, vacancyAt, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, saidKonak, stateAt, topic, topicLast, topicMute, topicRun, whenYears } from '../memkeys'
+import { HEAT, alikShaved, avitoReviewAt, borisSaleAt, collectorsAskAt, countersuitAt, crewPaidAt, debutAt, internAt, kettleAt, lawyerAt, moustacheAskAt, ramPhotoAt, rubikAskAt, rubikHoleAt, vacancyAt, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, saidKonak, stateAt, topic, topicLast, topicMute, topicRun, whenYears } from '../memkeys'
 import type { ArcId, TopicId } from '../ids'
 import { PROMISE_SHAVE_ASK, RAM_PHOTO, BORIS_SALE, VACANCY, AVITO_REVIEW, RUBIK_ASK, KETTLE, CREW_CALL_B, LAWYER_B, COLLECTORS_ASK_B, INTERN_B, HOLE_B, COUNTERSUIT_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, DEBUT_BORIS_B } from '../world'
 
@@ -85,6 +85,11 @@ export const replyRules: R[] = [
       const pair = e && valueOf(e)
       if (!pair) return false // молчание не трогает ctx: следующее правило отвечает на тот же контекст
       game.setCtx(null)
+      // ответ легенды о месте денег прозвучал — state-вопросы места молчат окно (#981)
+      if (kind === 'legend') {
+        const place = moneyPlaceOf(sub)
+        if (place) stampMoneyPlace(game, place, Number(facts.sent))
+      }
       const id = talkId(kind, sub, Number(i))
       game.lines.mark(id)
       game.applyFacts(TALK_REMEMBER[id] ?? [])
@@ -101,7 +106,7 @@ export const replyRules: R[] = [
       if (!l) return false
       // вопрос прозвучал и получает ответ: вопросы-состояния того же места молчат окно свежести (#952)
       const place = moneyPlaceOf(legend)
-      if (place) game.applyFacts([set(moneyAskAt[place], Number(facts.sent))])
+      if (place) stampMoneyPlace(game, place, Number(facts.sent))
       const p = game.linePicked('LEG_' + legend, l.lines)
       if (!p) return game.excuseTurn()
       game.markTopical(await game.say([{ t: p.text, claims: p.spec.claims ?? [] }]))
