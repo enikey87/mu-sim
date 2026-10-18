@@ -12,6 +12,7 @@ import { ARC_DONE, ARCS, GROUP } from './arcs'
 import { FINALES } from './finales'
 import { meet } from './world'
 import { is, isOpen, test, valueOf, type Entry, type Facts } from '../engine/rules'
+import { ENDGAME_ARCH } from './endgame'
 import { playtest } from '../tools/playtest'
 
 const texts = (g: ReturnType<typeof makeGame>['game'], from = 0) =>
@@ -357,6 +358,31 @@ describe('отказ от стажировки переключает финал
       expect(game.holds(is(internDeclined)), 'отказ не записал факт').toBe(true)
       await game.fire('ArcFinale', { arc: 'collectors' })
       expect(chosen(game), 'отказ не переключил финал с «Стажёра»').not.toBe('intern')
+      declined = true
+    }
+    expect(declined, 'ни в одной из двадцати партий окна стажировки не было — проверка пустеет').toBe(true)
+  })
+
+  it('эпилог не утверждает стажировку после отказа — реальный порядок без повторного ArcFinale (#1056)', async () => {
+    let declined = false
+    for (let seed = 1; seed <= 20 && !declined; seed++) {
+      const { game } = makeGame({ seed })
+      game.S.mem[count.rude] = 6
+      await game.playFinale('collectors', FINALES.collectors.find((f) => f.id === 'intern')!)
+      // реальный порядок: финал записан до оффера и после отказа не переписывается
+      expect(chosen(game), 'финал не записан до оффера').toBe('intern')
+      const before = game.open(ENDGAME_ARCH).map((l) => l.slug)
+      expect(before, 'до отказа строка стажировки закрыта — проверка не про то').toContain('fin.collectors.intern')
+      expect(before).not.toContain('collectors.intern.declined')
+      game.S.choices = null
+      const btn = game.buildChoices().find((c) => c.act === 'internOffer' && c.arg === '1')
+      if (!btn) continue
+      await game.send(btn)
+      expect(game.holds(is(internDeclined)), 'отказ не записал факт').toBe(true)
+      expect(chosen(game), 'stored finale переписан — проверка не про то').toBe('intern')
+      const after = game.open(ENDGAME_ARCH).map((l) => l.slug)
+      expect(after, 'эпилог утверждает стажировку после отказа').not.toContain('fin.collectors.intern')
+      expect(after, 'замены нет: эпилог арки пустует').toContain('collectors.intern.declined')
       declined = true
     }
     expect(declined, 'ни в одной из двадцати партий окна стажировки не было — проверка пустеет').toBe(true)
