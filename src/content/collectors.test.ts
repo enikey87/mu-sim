@@ -1,14 +1,16 @@
 // Коллекторы после credit.broke: мини-сериал, перевербовка, микрозайм молчит (#128).
 import { describe, it, expect } from 'vitest'
-import { makeGame, setMoney } from '../test/helpers'
+import { makeGame, setMoney, cards } from '../test/helpers'
 import { START_DAY, ARC_MARINATION_DAYS } from '../engine/state'
-import { collectorsRecruited, collectorsTurned, creditBroke, endgame, intro, paydayScene, threatClaim } from './memkeys'
+import { collectorsRecruited, collectorsTurned, creditBroke, creditStage, endgame, intro, paydayScene, threatClaim } from './memkeys'
 import { loanTaken, loanDueAt } from './credit'
 import { D } from './excuses'
+import { P_COLLECTORS_DEBUT } from './rules/player-choice-pools'
+import type { Game } from '../engine/game'
 import { NOTIF } from './life'
 import { ARC_DONE, GROUP } from './arcs'
 import { meet } from './world'
-import { isOpen, test, valueOf, type Entry, type Facts } from '../engine/rules'
+import { is, isOpen, test, valueOf, type Entry, type Facts } from '../engine/rules'
 import { playtest } from '../tools/playtest'
 
 const texts = (g: ReturnType<typeof makeGame>['game'], from = 0) =>
@@ -290,5 +292,25 @@ describe('коллекторы (#128)', () => {
     const after = await runGroup(true)
     expect(after.some((t) => debtRe.test(t)), after.join(' | ')).toBe(false)
     expect(after.some((t) => oursRe.test(t)), after.join(' | ')).toBe(true)
+  })
+})
+
+describe('дебют коллекторов знает, клиент ли им игрок (#1022)', () => {
+  const pool = (g: Game) => g.open(P_COLLECTORS_DEBUT)
+
+  it('«Кто вы и при чём тут я?» — вопрос того, кто займ МФО ещё не брал', () => {
+    const fresh = makeGame().game
+    expect(fresh.holds(is(loanTaken('micro'))), 'займ в свежей партии — проверка пустеет').toBe(false)
+    expect(pool(fresh), 'без займа знакомства нет').toContain('Кто вы и при чём тут я?')
+    // клиент: ступени 1–2 пройдены, банк предлагает микрозайм, игрок его берёт настоящей кнопкой
+    const client = makeGame().game
+    setMoney(client, 100)
+    client.S.mem[creditStage] = 2
+    client.maybeCreditOffer()
+    const card = cards(client, 'Банк').at(-1)!
+    client.answerCard(card.id, 'take')
+    expect(client.holds(is(loanTaken('micro'))), 'займ МФО не отмечен — проверка пустеет').toBe(true)
+    expect(pool(client), 'клиент МФО спрашивает, кто они').not.toContain('Кто вы и при чём тут я?')
+    expect(pool(client), 'у клиента нет своей строки').toContain('Я вам должен, а Алик мне. Давайте меняйтесь')
   })
 })
