@@ -133,14 +133,17 @@ export const replyRules: R[] = [
   says('moustacheAsk', {
     respond: async ({ game }) => {
       game.applyFacts([set(moustacheAskAt, game.day)])
-      await game.say([game.uniq(() => game.draw('PROMISE_SHAVE_ASK', PROMISE_SHAVE_ASK))])
+      // linePicked, а не draw: строка сама объявляет «ставку» своим remember (#1029)
+      const line = game.linePicked('PROMISE_SHAVE_ASK', PROMISE_SHAVE_ASK)
+      await game.say([line?.text ?? ''])
       game.setCtx(null)
     },
   }, [is(alikShaved)]),
   // отклик на смену фото без усов (#1013): ответ потребляет окно события, как у окон #927 (#951)
   says('moustachePhoto', {
     respond: async ({ game }) => {
-      await game.say([game.draw('MOUSTACHE_PHOTO_B', MOUSTACHE_PHOTO_B)])
+      const line = game.linePicked('MOUSTACHE_PHOTO_B', MOUSTACHE_PHOTO_B)
+      await game.say([line?.text ?? ''])
       game.clearFact(moustachePhotoAt)
       game.setCtx(null)
     },

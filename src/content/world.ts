@@ -1,7 +1,7 @@
 // Тексты для новых возможностей системы правил: обещания, которые наступают, хор персонажей,
 // состояния мира со сроком (свадьба, болезнь Бориса, «Алик умер»).
 import { type Criterion, type Line, type Entry, named, exists, is, eq, gte, ne, missing, set, gate } from './fact'
-import { arsenTrack, cryptoHodl, garikConcrete, garikCut, garikDenied, grandpaDying, grantPaid, intro, karineKnowsDebt, karineThinksTax, met, mourning, nivaAway, nivaPlayer, nuneDekretOver, payday, saidFriday, saidStrasburg, saidTomorrow, alikShaved, wedding, collectorsRecruited, collectorsTurned, rubikBath } from './memkeys'
+import { arsenTrack, cryptoHodl, garikConcrete, garikCut, garikDenied, grandpaDying, grantPaid, intro, karineKnowsDebt, karineThinksTax, met, mourning, moustacheStakeSaid, nivaAway, nivaPlayer, nuneDekretOver, payday, saidFriday, saidStrasburg, saidTomorrow, alikShaved, wedding, collectorsRecruited, collectorsTurned, rubikBath } from './memkeys'
 import type { WhoId } from './ids'
 
 // Мир последователен: кто и что есть в истории и в каком оно положении — факты, их ставит серия (remember), ступень суда
@@ -62,6 +62,8 @@ export const WORLD = {
   saidStrasburg: named('saidStrasburg', is(saidStrasburg)),
   /** Усы на месте: ставки и клятвы усами молчат, пока сбриты (`alik.shaved`). */
   moustache: named('moustache', missing(alikShaved)),
+  /** Слово «ставка» прозвучало (#1029): до него вопрос «Ставка сыграла?» ссылается на невведённое понятие. */
+  stakeSaid: named('stakeSaid', is(moustacheStakeSaid)),
   /** В семье прощаются: дедушка умирает или хоронят Алика. */
   mourning: named('mourning', is(mourning)),
   grandpaDying: named('grandpaDying', is(grandpaDying)),
@@ -152,23 +154,23 @@ export const PROMISE_MET = [
   '«{t}» — готово. Теперь нужен следующий шаг. Какой — выясняем.',
 ]
 /** Срок со ставкой «усы» сорван — Алик без усов (docs/design/moustache.md). */
-export const PROMISE_SHAVE = [
+export const PROMISE_SHAVE: Line[] = [
   'Слово Алика — закон. Усы — нет. Теперь меня в банке не узнают, брат. Это тоже задержка.',
   'Деньги — как усы. Отрастут.',
-  needs('karineHome')(needs('karine')('Карине довольна: усы сбриты. Ты — тоже, надеюсь. Денег по-прежнему нет, но ставка сыграла.')),
+  needs('karineHome', 'karine')({ t: 'Карине довольна: усы сбриты. Ты — тоже, надеюсь. Денег по-прежнему нет, но ставка сыграла.', remember: [set(moustacheStakeSaid, true)] }),
 ]
 /** Ответ на «Алик, как усы?» пока отрастают (#352). Числа дней в тексте нет. */
-export const PROMISE_SHAVE_ASK = [
+export const PROMISE_SHAVE_ASK: Line[] = [
   'Деньги — как усы. Отрастут.',
   'Растут. Медленно. Как перевод.',
   needs('karineHome')(needs('karine')('Карине говорит: красиво. Я говорю: холодно.')),
   'Без усов меня в банке не узнают. Это удобно — и для них, и для меня.',
   'Отрастут. Главное — не сбрить обещание вместе с ними.',
-  'Усы были ставкой. Ставка сыграла. Теперь ждём реванша.',
+  { t: 'Усы были ставкой. Ставка сыграла. Теперь ждём реванша.', remember: [set(moustacheStakeSaid, true)] },
 ]
 /** Ответ на реакцию к смене фото без усов (#1013): говорит о ставке и лице, а не о деньгах, которых нет. */
-export const MOUSTACHE_PHOTO_B = [
-  'Усы были ставкой, брат. Ставка сыграла. Деньги — отдельная графа, она пока пустая.',
+export const MOUSTACHE_PHOTO_B: Line[] = [
+  { t: 'Усы были ставкой, брат. Ставка сыграла. Деньги — отдельная графа, она пока пустая.', remember: [set(moustacheStakeSaid, true)] },
   'Без усов я тот же Алик, только честнее выгляжу. В банке меня теперь не узнают — это плюс.',
   needs('karine')(needs('karineHome')('Карине нравится. Мне тоже. Денег это, правда, не добавило.')),
   'Сбрил сам, никто не заставлял. Слово Алика — закон, усы — нет.',

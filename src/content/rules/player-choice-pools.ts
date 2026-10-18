@@ -1,5 +1,5 @@
 // Именованные пулы кнопок из rules/choices — вынесены, чтобы попасть в PLAYER_POOLS (#491).
-import { needs } from '../world'
+import { needs, WORLD } from '../world'
 import { gate, is, missing } from '../fact'
 
 export const P_VIA_BORIS = [
@@ -42,7 +42,8 @@ export const P_MOUSTACHE = [
 /** Реакция на смену фото без усов (#1013): заметное событие ставки — окно хода события и трёх после.
  *  Строки листа задачи; «Карине нравится» — только когда жена в истории (нужно `intro.karine`). */
 export const P_MOUSTACHE_PHOTO = [
-  'Ставка сыграла? А деньги где?',
+  // слово «ставка» вводит Алик — строкой ответа окна, ответом на «как усы?» или строкой сбривания (#1029)
+  gate(WORLD.stakeSaid)('Ставка сыграла? А деньги где?'),
   'Без усов ты кто?',
   needs('karine')('Карине нравится. А мне — оплата'),
 ] as const
