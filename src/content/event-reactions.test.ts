@@ -3,11 +3,12 @@ import { describe, it, expect, vi } from 'vitest'
 import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
 import { NOTIF } from './life'
-import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK } from './rules/player-choice-pools'
+import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER } from './rules/player-choice-pools'
 import { BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B } from './world'
 import { ARCS } from './arcs'
 import { FINALES } from './finales'
-import { court, HEAT } from './memkeys'
+import { COURT_LAWYER_AGAIN } from './quests'
+import { court, HEAT, lawyerAt } from './memkeys'
 import { valueOf } from './fact'
 
 const AD = 'Новое объявление рядом: «Продаю барана Бориса, торг, умеет писать».'
@@ -141,6 +142,54 @@ describe('прямые вопросы и первые сообщения (#958):
     await game.fire('PlayerMessage', { tone: 'threat' })
     expect(game.S.mem['intro.arsen'], 'Арсен вошёл в историю своим сообщением').toBe(true)
     await answered(game, 'lawyerAsk')
+  })
+
+  it('Арсен уже знаком: Court_Lawyer_Again открывает то же окно, чужой ход его закрывает, ответ потребляет (#971)', async () => {
+    const lawyerChoice = (game: Game) => game.choices.find((c) => c.act === 'lawyerAsk')
+    const offered = (game: Game) => game.rules.collect({ event: 'BuildChoices' }, game.facts()).some((r) => r.name === 'Opt_LawyerFirst')
+    const known = async () => {
+      const { game } = makeGame()
+      await game.enterNode('nephew', 'start')
+      game.S.scene = null
+      game.S.choices = null
+      expect(game.S.mem['intro.arsen'], 'Арсен уже в истории — иначе сработает Court_Lawyer').toBe(true)
+      game.S.mem[court] = 1
+      game.S.offlineDays = 0
+      return game
+    }
+    const threat = async (game: Game) => {
+      const from = game.S.msgs.length
+      await game.send('Подам на тебя в суд')
+      const said = game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' ? [m.text] : []))
+      expect(said.join(' '), 'угроза ушла в ветку «это снова Арсен»').toContain(COURT_LAWYER_AGAIN[1][1])
+      expect(game.S.mem[lawyerAt], 'ветка Again штампует ход сообщения юриста').toBe(game.S.stats.sent)
+      return said
+    }
+
+    const game = await known()
+    expect(offered(game), 'до угрозы окна нет').toBe(false)
+    await threat(game)
+    const btn = lawyerChoice(game)
+    expect(btn, 'ближайший блок — кнопка из P_LAWYER').toBeTruthy()
+    expect(P_LAWYER.some((t) => btn!.text.toLowerCase().includes(t.slice(0, 12).toLowerCase())), btn!.text).toBe(true)
+    expect(offered(game), 'окно на ходу сообщения').toBe(true)
+    for (let i = 1; i <= 3; i++) {
+      await game.send('Алик, привет')
+      expect(offered(game), `ход +${i}: окно ещё открыто`).toBe(true)
+    }
+    await game.send('Алик, привет')
+    expect(game.S.stats.sent - Number(game.S.mem[lawyerAt]), 'четвёртый чужой ход — за окном').toBeGreaterThan(3)
+    expect(offered(game), 'окно >3 — кнопки нет').toBe(false)
+    expect(lawyerChoice(game), 'окно >3 — в блоке кнопки нет').toBeUndefined()
+
+    const answered = await known()
+    await threat(answered)
+    const pick = lawyerChoice(answered)
+    expect(pick, 'до ответа кнопка в блоке').toBeTruthy()
+    await answered.send(pick!)
+    expect(answered.S.mem[lawyerAt], 'ответ потребил штамп').toBeUndefined()
+    expect(offered(answered), 'после ответа окно закрыто').toBe(false)
+    expect(lawyerChoice(answered), 'повторного блока нет').toBeUndefined()
   })
 
   it('вопрос Алика «тебе коллекторы пишут?»: отклик есть, после ответа окно закрыто', async () => {
