@@ -19,7 +19,7 @@ import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, PROMISE_PENCIL,
 import { CREW_PAID } from '../crew'
 import { HOLIDAY_MONEY, type Holiday } from '../holidays'
 import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_THIRD, LIE_NOCRED } from '../lies'
-import { HEAT, alikShaved, avitoReviewAt, borisSaleAt, collectorsAskAt, countersuitAt, crewPaidAt, debutAt, grantTileAt, internAt, kettleAt, lawyerAt, moustacheAskAt, ramPhotoAt, rubikAskAt, rubikHoleAt, moustachePhotoAt, transferAt, vacancyAt, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, saidKonak, stateAt, topic, topicLast, topicMute, topicRun, whenYears } from '../memkeys'
+import { HEAT, alikShaved, avitoReviewAt, borisSaleAt, collectorsAskAt, countersuitAt, crewPaidAt, debutAt, grantTileAt, internAt, kettleAt, lawyerAt, moustacheAskAt, ramPhotoAt, rubikAskAt, rubikHoleAt, moustachePhotoAt, photoAt, transferAt, vacancyAt, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, saidKonak, stateAt, topic, topicLast, topicMute, topicRun, whenYears } from '../memkeys'
 import type { ArcId, TopicId } from '../ids'
 import { PROMISE_SHAVE_ASK, MOUSTACHE_PHOTO_B, RAM_PHOTO, BORIS_SALE, VACANCY, AVITO_REVIEW, RUBIK_ASK, KETTLE, CREW_CALL_B, LAWYER_B, COLLECTORS_ASK_B, INTERN_B, HOLE_B, COUNTERSUIT_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, DEBUT_BORIS_B, DEBUT_NIVA_B, GRANT_TILE_B } from '../world'
 
@@ -113,7 +113,8 @@ export const replyRules: R[] = [
       game.setCtx({ ...(game.ctx ?? {}), legend })
     },
   }),
-  simple('photo', (g) => g.uniq(g.X.photo)),
+  // отклик на фото «платёжки» (#1017): ответ потребляет окно события, как у окон #927/#951
+  simple('photo', (g) => g.uniq(g.X.photo), (g) => g.clearFact(photoAt)),
   simple('voice', (g) => g.uniq(g.X.cow)),
   simple('voiceText', (g) => g.pair('VOICE_A', D.VOICE_A, 'VOICE_B', D.VOICE_B)),
   says('transferQ', {
@@ -254,15 +255,22 @@ export const replyRules: R[] = [
     },
   }),
   says('internOffer', {
-    respond: async ({ game }) => {
-      await game.say([game.draw('INTERN_B', INTERN_B)])
+    respond: async ({ game, facts }) => {
+      // ответ по выбранной строке игрока (#1017): номер согласия/отказа уехал с arg у оффера.
+      // Номер без строки (старый путь/прямой fire) — колода, как раньше: окно не пустует.
+      const i = Number(facts.arg)
+      const line = Number.isInteger(i) ? INTERN_B[i] : undefined
+      await game.say([line ? valueOf(line) : game.draw('INTERN_B', INTERN_B)])
       game.clearFact(internAt)
       game.setCtx(null)
     },
   }),
   says('rubikHole', {
-    respond: async ({ game }) => {
-      await game.say([game.draw('HOLE_B', HOLE_B)])
+    respond: async ({ game, facts }) => {
+      // «ровно/криво/за плату» получают свой ответ B-пула (#1017), а не случайный из колоды
+      const i = Number(facts.arg)
+      const line = Number.isInteger(i) ? HOLE_B[i] : undefined
+      await game.say([line ? valueOf(line) : game.draw('HOLE_B', HOLE_B)])
       game.clearFact(rubikHoleAt)
       game.setCtx(null)
     },

@@ -241,7 +241,7 @@ export const DIRECT: Record<string, DirectCase> = {
     setup: (g) => { dead(g); g.recordPromise({ text: 'завтра', d: 1 }); g.S.day += 1 },
   },
   // #577: после разрастания пулов звонка выборки перестали собирать и второе приглашение Арсена
-  Court_Lawyer_Again: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem.court = 1; g.S.mem['intro.arsen'] = true } },
+  Court_Lawyer_Again: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem.court = 1; g.S.mem['intro.arsen'] = true; g.S.mem['wrote.arsen'] = true } },
   // #981 (окна follow-пула бетона и штампы легенды места) сдвинул розыгрыш — ответ окну дебюта Арсена (#973)
   // ушёл из выборок и держался прямым случаем; #1004 (маринование первой арки) сдвинуло выборки обратно —
   // 11 партий при пороге 7, гейт видит сам
@@ -263,17 +263,9 @@ export const DIRECT: Record<string, DirectCase> = {
   // #889: перекалибровка вариантов бетона сдвинула розыгрыш — сцена снова в выборках CI
   // (7 партий при пороге 7) — прямой случай не нужен, гейт видит её без подсказки
   // #964 (встречный иск) сдвинул розыгрыш — в семье +6000 сцена упала до нуля, случай вернулся
-  Scene_wife: {
-    event: 'PickScene',
-    setup: (g) => {
-      g.S.mem['count.rude'] = 1 // ворота сцены: игрок уже грубил, Карине ещё не знакомы
-      for (const r of g.rules.all) {
-        if (r.event !== 'PickScene' || r.name === 'Scene_wife') continue
-        if (r.once) g.S.rules.once[r.name] = true
-        else g.S.rules.cooldown[r.name] = { turn: g.S.stats.sent, day: g.S.day }
-      }
-    },
-  },
+  // #1017 (окно фото «платёжки» и ответы по выбранной строке) сдвинуло выборки — сцена «жена» снова в них
+  // (7 партий при пороге 7), гейт видит сам; уйдёт из выборок — вернуть прямым случаем ниже
+  // Scene_wife: { event: 'PickScene', setup: (g) => { g.S.mem['count.rude'] = 1 } } // ворота: грубил, Карине не знакомы
   Quest_q_niva: { event: 'PickQuest', setup: (g) => { g.S.mem[legendId] = 'niva_stuck'; g.S.mem[legendDay] = g.S.day } },
   // #795: денежная кнопка вместо случайной кнопки про арку сдвинула розыгрыш выборок — эти правила
   // ушли из чужих семейств сидов (`rules:stable`); в выборках гейта они редкие, потому держим прямыми случаями

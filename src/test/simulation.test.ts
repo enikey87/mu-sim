@@ -3,12 +3,12 @@ import { describe, it, expect } from 'vitest'
 import { makeGame, botTurn, alikTexts, FIX_RE } from './helpers'
 import { SAD, TIMEY } from '../engine/game'
 import type { Choice, Ctx } from '../engine/state'
-import { D, TRANSFER_FRESH_TURNS } from '../content/excuses'
-import { transferAt } from '../content/memkeys'
+import { D, TRANSFER_FRESH_TURNS, PHOTO_FRESH_TURNS } from '../content/excuses'
+import { transferAt, photoAt } from '../content/memkeys'
 import { WORLD } from '../content/world'
 import { ENDGAME_ALIK_BACK, ENDGAME_FORMALITIES, ENDGAME_RETURNER_LINES } from '../content/endgame'
 
-interface Step { choice: Choice | null; ctxBefore: Ctx | null; mourning: boolean; transferFresh: boolean; replies: string[] }
+interface Step { choice: Choice | null; ctxBefore: Ctx | null; mourning: boolean; transferFresh: boolean; photoFresh: boolean; replies: string[] }
 
 async function play(seed: number, turns: number) {
   const { game } = makeGame({ seed })
@@ -21,10 +21,12 @@ async function play(seed: number, turns: number) {
     const mourning = game.holds(WORLD.mourning)
     // окно перевода (#1003) — по состоянию до хода: кнопка строится на нём, а не после отправки
     const transferFresh = game.S.stats.sent - Number(game.S.mem[transferAt] ?? -99) <= TRANSFER_FRESH_TURNS
+    // окно фото «платёжки» (#1017) — тот же замер по состоянию до хода
+    const photoFresh = game.S.stats.sent - Number(game.S.mem[photoAt] ?? -99) <= PHOTO_FRESH_TURNS
     const from = game.S.msgs.length
     const choice = await botTurn(game)
     if (game.S.mem['endgame.active'] && beforeEndgame === Infinity) beforeEndgame = game.S.msgs.length
-    steps.push({ choice, ctxBefore, mourning, transferFresh, replies: alikTexts(game.S.msgs.slice(from)) })
+    steps.push({ choice, ctxBefore, mourning, transferFresh, photoFresh, replies: alikTexts(game.S.msgs.slice(from)) })
   }
   return { game, steps, beforeEndgame }
 }
@@ -86,9 +88,14 @@ describe.each([1, 2, 3])('симуляция, seed %i', (seed) => {
       if (c.act === 'voiceText') expect(s.replies.join(' '), 'ответ на «текстом» — про корову').not.toMatch(/коров|мычан/i)
       if (c.act === 'idleReply') expect(ctx.type).toBe('idle')
       if (c.act === 'reactQ') expect(ctx.type).toBe('reactOnly')
-      if (['photo', 'voice', 'voiceText', 'stickerQ', 'fwdQ'].includes(c.act)) {
-        const want = { photo: 'photo', voice: 'voice', voiceText: 'voice', stickerQ: 'sticker', fwdQ: 'fwd' }[c.act]
+      if (['voice', 'voiceText', 'stickerQ', 'fwdQ'].includes(c.act)) {
+        const want = { voice: 'voice', voiceText: 'voice', stickerQ: 'sticker', fwdQ: 'fwd' }[c.act]
         expect(ctx.type, `${c.act} при ctx.type=${ctx.type}`).toBe(want)
+      }
+      if (c.act === 'photo') {
+        // окно фото «платёжки» (#1017): кнопка реакции строится в окне PHOTO_FRESH_TURNS ходов и не гаснет с ctx
+        // (состояние взято до хода — s.photoFresh)
+        expect(ctx.type === 'photo' || s.photoFresh, `photo при ctx.type=${ctx.type} и без окна фото`).toBe(true)
       }
       if (c.act === 'transferQ') {
         // окно перевода (#1003): кнопка реакции строится в окне TRANSFER_FRESH_TURNS ходов и не гаснет с ctx

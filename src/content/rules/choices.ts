@@ -67,6 +67,16 @@ const freshFromArr = (game: ContentApi, key: string, arr: readonly Entry<unknown
   requirePlayerPool(key.startsWith('F_') ? `ARCS.${key.slice(2)}.follow` : key, arr)
   return game.freshPlayer(key, arr as readonly Entry<string>[]) ?? ''
 }
+/** Линия игрока из плоского пула вместе с её номером: ответ окна подбирается по выбранной строке,
+ *  а не колодой (#1017). Номер уезжает с arg, как у угрозы «до Страсбурга» (#982). */
+const fromArrNum = (game: ContentApi, key: string, arr: readonly string[], set: (i: number) => void): string => {
+  requirePlayerPool(key, arr)
+  return game.playerLine(() => {
+    const raw = game.draw(key, arr)
+    set(arr.indexOf(raw))
+    return raw
+  })
+}
 
 
 const offer = (o: OfferSpec): R => ({
@@ -146,8 +156,24 @@ export const choiceRules: R[] = [
   offer({ name: 'CrewCall', when: [lte('sinceCrew', CREW_FRESH_TURNS)], act: 'crewCall', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_CREW_CALL', P_CREW_CALL) }),
   offer({ name: 'LawyerFirst', when: [is('lawyerFresh')], act: 'lawyerAsk', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_LAWYER', P_LAWYER) }),
   offer({ name: 'CollectorsAsk', when: [is('collectorsAskFresh')], act: 'collectorsAsk', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_COLLECTORS_ASK', P_COLLECTORS_ASK) }),
-  offer({ name: 'InternOffer', when: [is('internFresh')], act: 'internOffer', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_INTERN', P_INTERN) }),
-  offer({ name: 'RubikHole', when: [is('rubikHoleFresh')], act: 'rubikHole', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_HOLE', P_HOLE) }),
+  // ответ по выбранной строке, а не колодой (#1017): согласие/отказ стажёра и «ровно/криво/за плату»
+  // получают свой ответ B-пула — номер выбранной строки уезжает с arg
+  ...(() => {
+    let arg = ''
+    return [offer({
+      name: 'InternOffer', when: [is('internFresh')], act: 'internOffer', tone: 'neutral', bonus: 3,
+      text: (g) => fromArrNum(g, 'P_INTERN', P_INTERN, (i) => { arg = String(i) }),
+      arg: () => arg,
+    })]
+  })(),
+  ...(() => {
+    let arg = ''
+    return [offer({
+      name: 'RubikHole', when: [is('rubikHoleFresh')], act: 'rubikHole', tone: 'neutral', bonus: 3,
+      text: (g) => fromArrNum(g, 'P_HOLE', P_HOLE, (i) => { arg = String(i) }),
+      arg: () => arg,
+    })]
+  })(),
   // дебюты участников (#973): первое сообщение персонажа — ход и три после, пул — только у тех, у кого 2+ строки.
   // bonus 5: на rude-пути окно конкурирует с извинением (6) и мычанием (6) — дебют должен попадать в блок.
   // Пул Арсена под воротами (#982): пустой пул даёт пустой текст — freshFromArr, не draw
@@ -164,7 +190,8 @@ export const choiceRules: R[] = [
   offer({ name: 'Countersuit', when: [is('countersuitFresh')], act: 'countersuitAsk', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_COUNTERSUIT', P_COUNTERSUIT) }),
 
   // ответ на то, ЧТО прислал Алик
-  offer({ name: 'Photo', when: [eq('ctx.type', 'photo')], act: 'photo', tone: 'neutral', bonus: 3, text: (g) => fromD(g, 'P_PHOTO') }),
+  // фото «платёжки» — заметное событие с окном отклика (#1017): кнопка из пула реакций живёт и когда ctx ушёл дальше
+  offer({ name: 'Photo', when: [is('photoFresh')], act: 'photo', tone: 'neutral', bonus: 3, text: (g) => fromD(g, 'P_PHOTO') }),
   offer({ name: 'VoiceCow', slot: 'voice', weight: 0.4, when: [eq('ctx.type', 'voice')], act: 'voice', tone: 'neutral', bonus: 3, text: (g) => fromD(g, 'P_VOICE') }),
   offer({ name: 'VoiceText', slot: 'voice', weight: 0.6, when: [eq('ctx.type', 'voice')], act: 'voiceText', tone: 'neutral', bonus: 3, text: (g) => fromD(g, 'P_VOICE2') }),
   // перевод 50 ₽ — заметное событие с окном отклика (#1003): кнопка из пула реакций живёт и когда ctx ушёл дальше
