@@ -50,18 +50,22 @@ export const billRules: R[] = [
     name: 'Beat_LightOff', event: 'StoryBeat', when: [named('beatLightOffFresh', is(lightOff), answeredWithText)], once: true, priority: 'chatter',
     respond: async ({ game }) => {
       await game.say(['Свет отключили? Брат, это знак — экономь. Я тоже экономлю: не плачу.'])
+      // карточка чужой темы не оставляет чужой ctx (#1000, заметка 14): сомнение в отмазке не отвечает свету
+      game.setCtx(null)
     },
   },
   {
     name: 'Beat_NetRation', event: 'StoryBeat', when: [named('beatNetRationFresh', is(netRation), answeredWithText)], once: true, priority: 'chatter',
     respond: async ({ game }) => {
       await game.say(['Интернет по талонам? Пиши короче. «Мууу» — один талон.'])
+      game.setCtx(null)
     },
   },
   {
     name: 'Beat_PhoneWarn', event: 'StoryBeat', when: [named('beatPhoneWarnFresh', is(phoneWarn), answeredWithText)], once: true, priority: 'chatter',
     respond: async ({ game }) => {
       await game.say(['Оператор пишет, что ты ему должен. Знакомое чувство.'])
+      game.setCtx(null)
     },
   },
 ]

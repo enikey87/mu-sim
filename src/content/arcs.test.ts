@@ -309,8 +309,8 @@ describe('вопрос «уже случилось?» только перед с
     await followBefore('grant', 'Грант заплатил?', /заплатил|оплачено/, 'Что там заказчик?')
     await followBefore('razmik', 'Размик слез?', /Размик слез!/, 'Как там Размик?', { when: /лаваш/, has: 'Размик ещё на кране?' })
     await followBefore('niva', '«Нива» нашлась?', /«Нива» вернулась!/, 'Есть новости про «Ниву»?', { when: /Гюмри/, has: 'Где «Нива»?' })
-    // контрольная строка — без ворот: «Как там свадьба?» с #831 требует объявленной свадьбы (первую серию)
-    await followBefore('samvel', 'Самвел ещё женится?', /Самвел женится снова/, 'Тамада гуляет, а плачу я?')
+    // контрольная строка — без ворот: с #831 требует объявленной свадьбы (первую серию); «снова», не «ещё» — к серии Самвел уже развёлся (#1000)
+    await followBefore('samvel', 'Самвел снова женится?', /Самвел женится снова/, 'Тамада гуляет, а я жду. Так нечестно.')
   })
 })
 
@@ -356,22 +356,22 @@ describe('вопрос про развязку Самвела — только �
     const { game } = makeGame()
     for (const i of at()) {
       const lines = game.open(ARCS.samvel.follow)
-      expect(lines, `серия ${i}`).toContain('Тамада гуляет, а плачу я?')
-      if (i === 7) expect(lines, 'перед развязкой').toContain('Самвел ещё женится?')
-      else expect(lines, `до развязки, серия ${i}`).not.toContain('Самвел ещё женится?')
+      expect(lines, `серия ${i}`).toContain('Тамада гуляет, а я жду. Так нечестно.')
+      if (i === 7) expect(lines, 'перед развязкой').toContain('Самвел снова женится?')
+      else expect(lines, `до развязки, серия ${i}`).not.toContain('Самвел снова женится?')
       game.S.day += 5
       await game.playArc('samvel')
     }
     // после развязки вопроса тоже нет — он отвечен
-    expect(game.open(ARCS.samvel.follow)).not.toContain('Самвел ещё женится?')
+    expect(game.open(ARCS.samvel.follow)).not.toContain('Самвел снова женится?')
   })
 
   // негативный контроль: та же строка без gate открыта на любой серии — значит, кнопку убирает именно гейт
   it('снятие номера серии возвращает кнопку: строка без gate видна и до развязки', async () => {
     const { game } = makeGame()
-    const bare = [...ARCS.samvel.follow.slice(0, 3), 'Самвел ещё женится?'] as Entry<string>[]
+    const bare = [...ARCS.samvel.follow.slice(0, 3), 'Самвел снова женится?'] as Entry<string>[]
     for (let i = 0; i < 5; i++) {
-      expect(game.open(bare), `серия ${i}`).toContain('Самвел ещё женится?')
+      expect(game.open(bare), `серия ${i}`).toContain('Самвел снова женится?')
       game.S.day += 5
       await game.playArc('samvel')
     }
