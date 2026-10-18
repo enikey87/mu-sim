@@ -54,7 +54,7 @@ import { classifyUserInput, legalClaim, type ClassifiedInput } from './input'
 import { track, left, shown, type Phase } from '../analytics/metrics'
 import { holidayOf, holidayGreetKey, holidayDays, HOLIDAY_EXCUSES } from '../content/holidays'
 import { dueIn, dateOf, fmtDate, fmtDayMonth, fmtShortDate, fmtTime, weekOf, nightHour, periodOf, tierOf, TIERS, type Due, type Period } from './time'
-import { type GameState, type BankWeek, type Msg, type NewMsg, type Card, type PhoneEvent, type Choice, type Ctx, type Tone, type Storage, type InputCategory, freshState, loadState, saveState, SAVE_KEY, LEND50_SEEN_KEY, MAX_PATIENCE, isLate, countOf, setCount, type PromiseRec } from './state'
+import { type GameState, type BankWeek, type Msg, type NewMsg, type Card, type PhoneEvent, type Choice, type Ctx, type Tone, type Storage, type InputCategory, freshState, loadState, saveState, SAVE_KEY, LEND50_SEEN_KEY, MAX_PATIENCE, ARC_MARINATION_DAYS, START_DAY, isLate, countOf, setCount, type PromiseRec } from './state'
 
 /** Текст срока как буквальный шаблон без учёта регистра; кэш — topicOfLast зовётся из facts() на каждую реплику. */
 const LITERAL = new Map<string, RegExp>()
@@ -1481,9 +1481,16 @@ export class Game {
   }
 
   // ---------- факты для правил ----------
+  /** Маринование первой арки (#1004): пока не начат ни один сериал, первые дни — только шаблонные отмазки;
+   *  считает окно в одном месте: сериал ждёт (`availableArcs`) и родня не пишет (факт `arcsMature`). */
+  private marinating(): boolean {
+    return Object.keys(this.S.arcs).length === 0 && this.S.day - START_DAY < ARC_MARINATION_DAYS
+  }
   availableArcs(): string[] {
     // when проверяем по mem+day, не через facts(): там arcAvailable → availableArcs
     const { mem, day } = this.S
+    // маринование первой арки (#1004): первые дни — шаблонные отмазки, сериал ждёт; задержка — здесь, в одном месте
+    if (this.marinating()) return []
     const fact = (key: string) => key === 'day' ? day : Object.prototype.propertyIsEnumerable.call(mem, key) ? mem[key] : undefined
     return Object.keys(ARCS).filter((id) => {
       const a = ARCS[id]
@@ -1611,6 +1618,8 @@ export class Game {
       somedayCount: S.promises.filter((p) => p.due == null && !p.condition).length,
       // сама — не больше одной серии в день: три легенды денег за день — уже не сюжет, а шум
       arcAvailable: this.availableArcs().length > 0 && !Object.values(S.arcs).some((a) => a.last === S.day),
+      // маринование первой арки (#1004): в первые дни родня не пишет — групповой чат ждёт, как и сериал
+      arcsMature: !this.marinating(),
       // начатая линия коллекторов идёт своим битом, но той же нормой: не больше серии в день (#324)
       collectorsCanAdvance: this.arcCanAdvance('collectors') && !Object.values(S.arcs).some((a) => a.last === S.day),
       arcsStarted: Object.keys(S.arcs).length,

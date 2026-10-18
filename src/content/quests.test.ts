@@ -1,6 +1,7 @@
 // Мини-квесты: каждый проходится до конца за 2–3 хода; запускаются из разговора; первый сериал — в первые ходы.
 import { describe, it, expect } from 'vitest'
 import { makeGame } from '../test/helpers'
+import { START_DAY, ARC_MARINATION_DAYS } from '../engine/state'
 import { QUESTS, STARTS } from './quests'
 import { ACH } from './achievements'
 
@@ -50,6 +51,7 @@ describe('начало игры и сериалы', () => {
   it('сюжетный ход запускает первый сериал, даже если игрок только спорит', async () => {
     const { game } = makeGame()
     game.S.stats.sent = 3
+    game.S.day = START_DAY + ARC_MARINATION_DAYS // окно маринования первой арки (#1004) не предмет этой проверки
     let r
     for (let i = 0; i < 20 && r !== 'Beat_FirstArc'; i++) r = (await game.fire('StoryBeat'))?.name
     expect(r).toBe('Beat_FirstArc')

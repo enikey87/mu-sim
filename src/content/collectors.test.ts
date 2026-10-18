@@ -1,6 +1,7 @@
 // Коллекторы после credit.broke: мини-сериал, перевербовка, микрозайм молчит (#128).
 import { describe, it, expect } from 'vitest'
 import { makeGame, setMoney } from '../test/helpers'
+import { START_DAY, ARC_MARINATION_DAYS } from '../engine/state'
 import { collectorsRecruited, collectorsTurned, creditBroke, endgame, intro, paydayScene, threatClaim } from './memkeys'
 import { loanTaken, loanDueAt } from './credit'
 import { D } from './excuses'
@@ -21,6 +22,7 @@ describe('коллекторы (#128)', () => {
 
   it('без credit.broke сериал в пуле nextArc не появляется', () => {
     const { game } = makeGame()
+    game.S.day = START_DAY + ARC_MARINATION_DAYS // окно маринования первой арки (#1004) не предмет этой проверки
     expect(game.availableArcs()).not.toContain('collectors')
     game.S.mem[creditBroke] = true
     expect(game.availableArcs()).toContain('collectors')

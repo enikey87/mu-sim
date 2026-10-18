@@ -13,6 +13,9 @@ export const DEBT0 = 240000
 export const START_MONEY = 28000
 export const MAX_PATIENCE = 5
 export const START_DAY = 184
+/** Дней «маринования» до первой арки (#1004): первые дни — только шаблонные отмазки Алика,
+ *  без сериалов, легенд и родни; задержка считается в `availableArcs` и `facts` — в одном месте. */
+export const ARC_MARINATION_DAYS = 6
 
 export type Tone = 'polite' | 'neutral' | 'rude' | 'threat' | 'cow'
 export type InputCategory =
