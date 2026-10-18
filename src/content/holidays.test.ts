@@ -2,7 +2,9 @@
 import { describe, it, expect } from 'vitest'
 import { makeGame, alikTexts } from '../test/helpers'
 import { FWD, FWD_HOLIDAY, NOTIF } from './life'
-import { holidayOf, holidayGreetKey, HOLIDAY_EXCUSES } from './holidays'
+import { holidayOf, holidayGreetKey, HOLIDAY_EXCUSES, HOLIDAY_MONEY } from './holidays'
+import type { Line } from './fact'
+
 import { dateOf } from '../engine/time'
 import { endgame } from './memkeys'
 import { spec } from '../engine/rules'
@@ -77,7 +79,8 @@ describe('праздники', () => {
       else delete game.S.mem[endgame.active]
       return game.lines.eligible('HOLIDAY', HOLIDAY_EXCUSES, game.lineFacts()).map((p) => p.text)
     }
-    expect(holidayLine(289).length).toBe(3)
+    // январская строка про сейф ждёт живой легенды сейфа (#1041) — её проверяет отдельный тест
+    expect(holidayLine(289).length).toBe(2)
     expect(holidayLine(355).length).toBe(3)
     expect(holidayLine(184)).toEqual([])
     expect(holidayLine(289, true)).toEqual([])
@@ -88,6 +91,24 @@ describe('праздники', () => {
     const from = game.S.msgs.length
     await game.excuseTurn()
     expect(allowed).toContain(alikTexts(game.S.msgs.slice(from)).join(' '))
+  })
+
+  it('строки про сейф в праздниках ждут живой легенды сейфа (#1041)', () => {
+    const { game } = makeGame({ seed: 7 })
+    const texts = (day: number, lines: readonly Line[]): string[] => {
+      game.S.day = day
+      delete game.S.mem[endgame.active]
+      return game.lines.eligible('HOLIDAY', lines, game.lineFacts()).map((p) => p.text)
+    }
+    const safe = (t: string) => /сейф/i.test(t)
+    expect(texts(287, HOLIDAY_EXCUSES).filter(safe), 'декабрьская отмазка про сейф без легенды').toEqual([])
+    expect(texts(289, HOLIDAY_EXCUSES).filter(safe), 'январская отмазка про сейф без легенды').toEqual([])
+    // ответы на упрёк про деньги сейф не поминают вовсе — день знают, а сейфа не обещают
+    expect(texts(287, HOLIDAY_MONEY.newYear).filter(safe), 'ответ про сейф на упрёк').toEqual([])
+    expect(texts(333, HOLIDAY_MONEY.trndez).filter(safe), 'трндезная строка про сейф').toEqual([])
+    game.setLegend('safe_nune', 'nune')
+    expect(texts(287, HOLIDAY_EXCUSES).some(safe), 'с легендой декабрьской отмазки про сейф нет').toBe(true)
+    expect(texts(289, HOLIDAY_EXCUSES).some(safe), 'с легендой январской отмазки про сейф нет').toBe(true)
   })
 
   it('окно: праздник звучит хотя бы раз, и тайл хода поздравляет один раз за праздник', async () => {
