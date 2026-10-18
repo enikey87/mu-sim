@@ -39,7 +39,7 @@ export const categoryIcon = (t: ReviewCategory): string => CATEGORIES.find((c) =
 export const reviewRequested = (search: string): boolean => new URLSearchParams(search).has(REVIEW_PARAM)
 
 /** Хранилище заметок: sessionStorage, но игра не падает, если его нет (приватный режим, чужая среда). */
-type NoteStore = Pick<Storage, 'getItem' | 'setItem'>
+type NoteStore = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 const store = (): NoteStore | null => {
   try {
     return typeof sessionStorage === 'undefined' ? null : sessionStorage
@@ -61,6 +61,14 @@ export function saveNotes(notes: readonly ReviewNote[], s: NoteStore | null = st
     s?.setItem(REVIEW_KEY, JSON.stringify(notes))
   } catch {
     /* хранилище недоступно — заметки останутся в памяти до перезагрузки */
+  }
+}
+/** Новая партия не наследует заметки: перезагрузка той же партии их хранит. */
+export function clearNotes(s: NoteStore | null = store()): void {
+  try {
+    s?.removeItem(REVIEW_KEY)
+  } catch {
+    /* нет хранилища — стирать нечего */
   }
 }
 /** Следующий id: заметки не удаляются молча, поэтому нумерация продолжается, а не переиспользуется. */
