@@ -6,7 +6,7 @@ import type { GameEvent, Offer } from './events'
 import { COURT, COURT_AFTER, COURT_LAWYER_AGAIN, COURT_VERDICT_AFTER_LETTER } from '../quests'
 import { THREAT_AGAIN } from '../misc'
 import { meet } from '../world'
-import { count, court, courtReferral, intro, lawyerAt, paydayScene, saidStrasburg, threatClaim } from '../memkeys'
+import { count, court, courtReferral, lawyerAt, paydayScene, saidStrasburg, threatClaim, wrote } from '../memkeys'
 
 type R = Rule<ContentApi, GameEvent, Offer>
 const threat = eq('tone', 'threat')
@@ -45,9 +45,10 @@ export const courtRules: R[] = [
     name: 'Court_Start', event: 'PlayerMessage', when: [threat], remember: [add(count.threat), set(court, 1)],
     respond: async ({ game }) => { game.mood(-1); await game.say([game.uniq(game.X.threat)]); game.goOffline(1) },
   },
-  // ступень 1 — юрист: здесь Арсен входит в историю, если его ещё не было
+  // ступень 1 — юрист: здесь Арсен входит в историю, если сам ещё не писал (#1017: упоминание в бетоне
+  // ставит intro, но не письмо — «здравствуйте, это Арсен» остаётся верным, а «снова» — нет)
   {
-    name: 'Court_Lawyer', event: 'PlayerMessage', when: [threat, eq(court, 1), missing(intro('arsen'))], bonus: 1,
+    name: 'Court_Lawyer', event: 'PlayerMessage', when: [threat, eq(court, 1), missing(wrote('arsen'))], bonus: 1,
     remember: [add(count.threat), add(court), ...meet('arsen')],
     respond: async ({ game, facts }) => {
       game.unlock('memory')
@@ -58,13 +59,13 @@ export const courtRules: R[] = [
     },
   },
   {
-    name: 'Court_Lawyer_Again', event: 'PlayerMessage', when: [threat, eq(court, 1), is(intro('arsen'))], bonus: 1,
+    name: 'Court_Lawyer_Again', event: 'PlayerMessage', when: [threat, eq(court, 1), is(wrote('arsen'))], bonus: 1,
     remember: [add(count.threat), add(court)],
     respond: async ({ game, facts }) => {
       game.unlock('memory')
       strasbourgSaid(game, facts)
       await saySaid(game, referred(game, COURT_LAWYER_AGAIN))
-      // первое сообщение юриста — и когда Арсен уже был знаком (#971)
+      // первое сообщение юриста — и когда Арсен уже писал сам (#971): «снова» только по настоящему письму
       game.applyFacts([set(lawyerAt, Number(facts.sent))])
     },
   },
