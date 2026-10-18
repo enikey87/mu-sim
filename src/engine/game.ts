@@ -1,6 +1,6 @@
 // Игра: состояние, сообщения, ход Алика, «живость». Решения — что ответить, что предложить игроку,
 // что сделать Алику — принимает система правил (engine/rules/, content/rules/*).
-import { make, D, low, cap, type ExcuseApi, type Promise3, type PromiseCondition, type Rel, type When } from '../content/excuses'
+import { make, D, TRANSFER_FRESH_TURNS, low, cap, type ExcuseApi, type Promise3, type PromiseCondition, type Rel, type When } from '../content/excuses'
 import { makeScenes, invKey, type Scene, type Line } from '../content/scenes'
 import { COLD_WAR, TRIBUNAL } from '../content/rude'
 import { MIRROR, MIRROR_AGAIN, MIRROR_OPEN, MIRROR_REPLY, type Mirror } from '../content/mirror'
@@ -1588,6 +1588,9 @@ export class Game {
       collectorsAskFresh: S.stats.sent - Number(S.mem[memkeys.collectorsAskAt] ?? -99) <= 3,
       internFresh: S.stats.sent - Number(S.mem[memkeys.internAt] ?? -99) <= 3,
       rubikHoleFresh: S.stats.sent - Number(S.mem[memkeys.rubikHoleAt] ?? -99) <= 3,
+      // перевод 50 ₽ (#1003): реакция на него — ход перевода и ещё TRANSFER_FRESH_TURNS; сумма — для подстановки
+      transferFresh: S.stats.sent - Number(S.mem[memkeys.transferAt] ?? -99) <= TRANSFER_FRESH_TURNS,
+      transferAmount: Number(S.mem[memkeys.transferAmount] ?? 50),
       countersuitFresh: S.stats.sent - Number(S.mem[memkeys.countersuitAt] ?? -99) <= 3,
       // первое сообщение заказчика Гранта (#983): ход реплики и три после
       grantTileFresh: S.stats.sent - Number(S.mem[memkeys.grantTileAt] ?? -99) <= 3,
@@ -2224,6 +2227,9 @@ export class Game {
     const amount = Number(this.S.mem[memkeys.nextTransfer] ?? 50)
     delete this.S.mem[memkeys.nextTransfer]
     this.alikMsg({ kind: 'transfer', from: 'alik', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE), amount })
+    // перевод — заметное событие с окном отклика (#1003): штамп хода, кнопка реакции не зависит от ctx
+    this.S.mem[memkeys.transferAt] = this.S.stats.sent
+    this.S.mem[memkeys.transferAmount] = amount
     this.S.ctx = { type: 'transfer', amount }
     if (this.adjustDebt(-amount)) {
       this.adjustMoney(amount, 'Перевод от Алика')
@@ -3064,6 +3070,9 @@ export class Game {
         if (!this.adjustDebt(-50)) return // после выплаты перевода нет — и пузыря тоже
         this.adjustMoney(50, 'Перевод от Алика')
         this.noteAlikPay(50)
+        // перевод из пачки — тот же факт-ход (#1003)
+        this.S.mem[memkeys.transferAt] = this.S.stats.sent
+        this.S.mem[memkeys.transferAmount] = 50
         deliver({ kind: 'transfer', from: 'alik', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE), amount: 50 })
         return
       case 'formality': for (const text of this.formalityLines()) deliver({ kind: 'text', from: 'alik', text: saidText(text) }, saidClaims(text)); return

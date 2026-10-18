@@ -257,6 +257,8 @@ export const DIRECT: Record<string, DirectCase> = {
   // #982 (пул дебюта Арсена ждёт события трека) — ответ окну дебюта в выборках больше не собирается
   Says_debutArsen: { event: 'PlayerSays', facts: { intent: 'debutArsen' } },
   Scene_lend: { event: 'PickScene', setup: (g) => { g.S.mood = 4 } }, // денег в свежей партии хватает (START_MONEY)
+  // #1003 (окно перевода) сдвинуло выборки — сцена заказчика ушла из них, держим прямым случаем
+  Scene_customer: { event: 'PickScene', setup: (g) => { g.S.day = 220 } },
   // Scene_newjob: с #826 срабатывает в выборках сам (8 партий при пороге 7) — прямой случай не нужен
   Scene_loan: { event: 'PickScene', setup: (g) => { g.S.day = 230 } },
   // #762: барахолка получила вес 5 — на чужих семействах сидов (`rules:stable`) «смертный одр» и траурный

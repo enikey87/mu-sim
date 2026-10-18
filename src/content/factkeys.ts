@@ -23,7 +23,7 @@ import {
   betonSet, cardSent, saidTomorrow, saidFriday, saidKonak, payday, count, endgame, holidayGreeted, lend50,
   paydayScene, lightOff, netRation, phoneWarn, creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited,
   collectorsTurned,
-  criticalAt, creditOfferSum, crewPaid, crewPaidAt, moneyAskAt, rubikBath, whenYears, ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt, countersuitAt, grantTileAt,
+  criticalAt, creditOfferSum, crewPaid, crewPaidAt, moneyAskAt, rubikBath, whenYears, ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt, countersuitAt, grantTileAt, transferAt, transferAmount,
   debutWho, debutAt, arsenTrack,
 } from './memkeys'
 import { momDachaAt, momDachaDays, type LoanId, type MomId, type ThingId } from './credit'
@@ -57,7 +57,7 @@ export type MemExactKey =
   | typeof borisSmetaReady | typeof taxFrozen | typeof taxThawed | typeof actSigned | typeof grantPaid
   | typeof rubikFined | typeof threatClaim | typeof nuneKeyPassed | typeof nuneDekretOver | typeof grandpaDying
   | typeof betonSet | typeof cardSent | typeof saidTomorrow | typeof saidFriday | typeof saidKonak | typeof paydayScene
-  | typeof debutWho | typeof debutAt | typeof arsenTrack
+  | typeof debutWho | typeof debutAt | typeof arsenTrack | typeof transferAt | typeof transferAmount
   | typeof lightOff | typeof netRation | typeof phoneWarn | typeof holidayGreeted
   | typeof creditStage | typeof creditOffer | typeof creditBroke | typeof momDone | typeof creditDeclined | typeof moneyPoor | typeof collectorsRecruited
   | typeof collectorsTurned
