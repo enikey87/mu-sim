@@ -20,6 +20,7 @@ import { HEAT, alikDead, alikShaved, intro, moustacheAskAt, blocked, court, mour
 import { requirePlayerPool } from '../player-pools'
 import {
   P_VIA_BORIS, P_VIA_KARINE, P_VIA_MAMA, P_MOO, P_MOUSTACHE, P_COURT, P_COLLECTORS_DEBUT,
+  STRASBOURG_THREAT,
   P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE,
   P_CREW_CALL, P_LAWYER, P_COLLECTORS_ASK, P_INTERN, P_HOLE, P_COUNTERSUIT,
   P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_BORIS, P_DEBUT_NIVA, P_GRANT_TILE,
@@ -148,8 +149,9 @@ export const choiceRules: R[] = [
   offer({ name: 'InternOffer', when: [is('internFresh')], act: 'internOffer', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_INTERN', P_INTERN) }),
   offer({ name: 'RubikHole', when: [is('rubikHoleFresh')], act: 'rubikHole', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_HOLE', P_HOLE) }),
   // дебюты участников (#973): первое сообщение персонажа — ход и три после, пул — только у тех, у кого 2+ строки.
-  // bonus 5: на rude-пути окно конкурирует с извинением (6) и мычанием (6) — дебют должен попадать в блок
-  offer({ name: 'DebutArsen', when: [is('debutFresh'), eq('debutWho', 'arsen')], act: 'debutArsen', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_DEBUT_ARSEN', P_DEBUT_ARSEN) }),
+  // bonus 5: на rude-пути окно конкурирует с извинением (6) и мычанием (6) — дебют должен попадать в блок.
+  // Пул Арсена под воротами (#982): пустой пул даёт пустой текст — freshFromArr, не draw
+  offer({ name: 'DebutArsen', when: [is('debutFresh'), eq('debutWho', 'arsen')], act: 'debutArsen', tone: 'neutral', bonus: 5, text: (g) => freshFromArr(g, 'P_DEBUT_ARSEN', P_DEBUT_ARSEN) }),
   offer({ name: 'DebutSamvel', when: [is('debutFresh'), eq('debutWho', 'samvel')], act: 'debutSamvel', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_DEBUT_SAMVEL', P_DEBUT_SAMVEL) }),
   offer({ name: 'DebutBoris', when: [is('debutFresh'), eq('debutWho', 'boris')], act: 'debutBoris', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_DEBUT_BORIS', P_DEBUT_BORIS) }),
   offer({ name: 'DebutNiva', when: [is('debutFresh'), eq('debutWho', 'niva')], act: 'debutNiva', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_DEBUT_NIVA', P_DEBUT_NIVA) }),
@@ -270,11 +272,22 @@ export const choiceRules: R[] = [
     text: (g, f) => { const key = 'F_' + f['ctx.arc']; const arr = ARCS[String(f['ctx.arc'])].follow; return g.freshPlayer(key, arr) ?? '' }, arg: (_g, f) => String(f['ctx.arc']),
     topic: (_g, f) => `arc:${String(f['ctx.arc'])}`,
   }),
-  // дело в суде открыто — игрок может его продолжить (угроза двигает линию суда)
-  offer({
-    name: 'Court', when: [gte(court, 1), lte(court, 6)], odds: 0.35, tone: 'threat',
-    text: (g) => fromArr(g, 'P_COURT', P_COURT),
-  }),
+  // дело в суде открыто — игрок может его продолжить (угроза двигает линию суда);
+  // выбранная строка «до самого Страсбурга» уходит с arg — судовая ветка ставит по ней факт оглашения (#982)
+  ...(() => {
+    let arg = ''
+    return [offer({
+      name: 'Court', when: [gte(court, 1), lte(court, 6)], odds: 0.35, tone: 'threat',
+      text: (g) => {
+        requirePlayerPool('P_COURT', P_COURT)
+        let raw = ''
+        const t = g.playerLine(() => (raw = g.draw('P_COURT', P_COURT)))
+        arg = raw === STRASBOURG_THREAT ? 'strasbourg' : ''
+        return t
+      },
+      arg: () => arg,
+    })]
+  })(),
   // «Это корова?» — только сразу после «Мууу», а не всю игру
   // ответить на то, что только что прозвучало: реплику легенды денег, вмешавшегося персонажа, воспоминание Алика,
   // реплику серии («колкость» #683 — окно держит проверка said в паре) или форму клятвы

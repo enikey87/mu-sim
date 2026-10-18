@@ -15,7 +15,7 @@ import { invoiceItems, invKey } from './scenes'
 import {
   ACTOR_KEYS, EVENT_KEYS, MEM_KEYS, type EventKey, type ActorKey,
   HEAT, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, evicted,
-  vendetta, court, courtVerdict, courtReferral, judgeApology, ritualCount, ritualCut, caughtCount, caughtAt, garikDenied, cryptoHodl,
+  vendetta, court, courtVerdict, courtReferral, judgeApology, saidStrasburg, ritualCount, ritualCut, caughtCount, caughtAt, garikDenied, cryptoHodl,
   bathAsked, mamaCalls, phoneKarine, karineKnowsDebt, karineThinksTax, alikShaved, moustacheKept, moustacheAskAt, alikDay, mooAt, sorryAt, rudeAt, thanksAt, topicRun, topicLast,
   legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway, nivaPlayer, carGone,
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, taxFrozen, taxThawed,
@@ -24,7 +24,7 @@ import {
   paydayScene, lightOff, netRation, phoneWarn, creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited,
   collectorsTurned,
   criticalAt, creditOfferSum, crewPaid, crewPaidAt, moneyAskAt, rubikBath, whenYears, ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt, countersuitAt, grantTileAt,
-  debutWho, debutAt,
+  debutWho, debutAt, arsenTrack,
 } from './memkeys'
 import { momDachaAt, momDachaDays, type LoanId, type MomId, type ThingId } from './credit'
 import { valueOf } from '../engine/rules'
@@ -48,7 +48,7 @@ export type BillField = 'dueAt' | 'due' | 'unpaid' | 'streak'
 export type MemExactKey =
   | typeof HEAT | typeof blocked | typeof blockedHint | typeof statusHidden | typeof polite | typeof bloodGiven
   | typeof alikDead | typeof mourning | typeof evicted | typeof vendetta | typeof court | typeof courtVerdict
-  | typeof courtReferral | typeof judgeApology | typeof ritualCount | typeof ritualCut | typeof caughtCount | typeof caughtAt | typeof garikDenied | typeof cryptoHodl
+  | typeof courtReferral | typeof judgeApology | typeof saidStrasburg | typeof ritualCount | typeof ritualCut | typeof caughtCount | typeof caughtAt | typeof garikDenied | typeof cryptoHodl
   | typeof bathAsked | typeof mamaCalls | typeof phoneKarine | typeof karineKnowsDebt | typeof karineThinksTax | typeof alikShaved | typeof moustacheKept | typeof moustacheAskAt | typeof alikDay | typeof mooAt | typeof sorryAt
   | typeof rudeAt | typeof thanksAt | typeof topicRun | typeof topicLast | typeof legendPromiseAt
   | typeof legendId | typeof legendDay | typeof legendArc | typeof nextTransfer | typeof tileCornerRemoved
@@ -57,7 +57,7 @@ export type MemExactKey =
   | typeof borisSmetaReady | typeof taxFrozen | typeof taxThawed | typeof actSigned | typeof grantPaid
   | typeof rubikFined | typeof threatClaim | typeof nuneKeyPassed | typeof nuneDekretOver | typeof grandpaDying
   | typeof betonSet | typeof cardSent | typeof saidTomorrow | typeof saidFriday | typeof saidKonak | typeof paydayScene
-  | typeof debutWho | typeof debutAt
+  | typeof debutWho | typeof debutAt | typeof arsenTrack
   | typeof lightOff | typeof netRation | typeof phoneWarn | typeof holidayGreeted
   | typeof creditStage | typeof creditOffer | typeof creditBroke | typeof momDone | typeof creditDeclined | typeof moneyPoor | typeof collectorsRecruited
   | typeof collectorsTurned
