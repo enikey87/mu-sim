@@ -13,7 +13,7 @@ import { intro } from './memkeys'
 import * as W from './world'
 import {
   RAM_PHOTO, BORIS_SALE, VACANCY, AVITO_REVIEW, RUBIK_ASK, KETTLE,
-  CREW_CALL_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, GRANT_TILE_B, DEBUT_NIVA_B, DEBUT_BORIS_B, MOUSTACHE_PHOTO_B, MAMA_MARKET_B, GRANT_HOUSE_B,
+  CREW_CALL_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, GRANT_TILE_B, DEBUT_NIVA_B, DEBUT_BORIS_B, MOUSTACHE_PHOTO_B, MAMA_MARKET_B, SAMVEL_DIVORCE_B, GRANT_HOUSE_B,
   LAWYER_B, COLLECTORS_ASK_B, INTERN_B, HOLE_B, COUNTERSUIT_B,
 } from './world'
 
@@ -84,6 +84,9 @@ const WINDOWS: Window[] = [
   // конец квеста «мама на рынке» (#1030): мама приходит квестом, своих меток пул не требует
   { pool: 'P_MAMA_MARKET', lines: PP.P_MAMA_MARKET, marks: {} },
   { pool: 'MAMA_MARKET_B', lines: MAMA_MARKET_B, marks: {} },
+  // развод дяди Самвела (#1037): конверт введён легендой свадьбы (#1016) — строки с ним несут гейт
+  { pool: 'P_SAMVEL_DIVORCE', lines: PP.P_SAMVEL_DIVORCE, marks: { конверт: 'heard.samvel_envelopes' } },
+  { pool: 'SAMVEL_DIVORCE_B', lines: SAMVEL_DIVORCE_B, marks: { конверт: 'heard.samvel_envelopes' } },
   // фото «платёжки» (#1017): отклик на событие Turn_Photo — баран и «Арарат» тема самого события, меток нет
   { pool: 'D.P_PHOTO', lines: D.P_PHOTO, marks: {} },
   { pool: 'D.PHOTO_A', lines: D.PHOTO_A, marks: {} },
