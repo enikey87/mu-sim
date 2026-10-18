@@ -3,7 +3,7 @@
 // участник, умеющий писать сам (SPEAKS), обязан быть здесь или в исключениях с причиной — новый
 // участник красит сюит на месте, а не в плейтесте через раунд. Офферы и потребление окна ответом —
 // как были (#951), тексты пулов не менялись.
-import { avitoReviewAt, borisSaleAt, collectorsAskAt, countersuitAt, crewPaidAt, grantHouseAt, grantTileAt, internAt, kettleAt, lawyerAt, mamaMarketAt, mooAt, moustachePhotoAt, photoAt, ramPhotoAt, rubikAskAt, rubikHoleAt, samvelDivorceAt, transferAt, vacancyAt } from './memkeys'
+import { avitoReviewAt, borisSaleAt, collectorsAskAt, countersuitAt, courtVerdictAt, crewPaidAt, grantHouseAt, grantTileAt, internAt, kettleAt, lawyerAt, mamaMarketAt, mooAt, moustachePhotoAt, photoAt, ramPhotoAt, rubikAskAt, rubikHoleAt, samvelDivorceAt, transferAt, vacancyAt } from './memkeys'
 
 /** Общий дебютный слот (#973): `wrote.<who>`/`debutWho`/`debutAt` ставит первое сообщение участника. */
 export const DEBUT_SLOT = 'debut'
@@ -82,4 +82,5 @@ export const EVENT_SOURCES: readonly EventSource[] = [
   { source: 'смена фото без усов (Due_StakeShave / Condition_StakeShave)', at: moustachePhotoAt, offer: 'MoustachePhoto', pool: 'P_MOUSTACHE_PHOTO' },
   { source: 'конец квеста «мама на рынке» (q_mama, узел drive)', at: mamaMarketAt, offer: 'MamaMarket', pool: 'P_MAMA_MARKET' },
   { source: 'развод дяди Самвела на свадьбе (серия samvel, stamp)', at: samvelDivorceAt, offer: 'SamvelDivorce', pool: 'P_SAMVEL_DIVORCE' },
+  { source: 'вердикт суда (сцена court, узлы debt/screens/moo, stamp)', at: courtVerdictAt, offer: 'CourtVerdict', pool: 'P_COURT_VERDICT' },
 ]

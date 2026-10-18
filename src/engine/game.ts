@@ -1604,6 +1604,8 @@ export class Game {
       mamaMarketFresh: S.stats.sent - Number(S.mem[memkeys.mamaMarketAt] ?? -99) <= 3,
       // развод дяди Самвела на свадьбе (#1037): событие серии — отклик живёт ход события и три после
       samvelDivorceFresh: S.stats.sent - Number(S.mem[memkeys.samvelDivorceAt] ?? -99) <= 3,
+      // вердикт суда (#1058): кульминация линии — отклик живёт ход вердикта и три после
+      courtVerdictFresh: S.stats.sent - Number(S.mem[memkeys.courtVerdictAt] ?? -99) <= 3,
       // второй дебют Гранта (#1041): дом «с кладом» — заметное событие, окно то же
       grantHouseFresh: S.stats.sent - Number(S.mem[memkeys.grantHouseAt] ?? -99) <= 3,
       // фото «платёжки» (#1017): заметное событие — отклик живёт ход фото и PHOTO_FRESH_TURNS после
@@ -2923,7 +2925,12 @@ export class Game {
       await this.sleep(600)
       if (invoiced) this.sys(`Алик вычел из долга ${v.total.toLocaleString('ru-RU')} ₽ по акту.`)
     }
-    if (n.a2) await this.say([n.who2 ? gen('a2', n.a2)() : variant('a2', n.a2)], false, n.who2)
+    if (n.a2) {
+      const line2 = n.who2 ? gen('a2', n.a2)() : variant('a2', n.a2)
+      // штамп строки второй реплики узла — тот же механизм, что у `a` (#1058): вердикт суда в `a2`
+      if (typeof line2 !== 'string' && 'stamp' in line2 && line2.stamp) this.S.mem[line2.stamp] = this.S.stats.sent
+      await this.say([line2], false, n.who2)
+    }
     if (n.sys2) {
       await this.sleep(700)
       const s = gen('sys2', n.sys2)()

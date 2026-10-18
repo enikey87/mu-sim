@@ -63,6 +63,9 @@ export const DIRECT: Record<string, DirectCase> = {
   // #983: окно первого «Би-бип» сдвинуло розыгрыш — обычный финал Гарика ни разу до экрана концовки
   Finale_garik_default: { event: 'ArcFinale', facts: { arc: 'garik' } },
   Finale_alik_death_will: { event: 'ArcFinale', facts: { arc: 'alik_death' }, setup: (g) => { g.S.ach.forgive = 1; g.S.mem['asked.alik_death'] = 1 } },
+  // #1058 (окно вердикта суда) сдвинуло выборки — обычный финал «смерти» ни разу до экрана концовки.
+  // asked.alik_death = 1: без вопросов о смерти матчится частный финал «Обиделся» (asked ≤ 0)
+  Finale_alik_death_default: { event: 'ArcFinale', facts: { arc: 'alik_death' }, setup: (g) => { g.S.mem['asked.alik_death'] = 1 } },
   Finale_rubik_bribe: { event: 'ArcFinale', facts: { arc: 'rubik' }, setup: (g) => { g.S.ach.redo = 1 } },
   Finale_samvel_tamada: { event: 'ArcFinale', facts: { arc: 'samvel' }, setup: (g) => { g.S.ach.toast = 1 } },
   Ending_alik: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem['finale.garik'] = 'cutter' } },
