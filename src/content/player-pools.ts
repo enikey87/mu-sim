@@ -12,6 +12,7 @@ import { IDLE_Q, STICKER_Q, FWD_Q, REACT_Q, DEL_Q } from './life'
 import { P_CREW_PAID } from './crew'
 import { P_HOLIDAY, type Holiday } from './holidays'
 import { ENDGAME_CHOICES, LEND50_CHOICES } from './endgame'
+import { MONEY_ASK } from './money-ask'
 import {
   P_VIA_BORIS, P_VIA_KARINE, P_VIA_MAMA, P_MOO, P_MOUSTACHE, P_COURT,
   P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE,
@@ -67,6 +68,9 @@ for (const [k, t] of Object.entries(TOPICS)) {
 }
 
 for (const [k, a] of Object.entries(ARCS)) put(`ARCS.${k}.follow`, a.follow as PlayerLinePool)
+
+// денежный вопрос (#795): ключ на место — тот же, что рисует оффер Money
+for (const [p, lines] of Object.entries(MONEY_ASK)) put(`MONEY_ASK_${p}`, lines)
 
 put('GROUP_Q', GROUP_Q)
 put('JOB_YES_P', JOB_YES_P)
