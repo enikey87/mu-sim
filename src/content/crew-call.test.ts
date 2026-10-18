@@ -1,10 +1,10 @@
 // Звонок с объекта (docs/design/crew-call.md, #576): Тарон входит в историю своим звонком,
 // звонок звучит один раз в середине партии и пишет факт crew.paid.
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { makeGame, alikTexts } from '../test/helpers'
 import type { Game } from '../engine/game'
 import type { Choice } from '../engine/state'
-import { alikDead, blocked, crewPaid, crewPaidAt, endgame } from './memkeys'
+import { alikDead, blocked, crewAllPaid, crewPaid, crewPaidAt, endgame } from './memkeys'
 import { CREW_CALL, CREW_FRESH_TURNS, P_CREW_PAID, CREW_PAID } from './crew'
 import { P_CREW_CALL } from './rules/player-choice-pools'
 import { CREW_CALL_B, SPEAKS, WORLD } from './world'
@@ -185,7 +185,7 @@ describe('упрёк по звонку с объекта', () => {
     const { game } = makeGame()
     game.S.day = 210
     // звонок вариантом 3 — тем же путём, что и правило Beat_CrewCall: один элемент пула + факт звонка
-    expect(await sayFresh(game, 'CREW_CALL', [CREW_CALL[2]])).toBe(true)
+    expect(await sayFresh(game, 'CREW_CALL', [CREW_CALL[2]])).toBeTruthy()
     game.rules.applyOps([set(crewPaid, true)], {})
     const offered = game.open(P_CREW_PAID)
     expect(offered.length, 'упрёк предлагается').toBeGreaterThan(0)
@@ -194,6 +194,38 @@ describe('упрёк по звонку с объекта', () => {
     const rules = optCrewPaid(game)
     const c = rules[0].offer!(game.rules.ctx(game, rules[0], { event: 'BuildChoices' }, game.facts()))
     expect(offered).toContain(c!.text)
+  })
+
+  // плейтест 82 (#1057): вариант 3 («плиточнику — в следующий раз») не говорит «всем рассчитали» —
+  // строки-цитаты ждут факт crewAllPaid, вопросы-инференции открыты в любом варианте
+  it('вариант звонка без «всем» не открывает утверждающие упрёки (#1057)', async () => {
+    const ASSERT = [
+      'Тарон писал: всем заплатили. Кроме меня.',
+      'Мне с объекта звонили и сказали: деньги ушли всем. Я подумал, что и мне. Ошибся ровно на одного.',
+      'Мне сказали: платят всем. Я сначала обрадовался. Потом дошло.',
+    ]
+    const QUESTION = 'Значит, я последний в очереди. Очередь из одного. Меня.'
+    const callWith = async (variant: readonly [string, string]): Promise<Game> => {
+      const { game } = makeGame()
+      game.S.day = 210
+      const draw = game.draw.bind(game)
+      vi.spyOn(game, 'draw').mockImplementation(((key: string, arr: readonly unknown[]) =>
+        key === 'CREW_CALL' ? variant[1] : draw(key as never, arr as never)) as unknown as typeof game.draw)
+      await game.fire('AlikIdle')
+      return game
+    }
+    const quiet = await callWith(valueOf(CREW_CALL[2]) as readonly [string, string])
+    expect(quiet.S.mem[crewPaid], 'звонок не состоялся — проверка пустеет').toBe(true)
+    expect(quiet.S.mem[crewAllPaid], 'вариант «следующий раз» поставил факт «всем»').toBeUndefined()
+    const open = quiet.open(P_CREW_PAID)
+    for (const l of ASSERT) expect(open, `вариант 3: «${l.slice(0, 34)}…»`).not.toContain(l)
+    expect(open, 'вопросные строки пустеют').toContain(QUESTION)
+    for (const v of [CREW_CALL[0], CREW_CALL[1]]) {
+      const pair = valueOf(v) as readonly [string, string]
+      const g = await callWith(pair)
+      expect(g.S.mem[crewAllPaid], `вариант «${pair[1].slice(0, 22)}…»`).toBe(true)
+      for (const l of ASSERT) expect(g.open(P_CREW_PAID), pair[1].slice(0, 22)).toContain(l)
+    }
   })
 
   // плейтест-раунд 46 / аудит раунда 38 (#731): префикс декора ронял первую букву имени — «Алик, тарон звонил»

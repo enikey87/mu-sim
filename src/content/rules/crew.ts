@@ -4,7 +4,7 @@
 import type { ContentApi } from '../../engine/game'
 import { type Rule, gte, missing, set } from '../fact'
 import type { GameEvent, Offer } from './events'
-import { alikDead, blocked, crewPaid, crewPaidAt, endgame } from '../memkeys'
+import { alikDead, blocked, crewAllPaid, crewPaid, crewPaidAt, endgame } from '../memkeys'
 import { CREW_CALL } from '../crew'
 import { meet } from '../world'
 import { sayFresh } from './rude'
@@ -24,7 +24,10 @@ export const crewRules: R[] = [
       // пропущенный звонок с объекта — строка системы; Тарон пишет следом и этим входит в историю
       game.sys('Пропущенный звонок: Тарон (чайнос)')
       await game.sleep(600)
-      await sayFresh(game, 'CREW_CALL', CREW_CALL)
+      // какой вариант прозвучал, решает, утверждает ли звонок «всем рассчитали» (#1057): варианты
+      // «всем рассчитали» говорят это прямо, «плиточнику — в следующий раз» и список Мкртича — нет
+      const played = await sayFresh(game, 'CREW_CALL', CREW_CALL)
+      if (played === CREW_CALL[0] || played === CREW_CALL[1]) game.applyFacts([set(crewAllPaid, true)])
       await game.sleep(300)
       // дальше на звонок опираются упрёки игрока и ответы Алика (#577) — факт пишется там же,
       // где звонок состоялся
