@@ -5,7 +5,7 @@ import type { Game } from '../../engine/game'
 import type { Facts } from '../../engine/rules'
 import type { Msg } from '../../engine/state'
 import * as T from '../rude'
-import { HEAT } from '../memkeys'
+import { HEAT, blockLifted } from '../memkeys'
 import { valueOf, spec, during, isOpen, saidText, type Entry } from '../fact'
 import { P_VIA_BORIS, P_VIA_KARINE, P_VIA_MAMA } from './player-choice-pools'
 
@@ -159,6 +159,35 @@ describe('лестница грубости: ступени', () => {
     game.nextDay(4)
     await game.afterTurn()
     expect(game.S.mem.blocked).toBeUndefined()
+  })
+  it('тихое истечение блока: первый доставленный ход несёт разблокировку (#1050)', async () => {
+    const { game } = makeGame()
+    heat(game, 3)
+    expect((await fire(game, 'rude')).r).toBe('Rude_Block')
+    expect(game.S.mem.blocked).toBe(true)
+    game.nextDay(4) // срок вышел сам: ни посредника, ни суда
+    expect(game.S.mem.blocked).toBeUndefined()
+    expect(game.S.mem[blockLifted], 'движок не пометил тихое снятие блока').toBe(true)
+    const n = game.S.msgs.length
+    await game.send('Алик, привет.')
+    const t = texts(game, n)
+    expect(t, 'разблокировка молчит').toContain(T.BLOCK_LIFTED_SYS)
+    expect(t, 'реплики разблокировки нет').toContain(T.BLOCK_LIFTED_LINE)
+    expect(game.S.mem[blockLifted], 'метка не потреблена первым ходом').toBeUndefined()
+    const n2 = game.S.msgs.length
+    await game.send('Ещё раз привет.')
+    expect(texts(game, n2), 'нарратив повторяется').not.toContain(T.BLOCK_LIFTED_SYS)
+    // посредник снимает блок раньше срока — тихого снятия нет, и метки тоже
+    const { game: g2 } = makeGame()
+    heat(g2, 3)
+    await fire(g2, 'rude')
+    g2.S.mem['intro.karine'] = true
+    const arg = fresh(g2).find((c) => c.act === 'via')!.arg
+    await says(g2, 'sorry')
+    await g2.fire('PlayerSays', { intent: 'via', arg })
+    expect(g2.S.mem.blocked, 'посредник не снял блок — проверка пустеет').toBe(false)
+    g2.nextDay(4)
+    expect(g2.S.mem[blockLifted], 'посредник оставил метку тихого снятия').toBeUndefined()
   })
   it('в блоке извинение не доставлено — только через посредника; до Бориса это Карине, посредник разблокирует', async () => {
     const { game } = makeGame()

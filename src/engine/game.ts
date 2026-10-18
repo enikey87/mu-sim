@@ -2,7 +2,7 @@
 // что сделать Алику — принимает система правил (engine/rules/, content/rules/*).
 import { make, D, TRANSFER_FRESH_TURNS, PHOTO_FRESH_TURNS, low, cap, type ExcuseApi, type Promise3, type PromiseCondition, type Rel, type When } from '../content/excuses'
 import { makeScenes, invKey, type Scene, type Line } from '../content/scenes'
-import { COLD_WAR, TRIBUNAL } from '../content/rude'
+import { BLOCK_LIFTED_LINE, BLOCK_LIFTED_SYS, COLD_WAR, TRIBUNAL } from '../content/rude'
 import { MIRROR, MIRROR_AGAIN, MIRROR_OPEN, MIRROR_REPLY, type Mirror } from '../content/mirror'
 import { PAYDAY_HOOKS } from '../content/rules/payday'
 import { QUEST_WHEN } from '../content/rules/world'
@@ -1176,7 +1176,11 @@ export class Game {
   }
   nextDay(n: number): void {
     this.S.day += n
+    const wasBlocked = this.S.mem[memkeys.blocked] === true
     this.rules.settle()
+    // чёрный список истёк своим сроком молча (#1050): метка для нарратива первого доставленного хода.
+    // Посредник снимает блок раньше (blocked = false) — тогда тихого снятия не было и метки нет.
+    if (wasBlocked && this.S.mem[memkeys.blocked] !== true) this.S.mem[memkeys.blockLifted] = true
     this.S.clock = this.realMinutes()
     this.push({ kind: 'sep', text: fmtDate(this.S.day) })
     if (this.inPlayerTurn) this.dayMovedInTurn = true
@@ -1928,6 +1932,16 @@ export class Game {
       this.save()
       this.inPlayerTurn = false
       return
+    }
+
+    // тихое истечение чёрного списка (#1050): первый доставленный ход несёт разблокировку — сис-строку
+    // и реплику Алика; через посредника блок снимается раньше и нарративится своим путём (метки нет)
+    if (S.mem[memkeys.blockLifted] && !this.alikSilent()) {
+      delete S.mem[memkeys.blockLifted]
+      await this.sleep(500)
+      if (this.disposed) { this.inPlayerTurn = false; return }
+      this.sys(BLOCK_LIFTED_SYS)
+      await this.say([BLOCK_LIFTED_LINE])
     }
 
     try {
