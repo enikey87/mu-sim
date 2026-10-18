@@ -10,7 +10,7 @@ import { DebugPanel } from './DebugPanel'
 import { Intro } from './Intro'
 import { uiOf, viewOf, introOf, reviewOffersOf, reviewSessionOf, reviewTranscriptOf } from './view'
 import { ReviewMenu, ReviewModal, ReviewProvider, type ReviewApi, type ReviewDraft } from './Review'
-import { isOptionNote, loadNotes, nextNoteId, reviewChoiceOf, reviewDump, reviewFileName, reviewRequested, reviewTargetOf, saveNotes, TARGET_TEXT_MAX, type ReviewNote, type ReviewTarget } from './review'
+import { clearNotes, isOptionNote, loadNotes, nextNoteId, reviewChoiceOf, reviewDump, reviewFileName, reviewRequested, reviewTargetOf, saveNotes, TARGET_TEXT_MAX, type ReviewNote, type ReviewTarget } from './review'
 import { platform } from '../platform'
 
 /** Корень: единственный компонент с Game в руках — отдаёт дереву фасад, а живую игру только DebugPanel. */
@@ -37,7 +37,7 @@ export function App({ game, onReset, debug = false, intro = false, introGate = f
   }, [ui])
 
   // битое сохранение — самый вероятный виновник падения, поэтому стираем его до новой игры
-  const hardReset = () => { ui.reset(); onReset() }
+  const hardReset = () => { clearNotes(); ui.reset(); onReset() }
 
   // --- режим живого рецензирования (#872): заметки в sessionStorage, партия не тронута ---
   const [reviewOn, setReviewOn] = useState(() => reviewRequested(window.location.search))
@@ -170,6 +170,7 @@ function Phone({ onReset, intro, introGate }: { onReset: () => void; intro: bool
 
   const reset = () => {
     if (!confirm('Стереть всё и начать заново?')) return
+    clearNotes()
     game.reset()
     onReset()
   }

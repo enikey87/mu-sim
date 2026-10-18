@@ -1638,6 +1638,22 @@ describe('режим рецензирования (#872)', () => {
     expect(dump.transcript).toContain(mine.text)
   })
 
+  it('«Начать заново» стирает рецензию: новая партия не поднимает чужие заметки', async () => {
+    sessionStorage.clear()
+    at('/?review')
+    const { unmount } = renderApp(makeGame({ seed: 2 }).game)
+    await note(alikBubble(), 'заметка этой партии')
+    expect(JSON.parse(sessionStorage.getItem('review_notes') ?? '[]'), 'заметка есть — иначе сброс ничего не стирает').toHaveLength(1)
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    await act(async () => { fireEvent.click(document.getElementById('infoBtn')!) })
+    await act(async () => { fireEvent.click(document.getElementById('resetBtn')!) })
+    expect(sessionStorage.getItem('review_notes'), 'хранилище рецензии пусто').toBeNull()
+    unmount()
+    renderApp(makeGame({ seed: 3 }).game)
+    expect(document.querySelector('.review-badge'), 'новая партия без бейджа').toBeNull()
+    vi.mocked(window.confirm).mockRestore()
+  })
+
   it('заметки переживают перезагрузку в той же сессии', async () => {
     sessionStorage.clear()
     at('/?review')
