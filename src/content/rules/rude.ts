@@ -16,17 +16,19 @@ const cools = [add(count.rude), add(HEAT)]
 // остывание — отложенное событие, а не отложенное «−1»: после примирения (температура = 0) старые остывания не уводят её в минус
 const cool: R['trigger'] = [{ event: 'RudeCool', delay: 20 }]
 
-/** Реплика участника без повторов: пул [кто, текст]. */
-export async function sayFresh(game: ContentApi, key: string, pool: readonly Entry<T.Said>[]): Promise<boolean> {
+/** Реплика участника без повторов: пул [кто, текст]. Возвращает сыгранную пару — вызывающий может
+ *  поставить по ней факт, который утверждает именно эта реплика (#1057); null — свежих нет. */
+export async function sayFresh(game: ContentApi, key: string, pool: readonly Entry<T.Said>[]): Promise<T.Said | null> {
   const bag = game.bagOf(key)
   const x = game.seen.pickFresh(() => game.draw(key, pool.map((e) => mapEntry(e, ([, v]) => v))), (v) => v)
   const t = saidText(x)
   // свежих нет — ничего не сказано, и колода остаётся там, где была
-  if (game.seen.has(t)) { game.restoreBag(key, bag); return false }
+  if (game.seen.has(t)) { game.restoreBag(key, bag); return null }
   game.seen.mark(t)
-  const [who, said] = pool.map(valueOf).find(([, v]) => v === x)!
+  const picked = pool.map(valueOf).find(([, v]) => v === x)!
+  const [who, said] = picked
   await game.say([who === 'alik' ? said : { w: who, t, claims: saidClaims(said) }])
-  return true
+  return picked
 }
 /** Остудить ссору на n, не ниже нуля. */
 export const cooldown = (game: ContentApi, n: number) => game.coolConflict(n)

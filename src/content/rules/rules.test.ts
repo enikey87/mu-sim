@@ -504,7 +504,7 @@ describe('промолчавшее правило не оставляет сле
     const pool: Array<readonly [string, string]> = [['alik', 'Раз.'], ['alik', 'Два.']]
     for (const [, t] of pool) game.seen.mark(t)
     const bags = structuredClone(game.S.bags)
-    expect(await sayFresh(game, 'T_FRESH', pool)).toBe(false)
+    expect(await sayFresh(game, 'T_FRESH', pool)).toBeNull()
     expect(game.S.bags).toEqual(bags)
   })
 })
