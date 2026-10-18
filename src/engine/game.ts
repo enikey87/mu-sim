@@ -7,7 +7,7 @@ import { MIRROR, MIRROR_AGAIN, MIRROR_OPEN, MIRROR_REPLY, type Mirror } from '..
 import { PAYDAY_HOOKS } from '../content/rules/payday'
 import { QUEST_WHEN } from '../content/rules/world'
 import { LEGENDS } from '../content/legends'
-import { moneyPlaceOf, stampMoneyPlace } from '../content/money-ask'
+import { moneyPlaceOf, moneyPlaceOfClaim, stampMoneyPlace } from '../content/money-ask'
 import { TOPICS, P_NEU_B_LATE, P_RUDE_BLOCKED, P_RUDE_POLITE, P_POL_POLITE, P_NIGHT, P_FRIDAY, P_MONEY, P_DESPERATE, DESPERATE_REPLY, MONEY_REPLY_POLITE, MONEY_REPLY_NEUTRAL, MONEY_REPLY_REGIMENT } from '../content/topics'
 import { FINALES, ENDINGS, DEFAULT_FINALE, paydayOutcome, type Finale, type PaydayId } from '../content/finales'
 import { ARCS, ARC_DONE, ARC_MENTIONS, CAST, type Episode, GROUP, GROUP_OOPS, WRONG_TO, WRONG_WHAT, WRONG_OOPS } from '../content/arcs'
@@ -2324,6 +2324,9 @@ export class Game {
     const source = who && isWhoId(who) ? who : 'alik'
     for (const event of claims) {
       if (typeof event === 'string') {
+        // утверждение о месте денег прозвучало (Алик, персонаж легенды, хор) — его state-вопросы молчат окно (#981)
+        const place = moneyPlaceOfClaim(event)
+        if (place) stampMoneyPlace(this, place, this.S.stats.sent)
         const point = CLAIM_LEDGER[event]
         publishClaim(this.S.ledger, point.subject, point.value, { source, day: this.S.day, msgId, claimKey: event })
       } else if ('retract' in event) {
