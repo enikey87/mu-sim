@@ -152,6 +152,26 @@ describe('«Лет двадцать?» — пара со своим ответо
     expect.fail('Алик не сравнил срок с коньяком за 80 кнопок')
   }
 
+  it('никогда-эхо отвечает из своего пула, а не про двадцать лет; arg идёт за текстом (#1022)', async () => {
+    const g = await said(byText('после таможни'))
+    // сравнение с коньяком уже звучало (настоящим путём его доводит тест выше): пул открыт целиком
+    g.S.mem['said.konak'] = true
+    // кнопки берём у самих правил: окно повтора и добор незасвеченного — часть `playerLine`, и именно
+    // оно ставило флаг «это «Лет двадцать?»» по промежуточной карте колоды (#1022)
+    const shown = buttons(g, 12).filter((b) => b.act === 'promiseNever')
+    expect(shown.length, 'кнопок «никогда» нет — проверка пустеет').toBeGreaterThan(3)
+    for (const b of shown) {
+      expect(b.arg === 'years', `«${b.text}» → arg ${String(b.arg)}`).toBe(/лет двадцать\?/i.test(b.text))
+    }
+    const echo = shown.find((b) => !/лет двадцать\?/i.test(b.text))!
+    expect(echo, 'никогда-эха в пуле нет — проверка пустеет').toBeDefined()
+    const n = g.S.msgs.length
+    await g.send({ text: echo.text, tone: 'neutral', act: 'promiseNever', arg: echo.arg ?? undefined })
+    const answer = alikTexts(g.S.msgs.slice(n)).join(' ')
+    expect(answer, 'на никогда-эхо ответили про двадцать лет').not.toContain('Двадцать лет')
+    expect(from(PROMISE_NEVER, answer), answer).toBe(true)
+  })
+
   it('кнопка ждёт сравнение с коньяком, зовёт колкий ответ, а соседняя ирония — общий пул', async () => {
     const g = await said(byText('после таможни'))
     expect(g.open(D.P_WHEN_NEVER), 'без сравнения с коньяком эхо осиротело бы').not.toContain(WHEN_YEARS)

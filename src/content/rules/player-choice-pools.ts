@@ -1,6 +1,6 @@
 // Именованные пулы кнопок из rules/choices — вынесены, чтобы попасть в PLAYER_POOLS (#491).
 import { needs } from '../world'
-import { gate, is } from '../fact'
+import { gate, is, missing } from '../fact'
 
 export const P_VIA_BORIS = [
   'Борис, передай Алику: прости меня',
@@ -25,7 +25,9 @@ export const P_MOO = [
 
 /** Дебют коллекторов (#888): вопрос про них — только в окне их первой серии. */
 export const P_COLLECTORS_DEBUT = [
-  'Кто вы и при чём тут я?',
+  // займ МФО уже взят — игрок их клиент и знает, кто они: «Кто вы?» — вопрос того, кто им ещё не должен (#1022)
+  gate(missing('credit.micro.taken'))('Кто вы и при чём тут я?'),
+  gate(is('credit.micro.taken'))('Я вам должен, а Алик мне. Давайте меняйтесь'),
   'Поручитель? Он и мне должен',
   'Алик, за мной пришли',
 ] as const

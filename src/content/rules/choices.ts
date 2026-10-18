@@ -207,13 +207,15 @@ export const choiceRules: R[] = [
           name: `When_${kind}`, when: [...term, eq('ctx.whenKind', kind)], act: 'promiseNever', tone: 'neutral',
           text: (g, f) => {
             const map = args(f)
-            years = false
             requirePlayerPool('D.P_WHEN_NEVER', D.P_WHEN_NEVER)
-            return g.playerLine(() => {
-              const raw = g.X.fill(g.draw('P_WHEN_NEVER', D.P_WHEN_NEVER), map)
-              if (raw === WHEN_YEARS) years = true
-              return raw
-            })
+            const line = g.playerLine(() => g.X.fill(g.draw('P_WHEN_NEVER', D.P_WHEN_NEVER), map))
+            // «Лет двадцать?» — единственная строка пула со своим ответом (#951). Флаг ставится по тому,
+            // что игрок реально увидит, а не по промежуточным доборам колоды: `playerLine` бросает колоду
+            // до восьми раз (окно повтора, добор незасвеченного), и старая отметка «добор был «Лет двадцать?»»
+            // оставляла её ответ на совсем другой реплике — никогда-эхо получало ответ про двадцать лет (#1022).
+            // Украшение реплики (обращение спереди, суффикс сзади) строку не отменяет — отсюда сверка по вхождению.
+            years = line.toLowerCase().includes(WHEN_YEARS.toLowerCase())
+            return line
           },
           arg: (_g, f) => (years ? 'years' : String(f['ctx.when'])),
         })
