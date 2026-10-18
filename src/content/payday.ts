@@ -2,10 +2,10 @@
 // Анонс → утро (линии партии отдают деньги) → все в сборе → дележ (сумма тает) → великая отмазка из событий партии →
 // перевёртыш (деньги приходят в невозможной форме) → кнопка на следующий день.
 // Реплики — пулы с условиями и приоритетом (game.line): звучит то, что было в этой партии.
-import { type Line, type LineSpec, type Entry, is, eq, ne, exists, gte, lte, gate, missing } from './fact'
+import { type Line, type LineSpec, type Entry, is, eq, ne, exists, gte, lte, gate, missing, set } from './fact'
 import type { Scene, SceneNode } from './scenes'
 import { needs, samvelLine, WORLD } from './world'
-import { bathAsked, court, cryptoHodl, garikConcrete, karineKnowsDebt, met, payday, rubikFined, taxThawed } from './memkeys'
+import { bathAsked, court, cryptoHodl, garikConcrete, judgeApology, karineKnowsDebt, met, payday, rubikFined, taxThawed } from './memkeys'
 
 export const ANNOUNCE = [
   needs('karineHome')(needs('karine')('Брат. Завтра. Всё. Честно. Я не шучу. Даже Карине не шутит.')),
@@ -52,7 +52,8 @@ export const SOURCES: Source[] = [
   { t: 'Хаш сдали обратно в ресторан. Вернули 1 500. Ты его, правда, съел, но они не проверяли.', when: [is('ach.q_hash')], prio: 1, amount: 1500 },
   // hodl жив: продать всё нельзя — обменяна часть, остальное в коине (#815)
   { t: '«Лаваш-коин» обменял часть: 12 000 и мешок лаваша. Остальное держу, брат, пусть лежит.', when: [is(cryptoHodl)], prio: 1, amount: 12000 },
-  { t: 'Судья Ашот вернул госпошлину. С извинениями. И с хашем.', when: [is('ach.court'), WORLD.judge], prio: 1, amount: 5000 },
+  // возврат госпошлины — то самое «потом извинился» из RUDE_AGAIN: факт извинений ставит прозвучавшая строка (#988)
+  { t: 'Судья Ашот вернул госпошлину. С извинениями. И с хашем.', when: [is('ach.court'), WORLD.judge], remember: [set(judgeApology, true)], prio: 1, amount: 5000 },
   { t: 'Лотерея! Второй билет на твоё имя выиграл. Не чайник — 10 000.', when: [is('ach.q_lottery')], prio: 1, amount: 10000 },
   { t: 'Тётя Гоар за спасение козы дала конверт. 3 000 и одно яйцо. Яйцо не козье — я уточнял.', when: [WORLD.goar, is('ach.q_goat')], prio: 1, amount: 3000 },
   // общие — если партия бедная
