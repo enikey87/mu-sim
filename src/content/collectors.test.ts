@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import { makeGame, setMoney, cards } from '../test/helpers'
 import { START_DAY, ARC_MARINATION_DAYS } from '../engine/state'
-import { collectorsRecruited, collectorsTurned, creditBroke, creditStage, endgame, internAt, intro, paydayScene, threatClaim } from './memkeys'
+import { collectorsRecruited, collectorsTurned, count, creditBroke, creditStage, endgame, finaleOf, internAt, internDeclined, intro, paydayScene, threatClaim } from './memkeys'
 import { loanTaken, loanDueAt } from './credit'
 import { D } from './excuses'
 import { P_COLLECTORS_DEBUT } from './rules/player-choice-pools'
@@ -331,5 +331,34 @@ describe('«три чашки чая» ждёт предложения стаж�
     await game.playFinale('collectors', FINALES.collectors.find((f) => f.id === 'intern')!)
     expect(game.S.mem[internAt], 'предложение стажировки не штампануло ход').toBe(game.S.stats.sent)
     expect(pool(game), 'после предложения стажировки строки нет').toContain(LINE)
+  })
+})
+
+describe('отказ от стажировки переключает финал арки (#1041)', () => {
+  const chosen = (g: Game) => g.S.mem[finaleOf('collectors')]
+
+  it('отказ пишет факт, и эпилог больше не утверждает стажировку', async () => {
+    // без отказа финал — «Стажёр-коллектор» (условие — шесть грубостей)
+    const accept = makeGame().game
+    accept.S.mem[count.rude] = 6
+    await accept.fire('ArcFinale', { arc: 'collectors' })
+    expect(chosen(accept), 'финал арки без отказа не «Стажёр»').toBe('intern')
+    // отказ — вторая строка пула P_INTERN (номер едет с arg оффера, #1017): играем настоящим путём.
+    // Кнопка попадает в блок не в каждой партии (два слота) — идём по сидам, как в тесте окна #958
+    let declined = false
+    for (let seed = 1; seed <= 20 && !declined; seed++) {
+      const { game } = makeGame({ seed })
+      game.S.mem[count.rude] = 6
+      await game.playFinale('collectors', FINALES.collectors.find((f) => f.id === 'intern')!)
+      game.S.choices = null
+      const btn = game.buildChoices().find((c) => c.act === 'internOffer' && c.arg === '1')
+      if (!btn) continue
+      await game.send(btn)
+      expect(game.holds(is(internDeclined)), 'отказ не записал факт').toBe(true)
+      await game.fire('ArcFinale', { arc: 'collectors' })
+      expect(chosen(game), 'отказ не переключил финал с «Стажёра»').not.toBe('intern')
+      declined = true
+    }
+    expect(declined, 'ни в одной из двадцати партий окна стажировки не было — проверка пустеет').toBe(true)
   })
 })

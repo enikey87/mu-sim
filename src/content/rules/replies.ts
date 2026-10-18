@@ -19,9 +19,9 @@ import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, PROMISE_PENCIL,
 import { CREW_PAID } from '../crew'
 import { HOLIDAY_MONEY, type Holiday } from '../holidays'
 import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_THIRD, LIE_NOCRED } from '../lies'
-import { HEAT, alikShaved, avitoReviewAt, borisSaleAt, collectorsAskAt, countersuitAt, crewPaidAt, debutAt, grantTileAt, internAt, kettleAt, lawyerAt, moustacheAskAt, ramPhotoAt, rubikAskAt, rubikHoleAt, moustachePhotoAt, photoAt, mamaMarketAt, samvelDivorceAt, transferAt, vacancyAt, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, saidKonak, stateAt, topic, topicLast, topicMute, topicRun, whenYears } from '../memkeys'
+import { HEAT, alikShaved, avitoReviewAt, borisSaleAt, collectorsAskAt, countersuitAt, crewPaidAt, debutAt, grantTileAt, internAt, internDeclined, kettleAt, lawyerAt, moustacheAskAt, ramPhotoAt, rubikAskAt, rubikHoleAt, moustachePhotoAt, photoAt, mamaMarketAt, samvelDivorceAt, grantHouseAt, transferAt, vacancyAt, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, saidKonak, stateAt, topic, topicLast, topicMute, topicRun, whenYears } from '../memkeys'
 import type { ArcId, TopicId } from '../ids'
-import { PROMISE_SHAVE_ASK, MOUSTACHE_PHOTO_B, MAMA_MARKET_B, SAMVEL_DIVORCE_B, RAM_PHOTO, BORIS_SALE, VACANCY, AVITO_REVIEW, RUBIK_ASK, KETTLE, CREW_CALL_B, LAWYER_B, COLLECTORS_ASK_B, INTERN_B, HOLE_B, COUNTERSUIT_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, DEBUT_BORIS_B, DEBUT_NIVA_B, GRANT_TILE_B } from '../world'
+import { PROMISE_SHAVE_ASK, MOUSTACHE_PHOTO_B, MAMA_MARKET_B, SAMVEL_DIVORCE_B, GRANT_HOUSE_B, RAM_PHOTO, BORIS_SALE, VACANCY, AVITO_REVIEW, RUBIK_ASK, KETTLE, CREW_CALL_B, LAWYER_B, COLLECTORS_ASK_B, INTERN_B, HOLE_B, COUNTERSUIT_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, DEBUT_BORIS_B, DEBUT_NIVA_B, GRANT_TILE_B } from '../world'
 
 type R = Rule<ContentApi, GameEvent, Offer>
 const says = (intent: string, rest: Partial<R> & Pick<R, 'respond'>, extra: R['when'] = []): R => ({
@@ -139,6 +139,15 @@ export const replyRules: R[] = [
       game.setCtx(null)
     },
   }, [is(alikShaved)]),
+  // отклик на второй дебют Гранта (#1041): ответ потребляет окно события (#951), говорит сам Грант
+  says('grantHouse', {
+    respond: async ({ game }) => {
+      // говорит сам Грант: пул несёт `{ w, t }` — рисуем `draw`, как у окна #983, а не `linePicked` (он вернул бы только текст)
+      await game.say([game.draw('GRANT_HOUSE_B', GRANT_HOUSE_B)])
+      game.clearFact(grantHouseAt)
+      game.setCtx(null)
+    },
+  }),
   // отклик на конец квеста «мама на рынке» (#1030): ответ потребляет окно события (#951), строка своя
   says('mamaMarket', {
     respond: async ({ game }) => {
@@ -279,6 +288,8 @@ export const replyRules: R[] = [
       // ответ по выбранной строке игрока (#1017): номер согласия/отказа уехал с arg у оффера.
       // Номер без строки (старый путь/прямой fire) — колода, как раньше: окно не пустует.
       const i = Number(facts.arg)
+      // выбор пишет факт, на который опирается финал (#1041): отказ (вторая строка пула) снимает «Стажёра»
+      if (i === 1) game.applyFacts([set(internDeclined, true)])
       const line = Number.isInteger(i) ? INTERN_B[i] : undefined
       await game.say([line ? valueOf(line) : game.draw('INTERN_B', INTERN_B)])
       game.clearFact(internAt)

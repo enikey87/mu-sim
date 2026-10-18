@@ -4,7 +4,7 @@ import { type Entry, type FactOp, type Criterion, type FactKey, type Said, set, 
 import { type ClaimKey } from './ids'
 import type { LedgerEvent } from './fact-types'
 import { needs, meet, WORLD, MENTION_RE } from './world'
-import { actSigned, alikDead, betonSet, borisMarried, collectorsAskAt, collectorsRecruited, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantPaid, grantTileAt, houseOnGarik, internAt, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, rubikHoleAt, samvelDivorceAt, sick, taxFrozen, wedding } from './memkeys'
+import { actSigned, alikDead, betonSet, borisMarried, collectorsAskAt, collectorsRecruited, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantHouseAt, grantPaid, grantTileAt, houseOnGarik, internAt, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, rubikHoleAt, samvelDivorceAt, sick, taxFrozen, wedding } from './memkeys'
 import { stateQuestion } from './money-ask'
 
 export type ArcMsg = Said | { w: string; t: string; claims?: LedgerEvent[]; remember?: FactOp[]; stamp?: string } | { t: string; claims: LedgerEvent[]; remember?: FactOp[]; stamp?: string }
@@ -118,7 +118,7 @@ export const ARCS: Record<string, Arc> = {
       { m: [{ w: 'mkrtich', t: 'Это Мкртич. Про конверт Алика подтверждаю: упал. Толстый. Я ещё удивился — Алик с деньгами идёт. Думал, мерещится, перекрестился.' }, 'Видишь? Свидетель. Крестился даже. А ты мне не верил.'] },
       { remember: meet('arsen', 'grant'), m: ['Фундамент не вскрывали — мой племянник Арсен изучил вопрос по бумагам. Деньги, залитые в фундамент, юридически — часть дома. Дом — заказчика, Гранта. Значит, теперь тебе должен Грант.', 'Поздравляю, брат, у тебя новый должник. Серьёзный человек, с домом. Я за тебя рад.',
         'И за себя — я свободен.'], then: 'promise', legend: 'beton_law' },
-      { m: [{ w: 'grant', t: 'Молодой человек, я вам ничего не должен. Но спасибо: выставил дом на продажу на двести сорок тысяч дороже. «С кладом».' }, 'Кум из банка посмотрел бумаги: деньги в бетоне — это вклад. Проценты капают, брат. Туда же, в бетон.'] },
+      { m: [{ w: 'grant', t: 'Молодой человек, я вам ничего не должен. Но спасибо: выставил дом на продажу на двести сорок тысяч дороже. «С кладом».', stamp: grantHouseAt }, 'Кум из банка посмотрел бумаги: деньги в бетоне — это вклад. Проценты капают, брат. Туда же, в бетон.'] },
       { m: ['Тётя Гоар погадала на кофейной гуще. Деньги — в северо-восточном углу. Под плиткой. Под твоей плиткой, брат.', 'Снимешь — достанем. Работу оплачу из найденного. Потом положишь обратно — за укладку отдельно, всё вместе.'], then: 'promise', legend: 'beton_goar' },
       { m: ['Грант пустил экскурсии: «Дом, в фундаменте которого лежат деньги плиточника». Вход 500. Тебе как пострадавшему — 400. Приходи, постоишь над своими деньгами.', 'Экскурсию ведёт Арсен. В конце все плачут. Ты тоже заплачешь, но со скидкой.'] },
       { remember: meet('judge'), m: [{ t: 'Дом купил судья Ашот. Мой кум. Деньги в фундаменте он признал «неотделимым улучшением».', claims: ['money_foundation'] }, 'Теперь это его деньги, брат. Спорить с судьёй — сам знаешь. Зато они в хороших руках. В надёжном бетоне.'], fx: { ach: 'arc_beton' }, legend: null },

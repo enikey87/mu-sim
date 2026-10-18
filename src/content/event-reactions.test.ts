@@ -4,12 +4,12 @@ import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
 import { NOTIF } from './life'
 import { D } from './excuses'
-import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE, P_MAMA_MARKET, P_SAMVEL_DIVORCE } from './rules/player-choice-pools'
-import { BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, INTERN_B, HOLE_B, AVITO_REVIEW, MAMA_MARKET_B, SAMVEL_DIVORCE_B } from './world'
+import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE, P_MAMA_MARKET, P_SAMVEL_DIVORCE, P_GRANT_HOUSE } from './rules/player-choice-pools'
+import { BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, GRANT_HOUSE_B, INTERN_B, HOLE_B, AVITO_REVIEW, MAMA_MARKET_B, SAMVEL_DIVORCE_B } from './world'
 import { ARCS } from './arcs'
 import { FINALES } from './finales'
 import { COURT_LAWYER_AGAIN } from './quests'
-import { court, HEAT, lawyerAt, debutWho, arsenTrack, saidStrasburg, grantTileAt, mamaMarketAt, samvelDivorceAt } from './memkeys'
+import { court, HEAT, lawyerAt, debutWho, arsenTrack, saidStrasburg, grantTileAt, grantHouseAt, mamaMarketAt, samvelDivorceAt } from './memkeys'
 import { valueOf, type Line } from './fact'
 import type { Choice } from '../engine/state'
 
@@ -586,6 +586,38 @@ describe('окно развода дяди Самвела на свадьбе (#
     const answers = SAMVEL_DIVORCE_B.map(text)
     expect(said.some((t) => answers.some((p) => t.includes(p))), `ответ не из пула события: ${said.join(' | ')}`).toBe(true)
     expect(game.S.mem[samvelDivorceAt], 'ответ не потребил окно').toBeUndefined()
+    expect(button(), 'после ответа окно закрыто').toBeUndefined()
+  })
+})
+
+describe('окно второго дебюта Гранта — дом «с кладом» (#1041)', () => {
+  const text = (e: unknown): string => { const v = valueOf(e as never); return typeof v === 'string' ? v : (v as { t: string }).t }
+  const low = (t: string) => t.charAt(0).toLowerCase() + t.slice(1)
+
+  it('реплика Гранта штампует ход, кнопка в блоке, окно три хода, ответ потребляет', async () => {
+    const { game } = makeGame()
+    const button = () => { game.S.choices = null; return game.buildChoices().find((c) => c.act === 'grantHouse') }
+    expect(button(), 'до серии кнопки нет').toBeUndefined()
+    await game.playEpisode(ARCS.beton.eps[4], 'beton')
+    expect(game.S.msgs.some((m) => m.kind === 'text' && m.who === 'grant'), 'Грант не написал — проверка пустеет').toBe(true)
+    const at = Number(game.S.mem[grantHouseAt])
+    expect(at, 'реплика не штампанула ход события').toBe(game.S.stats.sent)
+    expect(button(), 'на ходу события кнопки нет').toBeTruthy()
+    const texts = new Set<string>()
+    for (let i = 0; i < 40; i++) { const b = button(); if (b) texts.add(b.text) }
+    const pool = P_GRANT_HOUSE.map(text)
+    expect(texts.size, 'пул окна не прозвучал — проверка пустеет').toBeGreaterThan(0)
+    for (const t of texts) expect(pool.some((p) => t.includes(p) || t.includes(low(p))), `кнопка не из пула: ${t}`).toBe(true)
+    game.S.stats.sent = at + 3
+    expect(button(), 'третий ход после события — ещё окно').toBeTruthy()
+    game.S.stats.sent = at + 4
+    expect(button(), 'вне окна — кнопки нет').toBeUndefined()
+    game.S.stats.sent = at
+    const n = game.S.msgs.length
+    await game.fire('PlayerSays', { intent: 'grantHouse' })
+    const said = game.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' && m.who === 'grant' ? [m.text] : []))
+    expect(said.some((t) => GRANT_HOUSE_B.map(text).some((p) => t.includes(p))), `ответ не из пула события: ${said.join(' | ')}`).toBe(true)
+    expect(game.S.mem[grantHouseAt], 'ответ не потребил окно').toBeUndefined()
     expect(button(), 'после ответа окно закрыто').toBeUndefined()
   })
 })

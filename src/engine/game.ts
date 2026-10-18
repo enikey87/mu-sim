@@ -1600,6 +1600,8 @@ export class Game {
       mamaMarketFresh: S.stats.sent - Number(S.mem[memkeys.mamaMarketAt] ?? -99) <= 3,
       // развод дяди Самвела на свадьбе (#1037): событие серии — отклик живёт ход события и три после
       samvelDivorceFresh: S.stats.sent - Number(S.mem[memkeys.samvelDivorceAt] ?? -99) <= 3,
+      // второй дебют Гранта (#1041): дом «с кладом» — заметное событие, окно то же
+      grantHouseFresh: S.stats.sent - Number(S.mem[memkeys.grantHouseAt] ?? -99) <= 3,
       // фото «платёжки» (#1017): заметное событие — отклик живёт ход фото и PHOTO_FRESH_TURNS после
       photoFresh: S.stats.sent - Number(S.mem[memkeys.photoAt] ?? -99) <= PHOTO_FRESH_TURNS,
       sinceRude: S.stats.sent - Number(S.mem[memkeys.rudeAt] ?? -99),
