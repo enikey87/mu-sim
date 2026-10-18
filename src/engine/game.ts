@@ -7,7 +7,7 @@ import { MIRROR, MIRROR_AGAIN, MIRROR_OPEN, MIRROR_REPLY, type Mirror } from '..
 import { PAYDAY_HOOKS } from '../content/rules/payday'
 import { QUEST_WHEN } from '../content/rules/world'
 import { LEGENDS } from '../content/legends'
-import { moneyPlaceOf } from '../content/money-ask'
+import { moneyPlaceOf, stampMoneyPlace } from '../content/money-ask'
 import { TOPICS, P_NEU_B_LATE, P_RUDE_BLOCKED, P_RUDE_POLITE, P_POL_POLITE, P_NIGHT, P_FRIDAY, P_MONEY, P_DESPERATE, DESPERATE_REPLY, MONEY_REPLY_POLITE, MONEY_REPLY_NEUTRAL, MONEY_REPLY_REGIMENT } from '../content/topics'
 import { FINALES, ENDINGS, DEFAULT_FINALE, paydayOutcome, type Finale, type PaydayId } from '../content/finales'
 import { ARCS, ARC_DONE, ARC_MENTIONS, CAST, type Episode, GROUP, GROUP_OOPS, WRONG_TO, WRONG_WHAT, WRONG_OOPS } from '../content/arcs'
@@ -2061,13 +2061,19 @@ export class Game {
   /** «Клянусь мамой, завтра — всё отдам» + запись в журнал. */
   /** Обещание. Пока жива легенда денег — срок чаще вытекает из неё («как ключ выйдет»); legend = true — всегда из неё. */
   async promiseLine(prefix?: string, legend?: boolean): Promise<void> {
-    const legendSpec = this.legend() ? LEGENDS[this.legend()!] : undefined
+    const legendId = this.legend()
+    const legendSpec = legendId ? LEGENDS[legendId] : undefined
     // событие легенды уже случилось («свадьба Бориса прошла») — обещать «сразу после него» поздно
     const done = legendSpec?.until.condition ? this.conditionHolds(legendSpec.until.condition) : false
     const until = done ? undefined : legendSpec?.until
     // срок из легенды — не чаще, чем раз в LEGEND_VOW_GAP сообщений игрока: одна и та же клятва приедается (#179)
     const fromLegend = !!until && this.legendDue() && (legend || this.chance(0.4))
-    if (fromLegend) this.S.mem[memkeys.legendPromiseAt] = this.S.stats.sent
+    if (fromLegend) {
+      this.S.mem[memkeys.legendPromiseAt] = this.S.stats.sent
+      // напоминание сроком легенды называет и место денег: его state-вопросы молчат окно (#981)
+      const place = moneyPlaceOf(legendId)
+      if (place) stampMoneyPlace(this, place, this.S.stats.sent)
+    }
     const p = this.uniq(() => {
       const q = this.X.promise()
       if (fromLegend) this.alignPromise(q, until!)
@@ -2412,7 +2418,7 @@ export class Game {
       this.setLegend(ep.legend, arc)
       // объявление места денег потребляет окно свежести своего места (#962): state-вопросы не переспрашивают сказанное
       const place = moneyPlaceOf(ep.legend)
-      if (place) this.S.mem[memkeys.moneyAskAt[place]] = this.S.stats.sent
+      if (place) stampMoneyPlace(this, place, this.S.stats.sent)
     }
     // серия без своей легенды возвращает легенду своего сериала: свадьба идёт — значит, деньги «после свадьбы»; гейт клятвы возврат не открывает (#327)
     else if (arc && this.S.mem[memkeys.legendOf(arc)]) this.setLegend(String(this.S.mem[memkeys.legendOf(arc)]), arc, false)
@@ -3046,6 +3052,9 @@ export class Game {
           const spec = LEGENDS[legend]
           const promise = this.alignPromise(this.X.promise(), spec.until)
           this.S.mem[memkeys.legendPromiseAt] = this.S.stats.sent
+          // то же напоминание сроком легенды, что в promiseLine: место денег подтверждено — окно (#981)
+          const place = moneyPlaceOf(legend)
+          if (place) stampMoneyPlace(this, place, this.S.stats.sent)
           this.recordPromiseOnce(promise)
           deliver({ kind: 'text', from: 'alik', text: promise.text })
           return
