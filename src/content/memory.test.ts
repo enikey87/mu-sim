@@ -63,7 +63,20 @@ describe('память Алика', () => {
     const { game } = makeGame()
     game.S.mem.court = 5
     game.S.mem['intro.judge'] = true
+    game.S.mem['court.judgeApology'] = true // «потом извинился» — после возврата госпошлины в День выплаты (#988)
     expect(game.line('RUDE_AGAIN', RUDE_AGAIN)).toMatch(/суде/)
+  })
+  it('«Судья Ашот… потом извинился» — только после факта извинений (#988)', () => {
+    // партия раунда 73: суд прошёл, извинения приходят много позже (возврат госпошлины) — до них строка молчит
+    const before = makeGame().game
+    before.S.mem.court = 5
+    before.S.mem['intro.judge'] = true
+    expect(before.line('RUDE_AGAIN', RUDE_AGAIN), 'до извинений судьи').not.toMatch(/Судья Ашот/)
+    const after = makeGame().game
+    after.S.mem.court = 5
+    after.S.mem['intro.judge'] = true
+    after.S.mem['court.judgeApology'] = true
+    expect(after.line('RUDE_AGAIN', RUDE_AGAIN), 'после извинений').toMatch(/Судья Ашот/)
   })
   it('«уже сказано» переживает перезагрузку', () => {
     const { game, storage } = makeGame()

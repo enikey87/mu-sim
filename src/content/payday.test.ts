@@ -8,7 +8,7 @@ import { spec } from '../engine/rules/lines'
 import { CLAIMS, LEAD, MORNING_CONTRA, OUTCOME, ROLL, SOURCES, type Claim, type Lead } from './payday'
 import { LEGENDS } from './legends'
 import { CLAIM_LEDGER } from './ledger'
-import { bathAsked, garikCut, met, nuneDekretOver } from './memkeys'
+import { bathAsked, garikCut, judgeApology, met, nuneDekretOver } from './memkeys'
 import { ARCS } from './arcs'
 import { spec as lineSpec, valueOf, type Entry } from './fact'
 
@@ -172,6 +172,17 @@ describe('День выплаты', () => {
     expect(t).toMatch(/честный человек/)
     expect(t, 'старой формулировки нет').not.toMatch(/копил, пока сидел/i)
     expect(valueOf(garik[0]!).amount).toBe(25000)
+  })
+
+  // #988: «потом извинился» из RUDE_AGAIN опирается на факт, который ставит утренний источник судьи (возврат госпошлины)
+  it('источник судьи ставит факт извинений (#988)', () => {
+    const { game } = makeGame()
+    game.S.ach.court = game.S.day
+    game.S.mem['intro.judge'] = true
+    const p = game.linePicked('PD_SRC', SOURCES)
+    expect(p, 'источник судьи не выбран — проверка пустеет').toBeDefined()
+    expect(p!.text).toMatch(/госпошлину/)
+    expect(game.S.mem[judgeApology], 'извинения судьи ставит прозвучавшая строка').toBe(true)
   })
 
   it('с живым hodl утро не продаёт коины, а исход отдаёт лаваш; хвастовство о курсе помечено (#815)', async () => {
