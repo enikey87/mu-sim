@@ -3,7 +3,7 @@
 // участник, умеющий писать сам (SPEAKS), обязан быть здесь или в исключениях с причиной — новый
 // участник красит сюит на месте, а не в плейтесте через раунд. Офферы и потребление окна ответом —
 // как были (#951), тексты пулов не менялись.
-import { crewPaidAt, grantTileAt, lawyerAt, moustachePhotoAt } from './memkeys'
+import { crewPaidAt, grantTileAt, lawyerAt, moustachePhotoAt, photoAt } from './memkeys'
 
 /** Общий дебютный слот (#973): `wrote.<who>`/`debutWho`/`debutAt` ставит первое сообщение участника. */
 export const DEBUT_SLOT = 'debut'
@@ -63,4 +63,5 @@ export interface EventSource {
 
 export const EVENT_SOURCES: readonly EventSource[] = [
   { source: 'смена фото без усов (Due_StakeShave / Condition_StakeShave)', at: moustachePhotoAt, offer: 'MoustachePhoto', pool: 'P_MOUSTACHE_PHOTO' },
+  { source: 'фото «платёжки» (Turn_Photo / game.photo)', at: photoAt, offer: 'Photo', pool: 'D.P_PHOTO' },
 ]

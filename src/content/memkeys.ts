@@ -190,8 +190,9 @@ export const debutWho = 'debut.who'
 export const debutAt = 'debut.at'
 /** Арсен записал крик игрока на диктофон и собрал трек «Плиточник» (rude-дебют): до этого трек, крик и бит не упоминаются (#982). */
 export const arsenTrack = 'arsen.track'
-/** Участник уже писал сам: повторные сообщения окно дебюта не открывают (#973). */
-export const wrote = (who: string) => `wrote.${who}` as const
+/** Участник уже писал сам: повторные сообщения окно дебюта не открывают (#973); пара суда спрашивает
+ *  именно письмо, а не знакомство-упоминание (#1017) — generic хранит литерал для типизированных условий. */
+export const wrote = <W extends string>(who: W): `wrote.${W}` => `wrote.${who}`
 /** Рубик остался жить на объекте и спит в ванной (#590): до этой серии про ванную не говорят. */
 export const rubikBath = 'rubik.bath'
 /** Заметные системные события с окном реакции (#927): ход события для «свежих» фактов. */
@@ -215,6 +216,9 @@ export const grantTileAt = 'tile.grantAt'
 /** Смена фото профиля без усов (#1013): заметное событие ставки — окно отклика игрока; сам факт
  *  «усы сбриты» живёт в `alik.shaved`, а это — ход события, ход и три после которого кнопка реакции жива. */
 export const moustachePhotoAt = 'moustache.photoAt'
+/** Фото «платёжки» от Алика (#1017): заметное событие — ход фото, ход и PHOTO_FRESH_TURNS после
+ *  которого кнопка отклика жива; окно потребляет ответ игрока. */
+export const photoAt = 'photo.photoAt'
 
 /** Ключи досок персонажей (S.actors), не мира. */
 export const sick = 'sick'
@@ -227,7 +231,7 @@ export const EVENT_KEY_LIST = [
   'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sinceCrew', 'sorrySwing', 'promiseLive', 'promisePassed', 'promiseStake',
   'debutWho', 'debutFresh', 'transferFresh', 'transferAmount',
   'ramPhotoFresh', 'borisSaleFresh', 'vacancyFresh', 'avitoReviewFresh', 'rubikAskFresh', 'kettleFresh',
-  'lawyerFresh', 'collectorsAskFresh', 'internFresh', 'rubikHoleFresh', 'countersuitFresh', 'grantTileFresh', 'moustachePhotoFresh',
+  'lawyerFresh', 'collectorsAskFresh', 'internFresh', 'rubikHoleFresh', 'countersuitFresh', 'grantTileFresh', 'moustachePhotoFresh', 'photoFresh',
   'period', 'night', 'offline', 'scene', 'sinceAlik', 'lateCount', 'arcAvailable',
   'arcsStarted', 'arcsDone', 'arcsMature', 'quests', 'callbackReady', 'lieOpen', 'lieKind', 'lieAlikOld', 'deathCanAdvance', 'collectorsCanAdvance',
   'intent', 'tone', 'arg', 'category', 'arc', 'argArcDone', 'greet', 'promise', 'somedayCount', momDachaDays,
@@ -246,7 +250,7 @@ export const MEM_KEYS: ReadonlySet<string> = new Set([
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday, saidKonak,
   lightOff, netRation, phoneWarn, holidayGreeted,
-  creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, collectorsTurned, criticalAt, creditOfferSum, momDachaAt, crewPaid, crewPaidAt, rubikBath, whenYears, ...Object.values(moneyAskAt), transferAt, transferAmount, moustachePhotoAt, debutWho, debutAt, arsenTrack,
+  creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, collectorsTurned, criticalAt, creditOfferSum, momDachaAt, crewPaid, crewPaidAt, rubikBath, whenYears, ...Object.values(moneyAskAt), transferAt, transferAmount, moustachePhotoAt, photoAt, debutWho, debutAt, arsenTrack,
   ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt, countersuitAt, grantTileAt,
   ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lend50),
 ])

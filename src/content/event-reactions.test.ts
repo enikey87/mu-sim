@@ -3,13 +3,14 @@ import { describe, it, expect, vi } from 'vitest'
 import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
 import { NOTIF } from './life'
-import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, STRASBOURG_THREAT, P_GRANT_TILE } from './rules/player-choice-pools'
-import { BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B } from './world'
+import { D } from './excuses'
+import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE } from './rules/player-choice-pools'
+import { BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, INTERN_B, HOLE_B } from './world'
 import { ARCS } from './arcs'
 import { FINALES } from './finales'
 import { COURT_LAWYER_AGAIN } from './quests'
 import { court, HEAT, lawyerAt, debutWho, arsenTrack, saidStrasburg, grantTileAt } from './memkeys'
-import { valueOf } from './fact'
+import { valueOf, type Line } from './fact'
 import type { Choice } from '../engine/state'
 
 const AD = 'Новое объявление рядом: «Продаю барана Бориса, торг, умеет писать».'
@@ -150,10 +151,11 @@ describe('прямые вопросы и первые сообщения (#958):
     const offered = (game: Game) => game.rules.collect({ event: 'BuildChoices' }, game.facts()).some((r) => r.name === 'Opt_LawyerFirst')
     const known = async () => {
       const { game } = makeGame()
-      await game.enterNode('nephew', 'start')
-      game.S.scene = null
+      // Арсен уже писал сам (#1017): письмо ставит и знакомство, и «писал» — иначе сработает Court_Lawyer
+      game.S.mem['intro.arsen'] = true
+      game.S.mem['wrote.arsen'] = true
       game.S.choices = null
-      expect(game.S.mem['intro.arsen'], 'Арсен уже в истории — иначе сработает Court_Lawyer').toBe(true)
+      expect(game.S.mem['wrote.arsen'], 'Арсен уже писал — иначе сработает Court_Lawyer').toBe(true)
       game.S.mem[court] = 1
       game.S.offlineDays = 0
       return game
@@ -212,6 +214,78 @@ describe('прямые вопросы и первые сообщения (#958):
     expect(has(game, 'rubikHole'), 'без вопроса варианта нет').toBe(false)
     await game.playEpisode(ARCS.rubik.eps[3], 'rubik')
     await answered(game, 'rubikHole')
+  })
+
+  // ответ окна — по выбранной строке, а не колодой (#1017): согласие/отказ и стиль ремонта
+  const poolIndex = (text: string, pool: readonly string[]): number =>
+    pool.findIndex((p) => text.toLowerCase().includes(p.toLowerCase()))
+  const saidFrom = (game: Game, from: number): string =>
+    game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' ? [m.text] : [])).join(' ')
+  const textOf = (x: unknown): string => (typeof x === 'string' ? x : String((x as { t?: unknown }).t ?? ''))
+
+  it('ответ стажировке — по выбранной строке игрока, каждая из трёх (#1017)', async () => {
+    const seen = new Map<number, string>()
+    for (let seed = 1; seed <= 60 && seen.size < 3; seed++) {
+      const { game } = makeGame({ seed })
+      await game.playFinale('collectors', FINALES.collectors.find((f) => f.id === 'intern')!)
+      game.S.choices = null
+      const c = game.buildChoices().find((x) => x.act === 'internOffer')
+      expect(c, 'окна стажировки нет — проверка пустеет').toBeTruthy()
+      const i = poolIndex(c!.text, P_INTERN)
+      expect(i, `строка не из пула: «${c!.text}»`).toBeGreaterThanOrEqual(0)
+      const from = game.S.msgs.length
+      await game.send(c!)
+      const said = saidFrom(game, from)
+      const want = valueOf(INTERN_B[i])
+      expect(said, `выбрано «${P_INTERN[i]}» — ответ не по строке`).toContain(textOf(want))
+      if (i === 1) expect(said, 'отказу досталось «добро пожаловать»').not.toMatch(/Добро пожаловать/)
+      else expect(said, 'согласию достался «отказ принят»').not.toMatch(/Отказ принят/)
+      seen.set(i, said)
+    }
+    expect([...seen.keys()].sort(), 'не все три варианта пула получили свой ответ').toEqual([0, 1, 2])
+  })
+
+  it('ответ про дырку — по выбранной строке игрока, каждая из трёх (#1017)', async () => {
+    const seen = new Map<number, string>()
+    for (let seed = 1; seed <= 60 && seen.size < 3; seed++) {
+      const { game } = makeGame({ seed })
+      await game.playEpisode(ARCS.rubik.eps[3], 'rubik')
+      game.S.choices = null
+      const c = game.buildChoices().find((x) => x.act === 'rubikHole')
+      expect(c, 'окна «дырка» нет — проверка пустеет').toBeTruthy()
+      const i = poolIndex(c!.text, P_HOLE)
+      expect(i, `строка не из пула: «${c!.text}»`).toBeGreaterThanOrEqual(0)
+      const from = game.S.msgs.length
+      await game.send(c!)
+      const said = saidFrom(game, from)
+      const want = valueOf(HOLE_B[i])
+      expect(said, `выбрано «${P_HOLE[i]}» — ответ не по строке`).toContain(textOf(want))
+      seen.set(i, said)
+    }
+    expect([...seen.keys()].sort(), 'не все три варианта пула получили свой ответ').toEqual([0, 1, 2])
+  })
+
+  it('фото «платёжки»: окно отклика с хода события, ответ потребляет, новое фото открывает заново (#1017)', async () => {
+    const { game } = makeGame()
+    const button = () => { game.S.choices = null; return game.buildChoices().find((c) => c.act === 'photo') }
+    const lowFirst = (t: string) => t.charAt(0).toLowerCase() + t.slice(1)
+    expect(button(), 'без фото варианта нет').toBeUndefined()
+    await game.photo()
+    const at = Number(game.S.mem['photo.photoAt'])
+    expect(at, 'фото не штампануло ход').toBe(game.S.stats.sent)
+    const first = button()
+    expect(first, 'на ходу фото варианта нет').toBeDefined()
+    expect((D.P_PHOTO as readonly Line[]).map((x) => valueOf(x) as string).some((p) => first!.text.includes(p) || first!.text.includes(lowFirst(p))), `не из пула P_PHOTO: «${first!.text}»`).toBe(true)
+    game.S.stats.sent = at + 3
+    expect(button(), 'третий ход после фото — ещё окно').toBeDefined()
+    game.S.stats.sent = at + 4
+    expect(button(), 'вне окна — варианта нет').toBeUndefined()
+    game.S.stats.sent = at
+    await game.send(button()!)
+    expect(game.S.mem['photo.photoAt'], 'ответ не потребил окно').toBeUndefined()
+    expect(button(), 'после ответа окно не закрылось').toBeUndefined()
+    await game.photo()
+    expect(button(), 'новое фото окно не открыло').toBeDefined()
   })
 
   it('ответ про коллекторов держит только то, что они писали до вопроса (#970)', async () => {

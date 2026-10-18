@@ -23,7 +23,7 @@ import {
   betonSet, cardSent, saidTomorrow, saidFriday, saidKonak, payday, count, endgame, holidayGreeted, lend50,
   paydayScene, lightOff, netRation, phoneWarn, creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited,
   collectorsTurned,
-  criticalAt, creditOfferSum, crewPaid, crewPaidAt, moneyAskAt, rubikBath, whenYears, ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt, countersuitAt, grantTileAt, transferAt, transferAmount, moustachePhotoAt,
+  criticalAt, creditOfferSum, crewPaid, crewPaidAt, moneyAskAt, rubikBath, whenYears, ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt, countersuitAt, grantTileAt, transferAt, transferAmount, moustachePhotoAt, photoAt,
   debutWho, debutAt, arsenTrack,
 } from './memkeys'
 import { momDachaAt, momDachaDays, type LoanId, type MomId, type ThingId } from './credit'
@@ -63,7 +63,7 @@ export type MemExactKey =
   | typeof collectorsTurned
   | typeof criticalAt | typeof creditOfferSum | typeof crewPaid | typeof crewPaidAt | typeof moneyAskAt[keyof typeof moneyAskAt] | typeof rubikBath | typeof whenYears
   | typeof ramPhotoAt | typeof borisSaleAt | typeof vacancyAt | typeof avitoReviewAt
-  | typeof rubikAskAt | typeof kettleAt | typeof lawyerAt | typeof collectorsAskAt | typeof internAt | typeof rubikHoleAt | typeof countersuitAt | typeof grantTileAt | typeof moustachePhotoAt
+  | typeof rubikAskAt | typeof kettleAt | typeof lawyerAt | typeof collectorsAskAt | typeof internAt | typeof rubikHoleAt | typeof countersuitAt | typeof grantTileAt | typeof moustachePhotoAt | typeof photoAt
   | typeof payday[keyof typeof payday] | typeof count[keyof typeof count]
   | typeof endgame[keyof typeof endgame] | typeof lend50[keyof typeof lend50]
 

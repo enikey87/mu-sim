@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import { makeGame } from '../../test/helpers'
 import { COURT, COURT_AFTER, COURT_LAWYER_AGAIN, COURT_VERDICT_AFTER_LETTER } from '../quests'
+import { ARCS } from '../arcs'
 import { valueOf } from '../../engine/rules'
 import { THREAT_AGAIN } from '../misc'
 import type { Game } from '../../engine/game'
@@ -37,10 +38,24 @@ describe('линия суда', () => {
     expect([...COURT_AFTER.map(valueOf), ...THREAT_AGAIN.map(valueOf)]).toContain(after.t.at(-1))
     expect(game.S.mem['count.threat']).toBe(8)
   })
-  it('Арсен уже писал (племянник) — на ступени 1 не представляется второй раз', async () => {
+  it('упоминание Арсена (бетон) — не «снова»: первое письмо юриста представляется (#1017)', async () => {
     const { game } = makeGame()
-    await game.enterNode('nephew', 'start')
-    game.S.scene = null
+    await game.playEpisode(ARCS.beton.eps[3], 'beton') // «мой племянник Арсен изучил вопрос» — знакомство без письма
+    expect(game.S.mem['intro.arsen'], 'упоминание не поставило знакомство — проверка пустеет').toBe(true)
+    expect(game.S.mem['wrote.arsen'], 'упоминание не должно ставить «писал»').toBeUndefined()
+    game.S.mem.court = 1
+    const { r, t } = await threat(game)
+    expect(r).toBe('Court_Lawyer')
+    for (const [, line] of COURT[1]) expect(t).toContain(line)
+    expect(t.join(' ')).toMatch(/Здравствуйте, это Арсен/)
+    expect(t.join(' ')).not.toMatch(/Это снова Арсен/)
+  })
+  it('Арсен уже писал сам — на ступени 1 не представляется второй раз', async () => {
+    const { game } = makeGame()
+    // настоящее первое письмо: ступень 1 проходит штатно и штампует «писал» (#1017)
+    game.S.mem.court = 1
+    expect((await threat(game)).r).toBe('Court_Lawyer')
+    expect(game.S.mem['wrote.arsen'], 'первое письмо Арсена не штампануло «писал»').toBe(true)
     game.S.mem.court = 1
     const { r, t } = await threat(game)
     expect(r).toBe('Court_Lawyer_Again')
@@ -48,10 +63,10 @@ describe('линия суда', () => {
     expect(t.join(' ')).not.toMatch(/Здравствуйте, это Арсен/)
   })
   it('перевод звучит и на ветках: Арсен уже писал и вердикт после письма Страсбурга', async () => {
-    // Court_Lawyer_Again: Арсен знаком, ступень 1
+    // Court_Lawyer_Again: Арсен писал сам — письмо ставит и знакомство (#1017)
     const { game } = makeGame()
-    await game.enterNode('nephew', 'start')
-    game.S.scene = null
+    game.S.mem['intro.arsen'] = true
+    game.S.mem['wrote.arsen'] = true
     game.S.mem.court = 1
     game.S.mem['threat.claim'] = 'tax'
     const again = await threat(game)
@@ -67,16 +82,16 @@ describe('линия суда', () => {
     expect(lettered.t[0]).toBe(`Коллекторы? Коллекторы сказали — это в суд. ${COURT_VERDICT_AFTER_LETTER[0][1]}`)
   })
 
-  it('без Court_Lawyer_Again при знакомстве с Арсеном побеждает общая ступень', async () => {
+  it('без Court_Lawyer_Again при писавшем Арсене побеждает общая ступень', async () => {
     const { game } = makeGame()
-    await game.enterNode('nephew', 'start')
-    game.S.scene = null
+    game.S.mem['intro.arsen'] = true
+    game.S.mem['wrote.arsen'] = true
     game.S.mem.court = 1
     const again = game.rules.all.find((x) => x.name === 'Court_Lawyer_Again')!
     const when = again.when
     again.when = [{ key: '__never__', op: '==', value: true }]
     try {
-      // Court_Lawyer закрыт intro.arsen; без Again остаётся общая ступень
+      // Court_Lawyer закрыт wrote.arsen; без Again остаётся общая ступень
       expect((await threat(game)).r).toBe('Court_Step')
     } finally { again.when = when }
   })

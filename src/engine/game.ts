@@ -1,6 +1,6 @@
 // Игра: состояние, сообщения, ход Алика, «живость». Решения — что ответить, что предложить игроку,
 // что сделать Алику — принимает система правил (engine/rules/, content/rules/*).
-import { make, D, TRANSFER_FRESH_TURNS, low, cap, type ExcuseApi, type Promise3, type PromiseCondition, type Rel, type When } from '../content/excuses'
+import { make, D, TRANSFER_FRESH_TURNS, PHOTO_FRESH_TURNS, low, cap, type ExcuseApi, type Promise3, type PromiseCondition, type Rel, type When } from '../content/excuses'
 import { makeScenes, invKey, type Scene, type Line } from '../content/scenes'
 import { COLD_WAR, TRIBUNAL } from '../content/rude'
 import { MIRROR, MIRROR_AGAIN, MIRROR_OPEN, MIRROR_REPLY, type Mirror } from '../content/mirror'
@@ -1596,6 +1596,8 @@ export class Game {
       grantTileFresh: S.stats.sent - Number(S.mem[memkeys.grantTileAt] ?? -99) <= 3,
       // смена фото без усов (#1013): заметное событие ставки — отклик живёт ход события и три после
       moustachePhotoFresh: S.stats.sent - Number(S.mem[memkeys.moustachePhotoAt] ?? -99) <= 3,
+      // фото «платёжки» (#1017): заметное событие — отклик живёт ход фото и PHOTO_FRESH_TURNS после
+      photoFresh: S.stats.sent - Number(S.mem[memkeys.photoAt] ?? -99) <= PHOTO_FRESH_TURNS,
       sinceRude: S.stats.sent - Number(S.mem[memkeys.rudeAt] ?? -99),
       // без штампа звонка — далеко: «кто звонил» без имени закрыто (#928)
       sinceCrew: S.stats.sent - Number(S.mem[memkeys.crewPaidAt] ?? -99),
@@ -2214,6 +2216,8 @@ export class Game {
     await this.typingFor(2500)
     const text = this.uniq(() => saidJoin(this.draw('PHOTOTXT', PHOTO_A), ' ', this.draw('PHOTOTX2', PHOTO_B)))
     this.alikMsg({ kind: 'photo', from: 'alik', text: saidText(text) }, saidClaims(text))
+    // фото «платёжки» — заметное событие с окном отклика (#1017): штамп хода, кнопка реакции не живёт одним ctx
+    this.S.mem[memkeys.photoAt] = this.S.stats.sent
     this.S.ctx = { type: 'photo' }
   }
 

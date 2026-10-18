@@ -8,6 +8,7 @@ import { Gated, valueOf, is, gate, type Line, type FactKey } from './fact'
 import type { Criterion } from '../engine/rules'
 import * as PP from './rules/player-choice-pools'
 import { ARCS } from './arcs'
+import { D } from './excuses'
 import { intro } from './memkeys'
 import * as W from './world'
 import {
@@ -77,6 +78,10 @@ const WINDOWS: Window[] = [
   // окно ставки «усы» (#1013): «Карине» приходит только со знакомством — строка несёт needs('karine')
   { pool: 'P_MOUSTACHE_PHOTO', lines: PP.P_MOUSTACHE_PHOTO, marks: { Карине: 'intro.karine' } },
   { pool: 'MOUSTACHE_PHOTO_B', lines: MOUSTACHE_PHOTO_B, marks: { Карине: 'intro.karine' } },
+  // фото «платёжки» (#1017): отклик на событие Turn_Photo — баран и «Арарат» тема самого события, меток нет
+  { pool: 'D.P_PHOTO', lines: D.P_PHOTO, marks: {} },
+  { pool: 'D.PHOTO_A', lines: D.PHOTO_A, marks: {} },
+  { pool: 'D.PHOTO_B', lines: D.PHOTO_B, marks: {} },
   { pool: 'P_VIA_BORIS', lines: PP.P_VIA_BORIS, marks: { Борис: null } },
   { pool: 'P_VIA_KARINE', lines: PP.P_VIA_KARINE, marks: { Карине: null } },
   { pool: 'P_VIA_MAMA', lines: PP.P_VIA_MAMA, marks: {} },
