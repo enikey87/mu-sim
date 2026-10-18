@@ -59,6 +59,8 @@ export const DIRECT: Record<string, DirectCase> = {
   Finale_grant_ally: { event: 'ArcFinale', facts: { arc: 'grant' }, setup: (g) => { g.S.ach.customer = 1 } },
   Finale_razmik_shift_or: { event: 'ArcFinale', facts: { arc: 'razmik' }, setup: (g) => { g.S.ach.newjob = 1 } },
   Finale_garik_cutter: { event: 'ArcFinale', facts: { arc: 'garik' }, setup: (g) => { g.S.ach.newjob = 1 } },
+  // #983: окно первого «Би-бип» сдвинуло розыгрыш — обычный финал Гарика ни разу до экрана концовки
+  Finale_garik_default: { event: 'ArcFinale', facts: { arc: 'garik' } },
   Finale_alik_death_will: { event: 'ArcFinale', facts: { arc: 'alik_death' }, setup: (g) => { g.S.ach.forgive = 1; g.S.mem['asked.alik_death'] = 1 } },
   Finale_rubik_bribe: { event: 'ArcFinale', facts: { arc: 'rubik' }, setup: (g) => { g.S.ach.redo = 1 } },
   Finale_samvel_tamada: { event: 'ArcFinale', facts: { arc: 'samvel' }, setup: (g) => { g.S.ach.toast = 1 } },
@@ -249,6 +251,8 @@ export const DIRECT: Record<string, DirectCase> = {
   // #981 (окна follow-пула бетона и штампы легенды места) сдвинул розыгрыш — ответ окну дебюта Арсена (#973)
   // ушёл из выборок, держим прямым случаем
   Says_lawyerAsk: { event: 'PlayerSays', facts: { intent: 'lawyerAsk' } },
+  // #982 (пул дебюта Арсена ждёт события трека) — ответ окну дебюта в выборках больше не собирается
+  Says_debutArsen: { event: 'PlayerSays', facts: { intent: 'debutArsen' } },
   Scene_lend: { event: 'PickScene', setup: (g) => { g.S.mood = 4 } }, // денег в свежей партии хватает (START_MONEY)
   // Scene_newjob: с #826 срабатывает в выборках сам (8 партий при пороге 7) — прямой случай не нужен
   Scene_loan: { event: 'PickScene', setup: (g) => { g.S.day = 230 } },

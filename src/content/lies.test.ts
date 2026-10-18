@@ -251,6 +251,21 @@ describe('поймать на лжи', () => {
     expect(game.facts().lieKind).toBe('customer')
     expect(game.facts().lieAlikOld).toBe(true) // прошлую версию сказал сам Алик — «вы же говорили» уместно
   })
+  it('перевыпуск старой легенды не делает её новой в «сначала… теперь…» (#987)', async () => {
+    const { game } = makeGame()
+    hear(game, ['money_safe'])
+    game.S.day += 1
+    hear(game, ['money_niva'])
+    await catchLie(game) // пара закрыта: иначе повтор того же противоречия эпизод не откроет
+    game.S.day += 1
+    hear(game, ['money_safe'], 'nune') // Нуне перевыпускает сейф последним клеймом
+    const lie = game.lie()
+    expect(lie?.old.key, 'сейф введён раньше «Нивы»').toBe('money_safe')
+    expect(lie?.new.key).toBe('money_niva')
+    const text = game.buildChoices().find((c) => c.act === 'catchLie')!.text
+    expect(text.indexOf('деньги в сейфе'), text).toBeLessThan(text.indexOf('деньги в «Ниве»'))
+    expect(game.facts().lieAlikOld, 'сейф ввёл Алик').toBe(true)
+  })
   it('версию сказал не Алик — игрок не приписывает её ему', () => {
     const { game } = makeGame()
     hear(game, ['money_safe'], 'nune')

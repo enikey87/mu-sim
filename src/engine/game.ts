@@ -7,7 +7,7 @@ import { MIRROR, MIRROR_AGAIN, MIRROR_OPEN, MIRROR_REPLY, type Mirror } from '..
 import { PAYDAY_HOOKS } from '../content/rules/payday'
 import { QUEST_WHEN } from '../content/rules/world'
 import { LEGENDS } from '../content/legends'
-import { moneyPlaceOf, stampMoneyPlace } from '../content/money-ask'
+import { moneyPlaceOf, moneyPlaceOfClaim, stampMoneyPlace } from '../content/money-ask'
 import { TOPICS, P_NEU_B_LATE, P_RUDE_BLOCKED, P_RUDE_POLITE, P_POL_POLITE, P_NIGHT, P_FRIDAY, P_MONEY, P_DESPERATE, DESPERATE_REPLY, MONEY_REPLY_POLITE, MONEY_REPLY_NEUTRAL, MONEY_REPLY_REGIMENT } from '../content/topics'
 import { FINALES, ENDINGS, DEFAULT_FINALE, paydayOutcome, type Finale, type PaydayId } from '../content/finales'
 import { ARCS, ARC_DONE, ARC_MENTIONS, CAST, type Episode, GROUP, GROUP_OOPS, WRONG_TO, WRONG_WHAT, WRONG_OOPS } from '../content/arcs'
@@ -1582,6 +1582,8 @@ export class Game {
       internFresh: S.stats.sent - Number(S.mem[memkeys.internAt] ?? -99) <= 3,
       rubikHoleFresh: S.stats.sent - Number(S.mem[memkeys.rubikHoleAt] ?? -99) <= 3,
       countersuitFresh: S.stats.sent - Number(S.mem[memkeys.countersuitAt] ?? -99) <= 3,
+      // первое сообщение заказчика Гранта (#983): ход реплики и три после
+      grantTileFresh: S.stats.sent - Number(S.mem[memkeys.grantTileAt] ?? -99) <= 3,
       sinceRude: S.stats.sent - Number(S.mem[memkeys.rudeAt] ?? -99),
       // без штампа звонка — далеко: «кто звонил» без имени закрыто (#928)
       sinceCrew: S.stats.sent - Number(S.mem[memkeys.crewPaidAt] ?? -99),
@@ -1942,7 +1944,8 @@ export class Game {
         this.clearScene() // свой текст посреди сцены — сцена прерывается
         await this.alikTurn(tone, o.category)
       } else {
-        await this.alikTurn(tone, o.category)
+        // arg варианта (кнопка без act, например угроза судом) едет в факты PlayerMessage: по нему реплика называет себя (#982)
+        await this.alikTurn(tone, o.category, o.arg)
       }
       if (this.disposed) return
 
@@ -2118,7 +2121,7 @@ export class Game {
   }
 
   // ---------- ход Алика ----------
-  async alikTurn(tone: Tone, category?: Choice['category']): Promise<void> {
+  async alikTurn(tone: Tone, category?: Choice['category'], arg?: Choice['arg']): Promise<void> {
     const S = this.S
     S.ctx = null
     // обычный +1…3 — в конце хода (после хора); здесь только возврат из пропажи
@@ -2129,7 +2132,7 @@ export class Game {
       S.offlineDays = 0
       await this.say([this.uniq(this.X.back)])
     }
-    await this.fire('PlayerMessage', { tone, category })
+    await this.fire('PlayerMessage', { tone, category, arg })
   }
 
   /** Обычный ход: иногда «прочитано и молчит», иногда реплика по времени суток, потом взвешенный выбор. */
@@ -2324,6 +2327,9 @@ export class Game {
     const source = who && isWhoId(who) ? who : 'alik'
     for (const event of claims) {
       if (typeof event === 'string') {
+        // утверждение о месте денег прозвучало (Алик, персонаж легенды, хор) — его state-вопросы молчат окно (#981)
+        const place = moneyPlaceOfClaim(event)
+        if (place) stampMoneyPlace(this, place, this.S.stats.sent)
         const point = CLAIM_LEDGER[event]
         publishClaim(this.S.ledger, point.subject, point.value, { source, day: this.S.day, msgId, claimKey: event })
       } else if ('retract' in event) {
@@ -2354,10 +2360,22 @@ export class Game {
     const ok = a.claimKey ?? claimKeyOf(a.subject, a.value)
     const nk = b.claimKey ?? claimKeyOf(b.subject, b.value)
     const o = ok ? claimByKey(ok) : undefined, n = nk ? claimByKey(nk) : undefined
-    if (!o || !n) return null
+    if (!ok || !nk || !o || !n) return null
     const kind: LieKind = ep.subject === 'grandpa.life' ? 'grandpa' : ep.subject === 'customer.payment' ? 'customer' : 'money'
-    // «вы же говорили» — только про версию самого Алика; прошлую могла сказать и родня
-    return { old: o, new: n, kind, alikOld: a.source === 'alik' }
+    // «сначала/теперь» — день первого введения версии, не день последнего клейма (#987)
+    const intro = (key: string) => {
+      let best: { day: number; id: number; source: string } | undefined
+      for (const c of this.S.ledger.claims) {
+        const k = c.claimKey ?? claimKeyOf(c.subject, c.value)
+        if (k !== key) continue
+        if (!best || c.day < best.day || (c.day === best.day && c.id < best.id)) best = { day: c.day, id: c.id, source: c.source }
+      }
+      return best
+    }
+    const ia = intro(ok), ib = intro(nk)
+    const aFirst = !ia || !ib || ia.day < ib.day || (ia.day === ib.day && ia.id <= ib.id)
+    // «вы же говорили» — про того, кто эту раннюю версию ввёл; гейт пула не меняется
+    return { old: aFirst ? o : n, new: aFirst ? n : o, kind, alikOld: (aFirst ? ia?.source : ib?.source) === 'alik' }
   }
   async caught(line: string): Promise<void> {
     const ep = currentEpisode(this.S.ledger)

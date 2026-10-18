@@ -1,7 +1,7 @@
 // Тексты для новых возможностей системы правил: обещания, которые наступают, хор персонажей,
 // состояния мира со сроком (свадьба, болезнь Бориса, «Алик умер»).
 import { type Criterion, type Line, type Entry, named, exists, is, eq, gte, ne, missing, set, gate } from './fact'
-import { cryptoHodl, garikConcrete, garikCut, garikDenied, grandpaDying, grantPaid, intro, karineKnowsDebt, karineThinksTax, met, mourning, nivaAway, nivaPlayer, nuneDekretOver, payday, saidFriday, saidTomorrow, alikShaved, wedding, collectorsRecruited, collectorsTurned, rubikBath } from './memkeys'
+import { arsenTrack, cryptoHodl, garikConcrete, garikCut, garikDenied, grandpaDying, grantPaid, intro, karineKnowsDebt, karineThinksTax, met, mourning, nivaAway, nivaPlayer, nuneDekretOver, payday, saidFriday, saidStrasburg, saidTomorrow, alikShaved, wedding, collectorsRecruited, collectorsTurned, rubikBath } from './memkeys'
 import type { WhoId } from './ids'
 
 // Мир последователен: кто и что есть в истории и в каком оно положении — факты, их ставит серия (remember), ступень суда
@@ -56,6 +56,10 @@ export const WORLD = {
   /** Алик хоть раз назвал сроком «завтра» — теперь на это слово можно ссылаться. */
   saidTomorrow: named('saidTomorrow', is(saidTomorrow)),
   saidFriday: named('saidFriday', is(saidFriday)),
+  /** Арсен записал крик и собрал трек «Плиточник» (rude-дебют): вопросы про трек, крик и бит — только после (#982). */
+  arsenTrack: named('arsenTrack', is(arsenTrack)),
+  /** Игрок сам оглашал план «до Страсбурга»: отклик Арсена про Страсбург — только после (#982). */
+  saidStrasburg: named('saidStrasburg', is(saidStrasburg)),
   /** Усы на месте: ставки и клятвы усами молчат, пока сбриты (`alik.shaved`). */
   moustache: named('moustache', missing(alikShaved)),
   /** В семье прощаются: дедушка умирает или хоронят Алика. */
@@ -210,22 +214,34 @@ export const CREW_CALL_B = [
 ]
 /** Ответы на дебюты участников (#973): голос самого персонажа, только то, что его сообщение утверждает. */
 export const DEBUT_ARSEN_B = [
-  needs('arsen')({ w: 'arsen', t: 'Трек в открытом доступе. Дядя слушает его каждое утро. Со слезами. Прослушивания растут.' }),
-  needs('arsen')({ w: 'arsen', t: 'Автор — вы, исполнитель — ваш крик, продюсер — дядя. Дядя гонорар уже потратил.' }),
-  needs('arsen')({ w: 'arsen', t: 'Бит из вашего крика и дядиного «дай денег». Получилось грустно, но честно.' }),
+  needs('arsen', 'arsenTrack')({ w: 'arsen', t: 'Трек в открытом доступе. Дядя слушает его каждое утро. Со слезами. Прослушивания растут.' }),
+  needs('arsen', 'arsenTrack')({ w: 'arsen', t: 'Автор — вы, исполнитель — ваш крик, продюсер — дядя. Дядя гонорар уже потратил.' }),
+  needs('arsen', 'arsenTrack')({ w: 'arsen', t: 'Бит из вашего крика и дядиного «дай денег». Получилось грустно, но честно.' }),
 ]
 export const DEBUT_SAMVEL_B = [
   needs('samvel')({ w: 'samvel', t: 'Я хозяин свадьбы. Алик — гость, который должен. Разница огромная.' }),
   needs('samvel')({ w: 'samvel', t: 'Сто тринадцать. На каждой главным был я. У Алика была роль — обещать.' }),
   needs('samvel')({ w: 'samvel', t: 'Хозяин — я, мегафон — мой. Твой долг — у Алика. Всё по ролям, мальчик.' }),
 ]
+/** Ответ Гранта на первое «плитка — орудие» (#983): только плитка и адвокат из этой реплики. */
+export const GRANT_TILE_B = [
+  needs('grant')({ w: 'grant', t: 'Плитка — орудие. Я так и написал. Адвокат свяжется.' }),
+  needs('grant')({ w: 'grant', t: 'Адвокат свяжется. Он смотрит плитку. Плитка смотрит в пол.' }),
+  needs('grant')({ w: 'grant', t: 'Я написал про плитку и про адвоката. Остальное — к Алику.' }),
+]
+/** Ответ «Нивы» на первое «Би-бип» (#983): только то, что бип утверждает. */
+export const DEBUT_NIVA_B = [
+  needs('niva')({ w: 'niva', t: 'Би-бип. Я написала. Остальное пусть скажет Алик. Би-бип.' }),
+  needs('niva')({ w: 'niva', t: 'Би-бип. Принято. Би-бип.' }),
+]
 export const DEBUT_BORIS_B = [
   needs('borisWrites')({ w: 'boris', t: 'Бе-е-е. (Борис кивает.)' }),
   needs('borisWrites')({ w: 'boris', t: 'Бее! (Борис показывает копытом на Алика.)' }),
   needs('borisWrites')({ w: 'boris', t: 'Бе-бе. (Борис не уточняет.)' }),
 ]
-/** Ответ Арсена на вопросы про суд и Страсбург (#958). */export const LAWYER_B = [
-  needs('arsen')({ w: 'arsen', t: 'Страсбург — это три инстанции. Я весь сериал записал, пойдём по всем.' }),
+/** Ответ Арсена на вопросы про суд и Страсбург (#958). Страсбург — только после оглашения игроком (#996). */
+export const LAWYER_B = [
+  needs('arsen', 'saidStrasburg')({ w: 'arsen', t: 'Страсбург — это три инстанции. Я весь сериал записал, пойдём по всем.' }),
   needs('arsen')({ w: 'arsen', t: 'Диплом в процессе. Второй курс, но уверенность — с первого. Алик проверил.' }),
   needs('arsen')({ w: 'arsen', t: 'Суд — это быстро. Для тех, кто платит юристу. У Алика юрист я, поэтому подождём.' }),
 ]

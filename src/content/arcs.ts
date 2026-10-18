@@ -4,7 +4,7 @@ import { type Entry, type FactOp, type Criterion, type FactKey, type Said, set, 
 import { type ClaimKey } from './ids'
 import type { LedgerEvent } from './fact-types'
 import { needs, meet, WORLD, MENTION_RE } from './world'
-import { actSigned, alikDead, betonSet, borisMarried, collectorsAskAt, collectorsRecruited, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantPaid, houseOnGarik, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, rubikHoleAt, sick, taxFrozen, wedding } from './memkeys'
+import { actSigned, alikDead, betonSet, borisMarried, collectorsAskAt, collectorsRecruited, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantPaid, grantTileAt, houseOnGarik, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, rubikHoleAt, sick, taxFrozen, wedding } from './memkeys'
 import { stateQuestion } from './money-ask'
 
 export type ArcMsg = Said | { w: string; t: string; claims?: LedgerEvent[]; remember?: FactOp[]; stamp?: string } | { t: string; claims: LedgerEvent[]; remember?: FactOp[]; stamp?: string }
@@ -60,7 +60,7 @@ export const ARCS: Record<string, Arc> = {
       gate(eq('arc.boris', 7))('Алик, как Борис-то? Профессия у него серьёзная, а денег у меня всё нет.'),
       gate(eq('arc.boris', 2))('Борису лучше? А квитанции мои он доест или свои?'),
       gate(eq('arc.boris', 5))('Борис женился? Подарок им везти или деньгами обойдёмся?'),
-      gate(eq('arc.boris', 9))('Бориса в налоговую забрали? Значит, деньги приморозили.'),
+      gate(eq('arc.boris', 9))(stateQuestion('bank', 'Бориса в налоговую забрали? Значит, деньги приморозили.')),
       // безгейтные формулировки держат ёмкость пула: порог «Бригадира» — шесть вопросов (#753, #926)
       'Как там баран? Овца из него вышла или всё ещё смотрит на Арарат?',
       'Борис на объект выходил? Пусть хотя бы посмотрит, где мои деньги лежали.',
@@ -137,6 +137,9 @@ export const ARCS: Record<string, Arc> = {
   niva: {
     title: 'Побег «Нивы»',
     follow: [
+      // state-вопросы места «Нива» — исключение линтера #995: счётчик asked.niva (финал «Нива выбрала тебя»)
+      // достижим только при открытом пуле — окно гасит вопрос (замер: 1 вопрос за 300 ходов). Позиционные
+      // гейты #919 держат место; window-гейт осознанно не ставится
       'Есть новости про «Ниву»?',
       gate(WORLD.nivaAway, is('heard.money_foundation'))('«Нива» уехала. Значит, деньги у меня в фундаменте, а не у Алика?'),
       gate(WORLD.nivaPlayer)('«Нива» сама ко мне приехала? И в бардачке 50 — это мне или в долг?'),
@@ -158,12 +161,13 @@ export const ARCS: Record<string, Arc> = {
   nune: {
     title: 'Бухгалтер Нуне',
     follow: [
-      'Как Нуне? Денег нет — они в сейфе, я правильно понял?',
-      'Алик, что с бухгалтерией? Долг растёт, а ключ из декрета не выходит.',
+      // state-вопросы места (сейфа) несут то же окно, что money-ask (#981, раунд 73): подтверждённое Нуне место не переспрашивается
+      stateQuestion('safe', 'Как Нуне? Денег нет — они в сейфе, я правильно понял?'),
+      stateQuestion('safe', 'Алик, что с бухгалтерией? Долг растёт, а ключ из декрета не выходит.'),
       gate(gte('arc.nune', 4))('Ключ найдётся? Если не твой, так кто тогда ответит?'),
-      needs('dekretNow')('Нуне вышла из декрета? Год-два, и деньги вернутся?'),
+      needs('dekretNow')(stateQuestion('safe', 'Нуне вышла из декрета? Год-два, и деньги вернутся?')),
       gate(eq('finale.nune', 'ledger'))('Нуне акт подписала, долг вырос на 72 000. Сколько из этого моё?'),
-      'Нуне в декрете, сейф закрыт, а деньги стоят. Так и будем стоять?',
+      stateQuestion('safe', 'Нуне в декрете, сейф закрыт, а деньги стоят. Так и будем стоять?'),
     ],
     eps: [
       { remember: meet('nune'), m: [{ t: 'Бухгалтер Нуне ушла в декрет. Ключ от сейфа у неё в сумочке. Декрет я понимаю: у меня все деньги так — вроде есть, а достать нельзя.', claims: ['money_safe'] }], then: 'promise', legend: 'safe_nune' },
@@ -221,8 +225,8 @@ export const ARCS: Record<string, Arc> = {
       gate(eq('arc.rubik', 7))('Акт подписали?'),
       gate(gte('arc.rubik', 7))('Акт подпишут? Штраф на меня запишут?'),
       // вопрос — после развязки (#914): до неё «оказывается, из налоговой» телеграфировало открытие за месяцы
-      gate(is(taxFrozen))('Рубик из налоговой — значит, деньги в безопасности? Пусть лежат.'),
-      gate(is(taxFrozen))('Алик, счета заморозили? Долг мой там же, никуда не делся?'),
+      gate(is(taxFrozen))(stateQuestion('bank', 'Рубик из налоговой — значит, деньги в безопасности? Пусть лежат.')),
+      gate(is(taxFrozen))(stateQuestion('bank', 'Алик, счета заморозили? Долг мой там же, никуда не делся?')),
       gate(gte('arc.rubik', 5))('Рубик вычислил, и деньги ушли из долга? Или прибавились?'),
     ],
     eps: [
@@ -358,7 +362,7 @@ export const ARCS: Record<string, Arc> = {
     eps: [
       { m: ['Брат, проблема. На твоей плитке поскользнулся заказчик. Говорит, слишком гладкая. Как лёд.'] },
       { m: ['Заказчик в гипсе. Подаёт в суд. На тебя. Я ни при чём — я только деньги не платил.'], legend: 'court_tile' },
-      { m: [{ w: 'grant', t: 'Молодой человек, ваша плитка — орудие. Мой адвокат с вами свяжется.' }] },
+      { m: [{ w: 'grant', t: 'Молодой человек, ваша плитка — орудие. Мой адвокат с вами свяжется.', stamp: grantTileAt }] },
       { m: [gate(is('ctx.debtMoved'))('Хорошая новость: я твой адвокат! Бесплатно. Ну как бесплатно — из твоего долга вычту.')], fx: { debt: -10000 }, sys: 'Алик вычел из долга 10 000 ₽ за адвокатские услуги.' },
       { m: ['Твою плитку внесли в реестр памятников. Теперь с неё нельзя ничего требовать. Как с меня, брат.'] },
       { m: ['Суд решил: плитка невиновна. Виноват пол под ней. Пол клал я. По этому делу мы квиты, брат. Основной долг остался — суд его даже трогать побоялся.'], fx: { ach: 'arc_tile' }, then: 'promise', legend: null },

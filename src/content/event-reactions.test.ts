@@ -3,13 +3,14 @@ import { describe, it, expect, vi } from 'vitest'
 import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
 import { NOTIF } from './life'
-import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER } from './rules/player-choice-pools'
-import { BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B } from './world'
+import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, STRASBOURG_THREAT, P_GRANT_TILE } from './rules/player-choice-pools'
+import { BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B } from './world'
 import { ARCS } from './arcs'
 import { FINALES } from './finales'
 import { COURT_LAWYER_AGAIN } from './quests'
-import { court, HEAT, lawyerAt } from './memkeys'
+import { court, HEAT, lawyerAt, debutWho, arsenTrack, saidStrasburg, grantTileAt } from './memkeys'
 import { valueOf } from './fact'
+import type { Choice } from '../engine/state'
 
 const AD = 'Новое объявление рядом: «Продаю барана Бориса, торг, умеет писать».'
 const VACANCY_CARD = 'Новая вакансия: плиточник, оплата сразу! Работодатель: Алик В.'
@@ -171,7 +172,7 @@ describe('прямые вопросы и первые сообщения (#958):
     await threat(game)
     const btn = lawyerChoice(game)
     expect(btn, 'ближайший блок — кнопка из P_LAWYER').toBeTruthy()
-    expect(P_LAWYER.some((t) => btn!.text.toLowerCase().includes(t.slice(0, 12).toLowerCase())), btn!.text).toBe(true)
+    expect(P_LAWYER.some((t) => btn!.text.toLowerCase().includes(valueOf(t).slice(0, 12).toLowerCase())), btn!.text).toBe(true)
     expect(offered(game), 'окно на ходу сообщения').toBe(true)
     for (let i = 1; i <= 3; i++) {
       await game.send('Алик, привет')
@@ -229,9 +230,15 @@ describe('прямые вопросы и первые сообщения (#958):
 
 describe('дебюты участников через rude/хор (#973)', () => {
   const has = (game: Game, act: string) => { game.S.choices = null; return game.buildChoices().some((c) => c.act === act) }
-  /** Первое сообщение персонажа настоящим путём: rude-семья (Арсен) или хор (Самвел, Борис). */
+  /** Первое сообщение персонажа настоящим путём: rude-семья (Арсен), хор (Самвел, Борис) или серия («Нива», #983). */
   const debutCases: Array<[string, string, string, (g: Game) => Promise<void>]> = [
-    ['arsen', 'debutArsen', 'Арсен', async (g) => { g.S.mem['intro.arsen'] = true; g.S.mem[HEAT] = 1; await g.fire('PlayerMessage', { tone: 'rude' }) }],
+    ['arsen', 'debutArsen', 'Арсен', async (g) => {
+      g.S.mem['intro.arsen'] = true
+      g.S.mem[HEAT] = 1
+      // содержимое пула дебюта — предмет #982: вопросы про трек молчат без события, окно проверяем с фактом
+      g.S.mem['arsen.track'] = true
+      await g.fire('PlayerMessage', { tone: 'rude' })
+    }],
     ['samvel', 'debutSamvel', 'Самвел', async (g) => {
       g.S.mem['intro.samvel'] = true
       for (let i = 0; i < 60; i++) { await g.fire('Mentioned', {}, { target: 'samvel' }); if (g.S.msgs.some((m) => m.kind === 'text' && m.who === 'samvel')) return }
@@ -242,6 +249,7 @@ describe('дебюты участников через rude/хор (#973)', () =
       for (let i = 0; i < 60; i++) { await g.fire('Mentioned', {}, { target: 'boris' }); if (g.S.msgs.some((m) => m.kind === 'text' && m.who === 'boris')) return }
       expect.fail('Борис не заговорил в хоре')
     }],
+    ['niva', 'debutNiva', 'Нива', async (g) => { await g.playEpisode(ARCS.niva.eps[4], 'niva') }],
   ]
 
   it.each(debutCases)('первое сообщение %s: окно на дебюте, чужой ход закрыт, ответ потребляет, повтор не открывает', async (who, act, name, debut) => {
@@ -328,5 +336,100 @@ describe('реакции: вопрос Рубика и чайник (#953)', () 
     const said = game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : []))
     expect(said.some((t) => KETTLE.map(valueOf).includes(t)), 'ответ не из пула').toBe(true)
     expect(has(game, 'kettle'), 'после ответа окно закрыто').toBe(false)
+  })
+})
+
+describe('первое сообщение заказчика Гранта (#983)', () => {
+  const has = (game: Game) => { game.S.choices = null; return game.buildChoices().some((c) => c.act === 'grantTile') }
+  const lineOf = (e: Parameters<typeof valueOf>[0]): string => {
+    const v = valueOf(e)
+    if (typeof v === 'string') return v
+    if (v && typeof v === 'object' && 't' in v && typeof v.t === 'string') return v.t
+    return ''
+  }
+
+  it('окно на «плитка — орудие», не на другом сообщении Гранта; чужой ход закрывает, ответ потребляет', async () => {
+    const { game } = makeGame()
+    expect(has(game), 'до реплики кнопки нет').toBe(false)
+    await game.playEpisode(ARCS.grant.eps[1], 'grant')
+    expect(game.S.msgs.some((m) => m.kind === 'text' && m.who === 'grant'), 'Грант написал — проверка пустеет').toBe(true)
+    expect(has(game), 'баня — не эта реплика, окна нет').toBe(false)
+    expect(game.S.mem[grantTileAt]).toBeUndefined()
+
+    await game.playEpisode(ARCS.tile.eps[2], 'tile')
+    const at = Number(game.S.mem[grantTileAt])
+    expect(at, 'реплика не штампанула ход').toBe(game.S.stats.sent)
+    expect(has(game), 'ход дебюта — кнопка есть').toBe(true)
+    const text = game.buildChoices().find((c) => c.act === 'grantTile')!.text.toLowerCase()
+    expect(P_GRANT_TILE.map(lineOf).some((t) => text.includes(t.slice(0, 12).toLowerCase())), text).toBe(true)
+    game.S.stats.sent = at + 3
+    expect(has(game), 'третий ход после реплики — ещё окно').toBe(true)
+    game.S.stats.sent = at + 4
+    expect(has(game), 'чужой ход за окном — кнопки нет').toBe(false)
+    game.S.stats.sent = at
+    const from = game.S.msgs.length
+    await game.fire('PlayerSays', { intent: 'grantTile' })
+    const said = game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' && m.who === 'grant' ? [m.text] : []))
+    expect(said.some((t) => GRANT_TILE_B.map(lineOf).includes(t)), `ответ не из пула: ${said.join(' | ')}`).toBe(true)
+    expect(has(game), 'после ответа окно закрыто').toBe(false)
+  })
+})
+
+describe('пулы Арсена держат только утверждённое (#982)', () => {
+  const frame = (game: Game) => { game.S.choices = null; return game.buildChoices() }
+  const has = (game: Game, act: string) => frame(game).some((c) => c.act === act)
+
+  it('юристский дебют не открывает вопросы про трек, крик и бит: пул ждёт своё событие', async () => {
+    const { game } = makeGame()
+    game.S.mem[court] = 1
+    // законный путь дебюта: Арсен-юрист, трек/крик/бит в нём не звучат
+    await game.fire('PlayerMessage', { tone: 'threat' })
+    expect(game.S.mem[debutWho], 'дебют Арсена не состоялся — проверка пустеет').toBe('arsen')
+    expect(has(game, 'debutArsen'), 'вопросы про трек раньше трека').toBe(false)
+    // событие случилось (крик записан, трек собран) — вопросы появляются, и они из пула дебюта
+    game.S.mem[arsenTrack] = true
+    const btn = frame(game).find((c) => c.act === 'debutArsen')
+    expect(btn, 'после события кнопки нет').toBeTruthy()
+    expect(P_DEBUT_ARSEN.map(valueOf), 'кнопка не из пула дебюта').toContain(btn!.text)
+  })
+
+  it('источник: строка rude-семьи о «Плиточнике» сама ставит факт', async () => {
+    const { game } = makeGame()
+    game.S.mem['intro.arsen'] = true
+    let heard = false
+    for (let i = 0; i < 20 && !heard; i++) {
+      game.S.day += 5 // перерыв семьи — 4 дня
+      game.S.mem[HEAT] = 1
+      await game.fire('PlayerMessage', { tone: 'rude' })
+      heard = game.S.msgs.some((m) => m.kind === 'text' && m.text.includes('Плиточник'))
+    }
+    expect(heard, 'строка трека не прозвучала — проверка пустеет').toBe(true)
+    expect(game.S.mem[arsenTrack], 'факт ставит прозвучавшая строка').toBe(true)
+  })
+
+  it('выбранная реплика «до Страсбурга» ставит факт оглашения', async () => {
+    const { game } = makeGame()
+    game.S.mem['intro.arsen'] = true
+    game.S.mem[court] = 2
+    let plan: Choice | undefined
+    for (let i = 0; i < 200 && !plan; i++) plan = frame(game).find((c) => c.text === STRASBOURG_THREAT)
+    expect(plan, 'строка «до Страсбурга» не предложена — проверка пустеет').toBeDefined()
+    await game.send(plan!)
+    expect(game.S.mem[saidStrasburg], 'выбранная реплика не поставила факт').toBe(true)
+  })
+
+  it('отклик Арсена про Страсбург — только после оглашения', async () => {
+    const { game } = makeGame()
+    game.S.mem['intro.arsen'] = true
+    game.S.mem[lawyerAt] = game.S.stats.sent
+    const offered = () => { const c = frame(game).find((x) => x.act === 'lawyerAsk'); return c ? [c.text] : [] }
+    const before = new Set<string>()
+    for (let i = 0; i < 40; i++) for (const t of offered()) before.add(t)
+    expect(before.size, 'окно Арсена ничего не предложило — проверка пустеет').toBeGreaterThan(0)
+    expect([...before], 'Страсбург без оглашения игроком').not.toContain('Арсен, а Страсбург — это долго ждать?')
+    game.S.mem[saidStrasburg] = true
+    let saw = false
+    for (let i = 0; i < 80 && !saw; i++) saw = offered().includes('Арсен, а Страсбург — это долго ждать?')
+    expect(saw, 'после оглашения Страсбург не предлагается').toBe(true)
   })
 })
