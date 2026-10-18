@@ -5,7 +5,7 @@ import { makeGame, alikTexts } from '../../test/helpers'
 import { ARCS } from '../arcs'
 import { FINALES } from '../finales'
 import { alikDead, finaleOf } from '../memkeys'
-import { CHORUS, CHORUS_FED_UP, WEDDING_NOISE, BORIS_SICK, DEAD_KARINE, DEAD_ALIK, PROMISE_DUE } from '../world'
+import { CHORUS, CHORUS_FED_UP, WEDDING_NOISE, BORIS_SICK, DEAD_KARINE, DEAD_ALIK, PROMISE_DUE, MENTION_RE } from '../world'
 import { PROMISE_CONDITIONS } from '../excuses'
 import { LEGENDS, CHORUS_LEGEND } from '../legends'
 import { TALK_REMEMBER } from '../talk'
@@ -518,5 +518,22 @@ describe('квесты: once через правило PickQuest', () => {
     for (const t of Object.values(TOPICS)) {
       for (const id of Object.values(t.quest ?? {})) expect(names.has('Quest_' + id), id).toBe(true)
     }
+  })
+})
+
+describe('триггер хора на обвинительный контекст (#1000, заметка 12)', () => {
+  it('нейтральное «заказчик» хор Гранта не зовёт, обвинение — зовёт', () => {
+    const neutral = [
+      'Заказчик говорит, затирка — цвет денег. Красиво.',
+      'Заказчик доволен объектом. Я — нет.',
+      'Грант передал привет через прораба.',
+    ]
+    for (const t of neutral) expect(MENTION_RE.grant.test(t), `нейтральное: «${t}»`).toBe(false)
+    const blame = [
+      'Заказчик не платит, второй месяц.',
+      'Это всё Грант — он мне должен.',
+      'Долг висит: заказчик ждёт, я жду.',
+    ]
+    for (const t of blame) expect(MENTION_RE.grant.test(t), `обвинение: «${t}»`).toBe(true)
   })
 })

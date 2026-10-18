@@ -185,13 +185,14 @@ export const DIRECT: Record<string, DirectCase> = {
   // гейт видит сам, запись снята
   // #953: окна вопроса Рубика и чайника сдвинули розыгрыш — Scene_nephew в 7 партиях (порог 7), гейт видит сам
   // #953 вместе с #952: сцена «кафе» ни разу не дошла до экрана концовки — соседи на перерыве, остаётся она
-  Scene_meet: {
-    event: 'PickScene',
-    setup: (g) => {
-      const now = { turn: g.S.stats.sent, day: g.S.day }
-      for (const r of g.rules.all) if (r.event === 'PickScene' && r.name !== 'Scene_meet') g.S.rules.cooldown[r.name] = now
-    },
-  },
+  // #1000 (строки рецензии №3) сдвинуло выборки — сцена «кафе» снова в них (7 партий при пороге 7), гейт видит сам
+  // Scene_meet: {
+  //   event: 'PickScene',
+  //   setup: (g) => {
+  //     const now = { turn: g.S.stats.sent, day: g.S.day }
+  //     for (const r of g.rules.all) if (r.event === 'PickScene' && r.name !== 'Scene_meet') g.S.rules.cooldown[r.name] = now
+  //   },
+  // },
   // гейт на чужих семействах (#434): в семье +2000 «через маму» не выпадало; если выборки снова увидят
   // его часто (порог 7), гейт скажет «снять» — тогда запись уйдёт, как Says_voice в #887
   Says_via_mama: { event: 'PlayerSays', facts: { intent: 'via', arg: 'mama' } },
