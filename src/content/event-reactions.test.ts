@@ -4,12 +4,12 @@ import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
 import { NOTIF } from './life'
 import { D } from './excuses'
-import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE, P_MAMA_MARKET } from './rules/player-choice-pools'
-import { BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, INTERN_B, HOLE_B, AVITO_REVIEW, MAMA_MARKET_B } from './world'
+import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE, P_MAMA_MARKET, P_SAMVEL_DIVORCE } from './rules/player-choice-pools'
+import { BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, INTERN_B, HOLE_B, AVITO_REVIEW, MAMA_MARKET_B, SAMVEL_DIVORCE_B } from './world'
 import { ARCS } from './arcs'
 import { FINALES } from './finales'
 import { COURT_LAWYER_AGAIN } from './quests'
-import { court, HEAT, lawyerAt, debutWho, arsenTrack, saidStrasburg, grantTileAt, mamaMarketAt } from './memkeys'
+import { court, HEAT, lawyerAt, debutWho, arsenTrack, saidStrasburg, grantTileAt, mamaMarketAt, samvelDivorceAt } from './memkeys'
 import { valueOf, type Line } from './fact'
 import type { Choice } from '../engine/state'
 
@@ -551,6 +551,41 @@ describe('окно конца квеста «мама на рынке» (#1030)'
     const answers = MAMA_MARKET_B.map(text)
     expect(said.some((t) => answers.some((p) => t.includes(p))), `ответ не из пула события: ${said.join(' | ')}`).toBe(true)
     expect(game.S.mem[mamaMarketAt], 'ответ не потребил окно').toBeUndefined()
+    expect(button(), 'после ответа окно закрыто').toBeUndefined()
+  })
+})
+
+describe('окно развода дяди Самвела на свадьбе (#1037)', () => {
+  const text = (e: unknown): string => { const v = valueOf(e as never); return typeof v === 'string' ? v : (v as { t: string }).t }
+  const low = (t: string) => t.charAt(0).toLowerCase() + t.slice(1)
+
+  it('серия штампует ход развода, кнопка в блоке, окно три хода, ответ потребляет', async () => {
+    const { game } = makeGame()
+    const button = () => { game.S.choices = null; return game.buildChoices().find((c) => c.act === 'samvelDivorce') }
+    expect(button(), 'до серии кнопки нет').toBeUndefined()
+    // настоящий путь: серии арки до строки развода (eps[6])
+    for (let i = 0; i < ARCS.samvel.eps.length && !game.S.mem[samvelDivorceAt]; i++) await game.playArc('samvel')
+    expect(game.S.msgs.some((m) => m.kind === 'text' && m.text.includes('развёлся')), 'серия не прозвучала — проверка пустеет').toBe(true)
+    const at = Number(game.S.mem[samvelDivorceAt])
+    expect(Number.isFinite(at), 'серия не штампанула ход события').toBe(true)
+    expect(at, 'штамп не на ходу строки').toBe(game.S.stats.sent)
+    expect(button(), 'на ходу события кнопки нет').toBeTruthy()
+    const texts = new Set<string>()
+    for (let i = 0; i < 60; i++) { const b = button(); if (b) texts.add(b.text) }
+    const pool = P_SAMVEL_DIVORCE.map(text)
+    expect(texts.size, 'пул окна не прозвучал — проверка пустеет').toBeGreaterThan(0)
+    for (const t of texts) expect(pool.some((p) => t.includes(p) || t.includes(low(p))), `кнопка не из пула: ${t}`).toBe(true)
+    game.S.stats.sent = at + 3
+    expect(button(), 'третий ход после события — ещё окно').toBeTruthy()
+    game.S.stats.sent = at + 4
+    expect(button(), 'вне окна — кнопки нет').toBeUndefined()
+    game.S.stats.sent = at
+    const n = game.S.msgs.length
+    await game.fire('PlayerSays', { intent: 'samvelDivorce' })
+    const said = game.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : []))
+    const answers = SAMVEL_DIVORCE_B.map(text)
+    expect(said.some((t) => answers.some((p) => t.includes(p))), `ответ не из пула события: ${said.join(' | ')}`).toBe(true)
+    expect(game.S.mem[samvelDivorceAt], 'ответ не потребил окно').toBeUndefined()
     expect(button(), 'после ответа окно закрыто').toBeUndefined()
   })
 })
