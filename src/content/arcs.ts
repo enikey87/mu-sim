@@ -4,7 +4,7 @@ import { type Entry, type FactOp, type Criterion, type FactKey, type Said, set, 
 import { type ClaimKey } from './ids'
 import type { LedgerEvent } from './fact-types'
 import { needs, meet, WORLD, MENTION_RE } from './world'
-import { actSigned, alikDead, betonSet, borisMarried, collectorsAskAt, collectorsRecruited, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantHouseAt, grantPaid, grantTileAt, houseOnGarik, internAt, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, rubikHoleAt, samvelDivorceAt, sick, taxFrozen, wedding } from './memkeys'
+import { actSigned, alikDead, betonSet, borisMarried, collectorsAskAt, collectorsRecruited, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantHouseAt, grantPaid, grantTileAt, houseOnGarik, internAt, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, rubikHoleAt, samvelDivorceAt, sick, taxFrozen, tileSlipAt, wedding } from './memkeys'
 import { stateQuestion } from './money-ask'
 
 export type ArcMsg = Said | { w: string; t: string; claims?: LedgerEvent[]; remember?: FactOp[]; stamp?: string } | { t: string; claims: LedgerEvent[]; remember?: FactOp[]; stamp?: string }
@@ -378,7 +378,7 @@ export const ARCS: Record<string, Arc> = {
       needs('judge')('Судья Ашот, плитка-то ровная. Так на Алика записали?'),
     ],
     eps: [
-      { m: ['Брат, проблема. На твоей плитке поскользнулся заказчик. Говорит, слишком гладкая. Как лёд.'] },
+      { m: [{ t: 'Брат, проблема. На твоей плитке поскользнулся заказчик. Говорит, слишком гладкая. Как лёд.', claims: [], stamp: tileSlipAt }] },
       { m: ['Заказчик в гипсе. Подаёт в суд. На тебя. Я ни при чём — я только деньги не платил.'], legend: 'court_tile' },
       { m: [{ w: 'grant', t: 'Молодой человек, ваша плитка — орудие. Мой адвокат с вами свяжется.', stamp: grantTileAt }] },
       { m: [gate(is('ctx.debtMoved'))('Хорошая новость: я твой адвокат! Бесплатно. Ну как бесплатно — из твоего долга вычту.')], fx: { debt: -10000 }, sys: 'Алик вычел из долга 10 000 ₽ за адвокатские услуги.' },

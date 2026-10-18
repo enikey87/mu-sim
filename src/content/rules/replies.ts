@@ -19,9 +19,9 @@ import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, PROMISE_PENCIL,
 import { CREW_PAID } from '../crew'
 import { HOLIDAY_MONEY, type Holiday } from '../holidays'
 import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_THIRD, LIE_NOCRED } from '../lies'
-import { HEAT, alikShaved, avitoReviewAt, borisSaleAt, collectorsAskAt, countersuitAt, courtVerdictAt, crewPaidAt, debutAt, grantTileAt, internAt, internDeclined, kettleAt, lawyerAt, moustacheAskAt, ramPhotoAt, rubikAskAt, rubikHoleAt, moustachePhotoAt, photoAt, mamaMarketAt, samvelDivorceAt, grantHouseAt, transferAt, vacancyAt, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, saidKonak, stateAt, topic, topicLast, topicMute, topicRun, whenYears } from '../memkeys'
+import { HEAT, alikShaved, avitoReviewAt, borisSaleAt, collectorsAskAt, countersuitAt, courtVerdictAt, tileSlipAt, crewPaidAt, debutAt, grantTileAt, internAt, internDeclined, kettleAt, lawyerAt, moustacheAskAt, ramPhotoAt, rubikAskAt, rubikHoleAt, moustachePhotoAt, photoAt, mamaMarketAt, samvelDivorceAt, grantHouseAt, transferAt, vacancyAt, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, saidKonak, stateAt, topic, topicLast, topicMute, topicRun, whenYears } from '../memkeys'
 import type { ArcId, TopicId } from '../ids'
-import { PROMISE_SHAVE_ASK, MOUSTACHE_PHOTO_B, MAMA_MARKET_B, SAMVEL_DIVORCE_B, GRANT_HOUSE_B, COURT_VERDICT_B, RAM_PHOTO, BORIS_SALE, VACANCY, AVITO_REVIEW, RUBIK_ASK, KETTLE, CREW_CALL_B, LAWYER_B, COLLECTORS_ASK_B, INTERN_B, HOLE_B, COUNTERSUIT_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, DEBUT_BORIS_B, DEBUT_NIVA_B, GRANT_TILE_B } from '../world'
+import { PROMISE_SHAVE_ASK, MOUSTACHE_PHOTO_B, MAMA_MARKET_B, SAMVEL_DIVORCE_B, GRANT_HOUSE_B, COURT_VERDICT_B, TILE_SLIP_B, RAM_PHOTO, BORIS_SALE, VACANCY, AVITO_REVIEW, RUBIK_ASK, KETTLE, CREW_CALL_B, LAWYER_B, COLLECTORS_ASK_B, INTERN_B, HOLE_B, COUNTERSUIT_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, DEBUT_BORIS_B, DEBUT_NIVA_B, GRANT_TILE_B } from '../world'
 
 type R = Rule<ContentApi, GameEvent, Offer>
 const says = (intent: string, rest: Partial<R> & Pick<R, 'respond'>, extra: R['when'] = []): R => ({
@@ -170,6 +170,14 @@ export const replyRules: R[] = [
     respond: async ({ game }) => {
       await game.say([game.draw('COURT_VERDICT_B', COURT_VERDICT_B)])
       game.clearFact(courtVerdictAt)
+      game.setCtx(null)
+    },
+  }),
+  // отклик на первую серию плиточной арки (#1059): ответ потребляет окно события
+  says('tileSlip', {
+    respond: async ({ game }) => {
+      await game.say([game.draw('TILE_SLIP_B', TILE_SLIP_B)])
+      game.clearFact(tileSlipAt)
       game.setCtx(null)
     },
   }),
