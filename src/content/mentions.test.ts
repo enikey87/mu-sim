@@ -240,7 +240,7 @@ function corpus(): Found[] {
 /** Усы Алика на месте: реплика, называющая их, звучит, пока они не сбриты (`needs('moustache')`, docs/design/moustache.md). */
 const MOUSTACHE = new RegExp(W + 'ус(?:ы|ами|ах)(?![а-яё])', 'i')
 /** Строки исполненной ставки: звучат уже после того, как усы сбриты или спасены. */
-const AFTER_STAKE = /PROMISE_SHAVE|P_MOUSTACHE|Opt_Moustache/
+const AFTER_STAKE = /PROMISE_SHAVE|P_MOUSTACHE|MOUSTACHE_PHOTO|Opt_Moustache/
 
 function problems(found: Found[]): string[] {
   const out: string[] = []
@@ -265,7 +265,8 @@ describe('упоминания в контенте', () => {
   })
   it('реплика об усах Алика закрыта, пока они сбриты: снятое needs(moustache) краснеет (#327)', () => {
     const found = corpus().filter((f) => MOUSTACHE.test(f.text) && !AFTER_STAKE.test(f.path))
-    // сегодня их шесть: три отмазки, «Нива» в легенде, «у дяди усы» в сцене и форма клятвы со ставкой
+    // сегодня их больше шести: три отмазки, «Нива» в легенде, «у дяди усы» в сцене, форма клятвы со ставкой
+    // и окно отклика на смену фото (#1013) — оно живёт ровно тогда, когда усы сбриты
     expect(found.length, 'реплик об усах меньше известных — проверка пустеет').toBeGreaterThanOrEqual(6)
     expect(found.filter((f) => !holds('moustache', f.known)).map((f) => `${f.path}: «${f.text.slice(0, 70)}»`)).toEqual([])
     // сам детектор: без требования — находка, с требованием — нет

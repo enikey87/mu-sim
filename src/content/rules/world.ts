@@ -6,7 +6,7 @@ import type { GameEvent, Offer } from './events'
 import { WORLD, speaks as speaksCriterion } from '../world'
 import { CHORUS_LEGEND } from '../legends'
 import { PROMISE_DUE, PROMISE_DUE_COSMIC, PROMISE_DUE_KEPT, PROMISE_MET, PROMISE_SHAVE, PROMISE_SHAVE_KEPT, CHORUS, CHORUS_FED_UP, WEDDING_NOISE, BORIS_SICK, DEAD_KARINE, DEAD_ALIK } from '../world'
-import { alikDead, alikShaved, blocked, count, endgame, grantPaid, interjections, intro, met, mourning, moustacheKept, payday, sick } from '../memkeys'
+import { alikDead, alikShaved, blocked, count, endgame, grantPaid, interjections, intro, met, mourning, moustacheKept, moustachePhotoAt, payday, sick } from '../memkeys'
 import { JournalForAmnesty } from './criteria'
 import { low } from '../excuses'
 import { moneyPlaceOf, stampMoneyPlace } from '../money-ask'
@@ -83,6 +83,8 @@ const stakeKept = async ({ game, facts }: { game: ContentApi; facts: Facts }) =>
 const stakeShave = async ({ game, facts }: { game: ContentApi; facts: Facts }) => {
   game.promiseStakeDone(Number(facts.promise))
   game.sys('Алик Воздухонесян сменил фото профиля. На фото — Алик без усов.')
+  // смена фото — заметное событие с окном отклика (#1013): факт-ход, кнопку реакции держит `moustachePhotoFresh`
+  game.applyFacts([set(moustachePhotoAt, Number(facts.sent))])
   await game.say([dueLine(game, facts, 'DUE_SHAVE', PROMISE_SHAVE)])
   game.unlock('shaved')
 }

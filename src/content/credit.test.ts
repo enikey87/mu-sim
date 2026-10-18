@@ -8,6 +8,7 @@ import {
   sold, momHelp, momDachaAt, momDachaDays, loanTaken, loanDueAt, loanPayment, allSold,
 } from './credit'
 import { SAVE_KEY, freshState, setCount } from '../engine/state'
+import { D } from './excuses'
 
 describe('кредитная лестница', () => {
   it('на дне банк предлагает первую ступень', () => {
@@ -272,6 +273,30 @@ describe('карточка банка с кнопками (#287)', () => {
     return { game, card }
   }
   const mine = (g: ReturnType<typeof makeGame>['game']) => g.S.msgs.filter((m) => m.kind === 'text' && m.from === 'me').length
+
+  it('«У меня кредит.» звучит только после взятого кредита — до него это выдумка (#1013)', () => {
+    // до кредита: ступени в памяти нет, и строка не предлагается ни пулом, ни блоком
+    const before = makeGame().game
+    const pool = (g: Game) => { g.S.choices = null; return g.open(D.P_NEU_B) }
+    const offered = (g: Game) => {
+      const texts = new Set<string>()
+      for (let i = 0; i < 60; i++) { g.S.choices = null; for (const c of g.buildChoices()) texts.add(c.text) }
+      return [...texts]
+    }
+    expect(before.S.mem[creditStage], 'ступени кредита в свежей партии нет — проверка пустеет').toBeUndefined()
+    expect(pool(before), 'до кредита строка предлагается').not.toContain('У меня кредит.')
+    expect(offered(before).some((t) => t.includes('У меня кредит.')), 'до кредита строка в блоке').toBe(false)
+    // после настоящего кредита: карточка банка «Взять кредит» → ступень 1, строка есть
+    const { game } = makeGame()
+    setMoney(game, 100)
+    game.chargeBill('rent') // не прошло → предложение кредита
+    const card = cards(game, 'Банк').at(-1)!
+    expect(card.offer?.take, 'карточка банка — не предложение кредита').toContain('Взять кредит')
+    game.answerCard(card.id, 'take')
+    expect(game.S.mem[creditStage], 'кредит не взят — проверка пустеет').toBe(1)
+    expect(pool(game), 'после кредита строка не предлагается').toContain('У меня кредит.')
+    expect(offered(game).some((t) => t.includes('У меня кредит.')), 'после кредита строки нет в блоке').toBe(true)
+  })
 
   it('причина рядом с предложением', () => {
     const { card } = bottom()

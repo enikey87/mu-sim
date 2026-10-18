@@ -3,9 +3,9 @@ import { describe, it, expect, vi } from 'vitest'
 import { makeGame, respondCtx } from '../test/helpers'
 import { spec, valueOf } from './fact'
 import { OATH_FORMS } from './misc'
-import { WORLD, meet, PROMISE_MET, PROMISE_SHAVE, PROMISE_SHAVE_ASK, PROMISE_SHAVE_KEPT } from './world'
-import { alikDead, alikShaved, endgame, moustacheKept, nuneKeyPassed } from './memkeys'
-import { P_MOUSTACHE } from './rules/player-choice-pools'
+import { WORLD, meet, MOUSTACHE_PHOTO_B, PROMISE_MET, PROMISE_SHAVE, PROMISE_SHAVE_ASK, PROMISE_SHAVE_KEPT } from './world'
+import { alikDead, alikShaved, endgame, moustacheKept, moustachePhotoAt, nuneKeyPassed } from './memkeys'
+import { P_MOUSTACHE, P_MOUSTACHE_PHOTO } from './rules/player-choice-pools'
 import { D, low } from './excuses'
 import { promiseRules } from './rules/world'
 import type { Entry } from './fact'
@@ -39,6 +39,41 @@ describe('ставка «усы»', () => {
     expect(game.holds(WORLD.moustache)).toBe(false)
     expect(oathOpen(game)).toBe(false)
     expect(oathUsamiOpen(game)).toBe(false)
+  })
+
+  it('смена фото без усов открывает окно отклика: кнопка на ходу события, ответ его потребляет (#1013)', async () => {
+    const { game } = makeGame()
+    game.rules.applyOps(meet('karine'), {})
+    game.S.mood = 3
+    game.recordPromise({ text: 'завтра — всё отдам', d: 1, stake: 'moustache' })
+    game.S.day += 1
+    const button = () => { game.S.choices = null; return game.buildChoices().find((c) => c.act === 'moustachePhoto') }
+    const has = () => Boolean(button())
+    const fromPool = (t: string) => P_MOUSTACHE_PHOTO.map(valueOf).some((p) => {
+      const low = p.charAt(0).toLowerCase() + p.slice(1)
+      return t.includes(p) || t.includes(low)
+    })
+    expect(has(), 'до события кнопки нет').toBe(false)
+    expect((await game.fire('PromiseDue', { promise: 0 }))?.name).toBe('Due_StakeShave')
+    expect(sys(game, 0).join(' '), 'событие не прозвучало — проверка пустеет').toContain('На фото — Алик без усов')
+    const at = Number(game.S.mem[moustachePhotoAt])
+    expect(at, 'событие не штампануло ход').toBe(game.S.stats.sent)
+    expect(button(), 'на ходу события кнопки нет').toBeDefined()
+    const texts = new Set<string>()
+    for (let i = 0; i < 60; i++) { const b = button(); if (b) texts.add(b.text) }
+    expect([...texts].length, 'пул окна не прозвучал — проверка пустеет').toBeGreaterThan(0)
+    for (const t of texts) expect(fromPool(t), `кнопка не из пула окна ` + t).toBe(true)
+    game.S.stats.sent = at + 3
+    expect(has(), 'третий ход после события — ещё окно').toBe(true)
+    game.S.stats.sent = at + 4
+    expect(has(), 'вне окна — кнопки нет').toBe(false)
+    game.S.stats.sent = at
+    const n = game.S.msgs.length
+    await game.fire('PlayerSays', { intent: 'moustachePhoto' })
+    const said = alik(game, n)
+    expect(said.some((t) => MOUSTACHE_PHOTO_B.map(valueOf).some((p) => t.includes(p))), 'ответ не из пула события: ' + said.join(' | ')).toBe(true)
+    expect(game.S.mem[moustachePhotoAt], 'ответ не потребил окно').toBeUndefined()
+    expect(has(), 'после ответа окно закрыто').toBe(false)
   })
 
   it('~40 дней спустя усы снова «на месте»', async () => {

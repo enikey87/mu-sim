@@ -3,7 +3,7 @@
 // участник, умеющий писать сам (SPEAKS), обязан быть здесь или в исключениях с причиной — новый
 // участник красит сюит на месте, а не в плейтесте через раунд. Офферы и потребление окна ответом —
 // как были (#951), тексты пулов не менялись.
-import { crewPaidAt, grantTileAt, lawyerAt } from './memkeys'
+import { crewPaidAt, grantTileAt, lawyerAt, moustachePhotoAt } from './memkeys'
 
 /** Общий дебютный слот (#973): `wrote.<who>`/`debutWho`/`debutAt` ставит первое сообщение участника. */
 export const DEBUT_SLOT = 'debut'
@@ -44,4 +44,23 @@ export const EXEMPT: readonly Exempt[] = [
   { who: 'razmik', why: 'первое сообщение — серия крановщика и очереди; отклик — follow-вопросы линии' },
   { who: 'rubik', why: 'первое сообщение — серия инспектора; прямые вопросы — отдельные окна (#958)' },
   { who: 'garik', why: 'первое сообщение — серия (фундамент); отклик — follow-вопросы арки' },
+]
+
+/** Источники окна, которые не участник, а системное событие (#1013): смена фото профиля — заметное
+ *  событие ставки «усы». Заказ окна тот же, что у дебютов: факт-ход (`at`), пул кнопок (`pool`),
+ *  оффер ответа (`offer`). В `FIRST_WINDOWS` такая запись не встаёт: там `who` — ключ SPEAKS/CAST,
+ *  а у системной строки своего голоса нет; реестр ведёт линтер так же, как дебюты. */
+export interface EventSource {
+  /** Что за событие — для человека и ревью; текст игра не читает. */
+  source: string
+  /** Факт-ход события: ключ памяти, который ставит источник. */
+  at: string
+  /** Оффер ответа: имя в сборке вариантов (правило `Opt_<offer>`). */
+  offer: string
+  /** Пул кнопок игрока (ключ реестра PLAYER_POOLS). */
+  pool: string
+}
+
+export const EVENT_SOURCES: readonly EventSource[] = [
+  { source: 'смена фото без усов (Due_StakeShave / Condition_StakeShave)', at: moustachePhotoAt, offer: 'MoustachePhoto', pool: 'P_MOUSTACHE_PHOTO' },
 ]
