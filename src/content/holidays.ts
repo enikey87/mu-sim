@@ -1,7 +1,7 @@
 // Праздники по календарю переписки: окно шире одного дня — сообщение двигает календарь на 1–3 дня.
 import { dateOf } from '../engine/time'
-import { type Line, eq, gte, lte, missing } from './fact'
-import { endgame } from './memkeys'
+import { type Line, eq, gate, gte, is, lte, missing } from './fact'
+import { endgame, taxFrozen } from './memkeys'
 
 export type Holiday = 'newYear' | 'march8' | 'trndez' | 'builders'
 
@@ -106,7 +106,7 @@ export function holidayDays(ref: HolidayRef, day: number): number {
 
 /** Ключ «поздравили»: год начала окна, не текущей даты — NY через 31.12→1.01 один раз (#255). */
 /** Кнопка игрока в окне праздника (#585, «После MVP» документа): деньги под праздником. */
-export const P_HOLIDAY: Record<Holiday, string[]> = {
+export const P_HOLIDAY: Record<Holiday, readonly Line[]> = {
   newYear: [
     'Новый год на носу. Где деньги, Алик?',
     'С Новым годом! Обещанные деньги — в подарок?',
@@ -115,7 +115,8 @@ export const P_HOLIDAY: Record<Holiday, string[]> = {
   march8: [
     'С 8 Марта! А с зарплатой что?',
     'Женский день. Моей совести — подарок?',
-    'Праздник весны. Деньги оттаяли?',
+    // «оттаяли» — про замороженные счета: вопрос свеж, пока счета заморожены и оттайку не объявляли (#1029)
+    gate(is(taxFrozen))('Праздник весны. Деньги оттаяли?'),
   ],
   trndez: [
     'Трндез. Костёр. Где деньги, Алик?',

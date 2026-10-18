@@ -3,8 +3,10 @@
 import { describe, it, expect } from 'vitest'
 import { makeGame, alikTexts } from '../test/helpers'
 import { HOLIDAY_MONEY, P_HOLIDAY, holidayOf, type Holiday } from './holidays'
+import { is, valueOf } from './fact'
+import { LEGENDS } from './legends'
 import { dateOf } from '../engine/time'
-import { alikDead, blocked, endgame } from './memkeys'
+import { alikDead, blocked, endgame, taxFrozen } from './memkeys'
 import type { Game } from '../engine/game'
 
 const NY = 289 // 1 января: окно Нового года
@@ -55,7 +57,8 @@ describe('деньги под праздником', () => {
       const { game } = makeGame({ seed })
       game.S.day = NY - 1
       const buttons = game.buildChoices().map((c) => c.text)
-      const hit = buttons.find((t) => P_HOLIDAY.newYear.some((p) => t.includes('Новый год на носу') || t.includes(p.slice(0, 16))))
+      const text = (e: unknown): string => { const v = valueOf(e as never); return typeof v === 'string' ? v : (v as { t: string }).t }
+      const hit = buttons.find((t) => P_HOLIDAY.newYear.some((p) => t.includes('Новый год на носу') || t.includes(text(p).slice(0, 16))))
       if (hit) seen.add(hit)
     }
     expect([...seen].some((t) => t.includes('Новый год на носу')), `канун: ${[...seen].join(' | ')}`).toBe(true)
@@ -203,5 +206,27 @@ describe('деньги под праздником: день внутри окн
     }
     expect(textsAt(M8).some((t) => /^Сегодня/.test(t)), '«сегодня» — 8-го').toBe(true)
     expect(textsAt(M8 + 1).some((t) => /^Сегодня/.test(t)), '9-го «сегодня» мимо').toBe(false)
+  })
+})
+
+describe('«Деньги оттаяли?» — вопрос при замороженных счетах (#1029)', () => {
+  const OTTAYALI = 'Праздник весны. Деньги оттаяли?'
+
+  it('без заморозки строки нет; при заморозке — есть, а строка оттайки её закрывает', () => {
+    const text = (e: unknown): string => { const v = valueOf(e as never); return typeof v === 'string' ? v : (v as { t: string }).t }
+    const lines = (g: Game) => g.open(P_HOLIDAY.march8).map(text)
+    const fresh = makeGame().game
+    expect(fresh.holds(is(taxFrozen)), 'в свежей партии счета заморожены — проверка пустеет').toBe(false)
+    expect(lines(fresh), '«оттаяли» звучит до того, как что-то замерзало').not.toContain(OTTAYALI)
+    const frozen = makeGame().game
+    frozen.S.mem[taxFrozen] = true
+    expect(lines(frozen), 'при замороженных счетах вопроса нет').toContain(OTTAYALI)
+    // строка оттайки снимает факт — повторный «оттаяли?» стал бы вопросом об известном
+    frozen.setLegend('frozen', 'boris')
+    let thawed = false
+    for (let i = 0; i < 8 && !thawed; i++) thawed = Boolean(frozen.linePicked('LEG_frozen', LEGENDS.frozen.lines)?.text.includes('Счета разморозили'))
+    expect(thawed, 'строка оттайки не прозвучала — проверка пустеет').toBe(true)
+    expect(frozen.holds(is(taxFrozen)), 'факт заморозки не снят строкой оттайки').toBe(false)
+    expect(lines(frozen), 'после оттайки «оттаяли» снова предлагается').not.toContain(OTTAYALI)
   })
 })

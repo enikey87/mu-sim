@@ -216,6 +216,9 @@ export const grantTileAt = 'tile.grantAt'
 /** Смена фото профиля без усов (#1013): заметное событие ставки — окно отклика игрока; сам факт
  *  «усы сбриты» живёт в `alik.shaved`, а это — ход события, ход и три после которого кнопка реакции жива. */
 export const moustachePhotoAt = 'moustache.photoAt'
+/** Слово «ставка» прозвучало (#1029): объявитель — строка-ответ окна усов (`MOUSTACHE_PHOTO_B[0]`),
+ *  ответ на «как усы?» и строка сбривания; до него вопрос «Ставка сыграла?» ссылался бы на невведённое понятие. */
+export const moustacheStakeSaid = 'moustache.stakeSaid'
 /** Фото «платёжки» от Алика (#1017): заметное событие — ход фото, ход и PHOTO_FRESH_TURNS после
  *  которого кнопка отклика жива; окно потребляет ответ игрока. */
 export const photoAt = 'photo.photoAt'
@@ -250,7 +253,7 @@ export const MEM_KEYS: ReadonlySet<string> = new Set([
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday, saidKonak,
   lightOff, netRation, phoneWarn, holidayGreeted,
-  creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, collectorsTurned, criticalAt, creditOfferSum, momDachaAt, crewPaid, crewPaidAt, rubikBath, whenYears, ...Object.values(moneyAskAt), transferAt, transferAmount, moustachePhotoAt, photoAt, debutWho, debutAt, arsenTrack,
+  creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, collectorsTurned, criticalAt, creditOfferSum, momDachaAt, crewPaid, crewPaidAt, rubikBath, whenYears, ...Object.values(moneyAskAt), transferAt, transferAmount, moustachePhotoAt, moustacheStakeSaid, photoAt, debutWho, debutAt, arsenTrack,
   ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt, countersuitAt, grantTileAt,
   ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lend50),
 ])

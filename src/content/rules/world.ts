@@ -70,6 +70,12 @@ const dueLine = (game: ContentApi, f: Facts, key: string, arr: readonly Entry<st
   const p = promiseText(game, f)!
   return game.uniq(() => `${game.X.g('ADDR')}, ${low(game.X.fill(game.draw(key, arr), { t: p.t }))}`)
 }
+/** Строка срока, объявляющая факт собой (`remember`): её рисует `linePicked`, объявление — до реплики (#1029). */
+const duePicked = (game: ContentApi, f: Facts, key: string, arr: readonly Line[]) => {
+  const p = promiseText(game, f)!
+  const line = game.linePicked(key, arr)
+  return line ? `${game.X.g('ADDR')}, ${low(game.X.fill(line.text, { t: p.t }))}` : dueLine(game, f, key, arr as readonly Entry<string>[])
+}
 // срок актуален: обещание есть и его не «переписали» в когда-нибудь
 const live = eq('promiseLive', true)
 const stakeMoustache = eq('promiseStake', 'moustache')
@@ -85,7 +91,7 @@ const stakeShave = async ({ game, facts }: { game: ContentApi; facts: Facts }) =
   game.sys('Алик Воздухонесян сменил фото профиля. На фото — Алик без усов.')
   // смена фото — заметное событие с окном отклика (#1013): факт-ход, кнопку реакции держит `moustachePhotoFresh`
   game.applyFacts([set(moustachePhotoAt, Number(facts.sent))])
-  await game.say([dueLine(game, facts, 'DUE_SHAVE', PROMISE_SHAVE)])
+  await game.say([duePicked(game, facts, 'DUE_SHAVE', PROMISE_SHAVE)])
   game.unlock('shaved')
 }
 export const promiseRules: R[] = [

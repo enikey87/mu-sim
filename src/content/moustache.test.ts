@@ -1,7 +1,8 @@
 // Ставка «сбрею усы» (docs/design/moustache.md): запись в журнале, исполнение в срок, факт ~40 дней.
 import { describe, it, expect, vi } from 'vitest'
 import { makeGame, respondCtx } from '../test/helpers'
-import { spec, valueOf } from './fact'
+import { spec, valueOf, type Line } from './fact'
+import { lineId } from '../engine/rules/lines'
 import { OATH_FORMS } from './misc'
 import { WORLD, meet, MOUSTACHE_PHOTO_B, PROMISE_MET, PROMISE_SHAVE, PROMISE_SHAVE_ASK, PROMISE_SHAVE_KEPT } from './world'
 import { alikDead, alikShaved, endgame, moustacheKept, moustachePhotoAt, nuneKeyPassed } from './memkeys'
@@ -71,9 +72,44 @@ describe('ставка «усы»', () => {
     const n = game.S.msgs.length
     await game.fire('PlayerSays', { intent: 'moustachePhoto' })
     const said = alik(game, n)
-    expect(said.some((t) => MOUSTACHE_PHOTO_B.map(valueOf).some((p) => t.includes(p))), 'ответ не из пула события: ' + said.join(' | ')).toBe(true)
+    const poolLines = MOUSTACHE_PHOTO_B.map((e) => { const v = valueOf(e); return typeof v === 'string' ? v : v.t })
+    expect(said.some((t) => poolLines.some((p) => t.includes(p))), 'ответ не из пула события: ' + said.join(' | ')).toBe(true)
     expect(game.S.mem[moustachePhotoAt], 'ответ не потребил окно').toBeUndefined()
     expect(has(), 'после ответа окно закрыто').toBe(false)
+  })
+
+  it('вопрос «Ставка сыграла?» открывается, только когда Алик назвал ставку (#1029)', async () => {
+    const { game } = makeGame()
+    game.S.mood = 3
+    game.recordPromise({ text: 'завтра — всё отдам', d: 1, stake: 'moustache' })
+    game.S.day += 1
+    const stakeQuestion = () => { game.S.choices = null; return game.buildChoices().some((c) => c.act === 'moustachePhoto' && /ставк/i.test(c.text)) }
+    // строка сбривания, называющая ставку, в этой партии ещё не звучала: событие приходит без слова «ставка»
+    game.lines.mark(lineId('DUE_SHAVE', 'Карине довольна: усы сбриты. Ты — тоже, надеюсь. Денег по-прежнему нет, но ставка сыграла.'))
+    expect(game.holds(WORLD.stakeSaid), 'ставка сказана до события — проверка пустеет').toBe(false)
+    expect((await game.fire('PromiseDue', { promise: 0 }))?.name).toBe('Due_StakeShave')
+    expect(stakeQuestion(), 'на ходу события вопрос про ставку ссылается на невведённое слово').toBe(false)
+    // Алик называет ставку настоящим ответом на «как усы?» (окно фото ещё живо: ход события и три после)
+    for (let i = 0; i < 8 && !game.holds(WORLD.stakeSaid); i++) await game.fire('PlayerSays', { intent: 'moustacheAsk' })
+    expect(game.holds(WORLD.stakeSaid), 'Алик так и не назвал ставку за восемь ответов — проверка пустеет').toBe(true)
+    expect(stakeQuestion(), 'после слова «ставка» вопроса в блоке нет').toBe(true)
+  })
+
+  it('ответ окна, называющий ставку, ставит факт сам (#1029)', async () => {
+    const { game } = makeGame()
+    game.S.mood = 3
+    game.recordPromise({ text: 'завтра — всё отдам', d: 1, stake: 'moustache' })
+    game.S.day += 1
+    // строки-объявители события уже сказаны: в окне остаётся только ответ, называющий ставку
+    game.lines.mark(lineId('DUE_SHAVE', 'Карине довольна: усы сбриты. Ты — тоже, надеюсь. Денег по-прежнему нет, но ставка сыграла.'))
+    for (const t of ['Без усов я тот же Алик, только честнее выгляжу. В банке меня теперь не узнают — это плюс.', 'Карине нравится. Мне тоже. Денег это, правда, не добавило.', 'Сбрил сам, никто не заставлял. Слово Алика — закон, усы — нет.']) {
+      game.lines.mark(lineId('MOUSTACHE_PHOTO_B', t))
+    }
+    expect((await game.fire('PromiseDue', { promise: 0 }))?.name).toBe('Due_StakeShave')
+    expect(game.holds(WORLD.stakeSaid), 'ставка сказана до ответа — проверка пустеет').toBe(false)
+    await game.fire('PlayerSays', { intent: 'moustachePhoto' })
+    expect(alik(game, 0).join(' '), 'ответ окна не назвал ставку — проверка пустеет').toContain('ставкой')
+    expect(game.holds(WORLD.stakeSaid), 'строка-объявитель не поставила факт').toBe(true)
   })
 
   it('~40 дней спустя усы снова «на месте»', async () => {
@@ -504,7 +540,7 @@ describe('ставка «усы»', () => {
   })
 
   it('строки пулов ставки и «условие наступило» после обращения — с маленькой буквы, имена остаются (#327)', async () => {
-    const cases: Array<[string, readonly Entry<string>[], string, string, () => Game]> = []
+    const cases: Array<[string, readonly Line[], string, string, () => Game]> = []
     const staked = (): Game => {
       const { game } = makeGame()
       game.recordPromise({ text: 'завтра', d: 1, stake: 'moustache' })
