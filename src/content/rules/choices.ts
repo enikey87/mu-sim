@@ -215,6 +215,11 @@ export const choiceRules: R[] = [
           arg: (_g, f) => (years ? 'years' : String(f['ctx.when'])),
         })
       }),
+      // плавающий событийный срок (#1002): достижимое событие мира — свои варианты вместо never-эха
+      when({
+        name: 'When_Floating', when: [...term, eq('ctx.whenKind', 'floating')], act: 'promiseCheck', tone: 'neutral',
+        text: (g, f) => fromD(g, 'P_WHEN_FLOATING', args(f)), arg: (_g, f) => String(f['ctx.when']),
+      }),
     ]
   })(),
 

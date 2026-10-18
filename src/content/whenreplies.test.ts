@@ -28,7 +28,7 @@ async function said(w: When, before?: (g: Game) => void, seed = 1): Promise<Game
 const buttons = (g: Game, draws = 3) => {
   const facts = g.lineFacts()
   return g.rules.all.filter((r) => r.event === 'BuildChoices' && r.name.startsWith('Opt_When') && r.when.every((c) => holds(c, facts))).flatMap((r) =>
-    Array.from({ length: draws }, () => r.offer!(g.rules.ctx(g, r, { event: 'BuildChoices' }, g.facts()))).flatMap((c) => (c ? [{ rule: r.name, act: c.act!, arg: c.arg }] : [])))
+    Array.from({ length: draws }, () => r.offer!(g.rules.ctx(g, r, { event: 'BuildChoices' }, g.facts()))).flatMap((c) => (c ? [{ rule: r.name, act: c.act!, arg: c.arg, text: c.text }] : [])))
 }
 
 /** Игрок нажал кнопку: что ответил Алик. */
@@ -211,5 +211,36 @@ describe('игрок нажимает кнопку настоящим ходом
       const text = alikTexts(g.S.msgs.slice(n)).join(' ')
       expect(ok(text), `${term} → ${act}: ${text}`).toBe(true)
     }
+  })
+})
+
+describe('плавающий событийный срок (#1002)', () => {
+  it('«как дядя Самвел проснётся» — плавающий ответ, без never-эха', async () => {
+    const term = 'как дядя Самвел проснётся'
+    const g = await said(byText(term))
+    const b = buttons(g, 6)
+    expect(b.some((x) => x.rule === 'Opt_When_Floating'), 'плавающей кнопки нет').toBe(true)
+    expect(b.some((x) => x.rule === 'Opt_When_never' || x.rule === 'Opt_When_absurd'), 'never-эхо на плавающем сроке').toBe(false)
+    expect(buttons(g, 1).find((x) => x.rule === 'Opt_When_Floating')!.text).toMatch(/Вот это хотя бы срок|Плавающий|не «никогда»|живое после/)
+  })
+
+  it('тексты задачи в плавающем пуле', () => {
+    const pool = D.P_WHEN_FLOATING.map(valueOf)
+    expect(pool).toContain('Вот это хотя бы срок. Разбудить его можно?')
+    expect(pool).toContain('Плавающий. Значит, доплывёт.')
+  })
+
+  it('«когда Арарат вернут» — абсурд, never-эхо как было; плавающей кнопки нет', async () => {
+    const g = await said(byText('когда Арарат вернут'))
+    const b = buttons(g, 6)
+    expect(b.some((x) => x.rule === 'Opt_When_absurd' || x.rule === 'Opt_When_never'), 'абсурдному сроку не дали эха').toBe(true)
+    expect(b.some((x) => x.rule === 'Opt_When_Floating'), 'плавающая кнопка на абсурде').toBe(false)
+  })
+
+  it('ответ Алика на плавающий срок — про событие, а не про дату', async () => {
+    const term = 'как дядя Самвел проснётся'
+    const { said: answer } = await pressed(byText(term), 'Opt_When_Floating')
+    const expected = WHEN_COND.map(valueOf).map((t) => t.replace('{t}', term).replace('{T}', cap(term)))
+    expect(expected.some((t) => answer.includes(t)), `ответ не из WHEN_COND: ${answer}`).toBe(true)
   })
 })
