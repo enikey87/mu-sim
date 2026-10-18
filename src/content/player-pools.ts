@@ -14,7 +14,7 @@ import { P_HOLIDAY, type Holiday } from './holidays'
 import { ENDGAME_CHOICES, LEND50_CHOICES } from './endgame'
 import { MONEY_ASK } from './money-ask'
 import {
-  P_VIA_BORIS, P_VIA_KARINE, P_VIA_MAMA, P_MOO, P_MOUSTACHE, P_COURT,
+  P_VIA_BORIS, P_VIA_KARINE, P_VIA_MAMA, P_MOO, P_MOUSTACHE, P_COURT, P_COLLECTORS_DEBUT,
   P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE,
   P_CREW_CALL, P_LAWYER, P_COLLECTORS_ASK, P_INTERN, P_HOLE, P_COUNTERSUIT,
   P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_BORIS, P_DEBUT_NIVA, P_GRANT_TILE,
@@ -108,6 +108,8 @@ put('P_DEBUT_NIVA', P_DEBUT_NIVA)
 put('P_GRANT_TILE', P_GRANT_TILE)
 put('P_COUNTERSUIT', P_COUNTERSUIT)
 put('P_COURT', P_COURT)
+// дебют коллекторов (#888) — нашёлся вне реестра линтером окна первого сообщения (#994)
+put('P_COLLECTORS_DEBUT', P_COLLECTORS_DEBUT)
 
 // сцена choice: кнопки — вся колода CONSTR/ABSURD
 put('scene choice.ask CONSTR', D.CONSTR as PlayerLinePool)
