@@ -5,7 +5,7 @@ import type { Game } from '../engine/game'
 import { NOTIF } from './life'
 import { D } from './excuses'
 import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE } from './rules/player-choice-pools'
-import { BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, INTERN_B, HOLE_B } from './world'
+import { BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, INTERN_B, HOLE_B, AVITO_REVIEW } from './world'
 import { ARCS } from './arcs'
 import { FINALES } from './finales'
 import { COURT_LAWYER_AGAIN } from './quests'
@@ -86,6 +86,20 @@ describe('реакции на системные события (#927)', () => {
     expect(has(), 'третий ход после события — ещё окно').toBe(true)
     game.S.stats.sent = at + 4
     expect(has(), 'вне окна — варианта нет').toBe(false)
+  })
+
+  it('отзыв Авито: коньячная строка в пуле и выбирается (#1025)', async () => {
+    const line = 'Отзыв выдержанный, как коньяк. Пять звёзд — это букет. Основная сумма — сама выдержка.'
+    expect(AVITO_REVIEW.map(valueOf), 'коньячной строки нет в пуле').toContain(line)
+    const { game } = makeGame()
+    const seen = new Set<string>()
+    // колода без повторов: несколько ответов подряд соберут весь пул
+    for (let i = 0; i < AVITO_REVIEW.length + 2 && !seen.has(line); i++) {
+      const from = game.S.msgs.length
+      await game.fire('PlayerSays', { intent: 'avitoReview' })
+      for (const t of game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' ? [m.text] : []))) seen.add(t)
+    }
+    expect([...seen], 'коньячная строка не выбирается').toContain(line)
   })
 
   it('пулы реакций и ответов не пусты (#927)', () => {

@@ -256,6 +256,18 @@ describe('игрок видит кнопки настоящим путём', () 
   })
 })
 
+describe('плавающий срок: «разбудить» дышит спящим (#1025)', () => {
+  const line = 'Вот это хотя бы срок. Разбудить его можно?'
+  it('на «после приёмки» будить некого, на «проснётся» строка предлагается', async () => {
+    expect(pool('P_WHEN_FLOATING'), 'строка ушла из пула — проверка пустеет').toContain(line)
+    const awake = await said(byText('после приёмки второго этажа'))
+    expect(awake.facts()['ctx.whenKind'], 'срок не плавающий — проверка не про то').toBe('floating')
+    expect(awake.open(D.P_WHEN_FLOATING), 'на приёмке «разбудить» предлагается').not.toContain(line)
+    const sleeping = await said(byText('как дядя Самвел проснётся'))
+    expect(sleeping.open(D.P_WHEN_FLOATING), 'на «проснётся» строки нет').toContain(line)
+  })
+})
+
 describe('правки обещаний: род у каждого термина EDIT_WHEN (#923)', () => {
   const editTerms = (): When[] => (L.EDIT_WHEN as Entry<When>[]).map(valueOf)
 
@@ -266,6 +278,24 @@ describe('правки обещаний: род у каждого термина
     expect(year.due, 'горизонт — 1 января следующего года').toEqual({ newYear: true })
     expect(editTerms().find((w) => w.t === 'когда-нибудь')!.kind).toBe('never')
     expect(editTerms().find((w) => w.t === 'после следующей свадьбы')!.kind).toBe('event')
+  })
+
+  it('«в будущем. Не уточняю» — срок без числа: ни карандаша, ни напоминания с днями (#1025)', async () => {
+    const vague = editTerms().find((w) => w.t === 'в будущем. Не уточняю')!
+    expect(['never', 'dodge'], 'род без числа').toContain(vague.kind)
+    expect(vague.d, 'числа у срока нет').toBeNull()
+    expect(vague.est, 'оценка не выдумывается').toBeUndefined()
+    const { game } = makeGame({ seed: 1 })
+    const p: When & { text: string } = { text: 'в будущем. Не уточняю', ...vague }
+    game.recordPromise(p)
+    expect(game.S.promises.at(-1)!.due, 'журнал не строит дату').toBeNull()
+    game.S.ctx = game.ctxFromPromise(p)
+    const f = game.facts()
+    expect(f['ctx.whenDays'], 'горизонта в днях нет').toBeUndefined()
+    expect(f['ctx.whenHorizon'], 'даль не строится').toBeUndefined()
+    const texts: string[] = []
+    for (let i = 0; i < 30; i++) { game.S.choices = null; for (const c of game.buildChoices()) texts.push(c.text) }
+    expect(texts.filter((t) => /\d+ (день|дня|дней)/.test(t)), `дни не выдумываются: ${texts.join(' | ')}`).toEqual([])
   })
 
   it('после правки род на доске, и на «в следующем году» риторика «никогда» не собирается', async () => {
