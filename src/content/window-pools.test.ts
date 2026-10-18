@@ -13,7 +13,7 @@ import { intro } from './memkeys'
 import * as W from './world'
 import {
   RAM_PHOTO, BORIS_SALE, VACANCY, AVITO_REVIEW, RUBIK_ASK, KETTLE,
-  CREW_CALL_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, GRANT_TILE_B, DEBUT_NIVA_B, DEBUT_BORIS_B, MOUSTACHE_PHOTO_B, MAMA_MARKET_B,
+  CREW_CALL_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, GRANT_TILE_B, DEBUT_NIVA_B, DEBUT_BORIS_B, MOUSTACHE_PHOTO_B, MAMA_MARKET_B, GRANT_HOUSE_B,
   LAWYER_B, COLLECTORS_ASK_B, INTERN_B, HOLE_B, COUNTERSUIT_B,
 } from './world'
 
@@ -49,6 +49,9 @@ const WINDOWS: Window[] = [
   { pool: 'DEBUT_NIVA_B', lines: DEBUT_NIVA_B, marks: {} },
   { pool: 'P_GRANT_TILE', lines: PP.P_GRANT_TILE, marks: { Грант: null, фундамент: 'heard.money_foundation' } },
   { pool: 'GRANT_TILE_B', lines: GRANT_TILE_B, marks: { Грант: null } },
+  // второй дебют Гранта (#1041): пул и ответ ссылаются только на его же строку про дом и клад
+  { pool: 'P_GRANT_HOUSE', lines: PP.P_GRANT_HOUSE, marks: {} },
+  { pool: 'GRANT_HOUSE_B', lines: GRANT_HOUSE_B, marks: {} },
   { pool: 'P_CREW_CALL', lines: PP.P_CREW_CALL, marks: { Тарон: null, звон: null } },
   { pool: 'CREW_CALL_B', lines: CREW_CALL_B, marks: { Тарон: null, звон: null } },
   { pool: 'P_COLLECTORS_DEBUT', lines: PP.P_COLLECTORS_DEBUT, marks: { поручител: null } },
