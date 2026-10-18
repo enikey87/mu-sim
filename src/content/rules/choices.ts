@@ -164,7 +164,8 @@ export const choiceRules: R[] = [
   offer({ name: 'Photo', when: [eq('ctx.type', 'photo')], act: 'photo', tone: 'neutral', bonus: 3, text: (g) => fromD(g, 'P_PHOTO') }),
   offer({ name: 'VoiceCow', slot: 'voice', weight: 0.4, when: [eq('ctx.type', 'voice')], act: 'voice', tone: 'neutral', bonus: 3, text: (g) => fromD(g, 'P_VOICE') }),
   offer({ name: 'VoiceText', slot: 'voice', weight: 0.6, when: [eq('ctx.type', 'voice')], act: 'voiceText', tone: 'neutral', bonus: 3, text: (g) => fromD(g, 'P_VOICE2') }),
-  offer({ name: 'Transfer', when: [eq('ctx.type', 'transfer')], act: 'transferQ', tone: 'neutral', bonus: 3, text: (g, f) => fromD(g, 'P_TRANSFER', { amount: String(f['ctx.amount'] ?? 50) }) }),
+  // перевод 50 ₽ — заметное событие с окном отклика (#1003): кнопка из пула реакций живёт и когда ctx ушёл дальше
+  offer({ name: 'Transfer', when: [is('transferFresh')], act: 'transferQ', tone: 'neutral', bonus: 3, text: (g, f) => fromD(g, 'P_TRANSFER', { amount: String(f['transferAmount'] ?? 50) }) }),
   offer({ name: 'Ping', when: [eq('ctx.type', 'readonly')], act: 'ping', tone: 'neutral', bonus: 3, text: (g) => fromD(g, 'P_PING') }),
   // «Завтра» → «это когда?», а «Брат, в пути» → «А подробнее?»
   offer({

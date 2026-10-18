@@ -19,7 +19,7 @@ import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, PROMISE_PENCIL,
 import { CREW_PAID } from '../crew'
 import { HOLIDAY_MONEY, type Holiday } from '../holidays'
 import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_THIRD, LIE_NOCRED } from '../lies'
-import { HEAT, alikShaved, avitoReviewAt, borisSaleAt, collectorsAskAt, countersuitAt, crewPaidAt, debutAt, grantTileAt, internAt, kettleAt, lawyerAt, moustacheAskAt, ramPhotoAt, rubikAskAt, rubikHoleAt, vacancyAt, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, saidKonak, stateAt, topic, topicLast, topicMute, topicRun, whenYears } from '../memkeys'
+import { HEAT, alikShaved, avitoReviewAt, borisSaleAt, collectorsAskAt, countersuitAt, crewPaidAt, debutAt, grantTileAt, internAt, kettleAt, lawyerAt, moustacheAskAt, ramPhotoAt, rubikAskAt, rubikHoleAt, transferAt, vacancyAt, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, saidKonak, stateAt, topic, topicLast, topicMute, topicRun, whenYears } from '../memkeys'
 import type { ArcId, TopicId } from '../ids'
 import { PROMISE_SHAVE_ASK, RAM_PHOTO, BORIS_SALE, VACANCY, AVITO_REVIEW, RUBIK_ASK, KETTLE, CREW_CALL_B, LAWYER_B, COLLECTORS_ASK_B, INTERN_B, HOLE_B, COUNTERSUIT_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, DEBUT_BORIS_B, DEBUT_NIVA_B, GRANT_TILE_B } from '../world'
 
@@ -118,6 +118,7 @@ export const replyRules: R[] = [
   simple('voiceText', (g) => g.pair('VOICE_A', D.VOICE_A, 'VOICE_B', D.VOICE_B)),
   says('transferQ', {
     respond: async ({ game }) => {
+      game.clearFact(transferAt) // ответ потребил окно перевода (#951/#1003)
       const reply = game.uniq(game.X.transferQ)
       if (reply.nextTransfer) game.applyFacts([set(nextTransfer, reply.nextTransfer)])
       await game.say([reply.text])
