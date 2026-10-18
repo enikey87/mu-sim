@@ -22,7 +22,7 @@ import {
   P_VIA_BORIS, P_VIA_KARINE, P_VIA_MAMA, P_MOO, P_MOUSTACHE, P_COURT, P_COLLECTORS_DEBUT,
   P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE,
   P_CREW_CALL, P_LAWYER, P_COLLECTORS_ASK, P_INTERN, P_HOLE, P_COUNTERSUIT,
-  P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_BORIS,
+  P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_BORIS, P_DEBUT_NIVA, P_GRANT_TILE,
 } from './player-choice-pools'
 
 type R = Rule<ContentApi, GameEvent, Offer>
@@ -152,6 +152,9 @@ export const choiceRules: R[] = [
   offer({ name: 'DebutArsen', when: [is('debutFresh'), eq('debutWho', 'arsen')], act: 'debutArsen', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_DEBUT_ARSEN', P_DEBUT_ARSEN) }),
   offer({ name: 'DebutSamvel', when: [is('debutFresh'), eq('debutWho', 'samvel')], act: 'debutSamvel', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_DEBUT_SAMVEL', P_DEBUT_SAMVEL) }),
   offer({ name: 'DebutBoris', when: [is('debutFresh'), eq('debutWho', 'boris')], act: 'debutBoris', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_DEBUT_BORIS', P_DEBUT_BORIS) }),
+  offer({ name: 'DebutNiva', when: [is('debutFresh'), eq('debutWho', 'niva')], act: 'debutNiva', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_DEBUT_NIVA', P_DEBUT_NIVA) }),
+  // первое сообщение заказчика Гранта (#983): свой штамп, не общее окно дебюта — текст только про эту реплику
+  offer({ name: 'GrantTile', when: [is('grantTileFresh')], act: 'grantTile', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_GRANT_TILE', P_GRANT_TILE) }),
   // встречный иск — заметное событие с окном отклика (#964): ход и три после
   offer({ name: 'Countersuit', when: [is('countersuitFresh')], act: 'countersuitAsk', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_COUNTERSUIT', P_COUNTERSUIT) }),
 

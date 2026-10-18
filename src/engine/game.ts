@@ -1582,6 +1582,8 @@ export class Game {
       internFresh: S.stats.sent - Number(S.mem[memkeys.internAt] ?? -99) <= 3,
       rubikHoleFresh: S.stats.sent - Number(S.mem[memkeys.rubikHoleAt] ?? -99) <= 3,
       countersuitFresh: S.stats.sent - Number(S.mem[memkeys.countersuitAt] ?? -99) <= 3,
+      // первое сообщение заказчика Гранта (#983): ход реплики и три после
+      grantTileFresh: S.stats.sent - Number(S.mem[memkeys.grantTileAt] ?? -99) <= 3,
       sinceRude: S.stats.sent - Number(S.mem[memkeys.rudeAt] ?? -99),
       // без штампа звонка — далеко: «кто звонил» без имени закрыто (#928)
       sinceCrew: S.stats.sent - Number(S.mem[memkeys.crewPaidAt] ?? -99),
