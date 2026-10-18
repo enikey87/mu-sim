@@ -595,3 +595,33 @@ describe('follow-строки оперируют только введённым
     expect(bad).toEqual([])
   })
 })
+
+describe('вопрос про коллекторов держит только показанное аркой (#1013)', () => {
+  const LETTERS = 'Коллекторы пишут, деньги требуют.'
+  const TYOSCHA = 'Коллекторы пишут, деньги требуют. Тёща Алика тоже подключилась — она всегда в курсе.'
+  const open = (game: ReturnType<typeof makeGame>['game']) => game.open(ARCS.collectors.follow)
+
+  it('«звонят» не звучит: арка показывает письма, а не звонки', () => {
+    const { game } = makeGame()
+    game.S.mem.credit_broke = true
+    game.S.arcs.collectors = { i: 2, last: 0 }
+    expect(open(game), 'строка про письма пропала — проверка пустеет').toContain(LETTERS)
+    expect(ARCS.collectors.follow.map(valueOf).filter((t) => /звон/i.test(t)), 'строка утверждает звонок без события').toEqual([])
+    // источник — серия 2 («тебе коллекторы пишут?»): звонков арка не показывает вовсе
+    expect(/пишут/.test(JSON.stringify(ARCS.collectors.eps)), 'арка не показывает писем — строка была бы не про что').toBe(true)
+  })
+
+  it('тёща Алика — только когда жена уже в истории: строка гейтнута и называет её своей', () => {
+    const fresh = makeGame().game
+    fresh.S.mem.credit_broke = true
+    fresh.S.arcs.collectors = { i: 2, last: 0 }
+    expect(open(fresh), 'тёща без знакомства с Карине').not.toContain(TYOSCHA)
+    const married = makeGame().game
+    married.S.mem.credit_broke = true
+    married.S.arcs.collectors = { i: 2, last: 0 }
+    married.S.mem['intro.karine'] = true
+    expect(open(married), 'со женой в истории строки нет').toContain(TYOSCHA)
+    // родня — Алика, а не игрока (#915): фантомной тёщи у игрока в строках пула нет
+    for (const t of open(married)) if (/тёщ/i.test(t)) expect(t, 'родня без принадлежности Алику').toMatch(/Алика/)
+  })
+})

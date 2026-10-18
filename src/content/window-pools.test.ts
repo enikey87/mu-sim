@@ -4,13 +4,15 @@
 // либо требует гейт на факт (FactKey); метка вне карты или без гейта — красный сюит.
 // Опция allow — только с оправданием: строка, где ссылка осознанная и гейтом не чинится.
 import { describe, it, expect } from 'vitest'
-import { Gated, valueOf, type Line, type FactKey } from './fact'
+import { Gated, valueOf, is, gate, type Line, type FactKey } from './fact'
 import type { Criterion } from '../engine/rules'
 import * as PP from './rules/player-choice-pools'
+import { ARCS } from './arcs'
+import { intro } from './memkeys'
 import * as W from './world'
 import {
   RAM_PHOTO, BORIS_SALE, VACANCY, AVITO_REVIEW, RUBIK_ASK, KETTLE,
-  CREW_CALL_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, GRANT_TILE_B, DEBUT_NIVA_B, DEBUT_BORIS_B,
+  CREW_CALL_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, GRANT_TILE_B, DEBUT_NIVA_B, DEBUT_BORIS_B, MOUSTACHE_PHOTO_B,
   LAWYER_B, COLLECTORS_ASK_B, INTERN_B, HOLE_B, COUNTERSUIT_B,
 } from './world'
 
@@ -72,6 +74,9 @@ const WINDOWS: Window[] = [
   { pool: 'COUNTERSUIT_B', lines: COUNTERSUIT_B, marks: { кум: null, тамад: null } },
   // --- окна, у которых метки только именами участников
   { pool: 'P_MOUSTACHE', lines: PP.P_MOUSTACHE, marks: {} },
+  // окно ставки «усы» (#1013): «Карине» приходит только со знакомством — строка несёт needs('karine')
+  { pool: 'P_MOUSTACHE_PHOTO', lines: PP.P_MOUSTACHE_PHOTO, marks: { Карине: 'intro.karine' } },
+  { pool: 'MOUSTACHE_PHOTO_B', lines: MOUSTACHE_PHOTO_B, marks: { Карине: 'intro.karine' } },
   { pool: 'P_VIA_BORIS', lines: PP.P_VIA_BORIS, marks: { Борис: null } },
   { pool: 'P_VIA_KARINE', lines: PP.P_VIA_KARINE, marks: { Карине: null } },
   { pool: 'P_VIA_MAMA', lines: PP.P_VIA_MAMA, marks: {} },
@@ -79,6 +84,31 @@ const WINDOWS: Window[] = [
   // угроза «до Страсбурга» сама вводит план и ставит факт saidStrasburg (#982) — это источник, не ссылка
   { pool: 'P_COURT', lines: PP.P_COURT, marks: { Арсен: null, Страсбург: null } },
 ]
+
+/** Метки follow-пулов арок (#1013): что сериал этой арки объявляет сам (null) и на какой факт обязана
+ *  быть гейтнута чужая метка. Список узкий — как MARKS: посторонняя ссылка краснеет, своя — нет. */
+const ARC_MARKS: Record<string, Record<string, FactKey | null>> = {
+  boris: { Борис: null }, // баран введён первой серией арки
+  // фундамент — мотив арки (деньги в опалубке); Арсен/Грант/Гоар приходят её же сериями — вопросы несут needs(WORLD.*)
+  beton: { фундамент: null, Арсен: 'intro.arsen', Грант: 'intro.grant', Гоар: 'intro.goar' },
+  // свадьба и конверт — свои; Мкртич приходит из другой линии, вопрос гейтнут needs(WORLD.mkrtich)
+  samvel: { Самвел: null, конверт: null, тамад: null, Мкртич: 'intro.mkrtich' },
+  // «Нива» звонит: её серия говорит «Она за мой счёт звонит» (eps[4]); фундамент — из арки бетона, по факту
+  niva: { звон: null, фундамент: 'heard.money_foundation' },
+  collectors: { Тарон: 'intro.taron' },
+  nune: { Нуне: null },
+  rubik: { Рубик: null },
+  grant: { Грант: null },
+  razmik: { Размик: null },
+  // Гарик и его фундамент — свои; конверт в фундаменте — мотив арки бетона, отсюда гейт на arc.beton
+  garik: { Гарик: null, фундамент: 'garik.concrete', конверт: 'arc.beton' },
+  tile: { Ашот: 'intro.judge' },
+  alik_death: { Самвел: 'intro.samvel' },
+}
+
+/** Follow-пулы арок (#1013): вопрос про сериал ссылается только на то, что арка ввела, или несёт гейт. */
+const arcWindows = (): Window[] =>
+  Object.entries(ARCS).map(([id, a]): Window => ({ pool: `ARCS.${id}.follow`, lines: a.follow, marks: ARC_MARKS[id] ?? {} }))
 
 /** Листья условий: вложенные named/all разворачиваются — сверяем по ключам фактов. */
 const leaves = (cs: readonly Criterion[]): string[] =>
@@ -96,28 +126,41 @@ const lineText = (l: Line): string => {
 const hasMark = (text: string, mark: string): boolean =>
   new RegExp(`(^|[^а-яё])${mark}`, 'i').test(text)
 
+/** Находки одной карты окна: метка объявлена окном (null), гейтнута на свой факт — или красная. */
+const markIssues = (w: Window): string[] => {
+  const issues: string[] = []
+  const texts = new Set(w.lines.map(lineText))
+  for (const [t, why] of w.allow ?? []) {
+    if (!texts.has(t)) issues.push(`${w.pool}: allow «${t.slice(0, 40)}…» — строки больше нет (${why})`)
+  }
+  for (const l of w.lines) {
+    const text = lineText(l)
+    if ((w.allow ?? []).some(([t]) => t === text)) continue
+    const gates = gateKeys(l)
+    for (const mark of MARKS) {
+      if (!hasMark(text, mark)) continue
+      const need = w.marks[mark]
+      if (need === undefined) { issues.push(`${w.pool}: метка «${mark}» вне карты окна — «${text}»`); continue }
+      if (need === null) continue
+      if (!gates.includes(need)) issues.push(`${w.pool}: «${mark}» без гейта на ${need} — «${text}»`)
+    }
+  }
+  return issues
+}
+
 describe('окна держат только утверждённое (#996)', () => {
   it('каждая строка окна ссылается лишь на объявленное, либо несёт гейт на факт, либо оправдана в allow', () => {
-    const issues: string[] = []
-    for (const w of WINDOWS) {
-      const texts = new Set(w.lines.map(lineText))
-      for (const [t, why] of w.allow ?? []) {
-        if (!texts.has(t)) issues.push(`${w.pool}: allow «${t.slice(0, 40)}…» — строки больше нет (${why})`)
-      }
-      for (const l of w.lines) {
-        const text = lineText(l)
-        if ((w.allow ?? []).some(([t]) => t === text)) continue
-        const gates = gateKeys(l)
-        for (const mark of MARKS) {
-          if (!hasMark(text, mark)) continue
-          const need = w.marks[mark]
-          if (need === undefined) { issues.push(`${w.pool}: метка «${mark}» вне карты окна — «${text}»`); continue }
-          if (need === null) continue
-          if (!gates.includes(need)) issues.push(`${w.pool}: «${mark}» без гейта на ${need} — «${text}»`)
-        }
-      }
-    }
+    // пулы кнопок и ответов + follow-пулы арок (#1013): вопрос про сериал — то же окно, что кнопка
+    const issues = [...WINDOWS, ...arcWindows()].flatMap(markIssues)
     expect(issues, `\n${issues.join('\n')}`).toEqual([])
+  })
+
+  it('НК детектора: чужая метка в follow-пуле без гейта краснеет, та же строка с гейтом — нет (#1013)', () => {
+    const pool = (lines: Line[], marks: Record<string, FactKey | null> = { Борис: 'intro.baran' }): Window =>
+      ({ pool: 'ARCS.test.follow', lines, marks })
+    expect(markIssues(pool(['Ко мне пришёл Борис.'])).join(' '), 'метка без гейта не покраснела').toContain('без гейта на intro.baran')
+    expect(markIssues(pool(['Ко мне пришёл Борис.'], {})).join(' '), 'метка вне карты окна не покраснела').toContain('вне карты окна')
+    expect(markIssues(pool([gate(is(intro('baran')))('Ко мне пришёл Борис.')]))).toEqual([])
   })
 
   it('у каждого пула окна есть карта: новый пул без записи — красный', () => {

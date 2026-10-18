@@ -2,7 +2,7 @@
 // запись полна (факт-ход — ключ памяти, пул зарегистрирован, оффер существует). Новый участник
 // без записи — красный сюит, а не находка рецензента через раунд плейтеста.
 import { describe, it, expect } from 'vitest'
-import { FIRST_WINDOWS, EXEMPT, DEBUT_SLOT } from './first-windows'
+import { FIRST_WINDOWS, EXEMPT, DEBUT_SLOT, EVENT_SOURCES } from './first-windows'
 import { SPEAKS, speaks } from './world'
 import { MEM_KEYS } from './memkeys'
 import { playerPool } from './player-pools'
@@ -31,6 +31,19 @@ describe('реестр окна первого сообщения (#994)', () =>
       expect(pool, `${w.who}: пул ${w.pool} не в реестре кнопок`).toBeDefined()
       expect(pool!.length, `${w.who}: пул ${w.pool} пуст`).toBeGreaterThan(0)
       expect(offers.has(`Opt_${w.offer}`), `${w.who}: оффера Opt_${w.offer} нет в правилах`).toBe(true)
+    }
+  })
+
+  it('источники-события полны: факт-ход — ключ памяти, пул зарегистрирован и не пуст, оффер существует (#1013)', () => {
+    // системная строка не участник: в FIRST_WINDOWS ей места нет, но заказ окна тот же — сверяем полноту
+    const offers = new Set(allRules.map((r) => r.name))
+    expect(EVENT_SOURCES.length, 'реестр источников пуст — проверка пустеет').toBeGreaterThan(0)
+    for (const e of EVENT_SOURCES) {
+      expect(MEM_KEYS.has(e.at), `${e.source}: факта ${e.at} нет в memkeys`).toBe(true)
+      const pool = playerPool(e.pool)
+      expect(pool, `${e.source}: пул ${e.pool} не в реестре кнопок`).toBeDefined()
+      expect(pool!.length, `${e.source}: пул ${e.pool} пуст`).toBeGreaterThan(0)
+      expect(offers.has(`Opt_${e.offer}`), `${e.source}: оффера Opt_${e.offer} нет в правилах`).toBe(true)
     }
   })
 
