@@ -71,4 +71,17 @@ describe('фоновые счета не отвечают игроку (#533)', 
     }
     expect(heard, 'свет прозвучал после настоящего ответа').toMatch(/Свет отключили\?/)
   })
+
+  it('карточка света снимает объектный ctx: сомнение в отмазке не отвечает свету (#1000, заметка 14)', async () => {
+    const { game } = makeGame()
+    game.S.ctx = { constr: true } // как после объектной отмазки Алика
+    const defends = () => { game.S.choices = null; return game.buildChoices().some((c) => c.act === 'defend') }
+    expect(defends(), 'сомнение после объектной отмазки').toBe(true)
+    game.S.mem[lightOff] = true
+    let fired = false
+    for (let i = 0; i < 60 && !fired; i++) fired = (await game.fire('StoryBeat'))?.name === 'Beat_LightOff'
+    expect(fired, 'карточка света не сыграла — проверка пустеет').toBe(true)
+    expect(game.S.ctx, 'карточка оставила чужой ctx').toBeNull()
+    expect(defends(), 'сомнение в отмазке отвечает свету').toBe(false)
+  })
 })
