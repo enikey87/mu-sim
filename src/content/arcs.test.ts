@@ -598,30 +598,44 @@ describe('follow-строки оперируют только введённым
 
 describe('вопрос про коллекторов держит только показанное аркой (#1013)', () => {
   const LETTERS = 'Коллекторы пишут, деньги требуют.'
-  const TYOSCHA = 'Коллекторы пишут, деньги требуют. Тёща Алика тоже подключилась — она всегда в курсе.'
   const open = (game: ReturnType<typeof makeGame>['game']) => game.open(ARCS.collectors.follow)
 
-  it('«звонят» не звучит: арка показывает письма, а не звонки', () => {
+  it('«звонят» и тёщи-коллекторши нет: арка показывает письма, а тёща в партии не вводится', () => {
     const { game } = makeGame()
     game.S.mem.credit_broke = true
     game.S.arcs.collectors = { i: 2, last: 0 }
     expect(open(game), 'строка про письма пропала — проверка пустеет').toContain(LETTERS)
-    expect(ARCS.collectors.follow.map(valueOf).filter((t) => /звон/i.test(t)), 'строка утверждает звонок без события').toEqual([])
+    expect(ARCS.collectors.follow.map(valueOf).filter((t) => /звон|тёщ/i.test(t)), 'строка утверждает звонок или тёщу без события').toEqual([])
     // источник — серия 2 («тебе коллекторы пишут?»): звонков арка не показывает вовсе
     expect(/пишут/.test(JSON.stringify(ARCS.collectors.eps)), 'арка не показывает писем — строка была бы не про что').toBe(true)
   })
 
-  it('тёща Алика — только когда жена уже в истории: строка гейтнута и называет её своей', () => {
-    const fresh = makeGame().game
-    fresh.S.mem.credit_broke = true
-    fresh.S.arcs.collectors = { i: 2, last: 0 }
-    expect(open(fresh), 'тёща без знакомства с Карине').not.toContain(TYOSCHA)
-    const married = makeGame().game
-    married.S.mem.credit_broke = true
-    married.S.arcs.collectors = { i: 2, last: 0 }
-    married.S.mem['intro.karine'] = true
-    expect(open(married), 'со женой в истории строки нет').toContain(TYOSCHA)
-    // родня — Алика, а не игрока (#915): фантомной тёщи у игрока в строках пула нет
-    for (const t of open(married)) if (/тёщ/i.test(t)) expect(t, 'родня без принадлежности Алику').toMatch(/Алика/)
+})
+
+describe('конверты Самвела: вопрос открывает реплика легенды, а не календарь (#1016)', () => {
+  const ENVELOPES = 'Самвел, конверты у вас. Мой долг — туда же сдать?'
+  const EMPTY = 'Конверт молодым пуст? Пусть дядя из моего долга отсыпет.'
+  const open = (game: ReturnType<typeof makeGame>['game']) => game.open(ARCS.samvel.follow)
+
+  it('до реплики легенды про конверты обоих вопросов нет, после — есть', async () => {
+    const { game } = makeGame()
+    game.S.arcs.samvel = { i: 1, last: 0 } // арка идёт с декабря, как в партии 182117
+    expect(open(game), 'вопрос про конверты звучит до того, как мир их ввёл').not.toContain(ENVELOPES)
+    expect(open(game), 'вопрос про пустой конверт звучит до того, как мир их ввёл').not.toContain(EMPTY)
+    // настоящий путь: реплика легенды свадьбы звучит ходом Алика (Turn_Legend)
+    game.setLegend('wedding', 'samvel')
+    let heard = false
+    for (let i = 0; i < 120 && !heard; i++) {
+      game.S.stats.sent += 3
+      game.setLegend('wedding', 'samvel') // серии других сериалов по дороге ставят свои легенды
+      const n = game.S.msgs.length
+      if ((await game.fire('AlikTurn'))?.name === 'Turn_Legend')
+        heard = game.S.msgs.slice(n).some((m) => m.kind === 'text' && m.text.includes('Гости подарили конверты'))
+      game.S.scene = null
+    }
+    expect(heard, 'реплика легенды не прозвучала — проверка пустеет').toBe(true)
+    expect(game.facts()['heard.samvel_envelopes'], 'реплика не опубликовала утверждение про конверты').toBe(true)
+    expect(open(game), 'после реплики вопроса про конверты нет').toContain(ENVELOPES)
+    expect(open(game), 'после реплики вопроса про пустой конверт нет').toContain(EMPTY)
   })
 })

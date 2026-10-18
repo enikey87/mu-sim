@@ -27,6 +27,8 @@ export interface LedgerValueMap {
   'beton.mood': 'offended'
   'crane.where': 'wedding'
   'salary.eagle': 'taken'
+  /** Свадебные конверты Самвела (#1016): Алик рассказал, где они; не место денег, а событие свадьбы. */
+  'samvel.envelopes': 'at_samvel'
 }
 export type LedgerSubject = keyof LedgerValueMap
 type LedgerPoint = { [S in LedgerSubject]: { subject: S; value: LedgerValueMap[S] } }[LedgerSubject]
@@ -210,6 +212,7 @@ export const CLAIM_LEDGER: Record<ClaimKey, LedgerPoint> = {
   beton: point('beton.mood', 'offended'),
   crane_wedding: point('crane.where', 'wedding'),
   eagle: point('salary.eagle', 'taken'),
+  samvel_envelopes: point('samvel.envelopes', 'at_samvel'),
 }
 
 /**

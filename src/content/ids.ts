@@ -138,6 +138,7 @@ export type ClaimKey =
   | 'money_safe'
   | 'money_foundation'
   | 'money_niva'
+  | 'samvel_envelopes'
   | 'sent'
   | 'no_money'
   | 'grandpa_dead'
