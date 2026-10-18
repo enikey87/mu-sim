@@ -54,7 +54,12 @@ export const courtRules: R[] = [
   {
     name: 'Court_Lawyer_Again', event: 'PlayerMessage', when: [threat, eq(court, 1), is(intro('arsen'))], bonus: 1,
     remember: [add(count.threat), add(court)],
-    respond: async ({ game }) => { game.unlock('memory'); await saySaid(game, referred(game, COURT_LAWYER_AGAIN)) },
+    respond: async ({ game, facts }) => {
+      game.unlock('memory')
+      await saySaid(game, referred(game, COURT_LAWYER_AGAIN))
+      // первое сообщение юриста — и когда Арсен уже был знаком (#971)
+      game.applyFacts([set(lawyerAt, Number(facts.sent))])
+    },
   },
   {
     // претензия, апелляция, Страсбург, решение — по ступеням
