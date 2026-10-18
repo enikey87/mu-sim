@@ -5,6 +5,8 @@
 import { describe, expect, it } from 'vitest'
 import { CAST } from './arcs'
 import { D, low } from './excuses'
+import { valueOf } from './fact'
+import { makeGame } from '../test/helpers'
 
 /** Имя говорящего — последнее слово с заглавной в отображаемом имени: «Заказчик Грант» → «Грант».
  *  Роль-титул (Заказчик, Прораб, Мама, Коллекторы…) именем не считается: «…, Мама рядом стоит…»,
@@ -48,5 +50,20 @@ describe('кот Алика в репликах введён на месте (#9
       if (!hasCat.test(line)) continue
       expect(line, `кот без ввода: «${line}»`).toMatch(/мой кот|он мой/i)
     }
+  })
+})
+
+describe('сервиз тёти Гоар — только после тамада-квеста (#1046)', () => {
+  const line = 'Ты мне сердце разбил. Как сервиз тёти Гоар.'
+  it('знакомства по козе мало; после q_tamada строка открывается', async () => {
+    const { game } = makeGame()
+    expect(D.OFF_A.map(valueOf), 'строки нет в пуле — проверка пустеет').toContain(line)
+    await game.enterNode('q_goat', 'ask') // реальный путь знакомства: коза на крыше, тамады не было
+    expect(game.S.mem['intro.goar'], 'Гоар не вошла в историю — проверка пустеет').toBe(true)
+    expect(game.S.ach['q_tamada'], 'тамада уже сыграна — проверка не про то').toBeUndefined()
+    expect(game.open(D.OFF_A), 'сервиз-строка без тамада-сюжета').not.toContain(line)
+    await game.enterNode('q_tamada', 'yes') // сервиз разбит: ачивка q_tamada
+    expect(game.S.ach['q_tamada'], 'тамада-квест не сыграл').toBeDefined()
+    expect(game.open(D.OFF_A), 'сервиз-строка после тамады').toContain(line)
   })
 })
