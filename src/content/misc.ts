@@ -2,7 +2,7 @@
 import { type Line, during, eq, gate, gte, is, missing, of, type Entry } from './fact'
 import { type ClaimKey } from './ids'
 import { needs, WORLD } from './world'
-import { alikDead, bloodGiven, court, endgame, polite, sick, threatClaim, wedding } from './memkeys'
+import { alikDead, bloodGiven, court, endgame, judgeApology, polite, sick, threatClaim, wedding } from './memkeys'
 import { sold } from './credit'
 /** Плата за сдачу крови на дне (#339): комедийный масштаб под MONEY_BOTTOM, через adjustMoney. */
 export const BLOOD_PAY = 1000
@@ -53,7 +53,8 @@ export const RUDE_AGAIN: Line[] = [
   'Ты так кричишь, будто я тебе что-то должен. А, ну да.',
   needs('karineHome')(needs('karine')('Мне кардиолог запретил читать твои сообщения. Я читаю через Карине.')),
   // память: крик напоминает о том, что было в партии
-  needs('judge')({ t: 'Кричишь, как на суде. Судья Ашот тоже так кричал — потом извинился. Бери пример.', when: [gte(court, 4)], prio: 1 }),
+  // «потом извинился» — факт извинений ставит источник судьи в День выплаты (#988): до него строка не звучит
+  needs('judge')({ t: 'Кричишь, как на суде. Судья Ашот тоже так кричал — потом извинился. Бери пример.', when: [gte(court, 4), is(judgeApology)], prio: 1 }),
   { t: 'Ты кричишь, а я помню хаш. Ты тогда молчал и ел. Хорошее было время.', when: [is('ach.q_hash')], prio: 1 },
   needs('boris')({ t: 'Борис из-за тебя заболел. Цифрами и криком.', when: [of('boris', is(sick))], prio: 2 }),
   needs('samvel')({ t: 'После семейного суда ты опять кричишь? Самвел готовит второе заседание. С коньяком.', when: [is('ach.tribunal')], prio: 1 }),
