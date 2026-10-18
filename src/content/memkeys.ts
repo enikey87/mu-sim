@@ -200,6 +200,8 @@ export const collectorsAskAt = 'collectors.askAt'
 export const internAt = 'collectors.internAt'
 /** Вопрос про дырку от образца плитки (#958): ход вопроса. */
 export const rubikHoleAt = 'rubik.holeAt'
+/** Первое сообщение заказчика Гранта («плитка — орудие», #983): ход реплики. */
+export const grantTileAt = 'tile.grantAt'
 
 /** Ключи досок персонажей (S.actors), не мира. */
 export const sick = 'sick'
@@ -212,7 +214,7 @@ export const EVENT_KEY_LIST = [
   'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sinceCrew', 'sorrySwing', 'promiseLive', 'promisePassed', 'promiseStake',
   'debutWho', 'debutFresh',
   'ramPhotoFresh', 'borisSaleFresh', 'vacancyFresh', 'avitoReviewFresh', 'rubikAskFresh', 'kettleFresh',
-  'lawyerFresh', 'collectorsAskFresh', 'internFresh', 'rubikHoleFresh', 'countersuitFresh',
+  'lawyerFresh', 'collectorsAskFresh', 'internFresh', 'rubikHoleFresh', 'countersuitFresh', 'grantTileFresh',
   'period', 'night', 'offline', 'scene', 'sinceAlik', 'lateCount', 'arcAvailable',
   'arcsStarted', 'arcsDone', 'quests', 'callbackReady', 'lieOpen', 'lieKind', 'lieAlikOld', 'deathCanAdvance', 'collectorsCanAdvance',
   'intent', 'tone', 'arg', 'category', 'arc', 'argArcDone', 'greet', 'promise', 'somedayCount', momDachaDays,
@@ -232,6 +234,6 @@ export const MEM_KEYS: ReadonlySet<string> = new Set([
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday, saidKonak,
   lightOff, netRation, phoneWarn, holidayGreeted,
   creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, collectorsTurned, criticalAt, creditOfferSum, momDachaAt, crewPaid, crewPaidAt, rubikBath, whenYears, ...Object.values(moneyAskAt), debutWho, debutAt,
-  ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt, countersuitAt,
+  ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt, countersuitAt, grantTileAt,
   ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lend50),
 ])

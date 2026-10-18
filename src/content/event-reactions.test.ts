@@ -3,12 +3,12 @@ import { describe, it, expect, vi } from 'vitest'
 import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
 import { NOTIF } from './life'
-import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER } from './rules/player-choice-pools'
-import { BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B } from './world'
+import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_GRANT_TILE } from './rules/player-choice-pools'
+import { BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B } from './world'
 import { ARCS } from './arcs'
 import { FINALES } from './finales'
 import { COURT_LAWYER_AGAIN } from './quests'
-import { court, HEAT, lawyerAt } from './memkeys'
+import { court, HEAT, lawyerAt, grantTileAt } from './memkeys'
 import { valueOf } from './fact'
 
 const AD = 'Новое объявление рядом: «Продаю барана Бориса, торг, умеет писать».'
@@ -328,5 +328,41 @@ describe('реакции: вопрос Рубика и чайник (#953)', () 
     const said = game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : []))
     expect(said.some((t) => KETTLE.map(valueOf).includes(t)), 'ответ не из пула').toBe(true)
     expect(has(game, 'kettle'), 'после ответа окно закрыто').toBe(false)
+  })
+})
+
+describe('первое сообщение заказчика Гранта (#983)', () => {
+  const has = (game: Game) => { game.S.choices = null; return game.buildChoices().some((c) => c.act === 'grantTile') }
+  const lineOf = (e: Parameters<typeof valueOf>[0]): string => {
+    const v = valueOf(e)
+    if (typeof v === 'string') return v
+    if (v && typeof v === 'object' && 't' in v && typeof v.t === 'string') return v.t
+    return ''
+  }
+
+  it('окно на «плитка — орудие», не на другом сообщении Гранта; чужой ход закрывает, ответ потребляет', async () => {
+    const { game } = makeGame()
+    expect(has(game), 'до реплики кнопки нет').toBe(false)
+    await game.playEpisode(ARCS.grant.eps[1], 'grant')
+    expect(game.S.msgs.some((m) => m.kind === 'text' && m.who === 'grant'), 'Грант написал — проверка пустеет').toBe(true)
+    expect(has(game), 'баня — не эта реплика, окна нет').toBe(false)
+    expect(game.S.mem[grantTileAt]).toBeUndefined()
+
+    await game.playEpisode(ARCS.tile.eps[2], 'tile')
+    const at = Number(game.S.mem[grantTileAt])
+    expect(at, 'реплика не штампанула ход').toBe(game.S.stats.sent)
+    expect(has(game), 'ход дебюта — кнопка есть').toBe(true)
+    const text = game.buildChoices().find((c) => c.act === 'grantTile')!.text.toLowerCase()
+    expect(P_GRANT_TILE.map(lineOf).some((t) => text.includes(t.slice(0, 12).toLowerCase())), text).toBe(true)
+    game.S.stats.sent = at + 3
+    expect(has(game), 'третий ход после реплики — ещё окно').toBe(true)
+    game.S.stats.sent = at + 4
+    expect(has(game), 'чужой ход за окном — кнопки нет').toBe(false)
+    game.S.stats.sent = at
+    const from = game.S.msgs.length
+    await game.fire('PlayerSays', { intent: 'grantTile' })
+    const said = game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' && m.who === 'grant' ? [m.text] : []))
+    expect(said.some((t) => GRANT_TILE_B.map(lineOf).includes(t)), `ответ не из пула: ${said.join(' | ')}`).toBe(true)
+    expect(has(game), 'после ответа окно закрыто').toBe(false)
   })
 })
