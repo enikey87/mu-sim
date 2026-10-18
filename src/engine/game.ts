@@ -1606,6 +1606,8 @@ export class Game {
       samvelDivorceFresh: S.stats.sent - Number(S.mem[memkeys.samvelDivorceAt] ?? -99) <= 3,
       // вердикт суда (#1058): кульминация линии — отклик живёт ход вердикта и три после
       courtVerdictFresh: S.stats.sent - Number(S.mem[memkeys.courtVerdictAt] ?? -99) <= 3,
+      // первая серия плиточной арки (#1059): падение заказчика — отклик живёт ход серии и три после
+      tileSlipFresh: S.stats.sent - Number(S.mem[memkeys.tileSlipAt] ?? -99) <= 3,
       // второй дебют Гранта (#1041): дом «с кладом» — заметное событие, окно то же
       grantHouseFresh: S.stats.sent - Number(S.mem[memkeys.grantHouseAt] ?? -99) <= 3,
       // фото «платёжки» (#1017): заметное событие — отклик живёт ход фото и PHOTO_FRESH_TURNS после
