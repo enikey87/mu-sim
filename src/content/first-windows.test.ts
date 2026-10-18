@@ -2,6 +2,7 @@
 // запись полна (факт-ход — ключ памяти, пул зарегистрирован, оффер существует). Новый участник
 // без записи — красный сюит, а не находка рецензента через раунд плейтеста.
 import { describe, it, expect } from 'vitest'
+import type { Criterion } from '../engine/rules'
 import { FIRST_WINDOWS, EXEMPT, DEBUT_SLOT, EVENT_SOURCES } from './first-windows'
 import { SPEAKS, speaks } from './world'
 import { MEM_KEYS } from './memkeys'
@@ -45,6 +46,21 @@ describe('реестр окна первого сообщения (#994)', () =>
       expect(pool!.length, `${e.source}: пул ${e.pool} пуст`).toBeGreaterThan(0)
       expect(offers.has(`Opt_${e.offer}`), `${e.source}: оффера Opt_${e.offer} нет в правилах`).toBe(true)
     }
+  })
+
+  it('у каждого окна есть запись: оффер на «свежем» факте — в EVENT_SOURCES или в FIRST_WINDOWS (#1030)', () => {
+    // окно события — оффер, чьё условие держится на `<событие>Fresh` (ход события и три после);
+    // новый оффер такого рода без записи в реестре — красный сюит, а не находка рецензента через раунд
+    const fresh = (cs: readonly Criterion[]): boolean =>
+      cs.some((c) => (c.op === 'all' ? fresh(c.all ?? []) : String(c.key).endsWith('Fresh')))
+    // кнопки срока — окно контекста (`ctx.whenFresh`), а не событие: у них свой документ (deadline-replies)
+    const offers = allRules
+      .filter((r) => r.event === 'BuildChoices' && r.name.startsWith('Opt_') && fresh(r.when ?? [])
+        && !(r.when ?? []).some((c) => String(c.key).startsWith('ctx.when')))
+      .map((r) => r.name.slice('Opt_'.length))
+    const known = new Set([...FIRST_WINDOWS.map((w) => w.offer), ...EVENT_SOURCES.map((e) => e.offer)])
+    expect(offers.filter((o) => !known.has(o)), 'окна без записи в реестрах').toEqual([])
+    expect(offers.length, 'окон со свежим фактом не нашлось — проверка пустеет').toBeGreaterThan(6)
   })
 
   it('общий дебютный слот, на который ссылается реестр, живёт в движке', async () => {

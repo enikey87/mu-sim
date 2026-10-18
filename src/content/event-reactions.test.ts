@@ -4,12 +4,12 @@ import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
 import { NOTIF } from './life'
 import { D } from './excuses'
-import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE } from './rules/player-choice-pools'
-import { BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, INTERN_B, HOLE_B, AVITO_REVIEW } from './world'
+import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE, P_MAMA_MARKET } from './rules/player-choice-pools'
+import { BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, INTERN_B, HOLE_B, AVITO_REVIEW, MAMA_MARKET_B } from './world'
 import { ARCS } from './arcs'
 import { FINALES } from './finales'
 import { COURT_LAWYER_AGAIN } from './quests'
-import { court, HEAT, lawyerAt, debutWho, arsenTrack, saidStrasburg, grantTileAt } from './memkeys'
+import { court, HEAT, lawyerAt, debutWho, arsenTrack, saidStrasburg, grantTileAt, mamaMarketAt } from './memkeys'
 import { valueOf, type Line } from './fact'
 import type { Choice } from '../engine/state'
 
@@ -519,5 +519,38 @@ describe('пулы Арсена держат только утверждённо
     let saw = false
     for (let i = 0; i < 80 && !saw; i++) saw = offered().includes('Арсен, а Страсбург — это долго ждать?')
     expect(saw, 'после оглашения Страсбург не предлагается').toBe(true)
+  })
+})
+
+describe('окно конца квеста «мама на рынке» (#1030)', () => {
+  const text = (e: unknown): string => { const v = valueOf(e as never); return typeof v === 'string' ? v : (v as { t: string }).t }
+  const low = (t: string) => t.charAt(0).toLowerCase() + t.slice(1)
+
+  it('событие штампует ход, кнопка в блоке, окно три хода, ответ потребляет', async () => {
+    const { game } = makeGame()
+    const button = () => { game.S.choices = null; return game.buildChoices().find((c) => c.act === 'mamaMarket') }
+    expect(button(), 'до квеста кнопки нет').toBeUndefined()
+    await game.enterNode('q_mama', 'drive')
+    expect(game.S.msgs.some((m) => m.kind === 'sys' && m.text.includes('четыре часа')), 'событие не прозвучало — проверка пустеет').toBe(true)
+    const at = Number(game.S.mem[mamaMarketAt])
+    expect(at, 'узел квеста не штампанул ход события').toBe(game.S.stats.sent)
+    expect(button(), 'на ходу события кнопки нет').toBeTruthy()
+    const texts = new Set<string>()
+    for (let i = 0; i < 60; i++) { const b = button(); if (b) texts.add(b.text) }
+    const pool = P_MAMA_MARKET.map(text)
+    expect(texts.size, 'пул окна не прозвучал — проверка пустеет').toBeGreaterThan(0)
+    for (const t of texts) expect(pool.some((p) => t.includes(p) || t.includes(low(p))), `кнопка не из пула: ${t}`).toBe(true)
+    game.S.stats.sent = at + 3
+    expect(button(), 'третий ход после события — ещё окно').toBeTruthy()
+    game.S.stats.sent = at + 4
+    expect(button(), 'вне окна — кнопки нет').toBeUndefined()
+    game.S.stats.sent = at
+    const n = game.S.msgs.length
+    await game.fire('PlayerSays', { intent: 'mamaMarket' })
+    const said = game.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : []))
+    const answers = MAMA_MARKET_B.map(text)
+    expect(said.some((t) => answers.some((p) => t.includes(p))), `ответ не из пула события: ${said.join(' | ')}`).toBe(true)
+    expect(game.S.mem[mamaMarketAt], 'ответ не потребил окно').toBeUndefined()
+    expect(button(), 'после ответа окно закрыто').toBeUndefined()
   })
 })

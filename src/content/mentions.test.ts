@@ -168,6 +168,8 @@ function corpus(): Found[] {
         'achievements.ACH', 'arcs.CAST', 'finales.ENDINGS', 'finales.DEFAULT_FINALE', 'topics.TOPIC_NAME', 'world.WORLD', 'world.SPEAKS', 'world.MENTION_RE',
         // реестры ключей фактов: не реплики
         'world.EXTRAS', 'factkeys.CTX_KEYS', 'factkeys.HAS_KEYS', 'factkeys.FAMILIES',
+        // реестр источников окна: `source` — описание для человека («карточка Авито о баране»), а не реплика (#1030)
+        'first-windows.EVENT_SOURCES',
         // реестр пулов кнопок: дублирует legends/talk/topics с пустыми known (#491)
         'player-pools.PLAYER_CHOICE_POOLS', 'player-pools.PLAYER_PAIR_POOLS',
         // правят или сверяют уже сказанное: автозамена, противоречия Дня выплаты (звено звучит, только если было событие)
