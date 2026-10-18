@@ -46,7 +46,7 @@ export const SOURCES: Source[] = [
   { t: 'Самвел раздал свадебные конверты. Сорок свадеб — сорок конвертов. 60 000.', when: [WORLD.samvel, exists('finale.samvel')], prio: 1, amount: 60000 },
   { t: 'Размик сбросился. Сказал: «Брату плиточнику — нужнее». 45 000.', when: [exists('finale.razmik')], prio: 1, amount: 45000 },
   { t: 'Инспектор Рубик подписал акт! Грант оплатил объект. 55 000 — твои.', when: [WORLD.grant, exists('finale.rubik')], prio: 1, amount: 55000 },
-  { t: 'Суд по плитке закончился. Нам вернули залог. 35 000.', when: [exists('finale.tile')], prio: 1, amount: 35000 },
+  { t: 'Из суда по плитке вернули залог. 35 000.', when: [exists('finale.tile')], prio: 1, amount: 35000 },
   { t: 'Я с того света принёс. 20 000. Там, оказывается, тоже бывают выплаты.', when: [exists('finale.alik_death')], prio: 1, amount: 20000 },
   // квесты и суд
   { t: 'Хаш сдали обратно в ресторан. Вернули 1 500. Ты его, правда, съел, но они не проверяли.', when: [is('ach.q_hash')], prio: 1, amount: 1500 },
