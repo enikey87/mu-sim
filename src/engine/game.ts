@@ -2068,12 +2068,10 @@ export class Game {
     const until = done ? undefined : legendSpec?.until
     // срок из легенды — не чаще, чем раз в LEGEND_VOW_GAP сообщений игрока: одна и та же клятва приедается (#179)
     const fromLegend = !!until && this.legendDue() && (legend || this.chance(0.4))
-    if (fromLegend) {
-      this.S.mem[memkeys.legendPromiseAt] = this.S.stats.sent
-      // напоминание сроком легенды называет и место денег: его state-вопросы молчат окно (#981)
-      const place = moneyPlaceOf(legendId)
-      if (place) stampMoneyPlace(this, place, this.S.stats.sent)
-    }
+    if (fromLegend) this.S.mem[memkeys.legendPromiseAt] = this.S.stats.sent
+    // напоминание сроком легенды называет и место денег: его state-вопросы молчат окно (#981)
+    const place = fromLegend ? moneyPlaceOf(legendId) : undefined
+    if (place) stampMoneyPlace(this, place, this.S.stats.sent)
     const p = this.uniq(() => {
       const q = this.X.promise()
       if (fromLegend) this.alignPromise(q, until!)
