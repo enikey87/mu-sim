@@ -251,6 +251,8 @@ export const DIRECT: Record<string, DirectCase> = {
   // #981 (окна follow-пула бетона и штампы легенды места) сдвинул розыгрыш — ответ окну дебюта Арсена (#973)
   // ушёл из выборок, держим прямым случаем
   Says_lawyerAsk: { event: 'PlayerSays', facts: { intent: 'lawyerAsk' } },
+  // #982 (пул дебюта Арсена ждёт события трека) — ответ окну дебюта в выборках больше не собирается
+  Says_debutArsen: { event: 'PlayerSays', facts: { intent: 'debutArsen' } },
   Scene_lend: { event: 'PickScene', setup: (g) => { g.S.mood = 4 } }, // денег в свежей партии хватает (START_MONEY)
   // Scene_newjob: с #826 срабатывает в выборках сам (8 партий при пороге 7) — прямой случай не нужен
   Scene_loan: { event: 'PickScene', setup: (g) => { g.S.day = 230 } },

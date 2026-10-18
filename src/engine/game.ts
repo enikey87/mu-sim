@@ -1944,7 +1944,8 @@ export class Game {
         this.clearScene() // свой текст посреди сцены — сцена прерывается
         await this.alikTurn(tone, o.category)
       } else {
-        await this.alikTurn(tone, o.category)
+        // arg варианта (кнопка без act, например угроза судом) едет в факты PlayerMessage: по нему реплика называет себя (#982)
+        await this.alikTurn(tone, o.category, o.arg)
       }
       if (this.disposed) return
 
@@ -2120,7 +2121,7 @@ export class Game {
   }
 
   // ---------- ход Алика ----------
-  async alikTurn(tone: Tone, category?: Choice['category']): Promise<void> {
+  async alikTurn(tone: Tone, category?: Choice['category'], arg?: Choice['arg']): Promise<void> {
     const S = this.S
     S.ctx = null
     // обычный +1…3 — в конце хода (после хора); здесь только возврат из пропажи
@@ -2131,7 +2132,7 @@ export class Game {
       S.offlineDays = 0
       await this.say([this.uniq(this.X.back)])
     }
-    await this.fire('PlayerMessage', { tone, category })
+    await this.fire('PlayerMessage', { tone, category, arg })
   }
 
   /** Обычный ход: иногда «прочитано и молчит», иногда реплика по времени суток, потом взвешенный выбор. */

@@ -1,7 +1,7 @@
 // Тексты для новых возможностей системы правил: обещания, которые наступают, хор персонажей,
 // состояния мира со сроком (свадьба, болезнь Бориса, «Алик умер»).
 import { type Criterion, type Line, type Entry, named, exists, is, eq, gte, ne, missing, set, gate } from './fact'
-import { cryptoHodl, garikConcrete, garikCut, garikDenied, grandpaDying, grantPaid, intro, karineKnowsDebt, karineThinksTax, met, mourning, nivaAway, nivaPlayer, nuneDekretOver, payday, saidFriday, saidTomorrow, alikShaved, wedding, collectorsRecruited, collectorsTurned, rubikBath } from './memkeys'
+import { arsenTrack, cryptoHodl, garikConcrete, garikCut, garikDenied, grandpaDying, grantPaid, intro, karineKnowsDebt, karineThinksTax, met, mourning, nivaAway, nivaPlayer, nuneDekretOver, payday, saidFriday, saidStrasburg, saidTomorrow, alikShaved, wedding, collectorsRecruited, collectorsTurned, rubikBath } from './memkeys'
 import type { WhoId } from './ids'
 
 // Мир последователен: кто и что есть в истории и в каком оно положении — факты, их ставит серия (remember), ступень суда
@@ -56,6 +56,10 @@ export const WORLD = {
   /** Алик хоть раз назвал сроком «завтра» — теперь на это слово можно ссылаться. */
   saidTomorrow: named('saidTomorrow', is(saidTomorrow)),
   saidFriday: named('saidFriday', is(saidFriday)),
+  /** Арсен записал крик и собрал трек «Плиточник» (rude-дебют): вопросы про трек, крик и бит — только после (#982). */
+  arsenTrack: named('arsenTrack', is(arsenTrack)),
+  /** Игрок сам оглашал план «до Страсбурга»: отклик Арсена про Страсбург — только после (#982). */
+  saidStrasburg: named('saidStrasburg', is(saidStrasburg)),
   /** Усы на месте: ставки и клятвы усами молчат, пока сбриты (`alik.shaved`). */
   moustache: named('moustache', missing(alikShaved)),
   /** В семье прощаются: дедушка умирает или хоронят Алика. */

@@ -1,15 +1,20 @@
 // Линия суда: каждая угроза судом двигает дело на ступень (court = номер ступени).
 // 0 насмешка → 1 юрист Арсен → 2 досудебная претензия → 3 заседание (сцена) → 4 апелляция → 5 Страсбург → 6 решение; дальше — «опять суд?».
 import type { ContentApi } from '../../engine/game'
-import { type Rule, eq, gte, lte, add, set, is, missing } from '../fact'
+import { type Rule, type Facts, eq, gte, lte, add, set, is, missing } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { COURT, COURT_AFTER, COURT_LAWYER_AGAIN, COURT_VERDICT_AFTER_LETTER } from '../quests'
 import { THREAT_AGAIN } from '../misc'
 import { meet } from '../world'
-import { count, court, courtReferral, intro, lawyerAt, paydayScene, threatClaim } from '../memkeys'
+import { count, court, courtReferral, intro, lawyerAt, paydayScene, saidStrasburg, threatClaim } from '../memkeys'
 
 type R = Rule<ContentApi, GameEvent, Offer>
 const threat = eq('tone', 'threat')
+
+/** Угроза пришла выбранной репликой «до Страсбурга» — факт оглашения для отклика Арсена (#982). */
+function strasbourgSaid(game: ContentApi, facts: Facts): void {
+  if (String(facts.arg ?? '') === 'strasbourg') game.applyFacts([set(saidStrasburg, true)])
+}
 
 async function saySaid(game: ContentApi, lines: ReadonlyArray<readonly [string, string]>): Promise<void> {
   for (const [w, t] of lines) { await game.say([w === 'alik' ? t : { w, t }]); await game.sleep(400) }
@@ -46,6 +51,7 @@ export const courtRules: R[] = [
     remember: [add(count.threat), add(court), ...meet('arsen')],
     respond: async ({ game, facts }) => {
       game.unlock('memory')
+      strasbourgSaid(game, facts)
       await saySaid(game, referred(game, COURT[1]))
       // первое сообщение Арсена — окно отклика (#958)
       game.applyFacts([set(lawyerAt, Number(facts.sent))])
@@ -56,6 +62,7 @@ export const courtRules: R[] = [
     remember: [add(count.threat), add(court)],
     respond: async ({ game, facts }) => {
       game.unlock('memory')
+      strasbourgSaid(game, facts)
       await saySaid(game, referred(game, COURT_LAWYER_AGAIN))
       // первое сообщение юриста — и когда Арсен уже был знаком (#971)
       game.applyFacts([set(lawyerAt, Number(facts.sent))])
@@ -64,7 +71,8 @@ export const courtRules: R[] = [
   {
     // претензия, апелляция, Страсбург, решение — по ступеням
     name: 'Court_Step', event: 'PlayerMessage', when: [threat, gte(court, 1), lte(court, 6)], remember: [add(count.threat), add(court)],
-    respond: async ({ game }) => {
+    respond: async ({ game, facts }) => {
+      strasbourgSaid(game, facts)
       const stage = Number(game.mem()[court]) - 1 // память уже сдвинута на следующую ступень
       game.unlock('memory')
       if (stage === 3) return game.enterNode('court', game.scenes.court.start) // заседание: суд уже идёт, переводить нечего
