@@ -229,7 +229,7 @@ describe('прямые вопросы и первые сообщения (#958):
 
 describe('дебюты участников через rude/хор (#973)', () => {
   const has = (game: Game, act: string) => { game.S.choices = null; return game.buildChoices().some((c) => c.act === act) }
-  /** Первое сообщение персонажа настоящим путём: rude-семья (Арсен) или хор (Самвел, Борис). */
+  /** Первое сообщение персонажа настоящим путём: rude-семья (Арсен), хор (Самвел, Борис) или серия («Нива», #983). */
   const debutCases: Array<[string, string, string, (g: Game) => Promise<void>]> = [
     ['arsen', 'debutArsen', 'Арсен', async (g) => { g.S.mem['intro.arsen'] = true; g.S.mem[HEAT] = 1; await g.fire('PlayerMessage', { tone: 'rude' }) }],
     ['samvel', 'debutSamvel', 'Самвел', async (g) => {
@@ -242,6 +242,7 @@ describe('дебюты участников через rude/хор (#973)', () =
       for (let i = 0; i < 60; i++) { await g.fire('Mentioned', {}, { target: 'boris' }); if (g.S.msgs.some((m) => m.kind === 'text' && m.who === 'boris')) return }
       expect.fail('Борис не заговорил в хоре')
     }],
+    ['niva', 'debutNiva', 'Нива', async (g) => { await g.playEpisode(ARCS.niva.eps[4], 'niva') }],
   ]
 
   it.each(debutCases)('первое сообщение %s: окно на дебюте, чужой ход закрыт, ответ потребляет, повтор не открывает', async (who, act, name, debut) => {
