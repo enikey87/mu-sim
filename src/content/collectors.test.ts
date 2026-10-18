@@ -2,13 +2,14 @@
 import { describe, it, expect } from 'vitest'
 import { makeGame, setMoney, cards } from '../test/helpers'
 import { START_DAY, ARC_MARINATION_DAYS } from '../engine/state'
-import { collectorsRecruited, collectorsTurned, creditBroke, creditStage, endgame, intro, paydayScene, threatClaim } from './memkeys'
+import { collectorsRecruited, collectorsTurned, creditBroke, creditStage, endgame, internAt, intro, paydayScene, threatClaim } from './memkeys'
 import { loanTaken, loanDueAt } from './credit'
 import { D } from './excuses'
 import { P_COLLECTORS_DEBUT } from './rules/player-choice-pools'
 import type { Game } from '../engine/game'
 import { NOTIF } from './life'
-import { ARC_DONE, GROUP } from './arcs'
+import { ARC_DONE, ARCS, GROUP } from './arcs'
+import { FINALES } from './finales'
 import { meet } from './world'
 import { is, isOpen, test, valueOf, type Entry, type Facts } from '../engine/rules'
 import { playtest } from '../tools/playtest'
@@ -312,5 +313,23 @@ describe('дебют коллекторов знает, клиент ли им �
     expect(client.holds(is(loanTaken('micro'))), 'займ МФО не отмечен — проверка пустеет').toBe(true)
     expect(pool(client), 'клиент МФО спрашивает, кто они').not.toContain('Кто вы и при чём тут я?')
     expect(pool(client), 'у клиента нет своей строки').toContain('Я вам должен, а Алик мне. Давайте меняйтесь')
+  })
+})
+
+describe('«три чашки чая» ждёт предложения стажировки (#1036)', () => {
+  const LINE = '«Деньги-Ара» — три чашки чая? И всё это в мой долг?'
+  const pool = (g: Game) => g.open(ARCS.collectors.follow)
+
+  it('до финала арки строка молчит, после предложения стажировки — звучит; пул не пустеет', async () => {
+    const { game } = makeGame()
+    game.S.mem[creditBroke] = true
+    game.S.arcs.collectors = { i: 2, last: 0 }
+    expect(game.holds(is(internAt)), 'стажировка в свежей партии — проверка пустеет').toBe(false)
+    expect(pool(game), 'число «три» звучит до предложения стажировки').not.toContain(LINE)
+    // до финала пул держат безгейтные соседи: вопрос про коллекторов не пропадает
+    expect(pool(game).length, 'follow обескровлен гейтом — вопроса про коллекторов не осталось').toBeGreaterThanOrEqual(3)
+    await game.playFinale('collectors', FINALES.collectors.find((f) => f.id === 'intern')!)
+    expect(game.S.mem[internAt], 'предложение стажировки не штампануло ход').toBe(game.S.stats.sent)
+    expect(pool(game), 'после предложения стажировки строки нет').toContain(LINE)
   })
 })

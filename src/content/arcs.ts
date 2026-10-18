@@ -4,7 +4,7 @@ import { type Entry, type FactOp, type Criterion, type FactKey, type Said, set, 
 import { type ClaimKey } from './ids'
 import type { LedgerEvent } from './fact-types'
 import { needs, meet, WORLD, MENTION_RE } from './world'
-import { actSigned, alikDead, betonSet, borisMarried, collectorsAskAt, collectorsRecruited, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantPaid, grantTileAt, houseOnGarik, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, rubikHoleAt, sick, taxFrozen, wedding } from './memkeys'
+import { actSigned, alikDead, betonSet, borisMarried, collectorsAskAt, collectorsRecruited, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantPaid, grantTileAt, houseOnGarik, internAt, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, rubikHoleAt, sick, taxFrozen, wedding } from './memkeys'
 import { stateQuestion } from './money-ask'
 
 export type ArcMsg = Said | { w: string; t: string; claims?: LedgerEvent[]; remember?: FactOp[]; stamp?: string } | { t: string; claims: LedgerEvent[]; remember?: FactOp[]; stamp?: string }
@@ -413,7 +413,8 @@ export const ARCS: Record<string, Arc> = {
       // «звонят» не вводилось: коллекторы пишут (серия 2, «тебе коллекторы пишут?»). Тёщи Алика в партии
       // нет: она живёт в отмазках, а её «подключение» — событие, которого не было (плейтест 75, #1016)
       'Коллекторы пишут, деньги требуют.',
-      '«Деньги-Ара» — три чашки чая? И всё это в мой долг?',
+      // число «три» вводит предложение стажировки (финал арки, `internAt`): до него строка называла бы невведённое (#1036)
+      gate(exists(internAt))('«Деньги-Ара» — три чашки чая? И всё это в мой долг?'),
       'Коллекторы на объекте расселись: чай длинный, долг тоже.',
       gate(missing(collectorsRecruited))('Коллектор говорит: плати. Я отвечаю: деньги у Алика.'),
       gate(is(collectorsRecruited))('Они у тебя работают. И помогают? А долг от этого не растёт?'),
