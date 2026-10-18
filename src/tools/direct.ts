@@ -185,13 +185,7 @@ export const DIRECT: Record<string, DirectCase> = {
   // гейт видит сам, запись снята
   // #953: окна вопроса Рубика и чайника сдвинули розыгрыш — Scene_nephew в 7 партиях (порог 7), гейт видит сам
   // #953 вместе с #952: сцена «кафе» ни разу не дошла до экрана концовки — соседи на перерыве, остаётся она
-  Scene_meet: {
-    event: 'PickScene',
-    setup: (g) => {
-      const now = { turn: g.S.stats.sent, day: g.S.day }
-      for (const r of g.rules.all) if (r.event === 'PickScene' && r.name !== 'Scene_meet') g.S.rules.cooldown[r.name] = now
-    },
-  },
+  // #1001 (место Бориса в формулировках) сдвинуло розыгрыш — «кафе» играло в 9 партиях (порог 7), запись снята
   // гейт на чужих семействах (#434): в семье +2000 «через маму» не выпадало; если выборки снова увидят
   // его часто (порог 7), гейт скажет «снять» — тогда запись уйдёт, как Says_voice в #887
   Says_via_mama: { event: 'PlayerSays', facts: { intent: 'via', arg: 'mama' } },
@@ -201,16 +195,12 @@ export const DIRECT: Record<string, DirectCase> = {
   // и там — держим запись (арбитр — CI), конфликт гейтов заведён в #949
   // #1004 (маринование первой арки) сдвинуло выборки — голосовое снова в них (8 партий при пороге 7), гейт видит сам
   // Says_voice: { event: 'PlayerSays', facts: { intent: 'voice' } },
-  Scene_choice: {
-    event: 'PickScene',
-    setup: (g) => {
-      const now = { turn: g.S.stats.sent, day: g.S.day }
-      for (const r of g.rules.all) if (r.event === 'PickScene' && r.name !== 'Scene_choice') g.S.rules.cooldown[r.name] = now
-    },
-  },
+  // #1001 (место Бориса в формулировках) сдвинуло розыгрыш — сцена «выбери отмазку сам» в 7 партиях (порог 7), гейт видит сам
   Chorus_garik_FedUp: { event: 'Mentioned', target: 'garik', setup: (g) => { g.S.mem['intro.garik'] = true; g.S.actors.garik = { interjections: 3 } } },
   // #824: окно повтора сдвинуло розыгрыш — траурный хор Карине ушёл из семейства +2000, держали прямым случаем
   // #920: варианты предложения и козы сдвинули розыгрыш — Chorus_karine_Dead в 8 партиях (порог 7), гейт видит сам
+  // #1001: снова ушёл из выборок — держим прямым случаем; пул — траурная строка легенды «dead»
+  Chorus_karine_Dead: { event: 'Mentioned', target: 'karine', setup: (g) => { g.S.mem.alik_dead = true; g.S.mem['intro.karine'] = true; g.S.mem[legendId] = 'dead' } },
   Finale_razmik_shift: { event: 'ArcFinale', facts: { arc: 'razmik' }, setup: (g) => { g.S.ach.fence = 1 } },
   Finale_tile_lost: { event: 'ArcFinale', facts: { arc: 'tile' }, setup: (g) => { g.S.mem.court = 6 } },
   // #824: окно повтора сдвинуло розыгрыш — обычный финал плитки ушёл из выборок, держим прямым случаем
@@ -264,6 +254,8 @@ export const DIRECT: Record<string, DirectCase> = {
   // #762: барахолка получила вес 5 — на чужих семействах сидов (`rules:stable`) «смертный одр» и траурный
   // хор Карине падают до нуля; в выборках гейта они редкие (3 и 5 партий из 72), потому держим прямыми случаями
   // Scene_deathbed: с #824/#828 срабатывает в выборках сам (7 партий при пороге 7) — прямой случай не нужен
+  // #1001 (место Бориса в формулировках) снова ушло из выборок — «смертный одр» держим прямым случаем
+  Scene_deathbed: { event: 'PickScene', setup: (g) => { g.S.day = 245; g.S.mood = 5 } },
   // #795: кнопки игрока (денежный вопрос вместо случайной кнопки про арку) сдвинули розыгрыш —
   // обычная сцена «жена» стала редкой в выборках, случай держали прямым (свой setup подавлял соседние сцены)
   // #889: перекалибровка вариантов бетона сдвинула розыгрыш — сцена снова в выборках CI
@@ -286,6 +278,7 @@ export const DIRECT: Record<string, DirectCase> = {
   Ending_payday_niva: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'niva' } },
   Payday_niva: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['finale.niva'] = 'chose' } },
   // Scene_choice: с #821 срабатывает в выборках сам (7 партий при пороге 7) — прямой случай не нужен
+  // #1001 (место Бориса в формулировках) сдвинуло розыгрыш — сцена снова в выборках сам (см. комментарий выше)
   Finale_niva_chose_or: { event: 'ArcFinale', facts: { arc: 'niva' }, setup: (g) => { g.S.mem['asked.niva'] = 5 } },
   // апелляция на жаре: колкости растянули партии — угроза-повтор уходит из выборок (#683);
   // once встречного иска израсходован, иначе Hot (bonus 2) перебивает Hot_Again (bonus 1)
