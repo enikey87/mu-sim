@@ -4,6 +4,7 @@
 import { type Entry, type FactOp, gate, gt, is, missing, set } from './fact'
 import { needs } from './world'
 import { moneyAskAt, taxFrozen, nivaBack } from './memkeys'
+import type { ClaimKey } from './ids'
 
 /** Ходов после ответа Алика или его объявления о месте денег: столько вопросы-состояния этого места молчат (#952/#962, образец окна #928/#936). */
 export const MONEY_ASK_TURNS = 20
@@ -13,6 +14,13 @@ export const stateQuestion = <T>(place: MoneyPlace, e: Entry<T>): Entry<T> => ga
 export const stampMoneyPlace = (game: { applyFacts: (ops: FactOp[]) => void }, place: MoneyPlace, sent: number): void => {
   game.applyFacts([set(moneyAskAt[place], sent)])
 }
+
+/** Утверждения журнала о месте денег (#981): какое утверждение какому месту отвечает. */
+const PLACE_CLAIMS: Partial<Record<ClaimKey, MoneyPlace>> = {
+  money_deposit: 'bank', money_safe: 'safe', money_foundation: 'beton', money_niva: 'niva', money_crypto: 'crypto',
+}
+/** Место, которое называет прозвучавшее утверждение (Алик, персонаж легенды, хор); undefined — утверждение не о месте денег. */
+export const moneyPlaceOfClaim = (claim: unknown): MoneyPlace | undefined => PLACE_CLAIMS[claim as ClaimKey]
 
 /** Чьи легенды к какому месту относятся: банк (счета), фундамент, сейф, крипта, «Нива». */
 export const MONEY_PLACES = {
