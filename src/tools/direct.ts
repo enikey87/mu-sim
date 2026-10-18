@@ -201,13 +201,15 @@ export const DIRECT: Record<string, DirectCase> = {
   // и там — держим запись (арбитр — CI), конфликт гейтов заведён в #949
   // #1004 (маринование первой арки) сдвинуло выборки — голосовое снова в них (8 партий при пороге 7), гейт видит сам
   // Says_voice: { event: 'PlayerSays', facts: { intent: 'voice' } },
-  Scene_choice: {
-    event: 'PickScene',
-    setup: (g) => {
-      const now = { turn: g.S.stats.sent, day: g.S.day }
-      for (const r of g.rules.all) if (r.event === 'PickScene' && r.name !== 'Scene_choice') g.S.rules.cooldown[r.name] = now
-    },
-  },
+  // #1002 (плавающий событийный срок сдвинул розыгрыш) — Scene_choice снова в выборках (7 партий при пороге 7),
+  // гейт видит сам; прямым случаем держалась как редкая
+  // Scene_choice: {
+  //   event: 'PickScene',
+  //   setup: (g) => {
+  //     const now = { turn: g.S.stats.sent, day: g.S.day }
+  //     for (const r of g.rules.all) if (r.event === 'PickScene' && r.name !== 'Scene_choice') g.S.rules.cooldown[r.name] = now
+  //   },
+  // },
   Chorus_garik_FedUp: { event: 'Mentioned', target: 'garik', setup: (g) => { g.S.mem['intro.garik'] = true; g.S.actors.garik = { interjections: 3 } } },
   // #824: окно повтора сдвинуло розыгрыш — траурный хор Карине ушёл из семейства +2000, держали прямым случаем
   // #920: варианты предложения и козы сдвинули розыгрыш — Chorus_karine_Dead в 8 партиях (порог 7), гейт видит сам

@@ -2,7 +2,7 @@
 // Общее правило по intent + более специфичные для частных случаев (память, контекст).
 import type { ContentApi } from '../../engine/game'
 import { fmtDays } from '../../engine/time'
-import { type Rule, eq, ne, is, gte, add, set, valueOf } from '../fact'
+import { type Rule, eq, ne, is, gte, add, set, matches, valueOf } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { AlikOffline, ThickJournal } from './criteria'
 import { cooldown } from './rude'
@@ -146,7 +146,8 @@ export const replyRules: R[] = [
       await game.say([game.uniq(() => game.draw('WHEN_COND', WHEN_COND).replace('{t}', t).replace('{T}', cap(t)))])
       game.setCtx(null)
     },
-  }, [eq('ctx.whenKind', 'event')]),
+    // плавающий событийный срок (#1002) отвечает так же: это событие, а не дата
+  }, [matches('ctx.whenKind', /^(event|floating)$/)]),
   says('promiseNever', {
     remember: [set(whenYears, true)],
     respond: async ({ game }) => {
