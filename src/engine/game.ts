@@ -2359,10 +2359,22 @@ export class Game {
     const ok = a.claimKey ?? claimKeyOf(a.subject, a.value)
     const nk = b.claimKey ?? claimKeyOf(b.subject, b.value)
     const o = ok ? claimByKey(ok) : undefined, n = nk ? claimByKey(nk) : undefined
-    if (!o || !n) return null
+    if (!ok || !nk || !o || !n) return null
     const kind: LieKind = ep.subject === 'grandpa.life' ? 'grandpa' : ep.subject === 'customer.payment' ? 'customer' : 'money'
-    // «вы же говорили» — только про версию самого Алика; прошлую могла сказать и родня
-    return { old: o, new: n, kind, alikOld: a.source === 'alik' }
+    // «сначала/теперь» — день первого введения версии, не день последнего клейма (#987)
+    const intro = (key: string) => {
+      let best: { day: number; id: number; source: string } | undefined
+      for (const c of this.S.ledger.claims) {
+        const k = c.claimKey ?? claimKeyOf(c.subject, c.value)
+        if (k !== key) continue
+        if (!best || c.day < best.day || (c.day === best.day && c.id < best.id)) best = { day: c.day, id: c.id, source: c.source }
+      }
+      return best
+    }
+    const ia = intro(ok), ib = intro(nk)
+    const aFirst = !ia || !ib || ia.day < ib.day || (ia.day === ib.day && ia.id <= ib.id)
+    // «вы же говорили» — про того, кто эту раннюю версию ввёл; гейт пула не меняется
+    return { old: aFirst ? o : n, new: aFirst ? n : o, kind, alikOld: (aFirst ? ia?.source : ib?.source) === 'alik' }
   }
   async caught(line: string): Promise<void> {
     const ep = currentEpisode(this.S.ledger)
