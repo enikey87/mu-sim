@@ -26,7 +26,7 @@ describe('несостыковки из партии пользователя', 
       .flat().filter((c) => c.tone === 'neutral').map((c) => c.text)
     expect(game.S.msgs.some((m) => m.kind === 'card' && m.app === 'Хозяин квартиры')).toBe(false)
     const before = offer(game)
-    expect(before.some((t) => t.includes('Мой хозяин квартиры тоже из Еревана. Скучает по деньгам.'))).toBe(true)
+    expect(before.some((t) => t.includes('Мой хозяин квартиры из Еревана. Слушает Алика — и тоже не верит.'))).toBe(true)
     expect(before.join(' ')).not.toContain('Он не верит')
 
     const evicted = makeGame().game
@@ -37,7 +37,7 @@ describe('несостыковки из партии пользователя', 
     expect(evicted.S.mem.evicted).toBe(true)
     const after = offer(evicted)
     expect(after.length).toBeGreaterThan(10)
-    expect(after.join(' ')).not.toMatch(/хозяин квартиры тоже из Еревана/i)
+    expect(after.join(' ')).not.toMatch(/хозяин квартиры из Еревана/i)
   })
   it('Борис не звучит до своего сериала: ни в генераторе отмазок, ни в семейном чате, ни в хоре на слово «баран»', async () => {
     const { game } = makeGame()
