@@ -4,7 +4,7 @@
 import type { Scene } from './scenes'
 import { gate, missing } from './fact'
 import { needs } from './world'
-import { courtVerdict, cryptoHodl, intro, kettleAt } from './memkeys'
+import { courtVerdict, cryptoHodl, intro, kettleAt, mamaMarketAt } from './memkeys'
 
 export const QUESTS: Record<string, Scene> = {
   q_hash: {
@@ -119,7 +119,7 @@ export const QUESTS: Record<string, Scene> = {
       drive: {
         fx: { days: 1, mood: 2, ach: 'q_mama' },
         sys: 'Вы возили маму Алика по рынку четыре часа. Она торговалась за каждый помидор.',
-        who: 'mama', a: ['Спасибо, сынок. Вот тебе пирожки. Деньги — это Алик должен, я не вмешиваюсь.'],
+        who: 'mama', a: [{ t: 'Спасибо, сынок. Вот тебе пирожки. Деньги — это Алик должен, я не вмешиваюсь.', stamp: mamaMarketAt }],
         a2: ['Мама довольна! Пирожки — это аванс, брат. С картошкой — две тысячи, с мясом — три.'],
       },
       why: { a: ['Я занят. Я в банке. За твоими деньгами. Ты что, хочешь, чтобы я бросил банк?'], opts: [{ t: 'Ладно, отвезу', go: 'drive' }, { t: 'Не отвезу', go: 'no' }] },

@@ -23,7 +23,7 @@ import {
   STRASBOURG_THREAT,
   P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE,
   P_CREW_CALL, P_LAWYER, P_COLLECTORS_ASK, P_INTERN, P_HOLE, P_COUNTERSUIT,
-  P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_BORIS, P_DEBUT_NIVA, P_GRANT_TILE, P_MOUSTACHE_PHOTO,
+  P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_BORIS, P_DEBUT_NIVA, P_GRANT_TILE, P_MOUSTACHE_PHOTO, P_MAMA_MARKET,
 } from './player-choice-pools'
 
 type R = Rule<ContentApi, GameEvent, Offer>
@@ -186,6 +186,9 @@ export const choiceRules: R[] = [
   // смена фото без усов (#1013): заметное событие ставки — отклик в окне события (ход и три после).
   // bonus 5: рядом стоит обычная кнопка «как усы?» (специфичность 5) — событийная реакция должна попасть в блок
   offer({ name: 'MoustachePhoto', when: [is('moustachePhotoFresh')], act: 'moustachePhoto', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_MOUSTACHE_PHOTO', P_MOUSTACHE_PHOTO) }),
+  // конец квеста «мама на рынке» (#1030): заметное событие — отклик в окне события (ход и три после).
+  // bonus 5: рядом стоят извинение и мычание (6) — событийная реакция обязана попасть в блок
+  offer({ name: 'MamaMarket', when: [is('mamaMarketFresh')], act: 'mamaMarket', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_MAMA_MARKET', P_MAMA_MARKET) }),
   // встречный иск — заметное событие с окном отклика (#964): ход и три после
   offer({ name: 'Countersuit', when: [is('countersuitFresh')], act: 'countersuitAsk', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_COUNTERSUIT', P_COUNTERSUIT) }),
 

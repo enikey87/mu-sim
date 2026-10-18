@@ -3,7 +3,7 @@
 // участник, умеющий писать сам (SPEAKS), обязан быть здесь или в исключениях с причиной — новый
 // участник красит сюит на месте, а не в плейтесте через раунд. Офферы и потребление окна ответом —
 // как были (#951), тексты пулов не менялись.
-import { crewPaidAt, grantTileAt, lawyerAt, moustachePhotoAt, photoAt } from './memkeys'
+import { avitoReviewAt, borisSaleAt, collectorsAskAt, countersuitAt, crewPaidAt, grantTileAt, internAt, kettleAt, lawyerAt, mamaMarketAt, mooAt, moustachePhotoAt, photoAt, ramPhotoAt, rubikAskAt, rubikHoleAt, transferAt, vacancyAt } from './memkeys'
 
 /** Общий дебютный слот (#973): `wrote.<who>`/`debutWho`/`debutAt` ставит первое сообщение участника. */
 export const DEBUT_SLOT = 'debut'
@@ -62,6 +62,22 @@ export interface EventSource {
 }
 
 export const EVENT_SOURCES: readonly EventSource[] = [
-  { source: 'смена фото без усов (Due_StakeShave / Condition_StakeShave)', at: moustachePhotoAt, offer: 'MoustachePhoto', pool: 'P_MOUSTACHE_PHOTO' },
+  // семейство #927: заметные карточки и системные строки
+  { source: 'фото-баран (движок, 25-е сообщение)', at: ramPhotoAt, offer: 'RamPhoto', pool: 'P_RAM_PHOTO' },
+  { source: 'объявление о продаже Бориса (карточка Авито)', at: borisSaleAt, offer: 'BorisSale', pool: 'P_BORIS_SALE' },
+  { source: 'вакансия «оплата сразу» (карточка hh.ru)', at: vacancyAt, offer: 'Vacancy', pool: 'P_VACANCY' },
+  { source: 'отзыв Авито «терпеливый» (карточка)', at: avitoReviewAt, offer: 'AvitoReview', pool: 'P_AVITO_REVIEW' },
+  { source: 'прямой вопрос Рубика (строка серии, stamp)', at: rubikAskAt, offer: 'RubikAsk', pool: 'P_RUBIK_ASK' },
+  { source: 'выигрыш чайника (узел квеста, stamp)', at: kettleAt, offer: 'Kettle', pool: 'P_KETTLE' },
+  { source: 'встречный иск (rude-правило, applyFacts)', at: countersuitAt, offer: 'Countersuit', pool: 'P_COUNTERSUIT' },
+  { source: '«Мууу» в ленте (движок)', at: mooAt, offer: 'Cow', pool: 'D.P_COW' },
+  // первые сообщения и заметные события персонажей (#958/#983/#1003/#1013/#1030)
+  { source: 'первое сообщение заказчика Гранта (серия, stamp)', at: grantTileAt, offer: 'GrantTile', pool: 'P_GRANT_TILE' },
+  { source: 'вопрос «тебе коллекторы пишут?» (серия 2 арки, stamp)', at: collectorsAskAt, offer: 'CollectorsAsk', pool: 'P_COLLECTORS_ASK' },
+  { source: 'предложение стажировки «Деньги-Ара» (финал арки)', at: internAt, offer: 'InternOffer', pool: 'P_INTERN' },
+  { source: 'вопрос «дырку заделаешь?» (серия Рубика, stamp)', at: rubikHoleAt, offer: 'RubikHole', pool: 'P_HOLE' },
   { source: 'фото «платёжки» (Turn_Photo / game.photo)', at: photoAt, offer: 'Photo', pool: 'D.P_PHOTO' },
+  { source: 'перевод от Алика (правило и пачка непрочитанных)', at: transferAt, offer: 'Transfer', pool: 'D.P_TRANSFER' },
+  { source: 'смена фото без усов (Due_StakeShave / Condition_StakeShave)', at: moustachePhotoAt, offer: 'MoustachePhoto', pool: 'P_MOUSTACHE_PHOTO' },
+  { source: 'конец квеста «мама на рынке» (q_mama, узел drive)', at: mamaMarketAt, offer: 'MamaMarket', pool: 'P_MAMA_MARKET' },
 ]

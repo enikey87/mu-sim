@@ -5,6 +5,7 @@
 // FactKey — тип для конструкторов условий (#258): опечатка не компилируется. isFactKey — рантайм
 // для линтера и наследия (fx.set / динамика); новые условия идут через типизированные конструкторы.
 import { ARCS, CAST } from './arcs'
+import { FINALES } from './finales'
 import { ACH } from './achievements'
 import { CLAIMS } from './lies'
 import { TOPICS } from './topics'
@@ -23,7 +24,7 @@ import {
   betonSet, cardSent, saidTomorrow, saidFriday, saidKonak, payday, count, endgame, holidayGreeted, lend50,
   paydayScene, lightOff, netRation, phoneWarn, creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited,
   collectorsTurned,
-  criticalAt, creditOfferSum, crewPaid, crewPaidAt, moneyAskAt, rubikBath, whenYears, ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt, countersuitAt, grantTileAt, transferAt, transferAmount, moustachePhotoAt, moustacheStakeSaid, photoAt,
+  criticalAt, creditOfferSum, crewPaid, crewPaidAt, moneyAskAt, rubikBath, whenYears, ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt, countersuitAt, grantTileAt, transferAt, transferAmount, moustachePhotoAt, moustacheStakeSaid, mamaMarketAt, photoAt,
   debutWho, debutAt, arsenTrack,
 } from './memkeys'
 import { momDachaAt, momDachaDays, type LoanId, type MomId, type ThingId } from './credit'
@@ -63,7 +64,7 @@ export type MemExactKey =
   | typeof collectorsTurned
   | typeof criticalAt | typeof creditOfferSum | typeof crewPaid | typeof crewPaidAt | typeof moneyAskAt[keyof typeof moneyAskAt] | typeof rubikBath | typeof whenYears
   | typeof ramPhotoAt | typeof borisSaleAt | typeof vacancyAt | typeof avitoReviewAt
-  | typeof rubikAskAt | typeof kettleAt | typeof lawyerAt | typeof collectorsAskAt | typeof internAt | typeof rubikHoleAt | typeof countersuitAt | typeof grantTileAt | typeof moustachePhotoAt | typeof moustacheStakeSaid | typeof photoAt
+  | typeof rubikAskAt | typeof kettleAt | typeof lawyerAt | typeof collectorsAskAt | typeof internAt | typeof rubikHoleAt | typeof countersuitAt | typeof grantTileAt | typeof moustachePhotoAt | typeof moustacheStakeSaid | typeof mamaMarketAt | typeof photoAt
   | typeof payday[keyof typeof payday] | typeof count[keyof typeof count]
   | typeof endgame[keyof typeof endgame] | typeof lend50[keyof typeof lend50]
 
@@ -95,7 +96,11 @@ const ach = setOf(Object.keys(ACH))
 const claims = setOf(CLAIMS.map((c) => c.key))
 const topics = setOf(Object.keys(TOPICS))
 const who = setOf([...Object.keys(CAST), ...EXTRAS])
-const states = setOf(Object.values(ARCS).flatMap((a) => a.eps.flatMap((e) => (e.state ? [e.state.key] : []))))
+// состояния включают и финалы: финал — та же серия с `state` (свадьба Ануш, #328), её день пишется тем же `stateAt`
+const states = setOf([
+  ...Object.values(ARCS).flatMap((a) => a.eps.flatMap((e) => (e.state ? [e.state.key] : []))),
+  ...Object.values(FINALES).flatMap((fs) => fs.flatMap((f) => (f.state ? [f.state.key] : []))),
+])
 const items = setOf(invoiceItems(30).map((r) => invKey(valueOf(r)[0]).slice('inv.'.length)))
 const moneyPlaces = setOf(Object.keys(MONEY_PLACES))
 
