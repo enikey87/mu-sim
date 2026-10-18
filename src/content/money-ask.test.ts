@@ -321,4 +321,48 @@ describe('follow-пул бетона и посторонние подтверж�
     expect(game.S.mem[moneyAskAt.beton], 'хор в рамках легенды места не штампует').toBe(game.S.stats.sent)
     expectWindow(game)
   })
+
+  /** Открытые state-вопросы пула: их закрывает подтверждение и возвращает окно. */
+  const openStates = (game: Game, pool: readonly Entry<string>[]) =>
+    pool.filter(windowed).map(valueOf).filter((t) => game.open(pool).includes(t))
+
+  it('подтверждение места персонажем (реплика Нуне в серии) закрывает оба пула сейфа (#981, раунд 73)', async () => {
+    const { game } = makeGame()
+    const stateAsk = MONEY_ASK.safe.filter(windowed).map(valueOf)
+    const stateFollow = ARCS.nune.follow.filter(windowed).map(valueOf)
+    expect(stateFollow.length, 'state-вопросов follow Нуне не стало — проверка пустеет').toBe(4)
+    const askOpen = openStates(game, MONEY_ASK.safe)
+    const followOpen = openStates(game, ARCS.nune.follow)
+    expect(askOpen.length, 'до подтверждения состояние money-ask не открыто — проверка пустеет').toBeGreaterThan(0)
+    expect(followOpen.length, 'до подтверждения состояние follow не открыто — проверка пустеет').toBeGreaterThan(0)
+    // серия Нуне: «Да, я в декрете… Ключ у меня» — подтверждение места персонажем, легенды серии нет
+    await game.playEpisode(ARCS.nune.eps[1], 'nune')
+    expect(game.S.mem[moneyAskAt.safe], 'подтверждение персонажем места не штампует').toBe(game.S.stats.sent)
+    for (const t of stateAsk) expect(game.open(MONEY_ASK.safe), `money-ask в окне: «${t}»`).not.toContain(t)
+    for (const t of stateFollow) expect(game.open(ARCS.nune.follow), `follow в окне: «${t}»`).not.toContain(t)
+    game.S.stats.sent += MONEY_ASK_TURNS + 1
+    for (const t of askOpen) expect(game.open(MONEY_ASK.safe), `money-ask за окном: «${t}»`).toContain(t)
+    for (const t of followOpen) expect(game.open(ARCS.nune.follow), `follow за окном: «${t}»`).toContain(t)
+  })
+
+  it('хор Нуне в рамках легенды сейфа подтверждает место (#981, раунд 73)', async () => {
+    const { game } = makeGame({ seed: 4 })
+    game.rules.applyOps(meet('nune'), {})
+    const askOpen = openStates(game, MONEY_ASK.safe)
+    const followOpen = openStates(game, ARCS.nune.follow)
+    let fired = false
+    for (let i = 0; i < 80 && !fired; i++) {
+      game.setLegend('safe_wrongkey', 'nune')
+      game.S.stats.sent += 13 // перерыв хора — 12 ходов
+      delete game.S.mem[moneyAskAt.safe]
+      fired = (await game.fire('Mentioned', {}, { target: 'nune' }))?.name === 'Chorus_nune'
+    }
+    expect(fired, 'Chorus_nune не сыграл — проверка пустеет').toBe(true)
+    expect(game.S.mem[moneyAskAt.safe], 'хор в рамках легенды места не штампует').toBe(game.S.stats.sent)
+    for (const t of MONEY_ASK.safe.filter(windowed).map(valueOf)) expect(game.open(MONEY_ASK.safe), `money-ask в окне: «${t}»`).not.toContain(t)
+    for (const t of ARCS.nune.follow.filter(windowed).map(valueOf)) expect(game.open(ARCS.nune.follow), `follow в окне: «${t}»`).not.toContain(t)
+    game.S.stats.sent += MONEY_ASK_TURNS + 1
+    for (const t of askOpen) expect(game.open(MONEY_ASK.safe), `money-ask за окном: «${t}»`).toContain(t)
+    for (const t of followOpen) expect(game.open(ARCS.nune.follow), `follow за окном: «${t}»`).toContain(t)
+  })
 })
