@@ -7,6 +7,7 @@ import { makeScenes, type Line } from './scenes'
 import { ARCS, ARC_DONE, CAST, GROUP } from './arcs'
 import { ACH } from './achievements'
 import { FINALES, ENDINGS } from './finales'
+import { P_MONEY } from './topics'
 import * as L from './life'
 import { allRules } from './rules'
 import { Decks } from '../engine/deck'
@@ -64,6 +65,14 @@ describe('живая рецензия №1: точечные правки (#891)
       'Самвел снова женится?', 'Заказчик доволен? Пусть и платит. Смета-то моя.',
       'Грант вам не платит, вы — мне. Я в этой схеме крайний.', 'а просто в календаре та дата ещё не наступила.',
     ]) expect(allSource, `новой строки нет: «${next}»`).toContain(next)
+  })
+  // живая рецензия №4 (#1025): «нечем» договорено до «нечем платить», «Гарика достали» — из фундамента:
+  // старая формулировка без хвоста повисает, старая без «из фундамента» читается как «замучили»
+  it('незавершённое «нечем» и двусмысленные «достали» ушли (#1025)', () => {
+    expect(allSource, 'старое «нечем» на месте').not.toContain('Мне буквально нечем.')
+    expect(P_MONEY.bottom.polite.map(valueOf), 'нового «нечем платить» нет в пуле').toContain('Алик, до конца недели — пожалуйста. Мне буквально нечем платить.')
+    expect(allSource, 'старый вопрос про Гарика на месте').not.toContain('Гарика достали?')
+    expect(allSource, 'нового вопроса про Гарика нет').toContain('Гарика достали из фундамента?')
   })
 })
 
