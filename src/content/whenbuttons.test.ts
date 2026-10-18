@@ -92,15 +92,16 @@ describe('матрица: кнопка по роду и горизонту — �
       const names = matching(g).map((r) => r.name).sort()
       const at = `${where}: «${w.t}» (${String(f['ctx.whenKind'])}, ${String(f['ctx.whenHorizon'])})`
       const expected = w.kind === 'never' || w.kind === 'absurd' ? [`Opt_When_${w.kind}`]
+        : w.kind === 'floating' ? ['Opt_When_Floating'] // плавающий событийный срок (#1002) — своя кнопка
         : f['ctx.whenHorizon'] === 'near' ? ['Opt_WhenCheck', 'Opt_WhenOk']
         : f['ctx.whenHorizon'] === 'far' ? ['Opt_WhenPencil'] : ['Opt_WhenFar']
       expect(names, at).toEqual(expected)
       // дальше недели «принять всерьёз» не собирается ни при каком сроке
-      if (f['ctx.whenHorizon'] === 'far' || f['ctx.whenHorizon'] === 'veryFar' || w.kind === 'never' || w.kind === 'absurd') expect(names, at).not.toContain('Opt_WhenOk')
+      if (f['ctx.whenHorizon'] === 'far' || f['ctx.whenHorizon'] === 'veryFar' || w.kind === 'never' || w.kind === 'absurd' || w.kind === 'floating') expect(names, at).not.toContain('Opt_WhenOk')
       seen.add(expected.join('+'))
     }
     // не пустая проверка: сроки есть на каждом из четырёх горизонтов и у обоих родов без даты
-    expect([...seen].sort()).toEqual(['Opt_WhenCheck+Opt_WhenOk', 'Opt_WhenFar', 'Opt_WhenPencil', 'Opt_When_absurd', 'Opt_When_never'])
+    expect([...seen].sort()).toEqual(['Opt_WhenCheck+Opt_WhenOk', 'Opt_WhenFar', 'Opt_WhenPencil', 'Opt_When_Floating', 'Opt_When_absurd', 'Opt_When_never'])
   })
 
   it('тексты кнопок: без «Запомнил» у «никогда» и абсурда, без «по-русски» у ясного срока, дата — только у ясного срока и увёртки', async () => {
@@ -131,7 +132,7 @@ describe('матрица: кнопка по роду и горизонту — �
     for (const [, w] of terms()) for (const b of buttons(await said(w), 2)) (acts[b.rule] ??= new Set()).add(String(b.act))
     expect(Object.fromEntries(Object.entries(acts).map(([rule, a]) => [rule, [...a]]))).toEqual({
       Opt_WhenOk: ['promiseOk'], Opt_WhenCheck: ['promiseCheck'], Opt_WhenPencil: ['promisePencil'], Opt_WhenFar: ['promiseFar'],
-      Opt_When_never: ['promiseNever'], Opt_When_absurd: ['promiseNever'],
+      Opt_When_never: ['promiseNever'], Opt_When_absurd: ['promiseNever'], Opt_When_Floating: ['promiseCheck'],
     })
   })
 })

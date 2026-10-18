@@ -41,8 +41,9 @@ describe('разметка сроков', () => {
     for (const [where, w] of all) {
       const at = `${where}: «${w.t}»`
       kinds.add(w.kind)
-      if (w.kind === 'never' || w.kind === 'absurd') {
-        // срока в мире нет — числу неоткуда взяться; журналу обещаний оставлены d/condition (#571)
+      if (w.kind === 'never' || w.kind === 'absurd' || w.kind === 'floating') {
+        // срока в мире нет — числу неоткуда взяться; журналу обещаний оставлены d/condition (#571);
+        // у плавающего (#1002) горизонт тоже не из мира — свои варианты вместо never-эха
         expect([w.due, w.est, w.state, w.holiday], `${at}: у срока без конца не осталось источника горизонта`).toEqual([undefined, undefined, undefined, undefined])
       }
       if (w.kind === 'clear' || w.kind === 'dodge') expect(w.d !== null || w.due !== undefined, `${at}: ясный срок и увёртка без даты`).toBe(true)
@@ -55,7 +56,7 @@ describe('разметка сроков', () => {
         expect(days >= 0 && days <= MAX_AHEAD, at).toBe(true)
       } else expect(w.holiday, `${at}: ссылка на календарь не у праздника`).toBeUndefined()
     }
-    expect([...kinds].sort()).toEqual(['absurd', 'clear', 'dodge', 'event', 'holiday', 'never'])
+    expect([...kinds].sort()).toEqual(['absurd', 'clear', 'dodge', 'event', 'floating', 'holiday', 'never'])
     expect(all.length, 'сроков в пулах и легендах меньше известных — проверка пустеет').toBeGreaterThanOrEqual(89)
   })
 
@@ -120,12 +121,12 @@ describe('календарь праздников и сезонов', () => {
 })
 
 describe('факты контекста: род и горизонт', () => {
-  it('каждый срок из пулов и легенд ложится на доску родом; горизонт есть везде, кроме «никогда» и абсурда', async () => {
+  it('каждый срок из пулов и легенд ложится на доску родом; горизонт есть везде, кроме «никогда», абсурда и плавающего', async () => {
     const all = terms()
     for (const [where, w] of all) {
       const g = await said(w)
       const c = ctx(g)
-      const none = w.kind === 'never' || w.kind === 'absurd'
+      const none = w.kind === 'never' || w.kind === 'absurd' || w.kind === 'floating'
       expect(c.kind, `${where}: «${w.t}»`).toBe(w.kind)
       expect(c.days === undefined, `${where}: «${w.t}» — горизонт ${String(c.days)}`).toBe(none)
       expect(c.horizon === undefined, where).toBe(none)
