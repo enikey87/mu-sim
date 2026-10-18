@@ -1,6 +1,7 @@
 // Сценарии правил: именно те места, где в оригинале были нелогичные ответы.
 import { describe, it, expect } from 'vitest'
 import { makeGame, alikTexts } from '../../test/helpers'
+import { START_DAY, ARC_MARINATION_DAYS } from '../../engine/state'
 import { type Entry, spec, valueOf } from '../../engine/rules'
 import type { Game } from '../../engine/game'
 import type { Choice, Ctx } from '../../engine/state'
@@ -378,7 +379,7 @@ describe('ход Алика (AlikTurn): веса как в оригинале', 
   // Порог — из замера: 0.64 с × 8 × 3 ≈ 16 с, округлено вверх; сама проверка частот не ослаблена.
   it('частоты действий близки к заданным', { timeout: 20_000 }, () => {
     const { game } = makeGame({ seed: 5 })
-    const f = { ...game.facts(), sent: 20, arcAvailable: true, arcsStarted: 3, mood: 5 } // сериалы уже идут — без «первого сериала»
+    const f = { ...game.facts(), sent: 20, arcAvailable: true, arcsStarted: 3, arcsMature: true, mood: 5 } // сериалы уже идут — без «первого сериала»
     const n: Record<string, number> = {}
     // доля Turn_Scene ≈ 0,094 при пороге 0,09: на 6000 ходах шум (σ ≈ 0,004) решал исход по сиду
     const N = 72000
@@ -402,6 +403,8 @@ describe('гарантия первой серии к 12-му сообщению
   const at12 = (seed: number) => {
     const { game } = makeGame({ seed })
     game.S.stats.sent = 12
+    // окно маринования первой арки (#1004): гарантия считается после него, как и в партии
+    game.S.day = START_DAY + ARC_MARINATION_DAYS
     return game
   }
 

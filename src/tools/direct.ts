@@ -5,6 +5,7 @@
 import type { Game } from '../engine/game'
 import type { Facts } from '../engine/rules'
 import { during } from '../engine/rules'
+import { START_DAY, ARC_MARINATION_DAYS } from '../engine/state'
 import { HEAT, legendDay, legendId, nuneKeyPassed, sorryAt } from '../content/memkeys'
 
 export type DirectCase = { event: string; facts?: Facts; target?: string; setup?: (g: Game) => void }
@@ -35,7 +36,7 @@ export const DIRECT: Record<string, DirectCase> = {
   Away_Offline: { event: 'AlikAway', setup: (g) => { g.S.offlineDays = 2 } },
   Turn_WhileDead: { event: 'AlikTurn', setup: (g) => { g.S.mem.alik_dead = true } },
   // гарантия первой серии (#636): к 12-му сообщению шанс Turn_ArcFirst мог промахнуться всю посадку
-  Turn_ArcGuarantee: { event: 'AlikTurn', setup: (g) => { g.S.stats.sent = 12 } },
+  Turn_ArcGuarantee: { event: 'AlikTurn', setup: (g) => { g.S.stats.sent = 12; g.S.day = START_DAY + ARC_MARINATION_DAYS } },
   Says_OtherArcWhileDead: { event: 'PlayerSays', facts: { intent: 'arc', arg: 'boris' }, setup: (g) => { g.S.mem.alik_dead = true } },
   Court_Verdict_Lettered: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem.court = 6; g.S.mem.payday = 'strasbourg' } },
   // #553: дрейф сроков платежей увёл оба правила из выборок — прямой случай держит их под гейтом
@@ -139,7 +140,7 @@ export const DIRECT: Record<string, DirectCase> = {
   },
   Quiet_PaydayOpen_AlikAway: { event: 'AlikAway', setup: paydayOpen },
   Quiet_PaydayOpen_PeriodLine: { event: 'PeriodLine', setup: paydayOpen },
-  Quiet_PaydayOpen_StoryBeat: { event: 'StoryBeat', setup: (g) => { paydayOpen(g); g.S.stats.sent = 5 } },
+  Quiet_PaydayOpen_StoryBeat: { event: 'StoryBeat', setup: (g) => { paydayOpen(g); g.S.stats.sent = 5; g.S.day = 340 } },
   // #927 (реакции на системные события сдвинули розыгрыш) — правило ушло из выборок, прямой случай вернулся.
   // До этого случай снимали (#889: в CI правило играло в 8 партиях, порог 7) — качели гейта решает замер.
   // #953 (окна вопроса Рубика и чайника) снова сдвинула розыгрыш — в 7 партиях (порог 7), гейт видит сам.
@@ -198,7 +199,8 @@ export const DIRECT: Record<string, DirectCase> = {
   // #964: гейты разошлись — в выборках CI правило не сработало ни разу (запись нужна), а на чужих
   // семействах играет во всех (8/7/8 при пороге 7, запись «устарела»); одна строка не может быть и там
   // и там — держим запись (арбитр — CI), конфликт гейтов заведён в #949
-  Says_voice: { event: 'PlayerSays', facts: { intent: 'voice' } },
+  // #1004 (маринование первой арки) сдвинуло выборки — голосовое снова в них (8 партий при пороге 7), гейт видит сам
+  // Says_voice: { event: 'PlayerSays', facts: { intent: 'voice' } },
   Scene_choice: {
     event: 'PickScene',
     setup: (g) => {
@@ -249,8 +251,9 @@ export const DIRECT: Record<string, DirectCase> = {
   // #577: после разрастания пулов звонка выборки перестали собирать и второе приглашение Арсена
   Court_Lawyer_Again: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem.court = 1; g.S.mem['intro.arsen'] = true } },
   // #981 (окна follow-пула бетона и штампы легенды места) сдвинул розыгрыш — ответ окну дебюта Арсена (#973)
-  // ушёл из выборок, держим прямым случаем
-  Says_lawyerAsk: { event: 'PlayerSays', facts: { intent: 'lawyerAsk' } },
+  // ушёл из выборок и держался прямым случаем; #1004 (маринование первой арки) сдвинуло выборки обратно —
+  // 11 партий при пороге 7, гейт видит сам
+  // Says_lawyerAsk: { event: 'PlayerSays', facts: { intent: 'lawyerAsk' } },
   // #982 (пул дебюта Арсена ждёт события трека) — ответ окну дебюта в выборках больше не собирается
   Says_debutArsen: { event: 'PlayerSays', facts: { intent: 'debutArsen' } },
   Scene_lend: { event: 'PickScene', setup: (g) => { g.S.mood = 4 } }, // денег в свежей партии хватает (START_MONEY)

@@ -3,6 +3,7 @@ import { ARCS } from '../content/arcs'
 import { gte, missing } from '../content/fact'
 import { collectorsRecruited, creditBroke, endgame } from '../content/memkeys'
 import { makeGame } from '../test/helpers'
+import { START_DAY, ARC_MARINATION_DAYS } from './state'
 
 describe('availableArcs', () => {
   it('читает условия старта по текущим памяти и дню, включая отсутствующий ключ', () => {
@@ -43,6 +44,7 @@ describe('availableArcs', () => {
 
   it('не перечисляет всю память ради условия одной арки', () => {
     const { game } = makeGame()
+    game.S.day = START_DAY + ARC_MARINATION_DAYS // окно маринования первой арки (#1004) не предмет этой проверки
     game.S.mem = new Proxy(game.S.mem, { ownKeys: () => { throw new Error('memory enumeration') } })
     game.S.mem[creditBroke] = true
     expect(game.availableArcs()).toContain('collectors')

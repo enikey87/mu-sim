@@ -119,7 +119,7 @@ export const turnRules: R[] = [
   // вендетта ходит из того же пула, что и пул ниже, — пропускаем её через missing.
   { name: 'Turn_ArcGuarantee', event: 'AlikTurn', when: [gte('sent', 12), lte('arcsStarted', 0), is('arcAvailable'), missing(vendetta)], specificity: 0.5, respond: async ({ game }) => { const id = game.nextArc(); if (id) await game.playArc(id) } },
   { name: 'Turn_Arc', event: 'AlikTurn', when: [gte('sent', 2), is('arcAvailable')], specificity: 0, weight: W.arc, respond: async ({ game }) => { const id = game.nextArc(); if (id) await game.playArc(id) } },
-  { name: 'Turn_Group', event: 'AlikTurn', when: [gte('sent', 8)], specificity: 0, weight: W.group, respond: ({ game }) => game.groupChat() },
+  { name: 'Turn_Group', event: 'AlikTurn', when: [gte('sent', 8), is('arcsMature')], specificity: 0, weight: W.group, respond: ({ game }) => game.groupChat() },
   { name: 'Turn_Wrong', event: 'AlikTurn', when: [gte('sent', 5)], specificity: 0, weight: W.wrong, respond: ({ game }) => game.wrongChat() },
   // бухгалтерия лжи: Алик сам возвращается к своему старому вранью
   // легенда денег: пока деньги «в сейфе, а ключ в малыше», ход Алика продолжает эту линию, а не случайную отмазку
