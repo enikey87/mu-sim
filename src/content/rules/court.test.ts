@@ -5,6 +5,9 @@ import { COURT, COURT_AFTER, COURT_LAWYER_AGAIN, COURT_VERDICT_AFTER_LETTER } fr
 import { ARCS } from '../arcs'
 import { valueOf } from '../../engine/rules'
 import { THREAT_AGAIN } from '../misc'
+import { courtVerdict, courtVerdictAt } from '../memkeys'
+import { P_COURT_VERDICT } from './player-choice-pools'
+import { COURT_VERDICT_B } from '../world'
 import type { Game } from '../../engine/game'
 
 const threat = async (game: Game) => { game.S.offlineDays = 0; const n = game.S.msgs.length; const r = await game.fire('PlayerMessage', { tone: 'threat' }); return { r: r?.name, t: game.S.msgs.slice(n).map((m) => (m.kind === 'text' || m.kind === 'sys' ? m.text : '')) } }
@@ -160,5 +163,39 @@ describe('линия суда', () => {
     try {
       expect((await threat(game)).r).toBe('Court_Step')
     } finally { lettered.when = when }
+  })
+})
+
+describe('окно отклика на вердикт суда (#1058)', () => {
+  const text = (e: unknown): string => { const v = valueOf(e as never); return typeof v === 'string' ? v : (v as { t: string }).t }
+  const low = (t: string) => t.charAt(0).toLowerCase() + t.slice(1)
+
+  it.each([['debt', 1], ['screens', 2], ['moo', 3]] as const)('узел %s: вердикт штампует ход, кнопка в блоке, окно три хода, ответ потребляет', async (node, verdict) => {
+    const { game } = makeGame()
+    const button = () => { game.S.choices = null; return game.buildChoices().find((c) => c.act === 'courtVerdict') }
+    expect(button(), 'до вердикта кнопки нет').toBeUndefined()
+    await game.enterNode('court', node)
+    expect(game.S.mem[courtVerdict], 'вердикт не записан — проверка пустеет').toBe(verdict)
+    const at = Number(game.S.mem[courtVerdictAt])
+    expect(Number.isFinite(at), 'вердикт не штампанул ход события').toBe(true)
+    expect(at, 'штамп не на ходу вердикта').toBe(game.S.stats.sent)
+    expect(button(), 'на ходу вердикта кнопки нет').toBeTruthy()
+    const texts = new Set<string>()
+    for (let i = 0; i < 60; i++) { const b = button(); if (b) texts.add(b.text) }
+    const pool = P_COURT_VERDICT.map(text)
+    expect(texts.size, 'пул окна не прозвучал — проверка пустеет').toBeGreaterThan(0)
+    for (const t of texts) expect(pool.some((p) => t.includes(p) || t.includes(low(p))), `кнопка не из пула: ${t}`).toBe(true)
+    game.S.stats.sent = at + 3
+    expect(button(), 'третий ход после вердикта — ещё окно').toBeTruthy()
+    game.S.stats.sent = at + 4
+    expect(button(), 'вне окна — кнопки нет').toBeUndefined()
+    game.S.stats.sent = at
+    const n = game.S.msgs.length
+    await game.fire('PlayerSays', { intent: 'courtVerdict' })
+    const said = game.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : []))
+    const answers = COURT_VERDICT_B.map(text)
+    expect(said.some((t) => answers.some((p) => t.includes(p))), `ответ не из пула события: ${said.join(' | ')}`).toBe(true)
+    expect(game.S.mem[courtVerdictAt], 'ответ не потребил окно').toBeUndefined()
+    expect(button(), 'после ответа окно закрыто').toBeUndefined()
   })
 })

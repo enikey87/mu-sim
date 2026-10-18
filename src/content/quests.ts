@@ -4,7 +4,7 @@
 import type { Scene } from './scenes'
 import { gate, missing } from './fact'
 import { needs } from './world'
-import { courtVerdict, cryptoHodl, intro, kettleAt, mamaMarketAt } from './memkeys'
+import { courtVerdict, courtVerdictAt, cryptoHodl, intro, kettleAt, mamaMarketAt } from './memkeys'
 
 export const QUESTS: Record<string, Scene> = {
   q_hash: {
@@ -223,17 +223,17 @@ export const COURT_SCENE: Scene = {
     },
     debt: {
       fx: { ach: 'court', set: { [courtVerdict]: 1 } },
-      who: 'judge', a: ['Суд установил: должен. Суд также установил: не может. Решение: пусть будет должен, но с уважением. Заседание закрыто, хаш открыт.'],
+      who: 'judge', a: [{ t: 'Суд установил: должен. Суд также установил: не может. Решение: пусть будет должен, но с уважением. Заседание закрыто, хаш открыт.', stamp: courtVerdictAt }],
     },
     screens: {
       fx: { ach: 'court', set: { [courtVerdict]: 2 } },
-      who: 'judge', a: ['Суд изучил переписку. Суд смеялся сорок минут. Решение: ответчику — выговор за сроки, которых нет в календаре, истцу — пятьдесят рублей.'],
+      who: 'judge', a: [{ t: 'Суд изучил переписку. Суд смеялся сорок минут. Решение: ответчику — выговор за сроки, которых нет в календаре, истцу — пятьдесят рублей.', stamp: courtVerdictAt }],
       then: 'transfer',
     },
     moo: {
       fx: { ach: 'court', set: { [courtVerdict]: 3 } },
       who: 'goar', a: ['Ме-е-е. (Это коза. Она свидетель.)'],
-      who2: 'judge', a2: ['Свидетель — коза — подтверждает мычание. Суд удовлетворяет иск частично: коровой. Корову предоставит ответчик. Когда найдёт.'],
+      who2: 'judge', a2: [{ t: 'Свидетель — коза — подтверждает мычание. Суд удовлетворяет иск частично: коровой. Корову предоставит ответчик. Когда найдёт.', stamp: courtVerdictAt }],
     },
   },
 }

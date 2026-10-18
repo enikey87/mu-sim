@@ -23,7 +23,7 @@ import {
   STRASBOURG_THREAT,
   P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE,
   P_CREW_CALL, P_LAWYER, P_COLLECTORS_ASK, P_INTERN, P_HOLE, P_COUNTERSUIT,
-  P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_BORIS, P_DEBUT_NIVA, P_GRANT_TILE, P_MOUSTACHE_PHOTO, P_MAMA_MARKET, P_SAMVEL_DIVORCE, P_GRANT_HOUSE,
+  P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_BORIS, P_DEBUT_NIVA, P_GRANT_TILE, P_MOUSTACHE_PHOTO, P_MAMA_MARKET, P_SAMVEL_DIVORCE, P_COURT_VERDICT, P_GRANT_HOUSE,
 } from './player-choice-pools'
 
 type R = Rule<ContentApi, GameEvent, Offer>
@@ -194,6 +194,9 @@ export const choiceRules: R[] = [
   // развод дяди Самвела на свадьбе (#1037): событие серии — отклик в окне события (ход и три после).
   // bonus 5: после серии рядом стоит вопрос арки (1) — реакция обязана попасть в блок
   offer({ name: 'SamvelDivorce', when: [is('samvelDivorceFresh')], act: 'samvelDivorce', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_SAMVEL_DIVORCE', P_SAMVEL_DIVORCE) }),
+  // вердикт суда (#1058): кульминация линии — отклик в окне события (ход и три после).
+  // bonus 5: после сцены блок собирают общие деньги — реакция обязана попасть в блок
+  offer({ name: 'CourtVerdict', when: [is('courtVerdictFresh')], act: 'courtVerdict', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_COURT_VERDICT', P_COURT_VERDICT) }),
   // встречный иск — заметное событие с окном отклика (#964): ход и три после
   offer({ name: 'Countersuit', when: [is('countersuitFresh')], act: 'countersuitAsk', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_COUNTERSUIT', P_COUNTERSUIT) }),
 

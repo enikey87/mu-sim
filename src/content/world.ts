@@ -1,7 +1,7 @@
 // Тексты для новых возможностей системы правил: обещания, которые наступают, хор персонажей,
 // состояния мира со сроком (свадьба, болезнь Бориса, «Алик умер»).
 import { type Criterion, type Line, type Entry, named, exists, is, eq, gte, ne, missing, set, gate } from './fact'
-import { arsenTrack, cryptoHodl, garikConcrete, garikCut, garikDenied, grandpaDying, grantPaid, intro, karineKnowsDebt, karineThinksTax, met, mourning, moustacheStakeSaid, nivaAway, nivaPlayer, nuneDekretOver, payday, saidFriday, saidStrasburg, saidTomorrow, alikShaved, wedding, collectorsRecruited, collectorsTurned, rubikBath } from './memkeys'
+import { arsenTrack, cryptoHodl, courtVerdict, garikConcrete, garikCut, garikDenied, grandpaDying, grantPaid, intro, karineKnowsDebt, karineThinksTax, met, mourning, moustacheStakeSaid, nivaAway, nivaPlayer, nuneDekretOver, payday, saidFriday, saidStrasburg, saidTomorrow, alikShaved, wedding, collectorsRecruited, collectorsTurned, rubikBath } from './memkeys'
 import type { WhoId } from './ids'
 
 // Мир последователен: кто и что есть в истории и в каком оно положении — факты, их ставит серия (remember), ступень суда
@@ -186,6 +186,13 @@ export const MAMA_MARKET_B = [
   'Аванс принят, брат. Остальное — как мама скажет. У неё слово твёрже банковского.',
   'Она торговалась за каждый помидор, я — за каждый перевод. Семейное, брат.',
   'С мясом — три тысячи. Значит, уважение дороже. Считай, я тебя уважил на три.',
+]
+/** Ответ на реакцию к вердикту суда (#1058): по каждому решению своя строка, универсальная — про документ. */
+export const COURT_VERDICT_B = [
+  gate(eq(courtVerdict, 1))('С уважением — это когда должен, но вежливо. Главное, что должен. А вежливость я переживу.'),
+  gate(eq(courtVerdict, 2))('Пятьдесят рублей — это аванс. Суд подтвердил долг, остальное — по-братски.'),
+  gate(eq(courtVerdict, 3))('Корову ищу. Пока нашёл козу. Суд сказал — сойдёт.'),
+  'Решение — это документ. Документ — уже половина денег. Вторая половина — когда-нибудь.',
 ]
 /** Ответ на реакцию к разводу дяди Самвела (#1037): свадьба идёт дальше, конверты не возвращают.
  *  Конверт введён легендой свадьбы (#1016): строки с ним молчат, пока легенда не прозвучала. */
