@@ -7,7 +7,7 @@ import type { Game } from '../engine/game'
 import type { Facts } from '../engine/rules'
 import { during } from '../engine/rules'
 import { START_DAY, ARC_MARINATION_DAYS } from '../engine/state'
-import { HEAT, legendDay, legendId, nuneKeyPassed, sorryAt } from '../content/memkeys'
+import { HEAT, legendDay, legendId, nuneKeyPassed, payday, sorryAt } from '../content/memkeys'
 
 export type DirectCase = { event: string; facts?: Facts; target?: string; setup?: (g: Game) => void }
 
@@ -22,6 +22,11 @@ const phone = (g: Game) => { g.rules.applyOps([during('phone.karine', 1)], {}) }
 const dead = (g: Game) => { g.S.mem.alik_dead = true }
 const blocked = (g: Game) => { g.S.mem.blocked = true }
 const offended = (g: Game) => { g.S.mem[HEAT] = 1; g.S.ctx = { offended: true } }
+/** Три сюжетных сериала закончены — ворота третьего акта (тот же setup, что `rich` в payday.test.ts). */
+const thirdAct = (g: Game) => {
+  g.S.day = 340
+  Object.assign(g.S.arcs, { nune: { i: 6, last: 0 }, niva: { i: 7, last: 0 }, boris: { i: 10, last: 0 } })
+}
 
 export const DIRECT: Record<string, DirectCase> = {
   Tone_Cow: { event: 'PlayerMessage', facts: { tone: 'cow' } },
@@ -271,7 +276,8 @@ export const DIRECT: Record<string, DirectCase> = {
   // Scene_deathbed: с #824/#828 срабатывает в выборках сам (7 партий при пороге 7) — прямой случай не нужен
   // #1001 (место Бориса в формулировках) снова ушло из выборок — «смертный одр» держим прямым случаем
   // #1068 (гейт «всем» в упрёке по звонку) сдвинул выборки обратно — сцена снова видна (8 партий при пороге 7)
-  // Scene_deathbed: { event: 'PickScene', setup: (g) => { g.S.day = 245; g.S.mood = 5 } }
+  // #1112 (формулировка «Нивы» в follow до первого «Би-бип») снова сдвинул розыгрыш — сцена из выборок ушла
+  Scene_deathbed: { event: 'PickScene', setup: (g) => { g.S.day = 245; g.S.mood = 5 } },
   // #795: кнопки игрока (денежный вопрос вместо случайной кнопки про арку) сдвинули розыгрыш —
   // обычная сцена «жена» стала редкой в выборках, случай держали прямым (свой setup подавлял соседние сцены)
   // #889: перекалибровка вариантов бетона сдвинула розыгрыш — сцена снова в выборках CI
@@ -285,6 +291,10 @@ export const DIRECT: Record<string, DirectCase> = {
   // ушли из чужих семейств сидов (`rules:stable`); в выборках гейта они редкие, потому держим прямыми случаями
   Ending_payday_niva: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'niva' } },
   Payday_niva: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['finale.niva'] = 'chose' } },
+  // #1112 (формулировка «Нивы» в follow до первого «Би-бип») сдвинула розыгрыш — в семье +4000
+  // подводка и анонс выплаты упали до нуля; держим оба прямыми случаями
+  Beat_PaydayLead_First: { event: 'StoryBeat', setup: thirdAct },
+  Beat_Payday: { event: 'StoryBeat', setup: (g) => { thirdAct(g); g.S.mem[payday.lead] = 1; g.S.mem[payday.signs] = 2 } },
   // Scene_choice: с #821 срабатывает в выборках сам (7 партий при пороге 7) — прямой случай не нужен
   // #1001 (место Бориса в формулировках) сдвинуло розыгрыш — сцена снова в выборках сам (см. комментарий выше)
   Finale_niva_chose_or: { event: 'ArcFinale', facts: { arc: 'niva' }, setup: (g) => { g.S.mem['asked.niva'] = 5 } },
