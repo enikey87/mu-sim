@@ -241,7 +241,7 @@ export const choiceRules: R[] = [
   // Кнопка — по горизонту и роду (docs/design/deadline-replies.md); специфичность прежняя, слот `when` вытесняет других как раньше
   ...(() => {
     const term = [exists('ctx.when'), is('ctx.whenFresh')]
-    const args = (f: Facts) => ({ t: String(f['ctx.when']), T: cap(String(f['ctx.when'])), date: String(f['ctx.whenDate'] ?? ''), days: fmtDays(Number(f['ctx.whenDays'] ?? 0)) })
+    const args = (f: Facts) => ({ t: String(f['ctx.when']), T: cap(String(f['ctx.when'])), date: String(f['ctx.whenDate'] ?? ''), days: fmtDays(Number(f['ctx.whenDays'] ?? 0)), record: fmtDays(Number(f['promiseRecordDays'] ?? 0)) })
     const when = (o: Pick<OfferSpec, 'name' | 'when' | 'act' | 'tone' | 'weight' | 'arg' | 'text'>) => offer({ slot: 'when', specificity: 3, bonus: 1, ...o })
     const near = [...term, eq('ctx.whenHorizon', 'near')]
     const askPool = (f: Facts): string =>
