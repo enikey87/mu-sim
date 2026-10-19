@@ -100,6 +100,8 @@ export const saidTomorrow = 'said.tomorrow'
 export const saidFriday = 'said.friday'
 /** Алик сравнил срок с коньяком («созревает. Как коньяк») — только после этого игрок называет число «Лет двадцать?» (#918). */
 export const saidKonak = 'said.konak'
+/** Хаш уже прозвучал в партии: вводящие строки пишут факт, угроза «пойду на хаш» ждёт его (#1143). */
+export const saidHash = 'said.hash'
 
 export const payday = {
   at: 'payday.at', sum: 'payday.sum', chain: 'payday.chain', caught: 'payday.caught',
@@ -286,7 +288,7 @@ export const MEM_KEYS: ReadonlySet<string> = new Set([
   ritualCount, ritualCut, caughtCount, caughtAt, garikDenied, cryptoHodl, bathAsked, mamaCalls, phoneKarine, karineKnowsDebt, karineThinksTax, alikShaved, moustacheKept, moustacheAskAt, alikDay, mooAt, sorryAt, courtReferral, judgeApology, saidStrasburg,
   rudeAt, thanksAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway, nivaPlayer, carGone,
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, taxFrozen, taxThawed,
-  actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday, saidKonak,
+  actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday, saidKonak, saidHash,
   lightOff, netRation, phoneWarn, holidayGreeted,
   creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, collectorsTurned, criticalAt, creditOfferSum, momDachaAt, crewPaid, crewPaidAt, crewAllPaid, rubikBath, whenYears, ...Object.values(moneyAskAt), transferAt, transferAmount, moustachePhotoAt, moustacheStakeSaid, mamaMarketAt, mamaVoiceAt, samvelDivorceAt, courtVerdictAt, tileSlipAt, saleAt, saleWhat, fraudLoan, blockLifted, internDeclined, grantHouseAt, photoAt, debutWho, debutAt, arsenTrack,
   ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt, countersuitAt, grantTileAt,

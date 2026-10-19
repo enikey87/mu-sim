@@ -1,7 +1,7 @@
-import { type Entry, type LineSpec, type Said, gate, gte, lte, eq, ne, is, missing, set } from './fact'
+import { type Entry, type FactOp, type LineSpec, type Said, gate, gte, lte, eq, ne, is, missing, set } from './fact'
 import { type When } from './excuses'
 import { needs, WORLD } from './world'
-import { avitoReviewAt, bloodGiven, borisSaleAt, count, endgame, evicted, fraudLoan, paydayScene, vacancyAt, wedding } from './memkeys'
+import { avitoReviewAt, bloodGiven, borisSaleAt, count, endgame, evicted, fraudLoan, paydayScene, saidHash, vacancyAt, wedding } from './memkeys'
 import { sold, momHelp, momDachaDays } from './credit'
 import { billStreak } from './bills'
 
@@ -29,10 +29,12 @@ export const IDLE: Entry<Said>[] = [
   'ты не пишешь, и я не пишу. Так и живём.', 'проверка связи. Раз, два. Деньги — три.', 'ты там не в суде, случайно?',
 ];
 
-export const PERIOD: Record<string, Entry<string>[]> = {
+export type PeriodLine = string | { t: string; remember?: FactOp[] }
+export const periodText = (line: PeriodLine): string => (typeof line === 'string' ? line : line.t)
+export const PERIOD: Record<string, Entry<PeriodLine>[]> = {
   night: ['{night}, брат…', 'я сплю. Это я во сне пишу.', 'ты почему не спишь? Из-за денег? Я тоже.', 'тихо, жена спит.', 'ночью о деньгах нельзя, примета.', needs('karineHome')(needs('karine')(needs('karine')('пишу под одеялом, чтоб Карине не видела.')))],
   morning: ['я ещё кофе не пил.', 'только проснулся.', 'еду на объект, пробки.', 'утро, я добрый, но бедный.', 'умываюсь, одной рукой пишу.'],
-  lunch: ['я на обеде, коротко.', 'ем хаш, руки жирные, пишу носом.', 'обед — святое, но тебе отвечу.', needs('garikFree')(needs('garik')('в шашлычной у Гарика, шумно.'))],
+  lunch: ['я на обеде, коротко.', { t: 'ем хаш, руки жирные, пишу носом.', remember: [set(saidHash, true)] }, 'обед — святое, но тебе отвечу.', needs('garikFree')(needs('garik')('в шашлычной у Гарика, шумно.'))],
   friday: ['ара, тут застолье, плохо слышу…', 'пятница, брат! Тост за тебя!', needs('samvel')(needs('samvel')('мы тут сидим, Самвел поёт.')), 'пятница, не пиши про деньги, грех.', 'застолье не отпускает.'],
   evening: [gate(missing(wedding('samvel')), missing(wedding('anush')))('я дома, с семьёй.'), gate(missing(wedding('samvel')), missing(wedding('anush')))('смотрю футбол, в перерыве отвечаю.'), needs('gagik')('нарды с Гагиком, мой ход.'), 'вечер, устал, ноги гудят.'],
 };

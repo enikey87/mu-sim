@@ -31,6 +31,11 @@ const says = (intent: string, rest: Partial<R> & Pick<R, 'respond'>, extra: R['w
   ...rest,
 })
 
+function takeSorryMark(game: ContentApi): void {
+  const mark = game.X.pullSorryMark()
+  if (mark?.length) game.applyFacts(mark)
+}
+
 async function sorry(game: ContentApi, line: string): Promise<void> {
   cooldown(game, 1) // извинение остужает ссору
   game.mood(3)
@@ -57,13 +62,16 @@ export const replyRules: R[] = [
   }, [eq('tone', 'rude')]),
   says('request', { respond: ({ game }) => game.excuseTurn() }),
 
-  says('sorry', { remember: [add(count.sorry)], respond: ({ game }) => sorry(game, game.uniq(game.X.sorry)) }),
+  says('sorry', { remember: [add(count.sorry)], respond: ({ game }) => { const line = game.uniq(game.X.sorry); takeSorryMark(game); return sorry(game, line) } }),
   says('sorry', {
     remember: [add(count.sorry)],
     respond: ({ game }) => {
       game.unlock('memory')
       // свежая фраза «опять мир?», а кончились — обычное прощение из генератора
-      return sorry(game, game.line('SORRY_AGAIN', SORRY_AGAIN, { fallback: game.X.sorry })!)
+      game.X.pullSorryMark()
+      const line = game.line('SORRY_AGAIN', SORRY_AGAIN, { fallback: game.X.sorry })!
+      takeSorryMark(game)
+      return sorry(game, line)
     },
   }, [gte(count.sorry, 2)]),
   // третий «мир» за 6 ходов — «качели»: Алик замечает, и ссору это уже не остужает
@@ -72,7 +80,10 @@ export const replyRules: R[] = [
     respond: async ({ game }) => {
       game.unlock('memory')
       game.mood(1) // мир всё-таки, хоть и качели
-      await game.say([game.line('SWING', SWING, { fallback: game.X.sorry })!])
+      game.X.pullSorryMark()
+      const line = game.line('SWING', SWING, { fallback: game.X.sorry })!
+      takeSorryMark(game)
+      await game.say([line])
       game.setCtx(null)
     },
   }, [gte('sorrySwing', 3)]),

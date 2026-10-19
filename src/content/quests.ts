@@ -2,16 +2,19 @@
 // Запускаются правилами PickScene (случайно, с перерывом) и из разговора — ответом по теме
 // («Приезжай! Хаш в 7 утра» → квест «хаш»). Формат — как у сцен (scenes.ts).
 import type { Scene } from './scenes'
-import { gate, missing } from './fact'
+import { gate, missing, set } from './fact'
 import { needs } from './world'
-import { courtVerdict, courtVerdictAt, cryptoHodl, intro, kettleAt, mamaMarketAt } from './memkeys'
+import { courtVerdict, courtVerdictAt, cryptoHodl, intro, kettleAt, mamaMarketAt, saidHash } from './memkeys'
 
 export const QUESTS: Record<string, Scene> = {
   q_hash: {
     start: 'ask',
     nodes: {
       ask: {
-        a: ['Приезжай завтра на хаш! В 7 утра. В счёт долга, брат, — поешь на всю сумму.', 'Слушай, приезжай на хаш. Всё за мой счёт. То есть в счёт твоего долга. Ну, моего тебе.'],
+        a: [
+          { t: 'Приезжай завтра на хаш! В 7 утра. В счёт долга, брат, — поешь на всю сумму.', remember: [set(saidHash, true)] },
+          { t: 'Слушай, приезжай на хаш. Всё за мой счёт. То есть в счёт твоего долга. Ну, моего тебе.', remember: [set(saidHash, true)] },
+        ],
         opts: [
           { t: 'Еду. Хоть поем.', go: 'eat', tone: 'polite' },
           { t: 'Сколько стоит хаш в счёт долга?', go: 'price' },
