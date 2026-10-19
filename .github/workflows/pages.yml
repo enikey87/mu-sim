@@ -76,9 +76,26 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e   # webServer сам собирает dist перед preview
 
+  build:
+    # Обязательный чек ruleset'а «main: PR + green build + up to date»: зелёный только когда
+    # зелёны все три job'а — разделение не ослабляет гейт мержа.
+    if: always()
+    needs: [tests, coverage, e2e]
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pages-build-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Все три job'а зелёные
+        run: |
+          echo "tests=${{ needs.tests.result }} coverage=${{ needs.coverage.result }} e2e=${{ needs.e2e.result }}"
+          test "${{ needs.tests.result }}" = success
+          test "${{ needs.coverage.result }}" = success
+          test "${{ needs.e2e.result }}" = success
+
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    needs: [tests, coverage, e2e]
+    needs: [build]
     runs-on: ubuntu-latest
     # начатая публикация досчитывается, следующая встаёт в очередь: отмена оставляет деплой незавершённым
     concurrency:
