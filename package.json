@@ -12,7 +12,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "typecheck": "node ./node_modules/typescript-7/bin/tsc --noEmit",
-    "lint": "eslint .",
+    "lint": "eslint . --cache --cache-location node_modules/.cache/eslint",
     "rules:report": "RULES_REPORT=1 vitest run src/tools/coverage-gate.test.ts",
     "rules:stable": "RULES_STABLE=1 vitest run src/tools/stable.test.ts",
     "test:rules": "vitest run src/engine/rules --coverage",

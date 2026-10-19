@@ -73,13 +73,23 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --prefer-offline --no-audit
+      # кэш eslint: тёплый lint 0.7s против 4.7s холодного (замер локально), файл лежит
+      # в node_modules/.cache и потому восстанавливается только после npm ci
+      - uses: actions/cache@v4
+        with:
+          path: node_modules/.cache/eslint
+          key: eslint-${{ runner.os }}-${{ hashFiles('package-lock.json', 'eslint.config.js') }}-${{ github.sha }}
+          restore-keys: |
+            eslint-${{ runner.os }}-${{ hashFiles('package-lock.json', 'eslint.config.js') }}-
       - run: npm audit --audit-level=high
       - run: npm run typecheck
       - run: npm run lint
       # настоящие партии ботом — в job'е coverage: здесь всё остальное (в т.ч. дрейф RARE)
       - run: npx vitest run --exclude 'src/tools/coverage-gate.test.ts'
       - run: npm run test:rules   # движок правил — покрытие 100%
-      - run: npm run build
+      # на PR прод-сборку гоняет e2e (webServer собирает dist), здесь она нужна только артефакту Pages
+      - if: github.event_name != 'pull_request'
+        run: npm run build
       - if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
         with:
@@ -118,7 +128,9 @@ jobs:
       - run: npm ci --prefer-offline --no-audit
       # Браузеры не кэшируем: замер 99b6a47 — с кэшем 23s, без 22s (раздача apt доминирует
       # и не кэшируется, восстановление ~300 МБ стоит как скачивание). Холодные 2m56s — сбой сети.
-      - run: npx playwright install --with-deps chromium
+      # --only-shell: e2e идёт headless, полный Chrome for Testing не нужен (проверено локально
+      # с спрятанным полным chromium — тест проходит на headless shell), а скачивание меньше
+      - run: npx playwright install --with-deps --only-shell chromium
       - run: npm run test:e2e   # webServer сам собирает dist перед preview
 
   build:
