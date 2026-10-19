@@ -4,7 +4,7 @@ import { type Entry, type FactOp, type Criterion, type FactKey, type Said, set, 
 import { type ClaimKey } from './ids'
 import type { LedgerEvent } from './fact-types'
 import { needs, meet, WORLD, MENTION_RE } from './world'
-import { actSigned, alikDead, betonSet, borisMarried, collectorsAskAt, collectorsRecruited, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantHouseAt, grantPaid, grantTileAt, houseOnGarik, internAt, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, rubikHoleAt, samvelDivorceAt, sick, taxFrozen, tileSlipAt, wedding, wrote } from './memkeys'
+import { actSigned, alikDead, betonSet, borisMarried, collectorsAskAt, collectorsRecruited, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantHouseAt, grantPaid, grantTileAt, houseOnGarik, internAt, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, rubikHoleAt, saidNuneNoWrite, samvelDivorceAt, sick, taxFrozen, tileSlipAt, wedding, wrote } from './memkeys'
 import { stateQuestion } from './money-ask'
 
 export type ArcMsg = Said | { w: string; t: string; claims?: LedgerEvent[]; remember?: FactOp[]; stamp?: string } | { t: string; claims: LedgerEvent[]; remember?: FactOp[]; stamp?: string }
@@ -199,7 +199,11 @@ export const ARCS: Record<string, Arc> = {
       // кто уже писал игроку, второй раз не представляется
       {
         m: [
-          gate(missing(met('nune')))({ w: 'nune', t: 'Здравствуйте. Я Нуне. Я в декрете. Ключ у меня. Не пишите Алику, он нервничает.', claims: ['money_safe' as ClaimKey] }),
+          // факт фразы — на строке, которая её произносит (#588): дебют Нуне мог прийти легендой,
+          // чьё письмо фразы не несёт, — тогда цитата в пуле дебюта молчит (#1148)
+          // факт фразы — на строке, которая её произносит (#588): дебют Нуне мог прийти легендой,
+          // чьё письмо фразы не несёт, — тогда цитата в пуле дебюта молчит (#1148)
+          gate(missing(met('nune')))({ w: 'nune', t: 'Здравствуйте. Я Нуне. Я в декрете. Ключ у меня. Не пишите Алику, он нервничает.', claims: ['money_safe' as ClaimKey], remember: [set(saidNuneNoWrite, true)] }),
           gate(is(met('nune')))({ w: 'nune', t: 'Это опять Нуне. Да, я в декрете — Алик уже всем рассказал. Ключ у меня. Не пишите Алику, он нервничает.', claims: ['money_safe' as ClaimKey] }),
         ],
       },
