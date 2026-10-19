@@ -297,13 +297,13 @@ test('смена фото «без усов» видна в день смены 
     const g = (window as unknown as {
       __alik: {
         applyFacts: (ops: object[]) => void
-        emit: () => void
+        notifyMsgs: () => void
         S: { day: number; mem: Record<string, unknown> }
         rules: { settle: () => void }
       }
     }).__alik
     g.applyFacts([{ key: 'alik.shaved', op: '=', value: true, forDays: 40 }])
-    g.emit()
+    g.notifyMsgs()
   })
   await expect(avatar).toHaveClass(/shaved/)
   await expect(avatar.locator('.shaved-cap')).toHaveText('без усов')
@@ -316,11 +316,11 @@ test('смена фото «без усов» видна в день смены 
 
   await page.evaluate(() => {
     const g = (window as unknown as {
-      __alik: { emit: () => void; S: { day: number }; rules: { settle: () => void } }
+      __alik: { notifyMsgs: () => void; S: { day: number }; rules: { settle: () => void } }
     }).__alik
     g.S.day += 40
     g.rules.settle()
-    g.emit()
+    g.notifyMsgs()
   })
   await expect(avatar).not.toHaveClass(/shaved/)
   await expect(avatar.locator('.shaved-cap')).toHaveCount(0)
