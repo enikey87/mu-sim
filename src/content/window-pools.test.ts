@@ -13,7 +13,7 @@ import { intro } from './memkeys'
 import * as W from './world'
 import {
   RAM_PHOTO, BORIS_SALE, VACANCY, AVITO_REVIEW, RUBIK_ASK, KETTLE,
-  CREW_CALL_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, GRANT_TILE_B, DEBUT_NIVA_B, DEBUT_BORIS_B, MOUSTACHE_PHOTO_B, MAMA_MARKET_B, SAMVEL_DIVORCE_B, GRANT_HOUSE_B, COURT_VERDICT_B, TILE_SLIP_B,
+  CREW_CALL_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, GRANT_TILE_B, DEBUT_NIVA_B, DEBUT_BORIS_B, MOUSTACHE_PHOTO_B, MAMA_MARKET_B, SAMVEL_DIVORCE_B, GRANT_HOUSE_B, COURT_VERDICT_B, TILE_SLIP_B, NUNE_DEBUT_B,
   LAWYER_B, COLLECTORS_ASK_B, INTERN_B, HOLE_B, COUNTERSUIT_B,
 } from './world'
 
@@ -46,6 +46,9 @@ const WINDOWS: Window[] = [
   { pool: 'P_DEBUT_BORIS', lines: PP.P_DEBUT_BORIS, marks: { Борис: null } },
   { pool: 'DEBUT_BORIS_B', lines: DEBUT_BORIS_B, marks: { Борис: null } },
   { pool: 'P_DEBUT_NIVA', lines: PP.P_DEBUT_NIVA, marks: {} },
+  // дебют бухгалтера (#1071): имя Нуне вводит само её первое письмо — окно события
+  { pool: 'P_NUNE_DEBUT', lines: PP.P_NUNE_DEBUT, marks: { Нуне: null } },
+  { pool: 'NUNE_DEBUT_B', lines: NUNE_DEBUT_B, marks: { Нуне: null } },
   { pool: 'DEBUT_NIVA_B', lines: DEBUT_NIVA_B, marks: {} },
   { pool: 'P_GRANT_TILE', lines: PP.P_GRANT_TILE, marks: { Грант: null, фундамент: 'heard.money_foundation' } },
   { pool: 'GRANT_TILE_B', lines: GRANT_TILE_B, marks: { Грант: null } },
