@@ -317,6 +317,34 @@ describe('дебют коллекторов знает, клиент ли им �
   })
 })
 
+describe('окно дебюта коллекторов молчит на исчерпанном пуле (#1078, #824)', () => {
+  const debut = (g: Game) => g.buildChoices().find((item) => item.act === 'arc' && item.arg === 'collectors')?.text
+  const openPool = (g: Game) => g.open(P_COLLECTORS_DEBUT)
+
+  it('все открытые строки пула в окне — вопроса нет, за окном — строка пула свежей', () => {
+    const { game } = makeGame()
+    game.S.mem[intro('collectors')] = true
+    game.S.mem[loanTaken('micro')] = true
+    game.S.arcs.collectors = { i: 1, last: 0 }
+    const shown: string[] = []
+    for (let i = 0; i < 10; i++) {
+      const t = debut(game)
+      if (!t) break
+      shown.push(t)
+    }
+    expect(shown.length, 'открытые формулировки пула показаны все').toBe(3)
+    expect(new Set(shown).size, 'формулировки свежие, без повторов').toBe(shown.length)
+    expect(debut(game), 'в том же ходе пул не повторяется дословно').toBeFalsy()
+    expect(game.buildChoices().map((c) => c.text).filter((t) => openPool(game).includes(t)),
+      'в блоке нет ни одной строки пула дословно').toEqual([])
+    game.S.stats.sent += 10
+    expect(debut(game), 'и до окна тоже').toBeFalsy()
+    game.S.stats.sent += 10
+    const again = debut(game)
+    expect(again && shown.includes(again), 'за окном вопрос возвращается строкой пула').toBe(true)
+  })
+})
+
 describe('«три чашки чая» ждёт предложения стажировки (#1036)', () => {
   const LINE = '«Деньги-Ара» — три чашки чая? И всё это в мой долг?'
   const pool = (g: Game) => g.open(ARCS.collectors.follow)
