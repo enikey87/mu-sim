@@ -73,8 +73,10 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --prefer-offline --no-audit
-      # кэш eslint: тёплый lint 0.7s против 4.7s холодного (замер локально), файл лежит
-      # в node_modules/.cache и потому восстанавливается только после npm ci
+      # кэш eslint: тёплый lint 0.7s против 4.7s холодного (замер локально). Стратегия content,
+      # а не дефолтная metadata: на свежем checkout'е mtimes новые и metadata-кэш протухает
+      # (проверено: после touch всех файлов metadata 5.0s, content 0.7s). Файл лежит внутри
+      # node_modules, поэтому восстанавливается только после npm ci.
       - uses: actions/cache@v4
         with:
           path: node_modules/.cache/eslint
