@@ -14,7 +14,7 @@ import { ARCS, ARC_DONE, ARC_MENTIONS, CAST, type Episode, GROUP, GROUP_OOPS, WR
 import * as L from '../content/life'
 import { ACH } from '../content/achievements'
 import { meet, speaks } from '../content/world'
-import { ALIK_STATUS, BLOOD_PAY, FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_HIDDEN, STATUS_WANDER, OATH_FORMS, OATH_STAKE_MOUSTACHE } from '../content/misc'
+import { ALIK_STATUS, BLOOD_PAY, FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_ADDRESSEES, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_HIDDEN, STATUS_WANDER, OATH_FORMS, OATH_STAKE_MOUSTACHE } from '../content/misc'
 import { STARTS } from '../content/quests'
 import { BILLS, billDue, billDueAt, billStreak, billUnpaid, lightOff, netRation, phoneWarn, type BillId } from '../content/bills'
 import {
@@ -520,6 +520,8 @@ export class Game {
     return { ...(t as object), text: t.text ? said(t.text) : '' } as T
   }
   playerDecor = (t: string): string => {
+    // вокатив третьему лицу в начале строки («Тарон, …») — адресат уже есть, префикс к Алику не клеим (#1108)
+    if (PLAYER_ADDRESSEES.has(t.split(',', 1)[0]!)) return t
     if (/^Алик/.test(t)) return t + this.draw('PSUF', PLAYER_SUFFIX)
     const pre = this.draw('PPRE', PLAYER_PREFIX)
     return pre + (pre.endsWith(', ') ? low(t) : t)
