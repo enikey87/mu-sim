@@ -4,16 +4,16 @@
 // go: 'node' | 'scene:node' | null (конец). Нет opts — сцена закончилась.
 import type { ExcuseApi } from './excuses'
 import type { Rng } from '../engine/rng'
-import { type Entry, type Claimed, gate, is, missing, gte, lte, valueOf } from './fact'
+import { type Entry, type Claimed, type FactOp, gate, is, missing, gte, lte, set, valueOf } from './fact'
 import { saidJoin, saidMap } from './fact'
 import { needs, WORLD } from './world'
 import { QUESTS, COURT_SCENE } from './quests'
 import { PAYDAY_SCENE } from './payday'
-import { HEAT, bathAsked, blocked, cardSent, fraudLoan, grantPaid, intro, karineKnowsDebt, karineThinksTax, polite, ritualCount, ritualCut } from './memkeys'
+import { HEAT, bathAsked, blocked, cardSent, fraudLoan, grantPaid, intro, karineKnowsDebt, karineThinksTax, polite, ritualCount, ritualCut, saidHash } from './memkeys'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- форма переменных задаётся сценой
 export type Vars = Record<string, any>
-export type Line = string | Claimed | { w: string; t: string } | { t: string; stamp?: string } | ((v: Vars) => string | Claimed)
+export type Line = string | Claimed | { w: string; t: string } | { t: string; stamp?: string; remember?: FactOp[] } | ((v: Vars) => string | Claimed)
 export interface SceneOpt { t: Line | Entry<string>[]; go: string | null; tone?: 'polite' | 'neutral' | 'rude' }
 export interface SceneFx {
   days?: number; debt?: number; money?: number; mood?: number; ach?: string; barter?: boolean; invoice?: boolean
@@ -703,7 +703,10 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
       start: 'ask',
       nodes: {
         ask: {
-          a: ['Извинения в тексте не принимаются. Только очно: хаш в 7 утра, три тоста, одна слеза.', needs('boris')('После такого «извини» не работает, брат. Нужен ритуал: хаш, тост, объятие. Или Борис не поймёт.')],
+          a: [
+            { t: 'Извинения в тексте не принимаются. Только очно: хаш в 7 утра, три тоста, одна слеза.', remember: [set(saidHash, true)] },
+            needs('boris')({ t: 'После такого «извини» не работает, брат. Нужен ритуал: хаш, тост, объятие. Или Борис не поймёт.', remember: [set(saidHash, true)] }),
+          ],
           opts: [
             { t: 'Хорошо, приеду на хаш', go: 'hash', tone: 'polite' },
             { t: 'Может, просто текстом?', go: 'text', tone: 'neutral' },

@@ -18,7 +18,7 @@ import type { GameEvent } from '../content/rules/events'
 import { MENTION_RE } from '../content/world'
 import { P_FRIDAY, P_MONEY, P_DESPERATE } from '../content/topics'
 import { BLOOD_PAY, FLOOR } from '../content/misc'
-import { PERIOD } from '../content/life'
+import { PERIOD, periodText } from '../content/life'
 
 describe('Game: начало и ход', () => {
   it('новая игра: одна из завязок, 184-й день, 3–4 варианта реплик', () => {
@@ -434,7 +434,7 @@ describe('Game: возвращение после паузы', () => {
       const from = game.S.msgs.length
       await game.periodLine(period)
       const said = alikTexts(game.S.msgs.slice(from)).join(' | ')
-      const fridaySaid = PERIOD.friday!.map(valueOf).some((f) => said.includes(f.slice(0, 18)))
+      const fridaySaid = PERIOD.friday!.map(valueOf).some((f) => said.includes(periodText(f).slice(0, 18)))
       expect(fridaySaid, `${fmtDate(day)}: пятничная реплика Алика`).toBe(dow === 5)
       // и предложенный игроку хвост «Пятница…» — по тому же календарю
       const offered: string[] = []
