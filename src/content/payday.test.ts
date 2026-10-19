@@ -8,9 +8,10 @@ import { spec } from '../engine/rules/lines'
 import { ANNOUNCE, CLAIMS, LEAD, MORNING_CONTRA, OUTCOME, ROLL, SOURCES, type Claim, type Lead } from './payday'
 import { LEGENDS } from './legends'
 import { CLAIM_LEDGER } from './ledger'
-import { bathAsked, garikCut, judgeApology, met, nuneDekretOver } from './memkeys'
+import { ENDGAME_ARCH } from './endgame'
+import { bathAsked, garikCut, judgeApology, met, nuneDekretOver, taxFrozen, taxThawed } from './memkeys'
 import { ARCS } from './arcs'
-import { spec as lineSpec, valueOf, type Entry } from './fact'
+import { is, spec as lineSpec, valueOf, type Entry } from './fact'
 
 const texts = (g: Game, n = 0) => g.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' || m.kind === 'sys' ? [m.text] : []))
 const choose = async (g: Game, go: string) => { g.S.choices = null; const c = g.choices.find((x) => x.go === go); expect(c, go).toBeDefined(); await g.send(c!) }
@@ -194,6 +195,55 @@ describe('День выплаты', () => {
     expect(p, 'источник судьи не выбран — проверка пустеет').toBeDefined()
     expect(p!.text).toMatch(/госпошлину/)
     expect(game.S.mem[judgeApology], 'извинения судьи ставит прозвучавшая строка').toBe(true)
+  })
+
+  // #1139: источник «Налоговая разморозила…» потребляет taxFrozen, иначе эпилог гейтится протухшей заморозкой
+  const THAW = 'Налоговая разморозила счета! Сказали: Борис дал такие показания, что им стыдно. 90 000.'
+  const FREEZE_NEWS = ['fin.boris.default', 'fin.rubik.default']
+  const freezeNews = (game: Game) => {
+    game.S.mem['finale.boris'] = 'default'
+    game.S.mem['finale.rubik'] = 'default'
+    game.S.mem[taxFrozen] = true
+    game.S.arcs.boris = { i: 1, last: 0 }
+    game.S.arcs.rubik = { i: 1, last: 0 }
+  }
+  const archSlugs = (game: Game) => game.open(ENDGAME_ARCH).map((l) => l.slug)
+
+  it('источник разморозки снимает taxFrozen (#1139)', async () => {
+    const { game } = makeGame()
+    freezeNews(game)
+    const line = SOURCES.map((e) => valueOf(e)).find((s) => s.t === THAW)
+    expect(line, 'строка разморозки не найдена — проверка пустеет').toBeDefined()
+    expect(line!.amount, 'сумма источника').toBe(90000)
+    expect(game.holds(is(taxFrozen)), 'до источника счета заморожены — проверка пустеет').toBe(true)
+    await game.enterNode('payday', 'bag')
+    const morning = texts(game).join('\n')
+    expect(morning, 'строка разморозки не прозвучала — проверка пустеет').toContain(THAW)
+    expect(morning, 'пени добрали вторые 90 000 в то же утро').not.toContain('Налоговая вернула пени')
+    expect(game.S.mem[taxFrozen], 'источник не снял заморозку').toBeUndefined()
+    expect(game.holds(is(taxFrozen)), 'гейт эпилога всё ещё видит заморозку').toBe(false)
+    expect(game.S.mem[taxThawed], 'разморозка не записана — срок легенды не наступает').toBe(true)
+  })
+
+  it('после разморозки эпилог не зовёт замороженные счета (#1139)', async () => {
+    const { game } = makeGame()
+    freezeNews(game)
+    const before = archSlugs(game)
+    for (const slug of FREEZE_NEWS) expect(before, `${slug} до источника — проверка пустеет`).toContain(slug)
+    const legendText = (g: Game) => g.open(LEGENDS.frozen.lines).map((l) => (typeof l === 'string' ? l : l.t)).join(' ')
+    expect(legendText(game), 'легенда до разморозки молчит — проверка пустеет').toMatch(/заморожен/)
+    await game.enterNode('payday', 'bag')
+    expect(texts(game).join('\n'), 'строка разморозки не прозвучала — проверка пустеет').toContain(THAW)
+    const after = archSlugs(game)
+    for (const slug of FREEZE_NEWS) expect(after, `${slug} звучит после разморозки`).not.toContain(slug)
+    expect(legendText(game), 'легенда после разморозки всё ещё твердит про заморозку').not.toMatch(/заморожен/)
+  })
+
+  it('без разморозки эпилог называет замороженные счета (#1139)', () => {
+    const { game } = makeGame()
+    freezeNews(game)
+    const slugs = archSlugs(game)
+    for (const slug of FREEZE_NEWS) expect(slugs, `${slug} молчит без разморозки`).toContain(slug)
   })
 
   it('с живым hodl утро не продаёт коины, а исход отдаёт лаваш; хвастовство о курсе помечено (#815)', async () => {

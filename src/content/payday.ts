@@ -5,7 +5,7 @@
 import { type Line, type LineSpec, type Entry, is, eq, ne, exists, gte, lte, gate, missing, set } from './fact'
 import type { Scene, SceneNode } from './scenes'
 import { needs, samvelLine, WORLD } from './world'
-import { bathAsked, court, cryptoHodl, garikConcrete, judgeApology, karineKnowsDebt, met, payday, rubikFined, taxThawed } from './memkeys'
+import { bathAsked, court, cryptoHodl, garikConcrete, judgeApology, karineKnowsDebt, met, payday, rubikFined, taxFrozen, taxThawed } from './memkeys'
 
 export const ANNOUNCE = [
   // капитуляция дедлайна (#1119): лестница отмазок исчерпана — Алик сдаётся сам, обычные анонсы молчат
@@ -30,15 +30,15 @@ export const LEAD: Entry<Lead>[] = [
   gate(exists('arc.garik'), missing(garikConcrete), WORLD.garikOnline, is(met('garik')))({ w: 'garik', t: 'Чувствую, скоро. Что именно — не знаю, но нутром чую. Нутро у меня большое.' }),
 ]
 
-/** Утро: линия партии отдаёт деньги. amount — сколько добавится в счётчик «к выплате». */
-export interface Source extends LineSpec { amount: number }
+/** Утро: линия партии отдаёт деньги. amount — сколько добавится в счётчик «к выплате». clear — факт, который источник потребляет, прозвучав. */
+export interface Source extends LineSpec { amount: number; clear?: string }
 export const SOURCES: Source[] = [
   // сериалы
   { t: 'Сейф открыли! Второй ключ нашёлся — у малыша в игрушках. Внутри 120 000 и соска.', when: [exists('finale.nune')], prio: 2, amount: 120000 },
   { t: '«Нива» же у тебя! Загляни в бардачок: там 80 000 и грузинский сыр. Я говорил — деньги в «Ниве». Ты просто не искал. Сыр верни.', when: [WORLD.niva, WORLD.nivaPlayer], prio: 2, amount: 80000 },
   { t: '«Нива» прислала из Батуми перевод. 60 000. Подпись: «Не ищи. Но деньги — вот».', when: [WORLD.niva, eq('finale.niva', 'default')], prio: 2, amount: 60000 },
   { t: 'Борис-прораб выписал премию. Всей бригаде. И тебе. Премия — 50 000. И клок шерсти.', when: [eq('finale.boris', 'brigadir')], prio: 2, amount: 50000 },
-  { t: 'Налоговая разморозила счета! Сказали: Борис дал такие показания, что им стыдно. 90 000.', when: [eq('finale.boris', 'default'), missing(taxThawed)], prio: 2, amount: 90000 },
+  { t: 'Налоговая разморозила счета! Сказали: Борис дал такие показания, что им стыдно. 90 000.', when: [eq('finale.boris', 'default'), missing(taxThawed)], prio: 2, amount: 90000, clear: taxFrozen },
   // счета уже разморозила легенда: тот же доход, но не вторая новость о разморозке
   { t: 'Налоговая вернула пени, которые списала при разморозке. Сказали: Борис дал такие показания, что им стыдно. 90 000.', when: [eq('finale.boris', 'default'), is(taxThawed)], prio: 2, amount: 90000 },
   { t: 'Помнишь конверт из фундамента? У него было двойное дно. 40 000 — чьи, не знаю, теперь наши.', when: [eq('finale.beton', 'opened')], prio: 2, amount: 40000 },

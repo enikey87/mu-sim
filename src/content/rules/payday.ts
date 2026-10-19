@@ -3,7 +3,7 @@ import type { ContentApi } from '../../engine/game'
 import { type Rule, eq, gte, is, exists, missing, set, during, lt } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { SOURCES, SOURCES_TOPUP, ROLL, CLAIMS, GRAND, GRAND_FALLBACK, SLOTS, CONTRADICTIONS, MORNING_CONTRA, OUTCOME, LEAD, type Source, type Call, type Claim, type Lead } from '../payday'
-import { alikDead, cryptoHodl, payday as pd, paydayScene } from '../memkeys'
+import { alikDead, cryptoHodl, payday as pd, paydayScene, taxFrozen, taxThawed } from '../memkeys'
 import { samvelLine } from '../world'
 
 type R = Rule<ContentApi, GameEvent, Offer>
@@ -38,10 +38,16 @@ export const PAYDAY_HOOKS: Record<string, (game: ContentApi) => Promise<void>> =
     game.sys('— День выплаты —')
     const owed = game.debt
     let sum = 0
+    let thawed = false
     for (let i = 0; i < 4 && sum < owed; i++) {
       const p = game.linePicked('PD_SRC', SOURCES)
       if (!p) break
       await game.say([p.text])
+      const consumed = (p.spec as Source).clear
+      if (consumed) {
+        game.clearFact(consumed)
+        if (consumed === taxFrozen) thawed = true
+      }
       game.applyFacts([set(pd.morning, `${game.mem()[pd.morning] ?? ''}\n${p.text}`)])
       const over = sum + (p.spec as Source).amount - owed
       sum = Math.min(owed, sum + (p.spec as Source).amount)
@@ -49,6 +55,8 @@ export const PAYDAY_HOOKS: Record<string, (game: ContentApi) => Promise<void>> =
       // сверх суммы по договору — не пропадает молча: 190 000 + 90 000 ≠ 240 000
       if (over > 0) await game.say([`Лишние ${fmt(over)} — это сдача. Сдачу оставляю себе, так принято. Я должен ${fmt(owed)}, ни рублём больше.`])
     }
+    // taxThawed — после цикла источников: строка пени смотрит на него и не должна добрать вторые 90 000 в то же утро
+    if (thawed) game.applyFacts([set(taxThawed, true)])
     if (sum < owed) { await game.say([game.X.fill(SOURCES_TOPUP, { sum: fmt(owed) })]); sum = owed; await money(game, sum) }
     game.sys('Алик добавил вас в группу «ДЕНЬ ВЫПЛАТЫ 💰 (не выходить)»')
     const came = new Set<string>()
