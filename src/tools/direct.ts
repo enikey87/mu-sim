@@ -317,4 +317,8 @@ export const DIRECT: Record<string, DirectCase> = {
   // просит случай («ни разу до экрана концовки») — возврат осознанный, замер в описании PR #1093
   Says_courtVerdict: { event: 'PlayerSays', facts: { intent: 'courtVerdict' } },
   Finale_tile_default: { event: 'ArcFinale', facts: { arc: 'tile' } },
+  // #1119 (дедлайн-предохранитель): подводка дедлайна (428) опережает поздний путь у ботов — их sent
+  // дорастает до 150 позже ~450-го дня. Болтливый игрок доходит до sent 150 к 420-му и раньше дедлайна —
+  // путь жив для людей, боты не воспроизводят, держим прямым случаем.
+  Beat_PaydayLead_Late: { event: 'StoryBeat', setup: (g) => { g.S.day = 425; g.S.stats.sent = 155 } },
 }

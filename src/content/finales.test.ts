@@ -430,7 +430,7 @@ describe('концовки игры', () => {
     const floor = (e: (typeof ENDINGS)[number], key: string) => Math.max(0, ...e.when.filter((c) => c.key === key && c.op === '>=').map((c) => Number(c.value)))
     const forcing = (g: Game) => g.rules.all.filter((r) => r.event === 'StoryBeat' && r.name.startsWith('Beat_Payday')).map((r) => r.name)
     // #893: подводка (Lead) тоже вынуждает выплату — она в семье Beat_Payday* наравне с анонсом
-    expect(forcing(makeGame().game)).toEqual(['Beat_PaydayLead_First', 'Beat_PaydayLead_Late', 'Beat_PaydayLead_Second', 'Beat_Payday', 'Beat_Payday_Late']) // пустой список сторожил бы вакуум
+    expect(forcing(makeGame().game)).toEqual(['Beat_PaydayLead_First', 'Beat_PaydayLead_Late', 'Beat_PaydayLead_Deadline', 'Beat_PaydayLead_Second', 'Beat_Payday', 'Beat_Payday_Late', 'Beat_Payday_Deadline']) // пустой список сторожил бы вакуум
     for (const [id, steps] of Object.entries(SCENARIO)) {
       const e = ENDINGS.find((x) => x.id === id)!
       const { game } = makeGame()

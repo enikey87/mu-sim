@@ -109,6 +109,7 @@ export const payday = {
   lead: 'payday.lead',
   /** Сколько штрихов подводки сыграно (анонс выплаты ждёт двух). */
   signs: 'payday.signs',
+  surrender: 'payday.surrender',
   /** Штрих уже звучал сегодня: один штрих в день (during, 1 день). */
   signToday: 'payday.signToday',
 } as const

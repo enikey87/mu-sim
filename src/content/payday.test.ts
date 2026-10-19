@@ -5,7 +5,7 @@ import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
 import type { Criterion } from '../engine/rules'
 import { spec } from '../engine/rules/lines'
-import { CLAIMS, LEAD, MORNING_CONTRA, OUTCOME, ROLL, SOURCES, type Claim, type Lead } from './payday'
+import { ANNOUNCE, CLAIMS, LEAD, MORNING_CONTRA, OUTCOME, ROLL, SOURCES, type Claim, type Lead } from './payday'
 import { LEGENDS } from './legends'
 import { CLAIM_LEDGER } from './ledger'
 import { bathAsked, garikCut, judgeApology, met, nuneDekretOver } from './memkeys'
@@ -548,5 +548,39 @@ describe('День выплаты', () => {
     expect(game.S.money).toBe(money) // перевод тоже без эффекта
     expect(game.adjustDebt(1000)).toBe(false)
     expect(game.S.debt).toBe(sealed)
+  })
+})
+
+describe('День выплаты: дедлайн-предохранитель (#1119, вариант 2+4)', () => {
+  const flat = (g: Game) => g.open(ANNOUNCE).map((l) => (typeof l === 'string' ? l : (l as { t: string }).t))
+
+  it('медленная партия без арок и 150 сообщений доходит до анонса дедлайном к 410–412 дню', async () => {
+    const { game } = makeGame()
+    game.S.day = 427
+    game.S.stats.sent = 0
+    for (let i = 0; i < 3; i++) expect((await game.fire('StoryBeat'))?.name ?? '').not.toMatch(/^Beat_Payday/)
+    game.nextDay(1) // 428: подводка дедлайна стартует без условий и метит капитуляцию
+    expect((await game.fire('StoryBeat'))?.name).toBe('Beat_PaydayLead_Deadline')
+    expect(game.S.mem['payday.signs']).toBe(1)
+    expect(game.S.mem['payday.surrender']).toBe(true)
+    game.nextDay(1)
+    expect((await game.fire('StoryBeat'))?.name).toBe('Beat_PaydayLead_Second')
+    expect(game.S.mem['payday.signs']).toBe(2)
+    game.nextDay(2) // 430: безусловный запуск
+    expect((await game.fire('StoryBeat'))?.name).toBe('Beat_Payday_Deadline')
+    expect(game.S.scene?.id).toBe('payday')
+    expect(game.S.ach.payday).toBeDefined()
+  })
+
+  it('кожа капитуляции: с фактом анонс отдаёт «терпение кончилось», без факта — обычные строки', () => {
+    const { game } = makeGame()
+    game.S.mem['payday.surrender'] = true
+    const skins = flat(game)
+    expect(skins).toHaveLength(1)
+    expect(skins[0]).toContain('терпение кончилось')
+    delete game.S.mem['payday.surrender']
+    const usual = flat(game)
+    expect(usual.some((t) => t.includes('терпение кончилось'))).toBe(false)
+    expect(usual.length).toBeGreaterThan(0)
   })
 })
