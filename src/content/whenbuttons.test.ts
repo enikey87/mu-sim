@@ -256,6 +256,50 @@ describe('игрок видит кнопки настоящим путём', () 
   })
 })
 
+/** Хвост кнопки на очень далёкий срок сверяется с рекордом журнала обещаний (#1118): «не помню» — только
+ *  за новым рекордом партии, срок меньше уже названного — это число из журнала, а не забывчивость. */
+describe('хвост «столько долгов не помню» — по рекорду журнала обещаний (#1118)', () => {
+  /** Тексты стены кнопок на срок `w` в партии, где раньше называли `record` дней (0 — не называли). */
+  const far = async (record: number, w: When): Promise<{ texts: string[]; facts: Record<string, unknown> }> => {
+    const g = await said(w)
+    if (record > 0) g.recordPromise({ text: 'до Нового года — отдам', d: record, kind: 'clear' })
+    const texts = new Set<string>()
+    for (let i = 0; i < 60; i++) {
+      g.S.choices = null
+      for (const c of g.buildChoices()) if (c.act === 'promiseFar') texts.add(c.text)
+    }
+    expect(texts.size, w.t).toBeGreaterThan(0)
+    return { texts: [...texts], facts: g.facts() }
+  }
+
+  it('срок меньше рекорда: вспоминает прежнее число, а не «не помню»', async () => {
+    const { texts, facts } = await far(343, { t: 'после Навасарда', d: 91, kind: 'clear' })
+    expect([facts['promiseRecordDays'], facts['promiseRecordNew'], facts['promiseRecordSeen']]).toEqual([343, false, true])
+    expect(texts.some((t) => t.includes('343 дня')), texts.join(' | ')).toBe(true)
+    for (const text of texts) expect(text, text).not.toContain('не помню')
+  })
+
+  it('срок больше всех прежних: рекорд обновляется, и звучит «не помню»', async () => {
+    const { texts, facts } = await far(343, { t: 'через год, не раньше', d: 400, kind: 'clear' })
+    // сам срок в рекорд не входит: иначе «больше всего названного» не сработало бы никогда
+    expect([facts['promiseRecordDays'], facts['promiseRecordNew'], facts['promiseRecordSeen']]).toEqual([343, true, false])
+    expect(texts.some((t) => t.includes('не помню')), texts.join(' | ')).toBe(true)
+    for (const text of texts) expect(text, text).not.toContain('343')
+  })
+
+  it('первый далёкий срок партии — тоже «не помню», рекорда ещё нет', async () => {
+    const { texts, facts } = await far(0, { t: 'после Навасарда', d: 91, kind: 'clear' })
+    expect([facts['promiseRecordDays'], facts['promiseRecordNew']]).toEqual([0, true])
+    expect(texts.some((t) => t.includes('не помню')), texts.join(' | ')).toBe(true)
+  })
+
+  it('запись без дней (старое сохранение) в рекорде считается по дате', async () => {
+    const g = await said({ t: 'после Навасарда', d: 91, kind: 'clear' })
+    g.S.promises.unshift({ t: 'до Нового года — отдам', made: g.S.day, due: g.S.day + 343 })
+    expect([g.facts()['promiseRecordDays'], g.facts()['promiseRecordNew']]).toEqual([343, false])
+  })
+})
+
 describe('плавающий срок: «разбудить» дышит спящим (#1025)', () => {
   const line = 'Вот это хотя бы срок. Разбудить его можно?'
   it('на «после приёмки» будить некого, на «проснётся» строка предлагается', async () => {

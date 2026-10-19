@@ -271,7 +271,7 @@ export const EVENT_KEY_LIST = [
   'lawyerFresh', 'collectorsAskFresh', 'internFresh', 'rubikHoleFresh', 'countersuitFresh', 'grantTileFresh', 'moustachePhotoFresh', 'mamaMarketFresh', 'mamaVoiceFresh', 'photoFresh', 'samvelDivorceFresh', 'courtVerdictFresh', 'tileSlipFresh', 'saleFresh', 'saleItem', 'grantHouseFresh',
   'period', 'night', 'offline', 'scene', 'sinceAlik', 'lateCount', 'arcAvailable',
   'arcsStarted', 'arcsDone', 'arcsMature', 'quests', 'callbackReady', 'lieOpen', 'lieKind', 'lieAlikOld', 'deathCanAdvance', 'collectorsCanAdvance',
-  'intent', 'tone', 'arg', 'category', 'arc', 'argArcDone', 'greet', 'promise', 'somedayCount', momDachaDays,
+  'intent', 'tone', 'arg', 'category', 'arc', 'argArcDone', 'greet', 'promise', 'somedayCount', 'promiseRecordDays', 'promiseRecordNew', 'promiseRecordSeen', momDachaDays,
 ] as const
 export type EventKey = (typeof EVENT_KEY_LIST)[number]
 export const EVENT_KEYS: ReadonlySet<string> = new Set(EVENT_KEY_LIST)
