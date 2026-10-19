@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest'
 import { Game } from '../engine/game'
 import { makeGame, setMoney, cards } from '../test/helpers'
-import { creditOffer, criticalAt, creditOfferSum, moneyPoor } from './memkeys'
+import { creditOffer, criticalAt, creditOfferSum, fraudLoan, moneyPoor } from './memkeys'
 import { LOANS, loanPayment, loanTaken, momHelp, sold } from './credit'
 
 const rub = (n: number) => `${n.toLocaleString('ru-RU')} ₽`
@@ -100,5 +100,33 @@ describe('карточки банка (#337)', () => {
     expect(offers(game)).toHaveLength(1)
     expect(game.S.mem[sold('microwave')]).toBeFalsy()
     expect(game.S.mem[loanTaken('consumer')]).toBeFalsy()
+  })
+})
+
+// плейтест-раунд 84 (#1069): сцена объявила кредит на имя игрока — и мир жил дальше, будто его не было
+describe('мошеннический кредит на имя игрока (#1069)', () => {
+  const ECHO = 'Кредит на ваше имя: остаток 300 000 ₽. Напоминаем: плательщик — вы.'
+  const echo = (g: Game) => cards(g, 'Банк').filter((c) => c.text === ECHO)
+
+  it('сцена ставит факт, и банк напоминает о кредите одним эхом — только после факта', async () => {
+    const { game } = makeGame()
+    // до сцены эха нет, сколько ни крути общий пул уведомлений
+    for (let i = 0; i < 300; i++) game.randomNotif()
+    expect(echo(game), 'эхо до факта').toHaveLength(0)
+    await game.enterNode('loan', 'where')
+    expect(game.S.mem[fraudLoan], 'узел сцены не оставил кредит в мире').toBe(true)
+    expect(game.S.msgs.some((m) => m.kind === 'sys' && m.text.includes('Остаток долга: 300 000')), 'сцена не объявила кредит — проверка пустеет').toBe(true)
+    // показ — настоящим путём: randomNotif сам выбирает строку из общего пула и метит её
+    for (let i = 0; i < 300 && echo(game).length === 0; i++) game.randomNotif()
+    expect(echo(game), 'эхо не появилось').toHaveLength(1)
+    for (let i = 0; i < 100; i++) game.randomNotif()
+    expect(echo(game), 'эхо повторилось').toHaveLength(1)
+  })
+
+  it('второй узел сцены (звонок в банк) тоже оставляет кредит в мире', async () => {
+    const { game } = makeGame()
+    await game.enterNode('loan', 'bank')
+    expect(game.S.mem[fraudLoan], 'узел «звонок в банк» не оставил кредит').toBe(true)
+    expect(game.S.msgs.some((m) => m.kind === 'sys' && m.text.includes('кредит оформлен')), 'сцена не объявила кредит — проверка пустеет').toBe(true)
   })
 })

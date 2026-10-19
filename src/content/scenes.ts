@@ -9,7 +9,7 @@ import { saidJoin, saidMap } from './fact'
 import { needs, WORLD } from './world'
 import { QUESTS, COURT_SCENE } from './quests'
 import { PAYDAY_SCENE } from './payday'
-import { HEAT, bathAsked, blocked, cardSent, grantPaid, intro, karineKnowsDebt, karineThinksTax, polite, ritualCount, ritualCut } from './memkeys'
+import { HEAT, bathAsked, blocked, cardSent, fraudLoan, grantPaid, intro, karineKnowsDebt, karineThinksTax, polite, ritualCount, ritualCut } from './memkeys'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- форма переменных задаётся сценой
 export type Vars = Record<string, any>
@@ -627,13 +627,13 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
           opts: [{ t: 'Где деньги с кредита?', go: 'where' }, { t: 'Я звоню в банк', go: 'bank' }],
         },
         where: {
-          fx: { ach: 'loan' },
+          fx: { ach: 'loan', set: { [fraudLoan]: true } },
           a: ['Деньги ушли на первый платёж по кредиту. Такая схема, брат. Финансы.'],
           sys2: 'Банк: кредит на ваше имя — 300 000 ₽. Выдано: 300 000 ₽. Внесено в счёт первого платежа: 300 000 ₽. Остаток долга: 300 000 ₽.',
           then: 'promise',
         },
         bank: {
-          fx: { ach: 'loan' },
+          fx: { ach: 'loan', set: { [fraudLoan]: true } },
           sys: 'Банк: «Всё верно, кредит оформлен. Поручитель — Воздухонесян А. Сказал, что он ваш отец».',
           a: ['Видишь, банк подтверждает. Я плохого не сделаю.'],
           then: 'promise',
