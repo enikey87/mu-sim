@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest'
 import { bootPlatform, platform } from './index'
 import { yandexPlatform } from './yandex'

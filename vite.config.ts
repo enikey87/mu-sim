@@ -7,7 +7,15 @@ export default defineConfig({
   base: './',
   plugins: [react()],
   test: {
-    environment: 'jsdom',
+    // jsdom нужен только файлам, которые реально трогают DOM: они помечены
+    // `// @vitest-environment jsdom` (см. analytics/*, platform, ui). Остальным хватает node —
+    // создание jsdom на каждый файл стоило ~26% времени прогона (123 создания · 152 с).
+    environment: 'node',
+    // isolate: false — воркеры переиспользуются между файлами: спавн 123 воркеров (~1.2 с каждый)
+    // стоил дороже, чем экономил. Проверено полным прогоном ×4 и перемешиванием файлов
+    // (--sequence.shuffle.files): утечек состояния между файлами нет — изменяемое живёт в Game/S,
+    // модульное в контенте — константы.
+    isolate: false,
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
     coverage: {
