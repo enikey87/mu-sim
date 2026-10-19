@@ -157,11 +157,14 @@ export const choiceRules: R[] = [
   offer({ name: 'LawyerFirst', when: [is('lawyerFresh')], act: 'lawyerAsk', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_LAWYER', P_LAWYER) }),
   offer({ name: 'CollectorsAsk', when: [is('collectorsAskFresh')], act: 'collectorsAsk', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_COLLECTORS_ASK', P_COLLECTORS_ASK) }),
   // ответ по выбранной строке, а не колодой (#1017): согласие/отказ стажёра и «ровно/криво/за плату»
-  // получают свой ответ B-пула — номер выбранной строки уезжает с arg
+  // получают свой ответ B-пула — номер выбранной строки уезжает с arg.
+  // bonus 5: на ходу предложения слоты блока держат звонок с объекта (специфичность 7) и вопрос про
+  // сериал (4, у финала — «вопрос ещё не задавали сегодня»): реакция окна обязана попасть в блок
+  // своим ходом, а не следующим (#1083 — на seed 215117 кнопка ждала блока 14.04)
   ...(() => {
     let arg = ''
     return [offer({
-      name: 'InternOffer', when: [is('internFresh')], act: 'internOffer', tone: 'neutral', bonus: 3,
+      name: 'InternOffer', when: [is('internFresh')], act: 'internOffer', tone: 'neutral', bonus: 5,
       text: (g) => fromArrNum(g, 'P_INTERN', P_INTERN, (i) => { arg = String(i) }),
       arg: () => arg,
     })]
