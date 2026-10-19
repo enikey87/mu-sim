@@ -176,6 +176,16 @@ export const paydayRules: R[] = [
     name: 'Beat_Payday_Late', event: 'StoryBeat', when: [gte('day', 420), gte('sent', 150), missing(alikDead), missing(paydayScene), missing(pd.at), gte(pd.signs, 2)], bonus: 9, once: true, priority: 'cinematic',
     respond: ({ game }) => resumePayday(game),
   },
+  // верхний предел (#1119): вежливая партия без сериалов не даёт ни arcsDone 3, ни sent 150 — выплата
+  // уезжала на 464-й день через поздний путь. Если к 294-му линии так и не сошлись, терпение Алика
+  // кончается: он объявляет выплату сам, не позже 300-го дня. Начатую нормальную подводку (pd.lead)
+  // и поздний путь (420+) не вытесняет — patience работает, только пока оба молчат.
+  {
+    name: 'Beat_Payday_Patience', event: 'StoryBeat',
+    when: [gte('day', 294), lt('day', 420), lt('arcsDone', 3), gte('sent', 20), missing(pd.lead), missing(paydayScene), missing(pd.at), missing(alikDead)],
+    bonus: 8, once: true, priority: 'cinematic',
+    respond: ({ game }) => game.enterNode('payday', 'patience'),
+  },
   // иерархия исходов — бонусами специфичности, а не числом условий: real 4 > lavash 3 > coins 2 = niva 2 > strasbourg/notyou 1 > default 0
   outcome('real', [is('ach.saint'), is('ach.court')], { bonus: 2 }),
   // поимка и «Нива выбрала тебя» — заслуга игрока: важнее исходов «по стилю партии»; между собой жребий допустим

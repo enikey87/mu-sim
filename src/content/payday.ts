@@ -3,7 +3,7 @@
 // перевёртыш (деньги приходят в невозможной форме) → кнопка на следующий день.
 // Реплики — пулы с условиями и приоритетом (game.line): звучит то, что было в этой партии.
 import { type Line, type LineSpec, type Entry, is, eq, ne, exists, gte, lte, gate, missing, set } from './fact'
-import type { Scene, SceneNode } from './scenes'
+import type { Scene, SceneNode, SceneOpt } from './scenes'
 import { needs, samvelLine, WORLD } from './world'
 import { bathAsked, court, cryptoHodl, garikConcrete, judgeApology, karineKnowsDebt, met, payday, rubikFined, taxThawed } from './memkeys'
 
@@ -251,16 +251,26 @@ const splitNode = (who?: string, yes?: string): SceneNode => ({
   ],
 })
 
+/** Выбор после анонса — общий для обоих анонсов: обычного и терпенского (#1119). */
+const ANNOUNCE_OPTS: SceneOpt[] = [
+  { t: 'Беру сумку и еду', go: 'bag', tone: 'polite' },
+  { t: 'Беру сумку и свидетеля', go: 'witness', tone: 'polite' },
+  { t: 'Я не верю ни одному слову', go: 'doubt' },
+]
+
 export const PAYDAY_SCENE: Scene = {
   start: 'announce',
   nodes: {
     announce: {
       a: ANNOUNCE, sys2: ANNOUNCE_PHOTO, hook: 'announce',
-      opts: [
-        { t: 'Беру сумку и еду', go: 'bag', tone: 'polite' },
-        { t: 'Беру сумку и свидетеля', go: 'witness', tone: 'polite' },
-        { t: 'Я не верю ни одному слову', go: 'doubt' },
-      ],
+      opts: ANNOUNCE_OPTS,
+    },
+    // терпенский анонс (#1119): линии за партию так и не сошлись — Алик объявляет выплату без них.
+    // Дальше сцена та же: bag/witness/doubt → morning
+    patience: {
+      a: ['Брат. Всё. Даже моё терпение кончилось. Пусть линии сходятся без меня — завтра день выплаты.'],
+      sys2: ANNOUNCE_PHOTO, hook: 'announce',
+      opts: ANNOUNCE_OPTS,
     },
     bag: { a: ['Правильно! Сумку побольше. Мешок, конечно, тоже возьму — вдруг не влезет.'], hook: 'morning' },
     witness: { a: ['Бери свидетеля! Чем больше свидетелей, тем честнее я выгляжу. Только не козу — у неё конфликт интересов.'], hook: 'morning' },

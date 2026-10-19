@@ -150,6 +150,9 @@ export const DIRECT: Record<string, DirectCase> = {
   Quiet_PaydayOpen_AlikAway: { event: 'AlikAway', setup: paydayOpen },
   Quiet_PaydayOpen_PeriodLine: { event: 'PeriodLine', setup: paydayOpen },
   Quiet_PaydayOpen_StoryBeat: { event: 'StoryBeat', setup: (g) => { paydayOpen(g); g.S.stats.sent = 5; g.S.day = 340 } },
+  // #1119: терпенский предел — бот-партии сходят арками (arcsDone 3+), до вежливого тупика не доходят:
+  // прямой случай держит гейт
+  Beat_Payday_Patience: { event: 'StoryBeat', setup: (g) => { g.S.day = 295; g.S.stats.sent = 100 } },
   // #927 (реакции на системные события сдвинули розыгрыш) — правило ушло из выборок, прямой случай вернулся.
   // До этого случай снимали (#889: в CI правило играло в 8 партиях, порог 7) — качели гейта решает замер.
   // #953 (окна вопроса Рубика и чайника) снова сдвинула розыгрыш — в 7 партиях (порог 7), гейт видит сам.

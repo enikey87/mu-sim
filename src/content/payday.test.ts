@@ -40,6 +40,22 @@ describe('День выплаты', () => {
     expect(game.S.scene?.id).toBe('payday')
     expect(game.S.ach.payday).toBeDefined()
   })
+  // #1119: верхний предел — вежливая партия без сериалов (arcsDone < 3) дожидалась выплаты 464 дня
+  // через поздний путь (420+sent 150). Терпение Алика кончается к 294-му: анонс не позже 300-го дня.
+  it('вежливая партия без сошедшихся линий: терпение Алика объявляет выплату не позже 300-го дня (#1119)', async () => {
+    const { game } = makeGame()
+    game.S.stats.sent = 100 // пишет вежливо и регулярно, но сериалы не ведёт
+    game.S.day = 293
+    expect((await game.fire('StoryBeat'))?.name ?? '').not.toBe('Beat_Payday_Patience')
+    expect(game.S.scene?.id).not.toBe('payday')
+    game.S.day = 295
+    expect((await game.fire('StoryBeat'))?.name).toBe('Beat_Payday_Patience')
+    expect(game.S.scene?.id).toBe('payday')
+    expect(game.S.ach.payday).toBeDefined()
+    // выплата — «завтра»: анонс на 295-м — 296 ≤ 300
+    expect(Number(game.S.mem['payday.at'])).toBe(game.S.day + 1)
+    expect(Number(game.S.mem['payday.at'])).toBeLessThanOrEqual(300)
+  })
   it('законченная линия коллекторов не приближает День выплаты: считаются сюжетные сериалы (#338)', () => {
     const { game } = makeGame()
     game.S.day = 340

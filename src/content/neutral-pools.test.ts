@@ -82,7 +82,9 @@ describe('нейтральные пулы длинной партии (#1117)', 
       const base = strip(c.text)
       if (bases.has(base)) log.push({ text: c.text, at })
     }
-    expect(log.length, 'пустой журнал ничего не доказывает').toBeGreaterThan(8)
+    // #1119: партия теперь кончается выплатой на ~296-й день, журнал «дна» короче (7 строк вместо 9+),
+    // но свойство та же: дословного повтора ближе 20 ходов нет
+    expect(log.length, 'пустой журнал ничего не доказывает').toBeGreaterThan(5)
     const last = new Map<string, number>()
     const bad: string[] = []
     for (const row of log) {
