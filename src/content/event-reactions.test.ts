@@ -104,6 +104,13 @@ describe('реакции на системные события (#927)', () => {
     expect([...seen], 'коньячная строка не выбирается').toContain(line)
   })
 
+  it('фото-баран: пул различает тебя и барана (#1113)', () => {
+    expect(P_RAM_PHOTO.map(valueOf)).toEqual([
+      'Алик, это ты на фото? Или баран?',
+      'Барана — вместо перевода? Я оценил. Но лучше деньгами.',
+    ])
+  })
+
   it('пулы реакций и ответов не пусты (#927)', () => {
     expect(P_RAM_PHOTO.length).toBeGreaterThan(0)
     expect(P_BORIS_SALE.length).toBeGreaterThan(0)
