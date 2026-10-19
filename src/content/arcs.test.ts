@@ -350,6 +350,35 @@ describe('follow Бориса и остальных арок: строка с ф
   })
 })
 
+describe('«Нива» звонит только после первого «Би-бип» (#1112)', () => {
+  const CALLS = '«Нива» мне всё звонит, а платить всё равно Алику.'
+  const GONE = '«Нива» уехала, а долг остался у тебя.'
+
+  it('до «Би-бип» строки про звонки нет, есть формулировка без звонков; после — наоборот', async () => {
+    const { game } = makeGame()
+    const pool = () => game.open(ARCS.niva.follow)
+    await game.playArc('niva') // серия 1: «Нива» у Алика, уехать ещё не успела
+    expect(pool(), '«Нива» ещё не в бегах — говорить не о чем').not.toContain(GONE)
+    await game.playArc('niva') // серия 2: уехала — nivaAway
+    expect(game.S.mem['niva.away'], '«Нива» не уехала — проверка пустеет').toBe(true)
+    expect(pool(), 'звонков ещё не было').toContain(GONE)
+    expect(pool(), 'звонков ещё не было').not.toContain(CALLS)
+    for (let i = 0; i < 3; i++) await game.playArc('niva') // серии 3–5: Гюмри, Грузия, «Би-бип.»
+    expect(game.S.mem['wrote.niva'], '«Нива» не написала — проверка пустеет').toBe(true)
+    expect(pool()).toContain(CALLS)
+    expect(pool(), 'после звонка заменять нечем').not.toContain(GONE)
+  })
+
+  // негативный контроль: та же строка без гейта первого сообщения видна и до «Би-бип» — значит, прячет её именно гейт
+  it('снятый гейт первого сообщения возвращает строку про звонки до «Би-бип»', async () => {
+    const { game } = makeGame()
+    await game.playArc('niva')
+    await game.playArc('niva')
+    const bare = [...ARCS.niva.follow.filter((e) => valueOf(e) !== CALLS), CALLS] as Entry<string>[]
+    expect(game.open(bare), 'без гейта строка есть').toContain(CALLS)
+  })
+})
+
 describe('вопрос про развязку Самвела — только перед серией, которая отвечает (#604)', () => {
   const at = () => [0, 1, 2, 3, 4, 5, 6, 7]
 
