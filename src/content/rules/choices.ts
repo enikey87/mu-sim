@@ -23,7 +23,7 @@ import {
   STRASBOURG_THREAT,
   P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE,
   P_CREW_CALL, P_LAWYER, P_COLLECTORS_ASK, P_INTERN, P_HOLE, P_COUNTERSUIT,
-  P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_BORIS, P_DEBUT_NIVA, P_NUNE_DEBUT, P_GRANT_TILE, P_MOUSTACHE_PHOTO, P_MAMA_MARKET, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_COURT_VERDICT, P_TILE_SLIP, P_GRANT_HOUSE,
+  P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_BORIS, P_DEBUT_NIVA, P_NUNE_DEBUT, P_GRANT_TILE, P_MOUSTACHE_PHOTO, P_MAMA_MARKET, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_COURT_VERDICT, P_TILE_SLIP, P_SOLD, P_GRANT_HOUSE,
 } from './player-choice-pools'
 
 type R = Rule<ContentApi, GameEvent, Offer>
@@ -203,6 +203,9 @@ export const choiceRules: R[] = [
   offer({ name: 'CourtVerdict', when: [is('courtVerdictFresh')], act: 'courtVerdict', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_COURT_VERDICT', P_COURT_VERDICT) }),
   // первая серия плиточной арки (#1059): падение заказчика — отклик в окне события (ход и три после)
   offer({ name: 'TileSlip', when: [is('tileSlipFresh')], act: 'tileSlip', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_TILE_SLIP', P_TILE_SLIP) }),
+  // продажа имущества со дна (#1084): заметное системное событие — отклик в окне события (ход продажи и три после).
+  // bonus 5: карточку продажи собирает дно денег — рядом стоят вопросы отчаяния (6–7); реакция обязана попасть в блок
+  offer({ name: 'Sold', when: [is('saleFresh')], act: 'soldQ', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_SOLD', P_SOLD) }),
   // встречный иск — заметное событие с окном отклика (#964): ход и три после
   offer({ name: 'Countersuit', when: [is('countersuitFresh')], act: 'countersuitAsk', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_COUNTERSUIT', P_COUNTERSUIT) }),
 

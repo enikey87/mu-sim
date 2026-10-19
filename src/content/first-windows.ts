@@ -3,7 +3,7 @@
 // участник, умеющий писать сам (SPEAKS), обязан быть здесь или в исключениях с причиной — новый
 // участник красит сюит на месте, а не в плейтесте через раунд. Офферы и потребление окна ответом —
 // как были (#951), тексты пулов не менялись.
-import { avitoReviewAt, borisSaleAt, collectorsAskAt, countersuitAt, courtVerdictAt, crewPaidAt, grantHouseAt, grantTileAt, internAt, kettleAt, lawyerAt, mamaMarketAt, mamaVoiceAt, mooAt, moustachePhotoAt, photoAt, ramPhotoAt, rubikAskAt, rubikHoleAt, samvelDivorceAt, tileSlipAt, transferAt, vacancyAt } from './memkeys'
+import { avitoReviewAt, borisSaleAt, collectorsAskAt, countersuitAt, courtVerdictAt, crewPaidAt, grantHouseAt, grantTileAt, internAt, kettleAt, lawyerAt, mamaMarketAt, mamaVoiceAt, mooAt, moustachePhotoAt, photoAt, ramPhotoAt, rubikAskAt, rubikHoleAt, samvelDivorceAt, saleAt, tileSlipAt, transferAt, vacancyAt } from './memkeys'
 
 /** Общий дебютный слот (#973): `wrote.<who>`/`debutWho`/`debutAt` ставит первое сообщение участника. */
 export const DEBUT_SLOT = 'debut'
@@ -85,4 +85,5 @@ export const EVENT_SOURCES: readonly EventSource[] = [
   { source: 'развод дяди Самвела на свадьбе (серия samvel, stamp)', at: samvelDivorceAt, offer: 'SamvelDivorce', pool: 'P_SAMVEL_DIVORCE' },
   { source: 'вердикт суда (сцена court, узлы debt/screens/moo, stamp)', at: courtVerdictAt, offer: 'CourtVerdict', pool: 'P_COURT_VERDICT' },
   { source: 'первая серия плиточной арки: заказчик упал на плитке (серия, stamp)', at: tileSlipAt, offer: 'TileSlip', pool: 'P_TILE_SLIP' },
+  { source: 'продажа имущества со дна (карточка банка, sellThing)', at: saleAt, offer: 'Sold', pool: 'P_SOLD' },
 ]
