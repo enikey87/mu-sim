@@ -196,13 +196,16 @@ describe('упрёк по звонку с объекта', () => {
     expect(offered).toContain(c!.text)
   })
 
-  // плейтест 82 (#1057): вариант 3 («плиточнику — в следующий раз») не говорит «всем рассчитали» —
-  // строки-цитаты ждут факт crewAllPaid, вопросы-инференции открыты в любом варианте
-  it('вариант звонка без «всем» не открывает утверждающие упрёки (#1057)', async () => {
+  // плейтест 82 (#1057) + раунд 84 (#1068): вариант 3 («плиточнику — в следующий раз») не говорит
+  // «всем рассчитали» — все утверждающие строки (в том числе с вопросительным хвостом) ждут факт
+  // crewAllPaid; чистая инференция про себя и безымянные строки вариантов 3–4 открыты в любом варианте
+  it('вариант звонка без «всем» не открывает утверждающие упрёки (#1057/#1068)', async () => {
     const ASSERT = [
       'Тарон писал: всем заплатили. Кроме меня.',
       'Мне с объекта звонили и сказали: деньги ушли всем. Я подумал, что и мне. Ошибся ровно на одного.',
       'Мне сказали: платят всем. Я сначала обрадовался. Потом дошло.',
+      'Значит, деньги были. Вы всем платили и мне — нет?',
+      'Вы рассчитали объект целиком. Целиком — это без меня, получается?',
     ]
     const QUESTION = 'Значит, я последний в очереди. Очередь из одного. Меня.'
     const callWith = async (variant: readonly [string, string]): Promise<Game> => {
@@ -220,6 +223,7 @@ describe('упрёк по звонку с объекта', () => {
     const open = quiet.open(P_CREW_PAID)
     for (const l of ASSERT) expect(open, `вариант 3: «${l.slice(0, 34)}…»`).not.toContain(l)
     expect(open, 'вопросные строки пустеют').toContain(QUESTION)
+    expect(open.length, 'пул варианта 3 обеднел: остались только строки «всем»').toBeGreaterThanOrEqual(3)
     for (const v of [CREW_CALL[0], CREW_CALL[1]]) {
       const pair = valueOf(v) as readonly [string, string]
       const g = await callWith(pair)
@@ -229,36 +233,55 @@ describe('упрёк по звонку с объекта', () => {
   })
 
   // плейтест-раунд 46 / аудит раунда 38 (#731): префикс декора ронял первую букву имени — «Алик, тарон звонил»
+  // #1068: пул делится фактом crewAllPaid — открытые строки собираем в обоих состояниях мира
   it('упрёк с Тароном звучит с заглавной при любом префиксе — и в кнопке, и в отправленной реплике', async () => {
-    const game = await afterCall()
-    const rules = optCrewPaid(game)
-    expect(rules).toHaveLength(1)
-    const offer = () => rules[0].offer!(game.rules.ctx(game, rules[0], { event: 'BuildChoices' }, game.facts()))
-    // первый показ строки — как есть; префикс клеится на повтор уже сказанного (pickFresh в playerLine)
-    const raw = new Map<string, Choice>()
-    for (let i = 0; i < 100 && raw.size < P_CREW_PAID.length; i++) {
-      const c = offer()
-      if (c) raw.set(c.text, c)
-    }
-    expect(raw.size, 'все строки пула показаны как есть').toBe(P_CREW_PAID.length)
-    for (const c of raw.values()) await game.send(c)
+    const pass = async (game: Game) => {
+      const rules = optCrewPaid(game)
+      expect(rules).toHaveLength(1)
+      const offer = () => rules[0].offer!(game.rules.ctx(game, rules[0], { event: 'BuildChoices' }, game.facts()))
+      // первый показ строки — как есть; префикс клеится на повтор уже сказанного (pickFresh в playerLine)
+      const raw = new Map<string, Choice>()
+      for (let i = 0; i < 60; i++) {
+        const c = offer()
+        if (c) raw.set(c.text, c)
+      }
+      expect(raw.size, 'открытые строки пула показаны как есть').toBe(game.open(P_CREW_PAID).length)
+      for (const c of raw.values()) await game.send(c)
 
-    const decorated = new Map<string, Choice>()
-    for (let i = 0; i < 120; i++) {
-      const c = offer()
-      if (c) decorated.set(c.text, c)
-    }
-    const taron = [...decorated.entries()].filter(([t]) => /арон/i.test(t))
-    expect(taron.length, 'вариант с Тароном попадался').toBeGreaterThan(0)
-    for (const [t] of taron) expect(t, t).toMatch(/Тарон/)
-    // проверка не на одном случае: среди повторов есть префикс с запятой — именно там low понижал букву
-    expect(taron.filter(([t]) => /^(Алик, |Слушайте, |Так, |Алик-джан, )/.test(t)).length, 'вариант с префиксом-обращением').toBeGreaterThan(0)
+      const decorated = new Map<string, Choice>()
+      const prefixedTaron = () => [...decorated.keys()].filter((t) => /^(Алик, |Слушайте, |Так, |Алик-джан, ).*арон/i.test(t)).length
+      for (let i = 0; i < 120 && prefixedTaron() === 0; i++) {
+        const c = offer()
+        if (c) decorated.set(c.text, c)
+      }
+      const taron = [...decorated.entries()].filter(([t]) => /арон/i.test(t))
+      expect(taron.length, 'вариант с Тароном попадался').toBeGreaterThan(0)
+      for (const [t] of taron) expect(t, t).toMatch(/Тарон/)
+      // проверка не на одном случае: среди повторов есть префикс с запятой — именно там low понижал букву
+      expect(prefixedTaron(), 'вариант с префиксом-обращением').toBeGreaterThan(0)
 
-    const c = taron.find(([t]) => t.startsWith('Алик, '))?.[1] ?? taron[0]![1]
-    const n = game.S.msgs.length
-    await game.send(c)
-    const mine = game.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' && m.from === 'me' ? [m.text] : []))
-    expect(mine[0], 'отправленная реплика — с заглавной').toMatch(/Тарон/)
+      const c = taron.find(([t]) => t.startsWith('Алик, '))?.[1] ?? taron[0]![1]
+      const n = game.S.msgs.length
+      await game.send(c)
+      const mine = game.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' && m.from === 'me' ? [m.text] : []))
+      expect(mine[0], 'отправленная реплика — с заглавной').toMatch(/Тарон/)
+    }
+    const callWith = async (variant: readonly [string, string]): Promise<Game> => {
+      const { game } = makeGame()
+      game.S.day = 210
+      const draw = game.draw.bind(game)
+      vi.spyOn(game, 'draw').mockImplementation(((key: string, arr: readonly unknown[]) =>
+        key === 'CREW_CALL' ? variant[1] : draw(key as never, arr as never)) as unknown as typeof game.draw)
+      await game.fire('AlikIdle')
+      return game
+    }
+    // строки-утверждения живут в мире «всем заплатили», строки вариантов 3–4 — в мире без него
+    const paid = await callWith(valueOf(CREW_CALL[1]) as readonly [string, string])
+    expect(paid.S.mem[crewAllPaid], 'вариант без «всем» — проверка не про то').toBe(true)
+    await pass(paid)
+    const quiet = await callWith(valueOf(CREW_CALL[2]) as readonly [string, string])
+    expect(quiet.S.mem[crewAllPaid], 'вариант 3 поставил факт «всем»').toBeUndefined()
+    await pass(quiet)
   })
 
   it('ответы Алика субъектно-агностичны: ответ не отвечает на субъект, которого упрёк не называл', async () => {
