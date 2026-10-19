@@ -314,7 +314,11 @@ export const choiceRules: R[] = [
   // Окно закрывает сама серия: следующий эпизод двигает arc.collectors, и вопрос уходит вместе с окном
   offer({
     name: 'CollectorsDebut', slot: 'arc', when: [is(intro('collectors')), eq('arc.collectors', 1)], act: 'arc', tone: 'polite', bonus: 2,
-    text: (g) => g.freshPlayer('F_collectors_debut', P_COLLECTORS_DEBUT) ?? g.draw('F_collectors_debut', P_COLLECTORS_DEBUT),
+    // окно повтора (#824): пока все формулировки пула в последних PLAYER_REPEAT_TURNS ходах, вопрос
+    // молчит, а не повторяется дословно (#1078) — фолбэк на сырой draw обходил окно и возвращал
+    // строку, показанную 2–3 хода назад. Цены у молчания нет: окно закрывает следующая серия,
+    // вопрос вернётся свежей строкой.
+    text: (g) => g.freshPlayer('F_collectors_debut', P_COLLECTORS_DEBUT) ?? '',
     arg: () => 'collectors',
   }),
   offer({
