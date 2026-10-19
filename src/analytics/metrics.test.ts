@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 // #611: счётчик Метрики. Приёмник подставной — живая Метрика не зовётся.
 import { describe, it, expect, beforeEach } from 'vitest'
 import { enable, firstGesture, isOn, track, COUNTER_ID, GAME_HOST, type Goal } from './metrics'

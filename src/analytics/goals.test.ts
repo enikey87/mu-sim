@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 // #612: шесть целей Метрики. Приёмник подставной — живая Метрика не зовётся.
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { enable, boot, shown, left, track, GAME_HOST } from './metrics'
