@@ -119,7 +119,7 @@ export const P_RAM_PHOTO = [
 ] as const
 
 export const P_BORIS_SALE = [
-  needs('boris')('Сколько за Бориса? Я в долге — зачтём.'),
+  needs('boris')('Сколько за Бориса? Ты в долге — зачтём.'),
   needs('boris')('Бориса продаёте? А он в курсе?'),
 ] as const
 

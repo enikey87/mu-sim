@@ -111,6 +111,12 @@ describe('реакции на системные события (#927)', () => {
     expect(P_AVITO_REVIEW.length).toBeGreaterThan(0)
   })
 
+  it('пул продажи Бориса не утверждает долг игрока от первого лица (#1110)', () => {
+    const lines = P_BORIS_SALE.map(valueOf)
+    expect(lines.some((t) => /я в долге/i.test(t)), 'строка делает игрока должником без опоры в фактах партии').toBe(false)
+    expect(lines.some((t) => /ты в долге|твоего долга/i.test(t) && /зачт/i.test(t)), 'вариант про зачёт из долга Алика потерян').toBe(true)
+  })
+
   it('ответ на реакцию потребляет событие: вариант больше не предлагается, строка пула не повторяется (#918)', async () => {
     const has = (game: Game, act: string) => game.buildChoices().some((c) => c.act === act)
     // фото-баран — настоящим событием хода
