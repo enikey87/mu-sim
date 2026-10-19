@@ -272,6 +272,65 @@ test('интро: строки затухают без обрыва и не на
   expect(probe.maxVisible, 'строка поверх строки или титула').toBeLessThanOrEqual(1)
 })
 
+test('смена фото «без усов» видна в день смены и проходит через 40 дней (#1116)', async ({ page }) => {
+  const avatar = page.locator('#avatar')
+  const look = () => avatar.evaluate((el) => {
+    const s = getComputedStyle(el)
+    const box = el.getBoundingClientRect()
+    return {
+      cls: el.className,
+      bg: s.backgroundColor,
+      mustache: getComputedStyle(el, '::after').content,
+      w: Math.round(box.width),
+      cap: el.querySelector('.shaved-cap')?.textContent ?? '',
+    }
+  })
+
+  await expect(avatar).toHaveText('А')
+  const before = await look()
+  expect(before.cls).not.toContain('shaved')
+  expect(before.mustache).not.toBe('none')
+  expect(before.w).toBe(40)
+  expect(before.cap).toBe('')
+
+  await page.evaluate(() => {
+    const g = (window as unknown as {
+      __alik: {
+        applyFacts: (ops: object[]) => void
+        emit: () => void
+        S: { day: number; mem: Record<string, unknown> }
+        rules: { settle: () => void }
+      }
+    }).__alik
+    g.applyFacts([{ key: 'alik.shaved', op: '=', value: true, forDays: 40 }])
+    g.emit()
+  })
+  await expect(avatar).toHaveClass(/shaved/)
+  await expect(avatar.locator('.shaved-cap')).toHaveText('без усов')
+  await expect(avatar.locator('.shaved-cap')).toBeVisible()
+  const shaved = await look()
+  expect(shaved.mustache).toBe('none')
+  expect(shaved.bg).not.toBe(before.bg)
+  expect(shaved.w).toBeGreaterThan(before.w)
+  expect(shaved.cap).toBe('без усов')
+
+  await page.evaluate(() => {
+    const g = (window as unknown as {
+      __alik: { emit: () => void; S: { day: number }; rules: { settle: () => void } }
+    }).__alik
+    g.S.day += 40
+    g.rules.settle()
+    g.emit()
+  })
+  await expect(avatar).not.toHaveClass(/shaved/)
+  await expect(avatar.locator('.shaved-cap')).toHaveCount(0)
+  await expect(avatar).toHaveText('А')
+  const back = await look()
+  expect(back.mustache).not.toBe('none')
+  expect(back.bg).toBe(before.bg)
+  expect(back.w).toBe(40)
+})
+
 test('PWA: манифест, иконки и theme-color на месте (#687)', async ({ page }) => {
   await page.goto('/?fast')
   await expect(page.locator('link[rel="manifest"]')).toHaveCount(1)
