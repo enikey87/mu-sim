@@ -4,7 +4,7 @@ import { type Entry, type FactOp, type Criterion, type FactKey, type Said, set, 
 import { type ClaimKey } from './ids'
 import type { LedgerEvent } from './fact-types'
 import { needs, meet, WORLD, MENTION_RE } from './world'
-import { actSigned, alikDead, betonSet, borisMarried, collectorsAskAt, collectorsRecruited, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantHouseAt, grantPaid, grantTileAt, houseOnGarik, internAt, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, rubikHoleAt, saidNuneNoWrite, samvelDivorceAt, sick, taxFrozen, tileSlipAt, wedding, wrote } from './memkeys'
+import { actSigned, alikDead, betonSet, borisMarried, collectorsAskAt, collectorsRecruited, collectorsTea, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantHouseAt, grantPaid, grantTileAt, houseOnGarik, internAt, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, rubikHoleAt, saidNuneNoWrite, samvelDivorceAt, sick, taxFrozen, tileSlipAt, wedding, wrote } from './memkeys'
 import { stateQuestion } from './money-ask'
 
 export type ArcMsg = Said | { w: string; t: string; claims?: LedgerEvent[]; remember?: FactOp[]; stamp?: string } | { t: string; claims: LedgerEvent[]; remember?: FactOp[]; stamp?: string }
@@ -429,7 +429,8 @@ export const ARCS: Record<string, Arc> = {
       'Коллекторы пишут, деньги требуют.',
       // число «три» вводит предложение стажировки (финал арки, `internAt`): до него строка называла бы невведённое (#1036)
       gate(exists(internAt))('«Деньги-Ара» — три чашки чая? И всё это в мой долг?'),
-      'Коллекторы на объекте расселись: чай длинный, долг тоже.',
+      // чай вводит третья серия (eps[2]): без неё строка называла бы невведённый образ (#1158)
+      gate(is(collectorsTea))('Коллекторы на объекте расселись: чай длинный, долг тоже.'),
       gate(missing(collectorsRecruited))('Коллектор говорит: плати. Я отвечаю: деньги у Алика.'),
       gate(is(collectorsRecruited))('Они у тебя работают. И помогают? А долг от этого не растёт?'),
       gate(is(collectorsTurned))('Теперь они работают на меня? И отчего долг всё равно растёт?'),
@@ -451,6 +452,7 @@ export const ARCS: Record<string, Arc> = {
         ],
       },
       {
+        remember: [set(collectorsTea, true)],
         m: [
           { w: 'collectors', t: 'Мы приехали к Алику. Он напоил чаем. Чай крепкий. Долг — ещё крепче. Разговариваем о смысле платежа.' },
           'Они у меня. Хорошие ребята. Говорят «нечем платить» так красиво, что я почти заплакал.',
