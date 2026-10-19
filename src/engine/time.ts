@@ -47,7 +47,8 @@ export function periodOf(hour: number, dow: number): Period {
 export const TIERS: ReadonlyArray<readonly [number, string]> = [
   [250, '📈 Отмазки Алика вышли на международный уровень'],
   [330, '🏛 Отмазки Алика вышли на исторический уровень'],
-  [450, '🌌 Отмазки Алика вышли на космический уровень'],
+  // 380 (было 450): вершина лестницы отмазок — до дедлайна выплаты (#1119/#1134, вариант 2+4)
+  [380, '🌌 Отмазки Алика вышли на космический уровень'],
 ]
 export const tierOf = (day: number): number => TIERS.filter(([d]) => day >= d).length
 

@@ -10,6 +10,12 @@ type R = Rule<ContentApi, GameEvent, Offer>
 const NAMES = ['Гарик', 'Борис', 'Гоар', 'мама', 'Рубик', 'Размик', 'Нуне', 'Карине', 'Страсбург', 'малыш', '«Нив', 'Грант']
 const fmt = (n: number) => n.toLocaleString('ru-RU')
 
+/** Дедлайн партии (#1119/#1134, вариант 2+4): День выплаты не откладывается дальше этого дня
+ *  ни при каком стиле. Предохранитель стоит СТРОГО после красивых путей (арки ≥330, поздний ≥420):
+ *  кто успевает — идёт своим путём с обычным анонсом; дедлайн ловит только застрявших —
+ *  с кожей капитуляции (космический уровень отмазок сыграл к 380-му, Алик сдаётся сам). */
+export const PAYDAY_HARD_DAY = 430
+
 async function money(game: ContentApi, sum: number): Promise<void> {
   game.applyFacts([set(pd.sum, sum)])
   await game.sleep(500)
@@ -160,6 +166,11 @@ export const paydayRules: R[] = [
     name: 'Beat_PaydayLead_Late', event: 'StoryBeat', when: [gte('day', 420), gte('sent', 150), missing(pd.lead), missing(pd.at), missing(paydayScene), missing(alikDead)],
     priority: 'chatter', respond: ({ game }) => sayLead(game, true),
   },
+  // дедлайн (#1119): за два дня до PAYDAY_HARD_DAY подводка стартует без условий — ни арок, ни 150 сообщений не нужно
+  {
+    name: 'Beat_PaydayLead_Deadline', event: 'StoryBeat', when: [gte('day', PAYDAY_HARD_DAY - 2), missing(pd.lead), missing(pd.at), missing(paydayScene), missing(alikDead)],
+    priority: 'chatter', respond: async ({ game }) => { game.applyFacts([set(pd.surrender, true)]); await sayLead(game, true) },
+  },
   {
     name: 'Beat_PaydayLead_Second', event: 'StoryBeat', when: [exists(pd.lead), lt(pd.signs, 2), missing(pd.signToday), missing(pd.at), missing(paydayScene), missing(alikDead)],
     priority: 'chatter', respond: ({ game }) => sayLead(game, false),
@@ -174,6 +185,12 @@ export const paydayRules: R[] = [
   // не тратится) и после выплаты перехватывало бы каждый StoryBeat, ничего не говоря
   {
     name: 'Beat_Payday_Late', event: 'StoryBeat', when: [gte('day', 420), gte('sent', 150), missing(alikDead), missing(paydayScene), missing(pd.at), gte(pd.signs, 2)], bonus: 9, once: true, priority: 'cinematic',
+    respond: ({ game }) => resumePayday(game),
+  },
+  // дедлайн (#1119): безусловный запуск после двух штрихов — инвариант «партия не длиннее PAYDAY_HARD_DAY (+окно подводки)»;
+  // бонус 11 выше красивых путей: если сошлись оба, говорит капитуляция
+  {
+    name: 'Beat_Payday_Deadline', event: 'StoryBeat', when: [gte('day', PAYDAY_HARD_DAY), gte(pd.signs, 2), missing(alikDead), missing(paydayScene), missing(pd.at)], bonus: 11, once: true, priority: 'cinematic',
     respond: ({ game }) => resumePayday(game),
   },
   // иерархия исходов — бонусами специфичности, а не числом условий: real 4 > lavash 3 > coins 2 = niva 2 > strasbourg/notyou 1 > default 0

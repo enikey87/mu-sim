@@ -284,10 +284,10 @@ describe('регрессии раунда 16', () => {
       if (!late) for (const id of ['boris', 'nune', 'grant']) g.S.arcs[id] = { i: ARCS[id].eps.length, last: 0 }
       const beat = () => g.rules.collect({ event: 'StoryBeat' }, g.facts()).map((r) => r.name).filter((n) => n.startsWith('Beat_Payday'))
       // #893: выплату предваряет подводка — сначала штрих, и только после двух штрихов объявление
-      expect(beat(), late ? 'поздний' : 'сошлись линии').toEqual([late ? 'Beat_PaydayLead_Late' : 'Beat_PaydayLead_First'])
+      expect(beat(), late ? 'поздний' : 'сошлись линии').toEqual(late ? ['Beat_PaydayLead_Late', 'Beat_PaydayLead_Deadline'] : ['Beat_PaydayLead_First'])
       g.S.mem['payday.lead'] = g.S.day - 2
       g.S.mem['payday.signs'] = 2
-      expect(beat(), late ? 'поздний' : 'сошлись линии').toEqual([late ? 'Beat_Payday_Late' : 'Beat_Payday'])
+      expect(beat(), late ? 'поздний' : 'сошлись линии').toEqual(late ? ['Beat_Payday_Deadline', 'Beat_Payday_Late'] : ['Beat_Payday'])
       g.S.mem.alik_dead = true
       expect(beat()).toEqual([])
     }

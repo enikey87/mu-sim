@@ -8,8 +8,10 @@ import { needs, samvelLine, WORLD } from './world'
 import { bathAsked, court, cryptoHodl, garikConcrete, judgeApology, karineKnowsDebt, met, payday, rubikFined, taxThawed } from './memkeys'
 
 export const ANNOUNCE = [
-  needs('karineHome')(needs('karine')('Брат. Завтра. Всё. Честно. Я не шучу. Даже Карине не шутит.')),
-  'Брат, садись. Завтра — день выплаты. Все линии сошлись. Я сам в шоке.',
+  // капитуляция дедлайна (#1119): лестница отмазок исчерпана — Алик сдаётся сам, обычные анонсы молчат
+  gate(exists(payday.surrender))('Брат, всё. Я устал врать. Завтра — деньги. Даже моё терпение кончилось.'),
+  gate(missing(payday.surrender))(needs('karineHome')(needs('karine')('Брат. Завтра. Всё. Честно. Я не шучу. Даже Карине не шутит.'))),
+  gate(missing(payday.surrender))('Брат, садись. Завтра — день выплаты. Все линии сошлись. Я сам в шоке.'),
 ]
 export const ANNOUNCE_PHOTO = 'Алик прислал фото: мешок из-под картошки, на нём маркером «ПЛИТОЧНИКУ».'
 

@@ -1587,7 +1587,9 @@ export class Game {
       let max = 0
       for (const p of S.promises) {
         const days = p.days ?? (p.due == null ? undefined : p.due - p.made)
-        if (days === undefined || (p.made === c.whenMade && days === whenDays)) continue
+        // день записи и абсолютная дата, не остаток whenDays: на следующий день остаток уже меньше
+        // названного горизонта, и обещание становилось собственным рекордом (#1132)
+        if (days === undefined || (p.made === c.whenMade && (p.due ?? undefined) === (c.whenDue ?? undefined))) continue
         if (days > max) max = days
       }
       return max
@@ -2367,12 +2369,16 @@ export class Game {
       text = m.text.slice(0, at) + repl + m.text.slice(at + p.t.length)
       // род и горизонт правленого срока — от разметки термина (#923): «в следующем году» — дата, а не «никогда»
       const due = term.d == null ? null : this.S.day + (term.due ? dueIn(term.due, this.S.day) : term.d)
+      const named = this.horizonAt(term, due)
       const rec = this.S.promises[this.S.promises.length - 1]
       if (rec && rec.t.includes(p.t)) {
         rec.t = rec.t.replace(p.t, w)
         rec.due = due // журнал хранит абсолютную дату срока: у «когда-нибудь» её нет
+        // тот же горизонт, что пишет recordPromise: без пересчёта days оставался от старого срока (#1132)
+        if (named === undefined) delete rec.days
+        else rec.days = Math.max(0, named - this.S.day)
       }
-      this.S.ctx = { ...this.S.ctx, when: w, whenNever: due == null, whenKind: term.kind, whenAt: this.horizonAt(term, due), whenMade: this.S.day, whenDue: due }
+      this.S.ctx = { ...this.S.ctx, when: w, whenNever: due == null, whenKind: term.kind, whenAt: named, whenMade: this.S.day, whenDue: due }
     } else {
       text = m.text.replace(/[.!]?$/, this.draw('EDIT_SUFFIX', L.EDIT_SUFFIX) + '.')
     }
