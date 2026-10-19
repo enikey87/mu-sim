@@ -338,6 +338,8 @@ describe('дебюты участников через rude/хор (#973)', () =
       expect.fail('Борис не заговорил в хоре')
     }],
     ['niva', 'debutNiva', 'Нива', async (g) => { await g.playEpisode(ARCS.niva.eps[4], 'niva') }],
+    // первое письмо Нуне — вторая серия её линии (реальный путь: серия 0 ставит знакомство/legacy, серия 1 — дебют)
+    ['nune', 'debutNune', 'Нуне', async (g) => { await g.playArc('nune'); await g.playArc('nune') }],
   ]
 
   it.each(debutCases)('первое сообщение %s: окно на дебюте, чужой ход закрыт, ответ потребляет, повтор не открывает', async (who, act, name, debut) => {
