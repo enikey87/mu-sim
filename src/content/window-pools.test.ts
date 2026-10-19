@@ -13,7 +13,7 @@ import { intro } from './memkeys'
 import * as W from './world'
 import {
   RAM_PHOTO, BORIS_SALE, VACANCY, AVITO_REVIEW, RUBIK_ASK, KETTLE,
-  CREW_CALL_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, GRANT_TILE_B, DEBUT_NIVA_B, DEBUT_BORIS_B, MOUSTACHE_PHOTO_B, MAMA_MARKET_B, SAMVEL_DIVORCE_B, GRANT_HOUSE_B, COURT_VERDICT_B, TILE_SLIP_B, NUNE_DEBUT_B,
+  CREW_CALL_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, GRANT_TILE_B, DEBUT_NIVA_B, DEBUT_BORIS_B, MOUSTACHE_PHOTO_B, MAMA_MARKET_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, GRANT_HOUSE_B, COURT_VERDICT_B, TILE_SLIP_B, NUNE_DEBUT_B,
   LAWYER_B, COLLECTORS_ASK_B, INTERN_B, HOLE_B, COUNTERSUIT_B,
 } from './world'
 
@@ -87,6 +87,9 @@ const WINDOWS: Window[] = [
   // конец квеста «мама на рынке» (#1030): мама приходит квестом, своих меток пул не требует
   { pool: 'P_MAMA_MARKET', lines: PP.P_MAMA_MARKET, marks: {} },
   { pool: 'MAMA_MARKET_B', lines: MAMA_MARKET_B, marks: {} },
+  // голосовое-плач мамы (#1085): серия сама объявляет пропущенные звонки и голосовое — окно их и называет
+  { pool: 'P_MAMA_VOICE', lines: PP.P_MAMA_VOICE, marks: { звон: null } },
+  { pool: 'MAMA_VOICE_B', lines: MAMA_VOICE_B, marks: { звон: null } },
   // развод дяди Самвела (#1037): конверт введён легендой свадьбы (#1016) — строки с ним несут гейт
   { pool: 'P_SAMVEL_DIVORCE', lines: PP.P_SAMVEL_DIVORCE, marks: { конверт: 'heard.samvel_envelopes' } },
   { pool: 'SAMVEL_DIVORCE_B', lines: SAMVEL_DIVORCE_B, marks: { конверт: 'heard.samvel_envelopes' } },
