@@ -61,7 +61,8 @@ export const DIRECT: Record<string, DirectCase> = {
   Finale_razmik_shift_or: { event: 'ArcFinale', facts: { arc: 'razmik' }, setup: (g) => { g.S.ach.newjob = 1 } },
   Finale_garik_cutter: { event: 'ArcFinale', facts: { arc: 'garik' }, setup: (g) => { g.S.ach.newjob = 1 } },
   // #983: окно первого «Би-бип» сдвинуло розыгрыш — обычный финал Гарика ни разу до экрана концовки
-  Finale_garik_default: { event: 'ArcFinale', facts: { arc: 'garik' } },
+  // #1071 (окно дебюта Нуне) сдвинуло выборки — финал снова в них (7 партий при пороге 7)
+  // Finale_garik_default: { event: 'ArcFinale', facts: { arc: 'garik' } }
   Finale_alik_death_will: { event: 'ArcFinale', facts: { arc: 'alik_death' }, setup: (g) => { g.S.ach.forgive = 1; g.S.mem['asked.alik_death'] = 1 } },
   // #1058 (окно вердикта суда) сдвинуло выборки — обычный финал «смерти» ни разу до экрана концовки.
   // asked.alik_death = 1: без вопросов о смерти матчится частный финал «Обиделся» (asked ≤ 0)

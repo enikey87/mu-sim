@@ -28,6 +28,7 @@ export const FIRST_WINDOWS: readonly FirstWindow[] = [
   { who: 'samvel', source: 'хор (CHORUS.samvel)', at: DEBUT_SLOT, offer: 'DebutSamvel', pool: 'P_DEBUT_SAMVEL' },
   { who: 'boris', source: 'хор (CHORUS.boris, «Бее»)', at: DEBUT_SLOT, offer: 'DebutBoris', pool: 'P_DEBUT_BORIS' },
   { who: 'niva', source: 'серия «Би-бип» (arcs niva eps[4])', at: DEBUT_SLOT, offer: 'DebutNiva', pool: 'P_DEBUT_NIVA' },
+  { who: 'nune', source: 'серия бухгалтера (arcs nune eps[1], первое письмо)', at: DEBUT_SLOT, offer: 'DebutNune', pool: 'P_NUNE_DEBUT' },
   { who: 'grant', source: 'серия «плитка — орудие» (stamp строки)', at: grantTileAt, offer: 'GrantTile', pool: 'P_GRANT_TILE' },
   { who: 'taron', source: 'звонок с объекта (crew.ts, штамп звонка)', at: crewPaidAt, offer: 'CrewCall', pool: 'P_CREW_CALL' },
   // окно держит счётчик серии: следующая серия двигает arc.collectors и вопрос уходит (#888)
@@ -39,7 +40,6 @@ export const FIRST_WINDOWS: readonly FirstWindow[] = [
 export interface Exempt { who: string; why: string }
 export const EXEMPT: readonly Exempt[] = [
   { who: 'karine', why: 'первое сообщение — сцена жены; отклик — хор, отдельного пула окна нет' },
-  { who: 'nune', why: 'первое сообщение — серия бухгалтера; отклик ведут follow-вопросы линии' },
   { who: 'mkrtich', why: 'первое сообщение — серия бетона (подтверждение конверта); своего пула нет' },
   { who: 'razmik', why: 'первое сообщение — серия крановщика и очереди; отклик — follow-вопросы линии' },
   { who: 'rubik', why: 'первое сообщение — серия инспектора; прямые вопросы — отдельные окна (#958)' },
