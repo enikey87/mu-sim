@@ -30,7 +30,7 @@ describe('гейт покрытия: сработало хоть раз (#278)',
   it('выборки стартуют вместе, возвращаются по порядку и не теряются', async () => {
     const specs: SampleSpec[] = [1, 2, 3].map((seed) => ({ kind: 'full', seeds: [seed], turns: 1, grumpy: 0 }))
     const complete: Array<(report: SampleReport) => void> = []
-    const pending = runCoverageJobs(specs, () => new Promise((resolve) => complete.push(resolve)))
+    const pending = runCoverageJobs(specs, () => new Promise((resolve) => complete.push(resolve)), specs.length)
     expect(complete).toHaveLength(3)
     const report = (seed: number): SampleReport => ({
       kind: 'full', turns: seed, weighted: [], fired: {}, games: {}, never: seed === 2 ? ['B'] : ['A', 'B'], unsaid: [], events: {},
@@ -46,6 +46,28 @@ describe('гейт покрытия: сработало хоть раз (#278)',
     await expect(runCoverageJobs(specs, async () => undefined as unknown as SampleReport)).rejects.toThrow()
     await expect(runCoverageJobs(specs, async () => { throw new Error('sample failed') })).rejects.toThrow('sample failed')
   })
+  it('пул держит не больше лимита и начинает с длинных выборок (#CI)', async () => {
+    const specs: SampleSpec[] = [
+      { kind: 'full', seeds: [1], turns: 1, grumpy: 0 },
+      { kind: 'full', seeds: [2, 3, 4], turns: 1, grumpy: 0 },   // самая длинная: 3 партии
+      { kind: 'full', seeds: [5, 6], turns: 1, grumpy: 0 },
+    ]
+    const report = (n: number): SampleReport => ({ kind: 'full', turns: n, weighted: [], fired: {}, games: {}, never: [], unsaid: [], events: {} })
+    const started: number[] = []
+    const finish = new Map<number, () => void>()
+    const pending = runCoverageJobs(specs, (s) => new Promise<SampleReport>((resolve) => {
+      started.push(s.seeds[0]!)
+      finish.set(s.seeds[0]!, () => resolve(report(s.seeds[0]!)))
+    }), 2)
+    expect(started, 'в воздухе ровно два задания, первыми — длинные').toEqual([2, 5])
+    finish.get(2)!()
+    await new Promise((r) => setTimeout(r, 0))
+    expect(started, 'освободившийся воркер берёт следующую').toEqual([2, 5, 1])
+    finish.get(5)!(); finish.get(1)!()
+    // отчёты возвращаются в объявленном порядке, а не в порядке запуска
+    expect((await pending).samples.map((s) => s.turns)).toEqual([1, 2, 5])
+  })
+
   it('воркеры дают те же отчёты, что последовательные выборки', async () => {
     const specs: SampleSpec[] = [
       { kind: 'full', seeds: [7], turns: 12, grumpy: 0 },
