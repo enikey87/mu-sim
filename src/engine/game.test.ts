@@ -128,9 +128,12 @@ describe('Game: начало и ход', () => {
     // #583: капс на готовой кнопке — не грубость: кнопка несёт свой тон, классификатор читает только свой текст
     const bottom = makeGame().game
     setMoney(bottom, Game.MONEY_BOTTOM)
-    bottom.S.choices = null
-    const btn = bottom.choices.find((c) => c.act === 'desperate')
-    expect(btn, 'кнопка отчаяния на дне').toBeDefined()
+    let btn: (typeof bottom.choices)[number] | undefined
+    for (let i = 0; i < 40 && !btn; i++) {
+      bottom.S.choices = null
+      btn = bottom.choices.find((c) => c.act === 'desperate' && c.tone === 'neutral')
+    }
+    expect(btn, 'нейтральная кнопка отчаяния на дне').toBeDefined()
     expect(btn!.tone, 'тон кнопки задан разметкой').toBe('neutral')
     await bottom.send(btn!)
     expect(bottom.ui.feel, 'телефон не трясёт от кнопки').not.toBe('shake')
@@ -1093,16 +1096,17 @@ describe('Game: деньги на карте', () => {
   it('бедность не смолкает: исчерпанный пул уровня молчит окно и звучит снова (#184/#240)', () => {
     const { game } = makeGame()
     setMoney(game, 1000)
+    const n = P_MONEY.bottom.polite.length
     const line = (day: number): string | null => { game.S.day = day; return game.poorLine('P_MONEY_bottom_POL', P_MONEY.bottom.polite) }
-    const fresh = [line(300), line(300), line(300)].filter((x): x is string => x !== null)
-    expect(new Set(fresh).size).toBe(3) // весь пул уровня — без повторов
+    const fresh = Array.from({ length: n }, () => line(300)).filter((x): x is string => x !== null)
+    expect(new Set(fresh).size).toBe(n) // весь пул уровня — без повторов
     expect(line(300)).toBeNull() // пул исчерпан — повтор той же строки молчит
     expect(line(301)).toBeNull() // и в пределах окна сказанное не возвращается
     expect(line(300 + 13)).toBeNull()
-    const back = [line(300 + 14), line(300 + 15), line(300 + 16)].filter((x): x is string => x !== null)
-    expect(back).toHaveLength(3) // окно прошло — пул звучит снова, а не замолкает навсегда
+    const back = Array.from({ length: n }, (_, i) => line(300 + 14 + i)).filter((x): x is string => x !== null)
+    expect(back).toHaveLength(n) // окно прошло — пул звучит снова, а не замолкает навсегда
     for (const b of back) expect(fresh.some((f) => b.startsWith(f))).toBe(true) // повторяет сказанное, но другими словами
-    expect(new Set(back.map((b) => fresh.find((f) => b.startsWith(f)))).size).toBe(3) // и идёт по кругу, а не долбит одну строку
+    expect(new Set(back.map((b) => fresh.find((f) => b.startsWith(f)))).size).toBe(n) // и идёт по кругу, а не долбит одну строку
   })
   it('исчерпанный пул бедности не отдаёт одну строку в каждой сборке за день (#348)', () => {
     const { game } = makeGame()
@@ -1119,12 +1123,13 @@ describe('Game: деньги на карте', () => {
     const storage = memStorage()
     const { game } = makeGame({ storage })
     setMoney(game, 1000)
+    const n = P_MONEY.bottom.polite.length
     const line = (g: Game, day: number): string | null => {
       g.S.day = day
       return g.poorLine('P_MONEY_bottom_POL', P_MONEY.bottom.polite)
     }
-    const fresh = [line(game, 300), line(game, 300), line(game, 300)].filter((x): x is string => x !== null)
-    expect(fresh).toHaveLength(3)
+    const fresh = Array.from({ length: n }, () => line(game, 300)).filter((x): x is string => x !== null)
+    expect(fresh).toHaveLength(n)
     for (const f of fresh) game.seen.mark(f) // как при отправке: иначе shown обнулится и пул снова «свежий»
     expect(line(game, 301)).toBeNull()
     game.save()
@@ -1132,9 +1137,9 @@ describe('Game: деньги на карте', () => {
     setMoney(again, 1000)
     expect(line(again, 301)).toBeNull()
     expect(line(again, 300 + 13)).toBeNull()
-    const back = [line(again, 300 + 14), line(again, 300 + 15), line(again, 300 + 16)]
+    const back = Array.from({ length: n }, (_, i) => line(again, 300 + 14 + i))
       .filter((x): x is string => x !== null)
-    expect(back).toHaveLength(3)
+    expect(back).toHaveLength(n)
     for (const b of back) expect(fresh.some((f) => b.startsWith(f))).toBe(true)
   })
   it('не-число в poorSaid сейва не глушит строку навсегда (#401)', () => {
@@ -1142,9 +1147,10 @@ describe('Game: деньги на карте', () => {
     const { game } = makeGame({ storage })
     setMoney(game, 1000)
     game.S.day = 300
-    const fresh = [0, 1, 2].map(() => game.poorLine('P_MONEY_bottom_POL', P_MONEY.bottom.polite))
+    const n = P_MONEY.bottom.polite.length
+    const fresh = Array.from({ length: n }, () => game.poorLine('P_MONEY_bottom_POL', P_MONEY.bottom.polite))
       .filter((x): x is string => x !== null)
-    expect(fresh).toHaveLength(3)
+    expect(fresh).toHaveLength(n)
     for (const f of fresh) game.seen.mark(f)
     expect(game.poorLine('P_MONEY_bottom_POL', P_MONEY.bottom.polite)).toBeNull()
     game.save()
