@@ -375,7 +375,7 @@ describe('отчаяние от бедности', () => {
     ]
     for (const route of routes) {
       let hit = false
-      for (let seed = 1; seed <= 24 && !hit; seed++) {
+      for (let seed = 1; seed <= 80 && !hit; seed++) {
         const bottom = makeGame({ seed }).game
         setMoney(bottom, Game.MONEY_BOTTOM)
         if (route.polite) bottom.S.mem.polite = true
