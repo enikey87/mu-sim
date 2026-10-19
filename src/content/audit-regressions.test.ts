@@ -22,7 +22,8 @@ import * as MISC from './misc'
 import { FWD, FWD_HOLIDAY, NOTIF, PERIOD } from './life'
 import { ARC_DONE, GROUP } from './arcs'
 import { LEGAL_CLAIMS, legalClaim, type LegalClaim } from '../engine/input'
-import { threatClaim } from './memkeys'
+import { met, saidNuneNoWrite, threatClaim } from './memkeys'
+import { P_NUNE_DEBUT } from './rules/player-choice-pools'
 
 /** Инстанция угрозы: тексты игрока → что игра обязана ответить. Проверяется и детектор, и пул. */
 const CLAIM_SAMPLES: Array<[string, LegalClaim]> = [
@@ -535,5 +536,26 @@ describe('регрессии раунда 16', () => {
     const boris = MEMORY.map(valueOf).filter((l): l is LineSpec => typeof l !== 'string' && /Борис-прораб/.test(l.t))
     expect(boris.length).toBeGreaterThan(0)
     for (const l of boris) expect(l.t).not.toMatch(/преми/)
+  })
+})
+
+describe('регрессии раунда 90', () => {
+  it('дебют Нуне: цитата «не пишите Алику» ждёт услышанной фразы (#1148)', async () => {
+    const quote = P_NUNE_DEBUT.map((l) => ({ l, t: String(valueOf(l)) })).find((x) => x.t.includes('Не пишите Алику'))!
+    const seen = (g: ReturnType<typeof makeGame>['game']) => g.choices.some((c) => c.text.includes('Не пишите Алику — а платить'))
+    // легенда сейфа — первое письмо Нуне (раунд 90, seed 227117): знакомство есть, фразы ещё не было
+    const legendFirst = makeGame().game
+    legendFirst.alikMsg({ kind: 'text', from: 'alik', text: 'Сейф закрыт, ключ у меня. Я в декрете. Не торопите декрет.', who: 'nune' })
+    expect(legendFirst.S.mem[met('nune')]).toBe(true)
+    expect(isOpen(quote.l, legendFirst.lineFacts()), 'цитата открыта без фразы').toBe(false)
+    for (let i = 0; i < 6; i++) { legendFirst.S.choices = null; expect(seen(legendFirst), 'цитата в дебютном блоке без фразы').toBe(false) }
+    // партия с интро арки: серия-объявление молчит, интро — первое письмо Нуне с фразой
+    const intro = makeGame().game
+    await intro.playArc('nune') // eps[0]: Алик объявляет декрет — Нуне ещё не писала
+    await intro.playArc('nune') // eps[1]: «Здравствуйте. Я Нуне… Не пишите Алику, он нервничает»
+    expect(intro.S.mem[saidNuneNoWrite]).toBe(true)
+    expect(isOpen(quote.l, intro.lineFacts()), 'цитата закрыта после фразы').toBe(true)
+    for (let i = 0; i < 4 && !seen(intro); i++) intro.S.choices = null
+    expect(seen(intro), 'цитаты нет в блоке после интро').toBe(true)
   })
 })
