@@ -1,7 +1,7 @@
 // Именованные пулы кнопок из rules/choices — вынесены, чтобы попасть в PLAYER_POOLS (#491).
 import { needs, WORLD } from '../world'
 import { gate, eq, is, missing } from '../fact'
-import { courtVerdict } from '../memkeys'
+import { courtVerdict, saidNuneNoWrite } from '../memkeys'
 import { sold } from '../credit'
 
 export const P_VIA_BORIS = [
@@ -210,10 +210,12 @@ export const P_GRANT_TILE = [
   gate(is('heard.money_foundation'))('Это Алик вам так рассказал? Спросите его про фундамент'),
 ] as const
 
-/** Дебют бухгалтера Нуне (#1071): первое письмо — декрет, ключ от сейфа и «не пишите Алику». */
+/** Дебют бухгалтера Нуне (#1071): первое письмо — декрет, ключ от сейфа и «не пишите Алику».
+ *  Цитата «не пишите Алику» ждёт услышанной фразы (#1148): дебют мог прийти легендой сейфа,
+ *  чьё письмо фразы не несёт, — интро арки в такой партии не звучит. */
 export const P_NUNE_DEBUT = [
   'Нуне, а ключ когда?',
-  'Не пишите Алику — а платить кто будет?',
+  gate(is(saidNuneNoWrite))('Не пишите Алику — а платить кто будет?'),
   'Декрет — это надолго? Как и мой долг?',
 ] as const
 
