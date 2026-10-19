@@ -71,12 +71,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      # кэш обязателен: без него шаг качает ~150 МБ (холодный прогон — до 3 минут)
-      - uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: ms-playwright-${{ runner.os }}-
+      # Браузеры не кэшируем: замер 99b6a47 — с кэшем 23s, без 22s (раздача apt доминирует
+      # и не кэшируется, восстановление ~300 МБ стоит как скачивание). Холодные 2m56s — сбой сети.
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e   # webServer сам собирает dist перед preview
 
