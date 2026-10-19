@@ -190,7 +190,9 @@ describe('регрессии раунда 16', () => {
   it('реплики легенд и обещаний не выдают старую новость и не обещают объяснений, которых не будет', () => {
     expect(texts(LEGENDS.niva_back.lines, {}).join(' ')).not.toMatch(/вернулась/)
     // заморозку ставят и Борис, и Рубик: до показаний Бориса легенда о нём не говорит
-    expect(texts(LEGENDS.frozen.lines, { 'intro.boris': true, 'arc.boris': 9 }).join(' ')).not.toMatch(/Борис/)
+    const frozenAt9 = texts(LEGENDS.frozen.lines, { 'intro.boris': true, 'arc.boris': 9, 'tax.frozen': true }).join(' ')
+    expect(frozenAt9, 'пул заморозки пуст — проверка не смотрит строки').toMatch(/заморожен/)
+    expect(frozenAt9).not.toMatch(/Борис/)
     expect(PROMISE_MET.join(' ')).not.toMatch(/Сейчас объясню/)
     for (const t of PROMISE_DUE_KEPT) expect(t).toContain('{t}')
     expect(String(valueOf(ARCS.rubik.eps.find((e) => texts(e.m, {}).join(' ').includes('проверяет уровнем'))!.m[0]))).not.toMatch(/который день/)
