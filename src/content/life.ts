@@ -1,7 +1,7 @@
 import { type Entry, type LineSpec, type Said, gate, gte, lte, eq, ne, is, missing, set } from './fact'
 import { type When } from './excuses'
 import { needs, WORLD } from './world'
-import { avitoReviewAt, bloodGiven, borisSaleAt, count, endgame, evicted, paydayScene, vacancyAt, wedding } from './memkeys'
+import { avitoReviewAt, bloodGiven, borisSaleAt, count, endgame, evicted, fraudLoan, paydayScene, vacancyAt, wedding } from './memkeys'
 import { sold, momHelp, momDachaDays } from './credit'
 import { billStreak } from './bills'
 
@@ -134,6 +134,8 @@ export interface Notif extends LineSpec { icon: string; app: string; spend?: tru
 const often = { repeat: true, cooldown: { turns: 40 } }
 export const NOTIF: Notif[] = [
   { icon: '🏦', app: 'Банк', t: 'Списание {spend} ₽. {what}. Баланс: {money} ₽', spend: true, when: [...moneyOpen], repeat: true, cooldown: { turns: 8 } },
+  // мошеннический кредит на имя игрока (#1069): объявление сцены живёт дальше — банк напоминает про остаток
+  { icon: '🏦', app: 'Банк', t: 'Кредит на ваше имя: остаток 300 000 ₽. Напоминаем: плательщик — вы.', when: [is(fraudLoan), ...moneyOpen] },
   { icon: '👩', app: 'Мама', t: 'Сынок, ты поел?', ...often }, { icon: '👩', app: 'Мама', t: 'Сынок, Алик заплатил?', ...often },
   { icon: '👩', app: 'Мама', t: 'Сынок, позвони маме.', ...often },
   { icon: '👩', app: 'Мама', t: 'Сынок, с Новым годом. Алик тебя поздравил? А перевёл?', when: [...holidayNewYear] },

@@ -238,6 +238,10 @@ export const samvelDivorceAt = 'samvel.divorceAt'
 /** Вердикт суда (#1058): кульминация линии — ход строки вердикта, ход и три после которого живёт
  *  окно отклика; сам вердикт уже хранит `courtVerdict`, это только штамп хода. */
 export const courtVerdictAt = 'court.verdictAt'
+/** Мошеннический кредит на имя игрока (#1069): сцена `loan` объявляет остаток 300 000 ₽ — состояние
+ *  мира остаётся на доске, чтобы банк напомнил о нём после сцены (факт-состояние, не штамп хода). */
+export const fraudLoan = 'bank.fraudLoan'
+
 /** Первая серия плиточной арки (#1059): заказчик поскользнулся на плитке игрока — ход строки,
  *  ход и три после которого живёт окно отклика (следующие серии отвечают только с arc.tile ≥ 2). */
 export const tileSlipAt = 'tile.slipAt'
@@ -276,7 +280,7 @@ export const MEM_KEYS: ReadonlySet<string> = new Set([
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday, saidKonak,
   lightOff, netRation, phoneWarn, holidayGreeted,
-  creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, collectorsTurned, criticalAt, creditOfferSum, momDachaAt, crewPaid, crewPaidAt, crewAllPaid, rubikBath, whenYears, ...Object.values(moneyAskAt), transferAt, transferAmount, moustachePhotoAt, moustacheStakeSaid, mamaMarketAt, samvelDivorceAt, courtVerdictAt, tileSlipAt, blockLifted, internDeclined, grantHouseAt, photoAt, debutWho, debutAt, arsenTrack,
+  creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, collectorsTurned, criticalAt, creditOfferSum, momDachaAt, crewPaid, crewPaidAt, crewAllPaid, rubikBath, whenYears, ...Object.values(moneyAskAt), transferAt, transferAmount, moustachePhotoAt, moustacheStakeSaid, mamaMarketAt, samvelDivorceAt, courtVerdictAt, tileSlipAt, fraudLoan, blockLifted, internDeclined, grantHouseAt, photoAt, debutWho, debutAt, arsenTrack,
   ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt, countersuitAt, grantTileAt,
   ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lend50),
 ])
