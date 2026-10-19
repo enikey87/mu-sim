@@ -1,6 +1,10 @@
 # CI: на каждый PR — тесты, типы и сборка.
 # Push в main — сборка и публикация на GitHub Pages
 # (в настройках репозитория Pages → Source = «GitHub Actions»).
+#
+# Три параллельных job'а вместо одного последовательного: гейт покрытия (6 выборок × 500 ходов
+# ботом, ~98s на 4 ядрах) держал критический путь всего прогона — теперь он идёт своим раннером
+# одновременно с остальными тестами, а e2e — со своими браузерами. Стенка = самый долгий job.
 name: CI & Pages
 
 on:
@@ -15,11 +19,11 @@ permissions:
   id-token: write
 
 jobs:
-  build:
+  tests:
     runs-on: ubuntu-latest
     # новые прогоны вытесняют старые: сборка предыдущего коммита больше не нужна
     concurrency:
-      group: pages-build-${{ github.ref }}
+      group: pages-tests-${{ github.ref }}
       cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
@@ -31,26 +35,54 @@ jobs:
       - run: npm audit --audit-level=high
       - run: npm run typecheck
       - run: npm run lint
-      - run: npm test             # в т.ч. 3 выборки покрытия + дрейф RARE
+      # настоящие партии ботом — в job'е coverage: здесь всё остальное (в т.ч. дрейф RARE)
+      - run: npx vitest run --exclude 'src/tools/coverage-gate.test.ts'
       - run: npm run test:rules   # движок правил — покрытие 100%
       - run: npm run build
-      # браузеры ставим прямо перед e2e: красный прогон тестов не платит за установку.
-      # Кэш ms-playwright обязателен: без него шаг качает ~150 МБ (холодный прогон — до 3 минут).
+      - if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  coverage:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pages-coverage-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # гейт (#278) на своём раннере: без конкуренции с остальным прогоном
+      - run: npx vitest run src/tools/coverage-gate.test.ts
+
+  e2e:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pages-e2e-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # кэш обязателен: без него шаг качает ~150 МБ (холодный прогон — до 3 минут)
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: ms-playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
           restore-keys: ms-playwright-${{ runner.os }}-
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
-      - if: github.event_name != 'pull_request'
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
+      - run: npm run test:e2e   # webServer сам собирает dist перед preview
 
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    needs: build
+    needs: [tests, coverage, e2e]
     runs-on: ubuntu-latest
     # начатая публикация досчитывается, следующая встаёт в очередь: отмена оставляет деплой незавершённым
     concurrency:
