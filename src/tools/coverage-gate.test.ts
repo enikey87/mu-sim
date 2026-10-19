@@ -3,11 +3,14 @@
 // сколько весь остальной набор (98s из 131s), и в CI он идёт своим job'ом параллельно остальным.
 // Синтетические проверки гейта (семейства сидов, классы never, DIRECT) остались в tools.test.ts.
 import { describe, it, expect } from 'vitest'
+import { availableParallelism } from 'node:os'
 import { multiSampleCoverage, formatCoverage, gateIssues, ruleCoverage, COVERAGE_SAMPLES } from './coverage'
 import { allRules } from '../content/rules'
 import { wallClock } from '../engine/clock'
 
 describe('покрытие правил: настоящие партии', () => {
+  // ВРЕМЕННАЯ ДИАГНОСТИКА PR-а: сколько ядер видит раннер
+  it('diagnostic: parallelism', () => { console.log(`DIAG cores=${availableParallelism()}`) })
   it(`за ${COVERAGE_SAMPLES.length} непересекающихся выборок (${COVERAGE_SAMPLES.filter((s) => s.kind === 'main').length} — до концовки) срабатывают все правила без прямого случая`, async () => {
     const r = await multiSampleCoverage()
     if (process.env.RULES_REPORT) {
