@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import { makeGame, setMoney, cards } from '../test/helpers'
 import { START_DAY, ARC_MARINATION_DAYS } from '../engine/state'
-import { collectorsRecruited, collectorsTurned, count, creditBroke, creditStage, endgame, finaleOf, internAt, internDeclined, intro, paydayScene, threatClaim } from './memkeys'
+import { collectorsRecruited, collectorsTea, collectorsTurned, count, creditBroke, creditStage, endgame, finaleOf, internAt, internDeclined, intro, paydayScene, threatClaim } from './memkeys'
 import { loanTaken, loanDueAt } from './credit'
 import { D } from './excuses'
 import { P_COLLECTORS_DEBUT } from './rules/player-choice-pools'
@@ -355,11 +355,30 @@ describe('«три чашки чая» ждёт предложения стаж�
     game.S.arcs.collectors = { i: 2, last: 0 }
     expect(game.holds(is(internAt)), 'стажировка в свежей партии — проверка пустеет').toBe(false)
     expect(pool(game), 'число «три» звучит до предложения стажировки').not.toContain(LINE)
-    // до финала пул держат безгейтные соседи: вопрос про коллекторов не пропадает
-    expect(pool(game).length, 'follow обескровлен гейтом — вопроса про коллекторов не осталось').toBeGreaterThanOrEqual(3)
+    // до финала пул держит безгейтный сосед: вопрос про коллекторов не пропадает
+    // (строк в пуле стало на одну меньше после гейта «чая длинного» на сцену чая, #1158)
+    expect(pool(game), 'follow обескровлен гейтом — вопроса про коллекторов не осталось').toContain('Коллекторы пишут, деньги требуют.')
     await game.playFinale('collectors', FINALES.collectors.find((f) => f.id === 'intern')!)
     expect(game.S.mem[internAt], 'предложение стажировки не штампануло ход').toBe(game.S.stats.sent)
     expect(pool(game), 'после предложения стажировки строки нет').toContain(LINE)
+  })
+})
+
+describe('«чай длинный» ждёт сцены чая (#1158)', () => {
+  const LINE = 'Коллекторы на объекте расселись: чай длинный, долг тоже.'
+  const pool = (g: Game) => g.open(ARCS.collectors.follow)
+
+  it('до третьей серии строка молчит, после сцены чая — звучит; пул не пустеет', async () => {
+    const { game } = makeGame()
+    game.S.mem[creditBroke] = true
+    game.S.arcs.collectors = { i: 2, last: 0 }
+    expect(game.holds(is(collectorsTea)), 'чай в свежей партии — проверка пустеет').toBe(false)
+    expect(pool(game), 'чай длинный до сцены чая').not.toContain(LINE)
+    // без строки чая вопрос про коллекторов держит безгейтный сосед — follow не обескровлен
+    expect(pool(game), 'в до-чаевом окне от коллекторов не осталось вопроса').toContain('Коллекторы пишут, деньги требуют.')
+    await game.playEpisode(ARCS.collectors.eps[2], 'collectors')
+    expect(game.S.mem[collectorsTea], 'сцена чая не записала факт').toBe(true)
+    expect(pool(game), 'после сцены чая строки нет').toContain(LINE)
   })
 })
 

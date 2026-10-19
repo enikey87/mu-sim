@@ -23,7 +23,7 @@ import {
   actSigned, grantPaid, rubikFined, threatClaim, nuneKeyPassed, nuneDekretOver, grandpaDying,
   betonSet, cardSent, saidTomorrow, saidFriday, saidKonak, saidHash, saidNuneNoWrite, payday, count, endgame, holidayGreeted, lend50,
   paydayScene, lightOff, netRation, phoneWarn, creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited,
-  collectorsTurned,
+  collectorsTurned, collectorsTea,
   criticalAt, creditOfferSum, crewPaid, crewPaidAt, crewAllPaid, moneyAskAt, rubikBath, whenYears, ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt, countersuitAt, grantTileAt, transferAt, transferAmount, moustachePhotoAt, moustacheStakeSaid, mamaMarketAt, mamaVoiceAt, samvelDivorceAt, courtVerdictAt, tileSlipAt, saleAt, saleWhat, fraudLoan, blockLifted, internDeclined, grantHouseAt, photoAt,
   debutWho, debutAt, arsenTrack,
 } from './memkeys'
@@ -61,7 +61,7 @@ export type MemExactKey =
   | typeof debutWho | typeof debutAt | typeof arsenTrack | typeof transferAt | typeof transferAmount
   | typeof lightOff | typeof netRation | typeof phoneWarn | typeof holidayGreeted
   | typeof creditStage | typeof creditOffer | typeof creditBroke | typeof momDone | typeof creditDeclined | typeof moneyPoor | typeof collectorsRecruited
-  | typeof collectorsTurned
+  | typeof collectorsTurned | typeof collectorsTea
   | typeof criticalAt | typeof creditOfferSum | typeof crewPaid | typeof crewPaidAt | typeof crewAllPaid | typeof moneyAskAt[keyof typeof moneyAskAt] | typeof rubikBath | typeof whenYears
   | typeof ramPhotoAt | typeof borisSaleAt | typeof vacancyAt | typeof avitoReviewAt
   | typeof rubikAskAt | typeof kettleAt | typeof lawyerAt | typeof collectorsAskAt | typeof internAt | typeof rubikHoleAt | typeof countersuitAt | typeof grantTileAt | typeof moustachePhotoAt | typeof moustacheStakeSaid | typeof mamaMarketAt | typeof mamaVoiceAt | typeof samvelDivorceAt | typeof courtVerdictAt | typeof tileSlipAt | typeof saleAt | typeof saleWhat | typeof fraudLoan | typeof blockLifted | typeof internDeclined | typeof grantHouseAt | typeof photoAt
