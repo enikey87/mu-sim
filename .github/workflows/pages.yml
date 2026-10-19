@@ -23,6 +23,8 @@ permissions:
 jobs:
   # docs-only: все изменения PR — docs/** или *.md. Пустой диф считаем кодом:
   # пустой коммит — штатный способ прогнать весь CI, он не должен пропускать тесты.
+  # Если PR молчит («no checks», событие не доставлено — транзиент GitHub, 19.10 ×2, #1125):
+  # gh workflow run pages.yml --ref <ветка> — надёжный будильник, проверен.
   changes:
     runs-on: ubuntu-latest
     concurrency:
