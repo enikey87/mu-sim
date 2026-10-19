@@ -2,12 +2,13 @@ import { describe, it, expect } from 'vitest'
 import type { Entry } from './fact-types'
 import { makeGame, alikTexts } from '../test/helpers'
 import { ARCS } from './arcs'
+import { LEGENDS } from './legends'
 import { FINALES } from './finales'
-import { valueOf } from './fact'
+import { is, valueOf } from './fact'
 import { Gated, type Criterion } from '../engine/rules'
 import { ARC_DONE } from './arcs'
 import { CHORUS } from './world'
-import { garikConcrete, garikCut, grantPaid, houseOnGarik, intro, taxFrozen } from './memkeys'
+import { garikConcrete, garikCut, grantPaid, houseOnGarik, intro, taxFrozen, wedding } from './memkeys'
 
 const lineText = (m: unknown) => (typeof m === 'string' ? m : (m as { t: string }).t)
 
@@ -633,6 +634,32 @@ describe('вопрос про коллекторов держит только �
     expect(/пишут/.test(JSON.stringify(ARCS.collectors.eps)), 'арка не показывает писем — строка была бы не про что').toBe(true)
   })
 
+})
+
+describe('колкость про нескончаемую свадьбу Самвела (#1114)', () => {
+  const LONGER = 'Самвел, ваша свадьба идёт дольше, чем я жду деньги. И обгоняет.'
+  const OUTLIVE = 'Эта свадьба переживёт нас обоих, Алик.'
+  const SETTLE = 'Алик, эта свадьба кончится или мне в ней прописаться?'
+  const follow = (game: ReturnType<typeof makeGame>['game']) => game.open(ARCS.samvel.follow)
+  const talk = (game: ReturnType<typeof makeGame>['game']) =>
+    game.open(LEGENDS.wedding.talk ?? []).map((p) => p[0])
+
+  it('до линии строк нет; линия идёт — есть, и после снятия восьмидневного флага тоже', async () => {
+    const { game } = makeGame()
+    expect(follow(game), 'до свадьбы колкости нет').not.toContain(LONGER)
+    expect(follow(game), 'до свадьбы колкости нет').not.toContain(OUTLIVE)
+    expect(talk(game), 'до свадьбы вопроса нет').not.toContain(SETTLE)
+    await game.playArc('samvel')
+    expect(game.holds(is(wedding('samvel'))), 'первая серия ставит флаг').toBe(true)
+    expect(follow(game), 'линия идёт').toContain(LONGER)
+    expect(follow(game), 'линия идёт').toContain(OUTLIVE)
+    expect(talk(game), 'линия идёт').toContain(SETTLE)
+    game.nextDay(9)
+    expect(game.holds(is(wedding('samvel'))), 'флаг восьми дней снят — проверка не пустеет').toBe(false)
+    expect(follow(game), 'свадьба в тексте не кончилась').toContain(LONGER)
+    expect(follow(game), 'свадьба в тексте не кончилась').toContain(OUTLIVE)
+    expect(talk(game), 'свадьба в тексте не кончилась').toContain(SETTLE)
+  })
 })
 
 describe('конверты Самвела: вопрос открывает реплика легенды, а не календарь (#1016)', () => {
