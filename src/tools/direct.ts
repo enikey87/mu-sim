@@ -65,7 +65,8 @@ export const DIRECT: Record<string, DirectCase> = {
   Finale_alik_death_will: { event: 'ArcFinale', facts: { arc: 'alik_death' }, setup: (g) => { g.S.ach.forgive = 1; g.S.mem['asked.alik_death'] = 1 } },
   // #1058 (окно вердикта суда) сдвинуло выборки — обычный финал «смерти» ни разу до экрана концовки.
   // asked.alik_death = 1: без вопросов о смерти матчится частный финал «Обиделся» (asked ≤ 0)
-  Finale_alik_death_default: { event: 'ArcFinale', facts: { arc: 'alik_death' }, setup: (g) => { g.S.mem['asked.alik_death'] = 1 } },
+  // #1068 (гейт «всем» в упрёке по звонку) сдвинул выборки обратно — финал снова виден (10 партий при пороге 7)
+  // Finale_alik_death_default: { event: 'ArcFinale', facts: { arc: 'alik_death' }, setup: (g) => { g.S.mem['asked.alik_death'] = 1 } }
   Finale_rubik_bribe: { event: 'ArcFinale', facts: { arc: 'rubik' }, setup: (g) => { g.S.ach.redo = 1 } },
   Finale_samvel_tamada: { event: 'ArcFinale', facts: { arc: 'samvel' }, setup: (g) => { g.S.ach.toast = 1 } },
   Ending_alik: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem['finale.garik'] = 'cutter' } },
@@ -260,7 +261,8 @@ export const DIRECT: Record<string, DirectCase> = {
   // хор Карине падают до нуля; в выборках гейта они редкие (3 и 5 партий из 72), потому держим прямыми случаями
   // Scene_deathbed: с #824/#828 срабатывает в выборках сам (7 партий при пороге 7) — прямой случай не нужен
   // #1001 (место Бориса в формулировках) снова ушло из выборок — «смертный одр» держим прямым случаем
-  Scene_deathbed: { event: 'PickScene', setup: (g) => { g.S.day = 245; g.S.mood = 5 } },
+  // #1068 (гейт «всем» в упрёке по звонку) сдвинул выборки обратно — сцена снова видна (8 партий при пороге 7)
+  // Scene_deathbed: { event: 'PickScene', setup: (g) => { g.S.day = 245; g.S.mood = 5 } }
   // #795: кнопки игрока (денежный вопрос вместо случайной кнопки про арку) сдвинули розыгрыш —
   // обычная сцена «жена» стала редкой в выборках, случай держали прямым (свой setup подавлял соседние сцены)
   // #889: перекалибровка вариантов бетона сдвинула розыгрыш — сцена снова в выборках CI
