@@ -2,9 +2,11 @@
 # Push в main — сборка и публикация на GitHub Pages
 # (в настройках репозитория Pages → Source = «GitHub Actions»).
 #
-# Три параллельных job'а вместо одного последовательного: гейт покрытия (6 выборок × 500 ходов
-# ботом, ~98s на 4 ядрах) держал критический путь всего прогона — теперь он идёт своим раннером
-# одновременно с остальными тестами, а e2e — со своими браузерами. Стенка = самый долгий job.
+# Прогон разбит на параллельные job'ы: tests (всё, кроме гейта покрытия),
+# coverage (настоящие партии ботом) и e2e (браузеры) — плюс обязательный чек
+# ruleset'а build: он зелёный только когда зелёны все три. Job changes считает,
+# трогает ли PR только документацию: такие PR тяжёлые job'ы пропускают
+# (проверять в них нечего), но обязательный чек остаётся на месте.
 name: CI & Pages
 
 on:
@@ -19,7 +21,46 @@ permissions:
   id-token: write
 
 jobs:
+  # docs-only: все изменения PR — docs/** или *.md. Пустой диф считаем кодом:
+  # пустой коммит — штатный способ прогнать весь CI, он не должен пропускать тесты.
+  changes:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pages-changes-${{ github.ref }}
+      cancel-in-progress: true
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - id: diff
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! files=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --paginate --jq '.[].filename'); then
+            echo "не удалось получить список файлов — считаем кодом" >&2
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "изменённые файлы:"; echo "$files"
+          code=true
+          if [ -n "$files" ]; then
+            code=false
+            while IFS= read -r f; do
+              case "$f" in
+                *.md|docs/*) ;;
+                *) code=true ;;
+              esac
+            done <<< "$files"
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          [ "$code" = false ] && echo "PR трогает только документацию" || echo "PR трогает код"
+
   tests:
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     # новые прогоны вытесняют старые: сборка предыдущего коммита больше не нужна
     concurrency:
@@ -31,7 +72,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      - run: npm ci --prefer-offline --no-audit
       - run: npm audit --audit-level=high
       - run: npm run typecheck
       - run: npm run lint
@@ -45,6 +86,8 @@ jobs:
           path: dist
 
   coverage:
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     concurrency:
       group: pages-coverage-${{ github.ref }}
@@ -55,11 +98,13 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      - run: npm ci --prefer-offline --no-audit
       # гейт (#278) на своём раннере: без конкуренции с остальным прогоном
       - run: npx vitest run src/tools/coverage-gate.test.ts
 
   e2e:
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     concurrency:
       group: pages-e2e-${{ github.ref }}
@@ -70,25 +115,30 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      - run: npm ci --prefer-offline --no-audit
       # Браузеры не кэшируем: замер 99b6a47 — с кэшем 23s, без 22s (раздача apt доминирует
       # и не кэшируется, восстановление ~300 МБ стоит как скачивание). Холодные 2m56s — сбой сети.
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e   # webServer сам собирает dist перед preview
 
   build:
-    # Обязательный чек ruleset'а «main: PR + green build + up to date»: зелёный только когда
-    # зелёны все три job'а — разделение не ослабляет гейт мержа.
+    # Обязательный чек ruleset'а «main: PR + green build + up to date»: зелёный, когда
+    # зелёны все три job'а. Документационному PR тяжёлые job'ы пропущены намеренно —
+    # для него чека достаточно без них (проверять нечего: ни кода, ни сборки).
     if: always()
-    needs: [tests, coverage, e2e]
+    needs: [changes, tests, coverage, e2e]
     runs-on: ubuntu-latest
     concurrency:
       group: pages-build-${{ github.ref }}
       cancel-in-progress: true
     steps:
-      - name: Все три job'а зелёные
+      - name: Все три job'а зелёные (или PR только с документацией)
         run: |
-          echo "tests=${{ needs.tests.result }} coverage=${{ needs.coverage.result }} e2e=${{ needs.e2e.result }}"
+          echo "event=${{ github.event_name }} code=${{ needs.changes.outputs.code }} tests=${{ needs.tests.result }} coverage=${{ needs.coverage.result }} e2e=${{ needs.e2e.result }}"
+          if [ "${{ github.event_name }}" = "pull_request" ] && [ "${{ needs.changes.outputs.code }}" = "false" ]; then
+            echo "PR трогает только документацию — тяжёлые job'ы пропущены намеренно"
+            exit 0
+          fi
           test "${{ needs.tests.result }}" = success
           test "${{ needs.coverage.result }}" = success
           test "${{ needs.e2e.result }}" = success
