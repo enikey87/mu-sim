@@ -472,6 +472,28 @@ describe('follow-вопросы бетона не называют развяз�
   })
 })
 
+describe('follow «Тогда и долги его живы?» — под гейтом 4-й серии grandpa (#1082)', () => {
+  const LINE = 'Дедушка Грачик жив? Тогда и долги его живы?'
+
+  it('до 4-й серии строки нет в пуле следования, после — есть', async () => {
+    const { game } = makeGame()
+    const pool = () => game.open(ARCS.grandpa.follow)
+    game.S.arcs.grandpa = { i: 3, last: -99 }
+    expect(pool(), 'долги дедушки вводит 4-я серия — до неё «долги его» не названы').not.toContain(LINE)
+    game.S.day += 5
+    await game.playArc('grandpa') // 4-я серия: «Мне — долги. Тебе — благословение»
+    expect(pool(), 'завещание прозвучало — вопрос уместен').toContain(LINE)
+  })
+
+  // негативный контроль: та же строка без gate видна до 4-й серии — значит, вопрос скрывает именно номер серии (модель #858)
+  it('снятие гейта возвращает вопрос: строка без gate видна до серии', () => {
+    const { game } = makeGame()
+    game.S.arcs.grandpa = { i: 3, last: -99 }
+    const bare = [...ARCS.grandpa.follow.slice(0, 1), LINE] as Entry<string>[]
+    expect(game.open(bare)).toContain(LINE)
+  })
+})
+
 describe('follow-строки оперируют только введёнными фактами (#813)', () => {
   /** Числа строки без разделителей: «8 000» → 8000. */
   const numbers = (t: string): string[] => (t.match(/\d[\d\s\u00A0]*\d|\d/g) ?? []).map((n) => n.replace(/[\s\u00A0]/g, ''))
@@ -549,6 +571,7 @@ describe('follow-строки оперируют только введённым
     // inArc — слово принадлежит этому сериалу: чужой «акт» Нуне или чужое «завещание» Алика проверяются своими воротами
     const FACT_WORDS: Array<{ re: RegExp; arc: string; from: number; inArc?: string; facts?: string[]; why: string }> = [
       { re: /завещани|наследств/i, arc: 'grandpa', from: 4, inArc: 'grandpa', why: 'завещание и раскладку называет 4-я серия grandpa' },
+      { re: /долги его|долги дедушк/i, arc: 'grandpa', from: 4, inArc: 'grandpa', why: 'долги дедушки вводит 4-я серия grandpa («Мне — долги»)' },
       { re: /хоспис|шаурмичн/i, arc: 'grandpa', from: 6, inArc: 'grandpa', why: 'хоспис и шаурмичная — последняя серия grandpa' },
       { re: /штраф/i, arc: 'rubik', from: 3, inArc: 'rubik', why: '«штраф» Рубик произносит в 3-й серии' },
       { re: /(?<![а-яё])акт/i, arc: 'rubik', from: 7, inArc: 'rubik', why: 'акт обсуждают в 7-й серии rubik' },
