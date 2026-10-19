@@ -11,7 +11,7 @@ import { ARCS } from './arcs'
 import { FINALES } from './finales'
 import { COURT_LAWYER_AGAIN } from './quests'
 import { RUDE_CALLS_VOICE, MAMA_VOICE_CRY } from './rude'
-import { court, HEAT, lawyerAt, debutWho, arsenTrack, saidStrasburg, grantTileAt, grantHouseAt, mamaMarketAt, mamaVoiceAt, mamaCalls, samvelDivorceAt, tileSlipAt, saleAt, saleWhat } from './memkeys'
+import { count, collectorsRecruited, court, crewPaid, crewPaidAt, HEAT, internAt, lawyerAt, debutWho, arsenTrack, saidStrasburg, grantTileAt, grantHouseAt, mamaMarketAt, mamaVoiceAt, mamaCalls, samvelDivorceAt, tileSlipAt, saleAt, saleWhat } from './memkeys'
 import { valueOf, type Line } from './fact'
 import type { Choice } from '../engine/state'
 
@@ -623,6 +623,33 @@ describe('окно второго дебюта Гранта — дом «с кл
     expect(said.some((t) => GRANT_HOUSE_B.map(text).some((p) => t.includes(p))), `ответ не из пула события: ${said.join(' | ')}`).toBe(true)
     expect(game.S.mem[grantHouseAt], 'ответ не потребил окно').toBeUndefined()
     expect(button(), 'после ответа окно закрыто').toBeUndefined()
+  })
+})
+
+describe('окно предложения стажировки (#1083)', () => {
+  it('предложение штампует ход, кнопка в блоке события при конкурентах, окно три хода', async () => {
+    // состояние хода из плейтеста 86 (seed 215117): за слоты блока с предложением конкурировали
+    // звонок с объекта (специфичность 7) и вопрос про сериал (4) — кнопка уходила в следующий блок.
+    // Фикс — bonus 5 у оффера (специфичность 6): кнопка берёт второй слот уже на ходу предложения;
+    // НК — вернуть bonus 3 — слот у кнопки снова отбирает случайный из группы 4, тест краснеет
+    for (let seed = 1; seed <= 20; seed++) {
+      const { game } = makeGame({ seed })
+      game.S.mem[count.rude] = 6
+      game.S.mem[collectorsRecruited] = true
+      game.S.mem[crewPaid] = true
+      game.S.mem[crewPaidAt] = game.S.stats.sent
+      game.S.arcs.collectors = { i: ARCS.collectors.eps.length - 1, last: game.S.day }
+      const button = () => { game.S.choices = null; return game.buildChoices().find((c) => c.act === 'internOffer') }
+      expect(button(), `seed ${seed}: до предложения кнопка есть`).toBeUndefined()
+      await game.playArc('collectors')
+      const at = Number(game.S.mem[internAt])
+      expect(at, `seed ${seed}: предложение не штампануло ход`).toBe(game.S.stats.sent)
+      expect(button(), `seed ${seed}: на ходу предложения кнопки нет в блоке`).toBeTruthy()
+      game.S.stats.sent = at + 3
+      expect(button(), `seed ${seed}: третий ход после предложения — ещё окно`).toBeTruthy()
+      game.S.stats.sent = at + 4
+      expect(button(), `seed ${seed}: вне окна — кнопки нет`).toBeUndefined()
+    }
   })
 })
 
