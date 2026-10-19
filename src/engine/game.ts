@@ -1,6 +1,6 @@
 // Игра: состояние, сообщения, ход Алика, «живость». Решения — что ответить, что предложить игроку,
 // что сделать Алику — принимает система правил (engine/rules/, content/rules/*).
-import { make, D, TRANSFER_FRESH_TURNS, PHOTO_FRESH_TURNS, low, cap, type ExcuseApi, type Promise3, type PromiseCondition, type Rel, type When } from '../content/excuses'
+import { make, D, TRANSFER_FRESH_TURNS, PHOTO_FRESH_TURNS, low, cap, type ExcuseApi, type Promise3, type PromiseCondition, type Rel, type When, type WhenKind } from '../content/excuses'
 import { makeScenes, invKey, type Scene, type Line } from '../content/scenes'
 import { BLOCK_LIFTED_LINE, BLOCK_LIFTED_SYS, COLD_WAR, TRIBUNAL } from '../content/rude'
 import { MIRROR, MIRROR_AGAIN, MIRROR_OPEN, MIRROR_REPLY, type Mirror } from '../content/mirror'
@@ -14,7 +14,7 @@ import { ARCS, ARC_DONE, ARC_MENTIONS, CAST, type Episode, GROUP, GROUP_OOPS, WR
 import * as L from '../content/life'
 import { ACH } from '../content/achievements'
 import { meet, speaks } from '../content/world'
-import { ALIK_STATUS, BLOOD_PAY, FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_HIDDEN, STATUS_WANDER, OATH_FORMS, OATH_STAKE_MOUSTACHE } from '../content/misc'
+import { ALIK_STATUS, BLOOD_PAY, FLOOR, PHOTO_A, PHOTO_B, JOB_YES_P, JOB_NO_P, PLAYER_ADDRESSEES, PLAYER_PREFIX, PLAYER_SUFFIX, STATUS_HIDDEN, STATUS_WANDER, OATH_FORMS, OATH_STAKE_MOUSTACHE } from '../content/misc'
 import { STARTS } from '../content/quests'
 import { BILLS, billDue, billDueAt, billStreak, billUnpaid, lightOff, netRation, phoneWarn, type BillId } from '../content/bills'
 import {
@@ -76,6 +76,23 @@ export class GameDisposed extends Error {
 
 type PoorText = string | { t: string; arg?: string }
 const poorText = (item: PoorText): string => typeof item === 'string' ? item : item.t
+
+/** Обещание так, как его записывает журнал: срок, род и ставка. `kind`/`est`/`holiday`/`state` нужны,
+ *  чтобы сохранить названный горизонт в днях (`PromiseRec.days`, #1118); `t` — срок из легенды,
+ *  по нему повтор находит себя в журнале. */
+interface PromiseInput {
+  text: string
+  d: number | null
+  due?: Due
+  condition?: PromiseCondition
+  tomorrow?: boolean
+  stake?: 'moustache'
+  kind?: WhenKind
+  est?: number
+  holiday?: When['holiday']
+  state?: When['state']
+  t?: string
+}
 
 export interface GameOptions {
   storage?: Storage | null
@@ -520,6 +537,8 @@ export class Game {
     return { ...(t as object), text: t.text ? said(t.text) : '' } as T
   }
   playerDecor = (t: string): string => {
+    // вокатив третьему лицу в начале строки («Тарон, …») — адресат уже есть, префикс к Алику не клеим (#1108)
+    if (PLAYER_ADDRESSEES.has(t.split(',', 1)[0]!)) return t
     if (/^Алик/.test(t)) return t + this.draw('PSUF', PLAYER_SUFFIX)
     const pre = this.draw('PPRE', PLAYER_PREFIX)
     return pre + (pre.endsWith(', ') ? low(t) : t)
@@ -1052,7 +1071,8 @@ export class Game {
     const got = this.relief(thing.amount)
     if (got === 0) return
     // без «Нивы» продажа резины убирает и машину (has.car гаснет): факт — там же, где это происходит (#530)
-    const ops = [set(creditOffer, false), set(sold(thing.id), true)]
+    // штамп продажи (#1084): ход и что продано — окно отклика игрока живёт ход продажи и три после
+    const ops = [set(creditOffer, false), set(sold(thing.id), true), set(memkeys.saleAt, this.S.stats.sent), set(memkeys.saleWhat, thing.id)]
     if (thing.id === 'tires' && !this.nivaAtPlayer()) ops.push(set(memkeys.carGone, true))
     this.rules.applyOps(ops, {})
     delete this.S.mem[memkeys.creditOfferSum]
@@ -1559,6 +1579,21 @@ export class Game {
     const lie = this.lie()
     const moneyLv = this.moneyLevel()
     const whenDays = c.whenAt === undefined ? undefined : Math.max(0, c.whenAt - S.day)
+    // рекорд названных сроков (#1118): «долгов на 91 день? Было и 343». Срок, на который отвечает кнопка,
+    // сам себя рекордом не делает — иначе «больше всего названного» не сработало бы никогда.
+    // Старое сохранение (до #1118) дней не хранит: считаем по дате записи — у увёртки с `est` это меньше
+    // названного, то есть ошибка в пользу «не помню» на сроке, который, возможно, уже звучал.
+    const promiseRecordDays = (() => {
+      let max = 0
+      for (const p of S.promises) {
+        const days = p.days ?? (p.due == null ? undefined : p.due - p.made)
+        // день записи и абсолютная дата, не остаток whenDays: на следующий день остаток уже меньше
+        // названного горизонта, и обещание становилось собственным рекордом (#1132)
+        if (days === undefined || (p.made === c.whenMade && (p.due ?? undefined) === (c.whenDue ?? undefined))) continue
+        if (days > max) max = days
+      }
+      return max
+    })()
     return {
       day: S.day, tier: S.tier, mood: S.mood, sent: S.stats.sent, moo: S.stats.moo, patience: S.patience, money: S.money, debt: S.debt, fifty: S.stats.fifty, paid: S.stats.paid,
       moneyNormal: moneyLv === 'normal', moneyLow: moneyLv === 'low', moneyBottom: moneyLv === 'bottom',
@@ -1610,6 +1645,10 @@ export class Game {
       courtVerdictFresh: S.stats.sent - Number(S.mem[memkeys.courtVerdictAt] ?? -99) <= 3,
       // первая серия плиточной арки (#1059): падение заказчика — отклик живёт ход серии и три после
       tileSlipFresh: S.stats.sent - Number(S.mem[memkeys.tileSlipAt] ?? -99) <= 3,
+      // продажа имущества со дна (#1084): заметное событие — отклик живёт ход продажи и три после;
+      // что продано — якорь пула: кнопка говорит про проданную вещь, а не про любую из проданных
+      saleFresh: S.stats.sent - Number(S.mem[memkeys.saleAt] ?? -99) <= 3,
+      saleItem: String(S.mem[memkeys.saleWhat] ?? ''),
       // второй дебют Гранта (#1041): дом «с кладом» — заметное событие, окно то же
       grantHouseFresh: S.stats.sent - Number(S.mem[memkeys.grantHouseAt] ?? -99) <= 3,
       // фото «платёжки» (#1017): заметное событие — отклик живёт ход фото и PHOTO_FRESH_TURNS после
@@ -1639,6 +1678,10 @@ export class Game {
       sinceAlik: daysSince(S.day, S.mem[memkeys.alikDay]),
       lateCount: this.lateCount(),
       somedayCount: S.promises.filter((p) => p.due == null && !p.condition).length,
+      // рекорд сроков и место текущего срока относительно него (#1118): «не помню» — только за новым рекордом
+      promiseRecordDays,
+      promiseRecordNew: whenDays !== undefined && whenDays > promiseRecordDays,
+      promiseRecordSeen: whenDays !== undefined && promiseRecordDays > 0 && whenDays <= promiseRecordDays,
       // сама — не больше одной серии в день: три легенды денег за день — уже не сюжет, а шум
       arcAvailable: this.availableArcs().length > 0 && !Object.values(S.arcs).some((a) => a.last === S.day),
       // маринование первой арки (#1004): в первые дни родня не пишет — групповой чат ждёт, как и сериал
@@ -2068,13 +2111,19 @@ export class Game {
   meetRel(r?: Rel): void {
     if (r?.id) this.rules.applyOps(meet(r.id), {})
   }
-  recordPromise(p?: { text: string; d: number | null; due?: Due; condition?: PromiseCondition; tomorrow?: boolean; stake?: 'moustache' } | null): void {
+  recordPromise(p?: PromiseInput | null): void {
     if (!p) return
     if (p.condition && this.conditionHolds(p.condition)) return
     if (p.tomorrow) this.rules.applyOps([set(memkeys.saidTomorrow, true)], {})
     if (p.due && 'weekday' in p.due && p.due.weekday === 5) this.rules.applyOps([set(memkeys.saidFriday, true)], {})
     const due = p.d == null ? null : this.S.day + (p.due ? dueIn(p.due, this.S.day) : p.d)
-    this.S.promises.push({ t: p.text, made: this.S.day, due, condition: p.condition, stake: p.stake })
+    // названный горизонт — тот же, из которого строится `ctx.whenDays` (#1118): у увёртки это поздняя
+    // из двух дат, у праздника — календарь, у события — остаток состояния или оценка
+    const whenAt = p.kind === undefined
+      ? due ?? undefined
+      : this.horizonAt({ t: p.text, d: p.d, kind: p.kind, due: p.due, condition: p.condition, est: p.est, holiday: p.holiday, state: p.state }, due)
+    const days = whenAt === undefined ? undefined : Math.max(0, whenAt - this.S.day)
+    this.S.promises.push({ t: p.text, made: this.S.day, due, days, condition: p.condition, stake: p.stake })
     // «сегодня» (due === day) тоже планируем — иначе d:0 молчит (#307)
     if (due !== null && due >= this.S.day) this.scheduleEvent(due, 'PromiseDue', { promise: this.S.promises.length - 1 })
     if (this.S.promises.length >= 20) this.unlock('promises20')
@@ -2088,7 +2137,7 @@ export class Game {
     return !!this.S.mem[c]
   }
   /** Срок легенды второй раз в журнал не пишем — повтор не новость (#179); прошедший срок в днях — новость. Повтор со ставкой переносит ставку в живую запись (#327). */
-  private recordPromiseOnce(p: { text: string; t?: string; d: number | null; due?: Due; condition?: PromiseCondition; tomorrow?: boolean; stake?: 'moustache' }): void {
+  private recordPromiseOnce(p: PromiseInput): void {
     const day = this.S.day
     const seen = p.condition
       ? this.S.promises.find((x) => x.condition === p.condition)
@@ -2320,12 +2369,16 @@ export class Game {
       text = m.text.slice(0, at) + repl + m.text.slice(at + p.t.length)
       // род и горизонт правленого срока — от разметки термина (#923): «в следующем году» — дата, а не «никогда»
       const due = term.d == null ? null : this.S.day + (term.due ? dueIn(term.due, this.S.day) : term.d)
+      const named = this.horizonAt(term, due)
       const rec = this.S.promises[this.S.promises.length - 1]
       if (rec && rec.t.includes(p.t)) {
         rec.t = rec.t.replace(p.t, w)
         rec.due = due // журнал хранит абсолютную дату срока: у «когда-нибудь» её нет
+        // тот же горизонт, что пишет recordPromise: без пересчёта days оставался от старого срока (#1132)
+        if (named === undefined) delete rec.days
+        else rec.days = Math.max(0, named - this.S.day)
       }
-      this.S.ctx = { ...this.S.ctx, when: w, whenNever: due == null, whenKind: term.kind, whenAt: this.horizonAt(term, due), whenMade: this.S.day, whenDue: due }
+      this.S.ctx = { ...this.S.ctx, when: w, whenNever: due == null, whenKind: term.kind, whenAt: named, whenMade: this.S.day, whenDue: due }
     } else {
       text = m.text.replace(/[.!]?$/, this.draw('EDIT_SUFFIX', L.EDIT_SUFFIX) + '.')
     }

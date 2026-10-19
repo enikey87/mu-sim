@@ -430,7 +430,7 @@ describe('концовки игры', () => {
     const floor = (e: (typeof ENDINGS)[number], key: string) => Math.max(0, ...e.when.filter((c) => c.key === key && c.op === '>=').map((c) => Number(c.value)))
     const forcing = (g: Game) => g.rules.all.filter((r) => r.event === 'StoryBeat' && r.name.startsWith('Beat_Payday')).map((r) => r.name)
     // #893: подводка (Lead) тоже вынуждает выплату — она в семье Beat_Payday* наравне с анонсом
-    expect(forcing(makeGame().game)).toEqual(['Beat_PaydayLead_First', 'Beat_PaydayLead_Late', 'Beat_PaydayLead_Second', 'Beat_Payday', 'Beat_Payday_Late']) // пустой список сторожил бы вакуум
+    expect(forcing(makeGame().game)).toEqual(['Beat_PaydayLead_First', 'Beat_PaydayLead_Late', 'Beat_PaydayLead_Deadline', 'Beat_PaydayLead_Second', 'Beat_Payday', 'Beat_Payday_Late', 'Beat_Payday_Deadline']) // пустой список сторожил бы вакуум
     for (const [id, steps] of Object.entries(SCENARIO)) {
       const e = ENDINGS.find((x) => x.id === id)!
       const { game } = makeGame()
@@ -661,8 +661,13 @@ describe('«Бараном»: барахолка доходит до игрок�
     // барахолка не показана в 7, 15, 17 и 21; 1, 3 и 4 доходят до выплаты, барахолка показана.
     // #1071 (окно дебюта Нуне) сдвинуло розыгрыш — замер 1–24: не доходят 1, 7, 18, 19 и 24;
     // 2, 3 и 4 доходят до выплаты, барахолка показана.
+    // #1082 (гейт «Тогда и долги его живы?» и безгейтный вопрос «как там» у дедушки) сдвинул розыгрыш —
+    // замер 1–24: до выплаты не доходят 1, 18, 19 и 24; 2, 3 и 4 доходят, барахолка показана.
+    // #1118 (хвост «не помню» по рекорду журнала обещаний — пул P_WHEN_FAR вырос на строку) сдвинул розыгрыш;
+    // #1122 (расширение нейтральных пулов) поверх #1118 — замер 1–24: до выплаты не доходят 1, 9, 13, 15, 17,
+    // 20, 22 и 23; барахолка не показана в 4 и 16; 2, 3 и 5 доходят до выплаты, барахолка показана.
     // Проверка та же: партия доходит до выплаты и сцена показана.
-    for (const seed of [2, 3, 4]) {
+    for (const seed of [2, 3, 5]) {
       const { game } = makeGame({ seed })
       const r = await playToPayday(game)
       expect(r.payday, `сид ${seed}: партия не дошла до Дня выплаты — проверка была бы пустой`).not.toBeNull()

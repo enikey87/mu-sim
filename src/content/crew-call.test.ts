@@ -234,7 +234,8 @@ describe('упрёк по звонку с объекта', () => {
 
   // плейтест-раунд 46 / аудит раунда 38 (#731): префикс декора ронял первую букву имени — «Алик, тарон звонил»
   // #1068: пул делится фактом crewAllPaid — открытые строки собираем в обоих состояниях мира
-  it('упрёк с Тароном звучит с заглавной при любом префиксе — и в кнопке, и в отправленной реплике', async () => {
+  // #1108: вокатив «Тарон, …» — уже адресат, префикс-обращение к Алику на него не клеится (двойного адресата нет)
+  it('упрёк с Тароном — с заглавной и без двойного адресата, в кнопке и в отправленной реплике', async () => {
     const pass = async (game: Game) => {
       const rules = optCrewPaid(game)
       expect(rules).toHaveLength(1)
@@ -249,22 +250,31 @@ describe('упрёк по звонку с объекта', () => {
       for (const c of raw.values()) await game.send(c)
 
       const decorated = new Map<string, Choice>()
-      const prefixedTaron = () => [...decorated.keys()].filter((t) => /^(Алик, |Слушайте, |Так, |Алик-джан, ).*арон/i.test(t)).length
-      for (let i = 0; i < 120 && prefixedTaron() === 0; i++) {
+      for (let i = 0; i < 120; i++) {
         const c = offer()
         if (c) decorated.set(c.text, c)
       }
-      const taron = [...decorated.entries()].filter(([t]) => /арон/i.test(t))
+      const taron = [...decorated.entries()].filter(([t]) => /Тарон/.test(t))
       expect(taron.length, 'вариант с Тароном попадался').toBeGreaterThan(0)
       for (const [t] of taron) expect(t, t).toMatch(/Тарон/)
-      // проверка не на одном случае: среди повторов есть префикс с запятой — именно там low понижал букву
-      expect(prefixedTaron(), 'вариант с префиксом-обращением').toBeGreaterThan(0)
+      const vocative = taron.filter(([t]) => /^Тарон,/.test(t))
+      const about = taron.filter(([t]) => /Тарон писал/.test(t))
+      // #1108: вокатив третьему лицу префикса не получает; сообщение о Тароне («Тарон писал: …») — получает как раньше
+      if (game.S.mem[crewAllPaid]) {
+        expect(about.length, 'строка-сообщение о Тароне в мире «всем заплатили»').toBeGreaterThan(0)
+        expect(vocative, 'вокатив живёт только в мире без «всем»').toEqual([])
+        expect(about.some(([t]) => /^(Алик, |Слушайте, |Так, |Алик-джан, |Секунду\. |Эм… )Тарон писал/.test(t)), 'строка-сообщение декорируется префиксом').toBe(true)
+      } else {
+        expect(vocative.length, 'вокатив «Тарон, …» попадался среди повторов').toBeGreaterThan(0)
+        expect(about, 'строки-сообщения в этом мире нет').toEqual([])
+        for (const [t] of vocative) expect(t, `вокатив без двойного адресата: «${t}»`).not.toMatch(/^(Алик|Слушайте|Так)/)
+      }
 
-      const c = taron.find(([t]) => t.startsWith('Алик, '))?.[1] ?? taron[0]![1]
+      const c = taron[0]![1]
       const n = game.S.msgs.length
       await game.send(c)
       const mine = game.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' && m.from === 'me' ? [m.text] : []))
-      expect(mine[0], 'отправленная реплика — с заглавной').toMatch(/Тарон/)
+      expect(mine[0], 'отправленная реплика — показанная строка').toBe(c.text)
     }
     const callWith = async (variant: readonly [string, string]): Promise<Game> => {
       const { game } = makeGame()

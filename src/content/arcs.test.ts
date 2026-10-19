@@ -2,12 +2,13 @@ import { describe, it, expect } from 'vitest'
 import type { Entry } from './fact-types'
 import { makeGame, alikTexts } from '../test/helpers'
 import { ARCS } from './arcs'
+import { LEGENDS } from './legends'
 import { FINALES } from './finales'
-import { valueOf } from './fact'
+import { is, valueOf } from './fact'
 import { Gated, type Criterion } from '../engine/rules'
 import { ARC_DONE } from './arcs'
 import { CHORUS } from './world'
-import { garikConcrete, garikCut, grantPaid, houseOnGarik, intro, taxFrozen } from './memkeys'
+import { garikConcrete, garikCut, grantPaid, houseOnGarik, intro, taxFrozen, wedding } from './memkeys'
 
 const lineText = (m: unknown) => (typeof m === 'string' ? m : (m as { t: string }).t)
 
@@ -349,6 +350,35 @@ describe('follow Бориса и остальных арок: строка с ф
   })
 })
 
+describe('«Нива» звонит только после первого «Би-бип» (#1112)', () => {
+  const CALLS = '«Нива» мне всё звонит, а платить всё равно Алику.'
+  const GONE = '«Нива» уехала, а долг остался у тебя.'
+
+  it('до «Би-бип» строки про звонки нет, есть формулировка без звонков; после — наоборот', async () => {
+    const { game } = makeGame()
+    const pool = () => game.open(ARCS.niva.follow)
+    await game.playArc('niva') // серия 1: «Нива» у Алика, уехать ещё не успела
+    expect(pool(), '«Нива» ещё не в бегах — говорить не о чем').not.toContain(GONE)
+    await game.playArc('niva') // серия 2: уехала — nivaAway
+    expect(game.S.mem['niva.away'], '«Нива» не уехала — проверка пустеет').toBe(true)
+    expect(pool(), 'звонков ещё не было').toContain(GONE)
+    expect(pool(), 'звонков ещё не было').not.toContain(CALLS)
+    for (let i = 0; i < 3; i++) await game.playArc('niva') // серии 3–5: Гюмри, Грузия, «Би-бип.»
+    expect(game.S.mem['wrote.niva'], '«Нива» не написала — проверка пустеет').toBe(true)
+    expect(pool()).toContain(CALLS)
+    expect(pool(), 'после звонка заменять нечем').not.toContain(GONE)
+  })
+
+  // негативный контроль: та же строка без гейта первого сообщения видна и до «Би-бип» — значит, прячет её именно гейт
+  it('снятый гейт первого сообщения возвращает строку про звонки до «Би-бип»', async () => {
+    const { game } = makeGame()
+    await game.playArc('niva')
+    await game.playArc('niva')
+    const bare = [...ARCS.niva.follow.filter((e) => valueOf(e) !== CALLS), CALLS] as Entry<string>[]
+    expect(game.open(bare), 'без гейта строка есть').toContain(CALLS)
+  })
+})
+
 describe('вопрос про развязку Самвела — только перед серией, которая отвечает (#604)', () => {
   const at = () => [0, 1, 2, 3, 4, 5, 6, 7]
 
@@ -472,6 +502,28 @@ describe('follow-вопросы бетона не называют развяз�
   })
 })
 
+describe('follow «Тогда и долги его живы?» — под гейтом 4-й серии grandpa (#1082)', () => {
+  const LINE = 'Дедушка Грачик жив? Тогда и долги его живы?'
+
+  it('до 4-й серии строки нет в пуле следования, после — есть', async () => {
+    const { game } = makeGame()
+    const pool = () => game.open(ARCS.grandpa.follow)
+    game.S.arcs.grandpa = { i: 3, last: -99 }
+    expect(pool(), 'долги дедушки вводит 4-я серия — до неё «долги его» не названы').not.toContain(LINE)
+    game.S.day += 5
+    await game.playArc('grandpa') // 4-я серия: «Мне — долги. Тебе — благословение»
+    expect(pool(), 'завещание прозвучало — вопрос уместен').toContain(LINE)
+  })
+
+  // негативный контроль: та же строка без gate видна до 4-й серии — значит, вопрос скрывает именно номер серии (модель #858)
+  it('снятие гейта возвращает вопрос: строка без gate видна до серии', () => {
+    const { game } = makeGame()
+    game.S.arcs.grandpa = { i: 3, last: -99 }
+    const bare = [...ARCS.grandpa.follow.slice(0, 1), LINE] as Entry<string>[]
+    expect(game.open(bare)).toContain(LINE)
+  })
+})
+
 describe('follow-строки оперируют только введёнными фактами (#813)', () => {
   /** Числа строки без разделителей: «8 000» → 8000. */
   const numbers = (t: string): string[] => (t.match(/\d[\d\s\u00A0]*\d|\d/g) ?? []).map((n) => n.replace(/[\s\u00A0]/g, ''))
@@ -549,6 +601,7 @@ describe('follow-строки оперируют только введённым
     // inArc — слово принадлежит этому сериалу: чужой «акт» Нуне или чужое «завещание» Алика проверяются своими воротами
     const FACT_WORDS: Array<{ re: RegExp; arc: string; from: number; inArc?: string; facts?: string[]; why: string }> = [
       { re: /завещани|наследств/i, arc: 'grandpa', from: 4, inArc: 'grandpa', why: 'завещание и раскладку называет 4-я серия grandpa' },
+      { re: /долги его|долги дедушк/i, arc: 'grandpa', from: 4, inArc: 'grandpa', why: 'долги дедушки вводит 4-я серия grandpa («Мне — долги»)' },
       { re: /хоспис|шаурмичн/i, arc: 'grandpa', from: 6, inArc: 'grandpa', why: 'хоспис и шаурмичная — последняя серия grandpa' },
       { re: /штраф/i, arc: 'rubik', from: 3, inArc: 'rubik', why: '«штраф» Рубик произносит в 3-й серии' },
       { re: /(?<![а-яё])акт/i, arc: 'rubik', from: 7, inArc: 'rubik', why: 'акт обсуждают в 7-й серии rubik' },
@@ -610,6 +663,32 @@ describe('вопрос про коллекторов держит только �
     expect(/пишут/.test(JSON.stringify(ARCS.collectors.eps)), 'арка не показывает писем — строка была бы не про что').toBe(true)
   })
 
+})
+
+describe('колкость про нескончаемую свадьбу Самвела (#1114)', () => {
+  const LONGER = 'Самвел, ваша свадьба идёт дольше, чем я жду деньги. И обгоняет.'
+  const OUTLIVE = 'Эта свадьба переживёт нас обоих, Алик.'
+  const SETTLE = 'Алик, эта свадьба кончится или мне в ней прописаться?'
+  const follow = (game: ReturnType<typeof makeGame>['game']) => game.open(ARCS.samvel.follow)
+  const talk = (game: ReturnType<typeof makeGame>['game']) =>
+    game.open(LEGENDS.wedding.talk ?? []).map((p) => p[0])
+
+  it('до линии строк нет; линия идёт — есть, и после снятия восьмидневного флага тоже', async () => {
+    const { game } = makeGame()
+    expect(follow(game), 'до свадьбы колкости нет').not.toContain(LONGER)
+    expect(follow(game), 'до свадьбы колкости нет').not.toContain(OUTLIVE)
+    expect(talk(game), 'до свадьбы вопроса нет').not.toContain(SETTLE)
+    await game.playArc('samvel')
+    expect(game.holds(is(wedding('samvel'))), 'первая серия ставит флаг').toBe(true)
+    expect(follow(game), 'линия идёт').toContain(LONGER)
+    expect(follow(game), 'линия идёт').toContain(OUTLIVE)
+    expect(talk(game), 'линия идёт').toContain(SETTLE)
+    game.nextDay(9)
+    expect(game.holds(is(wedding('samvel'))), 'флаг восьми дней снят — проверка не пустеет').toBe(false)
+    expect(follow(game), 'свадьба в тексте не кончилась').toContain(LONGER)
+    expect(follow(game), 'свадьба в тексте не кончилась').toContain(OUTLIVE)
+    expect(talk(game), 'свадьба в тексте не кончилась').toContain(SETTLE)
+  })
 })
 
 describe('конверты Самвела: вопрос открывает реплика легенды, а не календарь (#1016)', () => {

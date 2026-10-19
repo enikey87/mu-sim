@@ -256,6 +256,97 @@ describe('игрок видит кнопки настоящим путём', () 
   })
 })
 
+/** Хвост кнопки на очень далёкий срок сверяется с рекордом журнала обещаний (#1118): «не помню» — только
+ *  за новым рекордом партии, срок меньше уже названного — это число из журнала, а не забывчивость. */
+describe('хвост «столько долгов не помню» — по рекорду журнала обещаний (#1118)', () => {
+  /** Тексты стены кнопок на срок `w` в партии, где раньше называли `record` дней (0 — не называли). */
+  const far = async (record: number, w: When): Promise<{ texts: string[]; facts: Record<string, unknown> }> => {
+    const g = await said(w)
+    if (record > 0) g.recordPromise({ text: 'до Нового года — отдам', d: record, kind: 'clear' })
+    const texts = new Set<string>()
+    for (let i = 0; i < 60; i++) {
+      g.S.choices = null
+      for (const c of g.buildChoices()) if (c.act === 'promiseFar') texts.add(c.text)
+    }
+    expect(texts.size, w.t).toBeGreaterThan(0)
+    return { texts: [...texts], facts: g.facts() }
+  }
+
+  it('срок меньше рекорда: вспоминает прежнее число, а не «не помню»', async () => {
+    const { texts, facts } = await far(343, { t: 'после Навасарда', d: 91, kind: 'clear' })
+    expect([facts['promiseRecordDays'], facts['promiseRecordNew'], facts['promiseRecordSeen']]).toEqual([343, false, true])
+    expect(texts.some((t) => t.includes('343 дня')), texts.join(' | ')).toBe(true)
+    for (const text of texts) expect(text, text).not.toContain('не помню')
+  })
+
+  it('срок больше всех прежних: рекорд обновляется, и звучит «не помню»', async () => {
+    const { texts, facts } = await far(343, { t: 'через год, не раньше', d: 400, kind: 'clear' })
+    // сам срок в рекорд не входит: иначе «больше всего названного» не сработало бы никогда
+    expect([facts['promiseRecordDays'], facts['promiseRecordNew'], facts['promiseRecordSeen']]).toEqual([343, true, false])
+    expect(texts.some((t) => t.includes('не помню')), texts.join(' | ')).toBe(true)
+    for (const text of texts) expect(text, text).not.toContain('343')
+  })
+
+  it('первый далёкий срок партии — тоже «не помню», рекорда ещё нет', async () => {
+    const { texts, facts } = await far(0, { t: 'после Навасарда', d: 91, kind: 'clear' })
+    expect([facts['promiseRecordDays'], facts['promiseRecordNew']]).toEqual([0, true])
+    expect(texts.some((t) => t.includes('не помню')), texts.join(' | ')).toBe(true)
+  })
+
+  it('запись без дней (старое сохранение) в рекорде считается по дате', async () => {
+    const g = await said({ t: 'после Навасарда', d: 91, kind: 'clear' })
+    g.S.promises.unshift({ t: 'до Нового года — отдам', made: g.S.day, due: g.S.day + 343 })
+    expect([g.facts()['promiseRecordDays'], g.facts()['promiseRecordNew']]).toEqual([343, false])
+  })
+
+  it('на следующий день свой срок не становится рекордом (#1132)', async () => {
+    const w: When = { t: 'после Навасарда', d: 91, kind: 'clear' }
+    const g = await said(w)
+    const own = g.S.promises.at(-1)!.days
+    expect(own, 'горизонт записан — иначе проверка не про рекорд').toBe(91)
+    g.S.day += 2
+    expect(g.facts()['promiseRecordDays'], 'собственный горизонт не рекорд').not.toBe(own)
+    const texts = new Set<string>()
+    for (let i = 0; i < 60; i++) {
+      g.S.choices = null
+      for (const c of g.buildChoices()) if (c.act === 'promiseFar') texts.add(c.text)
+    }
+    expect(texts.size, 'кнопки далёкого срока живы — проверка не пустая').toBeGreaterThan(0)
+    const tail = `Было и ${fmtDays(own!)}`
+    for (const text of texts) expect(text, text).not.toContain(tail)
+  })
+
+  it('правка срока пересчитывает дни, и меньший срок вспоминает больший (#1132)', async () => {
+    const year = (L.EDIT_WHEN as Entry<When>[]).map(valueOf).find((w) => w.t === 'в следующем году')!
+    const { game } = makeGame({ seed: 1 })
+    const short: When = { t: 'завтра', d: 1, kind: 'clear' }
+    const p = { text: 'завтра — всё отдам', ...short }
+    game.recordPromise(p)
+    game.S.ctx = game.ctxFromPromise(p)
+    const m = game.push({ kind: 'text', from: 'alik', text: 'Завтра — всё отдам.' })
+    expect(game.S.promises.at(-1)!.days, 'до правки горизонт — «завтра»').toBe(1)
+    const orig = game.draw
+    vi.spyOn(game, 'draw').mockImplementation((key, arr) => (key === 'EDIT_WHEN' ? year : orig(key, arr)))
+    await game.editLast(m, p)
+    const rec = game.S.promises.at(-1)!
+    const horizon = dueIn(year.due!, game.S.day)
+    expect(rec.days, 'дни записи — горизонт нового срока').toBe(horizon)
+    expect(horizon, 'новый горизонт больше 91 — иначе «Было и» не про этот край').toBeGreaterThan(91)
+    vi.spyOn(game.X, 'promise').mockImplementation(() => ({ text: 'после Навасарда — отдам', t: 'после Навасарда', d: 91, kind: 'clear' }))
+    await game.promiseLine()
+    const facts = game.facts()
+    expect([facts['promiseRecordDays'], facts['promiseRecordSeen']]).toEqual([horizon, true])
+    const texts = new Set<string>()
+    for (let i = 0; i < 60; i++) {
+      game.S.choices = null
+      for (const c of game.buildChoices()) if (c.act === 'promiseFar') texts.add(c.text)
+    }
+    expect(texts.size, 'кнопки далёкого срока живы — проверка не пустая').toBeGreaterThan(0)
+    expect([...texts].some((t) => t.includes(`Было и ${fmtDays(horizon)}`)), [...texts].join(' | ')).toBe(true)
+    for (const text of texts) expect(text, text).not.toContain('не помню')
+  })
+})
+
 describe('плавающий срок: «разбудить» дышит спящим (#1025)', () => {
   const line = 'Вот это хотя бы срок. Разбудить его можно?'
   it('на «после приёмки» будить некого, на «проснётся» строка предлагается', async () => {

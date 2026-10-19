@@ -4,8 +4,11 @@
 // Гейт покрытия (#278): правило достижимо, если сработало хотя бы раз в объединении больших выборок; правило
 // основной игры — хотя бы раз в выборках «до концовки». Не срабатывает — прямой случай в direct.ts или удалить.
 // Верхней полосы, снимка и списков «почти всегда» нет: правка текста не делает правило «слишком частым».
-// DIRECT (#329) освобождает только правила, которые в выборках срабатывают реже DIRECT_MIN_GAMES партий:
-// запись у срабатывающего чаще правила — красное «снять из DIRECT», гейт его видит и без прямого случая.
+// DIRECT (#329) освобождает только правила, которые в выборках срабатывают реже DIRECT_MIN_GAMES партий.
+// Освобождение — единое условие (#1100, решение по #949/#968): правило снимается, только когда достижимость
+// доказана везде — порог в CI-выборках И ≥1 в каждой стабильной семье. Вердикт «снять из DIRECT» выносит
+// gateIssues (ему семьи передаёт прогон rules:stable); stableGateIssues (#434) снимать больше не может —
+// он только требует страховку: ноль в семье у правила не из DIRECT — прямой случай в direct.ts или удалить.
 import { Game } from '../engine/game'
 import { manualClock } from '../engine/clock'
 import { seededRng } from '../engine/rng'
@@ -17,6 +20,7 @@ import { DIRECT } from './direct'
 import { botTurn } from './bot'
 import { requiresKey } from './playtest'
 import { Worker } from 'node:worker_threads'
+import { availableParallelism } from 'node:os'
 import { resolve } from 'node:path'
 
 /** Почему правило не сработало в симуляции: `direct` — у него прямой случай (direct.ts), иначе гейт падает. */
@@ -93,32 +97,49 @@ const kindsFor = (r: Pick<Rule<unknown>, 'when'>): readonly SampleKind[] => (end
 const gamesPlayed = (samples: ReadonlyArray<Pick<SampleReport, 'kind' | 'games'>>, name: string, kinds: readonly SampleKind[]): number =>
   samples.reduce((count, sample) => count + (kinds.includes(sample.kind) ? (sample.games[name] ?? 0) : 0), 0)
 
+/** Семейство чужих сидов второго гейта (#434): сдвиг выборок и их отчёты. */
+export interface FamilySamples {
+  shift: number
+  samples: ReadonlyArray<Pick<SampleReport, 'kind' | 'games'>>
+}
+
+/**
+ * Освобождение от DIRECT — единое условие (#1100, решение по #949/#968): правило снимается, только
+ * когда достижимость доказана везде — ≥ DIRECT_MIN_GAMES в CI-выборках И ≥1 в каждой стабильной семье.
+ * Семьи не переданы — доказательства «везде» нет, запись остаётся: лишний прямой случай стоит один
+ * юнит-тест (direct.test.ts), а вечный красный гейт стоил бы всего сигнала покрытия.
+ */
+export const directReleased = (played: number, familyCounts: readonly number[]): boolean =>
+  played >= DIRECT_MIN_GAMES && familyCounts.length > 0 && familyCounts.every((count) => count >= 1)
+
 /**
  * Нарушения гейта. Не освобождённое правило, которое ни разу не сработало — в выборках «до концовки», если
  * это правило основной игры (эндгейм не прячет его пропажу), или во всех выборках, если правило эндгейма.
- * Правило из DIRECT срабатывает в выборках ≥ DIRECT_MIN_GAMES раз — его запись устарела, гейт его видит.
+ * Правило из DIRECT, у которого доказана достижимость везде (CI-выборки и все семьи, #1100), — «снять».
  */
 export function gateIssues(
   samples: ReadonlyArray<Pick<SampleReport, 'kind' | 'games'>>,
   rules: ReadonlyArray<Pick<Rule<unknown>, 'name' | 'when'>>,
   direct: Readonly<Record<string, unknown>> = DIRECT,
+  families: ReadonlyArray<FamilySamples> = [],
 ): string[] {
   return rules.flatMap((r) => {
     const kinds = kindsFor(r)
     const played = gamesPlayed(samples, r.name, kinds)
     if (r.name in direct) {
-      return played >= DIRECT_MIN_GAMES
-        ? [`${r.name}: сработало в ${played} партиях (порог ${DIRECT_MIN_GAMES}) — снять из DIRECT, гейт его видит`]
-        : []
+      const counts = families.map(({ samples }) => gamesPlayed(samples, r.name, kinds))
+      if (!directReleased(played, counts)) return []
+      const summary = families.map(({ shift }, i) => `+${shift}: ${counts[i]}`).join(', ')
+      return [`${r.name}: сработало в ${played} партиях (порог ${DIRECT_MIN_GAMES}), семьи ${summary} — снять из DIRECT, достижимость доказана везде`]
     }
     if (played > 0) return []
     return [`${r.name}: ${kinds.length > 1 ? 'правило эндгейма ни разу не сработало' : 'ни разу до экрана концовки'} — прямой случай в direct.ts или удалить`]
   })
 }
 
-/** Один вердикт по всем чужим семействам: ноль опасен в любом, DIRECT устарел только при частоте во всех. */
+/** Один вердикт по всем чужим семействам: ноль опасен в любом; снимать DIRECT этот гейт не может (#1100). */
 export function stableGateIssues(
-  families: ReadonlyArray<{ shift: number; samples: ReadonlyArray<Pick<SampleReport, 'kind' | 'games'>> }>,
+  families: ReadonlyArray<FamilySamples>,
   rules: ReadonlyArray<Pick<Rule<unknown>, 'name' | 'when'>>,
   direct: Readonly<Record<string, unknown>> = DIRECT,
 ): string[] {
@@ -128,11 +149,7 @@ export function stableGateIssues(
   return rules.flatMap((r) => {
     const counts = families.map(({ samples }) => gamesPlayed(samples, r.name, kindsFor(r)))
     const summary = families.map(({ shift }, i) => `+${shift}: ${counts[i]}`).join(', ')
-    if (r.name in direct) {
-      return counts.every((count) => count >= DIRECT_MIN_GAMES)
-        ? [`${r.name}: ${summary} — снять из DIRECT, гейт видит правило во всех семействах`]
-        : []
-    }
+    if (r.name in direct) return []
     return counts.some((count) => count === 0)
       ? [`${r.name}: ${summary} — прямой случай в direct.ts или удалить`]
       : []
@@ -190,16 +207,43 @@ export async function ruleCoverage(
 }
 
 /** Несколько выборок → достижимость по объединению. */
+/** Сколько выборок считать одновременно: больше доступных ядер — только конкуренция за CPU
+ *  и разброс времени (на 4-ядерном раннере шесть воркеров давали 41–78s на одних и тех же выборках). */
+const work = (s: SampleSpec): number => s.seeds.length * s.turns // объём партий выборки — для LPT-порядка
+export function coverageParallelism(samples: number): number {
+  return Math.max(1, Math.min(samples, availableParallelism()))
+}
+
 export function runCoverageJobs(
   samples: readonly SampleSpec[],
   run: (sample: SampleSpec) => Promise<SampleReport>,
+  limit = coverageParallelism(samples.length),
 ): Promise<MultiCoverage> {
   if (!samples.length) return Promise.reject(new Error('Нет выборок покрытия'))
-  return Promise.all(samples.map(async (sample) => {
-    const report = await run(sample)
-    if (!report || report.kind !== sample.kind) throw new Error('Выборка покрытия не вернула отчёт своего рода')
-    return report
-  })).then((reports) => ({ samples: reports, never: neverInAllSamples(reports.map((r) => r.never)) }))
+  const reports = new Array<SampleReport>(samples.length)
+  // длинные выборки — первыми: с пулом в N воркеров порядок «как объявлено» оставлял большие
+  // выборки в хвост и растягивал стенку (LPT-планирование: сначала самое долгое)
+  const queue = samples.map((sample, index) => ({ sample, index }))
+    .sort((a, b) => work(b.sample) - work(a.sample))
+  let next = 0
+  let failed = false
+  const worker = async (): Promise<void> => {
+    while (!failed) {
+      const job = queue[next++]
+      if (!job) return
+      try {
+        const report = await run(job.sample)
+        if (!report || report.kind !== job.sample.kind) throw new Error('Выборка покрытия не вернула отчёт своего рода')
+        reports[job.index] = report
+      } catch (error) {
+        // прогон уже красный: остальные воркеры новые выборки не начинают
+        failed = true
+        throw error
+      }
+    }
+  }
+  return Promise.all(Array.from({ length: Math.min(limit, samples.length) }, () => worker()))
+    .then(() => ({ samples: reports, never: neverInAllSamples(reports.map((r) => r.never)) }))
 }
 
 async function coverageWorkerCode(): Promise<string> {

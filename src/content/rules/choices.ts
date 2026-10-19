@@ -23,7 +23,7 @@ import {
   STRASBOURG_THREAT,
   P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE,
   P_CREW_CALL, P_LAWYER, P_COLLECTORS_ASK, P_INTERN, P_HOLE, P_COUNTERSUIT,
-  P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_BORIS, P_DEBUT_NIVA, P_NUNE_DEBUT, P_GRANT_TILE, P_MOUSTACHE_PHOTO, P_MAMA_MARKET, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_COURT_VERDICT, P_TILE_SLIP, P_GRANT_HOUSE,
+  P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_BORIS, P_DEBUT_NIVA, P_NUNE_DEBUT, P_GRANT_TILE, P_MOUSTACHE_PHOTO, P_MAMA_MARKET, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_COURT_VERDICT, P_TILE_SLIP, P_SOLD, P_GRANT_HOUSE,
 } from './player-choice-pools'
 
 type R = Rule<ContentApi, GameEvent, Offer>
@@ -157,11 +157,14 @@ export const choiceRules: R[] = [
   offer({ name: 'LawyerFirst', when: [is('lawyerFresh')], act: 'lawyerAsk', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_LAWYER', P_LAWYER) }),
   offer({ name: 'CollectorsAsk', when: [is('collectorsAskFresh')], act: 'collectorsAsk', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_COLLECTORS_ASK', P_COLLECTORS_ASK) }),
   // ответ по выбранной строке, а не колодой (#1017): согласие/отказ стажёра и «ровно/криво/за плату»
-  // получают свой ответ B-пула — номер выбранной строки уезжает с arg
+  // получают свой ответ B-пула — номер выбранной строки уезжает с arg.
+  // bonus 5: на ходу предложения слоты блока держат звонок с объекта (специфичность 7) и вопрос про
+  // сериал (4, у финала — «вопрос ещё не задавали сегодня»): реакция окна обязана попасть в блок
+  // своим ходом, а не следующим (#1083 — на seed 215117 кнопка ждала блока 14.04)
   ...(() => {
     let arg = ''
     return [offer({
-      name: 'InternOffer', when: [is('internFresh')], act: 'internOffer', tone: 'neutral', bonus: 3,
+      name: 'InternOffer', when: [is('internFresh')], act: 'internOffer', tone: 'neutral', bonus: 5,
       text: (g) => fromArrNum(g, 'P_INTERN', P_INTERN, (i) => { arg = String(i) }),
       arg: () => arg,
     })]
@@ -203,6 +206,9 @@ export const choiceRules: R[] = [
   offer({ name: 'CourtVerdict', when: [is('courtVerdictFresh')], act: 'courtVerdict', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_COURT_VERDICT', P_COURT_VERDICT) }),
   // первая серия плиточной арки (#1059): падение заказчика — отклик в окне события (ход и три после)
   offer({ name: 'TileSlip', when: [is('tileSlipFresh')], act: 'tileSlip', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_TILE_SLIP', P_TILE_SLIP) }),
+  // продажа имущества со дна (#1084): заметное системное событие — отклик в окне события (ход продажи и три после).
+  // bonus 5: карточку продажи собирает дно денег — рядом стоят вопросы отчаяния (6–7); реакция обязана попасть в блок
+  offer({ name: 'Sold', when: [is('saleFresh')], act: 'soldQ', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_SOLD', P_SOLD) }),
   // встречный иск — заметное событие с окном отклика (#964): ход и три после
   offer({ name: 'Countersuit', when: [is('countersuitFresh')], act: 'countersuitAsk', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_COUNTERSUIT', P_COUNTERSUIT) }),
 
@@ -235,7 +241,7 @@ export const choiceRules: R[] = [
   // Кнопка — по горизонту и роду (docs/design/deadline-replies.md); специфичность прежняя, слот `when` вытесняет других как раньше
   ...(() => {
     const term = [exists('ctx.when'), is('ctx.whenFresh')]
-    const args = (f: Facts) => ({ t: String(f['ctx.when']), T: cap(String(f['ctx.when'])), date: String(f['ctx.whenDate'] ?? ''), days: fmtDays(Number(f['ctx.whenDays'] ?? 0)) })
+    const args = (f: Facts) => ({ t: String(f['ctx.when']), T: cap(String(f['ctx.when'])), date: String(f['ctx.whenDate'] ?? ''), days: fmtDays(Number(f['ctx.whenDays'] ?? 0)), record: fmtDays(Number(f['promiseRecordDays'] ?? 0)) })
     const when = (o: Pick<OfferSpec, 'name' | 'when' | 'act' | 'tone' | 'weight' | 'arg' | 'text'>) => offer({ slot: 'when', specificity: 3, bonus: 1, ...o })
     const near = [...term, eq('ctx.whenHorizon', 'near')]
     const askPool = (f: Facts): string =>
@@ -308,7 +314,11 @@ export const choiceRules: R[] = [
   // Окно закрывает сама серия: следующий эпизод двигает arc.collectors, и вопрос уходит вместе с окном
   offer({
     name: 'CollectorsDebut', slot: 'arc', when: [is(intro('collectors')), eq('arc.collectors', 1)], act: 'arc', tone: 'polite', bonus: 2,
-    text: (g) => g.freshPlayer('F_collectors_debut', P_COLLECTORS_DEBUT) ?? g.draw('F_collectors_debut', P_COLLECTORS_DEBUT),
+    // окно повтора (#824): пока все формулировки пула в последних PLAYER_REPEAT_TURNS ходах, вопрос
+    // молчит, а не повторяется дословно (#1078) — фолбэк на сырой draw обходил окно и возвращал
+    // строку, показанную 2–3 хода назад. Цены у молчания нет: окно закрывает следующая серия,
+    // вопрос вернётся свежей строкой.
+    text: (g) => g.freshPlayer('F_collectors_debut', P_COLLECTORS_DEBUT) ?? '',
     arg: () => 'collectors',
   }),
   offer({

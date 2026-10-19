@@ -1411,10 +1411,41 @@ describe('усы: аватар без усов, пока верен факт с�
     game.S.mem['alik.shaved'] = true
     const { unmount } = renderApp(game)
     expect(avatar().className).toContain('shaved')
+    expect(avatar().querySelector('.shaved-cap')!.textContent).toBe('без усов')
+    expect(avatar()).toHaveAttribute('aria-label', 'Алик без усов')
     unmount()
     delete game.S.mem['alik.shaved']
     renderApp(game)
     expect(avatar().className).not.toContain('shaved')
+    expect(avatar().querySelector('.shaved-cap')).toBeNull()
+    expect(avatar().textContent).toBe('А')
+  })
+
+  it('день смены: подпись видна; через 40 дней кружок с усами возвращается (#1116)', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { during } = await import('../content/typed-criteria')
+    const { alikShaved } = await import('../content/memkeys')
+    const css = readFileSync('src/styles.css', 'utf8')
+    expect(css).toMatch(/\.avatar\.shaved\s*\{[^}]*background:\s*#f6e3c4/)
+    expect(css).toMatch(/\.avatar\.shaved \.shaved-cap/)
+    const { game } = makeGame()
+    let view = renderApp(game)
+    expect(avatar().className).not.toContain('shaved')
+    expect(avatar().textContent).toBe('А')
+    view.unmount()
+    game.applyFacts([during(alikShaved, 40)])
+    view = renderApp(game)
+    expect(avatar().className).toContain('shaved')
+    expect(avatar().querySelector('.shaved-letter')!.textContent).toBe('А')
+    expect(avatar().querySelector('.shaved-cap')!.textContent).toBe('без усов')
+    view.unmount()
+    game.S.day += 40
+    game.rules.settle()
+    view = renderApp(game)
+    expect(game.S.mem[alikShaved]).toBeUndefined()
+    expect(avatar().className).not.toContain('shaved')
+    expect(avatar().querySelector('.shaved-cap')).toBeNull()
+    expect(avatar().textContent).toBe('А')
   })
 
   it('баран важнее: на аватаре-баране сбритие не показывается', () => {
@@ -1424,6 +1455,8 @@ describe('усы: аватар без усов, пока верен факт с�
     renderApp(game)
     expect(avatar().className).toContain('ram')
     expect(avatar().className).not.toContain('shaved')
+    expect(avatar().querySelector('.shaved-cap')).toBeNull()
+    expect(avatar().textContent).toBe('🐏')
   })
 })
 

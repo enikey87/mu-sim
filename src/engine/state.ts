@@ -119,6 +119,9 @@ export interface PromiseRec {
   t: string
   made: number
   due: number | null
+  /** Названный срок в днях (горизонт от дня обещания, docs/design/deadline-replies.md): по нему
+   *  хвост кнопки сверяет новый срок с рекордом партии (#1118). У «никогда» и события без оценки его нет. */
+  days?: number
   condition?: PromiseCondition
   met?: number
   asked?: boolean

@@ -1,16 +1,17 @@
 // Реакции на заметные системные события (#927): вариант в блоке в окне события (ход и 1–3 после), вне окна — нет.
 import { describe, it, expect, vi } from 'vitest'
-import { makeGame } from '../test/helpers'
+import { makeGame, setMoney, cards } from '../test/helpers'
 import type { Game } from '../engine/game'
 import { NOTIF } from './life'
 import { D } from './excuses'
-import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE, P_MAMA_MARKET, P_SAMVEL_DIVORCE, P_GRANT_HOUSE, P_TILE_SLIP } from './rules/player-choice-pools'
-import { BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, GRANT_HOUSE_B, INTERN_B, HOLE_B, AVITO_REVIEW, MAMA_MARKET_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, TILE_SLIP_B } from './world'
+import { sold } from './credit'
+import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE, P_MAMA_MARKET, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_GRANT_HOUSE, P_TILE_SLIP, P_SOLD } from './rules/player-choice-pools'
+import { BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, GRANT_HOUSE_B, INTERN_B, HOLE_B, AVITO_REVIEW, MAMA_MARKET_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, TILE_SLIP_B, SOLD_B } from './world'
 import { ARCS } from './arcs'
 import { FINALES } from './finales'
 import { COURT_LAWYER_AGAIN } from './quests'
 import { RUDE_CALLS_VOICE, MAMA_VOICE_CRY } from './rude'
-import { court, HEAT, lawyerAt, debutWho, arsenTrack, saidStrasburg, grantTileAt, grantHouseAt, mamaMarketAt, mamaVoiceAt, samvelDivorceAt, tileSlipAt } from './memkeys'
+import { count, collectorsRecruited, court, crewPaid, crewPaidAt, HEAT, internAt, lawyerAt, debutWho, arsenTrack, saidStrasburg, grantTileAt, grantHouseAt, mamaMarketAt, mamaVoiceAt, mamaCalls, samvelDivorceAt, tileSlipAt, saleAt, saleWhat } from './memkeys'
 import { valueOf, type Line } from './fact'
 import type { Choice } from '../engine/state'
 
@@ -103,11 +104,24 @@ describe('реакции на системные события (#927)', () => {
     expect([...seen], 'коньячная строка не выбирается').toContain(line)
   })
 
+  it('фото-баран: пул различает тебя и барана (#1113)', () => {
+    expect(P_RAM_PHOTO.map(valueOf)).toEqual([
+      'Алик, это ты на фото? Или баран?',
+      'Барана — вместо перевода? Я оценил. Но лучше деньгами.',
+    ])
+  })
+
   it('пулы реакций и ответов не пусты (#927)', () => {
     expect(P_RAM_PHOTO.length).toBeGreaterThan(0)
     expect(P_BORIS_SALE.length).toBeGreaterThan(0)
     expect(P_VACANCY.length).toBeGreaterThan(0)
     expect(P_AVITO_REVIEW.length).toBeGreaterThan(0)
+  })
+
+  it('пул продажи Бориса не утверждает долг игрока от первого лица (#1110)', () => {
+    const lines = P_BORIS_SALE.map(valueOf)
+    expect(lines.some((t) => /я в долге/i.test(t)), 'строка делает игрока должником без опоры в фактах партии').toBe(false)
+    expect(lines.some((t) => /ты в долге|твоего долга/i.test(t) && /зачт/i.test(t)), 'вариант про зачёт из долга Алика потерян').toBe(true)
   })
 
   it('ответ на реакцию потребляет событие: вариант больше не предлагается, строка пула не повторяется (#918)', async () => {
@@ -625,6 +639,33 @@ describe('окно второго дебюта Гранта — дом «с кл
   })
 })
 
+describe('окно предложения стажировки (#1083)', () => {
+  it('предложение штампует ход, кнопка в блоке события при конкурентах, окно три хода', async () => {
+    // состояние хода из плейтеста 86 (seed 215117): за слоты блока с предложением конкурировали
+    // звонок с объекта (специфичность 7) и вопрос про сериал (4) — кнопка уходила в следующий блок.
+    // Фикс — bonus 5 у оффера (специфичность 6): кнопка берёт второй слот уже на ходу предложения;
+    // НК — вернуть bonus 3 — слот у кнопки снова отбирает случайный из группы 4, тест краснеет
+    for (let seed = 1; seed <= 20; seed++) {
+      const { game } = makeGame({ seed })
+      game.S.mem[count.rude] = 6
+      game.S.mem[collectorsRecruited] = true
+      game.S.mem[crewPaid] = true
+      game.S.mem[crewPaidAt] = game.S.stats.sent
+      game.S.arcs.collectors = { i: ARCS.collectors.eps.length - 1, last: game.S.day }
+      const button = () => { game.S.choices = null; return game.buildChoices().find((c) => c.act === 'internOffer') }
+      expect(button(), `seed ${seed}: до предложения кнопка есть`).toBeUndefined()
+      await game.playArc('collectors')
+      const at = Number(game.S.mem[internAt])
+      expect(at, `seed ${seed}: предложение не штампануло ход`).toBe(game.S.stats.sent)
+      expect(button(), `seed ${seed}: на ходу предложения кнопки нет в блоке`).toBeTruthy()
+      game.S.stats.sent = at + 3
+      expect(button(), `seed ${seed}: третий ход после предложения — ещё окно`).toBeTruthy()
+      game.S.stats.sent = at + 4
+      expect(button(), `seed ${seed}: вне окна — кнопки нет`).toBeUndefined()
+    }
+  })
+})
+
 describe('окно голосового-плача мамы (#1085)', () => {
   const text = (e: unknown): string => { const v = valueOf(e as never); return typeof v === 'string' ? v : (v as { t: string }).t }
   /** Оставить свежим только нужное голосовое: остальные строки серии уже показаны. */
@@ -657,6 +698,24 @@ describe('окно голосового-плача мамы (#1085)', () => {
     expect(said.some((t) => MAMA_VOICE_B.map(text).includes(t)), `ответ не из пула: ${said.join(' | ')}`).toBe(true)
     expect(game.S.mem[mamaVoiceAt], 'ответ не потребил окно').toBeUndefined()
     expect(button(), 'после ответа окно закрыто').toBeUndefined()
+  })
+
+  // #1091: счёт звонков в sys переменный («прошлое + 1 + rnd(4)») — строка пула его не повторяет
+  it('счёт звонков называет sys, а кнопка окна числа не повторяет', async () => {
+    const { game } = makeGame()
+    onlyFresh(game, (t) => t === MAMA_VOICE_CRY)
+    game.S.mem[HEAT] = 2
+    game.S.mem[mamaCalls] = 8 // прошлое партии: серия скажет 9–12, а не 7 из транскрипта
+    await game.fire('PlayerMessage', { tone: 'rude' })
+    const sys = game.S.msgs.flatMap((m) => (m.kind === 'sys' && m.text.includes('Мама Алика') ? [m.text] : []))
+    expect(sys, 'серия не назвала счёт — проверка пустеет').toHaveLength(1)
+    const n = Number(/\d+/.exec(sys[0])![0])
+    expect(n, 'счёт серии не растёт от прошлого').toBeGreaterThanOrEqual(9)
+    expect(P_MAMA_VOICE.map(text).join(' '), 'строка пула называет счёт звонков').not.toMatch(/\d|семь|восем|девят|десят|одиннадцат|двенадцат/i)
+    game.S.choices = null
+    const buttons = game.buildChoices()
+    expect(buttons.some((c) => c.act === 'mamaVoice'), 'кнопки окна нет — проверка пустеет').toBe(true)
+    expect(buttons.map((c) => c.text).join(' '), 'кнопка блока называет число из одного транскрипта').not.toContain('семь')
   })
 
   it('чужое голосовое серии (Самвел) окна мамы не открывает', async () => {
@@ -701,5 +760,72 @@ describe('окно первой серии плиточной арки (#1059)',
     expect(said.some((t) => answers.some((p) => t.includes(p))), `ответ не из пула события: ${said.join(' | ')}`).toBe(true)
     expect(game.S.mem[tileSlipAt], 'ответ не потребил окно').toBeUndefined()
     expect(button(), 'после ответа окно закрыто').toBeUndefined()
+  })
+})
+
+describe('окно продажи имущества (#1084)', () => {
+  const text = (e: unknown): string => { const v = valueOf(e as never); return typeof v === 'string' ? v : (v as { t: string }).t }
+  const low = (t: string) => t.charAt(0).toLowerCase() + t.slice(1)
+  /** Дно и карточка банка с предложением продать: отвечаем «Продать», кредит не берём. */
+  const bottom = () => {
+    const { game } = makeGame()
+    setMoney(game, 100)
+    game.chargeBill('rent') // не прошло → на дне отказ и предложение одной карточкой
+    return { game, card: cards(game, 'Банк').at(-1)! }
+  }
+  const openCard = (game: Game) => cards(game, 'Банк').filter((c) => c.offer && !c.answered).at(-1)!
+  const button = (game: Game) => { game.S.choices = null; return game.buildChoices().find((c) => c.act === 'soldQ') }
+
+  it('продажа штампует ход и вещь, кнопка в блоке, окно три хода, ответ потребляет', async () => {
+    const { game, card } = bottom()
+    expect(button(game), 'до продажи кнопки нет').toBeUndefined()
+    game.answerCard(card.id, 'sell')
+    expect(game.S.mem[sold('microwave')], 'продажи не было — проверка пустеет').toBe(true)
+    const at = Number(game.S.mem[saleAt])
+    expect(Number.isFinite(at), 'продажа не штампанула ход события').toBe(true)
+    expect(at, 'штамп не на ходу продажи').toBe(game.S.stats.sent)
+    expect(game.S.mem[saleWhat], 'штамп не назвал проданную вещь').toBe('microwave')
+    expect(button(game), 'на ходу продажи кнопки нет').toBeTruthy()
+    const texts = new Set<string>()
+    for (let i = 0; i < 60; i++) { const b = button(game); if (b) texts.add(b.text) }
+    const pool = P_SOLD.map(text)
+    expect(texts.size, 'пул окна не прозвучал — проверка пустеет').toBeGreaterThan(0)
+    for (const t of texts) expect(pool.some((p) => t.includes(p) || t.includes(low(p))), `кнопка не из пула: ${t}`).toBe(true)
+    // якорь окна — проданная вещь: строк о другой вещи в блоке нет
+    for (const t of texts) expect(t.includes('плитку'), `строка о чужой продаже в окне микроволновки: ${t}`).toBe(false)
+    game.S.stats.sent = at + 3
+    expect(button(game), 'третий ход после продажи — ещё окно').toBeTruthy()
+    game.S.stats.sent = at + 4
+    expect(button(game), 'вне окна — кнопки нет').toBeUndefined()
+    game.S.stats.sent = at
+    const n = game.S.msgs.length
+    await game.fire('PlayerSays', { intent: 'soldQ' })
+    const said = game.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : []))
+    const answers = SOLD_B.map(text)
+    expect(said.some((t) => answers.some((p) => t.includes(p))), `ответ не из пула события: ${said.join(' | ')}`).toBe(true)
+    expect(game.S.mem[saleAt], 'ответ не потребил окно').toBeUndefined()
+    expect(button(game), 'после ответа окно закрыто').toBeUndefined()
+  })
+
+  it('следующая продажа переякоривает окно: строки прошлой вещи молчат', () => {
+    const { game } = bottom()
+    game.answerCard(openCard(game).id, 'sell') // микроволновка
+    expect(game.S.mem[saleWhat]).toBe('microwave')
+    game.answerCard(openCard(game).id, 'sell') // гитара: причина «Продано, а остаток всё ещё критический»
+    expect(game.S.mem[sold('guitar')], 'второй продажи не было — проверка пустеет').toBe(true)
+    expect(game.S.mem[saleWhat], 'штамп не переехал на новую вещь').toBe('guitar')
+    const texts = new Set<string>()
+    for (let i = 0; i < 60; i++) { const b = button(game); if (b) texts.add(b.text) }
+    expect(texts.size, 'окно новой продажи пусто — проверка пустеет').toBeGreaterThan(0)
+    for (const t of texts) expect(t.includes('Микроволновку'), `строка прошлой продажи в блоке: ${t}`).toBe(false)
+  })
+
+  it('окно держится только свежим штампом: без штампа продажа кнопки не даёт', () => {
+    const { game } = bottom()
+    game.answerCard(openCard(game).id, 'sell')
+    expect(button(game), 'продажа не открыла окно').toBeTruthy()
+    game.clearFact(saleAt) // окно потреблено (ответом или протухшим)
+    expect(button(game), 'без штампа хода кнопки нет').toBeUndefined()
+    expect(game.S.mem[sold('microwave')], 'факт продажи вещи остаётся').toBe(true)
   })
 })
