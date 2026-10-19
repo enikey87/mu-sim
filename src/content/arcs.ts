@@ -4,7 +4,7 @@ import { type Entry, type FactOp, type Criterion, type FactKey, type Said, set, 
 import { type ClaimKey } from './ids'
 import type { LedgerEvent } from './fact-types'
 import { needs, meet, WORLD, MENTION_RE } from './world'
-import { actSigned, alikDead, betonSet, borisMarried, collectorsAskAt, collectorsRecruited, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantHouseAt, grantPaid, grantTileAt, houseOnGarik, internAt, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, rubikHoleAt, samvelDivorceAt, sick, taxFrozen, tileSlipAt, wedding } from './memkeys'
+import { actSigned, alikDead, betonSet, borisMarried, collectorsAskAt, collectorsRecruited, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantHouseAt, grantPaid, grantTileAt, houseOnGarik, internAt, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, rubikHoleAt, samvelDivorceAt, sick, taxFrozen, tileSlipAt, wedding, wrote } from './memkeys'
 import { stateQuestion } from './money-ask'
 
 export type ArcMsg = Said | { w: string; t: string; claims?: LedgerEvent[]; remember?: FactOp[]; stamp?: string } | { t: string; claims: LedgerEvent[]; remember?: FactOp[]; stamp?: string }
@@ -165,7 +165,11 @@ export const ARCS: Record<string, Arc> = {
       gate(WORLD.nivaAway, is('heard.money_foundation'))('«Нива» уехала. Значит, деньги у меня в фундаменте, а не у Алика?'),
       gate(WORLD.nivaPlayer)('«Нива» сама ко мне приехала? И в бардачке 50 — это мне или в долг?'),
       gate(eq('arc.niva', 5), WORLD.nivaAway)('«Нива» нашлась?'),
-      gate(WORLD.nivaAway)('«Нива» мне всё звонит, а платить всё равно Алику.'),
+      // звонки «Нивы» — факт её первого сообщения (#1112): до «Би-бип» строка утверждала бы
+      // несостоявшиеся звонки; до него предлагается формулировка без звонков. Маркер первого
+      // сообщения (`wrote.<кто>`) ставит движок (#973) — второй штамп тому же событию не нужен.
+      gate(WORLD.nivaAway, missing(wrote('niva')))('«Нива» уехала, а долг остался у тебя.'),
+      gate(WORLD.nivaAway, is(wrote('niva')))('«Нива» мне всё звонит, а платить всё равно Алику.'),
       needs('nivaAway')('Где «Нива»?'),
       gate(WORLD.nivaAway)('Алик, как там «Нива»? Долг за ней катается.'),
     ],
