@@ -125,7 +125,7 @@ export const REVIVED = /встал|встаёт|воскрес|вернулас�
 /** Повод поздравить (иначе «Поздравляю!» на «зуб мудрости растёт» звучит невпопад). */
 export const FESTIVE = /свадьб|крестин|юбилей|обручен|день рождения|отмечаем|обмываем|празд|родился|поступил|выпускн|сватовств|помолвк|открыва|открыли|приехал|вернулся|урожа|отелилась|правнук|первое слово|дочку выдают/
 
-export type SayItem = Said | { w?: string; t: string; claims?: LedgerEvent[]; stamp?: string }
+export type SayItem = Said | { w?: string; t: string; claims?: LedgerEvent[]; stamp?: string; remember?: FactOp[] }
 /** Тема эпизода противоречия — выбирает предметный ответ Алика. */
 export type LieKind = 'money' | 'grandpa' | 'customer'
 /** Что пришло, пока игрока не было: виды сообщений пачки непрочитанных. */
@@ -2415,9 +2415,24 @@ export class Game {
     this.S.ctx = { wrong: true }
   }
 
+  /** Факт строки применяется к той реплике, которая реально прозвучала, а не к отброшенной попытке колоды. */
+  private commitRemember(x: unknown): void {
+    if (!x || typeof x !== 'object' || !('remember' in x)) return
+    const ops = x.remember
+    if (Array.isArray(ops) && ops.length) this.rules.applyOps(ops, {})
+  }
   async periodLine(p: Period): Promise<void> {
-    if (!L.PERIOD[p]) return
-    await this.say([this.addrLine('PER_' + p, L.PERIOD[p])])
+    const pool = L.PERIOD[p]
+    if (!pool) return
+    let picked: unknown = null
+    const line = this.uniq(() => {
+      const raw = this.draw('PER_' + p, pool)
+      picked = raw
+      const text = typeof raw === 'string' ? raw : raw.t
+      return `${this.X.g('ADDR')}, ${text}`
+    })
+    this.commitRemember(picked)
+    await this.say([line])
     if (p === 'friday' && this.chance(0.5)) this.audio.feast((a) => this.draw('FEAST', a))
   }
 
@@ -2972,6 +2987,7 @@ export class Game {
     if (n.a && (!pays || paid) && (!debtFx || debtMoved)) {
       const line = n.who ? gen('a', n.a)() : variant('a', n.a)
       if (typeof line !== 'string' && 'stamp' in line && line.stamp) this.S.mem[line.stamp] = this.S.stats.sent
+      this.commitRemember(line)
       await this.say([line], false, n.who)
     }
     if (n.doc) {
@@ -2986,6 +3002,7 @@ export class Game {
       const line2 = n.who2 ? gen('a2', n.a2)() : variant('a2', n.a2)
       // штамп строки второй реплики узла — тот же механизм, что у `a` (#1058): вердикт суда в `a2`
       if (typeof line2 !== 'string' && 'stamp' in line2 && line2.stamp) this.S.mem[line2.stamp] = this.S.stats.sent
+      this.commitRemember(line2)
       await this.say([line2], false, n.who2)
     }
     if (n.sys2) {

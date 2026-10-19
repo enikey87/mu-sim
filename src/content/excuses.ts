@@ -1,7 +1,7 @@
 // Словари и генератор отмазок Алика Воздухонесяна.
 import { type Rng, mathRng } from '../engine/rng'
 import type { Due } from '../engine/time'
-import { type Entry, type Said, saidClaims, saidJoin, saidMap, saidText, valueOf, gate, eq, ne, gte, lt, lte, matches, missing, exists, is, of } from './fact'
+import { type Entry, type FactOp, type Said, saidClaims, saidJoin, saidMap, saidText, valueOf, gate, eq, ne, gte, lt, lte, matches, missing, exists, is, of, set } from './fact'
 import type { LegalClaim } from '../engine/input'
 import type { HolidayRef } from './holidays'
 import { isWhoId, type WhoId } from './ids'
@@ -9,7 +9,7 @@ import { needs, WORLD } from './world'
 import { selfConflict } from './ledger'
 import { sold } from './credit'
 import type { LedgerEvent } from './fact-types'
-import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, collectorsRecruited, count, evicted, finaleOf, grantPaid, met, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, saidKonak, sick, taxThawed, threatClaim, tileCornerRemoved, wedding, whenYears } from './memkeys'
+import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, collectorsRecruited, count, evicted, finaleOf, grantPaid, met, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, saidHash, saidKonak, sick, taxThawed, threatClaim, tileCornerRemoved, wedding, whenYears } from './memkeys'
 
 // draw(key, arr) выдаёт уместный сейчас элемент «из колоды» (без повторов до конца колоды); noRefill — после исчерпания null
 export type DrawFn = <T = unknown>(key: string, arr: readonly Entry<T>[], noRefill?: boolean, eligible?: (e: Entry<T>) => boolean) => T
@@ -610,7 +610,7 @@ D.SHORTQ = [
   'это не «никогда», радуйся.', 'это как Арарат: видно, но не достать.', 'это ровно тогда, когда нужно.',
 ];
 D.SORRY_A = ['Ладно, прощаю.', 'Эх, ну что с тебя взять.', 'Вот, другое дело.', 'Я отходчивый.', 'Мама сказала простить.'];
-D.SORRY_B = ['Но деньги теперь в понедельник.', 'Давай забудем. И про деньги тоже?', 'Обнимаю, брат.', 'Приходи на хаш, помиримся.', 'Сердце у меня большое, карман маленький.'];
+D.SORRY_B = ['Но деньги теперь в понедельник.', 'Давай забудем. И про деньги тоже?', 'Обнимаю, брат.', { t: 'Приходи на хаш, помиримся.', remember: [set(saidHash, true)] }, 'Сердце у меня большое, карман маленький.'];
 D.PING_A = ['Я не читал, это телефон сам.', 'Прочитал, думал, как ответить красиво.', 'Это жена прочитала.', 'Случайно открыл, брат, пальцем.', 'Смотрел на твоё сообщение и грустил.'];
 D.PREV_A = [
   'Тот раз не считается,', 'Брат, я помню,', 'Ара, это был другой я,', 'Так я же сказал примерно,',
@@ -665,7 +665,7 @@ D.P_RUDE_B = [
   needs('karineKnown')(needs('karine')('Я расскажу Карине!!!')), 'Отдай хотя бы тысячу!!!', 'Я выложу переписку в интернет!!!', 'Мне плевать на твои отмазки!!!',
   'Сколько можно обещать?!', 'Я приду с перфоратором!!!', gate(lt('day', 240))('Ты мне полгода жизни должен!!!'), gate(gte('day', 240))('Ты мне год жизни должен!!!'), 'Я позвоню твоей маме!!!',
   'Я отключу тебе плитку!!!', needs('saidTomorrow')('Хватит «завтра»!!!'), 'Где деньги, Алик?! ГДЕ?!',
-  'Я выложу твой объект в «Ремонт-позор»!!!', 'Я сам пойду к тебе на хаш и не уйду!!!', gate(is(met('mama')))('Мне твоя мама больше верит, чем тебе!!!'),
+  'Я выложу твой объект в «Ремонт-позор»!!!', gate(is(saidHash))('Я сам пойду к тебе на хаш и не уйду!!!'), gate(is(met('mama')))('Мне твоя мама больше верит, чем тебе!!!'),
   'Я перестал верить в твоё гостеприимство, Алик!!!', needs('karineKnown')(needs('karine')('Я сейчас напишу Карине всё!!!')), 'Мой кот тебя презирает!!!',
   'Ты не подрядчик, ты сериал!!!', gate(gte('sent', 6))('Хватит клясться!!! У тебя клятв больше, чем денег!!!'), 'Я запишу голосовое. Громкое!!!',
 ];
@@ -750,6 +750,15 @@ D.P_PREV = ['Алик, вы обещали «{t}» ещё {date}.', 'А помн
 
 export function make(draw: DrawFn, getTier: () => number = () => 0, rng: Rng = mathRng) {
   const g = <T = string>(k: string): T => draw(k, D[k]);
+  let sorryMark: FactOp[] | undefined
+  const spoken = (x: unknown): string => {
+    if (typeof x === 'string') return x
+    if (x && typeof x === 'object' && 't' in x && typeof x.t === 'string') {
+      if ('remember' in x && Array.isArray(x.remember)) sorryMark = x.remember
+      return x.t
+    }
+    return String(x)
+  }
   // уровень отмазки: чаще текущий, иногда более ранний
   const escTier = () => { const t = getTier(); return t && rng.random() < [0, 0.35, 0.5, 0.6][t] ? (rng.random() < 0.65 ? t : 1 + Math.floor(rng.random() * t)) : 0; };
   const rel = (): Rel => { const [n, gen, you, id] = g('REL').split('|'); return { n, g: gen, you: you || undefined, id: id && isWhoId(id) ? id : undefined }; };
@@ -859,7 +868,8 @@ export function make(draw: DrawFn, getTier: () => number = () => 0, rng: Rng = m
     },
     legendQ: () => `${g('LEG_A')} ${g('LEG_B')}`,
     shortQ: (s: string) => `«${s.replace(/[.!…,].*$/, '')}» — ${g('SHORTQ')}`,
-    sorry: () => `${g('SORRY_A')} ${g('SORRY_B')}`,
+    sorry: () => { sorryMark = undefined; return `${g('SORRY_A')} ${spoken(g('SORRY_B'))}` },
+    pullSorryMark: (): FactOp[] | undefined => { const m = sorryMark; sorryMark = undefined; return m },
     ping: () => { const p = promise(); return { text: `${g('PING_A')} ${g('OATH')}, ${p.text}.`, p }; },
     prev: (q?: { made?: number; illAt?: number }) => {
       const p = promise()
