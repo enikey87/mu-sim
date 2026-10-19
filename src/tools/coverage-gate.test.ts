@@ -14,7 +14,9 @@ describe('покрытие правил: настоящие партии', () =>
       for (const [i, s] of r.samples.entries()) process.stdout.write(`\n# sample ${i} (${s.kind})\n` + formatCoverage(s) + '\n')
       process.stdout.write(`\nunion never: ${r.never.join(', ') || '(none)'}\n`)
     }
-    // правило без прямого случая обязано сработать хоть раз; основной игры — до концовки
+    // правило без прямого случая обязано сработать хоть раз; основной игры — до концовки.
+    // Вердикт «снять из DIRECT» здесь молчит: освобождению нужны ещё семьи (#1100), их приносит
+    // прогон rules:stable — до тех пор лишняя запись стоит один юнит-тест direct.test.ts.
     expect(gateIssues(r.samples, allRules)).toEqual([])
   }, 900_000)
 

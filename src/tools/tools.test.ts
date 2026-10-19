@@ -122,25 +122,42 @@ describe('гейт покрытия: сработало хоть раз (#278)',
 })
 
 // DIRECT (#329): освобождение от гейта — привилегия редких правил, а не способ его расширить.
+// Единое условие освобождения (#1100, решение по #949/#968): порог в CI-выборках И ≥1 в каждой семье.
 
-describe('гейт: DIRECT освобождает только редкие правила (#329)', () => {
+describe('гейт: DIRECT освобождает только редкие правила (#329, #1100)', () => {
   const sample = (kind: 'full' | 'main', games: Record<string, number>) => ({ kind, fired: {}, games })
   const rule = (name: string, late = false) => ({ name, when: late ? [is(endgame.active)] : [] })
-  it('запись DIRECT у правила от порога и выше — красное «снять из DIRECT»', () => {
+  const family = (shift: number, games: Record<string, number>) => ({ shift, samples: [sample('main', games), sample('full', {})] })
+  const families = (games: Record<string, number>) => [2000, 4000, 6000].map((shift) => ({ shift, samples: [sample('main', games), sample('full', {})] }))
+  it('достижимость доказана везде — красное «снять из DIRECT» с обоими условиями', () => {
     const s = [sample('main', { Hot: DIRECT_MIN_GAMES, Warm: DIRECT_MIN_GAMES - 1 })]
-    expect(gateIssues(s, [rule('Hot'), rule('Warm')], { Hot: {}, Warm: {} }))
-      .toEqual([expect.stringMatching(new RegExp(`^Hot: сработало в ${DIRECT_MIN_GAMES} партиях`))])
+    expect(gateIssues(s, [rule('Hot'), rule('Warm')], { Hot: {}, Warm: {} }, families({ Hot: 9 })))
+      .toEqual([`Hot: сработало в ${DIRECT_MIN_GAMES} партиях (порог ${DIRECT_MIN_GAMES}), семьи +2000: 9, +4000: 9, +6000: 9 — снять из DIRECT, достижимость доказана везде`])
+  })
+  it('#949: порог в CI взят, но в семье ноль — запись законна, гейт молчит (рубик 8 / 3-0-4)', () => {
+    const s = [sample('main', { Finale_rubik_default: 8 })]
+    const rubik = [family(2000, { Finale_rubik_default: 3 }), family(4000, {}), family(6000, { Finale_rubik_default: 4 })]
+    expect(gateIssues(s, [rule('Finale_rubik_default')], { Finale_rubik_default: {} }, rubik)).toEqual([])
+  })
+  it('#968: семьи полны, но CI не берёт порог — запись нужна и законна (голосовое 0 / 8-7-8)', () => {
+    const s = [sample('main', {})]
+    const voice = [family(2000, { Says_voice: 8 }), family(4000, { Says_voice: 7 }), family(6000, { Says_voice: 8 })]
+    expect(gateIssues(s, [rule('Says_voice')], { Says_voice: {} }, voice)).toEqual([])
+  })
+  it('без семейств гейт запись не снимает: освобождение требует доказательства везде (#1100)', () => {
+    const s = [sample('main', { Hot: DIRECT_MIN_GAMES + 1 })]
+    expect(gateIssues(s, [rule('Hot')], { Hot: {} })).toEqual([])
   })
   it('полная выборка частого правила не считается: считаются партии его рода', () => {
     const s = [sample('main', { Hot: 2 }), sample('full', { Hot: 20 })]
-    expect(gateIssues(s, [rule('Hot')], { Hot: {} })).toEqual([])
+    expect(gateIssues(s, [rule('Hot')], { Hot: {} }, families({ Hot: 9 }))).toEqual([])
     const fullOnly = [sample('main', {}), sample('full', { Hot: 20 })]
     expect(gateIssues(fullOnly, [rule('Hot')], {})).toEqual([expect.stringMatching(/^Hot: ни разу до экрана концовки/)])
   })
   it('правило эндгейма из DIRECT считается по всем выборкам', () => {
     const s = [sample('main', { Late: 2 }), sample('full', { Late: DIRECT_MIN_GAMES - 3 })]
-    expect(gateIssues(s, [rule('Late', true)], { Late: {} })).toEqual([])
-    expect(gateIssues([sample('main', { Late: 2 }), sample('full', { Late: DIRECT_MIN_GAMES })], [rule('Late', true)], { Late: {} }))
+    expect(gateIssues(s, [rule('Late', true)], { Late: {} }, families({ Late: 1 }))).toEqual([])
+    expect(gateIssues([sample('main', { Late: 2 }), sample('full', { Late: DIRECT_MIN_GAMES })], [rule('Late', true)], { Late: {} }, families({ Late: 1 })))
       .toEqual([expect.stringMatching(/^Late: сработало в/)])
   })
   it('частые правила основной игры не в DIRECT: гейт видит их сам — контроль с light.off краснеет', () => {
@@ -163,15 +180,16 @@ describe('гейт на чужих семействах сидов (#434)', () =
     expect(stableGateIssues(families, [rule('Rare')], { Rare: {} })).toEqual([])
   })
 
-  it('9/9/9 снимает DIRECT; 6/7/9 оставляет его', () => {
+  it('снятие DIRECT — не вердикт второго гейта: тупики #949/#968 его не снимают (#1100)', () => {
     const hot = [2000, 4000, 6000].map((shift) => family(shift, { Hot: 9 }))
-    expect(stableGateIssues(hot, [rule('Hot')], { Hot: {} })).toEqual([
-      expect.stringMatching(/^Hot: .*\+2000: 9.*\+4000: 9.*\+6000: 9.*снять из DIRECT/),
-    ])
-    const threshold = [2000, 4000, 6000].map((shift) => family(shift, { Hot: DIRECT_MIN_GAMES }))
-    expect(stableGateIssues(threshold, [rule('Hot')], { Hot: {} })).toHaveLength(1)
-    const mixed = [family(2000, { Hot: 6 }), family(4000, { Hot: 7 }), family(6000, { Hot: 9 })]
-    expect(stableGateIssues(mixed, [rule('Hot')], { Hot: {} })).toEqual([])
+    expect(stableGateIssues(hot, [rule('Hot')], { Hot: {} })).toEqual([])
+    const rubik = [family(2000, { Finale_rubik_default: 3 }), family(4000, {}), family(6000, { Finale_rubik_default: 4 })]
+    expect(stableGateIssues(rubik, [rule('Finale_rubik_default')], { Finale_rubik_default: {} })).toEqual([])
+    // страховка держится: без записи ноль в +4000 по-прежнему требует прямой случай
+    expect(stableGateIssues(rubik, [rule('Finale_rubik_default')], {}))
+      .toEqual([expect.stringMatching(/^Finale_rubik_default: .*\+4000: 0.*прямой случай/)])
+    const voice = [family(2000, { Says_voice: 8 }), family(4000, { Says_voice: 7 }), family(6000, { Says_voice: 8 })]
+    expect(stableGateIssues(voice, [rule('Says_voice')], { Says_voice: {} })).toEqual([])
   })
 
   it('0/0/0 без DIRECT красный; эндгейм считает и полные выборки', () => {
