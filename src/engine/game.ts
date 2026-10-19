@@ -1297,8 +1297,13 @@ export class Game {
       delete this.S.ctx.s
       if (!Object.keys(this.S.ctx).length) this.S.ctx = null
     }
-    // ответить можно на последнее сказанное: воспоминание, реплика легенды или персонажа ставятся после своей реплики
-    if (this.S.ctx) { delete this.S.ctx.memory; delete this.S.ctx.legend; delete this.S.ctx.chorus; delete this.S.ctx.wrong }
+    // ответить можно на последнее сказанное: воспоминание, реплика легенды или персонажа ставятся после своей реплики;
+    // строительная претензия тоже живёт только в блоке своей отмазки — следующая реплика Алика её снимает (#1149)
+    if (this.S.ctx) {
+      delete this.S.ctx.memory; delete this.S.ctx.legend; delete this.S.ctx.chorus; delete this.S.ctx.wrong
+      delete this.S.ctx.constr
+      if (!Object.keys(this.S.ctx).length) this.S.ctx = null
+    }
     const out: Msg[] = []
     for (const x of items) {
       let text = typeof x === 'string' ? x : x.t
