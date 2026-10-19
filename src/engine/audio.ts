@@ -63,10 +63,10 @@ export function browserAudio(): Audio {
     try { fn() } catch { /* до первого касания или без Web Audio */ }
   }
   const trackTimeout = (fn: () => void, ms: number): void => {
-    const id = window.setTimeout(() => {
+    const id = globalThis.setTimeout(() => {
       pending.delete(id)
       if (!disposed) fn()
-    }, ms) as WallTimer
+    }, ms) as unknown as WallTimer
     pending.add(id)
   }
 
@@ -93,7 +93,7 @@ export function browserAudio(): Audio {
     dispose() {
       disposed = true
       muted = true
-      for (const id of pending) window.clearTimeout(id)
+      for (const id of pending) globalThis.clearTimeout(id)
       pending.clear()
       try { speechSynthesis.cancel() } catch { /* ignore */ }
     },

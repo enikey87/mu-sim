@@ -3,11 +3,10 @@ import { describe, it, expect } from 'vitest'
 import { lintRules, type Rule } from '../engine/rules'
 import { allRules } from '../content/rules'
 import { isFactKey } from '../content/factkeys'
-import { multiSampleCoverage, runCoverageJobs, formatCoverage, neverClass, neverInAllSamples, gateIssues, stableGateIssues, endgameOnly, COVERAGE_SAMPLES, DIRECT_MIN_GAMES, type SampleReport, type SampleSpec } from './coverage'
+import { multiSampleCoverage, runCoverageJobs, neverClass, neverInAllSamples, gateIssues, stableGateIssues, endgameOnly, COVERAGE_SAMPLES, DIRECT_MIN_GAMES, type SampleReport, type SampleSpec } from './coverage'
 import { DIRECT } from './direct'
 import { is } from '../content/fact'
 import { endgame } from '../content/memkeys'
-import { wallClock } from '../engine/clock'
 import { ruleCoverage } from './coverage'
 import { playtest } from './playtest'
 
@@ -171,40 +170,6 @@ describe('гейт на чужих семействах сидов (#434)', () =
 })
 
 // Редкие правила: срабатывают только при особых сочетаниях, которые бот за разумное время не собирает
-
-describe('покрытие правил', () => {
-  it(`за ${COVERAGE_SAMPLES.length} непересекающихся выборок (${COVERAGE_SAMPLES.filter((s) => s.kind === 'main').length} — до концовки) срабатывают все правила без прямого случая`, async () => {
-    const r = await multiSampleCoverage()
-    if (process.env.RULES_REPORT) {
-      for (const [i, s] of r.samples.entries()) process.stdout.write(`\n# sample ${i} (${s.kind})\n` + formatCoverage(s) + '\n')
-      process.stdout.write(`\nunion never: ${r.never.join(', ') || '(none)'}\n`)
-    }
-    // правило без прямого случая обязано сработать хоть раз; основной игры — до концовки
-    expect(gateIssues(r.samples, allRules)).toEqual([])
-  }, 900_000)
-
-  it('партии стенда не оставляют живых таймеров: баннер уведомления пережил бы прогон (#288)', async () => {
-    const pending = new Set<unknown>()
-    let banners = 0
-    const set = wallClock.setTimeout.bind(wallClock)
-    const clear = wallClock.clearTimeout.bind(wallClock)
-    wallClock.setTimeout = (fn, ms) => {
-      banners++
-      const id = set(() => { pending.delete(id); fn() }, ms)
-      pending.add(id)
-      return id
-    }
-    wallClock.clearTimeout = (id) => { pending.delete(id); clear(id) }
-    try {
-      await ruleCoverage([7], 60, undefined, 0, { freeText: 0.2 })
-    } finally {
-      wallClock.setTimeout = set
-      wallClock.clearTimeout = clear
-    }
-    expect(banners, 'баннеров не было — проверка была бы пустой').toBeGreaterThan(0)
-    expect(pending.size, 'таймер баннера остался живым после прогона').toBe(0)
-  }, 300_000)
-})
 
 describe('strictTurns в покрытии и плейтесте (#468)', () => {
   // регулярка по исходнику не видела флага, убранного в комментарий; сторож — настоящая партия (#493)

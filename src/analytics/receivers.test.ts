@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 // #653: второй приёмник целей — PostHog. #656: третий — Umami. Клиенты подставные, живой сети прогон не трогает.
 import { describe, it, expect, beforeEach } from 'vitest'
 import { enable, firstGesture, isOn, track, GAME_HOST } from './metrics'

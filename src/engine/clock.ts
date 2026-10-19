@@ -1,7 +1,7 @@
 // Время для движка. В игре — реальные таймеры (с ускорением ?fast), в тестах — ручные.
 /** Идентификатор игрового таймера: ускоряется ?fast, в тестах запускается вручную. */
 export type GameTimer = number & { readonly __clock: 'game' }
-/** Идентификатор настенного таймера: window.setTimeout, ?fast не ускоряет. */
+/** Идентификатор настенного таймера: globalThis.setTimeout, ?fast не ускоряет. */
 export type WallTimer = number & { readonly __clock: 'wall' }
 
 export interface Clock {
@@ -14,8 +14,9 @@ export interface Clock {
 export function realClock(speed = 1): Clock {
   return {
     sleep: (ms) => new Promise((r) => setTimeout(r, ms * speed)),
-    setTimeout: (fn, ms) => window.setTimeout(fn, ms * speed) as GameTimer,
-    clearTimeout: (id) => window.clearTimeout(id),
+    // в браузере globalThis.setTimeout возвращает number, в node-прогоне тестов — Timeout: каст через unknown
+    setTimeout: (fn, ms) => globalThis.setTimeout(fn, ms * speed) as unknown as GameTimer,
+    clearTimeout: (id) => globalThis.clearTimeout(id),
     now: () => Date.now(),
   }
 }
@@ -27,8 +28,8 @@ export interface WallClock {
 }
 
 export const wallClock: WallClock = {
-  setTimeout: (fn, ms) => window.setTimeout(fn, ms) as WallTimer,
-  clearTimeout: (id) => window.clearTimeout(id),
+  setTimeout: (fn, ms) => globalThis.setTimeout(fn, ms) as unknown as WallTimer,
+  clearTimeout: (id) => globalThis.clearTimeout(id),
 }
 
 /** Тестовые часы: sleep мгновенный, таймеры запускаются вручную через runTimers(). */
