@@ -15,6 +15,10 @@ const fromPool = (text: string, pool: readonly unknown[]) => pool.some((p) => {
   const v = valueOf(p as never)
   return text.includes(typeof v === 'string' ? v : (v as { t: string }).t)
 })
+const poolText = (e: unknown): string => {
+  const v = valueOf(e as never)
+  return typeof v === 'string' ? v : (v as { t: string }).t
+}
 const LOW = [...P_MONEY.low.polite, ...P_MONEY.low.neutral, ...P_DESPERATE.low]
 const BOTTOM = [...P_MONEY.bottom.polite, ...P_MONEY.bottom.neutral, ...P_DESPERATE.bottom]
 /** Любой вариант с намерением desperate — любого тона (#494). */
@@ -65,6 +69,15 @@ describe('отчаяние от бедности', () => {
     const sets = rebuilds(game, 40)
     expect(desperate(sets)).toEqual([])
     expect(sets.flat().filter((c) => fromPool(c.text, [...LOW, ...BOTTOM]))).toEqual([])
+  })
+
+  // #1144: пулы называют уровень («дно», «мало»), а не число или пустоту карты. Банк показывает
+  // остаток сам, поэтому «ноль» в варианте рядом со сводкой на 4 800 ₽ — ложное утверждение.
+  it('пулы P_MONEY не утверждают ноль или пустую карту (#1144)', () => {
+    const ZERO = /(?<![а-яё])(ноль|нул[яею]|нулев\w*|пуст[оаы]|пустой|пустая|пустое|пустую|пустым|пустых|пустыми|обнул\w*)(?![а-яё])/i
+    const lines = [P_MONEY.low.polite, P_MONEY.low.neutral, P_MONEY.bottom.polite, P_MONEY.bottom.neutral]
+      .flat().map(poolText)
+    expect(lines.filter((t) => ZERO.test(t))).toEqual([])
   })
 
   it('«мало»: отчаяние появляется, реплики из пула «мало», вежливый вариант — в каждой сборке', () => {
