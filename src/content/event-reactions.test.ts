@@ -5,13 +5,13 @@ import type { Game } from '../engine/game'
 import { NOTIF } from './life'
 import { D } from './excuses'
 import { sold } from './credit'
-import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE, P_MAMA_MARKET, P_SAMVEL_DIVORCE, P_GRANT_HOUSE, P_TILE_SLIP, P_SOLD } from './rules/player-choice-pools'
+import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE, P_MAMA_MARKET, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_GRANT_HOUSE, P_TILE_SLIP, P_SOLD } from './rules/player-choice-pools'
 import { BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, GRANT_HOUSE_B, INTERN_B, HOLE_B, AVITO_REVIEW, MAMA_MARKET_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, TILE_SLIP_B, SOLD_B } from './world'
 import { ARCS } from './arcs'
 import { FINALES } from './finales'
 import { COURT_LAWYER_AGAIN } from './quests'
 import { RUDE_CALLS_VOICE, MAMA_VOICE_CRY } from './rude'
-import { court, HEAT, lawyerAt, debutWho, arsenTrack, saidStrasburg, grantTileAt, grantHouseAt, mamaMarketAt, mamaVoiceAt, samvelDivorceAt, tileSlipAt, saleAt, saleWhat } from './memkeys'
+import { court, HEAT, lawyerAt, debutWho, arsenTrack, saidStrasburg, grantTileAt, grantHouseAt, mamaMarketAt, mamaVoiceAt, mamaCalls, samvelDivorceAt, tileSlipAt, saleAt, saleWhat } from './memkeys'
 import { valueOf, type Line } from './fact'
 import type { Choice } from '../engine/state'
 
@@ -658,6 +658,24 @@ describe('окно голосового-плача мамы (#1085)', () => {
     expect(said.some((t) => MAMA_VOICE_B.map(text).includes(t)), `ответ не из пула: ${said.join(' | ')}`).toBe(true)
     expect(game.S.mem[mamaVoiceAt], 'ответ не потребил окно').toBeUndefined()
     expect(button(), 'после ответа окно закрыто').toBeUndefined()
+  })
+
+  // #1091: счёт звонков в sys переменный («прошлое + 1 + rnd(4)») — строка пула его не повторяет
+  it('счёт звонков называет sys, а кнопка окна числа не повторяет', async () => {
+    const { game } = makeGame()
+    onlyFresh(game, (t) => t === MAMA_VOICE_CRY)
+    game.S.mem[HEAT] = 2
+    game.S.mem[mamaCalls] = 8 // прошлое партии: серия скажет 9–12, а не 7 из транскрипта
+    await game.fire('PlayerMessage', { tone: 'rude' })
+    const sys = game.S.msgs.flatMap((m) => (m.kind === 'sys' && m.text.includes('Мама Алика') ? [m.text] : []))
+    expect(sys, 'серия не назвала счёт — проверка пустеет').toHaveLength(1)
+    const n = Number(/\d+/.exec(sys[0])![0])
+    expect(n, 'счёт серии не растёт от прошлого').toBeGreaterThanOrEqual(9)
+    expect(P_MAMA_VOICE.map(text).join(' '), 'строка пула называет счёт звонков').not.toMatch(/\d|семь|восем|девят|десят|одиннадцат|двенадцат/i)
+    game.S.choices = null
+    const buttons = game.buildChoices()
+    expect(buttons.some((c) => c.act === 'mamaVoice'), 'кнопки окна нет — проверка пустеет').toBe(true)
+    expect(buttons.map((c) => c.text).join(' '), 'кнопка блока называет число из одного транскрипта').not.toContain('семь')
   })
 
   it('чужое голосовое серии (Самвел) окна мамы не открывает', async () => {
