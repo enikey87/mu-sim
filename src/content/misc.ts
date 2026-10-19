@@ -106,7 +106,7 @@ export const OATH_FORMS: Line[] = [
   // ставка «усы»: пока не сбриты и не эндгейм (docs/design/moustache.md)
   gate(missing(endgame.active))(needs('karineHome')(needs('karine')(needs('moustache')({
     id: OATH_STAKE_MOUSTACHE,
-    t: '{P}. Если нет — сбрею усы. Карине давно просит, так что мне в любом случае выгодно.',
+    t: '{P}. Если не расплачусь — сбрею усы. Карине давно просит, так что мне в любом случае выгодно.',
     repeat: true,
     cooldown: { turns: 15 },
   })))),
