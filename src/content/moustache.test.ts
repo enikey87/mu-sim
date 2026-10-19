@@ -161,7 +161,9 @@ describe('ставка «усы»', () => {
   it('форма клятвы пишет stake и молчит без усов / в эндгейме', () => {
     const { game } = makeGame()
     game.rules.applyOps(meet('karine'), {})
-    expect(stakeForm().t).toMatch(/сбрею усы/)
+    const forms = OATH_FORMS.map(spec)
+    expect(stakeForm().t).toContain('Если не расплачусь — сбрею')
+    expect(forms.some((s) => /Если нет — сбрею/.test(s.t))).toBe(false)
     expect(oathOpen(game)).toBe(true)
     game.S.mem[alikShaved] = true
     expect(oathOpen(game)).toBe(false)
