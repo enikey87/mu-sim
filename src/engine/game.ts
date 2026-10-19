@@ -1052,7 +1052,8 @@ export class Game {
     const got = this.relief(thing.amount)
     if (got === 0) return
     // без «Нивы» продажа резины убирает и машину (has.car гаснет): факт — там же, где это происходит (#530)
-    const ops = [set(creditOffer, false), set(sold(thing.id), true)]
+    // штамп продажи (#1084): ход и что продано — окно отклика игрока живёт ход продажи и три после
+    const ops = [set(creditOffer, false), set(sold(thing.id), true), set(memkeys.saleAt, this.S.stats.sent), set(memkeys.saleWhat, thing.id)]
     if (thing.id === 'tires' && !this.nivaAtPlayer()) ops.push(set(memkeys.carGone, true))
     this.rules.applyOps(ops, {})
     delete this.S.mem[memkeys.creditOfferSum]
@@ -1610,6 +1611,10 @@ export class Game {
       courtVerdictFresh: S.stats.sent - Number(S.mem[memkeys.courtVerdictAt] ?? -99) <= 3,
       // первая серия плиточной арки (#1059): падение заказчика — отклик живёт ход серии и три после
       tileSlipFresh: S.stats.sent - Number(S.mem[memkeys.tileSlipAt] ?? -99) <= 3,
+      // продажа имущества со дна (#1084): заметное событие — отклик живёт ход продажи и три после;
+      // что продано — якорь пула: кнопка говорит про проданную вещь, а не про любую из проданных
+      saleFresh: S.stats.sent - Number(S.mem[memkeys.saleAt] ?? -99) <= 3,
+      saleItem: String(S.mem[memkeys.saleWhat] ?? ''),
       // второй дебют Гранта (#1041): дом «с кладом» — заметное событие, окно то же
       grantHouseFresh: S.stats.sent - Number(S.mem[memkeys.grantHouseAt] ?? -99) <= 3,
       // фото «платёжки» (#1017): заметное событие — отклик живёт ход фото и PHOTO_FRESH_TURNS после
