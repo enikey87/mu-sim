@@ -54,7 +54,8 @@ export const DIRECT: Record<string, DirectCase> = {
   Finale_beton_opened_or: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem.court = 5 } },
   Finale_beton_corner: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.ach.redo = 1 } },
   // #927 (реакции на системные события; слияние с новой main сдвинуло розыгрыш): в семье +2000 правило упало до нуля
-  Finale_beton_ledger: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem.caught = 2 } },
+  // #1085 (окно отклика на голосовое-плач мамы) сдвинуло выборки — бот сам доходит до «ведомости» (7 партий при пороге 7)
+  // Finale_beton_ledger: { event: 'ArcFinale', facts: { arc: 'beton' }, setup: (g) => { g.S.mem.caught = 2 } },
   // два пойманных вранья: после #682 (тексты серий сдвинули поток розыгрышей) бот в выборках до него не доходит,
   // но в полной выборке финал звучал — случай прямой, не объяснение недостижимости
   Finale_grant_ally: { event: 'ArcFinale', facts: { arc: 'grant' }, setup: (g) => { g.S.ach.customer = 1 } },

@@ -5,11 +5,12 @@ import type { Game } from '../engine/game'
 import { NOTIF } from './life'
 import { D } from './excuses'
 import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE, P_MAMA_MARKET, P_SAMVEL_DIVORCE, P_GRANT_HOUSE, P_TILE_SLIP } from './rules/player-choice-pools'
-import { BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, GRANT_HOUSE_B, INTERN_B, HOLE_B, AVITO_REVIEW, MAMA_MARKET_B, SAMVEL_DIVORCE_B, TILE_SLIP_B } from './world'
+import { BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, GRANT_HOUSE_B, INTERN_B, HOLE_B, AVITO_REVIEW, MAMA_MARKET_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, TILE_SLIP_B } from './world'
 import { ARCS } from './arcs'
 import { FINALES } from './finales'
 import { COURT_LAWYER_AGAIN } from './quests'
-import { court, HEAT, lawyerAt, debutWho, arsenTrack, saidStrasburg, grantTileAt, grantHouseAt, mamaMarketAt, samvelDivorceAt, tileSlipAt } from './memkeys'
+import { RUDE_CALLS_VOICE, MAMA_VOICE_CRY } from './rude'
+import { court, HEAT, lawyerAt, debutWho, arsenTrack, saidStrasburg, grantTileAt, grantHouseAt, mamaMarketAt, mamaVoiceAt, samvelDivorceAt, tileSlipAt } from './memkeys'
 import { valueOf, type Line } from './fact'
 import type { Choice } from '../engine/state'
 
@@ -621,6 +622,51 @@ describe('окно второго дебюта Гранта — дом «с кл
     expect(said.some((t) => GRANT_HOUSE_B.map(text).some((p) => t.includes(p))), `ответ не из пула события: ${said.join(' | ')}`).toBe(true)
     expect(game.S.mem[grantHouseAt], 'ответ не потребил окно').toBeUndefined()
     expect(button(), 'после ответа окно закрыто').toBeUndefined()
+  })
+})
+
+describe('окно голосового-плача мамы (#1085)', () => {
+  const text = (e: unknown): string => { const v = valueOf(e as never); return typeof v === 'string' ? v : (v as { t: string }).t }
+  /** Оставить свежим только нужное голосовое: остальные строки серии уже показаны. */
+  const onlyFresh = (game: Game, keep: (t: string) => boolean) => {
+    for (const e of RUDE_CALLS_VOICE) {
+      const [, said] = valueOf(e) as [string, string | { t: string }]
+      const t = typeof said === 'string' ? said : said.t
+      if (!keep(t)) game.seen.mark(t)
+    }
+  }
+
+  it('голосовое-плач штампует ход, кнопка в блоке, окно три хода, ответ потребляет', async () => {
+    const { game } = makeGame()
+    onlyFresh(game, (t) => t === MAMA_VOICE_CRY)
+    game.S.mem[HEAT] = 2
+    await game.fire('PlayerMessage', { tone: 'rude' })
+    expect(game.S.msgs.some((m) => m.kind === 'text' && m.text === MAMA_VOICE_CRY), 'голосовое не прозвучало — проверка пустеет').toBe(true)
+    const at = Number(game.S.mem[mamaVoiceAt])
+    expect(at, 'голосовое не штампануло ход').toBe(game.S.stats.sent)
+    const button = () => { game.S.choices = null; return game.buildChoices().find((c) => c.act === 'mamaVoice') }
+    expect(button(), 'на ходу события кнопки нет').toBeTruthy()
+    game.S.stats.sent = at + 3
+    expect(button(), 'третий ход после события — ещё окно').toBeTruthy()
+    game.S.stats.sent = at + 4
+    expect(button(), 'вне окна — кнопки нет').toBeUndefined()
+    game.S.stats.sent = at
+    const n = game.S.msgs.length
+    await game.fire('PlayerSays', { intent: 'mamaVoice' })
+    const said = game.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : []))
+    expect(said.some((t) => MAMA_VOICE_B.map(text).includes(t)), `ответ не из пула: ${said.join(' | ')}`).toBe(true)
+    expect(game.S.mem[mamaVoiceAt], 'ответ не потребил окно').toBeUndefined()
+    expect(button(), 'после ответа окно закрыто').toBeUndefined()
+  })
+
+  it('чужое голосовое серии (Самвел) окна мамы не открывает', async () => {
+    const { game } = makeGame()
+    game.S.mem['intro.samvel'] = true
+    onlyFresh(game, (t) => t.includes('Это Самвел'))
+    game.S.mem[HEAT] = 2
+    await game.fire('PlayerMessage', { tone: 'rude' })
+    expect(game.S.msgs.some((m) => m.kind === 'text' && m.text.includes('Это Самвел')), 'голосовое Самвела не прозвучало — проверка пустеет').toBe(true)
+    expect(game.S.mem[mamaVoiceAt], 'чужое голосовое открыло окно мамы').toBeUndefined()
   })
 })
 

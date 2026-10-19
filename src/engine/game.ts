@@ -1602,6 +1602,8 @@ export class Game {
       moustachePhotoFresh: S.stats.sent - Number(S.mem[memkeys.moustachePhotoAt] ?? -99) <= 3,
       // мама на рынке (#1030): конец квеста — заметное событие, отклик живёт ход события и три после
       mamaMarketFresh: S.stats.sent - Number(S.mem[memkeys.mamaMarketAt] ?? -99) <= 3,
+      // голосовое-плач мамы в серии звонков (#1085): отклик живёт ход голосового и три после
+      mamaVoiceFresh: S.stats.sent - Number(S.mem[memkeys.mamaVoiceAt] ?? -99) <= 3,
       // развод дяди Самвела на свадьбе (#1037): событие серии — отклик живёт ход события и три после
       samvelDivorceFresh: S.stats.sent - Number(S.mem[memkeys.samvelDivorceAt] ?? -99) <= 3,
       // вердикт суда (#1058): кульминация линии — отклик живёт ход вердикта и три после

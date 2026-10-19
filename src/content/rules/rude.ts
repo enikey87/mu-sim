@@ -8,7 +8,7 @@ import type { GameEvent, Offer } from './events'
 import { WORLD, speaks } from '../world'
 import * as T from '../rude'
 import { RUDE_AGAIN } from '../misc'
-import { HEAT, blocked, blockedHint, count, countersuitAt, mamaCalls, phoneKarine, polite, ritualCount, statusHidden, vendetta } from '../memkeys'
+import { HEAT, blocked, blockedHint, count, countersuitAt, mamaCalls, mamaVoiceAt, phoneKarine, polite, ritualCount, statusHidden, vendetta } from '../memkeys'
 
 type R = Rule<ContentApi, GameEvent, Offer>
 const rude = eq('tone', 'rude')
@@ -85,14 +85,17 @@ export const rudeRules: R[] = [
   // S2 — пропущенные от мамы и голосовое с «расшифровкой»
   {
     name: 'Rude_Calls', event: 'PlayerMessage', when: [rude, gte(HEAT, 2)], bonus: 2, cooldown: { days: 5 }, remember: cools, trigger: cool,
-    respond: async ({ game }) => {
+    respond: async ({ game, facts }) => {
       game.mood(-1)
       // счётчик пропущенных только растёт: он копится за партию, а не выдумывается каждый раз
       const calls = Number(game.mem()[mamaCalls] ?? 6) + 1 + game.rnd(4)
       game.applyFacts([set(mamaCalls, calls)])
       game.sys(game.draw('RC_SYS', T.RUDE_CALLS_SYS).replace('{n}', String(calls)))
       await game.sleep(600)
-      await sayFresh(game, 'RC_VOICE', T.RUDE_CALLS_VOICE)
+      const voice = await sayFresh(game, 'RC_VOICE', T.RUDE_CALLS_VOICE)
+      // голосовое-плач — заметное событие с окном отклика (#1085): ход и три после.
+      // Штамп ставит именно эта строка серии: болтовня мамы и голосовое Самвела окна не открывают
+      if (voice && saidText(voice[1]) === T.MAMA_VOICE_CRY) game.applyFacts([set(mamaVoiceAt, Number(facts.sent))])
       await game.say([freshOr(game, 'RC_ALIK', T.RUDE_CALLS_ALIK, game.X.offended)])
       game.setCtx({ offended: true })
     },
