@@ -6,9 +6,10 @@ import { describe, it, expect } from 'vitest'
 import { makeGame, alikTexts } from '../test/helpers'
 import type { Game } from '../engine/game'
 import { LEGENDS } from './legends'
-import { PROMISE_DUE } from './world'
+import { PROMISE_DUE, meet } from './world'
 import { DELETED } from './life'
-import { spec } from './fact'
+import { D } from './excuses'
+import { spec, type Entry } from './fact'
 import { borisSmetaReady } from './memkeys'
 
 /** Единственный производитель `has.boris` — товар барахолки (scenes.ts, «баран Борис»). */
@@ -144,5 +145,25 @@ describe('одиночные реплики про Бориса: место ба
     giveBoris(atPlayer)
     expect(line(atPlayer), 'при баране у игрока реплика осталась прежней').not.toBe('Борис, не ешь квитанции')
     expect(line(atPlayer), 'у игрока нет своей формулировки').toContain('Мои уже съедены')
+  })
+})
+
+describe('клятва «Чтоб мой баран не проснулся»: «мой» — только пока баран у Алика (#1162)', () => {
+  const OATH = 'Чтоб мой баран не проснулся'
+  /** Пул клятв — тем же `eligible`, которым его тянет генератор отмазок. */
+  const open = (game: Game) => game.lines.eligible('OATH', D.OATH as Entry<string>[], game.lineFacts()).map((p) => p.text)
+  /** Барана назвали вслух — клятва про него открыта (тот же факт, что ставит `meet('baran')`). */
+  const heardBaran = (game: Game) => game.rules.applyOps(meet('baran'), {})
+
+  it('пока баран у Алика клятва звучит, после бартера — молчит', () => {
+    const atAlik = makeGame().game
+    heardBaran(atAlik)
+    expect(atAlik.facts()['has.boris'], 'факт владения выставлен не тем — проверка пустеет').toBe(false)
+    expect(open(atAlik), 'клятвы «мой баран» нет у самого хозяина — проверка пустеет').toContain(OATH)
+    const atPlayer = makeGame().game
+    heardBaran(atPlayer)
+    giveBoris(atPlayer)
+    expect(open(atPlayer), 'при баране у игрока клятва называет его Аликовым').not.toContain(OATH)
+    expect(open(atPlayer).length, 'пул клятв опустел — проверка пустеет').toBeGreaterThan(20)
   })
 })
