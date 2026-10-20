@@ -5,7 +5,7 @@ import { type Line, type Entry, eq, exists, gate, gte, is, missing, set } from '
 import { saidMatch, type TalkPair } from './said'
 import type { When } from './excuses'
 import { needs, WORLD } from './world'
-import { actSigned, borisMarried, borisSmetaReady, finaleOf, grantPaid, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, sick, taxFrozen, taxThawed, wedding } from './memkeys'
+import { actSigned, borisMarried, borisSmetaReady, finaleOf, grantPaid, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, saidGrantEnvelope, sick, taxFrozen, taxThawed, wedding } from './memkeys'
 
 export interface Legend {
   /** Срок, который из неё следует. Ни `condition`, ни `d` — сюжет срока не приводит (NEVER в legends.test.ts): клятва со ставкой на нём не звучит. */
@@ -451,7 +451,7 @@ export const CHORUS_LEGEND: Record<string, Line[]> = {
     { t: 'Пишу из фундамента. Код от сейфа — 1234. Шучу. Не выпустите — не скажу.', when: [eq('legend', 'garik')], prio: 1 },
   ],
   grant: [
-    { t: 'Молодой человек, ваш конверт стал частью моего дома. Дом, кстати, подорожал. Вам спасибо.', when: [eq('legend', 'beton_law')], prio: 1 },
+    { t: 'Молодой человек, ваш конверт стал частью моего дома. Дом, кстати, подорожал. Вам спасибо.', when: [eq('legend', 'beton_law')], prio: 1, remember: [set(saidGrantEnvelope, true)] },
     { t: 'Молодой человек, плитку в углу не трогать. Там экскурсия в двенадцать.', when: [eq('legend', 'beton_goar')], prio: 1 },
     { t: 'Молодой человек, я не плачу, пока в моей ванной живёт государство.', when: [eq('legend', 'inspect'), missing(grantPaid)], prio: 1 },
     // новость «всё заплатил» — у следующей серии Гранта; здесь только анонс, иначе она звучит дважды в любом порядке

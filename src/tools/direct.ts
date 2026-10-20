@@ -266,6 +266,20 @@ export const DIRECT: Record<string, DirectCase> = {
   // Says_lawyerAsk: { event: 'PlayerSays', facts: { intent: 'lawyerAsk' } },
   // #982 (пул дебюта Арсена ждёт события трека) — ответ окну дебюта в выборках больше не собирается
   Says_debutArsen: { event: 'PlayerSays', facts: { intent: 'debutArsen' } },
+  // #1179: дебют Гранта — хор легенды с шансом 0.3; окно живёт, только если первая фраза была про конверт
+  Opt_DebutGrant: {
+    event: 'BuildChoices',
+    setup: (g) => {
+      g.S.mem['intro.grant'] = true
+      g.S.mem['said.grant.envelope'] = true
+      g.S.mem['debut.who'] = 'grant'
+      g.S.mem['debut.at'] = g.S.stats.sent
+    },
+  },
+  Says_debutGrant: {
+    event: 'PlayerSays', facts: { intent: 'debutGrant' },
+    setup: (g) => { g.S.mem['intro.grant'] = true; g.S.mem['said.grant.envelope'] = true },
+  },
   Scene_lend: { event: 'PickScene', setup: (g) => { g.S.mood = 4 } }, // денег в свежей партии хватает (START_MONEY)
   // #1003 (окно перевода) сдвинуло выборки — сцена заказчика ушла из них, держим прямым случаем
   Scene_customer: { event: 'PickScene', setup: (g) => { g.S.day = 220 } },

@@ -5,13 +5,13 @@ import type { Game } from '../engine/game'
 import { NOTIF } from './life'
 import { D } from './excuses'
 import { sold } from './credit'
-import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE, P_MAMA_MARKET, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_GRANT_HOUSE, P_TILE_SLIP, P_SOLD } from './rules/player-choice-pools'
-import { BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, GRANT_HOUSE_B, INTERN_B, HOLE_B, AVITO_REVIEW, MAMA_MARKET_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, TILE_SLIP_B, SOLD_B } from './world'
+import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE, P_DEBUT_GRANT, P_MAMA_MARKET, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_GRANT_HOUSE, P_TILE_SLIP, P_SOLD } from './rules/player-choice-pools'
+import { BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, DEBUT_GRANT_B, GRANT_HOUSE_B, INTERN_B, HOLE_B, AVITO_REVIEW, MAMA_MARKET_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, TILE_SLIP_B, SOLD_B } from './world'
 import { ARCS } from './arcs'
 import { FINALES } from './finales'
 import { COURT_LAWYER_AGAIN } from './quests'
 import { RUDE_CALLS_VOICE, MAMA_VOICE_CRY } from './rude'
-import { count, collectorsRecruited, court, crewPaid, crewPaidAt, HEAT, internAt, lawyerAt, debutWho, arsenTrack, saidStrasburg, grantTileAt, grantHouseAt, mamaMarketAt, mamaVoiceAt, mamaCalls, samvelDivorceAt, tileSlipAt, saleAt, saleWhat } from './memkeys'
+import { count, collectorsRecruited, court, crewPaid, crewPaidAt, HEAT, internAt, lawyerAt, debutWho, debutAt, arsenTrack, saidStrasburg, saidGrantEnvelope, grantTileAt, grantHouseAt, mamaMarketAt, mamaVoiceAt, mamaCalls, samvelDivorceAt, tileSlipAt, saleAt, saleWhat } from './memkeys'
 import { valueOf, type Line } from './fact'
 import type { Choice } from '../engine/state'
 
@@ -477,6 +477,55 @@ describe('первое сообщение заказчика Гранта (#983)
     const said = game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' && m.who === 'grant' ? [m.text] : []))
     expect(said.some((t) => GRANT_TILE_B.map(lineOf).includes(t)), `ответ не из пула: ${said.join(' | ')}`).toBe(true)
     expect(has(game), 'после ответа окно закрыто').toBe(false)
+  })
+})
+
+describe('дебют Гранта хором легенды (#1179)', () => {
+  const has = (game: Game, act: string) => { game.S.choices = null; return game.buildChoices().some((c) => c.act === act) }
+  const lineOf = (e: Parameters<typeof valueOf>[0]): string => {
+    const v = valueOf(e)
+    if (typeof v === 'string') return v
+    if (v && typeof v === 'object' && 't' in v && typeof v.t === 'string') return v.t
+    return ''
+  }
+  /** Первое личное сообщение — хор при легенде beton_law. Знакомство уже есть (серия бумаг), писал он ещё нет. */
+  const chorusDebut = async (game: Game) => {
+    game.S.mem['intro.grant'] = true
+    game.setLegend('beton_law')
+    for (let i = 0; i < 80; i++) {
+      await game.fire('Mentioned', {}, { target: 'grant' })
+      if (game.S.msgs.some((m) => m.kind === 'text' && m.who === 'grant')) return
+    }
+    expect.fail('Грант не заговорил в хоре')
+  }
+
+  it.each([1, 2, 3])('сид %s: хор про конверт открывает пул, ответ гасит окно, повтор не открывает', async (seed) => {
+    const { game } = makeGame({ seed })
+    expect(has(game, 'debutGrant'), 'до дебюта кнопки нет').toBe(false)
+    await chorusDebut(game)
+    expect(game.S.mem[saidGrantEnvelope], 'хор не поставил факт конверта — проверка пустеет').toBe(true)
+    expect(game.S.msgs.some((m) => m.kind === 'text' && m.who === 'grant' && /конверт стал частью/.test(m.text)), 'первая реплика не про конверт').toBe(true)
+    const btn = game.buildChoices().find((c) => c.act === 'debutGrant')
+    expect(btn, 'окна дебюта нет').toBeTruthy()
+    expect(P_DEBUT_GRANT.map(lineOf), 'кнопка не из пула').toContain(btn!.text)
+    const from = game.S.msgs.length
+    await game.fire('PlayerSays', { intent: 'debutGrant' })
+    const said = game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' && m.who === 'grant' ? [m.text] : []))
+    expect(said.some((t) => DEBUT_GRANT_B.map(lineOf).includes(t)), `ответ не из пула: ${said.join(' | ')}`).toBe(true)
+    expect(game.S.mem[debutAt], 'ответ не потребил окно').toBeUndefined()
+    expect(has(game, 'debutGrant'), 'после ответа окно живо').toBe(false)
+    await game.say([{ w: 'grant', t: 'Молодой человек, это опять я.' }])
+    expect(has(game, 'debutGrant'), 'повторное сообщение открыло окно').toBe(false)
+  })
+
+  it('первая реплика — «плитка — орудие»: виден только GrantTile, общий слот погашен', async () => {
+    const { game } = makeGame()
+    await game.playEpisode(ARCS.tile.eps[2], 'tile')
+    expect(game.S.msgs.some((m) => m.kind === 'text' && m.who === 'grant'), 'Грант не написал — проверка пустеет').toBe(true)
+    expect(has(game, 'grantTile'), 'окна плитки нет').toBe(true)
+    expect(has(game, 'debutGrant'), 'общий дебют задвоился с плиткой').toBe(false)
+    expect(game.S.mem[debutAt], 'общий слот не погашен').toBeUndefined()
+    expect(game.S.mem[grantTileAt], 'штамп плитки пропал').toBe(game.S.stats.sent)
   })
 })
 

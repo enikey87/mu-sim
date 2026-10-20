@@ -21,7 +21,7 @@ import { HOLIDAY_MONEY, type Holiday } from '../holidays'
 import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_THIRD, LIE_NOCRED } from '../lies'
 import { HEAT, alikShaved, avitoReviewAt, borisSaleAt, collectorsAskAt, countersuitAt, courtVerdictAt, tileSlipAt, saleAt, crewPaidAt, debutAt, grantTileAt, internAt, internDeclined, kettleAt, lawyerAt, moustacheAskAt, ramPhotoAt, rubikAskAt, rubikHoleAt, moustachePhotoAt, photoAt, mamaMarketAt, mamaVoiceAt, samvelDivorceAt, grantHouseAt, transferAt, vacancyAt, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, saidKonak, stateAt, topic, topicLast, topicMute, topicRun, whenYears } from '../memkeys'
 import type { ArcId, TopicId } from '../ids'
-import { PROMISE_SHAVE_ASK, MOUSTACHE_PHOTO_B, MAMA_MARKET_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, GRANT_HOUSE_B, COURT_VERDICT_B, TILE_SLIP_B, SOLD_B, RAM_PHOTO, BORIS_SALE, VACANCY, AVITO_REVIEW, RUBIK_ASK, KETTLE, CREW_CALL_B, LAWYER_B, COLLECTORS_ASK_B, INTERN_B, HOLE_B, COUNTERSUIT_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, DEBUT_BORIS_B, DEBUT_NIVA_B, NUNE_DEBUT_B, GRANT_TILE_B } from '../world'
+import { PROMISE_SHAVE_ASK, MOUSTACHE_PHOTO_B, MAMA_MARKET_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, GRANT_HOUSE_B, COURT_VERDICT_B, TILE_SLIP_B, SOLD_B, RAM_PHOTO, BORIS_SALE, VACANCY, AVITO_REVIEW, RUBIK_ASK, KETTLE, CREW_CALL_B, LAWYER_B, COLLECTORS_ASK_B, INTERN_B, HOLE_B, COUNTERSUIT_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, DEBUT_BORIS_B, DEBUT_NIVA_B, NUNE_DEBUT_B, DEBUT_GRANT_B, GRANT_TILE_B } from '../world'
 
 type R = Rule<ContentApi, GameEvent, Offer>
 const says = (intent: string, rest: Partial<R> & Pick<R, 'respond'>, extra: R['when'] = []): R => ({
@@ -382,6 +382,13 @@ export const replyRules: R[] = [
   says('debutNune', {
     respond: async ({ game }) => {
       await game.say([game.draw('NUNE_DEBUT_B', NUNE_DEBUT_B)])
+      game.clearFact(debutAt)
+      game.setCtx(null)
+    },
+  }),
+  says('debutGrant', {
+    respond: async ({ game }) => {
+      await game.say([game.draw('DEBUT_GRANT_B', DEBUT_GRANT_B)])
       game.clearFact(debutAt)
       game.setCtx(null)
     },
