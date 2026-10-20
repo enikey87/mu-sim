@@ -5,7 +5,7 @@ import type { Game } from '../engine/game'
 import { NOTIF } from './life'
 import { D } from './excuses'
 import { sold } from './credit'
-import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE, P_MAMA_MARKET, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_GRANT_HOUSE, P_TILE_SLIP, P_SOLD } from './rules/player-choice-pools'
+import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE, P_MAMA_MARKET, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_GRANT_HOUSE, P_TILE_SLIP, P_SOLD } from './rules/player-choice-pools'
 import { BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, GRANT_HOUSE_B, INTERN_B, HOLE_B, AVITO_REVIEW, MAMA_MARKET_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, TILE_SLIP_B, SOLD_B } from './world'
 import { ARCS } from './arcs'
 import { FINALES } from './finales'
@@ -536,6 +536,53 @@ describe('пулы Арсена держат только утверждённо
     let saw = false
     for (let i = 0; i < 80 && !saw; i++) saw = offered().includes('Арсен, а Страсбург — это долго ждать?')
     expect(saw, 'после оглашения Страсбург не предлагается').toBe(true)
+  })
+})
+
+describe('дебют Самвела не предлагает свадьбу, пока её не ввела серия (#1166)', () => {
+  const SIDE = 'Самвел, а вы-то тут с какой стороны?'
+  const WEDDING = ['Самвел, а сколько у вас всего свадеб?', 'Самвел, а на этой свадьбе хозяин — вы или Алик?']
+  const INTRO = 'Мальчик, я Самвел. На моего племянника кричу только я. Встань в очередь, она с 1987 года.'
+  const frame = (game: Game) => { game.S.choices = null; return game.buildChoices() }
+  const debutTexts = (game: Game) => {
+    const seen = new Set<string>()
+    for (let i = 0; i < 12; i++) {
+      const b = frame(game).find((c) => c.act === 'debutSamvel')
+      if (b) seen.add(b.text)
+    }
+    return [...seen]
+  }
+  const rudeDebut = async (game: Game) => {
+    game.S.mem['intro.samvel'] = true
+    game.S.mem[HEAT] = 1
+    const n = game.S.msgs.length
+    const r = await game.fire('PlayerMessage', { tone: 'rude' })
+    expect(r?.name, 'rude-дебют Самвела не сработал — проверка пустеет').toBe('Rude_Family_samvel')
+    const said = game.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' && m.who === 'samvel' ? [m.text] : []))
+    expect(said, 'дебют пришёл не строкой знакомства — проверка не про тот путь').toContain(INTRO)
+    expect(game.S.mem[debutWho], 'дебют не штампанулся').toBe('samvel')
+  }
+
+  it('rude-дебют без серии: свадебные варианты молчат, окно не пустеет', async () => {
+    const { game } = makeGame()
+    await rudeDebut(game)
+    expect(game.S.arcs.samvel, 'серия сама началась — проверка не про тот путь').toBeUndefined()
+    expect(game.open(P_DEBUT_SAMVEL).map(valueOf), 'окно не пустеет').toContain(SIDE)
+    const seen = debutTexts(game)
+    expect(seen.length, 'окно дебюта ничего не предложило — проверка пустеет').toBeGreaterThan(0)
+    expect(seen.some((t) => WEDDING.some((w) => t.includes(w.slice(0, 24)))), 'свадебные варианты до введения свадьбы').toBe(false)
+    expect(seen.some((t) => t.includes('с какой стороны')), 'кнопка дебюта не из безгейтной строки').toBe(true)
+  })
+
+  it('после первой серии арки оба свадебных варианта доступны', async () => {
+    const { game } = makeGame()
+    await game.playArc('samvel')
+    expect(game.S.msgs.some((m) => m.kind === 'text' && /У дяди Самвела свадьба/.test(m.text)), 'серия не назвала свадьбу — проверка пустеет').toBe(true)
+    expect(game.S.arcs.samvel?.i, 'серия не засчитана').toBeGreaterThanOrEqual(1)
+    await rudeDebut(game)
+    const seen = debutTexts(game)
+    expect(seen.length, 'после серии окно пусто — проверка пустеет').toBeGreaterThan(0)
+    for (const w of WEDDING) expect(seen.some((t) => t.includes(w.slice(0, 24))), `после серии нет «${w.slice(0, 24)}»`).toBe(true)
   })
 })
 

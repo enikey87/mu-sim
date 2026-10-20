@@ -1,6 +1,6 @@
 // Именованные пулы кнопок из rules/choices — вынесены, чтобы попасть в PLAYER_POOLS (#491).
 import { needs, WORLD } from '../world'
-import { gate, eq, is, missing } from '../fact'
+import { gate, eq, is, missing, exists } from '../fact'
 import { courtVerdict, saidNuneNoWrite } from '../memkeys'
 import { sold } from '../credit'
 
@@ -195,11 +195,12 @@ export const P_DEBUT_ARSEN = [
   needs('arsenTrack')('Арсен, а бит из чего собран? Из крика?'),
 ] as const
 
-/** Дебют дяди Самвела в хоре (#973): свадьба и «не впутывай меня». */
+/** Дебют дяди Самвела (#973). Свадьбу называет первая серия арки, не сам дебют:
+ *  rude-знакомство и часть хора её не вводят (#1166). Первая строка без гейта — окно не пустеет. */
 export const P_DEBUT_SAMVEL = [
   'Самвел, а вы-то тут с какой стороны?',
-  'Самвел, а сколько у вас всего свадеб?',
-  'Самвел, а на этой свадьбе хозяин — вы или Алик?',
+  gate(exists('arc.samvel'))('Самвел, а сколько у вас всего свадеб?'),
+  gate(exists('arc.samvel'))('Самвел, а на этой свадьбе хозяин — вы или Алик?'),
 ] as const
 
 /** Первое сообщение заказчика Гранта: плитка — орудие, адвокат свяжется (#983).
