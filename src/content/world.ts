@@ -1,7 +1,7 @@
 // Тексты для новых возможностей системы правил: обещания, которые наступают, хор персонажей,
 // состояния мира со сроком (свадьба, болезнь Бориса, «Алик умер»).
 import { type Criterion, type Line, type Entry, named, exists, is, eq, gte, ne, missing, set, gate } from './fact'
-import { arsenTrack, cryptoHodl, courtVerdict, garikConcrete, garikCut, garikDenied, grandpaDying, grantPaid, intro, karineKnowsDebt, karineThinksTax, met, mourning, moustacheStakeSaid, nivaAway, nivaPlayer, nuneDekretOver, payday, saidFriday, saidStrasburg, saidTomorrow, alikShaved, wedding, collectorsRecruited, collectorsTurned, rubikBath } from './memkeys'
+import { arsenTrack, cryptoHodl, courtVerdict, garikConcrete, garikCut, garikDenied, grandpaDying, grantPaid, intro, karineKnowsDebt, karineThinksTax, met, mourning, moustacheStakeSaid, nivaAway, nivaPlayer, nuneDekretOver, payday, saidFriday, saidMoneyMoustache, saidStrasburg, saidTomorrow, alikShaved, wedding, collectorsRecruited, collectorsTurned, rubikBath } from './memkeys'
 import type { WhoId } from './ids'
 
 // Мир последователен: кто и что есть в истории и в каком оно положении — факты, их ставит серия (remember), ступень суда
@@ -156,12 +156,13 @@ export const PROMISE_MET = [
 /** Срок со ставкой «усы» сорван — Алик без усов (docs/design/moustache.md). */
 export const PROMISE_SHAVE: Line[] = [
   'Слово Алика — закон. Усы — нет. Теперь меня в банке не узнают, брат. Это тоже задержка.',
-  'Деньги — как усы. Отрастут.',
+  // фраза-объявитель нити «деньги ↔ усы» (#921): сама пишет факт — цитата «говоришь?» ждёт прозвучавшего (#1171)
+  { t: 'Деньги — как усы. Отрастут.', remember: [set(saidMoneyMoustache, true)] },
   needs('karineHome', 'karine')({ t: 'Карине довольна: усы сбриты. Ты — тоже, надеюсь. Денег по-прежнему нет, но ставка сыграла.', remember: [set(moustacheStakeSaid, true)] }),
 ]
 /** Ответ на «Алик, как усы?» пока отрастают (#352). Числа дней в тексте нет. */
 export const PROMISE_SHAVE_ASK: Line[] = [
-  'Деньги — как усы. Отрастут.',
+  { t: 'Деньги — как усы. Отрастут.', remember: [set(saidMoneyMoustache, true)] },
   'Растут. Медленно. Как перевод.',
   needs('karineHome')(needs('karine')('Карине говорит: красиво. Я говорю: холодно.')),
   'Без усов меня в банке не узнают. Это удобно — и для них, и для меня.',

@@ -1,7 +1,7 @@
 // Именованные пулы кнопок из rules/choices — вынесены, чтобы попасть в PLAYER_POOLS (#491).
 import { needs, WORLD } from '../world'
 import { gate, eq, is, missing, exists } from '../fact'
-import { courtVerdict, crewAllPaid, saidNuneNoWrite } from '../memkeys'
+import { courtVerdict, crewAllPaid, saidMoneyMoustache, saidNuneNoWrite } from '../memkeys'
 import { sold } from '../credit'
 
 export const P_VIA_BORIS = [
@@ -38,7 +38,8 @@ export const P_COLLECTORS_DEBUT = [
 export const P_MOUSTACHE = [
   'Усы отрастают? А долг?',
   'Как усы? Денег ещё меньше, чем усов?',
-  'Деньги — как усы, говоришь? Жду, когда отрастут',
+  // «говоришь?» цитирует фразу Алика «Деньги — как усы»: её говорят строка сбривания и ответ на «как усы?» — ждёт факта (#1171)
+  gate(is(saidMoneyMoustache))('Деньги — как усы, говоришь? Жду, когда отрастут'),
 ] as const
 
 /** Реакция на смену фото без усов (#1013): заметное событие ставки — окно хода события и трёх после.
