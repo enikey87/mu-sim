@@ -115,6 +115,33 @@ describe('окно отклика на звонок — только общее 
   })
 })
 
+describe('дебютное окно звонка: «всех» — только под фактом (#1170)', () => {
+  const LINE = 'Тарон, значит, рассчитали всех. Кроме меня. Так и запишем.'
+  const callWith = async (variant: readonly [string, string]): Promise<Game> => {
+    const { game } = makeGame()
+    game.S.day = 210
+    const draw = game.draw.bind(game)
+    vi.spyOn(game, 'draw').mockImplementation(((key: string, arr: readonly unknown[]) =>
+      key === 'CREW_CALL' ? variant[1] : draw(key as never, arr as never)) as unknown as typeof game.draw)
+    await game.fire('AlikIdle')
+    return game
+  }
+
+  it('вариант «плиточнику — в следующий раз» строку не открывает, окно не пустеет', async () => {
+    const quiet = await callWith(valueOf(CREW_CALL[2]) as readonly [string, string])
+    expect(quiet.S.mem[crewAllPaid], 'проверка не про тот путь: вариант поставил факт «всем»').toBeUndefined()
+    const open = quiet.open(P_CREW_CALL)
+    expect(open, '«рассчитали всех» открыто без факта').not.toContain(LINE)
+    expect(open.length, 'окно дебюта опустело').toBeGreaterThan(0)
+  })
+
+  it('вариант «получка ушла всему объекту» строку открывает', async () => {
+    const paid = await callWith(valueOf(CREW_CALL[1]) as readonly [string, string])
+    expect(paid.S.mem[crewAllPaid], 'проверка не про тот путь: вариант не поставил факт «всем»').toBe(true)
+    expect(paid.open(P_CREW_CALL), '«рассчитали всех» закрыто после факта').toContain(LINE)
+  })
+})
+
 describe('упрёк по звонку с объекта', () => {
   /** Партия, в которой звонок уже состоялся: факт crew.paid, Тарон в истории. */
   const afterCall = async () => {
