@@ -21,7 +21,7 @@ import {
   legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway, nivaPlayer, carGone,
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, threatClaim, nuneKeyPassed, nuneDekretOver, grandpaDying,
-  betonSet, cardSent, saidTomorrow, saidFriday, saidKonak, saidHash, saidNuneNoWrite, payday, count, endgame, holidayGreeted, lend50,
+  betonSet, cardSent, saidTomorrow, saidFriday, saidKonak, saidHash, saidNuneNoWrite, saidMoneyMoustache, payday, count, endgame, holidayGreeted, lend50,
   paydayScene, lightOff, netRation, phoneWarn, creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited,
   collectorsTurned, collectorsTea,
   criticalAt, creditOfferSum, crewPaid, crewPaidAt, crewAllPaid, moneyAskAt, rubikBath, whenYears, ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt, countersuitAt, grantTileAt, transferAt, transferAmount, moustachePhotoAt, moustacheStakeSaid, mamaMarketAt, mamaVoiceAt, samvelDivorceAt, courtVerdictAt, tileSlipAt, saleAt, saleWhat, fraudLoan, blockLifted, internDeclined, grantHouseAt, photoAt,
@@ -57,7 +57,7 @@ export type MemExactKey =
   | typeof razmikMarried
   | typeof borisSmetaReady | typeof taxFrozen | typeof taxThawed | typeof actSigned | typeof grantPaid
   | typeof rubikFined | typeof threatClaim | typeof nuneKeyPassed | typeof nuneDekretOver | typeof grandpaDying
-  | typeof betonSet | typeof cardSent | typeof saidTomorrow | typeof saidFriday | typeof saidKonak | typeof saidHash | typeof saidNuneNoWrite | typeof paydayScene
+  | typeof betonSet | typeof cardSent | typeof saidTomorrow | typeof saidFriday | typeof saidKonak | typeof saidHash | typeof saidNuneNoWrite | typeof saidMoneyMoustache | typeof paydayScene
   | typeof debutWho | typeof debutAt | typeof arsenTrack | typeof transferAt | typeof transferAmount
   | typeof lightOff | typeof netRation | typeof phoneWarn | typeof holidayGreeted
   | typeof creditStage | typeof creditOffer | typeof creditBroke | typeof momDone | typeof creditDeclined | typeof moneyPoor | typeof collectorsRecruited

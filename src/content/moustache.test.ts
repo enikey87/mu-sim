@@ -1,11 +1,11 @@
 // Ставка «сбрею усы» (docs/design/moustache.md): запись в журнале, исполнение в срок, факт ~40 дней.
 import { describe, it, expect, vi } from 'vitest'
 import { makeGame, respondCtx } from '../test/helpers'
-import { spec, valueOf, type Line } from './fact'
+import { spec, valueOf, isOpen, set, type Line } from './fact'
 import { lineId } from '../engine/rules/lines'
 import { OATH_FORMS } from './misc'
 import { WORLD, meet, MOUSTACHE_PHOTO_B, PROMISE_MET, PROMISE_SHAVE, PROMISE_SHAVE_ASK, PROMISE_SHAVE_KEPT } from './world'
-import { alikDead, alikShaved, endgame, moustacheKept, moustachePhotoAt, nuneKeyPassed } from './memkeys'
+import { alikDead, alikShaved, endgame, moustacheKept, moustachePhotoAt, nuneKeyPassed, saidMoneyMoustache } from './memkeys'
 import { P_MOUSTACHE, P_MOUSTACHE_PHOTO } from './rules/player-choice-pools'
 import { D, low } from './excuses'
 import { promiseRules } from './rules/world'
@@ -489,13 +489,14 @@ describe('ставка «усы»', () => {
     game.S.day = 10
     game.S.ach.shaved = 9
     game.S.mem[alikShaved] = true
-    expect(hasAsk()).toBe(true)
-    const choice = game.buildChoices().find((c) => c.act === 'moustacheAsk')!
+    const block = game.buildChoices()
+    expect(block.some((c) => c.act === 'moustacheAsk')).toBe(true)
+    const choice = block.find((c) => c.act === 'moustacheAsk')!
     expect(choice.text).toMatch(/ус/i)
     const from = game.S.msgs.length
     await game.fire('PlayerSays', { intent: 'moustacheAsk' })
     // ответ — строка своего пула: в нём есть и строки без слова «усы» («Растут. Медленно…»)
-    expect(alik(game, from).some((t) => PROMISE_SHAVE_ASK.map(valueOf).includes(t))).toBe(true)
+    expect(alik(game, from).some((t) => PROMISE_SHAVE_ASK.map((e) => spec(e).t).includes(t))).toBe(true)
     // cooldown: сразу снова не предлагаем
     expect(hasAsk()).toBe(false)
     game.S.day += 5
@@ -504,10 +505,32 @@ describe('ставка «усы»', () => {
 
   it('строки кнопки «как усы?» сами якорят нить: в каждой и усы, и деньги (#921)', () => {
     expect(P_MOUSTACHE.length).toBeGreaterThan(0)
-    for (const t of P_MOUSTACHE) {
+    for (const e of P_MOUSTACHE) {
+      const t = spec(e).t
       expect(t, `«${t}» — без усов`).toMatch(/ус/i)
       expect(t, `«${t}» — без денег или долга`).toMatch(/долг|денег|деньг/i)
     }
+  })
+
+  it('цитата «деньги — как усы, говоришь?» ждёт прозвучавшей фразы (#1171)', () => {
+    const quote = P_MOUSTACHE.map((l) => ({ l, t: spec(l).t })).find((x) => x.t.includes('говоришь'))!
+    const { game } = makeGame()
+    // нить жива (усы сбриты, окно 30 дней), но фразы «Деньги — как усы» ещё не было
+    game.S.day = 10
+    game.S.ach.shaved = 9
+    game.S.mem[alikShaved] = true
+    expect(isOpen(quote.l, game.lineFacts()), 'цитата открыта без фразы — снятый гейт краснит здесь').toBe(false)
+    const pre = game.buildChoices().find((c) => c.act === 'moustacheAsk')
+    expect(pre, 'без фразы кнопки нет — пул опустел').toBeDefined()
+    expect(pre!.text.includes('говоришь'), 'цитата в кнопке без фразы').toBe(false)
+    // фразу говорят сама строка сбривания и первый ответ на «как усы?» — их remember и есть объявитель
+    expect(PROMISE_SHAVE.map(spec).some((s) => s.t.includes('Деньги — как усы') && (s.remember?.length ?? 0) > 0), 'строка сбривания не объявляет фразу').toBe(true)
+    expect(PROMISE_SHAVE_ASK.map(spec).some((s) => s.t.includes('Деньги — как усы') && (s.remember?.length ?? 0) > 0), 'ответ на «как усы?» не объявляет фразу').toBe(true)
+    game.rules.applyOps([set(saidMoneyMoustache, true)], {})
+    expect(isOpen(quote.l, game.lineFacts()), 'цитата закрыта после фразы').toBe(true)
+    let shown = false
+    for (let i = 0; i < 4 && !shown; i++) { game.S.choices = null; shown = game.buildChoices().some((c) => c.act === 'moustacheAsk' && c.text.includes('говоришь')) }
+    expect(shown, 'цитаты нет в кнопке после фразы').toBe(true)
   })
 
   it('нить выдыхается: до 30 дней после бритья кнопка есть, с 31-го — нет (#921)', () => {
