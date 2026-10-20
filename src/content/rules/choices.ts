@@ -184,7 +184,8 @@ export const choiceRules: R[] = [
   offer({ name: 'DebutSamvel', when: [is('debutFresh'), eq('debutWho', 'samvel')], act: 'debutSamvel', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_DEBUT_SAMVEL', P_DEBUT_SAMVEL) }),
   offer({ name: 'DebutBoris', when: [is('debutFresh'), eq('debutWho', 'boris')], act: 'debutBoris', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_DEBUT_BORIS', P_DEBUT_BORIS) }),
   offer({ name: 'DebutNiva', when: [is('debutFresh'), eq('debutWho', 'niva')], act: 'debutNiva', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_DEBUT_NIVA', P_DEBUT_NIVA) }),
-  offer({ name: 'DebutNune', when: [is('debutFresh'), eq('debutWho', 'nune')], act: 'debutNune', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_NUNE_DEBUT', P_NUNE_DEBUT) }),
+  // пул Нуне тоже под воротами (#1170): финал бетона даёт первое письмо без сейфа — пустой пул не должен бросать draw
+  offer({ name: 'DebutNune', when: [is('debutFresh'), eq('debutWho', 'nune')], act: 'debutNune', tone: 'neutral', bonus: 5, text: (g) => freshFromArr(g, 'P_NUNE_DEBUT', P_NUNE_DEBUT) }),
   // первое сообщение заказчика Гранта (#983): свой штамп, не общее окно дебюта — текст только про эту реплику
   offer({ name: 'GrantTile', when: [is('grantTileFresh')], act: 'grantTile', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_GRANT_TILE', P_GRANT_TILE) }),
   // смена фото без усов (#1013): заметное событие ставки — отклик в окне события (ход и три после).

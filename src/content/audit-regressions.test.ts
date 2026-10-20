@@ -559,3 +559,23 @@ describe('регрессии раунда 90', () => {
     expect(seen(intro), 'цитаты нет в блоке после интро').toBe(true)
   })
 })
+
+describe('ревизия дебютных окон (#1170)', () => {
+  it('дебют Нуне: вопрос о ключе ждёт услышанного сейфа, а не первого письма', async () => {
+    const key = P_NUNE_DEBUT.map((l) => ({ l, t: String(valueOf(l)) })).find((x) => x.t.includes('ключ'))!
+    const seen = (g: ReturnType<typeof makeGame>['game']) => g.choices.some((c) => c.text.includes('Нуне, а ключ когда?'))
+    // первым письмом Нуне может стать финал бетона (#1149): имя и выписки есть, сейфа и ключа нет
+    const finaleFirst = makeGame().game
+    finaleFirst.alikMsg({ kind: 'text', from: 'alik', text: 'Это Нуне. Я сверила выписки. В тот день Алик снял со счёта 50 рублей.', who: 'nune' })
+    expect(finaleFirst.S.mem[met('nune')], 'проверка не про тот путь: Нуне не вошла в историю').toBe(true)
+    expect(isOpen(key.l, finaleFirst.lineFacts()), 'ключ открыт без сейфа').toBe(false)
+    for (let i = 0; i < 6; i++) { finaleFirst.S.choices = null; expect(seen(finaleFirst), 'ключ в дебютном блоке без сейфа').toBe(false) }
+    // сейф прозвучал (легенда места или серия) — вопрос о ключе опирается на услышанное
+    const safeFirst = makeGame().game
+    await safeFirst.say([{ t: 'Сейф закрыт, ключ у Нуне в сумочке, сумочка в роддоме.', claims: ['money_safe'] }])
+    safeFirst.alikMsg({ kind: 'text', from: 'alik', text: 'Это Нуне. Я сверила выписки. В тот день Алик снял со счёта 50 рублей.', who: 'nune' })
+    expect(isOpen(key.l, safeFirst.lineFacts()), 'ключ закрыт после сейфа').toBe(true)
+    for (let i = 0; i < 6 && !seen(safeFirst); i++) safeFirst.S.choices = null
+    expect(seen(safeFirst), 'ключа нет в блоке после сейфа').toBe(true)
+  })
+})
