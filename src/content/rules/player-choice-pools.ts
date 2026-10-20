@@ -1,7 +1,7 @@
 // Именованные пулы кнопок из rules/choices — вынесены, чтобы попасть в PLAYER_POOLS (#491).
 import { needs, WORLD } from '../world'
 import { gate, eq, is, missing, exists } from '../fact'
-import { courtVerdict, crewAllPaid, saidMoneyMoustache, saidNuneNoWrite } from '../memkeys'
+import { courtVerdict, crewAllPaid, saidGrantEnvelope, saidMoneyMoustache, saidNuneNoWrite } from '../memkeys'
 import { sold } from '../credit'
 
 export const P_VIA_BORIS = [
@@ -225,6 +225,14 @@ export const P_NUNE_DEBUT = [
   gate(is(saidNuneNoWrite))('Не пишите Алику — а платить кто будет?'),
   // декрет — факт серии бухгалтера: первым письмом Нуне может стать и чужая сцена (финал), где про декрет речи нет (#1149)
   needs('dekret')('Декрет — это надолго? Как и мой долг?'),
+] as const
+
+/** Дебют Гранта хором легенды (#1179): конверт стал частью дома. Строки молчат, пока эта фраза не прозвучала —
+ *  первое письмо Гранта бывает и другим (баня, плитка, «с кладом»), и тогда пул пуст, а не врёт. */
+export const P_DEBUT_GRANT = [
+  gate(WORLD.grant, is(saidGrantEnvelope))('Грант, конверт стал частью дома — это навсегда?'),
+  gate(WORLD.grant, is(saidGrantEnvelope))('Грант, дом подорожал. Конверт теперь стена?'),
+  gate(WORLD.grant, is(saidGrantEnvelope))('Грант, спасибо. Конверт вернёте или это теперь дом?'),
 ] as const
 
 /** Дебют «Нивы» (#983): первое «Би-бип» в чате. */

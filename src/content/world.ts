@@ -1,7 +1,7 @@
 // Тексты для новых возможностей системы правил: обещания, которые наступают, хор персонажей,
 // состояния мира со сроком (свадьба, болезнь Бориса, «Алик умер»).
 import { type Criterion, type Line, type Entry, named, exists, is, eq, gte, ne, missing, set, gate } from './fact'
-import { arsenTrack, cryptoHodl, courtVerdict, garikConcrete, garikCut, garikDenied, grandpaDying, grantPaid, intro, karineKnowsDebt, karineThinksTax, met, mourning, moustacheStakeSaid, nivaAway, nivaPlayer, nuneDekretOver, payday, saidFriday, saidMoneyMoustache, saidStrasburg, saidTomorrow, alikShaved, wedding, collectorsRecruited, collectorsTurned, rubikBath } from './memkeys'
+import { arsenTrack, cryptoHodl, courtVerdict, garikConcrete, garikCut, garikDenied, grandpaDying, grantPaid, intro, karineKnowsDebt, karineThinksTax, met, mourning, moustacheStakeSaid, nivaAway, nivaPlayer, nuneDekretOver, payday, saidFriday, saidGrantEnvelope, saidMoneyMoustache, saidStrasburg, saidTomorrow, alikShaved, wedding, collectorsRecruited, collectorsTurned, rubikBath } from './memkeys'
 import type { WhoId } from './ids'
 
 // Мир последователен: кто и что есть в истории и в каком оно положении — факты, их ставит серия (remember), ступень суда
@@ -288,6 +288,12 @@ export const DEBUT_SAMVEL_B = [
   needs('samvel')({ w: 'samvel', t: 'Я хозяин свадьбы. Алик — гость, который должен. Разница огромная.' }),
   needs('samvel')({ w: 'samvel', t: 'Сто тринадцать. На каждой главным был я. У Алика была роль — обещать.' }),
   needs('samvel')({ w: 'samvel', t: 'Хозяин — я, мегафон — мой. Твой долг — у Алика. Всё по ролям, мальчик.' }),
+]
+/** Ответ Гранта на первое «конверт стал частью дома» (#1179): только то, что сказала эта строка хора. */
+export const DEBUT_GRANT_B = [
+  gate(WORLD.grant, is(saidGrantEnvelope))({ w: 'grant', t: 'Конверт — часть дома. Дом мой. Спасибо вам, молодой человек.' }),
+  gate(WORLD.grant, is(saidGrantEnvelope))({ w: 'grant', t: 'Дом подорожал. Конверт внутри. Стену я не разбираю.' }),
+  gate(WORLD.grant, is(saidGrantEnvelope))({ w: 'grant', t: 'Я написал: конверт стал частью дома. Это и есть ответ.' }),
 ]
 /** Ответ Гранта на первое «плитка — орудие» (#983): только плитка и адвокат из этой реплики. */
 export const GRANT_TILE_B = [

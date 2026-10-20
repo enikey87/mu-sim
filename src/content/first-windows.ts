@@ -30,6 +30,7 @@ export const FIRST_WINDOWS: readonly FirstWindow[] = [
   { who: 'niva', source: 'серия «Би-бип» (arcs niva eps[4])', at: DEBUT_SLOT, offer: 'DebutNiva', pool: 'P_DEBUT_NIVA' },
   { who: 'nune', source: 'серия бухгалтера (arcs nune eps[1], первое письмо)', at: DEBUT_SLOT, offer: 'DebutNune', pool: 'P_NUNE_DEBUT' },
   { who: 'grant', source: 'серия «плитка — орудие» (stamp строки)', at: grantTileAt, offer: 'GrantTile', pool: 'P_GRANT_TILE' },
+  { who: 'grant', source: 'хор легенды beton_law (первое личное сообщение, общий слот)', at: DEBUT_SLOT, offer: 'DebutGrant', pool: 'P_DEBUT_GRANT' },
   { who: 'taron', source: 'звонок с объекта (crew.ts, штамп звонка)', at: crewPaidAt, offer: 'CrewCall', pool: 'P_CREW_CALL' },
   // окно держит счётчик серии: следующая серия двигает arc.collectors и вопрос уходит (#888)
   { who: 'collectors', source: 'дебют арки коллекторов (серия eps[0])', at: null, offer: 'CollectorsDebut', pool: 'P_COLLECTORS_DEBUT' },

@@ -1250,6 +1250,9 @@ export class Game {
         this.S.mem[memkeys.wrote(m.who)] = true
         this.S.mem[memkeys.debutWho] = m.who
         this.S.mem[memkeys.debutAt] = this.S.stats.sent
+        // узкое окно Гранта уже штамповало этот ход (плитка / дом) — общий слот задвоил бы кнопку (#1179)
+        if (m.who === 'grant' && (this.S.mem[memkeys.grantTileAt] === this.S.stats.sent || this.S.mem[memkeys.grantHouseAt] === this.S.stats.sent))
+          delete this.S.mem[memkeys.debutAt]
       }
       this.S.mem[memkeys.met(m.who)] = true; this.S.mem[memkeys.intro(m.who)] = true
     }
