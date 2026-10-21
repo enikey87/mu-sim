@@ -35,7 +35,7 @@ import {
   ENDGAME_ARCH, ENDGAME_ARCH_LIE, ENDGAME_CHOICES, ENDGAME_FALLBACK, ENDGAME_FORMALITIES, ENDGAME_GROUP, ENDGAME_INTRO, ENDGAME_JUBILEES,
   ENDGAME_LEAVE, ENDGAME_MONEY, ENDGAME_MUTE, ENDGAME_OPEN, ENDGAME_RENAMES, ENDGAME_RETURNER_LINES, ENDGAME_RETURNERS, ENDGAME_VENDETTA, ENDGAME_ALIK_BACK,
   EPILOGUE_BANNER,
-  LEND50_ASK, LEND50_ASK_AGAIN, LEND50_CHOICES, LEND50_LINK, LEND50_MEMORY, LEND50_NO, LEND50_NUNE, LEND50_RENAME, LEND50_SERIOUS, LEND50_SYS, LEND50_YES,
+  LEND50_ASK, LEND50_ASK_AGAIN, LEND50_CHOICES, LEND50_LINK, LEND50_MEMORY, LEND50_NO, LEND50_NUNE, LEND50_RENAME, LEND50_SERIOUS, LEND50_SERIOUS_ELSE, LEND50_SYS, LEND50_YES,
 } from '../content/endgame'
 import { type Rng, mathRng, rndInt, shuffle, chance } from './rng'
 import { Decks, type Bag } from './deck'
@@ -2830,7 +2830,7 @@ export class Game {
         this.sys(`Алик изменил название группы на «${LEND50_RENAME}»`)
         if (this.canSpeak('nune')) await this.say([{ w: 'nune', t: LEND50_NUNE }])
       } else if (answer === 'no') await this.say([this.draw('LEND50_NO', LEND50_NO)])
-      else await this.say([LEND50_SERIOUS])
+      else await this.say([isOpen(LEND50_SERIOUS, this.lineFacts()) ? valueOf(LEND50_SERIOUS) : LEND50_SERIOUS_ELSE])
     } finally {
       this.typos = typos
     }
