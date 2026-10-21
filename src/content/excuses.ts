@@ -9,7 +9,7 @@ import { needs, WORLD } from './world'
 import { selfConflict } from './ledger'
 import { sold } from './credit'
 import type { LedgerEvent } from './fact-types'
-import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, collectorsRecruited, count, evicted, finaleOf, grantPaid, met, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, saidHash, saidKonak, sick, taxThawed, threatClaim, tileCornerRemoved, wedding, whenYears } from './memkeys'
+import { actSigned, alikDead, betonSet, borisMarried, borisSmetaReady, collectorsRecruited, count, evicted, finaleOf, grantPaid, met, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, saidHash, saidKonak, saidOath, sick, taxThawed, threatClaim, tileCornerRemoved, wedding, whenYears } from './memkeys'
 
 // draw(key, arr) выдаёт уместный сейчас элемент «из колоды» (без повторов до конца колоды); noRefill — после исчерпания null
 export type DrawFn = <T = unknown>(key: string, arr: readonly Entry<T>[], noRefill?: boolean, eligible?: (e: Entry<T>) => boolean) => T
@@ -670,7 +670,7 @@ D.P_RUDE_B = [
   'Я отключу тебе плитку!!!', needs('saidTomorrow')('Хватит «завтра»!!!'), 'Где деньги, Алик?! ГДЕ?!',
   'Я выложу твой объект в «Ремонт-позор»!!!', gate(is(saidHash))('Я сам пойду к тебе на хаш и не уйду!!!'), gate(is(met('mama')))('Мне твоя мама больше верит, чем тебе!!!'),
   'Я перестал верить в твоё гостеприимство, Алик!!!', needs('karineKnown')(needs('karine')('Я сейчас напишу Карине всё!!!')), 'Мой кот тебя презирает!!!',
-  'Ты не подрядчик, ты сериал!!!', gate(gte('sent', 6))('Хватит клясться!!! У тебя клятв больше, чем денег!!!'), 'Я запишу голосовое. Громкое!!!',
+  'Ты не подрядчик, ты сериал!!!', gate(gte('sent', 6), is(saidOath))('Хватит клясться!!! У тебя клятв больше, чем денег!!!'), 'Я запишу голосовое. Громкое!!!',
 ];
 D.P_COW = [
   'Алик, это у вас корова мычит?', 'Что за «Мууу» на фоне?', 'Алик, у вас там корова?',
