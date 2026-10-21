@@ -1,10 +1,14 @@
 // Плейтест: партия воспроизводится по seed и по записи действий.
-// Прогон для разбора: PLAYTEST_OUT=<папка> PLAYTEST_SEEDS=1-8 [PLAYTEST_TURNS=300] npm run playtest
+// Прогон для разбора: PLAYTEST_OUT=<папка> PLAYTEST_SEEDS=1-8 [PLAYTEST_TURNS=300] [PLAYTEST_PROFILE=agreeable] npm run playtest
 import { describe, it, expect } from 'vitest'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { is, missing, gte } from '../engine/rules'
-import { playtest, transcript, worldDump, deathGated, requiresKey, attachSpeechAttribution, notifFails } from './playtest'
+import { playtest, transcript, worldDump, deathGated, requiresKey, attachSpeechAttribution, notifFails, pickChoice, type PlayProfile } from './playtest'
+import type { Choice } from '../engine/state'
+import type { Rng } from '../engine/rng'
+import { loanTaken } from '../content/credit'
+import { setMoney } from '../test/helpers'
 import { alikDead } from '../content/memkeys'
 import type { Game } from '../engine/game'
 import type { Rule } from '../engine/rules'
@@ -194,6 +198,61 @@ describe('плейтест', () => {
   }, 60_000)
 })
 
+/** Согласник: в блоке, где есть принятие, берёт его; блок без согласия играет как нейтральный. */
+describe('PLAYTEST_PROFILE=agreeable', () => {
+  const biased = (): Rng => {
+    const xs = [0.1, 0]
+    let i = 0
+    return { random: () => xs[i++] ?? 0 }
+  }
+  it('в блоке с согласием берёт его; партия на сиде 5 доходит до барана, нейтральная — нет', async () => {
+    const offer: Choice[] = [
+      { text: 'Нет, мне нужны деньги', tone: 'neutral', scene: 'barter', go: 'refuse' },
+      { text: 'Беру!', tone: 'polite', scene: 'barter', go: 'take' },
+      { text: 'А сколько это в рублях?', tone: 'neutral', scene: 'barter', go: 'price' },
+    ]
+    const intern: Choice[] = [
+      { text: 'Алик, отказываюсь. У меня клиент Алик: он не платит и не уходит.', tone: 'neutral', act: 'internOffer' },
+      { text: 'Алик, согласен. Все долги — по памяти, чай — по ведомости.', tone: 'neutral', act: 'internOffer' },
+    ]
+    const chosen = [
+      offer[pickChoice(biased(), 'curious', offer, 'agreeable')].text,
+      intern[pickChoice(biased(), 'curious', intern, 'agreeable')].text,
+    ]
+    expect(chosen, 'согласие не выбирается').toEqual([
+      'Беру!',
+      'Алик, согласен. Все долги — по памяти, чай — по ведомости.',
+    ])
+    const plain: Choice[] = [
+      { text: 'Держите дальше', tone: 'neutral' },
+      { text: 'Давайте лавашом', tone: 'neutral' },
+    ]
+    expect(pickChoice(biased(), 'curious', plain, 'agreeable'), 'нейтральный блок сменил выбор').toBe(pickChoice(biased(), 'curious', plain, 'neutral'))
+
+    const job = await playtest(1, 1, undefined, async (g) => {
+      g.S.arcs.boris = { i: 2, last: 0 }
+      g.S.actors.boris = { sick: true }
+      await g.job()
+    }, 'agreeable')
+    expect(job.acts[0]).toMatchObject({ kind: 'job', yes: true })
+
+    const loan = await playtest(2, 1, undefined, (g) => {
+      setMoney(g, 1000)
+      g.maybeCreditOffer()
+    }, 'agreeable')
+    expect(loan.game.S.mem[loanTaken('consumer')]).toBe(true)
+
+    const facts = (g: Awaited<ReturnType<typeof playtest>>['game']): string[] => [
+      g.facts()['has.boris'] === true ? 'has.boris' : '',
+      g.S.mem[loanTaken('micro')] === true ? 'credit.micro.taken' : '',
+    ].filter((k) => k !== '')
+    const neutral = await playtest(5, 300)
+    const agree = await playtest(5, 300, undefined, undefined, 'agreeable')
+    const deeper = facts(agree.game).filter((k) => !facts(neutral.game).includes(k))
+    expect(deeper).toEqual(['has.boris'])
+  }, 60_000)
+})
+
 /** Сиды из PLAYTEST_SEEDS: «1-4», «1,3,5», одиночный. Диапазон с концом меньше начала или не-число — ошибка:
  *  пустой прогон выглядел бы зелёным разбором («370001-37008» — раунд 37 аудита, техаудит P3-11). */
 const seeds = (s: string): number[] => s.split(',').flatMap((p) => {
@@ -223,10 +282,11 @@ describe.runIf(process.env.PLAYTEST_OUT)('прогон для разбора', (
   it('пишет переписки и записи действий', async () => {
     const out = process.env.PLAYTEST_OUT!
     mkdirSync(out, { recursive: true })
+    const profile: PlayProfile = process.env.PLAYTEST_PROFILE === 'agreeable' ? 'agreeable' : 'neutral'
     for (const seed of seeds(process.env.PLAYTEST_SEEDS ?? '1-4')) {
-      const p = await playtest(seed, Number(process.env.PLAYTEST_TURNS ?? 300))
+      const p = await playtest(seed, Number(process.env.PLAYTEST_TURNS ?? 300), undefined, undefined, profile)
       writeFileSync(join(out, `seed-${seed}.txt`), transcript(p))
-      writeFileSync(join(out, `seed-${seed}.json`), JSON.stringify({ seed, style: p.style, hour: p.hour, acts: p.acts }))
+      writeFileSync(join(out, `seed-${seed}.json`), JSON.stringify({ seed, style: p.style, hour: p.hour, ...(profile === 'agreeable' ? { profile } : {}), acts: p.acts }))
       writeFileSync(join(out, `seed-${seed}.world.json`), JSON.stringify(worldDump(p)))
     }
   }, 1_800_000)
