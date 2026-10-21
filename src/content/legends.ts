@@ -2,7 +2,7 @@
 // ставят серии сериалов; пока легенда жива (до 30 дней или до следующей серии), сроки вытекают из неё,
 // часть ходов Алика продолжает её, хор говорит в её рамках, а противоречие ловится бухгалтерией лжи.
 import { type Line, type Entry, eq, exists, gate, gte, is, missing, set } from './fact'
-import { saidMatch, type TalkPair } from './said'
+import { saidMatch, stateGate, type TalkPair } from './said'
 import type { When } from './excuses'
 import { needs, WORLD } from './world'
 import { actSigned, borisMarried, borisSmetaReady, finaleOf, grantPaid, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, saidGrantEnvelope, sick, taxFrozen, taxThawed, wedding } from './memkeys'
@@ -141,7 +141,14 @@ export const LEGENDS: Record<string, Legend> = {
       ['Алик, а просто перевести без квитанции?', 'Без квитанции банк думает, что деньги краденые. А они не краденые. Они съеденные. Разница!'],
       gate(WORLD.borisHome)(['Может, запереть Бориса отдельно от бумаг?', 'Пробовали. Он съел замок. Не весь. Но достаточно.']),
       gate(WORLD.borisPlayer)(['Может, запереть Бориса отдельно от бумаг?', 'Попробуй. У меня он замок съел — не весь, но достаточно.']),
-      ['Три дня ветеринар сказал? Я засекаю', 'Засекай! Только когда выйдут — ты сам читать будешь. Я на такое смотреть не могу, брат.'],
+      // «я засекаю» — пока журнал ещё держит трёхдневный срок, не после него
+      ['Три дня ветеринар сказал? Я засекаю', 'Засекай! Только когда выйдут — ты сам читать будешь. Я на такое смотреть не могу, брат.', stateGate((g) => {
+        for (let i = 0; ; i++) {
+          const p = g.promiseAt(i)
+          if (!p) return false
+          if (p.t.includes('как квитанции восстановим') && p.due != null && p.due >= g.day) return true
+        }
+      })],
     ],
   },
   boris_wedding: {
