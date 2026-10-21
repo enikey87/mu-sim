@@ -2179,13 +2179,15 @@ export class Game {
     const p = this.uniq(() => {
       const q = this.X.promise()
       if (fromLegend) this.alignPromise(q, until!)
-      if (prefix) return { text: `${prefix} ${low(q.text)}.`, q, stake: undefined as undefined | 'moustache' }
+      if (prefix) return { text: `${prefix} ${low(q.text)}.`, q, stake: undefined as undefined | 'moustache', oath: false }
       // форма клятвы — из пула (одна формула в каждом втором сообщении приедается); ставка — только на срок, который может наступить
       const form = this.linePicked('OATH_FORMS', OATH_FORMS, { filter: (s) => s.id !== OATH_STAKE_MOUSTACHE || q.d != null || !!q.condition })
       const stake = form?.id === OATH_STAKE_MOUSTACHE ? 'moustache' as const : undefined
       const tpl = form?.text ?? '{o}, {p}.'
-      return { text: tpl.replace('{o}', this.X.g('OATH')).replace('{P}', cap(q.text)).replace('{p}', q.text), q, stake }
+      // {o} — единственная подстановка D.OATH; «Слово Алика» и срок без этой формы клятвой не являются
+      return { text: tpl.replace('{o}', this.X.g('OATH')).replace('{P}', cap(q.text)).replace('{p}', q.text), q, stake, oath: tpl.includes('{o}') }
     })
+    if (p.oath) this.rules.applyOps([set(memkeys.saidOath, true)], {})
     if (fromLegend) this.recordPromiseOnce({ ...p.q, stake: p.stake })
     else this.recordPromise({ ...p.q, stake: p.stake })
     await this.say([p.text])
