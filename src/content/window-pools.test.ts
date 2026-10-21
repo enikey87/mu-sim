@@ -13,7 +13,7 @@ import { intro } from './memkeys'
 import * as W from './world'
 import {
   RAM_PHOTO, BORIS_SALE, VACANCY, AVITO_REVIEW, RUBIK_ASK, KETTLE,
-  CREW_CALL_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, GRANT_TILE_B, DEBUT_NIVA_B, DEBUT_BORIS_B, MOUSTACHE_PHOTO_B, MAMA_MARKET_B, TILE_AD_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, GRANT_HOUSE_B, COURT_VERDICT_B, TILE_SLIP_B, NUNE_DEBUT_B, DEBUT_GRANT_B, SOLD_B,
+  CREW_CALL_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, GRANT_TILE_B, DEBUT_NIVA_B, DEBUT_BORIS_B, MOUSTACHE_PHOTO_B, MAMA_MARKET_B, TILE_AD_B, TAMADA_DONE_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, GRANT_HOUSE_B, COURT_VERDICT_B, TILE_SLIP_B, NUNE_DEBUT_B, DEBUT_GRANT_B, SOLD_B,
   LAWYER_B, COLLECTORS_ASK_B, COLLECTORS_EP_B, INTERN_B, HOLE_B, COUNTERSUIT_B,
 } from './world'
 
@@ -93,6 +93,9 @@ const WINDOWS: Window[] = [
   // кража плиточной рекламы (#1216): подпись, «три заказа» и «процент — уважение» вводит сам узел send
   { pool: 'P_TILE_AD', lines: PP.P_TILE_AD, marks: {} },
   { pool: 'TILE_AD_B', lines: TILE_AD_B, marks: {} },
+  // финал квеста-тамады (#1222): застолье и сервиз вводит сам узел yes, Гоар — его знакомство
+  { pool: 'P_TAMADA_DONE', lines: PP.P_TAMADA_DONE, marks: { Гоар: 'intro.goar' } },
+  { pool: 'TAMADA_DONE_B', lines: TAMADA_DONE_B, marks: {} },
   // голосовое-плач мамы (#1085): серия сама объявляет пропущенные звонки и голосовое — окно их и называет
   { pool: 'P_MAMA_VOICE', lines: PP.P_MAMA_VOICE, marks: { звон: null } },
   { pool: 'MAMA_VOICE_B', lines: MAMA_VOICE_B, marks: { звон: null } },
