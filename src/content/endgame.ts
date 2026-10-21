@@ -1,7 +1,7 @@
 import type { Choice } from '../engine/state'
 import { type Entry, type Line, type Said, eq, exists, gate, is, missing } from './fact'
 import { needs, samvelLine, WORLD } from './world'
-import { finaleOf, internDeclined, lend50, met, moustacheKept, taxFrozen } from './memkeys'
+import { finaleOf, internDeclined, lend50, met, moustacheKept, saidFriday, taxFrozen } from './memkeys'
 
 export const ENDGAME_GROUP = 'ВЫПЛАТА ЗАКРЫТА ✅ (не выходить)'
 /** Первая строка эпилога: группа открывается после концовки — игрок видит, что это эпилог, а не «дальше» (#797). */
@@ -568,7 +568,9 @@ export const LEND50_CHOICES: Choice[] = [
 ]
 export const LEND50_YES = 'Получил. Уже потратил. Аванс на терпение — тебе же.'
 export const LEND50_NO = ['Понимаю. Я бы тоже себе не дал.', 'Правильно. Воспитал тебя на свою голову.']
-export const LEND50_SERIOUS = 'Серьёзнее, чем про пятницу.'
+export const LEND50_SERIOUS = gate(is(saidFriday))('Серьёзнее, чем про пятницу.')
+/** «Верну» уже сказано в просьбе: серьёзность без обещания на пятницу не зовёт чужой разговор. */
+export const LEND50_SERIOUS_ELSE = 'Серьёзнее, чем «верну». Ты меня знаешь.'
 /** Нуне — по знакомству: в группе она пишет, только если игрок её знает. */
 export const LEND50_NUNE = 'По ведомости это займ. По совести — подарок. По Алику — ничего.'
 export const LEND50_RENAME = 'ПЛИТОЧНИК — СПОНСОР'

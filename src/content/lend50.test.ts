@@ -2,12 +2,14 @@
 // Деньги и долг не двигаются — это проверяет каждая ветка.
 import { describe, it, expect } from 'vitest'
 import { flush, makeGame, memStorage } from '../test/helpers'
+import { valueOf } from '../engine/rules'
+import { saidFriday } from './memkeys'
 import type { Game } from '../engine/game'
 import type { Msg } from '../engine/state'
 import { uiOf, viewOf } from '../ui/view'
 import {
   ENDGAME_CHOICES, ENDGAME_GROUP, ENDGAME_INTRO, ENDGAME_OPEN, EPILOGUE_BANNER, LEND50_ASK, LEND50_ASK_AGAIN, LEND50_LINK,
-  LEND50_LOCKED, LEND50_NO, LEND50_NUNE, LEND50_RENAME, LEND50_SERIOUS, LEND50_SYS, LEND50_YES,
+  LEND50_LOCKED, LEND50_NO, LEND50_NUNE, LEND50_RENAME, LEND50_SERIOUS, LEND50_SERIOUS_ELSE, LEND50_SYS, LEND50_YES,
 } from './endgame'
 
 const texts = (g: Game, from = 0) => g.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' || m.kind === 'sys' ? [m.text] : []))
@@ -257,14 +259,28 @@ describe('«Займи 50»', () => {
     expect(t.join(' ')).not.toMatch(/Вам перевод|Возврат/)
     expect([game.S.money, game.S.debt]).toEqual([money, debt])
   })
-  it('«Ты серьёзно?»: ответ и своё описание ачивки', async () => {
+  it('«Ты серьёзно?»: про пятницу только после обещания, иначе без чужой пятницы', async () => {
+    const friday = 'Серьёзнее, чем про пятницу.'
+    expect(valueOf(LEND50_SERIOUS)).toBe(friday)
     const { game } = makeGame()
     await enter(game)
+    expect(game.choices.some((c) => c.act === 'lend50Serious' && c.text === 'Алик, ты серьёзно?')).toBe(true)
     const from = game.S.msgs.length
     await pick(game, 'lend50Serious')
-    expect(texts(game, from)).toContain(LEND50_SERIOUS)
+    const before = texts(game, from)
+    expect(before.join(' '), 'про пятницу до обещания').not.toMatch(/про пятницу/)
+    expect(before).toContain(LEND50_SERIOUS_ELSE)
     expect(game.S.mem['lend50.answer']).toBe('serious')
     expect(descOf(game, 'lend50')).toMatch(/Спросил Алика, серьёзно ли он/)
+
+    const { game: promised } = makeGame()
+    await enter(promised)
+    promised.S.mem[saidFriday] = true
+    const fromP = promised.S.msgs.length
+    await pick(promised, 'lend50Serious')
+    const after = texts(promised, fromP)
+    expect(after).toContain(friday)
+    expect(after).not.toContain(LEND50_SERIOUS_ELSE)
   })
   it('до ответа описание нейтральное: ачивка ещё не получена', async () => {
     const { game } = makeGame()
@@ -389,7 +405,7 @@ describe('«Займи 50»', () => {
     const expectExact = (act: string, t: string[]) => {
       if (act === 'lend50Yes') expect(t).toContain(LEND50_YES)
       else if (act === 'lend50No') expect(LEND50_NO.some((x) => t.includes(x))).toBe(true)
-      else expect(t).toContain(LEND50_SERIOUS)
+      else expect(t).toContain(LEND50_SERIOUS_ELSE)
     }
     for (const act of ['lend50Yes', 'lend50No', 'lend50Serious'] as const) {
       for (let seed = 1; seed <= 40; seed++) {
