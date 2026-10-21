@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest'
 import { makeGame } from '../test/helpers'
 import { ARCS } from './arcs'
 import { LEGENDS, CHORUS_LEGEND } from './legends'
+import { talkId } from './talk'
 import { meet } from './world'
 import { spec, lintLines, valueOf } from '../engine/rules'
 import type { Game } from '../engine/game'
@@ -339,5 +340,54 @@ describe('торг за код: Гарик торгуется после при�
   it('официальная версия до признания осталась: вопрос «спросить Гарика» открыт', async () => {
     const before = await played(5)
     expect(before.game.open([ask('Может, спросить Гарика? Он же код знает')]), 'старый вопрос не потерян').toHaveLength(1)
+  })
+})
+
+const TIMING = 'Три дня ветеринар сказал? Я засекаю'
+
+/** Остальные пары квитанций уже сказаны — сборка доходит до «я засекаю». */
+const onlyTiming = (game: Game) => {
+  const pairs = LEGENDS.boris_receipts.talk!
+  expect(pairs.map(valueOf).some((p) => p[0] === TIMING), 'пары «я засекаю» нет — проверка пустеет').toBe(true)
+  pairs.forEach((e, i) => { if (valueOf(e)[0] !== TIMING) game.lines.mark(talkId('legend', 'boris_receipts', i)) })
+  game.S.ctx = { legend: 'boris_receipts' }
+}
+
+const timingChoice = (game: Game): string | undefined => {
+  for (let i = 0; i < 40; i++) {
+    game.S.choices = null
+    const c = game.buildChoices().find((x) => x.act === 'talk' && x.text === TIMING)
+    if (c) return c.text
+  }
+  return undefined
+}
+
+describe('квитанции: «я засекаю» только пока срок не просрочен (#1202)', () => {
+  const raised = () => {
+    const { game } = makeGame()
+    game.setLegend('boris_receipts', 'boris')
+    game.recordPromise({ text: 'Переведу, как квитанции восстановим', d: 3 })
+    const vow = game.S.promises.at(-1)!
+    expect(vow.t, 'срок легенды не записан — окно не к чему привязать').toMatch(/как квитанции восстановим/)
+    expect(vow.due, 'у срока нет даты').toBe(game.S.day + 3)
+    onlyTiming(game)
+    return { game, due: vow.due! }
+  }
+
+  it('пока срок впереди и в день срока — пара есть, на следующий день её нет', () => {
+    const { game, due } = raised()
+    expect(timingChoice(game), 'свежий срок не предлагает «я засекаю»').toBe(TIMING)
+    game.S.day = due
+    expect(timingChoice(game), 'в день срока пара ещё уместна').toBe(TIMING)
+    game.S.day = due + 1
+    expect(timingChoice(game), 'после просрочки «три дня» звучат как только что назначенные').toBeUndefined()
+  })
+
+  it('без записи срока пара молчит: нечего засекать', () => {
+    const { game } = makeGame()
+    game.setLegend('boris_receipts', 'boris')
+    expect(game.S.promises, 'срок завелся сам').toEqual([])
+    onlyTiming(game)
+    expect(timingChoice(game)).toBeUndefined()
   })
 })
