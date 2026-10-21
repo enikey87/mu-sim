@@ -144,6 +144,22 @@ describe('машина игрока — один факт (#515)', () => {
     expect(new Set(spendsNoCar).size).toBeGreaterThan(3)
   })
 
+  it('штраф не называет парковку у объекта: такого факта в партии нет (#1203)', () => {
+    expect(fine.t, fine.t).not.toMatch(/у объекта Алика/)
+    expect(fine.t).toMatch(/Штраф 500 ₽/)
+    expect(fine.charge).toBe(500)
+  })
+
+  it('NC: вернуть «у объекта Алика» — проверка места красная', () => {
+    const saved = fine.t
+    try {
+      fine.t = 'Штраф 500 ₽: парковка у объекта Алика.'
+      expect(/у объекта Алика/.test(fine.t), 'старый текст снова называет объект').toBe(true)
+    } finally {
+      fine.t = saved
+    }
+  })
+
   it('NC: снять гейт has.car со штрафа — противоречие возвращается', () => {
     const saved = fine.when
     try {
