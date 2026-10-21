@@ -4,7 +4,7 @@ import { type Entry, type FactOp, type Criterion, type FactKey, type Said, set, 
 import { type ClaimKey } from './ids'
 import type { LedgerEvent } from './fact-types'
 import { needs, meet, WORLD, MENTION_RE } from './world'
-import { actSigned, alikDead, betonSet, borisMarried, collectorsAskAt, collectorsRecruited, collectorsTea, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantHouseAt, grantPaid, grantTileAt, houseOnGarik, internAt, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, rubikHoleAt, saidNuneNoWrite, samvelDivorceAt, sick, taxFrozen, tileSlipAt, wedding, wrote } from './memkeys'
+import { actSigned, alikDead, betonSet, borisMarried, collectorsAskAt, collectorsEpAt, collectorsRecruited, collectorsTea, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantHouseAt, grantPaid, grantTileAt, houseOnGarik, internAt, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, rubikHoleAt, saidNuneNoWrite, samvelDivorceAt, sick, taxFrozen, tileSlipAt, wedding, wrote } from './memkeys'
 import { stateQuestion } from './money-ask'
 
 export type ArcMsg = Said | { w: string; t: string; claims?: LedgerEvent[]; remember?: FactOp[]; stamp?: string } | { t: string; claims: LedgerEvent[]; remember?: FactOp[]; stamp?: string }
@@ -454,21 +454,21 @@ export const ARCS: Record<string, Arc> = {
       {
         remember: [set(collectorsTea, true)],
         m: [
-          { w: 'collectors', t: 'Мы приехали к Алику. Он напоил чаем. Чай крепкий. Долг — ещё крепче. Разговариваем о смысле платежа.' },
+          { w: 'collectors', t: 'Мы приехали к Алику. Он напоил чаем. Чай крепкий. Долг — ещё крепче. Разговариваем о смысле платежа.', stamp: collectorsEpAt },
           'Они у меня. Хорошие ребята. Говорят «нечем платить» так красиво, что я почти заплакал.',
         ],
       },
       {
         remember: [set(collectorsRecruited, true)],
         m: [
-          'Брат, предложил им работу на объекте. Они подумали — и остались. Раствор вместо процентов.',
+          { t: 'Брат, предложил им работу на объекте. Они подумали — и остались. Раствор вместо процентов.', claims: [], stamp: collectorsEpAt },
           { w: 'collectors', t: 'Мы остаёмся у Алика. Ваш микрозайм отрабатываем на стройке. «Деньги-Ара» пусть ждёт — вертикально.' },
         ],
       },
       {
         remember: [set(collectorsTurned, true)],
         m: [
-          { w: 'collectors', t: 'Мы пересчитали. Алик должен вам больше, чем вы — нам. Теперь мы взыскиваем для вас. Условия — за чаем.' },
+          { w: 'collectors', t: 'Мы пересчитали. Алик должен вам больше, чем вы — нам. Теперь мы взыскиваем для вас. Условия — за чаем.', stamp: collectorsEpAt },
           'Не радуйся, брат. Они взыскивают медленно. У них чай длинный.',
         ],
         fx: { ach: 'arc_collectors' },

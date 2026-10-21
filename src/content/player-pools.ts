@@ -5,6 +5,8 @@ import { D } from './excuses'
 import { TOPICS, P_NIGHT, P_FRIDAY, P_NEU_B_LATE, P_RUDE_BLOCKED, P_RUDE_POLITE, P_POL_POLITE, P_MONEY, P_DESPERATE } from './topics'
 import { P_LIE } from './lies'
 import { ARCS, WRONG_Q } from './arcs'
+import { spec } from './fact'
+import { collectorsRecruited, collectorsTea, collectorsTurned } from './memkeys'
 import { CHORUS_TALK, MEMORY_TALK } from './talk'
 import { LEGENDS } from './legends'
 import { GROUP_Q, JOB_YES_P, JOB_NO_P } from './misc'
@@ -120,6 +122,14 @@ put('P_COUNTERSUIT', P_COUNTERSUIT)
 put('P_COURT', P_COURT)
 // дебют коллекторов (#888) — нашёлся вне реестра линтером окна первого сообщения (#994)
 put('P_COLLECTORS_DEBUT', P_COLLECTORS_DEBUT)
+// окно эпизода (#1192): только строки follow, гейтнутые на факт этой серии, не весь пул
+const EP_FACT = new Set<string>([collectorsTea, collectorsRecruited, collectorsTurned])
+const P_COLLECTORS_EP = ARCS.collectors.follow.filter((e) => {
+  const w = spec(e).when ?? []
+  return w.some((c) => c.op === '==' && c.value === true && EP_FACT.has(String(c.key)))
+})
+put('P_COLLECTORS_EP', P_COLLECTORS_EP)
+export const collectorsEpPool = (): PlayerLinePool => P_COLLECTORS_EP
 
 // сцена choice: кнопки — вся колода CONSTR/ABSURD
 put('scene choice.ask CONSTR', D.CONSTR as PlayerLinePool)

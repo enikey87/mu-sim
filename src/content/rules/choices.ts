@@ -2,7 +2,7 @@
 // Берутся два самых приоритетных (специфичность + bonus); из одного слота — только одна.
 import type { ContentApi } from '../../engine/game'
 import type { Choice, Tone } from '../../engine/state'
-import { type Rule, type Facts, type Criterion, type Entry, eq, ne, is, exists, missing, gt, gte, lte, isOpen, valueOf, sinceWithin } from '../fact'
+import { type Rule, type Facts, type Criterion, type Entry, type Line, eq, ne, is, exists, missing, gt, gte, lte, isOpen, spec, valueOf, sinceWithin } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { D, cap, WHEN_YEARS } from '../excuses'
 import { talkPairs, talkId } from '../talk'
@@ -16,8 +16,8 @@ import { MONEY_ASK, moneyPlaceOf } from '../money-ask'
 import { P_HOLIDAY, holidayBefore, type Holiday } from '../holidays'
 import { WORLD, SPEAKS } from '../world'
 import { fmtDayMonth, fmtDays } from '../../engine/time'
-import { HEAT, alikDead, alikShaved, intro, moustacheAskAt, blocked, court, mourning, phoneKarine, crewPaid, endgame } from '../memkeys'
-import { requirePlayerPool } from '../player-pools'
+import { HEAT, alikDead, alikShaved, intro, moustacheAskAt, blocked, court, mourning, phoneKarine, crewPaid, endgame, collectorsTea, collectorsRecruited, collectorsTurned } from '../memkeys'
+import { collectorsEpPool, requirePlayerPool } from '../player-pools'
 import {
   P_VIA_BORIS, P_VIA_KARINE, P_VIA_MAMA, P_MOO, P_MOUSTACHE, P_COURT, P_COLLECTORS_DEBUT,
   STRASBOURG_THREAT,
@@ -156,6 +156,32 @@ export const choiceRules: R[] = [
   offer({ name: 'CrewCall', when: [lte('sinceCrew', CREW_FRESH_TURNS)], act: 'crewCall', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_CREW_CALL', P_CREW_CALL) }),
   offer({ name: 'LawyerFirst', when: [is('lawyerFresh')], act: 'lawyerAsk', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_LAWYER', P_LAWYER) }),
   offer({ name: 'CollectorsAsk', when: [is('collectorsAskFresh')], act: 'collectorsAsk', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_COLLECTORS_ASK', P_COLLECTORS_ASK) }),
+  // эпизод поставил факт — в блок идёт строка этого факта, не сосед из follow (#1192).
+  // bonus 12: ловлю лжи (11) и звонок с объекта (7) окно не вытесняет.
+  ...(() => {
+    let fact = ''
+    const beats = [collectorsTurned, collectorsRecruited, collectorsTea] as const
+    return [offer({
+      name: 'CollectorsEp', when: [is('collectorsEpFresh')], act: 'collectorsEp', tone: 'neutral', bonus: 12,
+      topic: () => 'arc:collectors',
+      text: (g) => {
+        const pool = collectorsEpPool()
+        requirePlayerPool('P_COLLECTORS_EP', pool)
+        for (const key of beats) {
+          if (!g.holds(is(key))) continue
+          const entry = pool.find((e) => (spec(e as Line).when ?? []).some((c) => c.key === key && c.op === '==' && c.value === true))
+          if (!entry) continue
+          const raw = valueOf(entry)
+          fact = key
+          const text = typeof raw === 'string' ? raw : String((raw as { t?: unknown }).t ?? '')
+          return g.playerLine(() => text)
+        }
+        fact = ''
+        return ''
+      },
+      arg: () => fact,
+    })]
+  })(),
   // ответ по выбранной строке, а не колодой (#1017): согласие/отказ стажёра и «ровно/криво/за плату»
   // получают свой ответ B-пула — номер выбранной строки уезжает с arg.
   // bonus 5: на ходу предложения слоты блока держат звонок с объекта (специфичность 7) и вопрос про

@@ -1,7 +1,7 @@
 // Тексты для новых возможностей системы правил: обещания, которые наступают, хор персонажей,
 // состояния мира со сроком (свадьба, болезнь Бориса, «Алик умер»).
 import { type Criterion, type Line, type Entry, named, exists, is, eq, gte, ne, missing, set, gate } from './fact'
-import { arsenTrack, cryptoHodl, courtVerdict, garikConcrete, garikCut, garikDenied, grandpaDying, grantPaid, intro, karineKnowsDebt, karineThinksTax, met, mourning, moustacheStakeSaid, nivaAway, nivaPlayer, nuneDekretOver, payday, saidFriday, saidGrantEnvelope, saidMoneyMoustache, saidStrasburg, saidTomorrow, alikShaved, wedding, collectorsRecruited, collectorsTurned, rubikBath } from './memkeys'
+import { arsenTrack, cryptoHodl, courtVerdict, garikConcrete, garikCut, garikDenied, grandpaDying, grantPaid, intro, karineKnowsDebt, karineThinksTax, met, mourning, moustacheStakeSaid, nivaAway, nivaPlayer, nuneDekretOver, payday, saidFriday, saidGrantEnvelope, saidMoneyMoustache, saidStrasburg, saidTomorrow, alikShaved, wedding, collectorsRecruited, collectorsTea, collectorsTurned, rubikBath } from './memkeys'
 import type { WhoId } from './ids'
 
 // Мир последователен: кто и что есть в истории и в каком оно положении — факты, их ставит серия (remember), ступень суда
@@ -322,6 +322,12 @@ export const LAWYER_B = [
   needs('arsen', 'saidStrasburg')({ w: 'arsen', t: 'Страсбург — это три инстанции. Я весь сериал записал, пойдём по всем.' }),
   needs('arsen')({ w: 'arsen', t: 'Диплом в процессе. Второй курс, но уверенность — с первого. Алик проверил.' }),
   needs('arsen')({ w: 'arsen', t: 'Суд — это быстро. Для тех, кто платит юристу. У Алика юрист я, поэтому подождём.' }),
+]
+/** Ответ на отклик эпизода арки (#1192): строка называет факт, который этот эпизод только что поставил. */
+export const COLLECTORS_EP_B = [
+  needs('collectors')(gate(is(collectorsTurned))('Взыскивают для тебя. Медленно. Чай длиннее срока.')),
+  needs('collectors')(gate(is(collectorsRecruited))('Остались. Раствор вместо процентов. Долг пока на месте.')),
+  needs('collectors')(gate(is(collectorsTea))('Чай длинный, брат. Про смысл платежа — дольше, чем про срок.')),
 ]
 /** Ответ Алика на «тебе коллекторы пишут?» (#958). */
 export const COLLECTORS_ASK_B = [
