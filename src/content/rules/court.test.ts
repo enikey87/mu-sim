@@ -3,10 +3,10 @@ import { describe, it, expect } from 'vitest'
 import { makeGame } from '../../test/helpers'
 import { COURT, COURT_AFTER, COURT_LAWYER_AGAIN, COURT_VERDICT_AFTER_LETTER } from '../quests'
 import { ARCS } from '../arcs'
-import { valueOf } from '../../engine/rules'
+import { isOpen, valueOf } from '../../engine/rules'
 import { THREAT_AGAIN } from '../misc'
 import { courtVerdict, courtVerdictAt } from '../memkeys'
-import { P_COURT_VERDICT } from './player-choice-pools'
+import { P_COURT, P_COURT_VERDICT } from './player-choice-pools'
 import { COURT_VERDICT_B } from '../world'
 import type { Game } from '../../engine/game'
 
@@ -197,5 +197,39 @@ describe('окно отклика на вердикт суда (#1058)', () => {
     expect(said.some((t) => answers.some((p) => t.includes(p))), `ответ не из пула события: ${said.join(' | ')}`).toBe(true)
     expect(game.S.mem[courtVerdictAt], 'ответ не потребил окно').toBeUndefined()
     expect(button(), 'после ответа окно закрыто').toBeUndefined()
+  })
+})
+
+describe('«Передайте Арсену: я готов» (#1211)', () => {
+  const READY = 'Передайте Арсену: я готов.'
+  const NEIGHBOR = 'Увидимся в суде, Алик.'
+  const line = P_COURT.find((l) => valueOf(l) === READY)!
+  const drawn = (game: Game, key: string): Set<string> => {
+    const out = new Set<string>()
+    for (let i = 0; i < P_COURT.length * 4; i++) out.add(game.draw(key, P_COURT))
+    return out
+  }
+
+  it('после знакомства без роли юриста строки нет; после ступени юриста — есть, соседи на месте', async () => {
+    const { game } = makeGame()
+    await game.playEpisode(ARCS.beton.eps[3], 'beton')
+    expect(game.S.mem['intro.arsen'], 'проверка не про тот путь: Арсена нет').toBe(true)
+    expect(game.S.mem['wrote.arsen'], 'упоминание не должно быть письмом юриста').toBeUndefined()
+    game.S.mem.court = 1
+    expect(isOpen(line, game.lineFacts()), 'строка открыта до роли юриста').toBe(false)
+    const before = drawn(game, 'P_COURT_1211_before')
+    expect(before.has(READY), 'колода отдала строку до роли').toBe(false)
+    expect(before.has(NEIGHBOR), 'пул пуст — негатив ничего не доказывает').toBe(true)
+    expect(before.has('Я нашёл юриста. Настоящего, с дипломом.'), 'соседняя строка закрылась').toBe(true)
+
+    const { r, t } = await threat(game)
+    expect(r, 'ступень юриста не прозвучала — позитив пустой').toBe('Court_Lawyer')
+    expect(t.join(' ')).toMatch(/юрист Алика/)
+    expect(game.S.mem.court).toBe(2)
+    expect(isOpen(line, game.lineFacts()), 'строка закрыта после роли юриста').toBe(true)
+    const after = drawn(game, 'P_COURT_1211_after')
+    expect(after.has(READY), 'колода не отдала строку после роли').toBe(true)
+    expect(after.has(NEIGHBOR), 'соседняя строка пропала').toBe(true)
+    expect(after.has('Я нашёл юриста. Настоящего, с дипломом.'), 'соседняя строка пропала').toBe(true)
   })
 })

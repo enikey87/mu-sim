@@ -1,7 +1,7 @@
 // Именованные пулы кнопок из rules/choices — вынесены, чтобы попасть в PLAYER_POOLS (#491).
 import { needs, WORLD } from '../world'
-import { gate, eq, is, missing, exists } from '../fact'
-import { courtVerdict, crewAllPaid, saidGrantEnvelope, saidMoneyMoustache, saidNuneNoWrite } from '../memkeys'
+import { gate, eq, gte, is, missing, exists } from '../fact'
+import { court, courtVerdict, crewAllPaid, saidGrantEnvelope, saidMoneyMoustache, saidNuneNoWrite } from '../memkeys'
 import { sold } from '../credit'
 
 export const P_VIA_BORIS = [
@@ -266,7 +266,8 @@ export const P_COURT = [
   'Жду повестку, Алик.',
   'До встречи в зале суда.',
   'Суд всё решит.',
-  needs('arsen')('Передайте Арсену: я готов.'),
+  // «мы готовы» говорит ступень юриста (court ≥ 2); до неё Арсен — только знакомый
+  gate(gte(court, 2))(needs('arsen')('Передайте Арсену: я готов.')),
   STRASBOURG_THREAT,
   'Готовьте документы, Алик.',
   'Суд — не застолье, там не отмажешься.',
