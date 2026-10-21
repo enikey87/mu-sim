@@ -4,7 +4,7 @@
 import type { Scene } from './scenes'
 import { gate, missing, set } from './fact'
 import { needs } from './world'
-import { courtVerdict, courtVerdictAt, cryptoHodl, intro, kettleAt, mamaMarketAt, saidHash, tileAdAt } from './memkeys'
+import { courtVerdict, courtVerdictAt, cryptoHodl, intro, kettleAt, mamaMarketAt, saidHash, tamadaDoneAt, tileAdAt } from './memkeys'
 
 export const QUESTS: Record<string, Scene> = {
   q_hash: {
@@ -70,7 +70,8 @@ export const QUESTS: Record<string, Scene> = {
       yes: {
         fx: { days: 1, debt: -1000, mood: 3, ach: 'q_tamada', set: { [intro('goar')]: true } },
         sys: 'Вы вели застолье шесть часов. Работа: +5 000 ₽ к долгу Алика. Сервиз тёти Гоар: −6 000 ₽. Итог: долг Алика уменьшился на 1 000 ₽.',
-        a: ['Ты — огонь! Гости плакали. Сервиз тёти Гоар тоже пострадал — она его на застолье привезла. Бухгалтерия уже посчитала, спорить поздно.'],
+        // событие с окном отклика (#1222): застолье, сервиз и знакомство с тётей Гоар звучат в этом же бите
+        a: [{ t: 'Ты — огонь! Гости плакали. Сервиз тёти Гоар тоже пострадал — она его на застолье привезла. Бухгалтерия уже посчитала, спорить поздно.', stamp: tamadaDoneAt }],
       },
       cant: { a: ['Все умеют! Говоришь «за маму» — все пьют. Говоришь «за деньги» — все молчат. Второе не говори.'], opts: [{ t: 'Ладно, за маму', go: 'yes' }, { t: 'Нет', go: 'no' }] },
       no: { a: ['Тамада без веры в людей — не тамада. Позвал племянника. Он сказал тост на 40 минут про крипту.'] },

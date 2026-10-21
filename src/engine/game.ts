@@ -1649,6 +1649,8 @@ export class Game {
       mamaMarketFresh: S.stats.sent - Number(S.mem[memkeys.mamaMarketAt] ?? -99) <= 3,
       // кража плиточной рекламы (#1216): финал узла `send` квеста `q_photo` — заметное событие, отклик живёт ход события и три после
       tileAdFresh: S.stats.sent - Number(S.mem[memkeys.tileAdAt] ?? -99) <= 3,
+      // финал квеста-тамады (#1222): узел `yes` квеста `q_tamada` — заметное событие, отклик живёт ход события и три после
+      tamadaDoneFresh: S.stats.sent - Number(S.mem[memkeys.tamadaDoneAt] ?? -99) <= 3,
       // голосовое-плач мамы в серии звонков (#1085): отклик живёт ход голосового и три после
       mamaVoiceFresh: S.stats.sent - Number(S.mem[memkeys.mamaVoiceAt] ?? -99) <= 3,
       // развод дяди Самвела на свадьбе (#1037): событие серии — отклик живёт ход события и три после

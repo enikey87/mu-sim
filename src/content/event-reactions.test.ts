@@ -5,13 +5,13 @@ import type { Game } from '../engine/game'
 import { NOTIF } from './life'
 import { D } from './excuses'
 import { sold } from './credit'
-import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE, P_DEBUT_GRANT, P_MAMA_MARKET, P_TILE_AD, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_GRANT_HOUSE, P_TILE_SLIP, P_SOLD } from './rules/player-choice-pools'
-import { BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, DEBUT_GRANT_B, GRANT_HOUSE_B, INTERN_B, HOLE_B, AVITO_REVIEW, MAMA_MARKET_B, TILE_AD_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, TILE_SLIP_B, SOLD_B } from './world'
+import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE, P_DEBUT_GRANT, P_MAMA_MARKET, P_TILE_AD, P_TAMADA_DONE, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_GRANT_HOUSE, P_TILE_SLIP, P_SOLD } from './rules/player-choice-pools'
+import { BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, DEBUT_GRANT_B, GRANT_HOUSE_B, INTERN_B, HOLE_B, AVITO_REVIEW, MAMA_MARKET_B, TILE_AD_B, TAMADA_DONE_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, TILE_SLIP_B, SOLD_B } from './world'
 import { ARCS } from './arcs'
 import { FINALES } from './finales'
 import { COURT_LAWYER_AGAIN } from './quests'
 import { RUDE_CALLS_VOICE, MAMA_VOICE_CRY } from './rude'
-import { count, collectorsRecruited, court, crewPaid, crewPaidAt, HEAT, internAt, lawyerAt, debutWho, debutAt, arsenTrack, saidStrasburg, saidGrantEnvelope, grantTileAt, grantHouseAt, mamaMarketAt, tileAdAt, mamaVoiceAt, mamaCalls, samvelDivorceAt, tileSlipAt, saleAt, saleWhat } from './memkeys'
+import { count, collectorsRecruited, court, crewPaid, crewPaidAt, HEAT, internAt, lawyerAt, debutWho, debutAt, arsenTrack, saidStrasburg, saidGrantEnvelope, grantTileAt, grantHouseAt, mamaMarketAt, tileAdAt, tamadaDoneAt, mamaVoiceAt, mamaCalls, samvelDivorceAt, tileSlipAt, saleAt, saleWhat } from './memkeys'
 import { valueOf, type Line } from './fact'
 import type { Choice } from '../engine/state'
 
@@ -706,6 +706,50 @@ describe('окно кражи плиточной рекламы (#1216)', () => 
     const answers = TILE_AD_B.map(text)
     expect(said.some((t) => answers.some((p) => t.includes(p))), `ответ не из пула события: ${said.join(' | ')}`).toBe(true)
     expect(game.S.mem[tileAdAt], 'ответ не потребил окно').toBeUndefined()
+    expect(button(game), 'после ответа окно закрыто').toBeUndefined()
+  })
+})
+
+describe('окно финала квеста-тамады (#1222)', () => {
+  const text = (e: unknown): string => { const v = valueOf(e as never); return typeof v === 'string' ? v : (v as { t: string }).t }
+  const low = (t: string) => t.charAt(0).toLowerCase() + t.slice(1)
+  const button = (game: Game) => { game.S.choices = null; return game.buildChoices().find((c) => c.act === 'tamadaDone') }
+
+  it('до взятия микрофона, после «Я не умею тосты» и после «Сначала деньги» реакции нет — негативный контроль', async () => {
+    for (const path of ['cant', 'no'] as const) {
+      const { game } = makeGame()
+      expect(button(game), `до квеста (${path}) кнопки нет`).toBeUndefined()
+      await game.enterNode('q_tamada', path) // настоящие ветки отказа: застолья не было
+      expect(game.S.mem[tamadaDoneAt], `${path}: отказ штампанул событие — окно открылось бы зря`).toBeUndefined()
+      expect(button(game), `${path}: после отказа кнопка про застолье`).toBeUndefined()
+    }
+  })
+
+  it('финал yes штампует ход, кнопка в блоке, окно три хода, ответ потребляет', async () => {
+    const { game } = makeGame()
+    expect(button(game), 'до события кнопки нет').toBeUndefined()
+    await game.enterNode('q_tamada', 'yes') // настоящий путь: узел финала сцены
+    expect(game.S.msgs.some((m) => m.kind === 'sys' && m.text.includes('Сервиз тёти Гоар')), 'событие не прозвучало — проверка пустеет').toBe(true)
+    const at = Number(game.S.mem[tamadaDoneAt])
+    expect(at, 'узел квеста не штампанул ход события').toBe(game.S.stats.sent)
+    expect(button(game), 'на ходу события кнопки нет').toBeTruthy()
+    // в ближайшем блоке вариант — из пула реакции на застолье, а не общая кнопка
+    const texts = new Set<string>()
+    for (let i = 0; i < 60; i++) { const b = button(game); if (b) texts.add(b.text) }
+    const pool = P_TAMADA_DONE.map(text)
+    expect(texts.size, 'пул окна не прозвучал — проверка пустеет').toBeGreaterThan(0)
+    for (const t of texts) expect(pool.some((p) => t.includes(p) || t.includes(low(p))), `кнопка не из пула: ${t}`).toBe(true)
+    game.S.stats.sent = at + 3
+    expect(button(game), 'третий ход после события — ещё окно').toBeTruthy()
+    game.S.stats.sent = at + 4
+    expect(button(game), 'вне окна — кнопки нет').toBeUndefined()
+    game.S.stats.sent = at
+    const n = game.S.msgs.length
+    await game.fire('PlayerSays', { intent: 'tamadaDone' })
+    const said = game.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : []))
+    const answers = TAMADA_DONE_B.map(text)
+    expect(said.some((t) => answers.some((p) => t.includes(p))), `ответ не из пула события: ${said.join(' | ')}`).toBe(true)
+    expect(game.S.mem[tamadaDoneAt], 'ответ не потребил окно').toBeUndefined()
     expect(button(game), 'после ответа окно закрыто').toBeUndefined()
   })
 })

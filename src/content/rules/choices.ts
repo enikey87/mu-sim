@@ -23,7 +23,7 @@ import {
   STRASBOURG_THREAT,
   P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE,
   P_CREW_CALL, P_LAWYER, P_COLLECTORS_ASK, P_INTERN, P_HOLE, P_COUNTERSUIT,
-  P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_BORIS, P_DEBUT_NIVA, P_NUNE_DEBUT, P_DEBUT_GRANT, P_GRANT_TILE, P_MOUSTACHE_PHOTO, P_MAMA_MARKET, P_TILE_AD, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_COURT_VERDICT, P_TILE_SLIP, P_SOLD, P_GRANT_HOUSE,
+  P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_BORIS, P_DEBUT_NIVA, P_NUNE_DEBUT, P_DEBUT_GRANT, P_GRANT_TILE, P_MOUSTACHE_PHOTO, P_MAMA_MARKET, P_TILE_AD, P_TAMADA_DONE, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_COURT_VERDICT, P_TILE_SLIP, P_SOLD, P_GRANT_HOUSE,
 } from './player-choice-pools'
 
 type R = Rule<ContentApi, GameEvent, Offer>
@@ -227,6 +227,9 @@ export const choiceRules: R[] = [
   // кража плиточной рекламы (#1216): финал узла `send` квеста `q_photo` — заметное событие, отклик в окне
   // события (ход и три после). bonus 5: на этом ходу рядом стоят вопросы общего блока — реакция должна попасть в слот
   offer({ name: 'TileAd', when: [is('tileAdFresh')], act: 'tileAd', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_TILE_AD', P_TILE_AD) }),
+  // финал квеста-тамады (#1222): узел `yes` квеста `q_tamada` — заметное событие, отклик в окне события
+  // (ход и три после). bonus 5: рядом стоят вопросы общего блока — реакция должна попасть в слот
+  offer({ name: 'TamadaDone', when: [is('tamadaDoneFresh')], act: 'tamadaDone', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_TAMADA_DONE', P_TAMADA_DONE) }),
   // голосовое-плач мамы (#1085): событие серии звонков — отклик в окне события (ход и три после).
   // bonus 5: рядом стоят извинение и мычание (6) — событийная реакция обязана попасть в блок
   offer({ name: 'MamaVoice', when: [is('mamaVoiceFresh')], act: 'mamaVoice', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_MAMA_VOICE', P_MAMA_VOICE) }),
