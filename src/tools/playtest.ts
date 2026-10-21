@@ -7,11 +7,13 @@ import { allRules } from '../content/rules'
 import { CAST } from '../content/arcs'
 import { ENDINGS } from '../content/finales'
 import { NOTIF } from '../content/life'
+import { PLAYER_PREFIX, PLAYER_SUFFIX } from '../content/misc'
 import { alikDead } from '../content/memkeys'
 import { type Criterion, type Rule } from '../engine/rules'
 import type { Choice, Msg, NewMsg, PhoneEvent } from '../engine/state'
 
 export type Style = 'curious' | 'polite' | 'hothead'
+export type PlayProfile = 'neutral' | 'agreeable'
 /** Фон-мычание в расшифровке: одна формулировка на все мычания партии (#876). */
 export const MOO_ASIDE = '(на фоне кто-то протяжно: «Мууууу»)'
 export const STYLES: Style[] = ['curious', 'polite', 'hothead']
@@ -83,10 +85,41 @@ const PROFILE: Record<Style, { ctx: number; rude: number; idle: number; polite: 
   hothead: { ctx: 0.4, rude: 0.3, idle: 0.03, polite: 0 },
 }
 
-function pick(rng: Rng, style: Style, cs: Choice[]): number {
+const agreeableProfile = (profile: PlayProfile): boolean => profile === 'agreeable'
+
+/** Обращение и хвост прячут основу: «Алик, согласен… 🙏» и «Беру!» — одна и та же кнопка. */
+function buttonStem(text: string): string {
+  let t = text.trim()
+  for (let i = 0; i < 6; i++) {
+    const suf = PLAYER_SUFFIX.find((s) => t.endsWith(s))
+    if (!suf) break
+    t = t.slice(0, -suf.length).trimEnd()
+  }
+  const pre = PLAYER_PREFIX.find((p) => t.startsWith(p))
+  if (pre) t = t.slice(pre.length)
+  return t.trim().toLowerCase()
+}
+
+/** «Давайте» и отказ не согласие; узел take/yes — принятие оффера сцены, даже если текст начинается иначе. */
+function agrees(c: Choice): boolean {
+  const t = buttonStem(c.text)
+  if (/^нет([!.…,\s]|$)/.test(t) || /^не[\s,]/.test(t) || /^отказ/.test(t)) return false
+  if (c.go === 'take' || c.go === 'yes') return true
+  if (/^да([!.…,?\s]|$)/.test(t)) return true
+  if (/^беру([!.…,\s]|$)/.test(t)) return true
+  if (/^согласен([!.…,\s]|$)/.test(t)) return true
+  return false
+}
+
+export function pickChoice(rng: Rng, style: Style, cs: Choice[], profile: PlayProfile = 'neutral'): number {
   const p = PROFILE[style]
   const idx = (f: (c: Choice) => boolean) => cs.map((c, i) => (f(c) ? i : -1)).filter((i) => i >= 0)
   const any = (ids: number[]) => ids[Math.floor(rng.random() * ids.length)]
+  if (agreeableProfile(profile)) {
+    const yes = idx(agrees)
+    // весь блок — согласие или его нет: тот же розыгрыш, что у нейтрального
+    if (yes.length > 0 && yes.length < cs.length) return any(yes)
+  }
   const ctx = idx((c) => !!(c.act || c.scene))
   if (ctx.length && rng.random() < p.ctx) return any(ctx)
   const rude = idx((c) => c.tone === 'rude' || c.tone === 'threat')
@@ -123,7 +156,7 @@ export function attachSpeechAttribution(game: Game): {
 }
 
 /** Сыграть партию ботом (или повторить записанные действия replay); watch — посмотреть на игру до первого хода. */
-export async function playtest(seed: number, turns: number, replay?: Act[], watch?: (game: Game) => void | Promise<void>): Promise<Played> {
+export async function playtest(seed: number, turns: number, replay?: Act[], watch?: (game: Game) => void | Promise<void>, profile: PlayProfile = 'neutral'): Promise<Played> {
   const style = STYLES[seed % STYLES.length]
   const hour = HOURS[seed % HOURS.length]
   const clock = manualClock(Date.parse('2026-09-14T12:00:00Z') + (seed % 7) * 864e5)
@@ -192,15 +225,20 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
     if (game.battery.dead) return { kind: 'charge' }
     const job = game.S.msgs.find((m) => m.kind === 'job' && !m.answered)
     if (job) {
+      if (agreeableProfile(profile)) return { kind: 'job', yes: true, at: game.S.msgs.length }
       // иногда зеркало — иначе оракул не видит его в партиях (#256)
       const yes: boolean | 'mirror' = game.canMirror() && bot.random() < 0.25 ? 'mirror' : bot.random() < 0.5
       return { kind: 'job', yes, at: game.S.msgs.length }
     }
     // карточка банка с кнопками: чаще выбирает, иногда откладывает или пишет дальше, не выбрав
-    if (openOffer(game) && bot.random() < 0.7) { const r = bot.random(); return { kind: 'card', pick: r < 0.5 ? 'take' : r < 0.85 ? 'sell' : 'later' } }
+    const offer = openOffer(game)
+    const last = acts.at(-1)
+    // повтор take, который карточку не закрыл, не съедает следующие ходы
+    if (agreeableProfile(profile) && offer?.offer?.take && !(last?.kind === 'card' && last.pick === 'take')) return { kind: 'card', pick: 'take' }
+    if (offer && bot.random() < 0.7) { const r = bot.random(); return { kind: 'card', pick: r < 0.5 ? 'take' : r < 0.85 ? 'sell' : 'later' } }
     if (game.S.stats.sent >= 5 && bot.random() < PROFILE[style].idle) return { kind: 'idle' }
     const offered = game.choices.map((c) => c.text)
-    return { kind: 'send', i: pick(bot, style, game.choices), offered, at: game.S.msgs.length }
+    return { kind: 'send', i: pickChoice(bot, style, game.choices, profile), offered, at: game.S.msgs.length }
   }
   for (let k = 0; k < (replay?.length ?? turns); k++) {
     const a = replay ? replay[k] : next()
