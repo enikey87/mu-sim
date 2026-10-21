@@ -22,8 +22,8 @@ import * as MISC from './misc'
 import { FWD, FWD_HOLIDAY, NOTIF, PERIOD } from './life'
 import { ARC_DONE, GROUP } from './arcs'
 import { LEGAL_CLAIMS, legalClaim, type LegalClaim } from '../engine/input'
-import { met, saidNuneNoWrite, threatClaim } from './memkeys'
-import { P_NUNE_DEBUT } from './rules/player-choice-pools'
+import { intro, met, saidNuneNoWrite, threatClaim } from './memkeys'
+import { P_DEBUT_NIVA, P_NUNE_DEBUT } from './rules/player-choice-pools'
 
 /** Инстанция угрозы: тексты игрока → что игра обязана ответить. Проверяется и детектор, и пул. */
 const CLAIM_SAMPLES: Array<[string, LegalClaim]> = [
@@ -577,5 +577,35 @@ describe('ревизия дебютных окон (#1170)', () => {
     expect(isOpen(key.l, safeFirst.lineFacts()), 'ключ закрыт после сейфа').toBe(true)
     for (let i = 0; i < 6 && !seen(safeFirst); i++) safeFirst.S.choices = null
     expect(seen(safeFirst), 'ключа нет в блоке после сейфа').toBe(true)
+  })
+})
+
+describe('дебют Нивы: бардачок (#1201)', () => {
+  it('строка «про бардачок» скрыта, пока ввод не прозвучал, и видна после', async () => {
+    const line = P_DEBUT_NIVA.map((l) => ({ l, t: String(valueOf(l)) })).find((x) => x.t.includes('бардачок'))!
+    const seen = (g: ReturnType<typeof makeGame>['game']) => g.choices.some((c) => c.text.includes('про бардачок'))
+    const wheel = (g: ReturnType<typeof makeGame>['game']) => g.choices.some((c) => c.text.includes('Кто за рулём'))
+    // первое письмо — бип из ссоры: Нива в истории, эпизода с бардачком не было
+    const beepFirst = makeGame().game
+    beepFirst.alikMsg({ kind: 'text', from: 'alik', text: 'Би-бип. Алик говорит: он тебя простит, если ты попросишь. Попроси через Бориса. Через меня нельзя, я за рулём.', who: 'niva' })
+    expect(beepFirst.S.mem[intro('niva')], 'проверка не про тот путь: Нива не вошла').toBe(true)
+    expect(beepFirst.facts()['heard.money_niva'], 'ввод уже прозвучал — негатив пустой').not.toBe(true)
+    expect(isOpen(line.l, beepFirst.lineFacts()), 'ссылка до введения').toBe(false)
+    let window = false
+    for (let i = 0; i < 6; i++) {
+      beepFirst.S.choices = null
+      expect(seen(beepFirst), 'ссылка до введения').toBe(false)
+      if (wheel(beepFirst)) window = true
+    }
+    expect(window, 'окно дебюта не собралось — негатив пустой').toBe(true)
+    // эпизод «не заводится» пишет money_niva — после него строка открыта и доходит до блока
+    const told = makeGame().game
+    await told.playEpisode(ARCS.niva.eps[0], 'niva')
+    expect(told.facts()['heard.money_niva'], 'эпизод не записал ввод бардачка').toBe(true)
+    expect(isOpen(line.l, told.lineFacts()), 'строка закрыта после ввода').toBe(true)
+    told.alikMsg({ kind: 'text', from: 'alik', text: 'Би-бип.', who: 'niva' })
+    let shown = false
+    for (let i = 0; i < 6 && !shown; i++) { told.S.choices = null; shown = seen(told) }
+    expect(shown, 'строки нет в блоке после ввода').toBe(true)
   })
 })
