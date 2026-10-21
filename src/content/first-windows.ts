@@ -3,7 +3,7 @@
 // участник, умеющий писать сам (SPEAKS), обязан быть здесь или в исключениях с причиной — новый
 // участник красит сюит на месте, а не в плейтесте через раунд. Офферы и потребление окна ответом —
 // как были (#951), тексты пулов не менялись.
-import { avitoReviewAt, borisSaleAt, collectorsAskAt, countersuitAt, courtVerdictAt, crewPaidAt, grantHouseAt, grantTileAt, internAt, kettleAt, lawyerAt, mamaMarketAt, mamaVoiceAt, mooAt, moustachePhotoAt, photoAt, ramPhotoAt, rubikAskAt, rubikHoleAt, samvelDivorceAt, saleAt, tileSlipAt, transferAt, vacancyAt } from './memkeys'
+import { avitoReviewAt, borisSaleAt, collectorsAskAt, collectorsEpAt, countersuitAt, courtVerdictAt, crewPaidAt, grantHouseAt, grantTileAt, internAt, kettleAt, lawyerAt, mamaMarketAt, mamaVoiceAt, mooAt, moustachePhotoAt, photoAt, ramPhotoAt, rubikAskAt, rubikHoleAt, samvelDivorceAt, saleAt, tileSlipAt, transferAt, vacancyAt } from './memkeys'
 
 /** Общий дебютный слот (#973): `wrote.<who>`/`debutWho`/`debutAt` ставит первое сообщение участника. */
 export const DEBUT_SLOT = 'debut'
@@ -76,6 +76,7 @@ export const EVENT_SOURCES: readonly EventSource[] = [
   { source: 'первое сообщение заказчика Гранта (серия, stamp)', at: grantTileAt, offer: 'GrantTile', pool: 'P_GRANT_TILE' },
   { source: 'второй дебют Гранта: дом «с кладом» (серия, stamp)', at: grantHouseAt, offer: 'GrantHouse', pool: 'P_GRANT_HOUSE' },
   { source: 'вопрос «тебе коллекторы пишут?» (серия 2 арки, stamp)', at: collectorsAskAt, offer: 'CollectorsAsk', pool: 'P_COLLECTORS_ASK' },
+  { source: 'эпизод арки коллекторов: чай, вербовка или разворот (stamp)', at: collectorsEpAt, offer: 'CollectorsEp', pool: 'P_COLLECTORS_EP' },
   { source: 'предложение стажировки «Деньги-Ара» (финал арки)', at: internAt, offer: 'InternOffer', pool: 'P_INTERN' },
   { source: 'вопрос «дырку заделаешь?» (серия Рубика, stamp)', at: rubikHoleAt, offer: 'RubikHole', pool: 'P_HOLE' },
   { source: 'фото «платёжки» (Turn_Photo / game.photo)', at: photoAt, offer: 'Photo', pool: 'D.P_PHOTO' },

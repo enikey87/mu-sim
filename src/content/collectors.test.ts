@@ -11,7 +11,8 @@ import { NOTIF } from './life'
 import { ARC_DONE, ARCS, GROUP } from './arcs'
 import { FINALES } from './finales'
 import { meet } from './world'
-import { is, isOpen, test, valueOf, type Entry, type Facts } from '../engine/rules'
+import { is, isOpen, spec, test, valueOf, type Entry, type Facts, type Line } from '../engine/rules'
+import { collectorsEpPool } from './player-pools'
 import { ENDGAME_ARCH } from './endgame'
 import { playtest } from '../tools/playtest'
 
@@ -361,6 +362,48 @@ describe('«три чашки чая» ждёт предложения стаж�
     await game.playFinale('collectors', FINALES.collectors.find((f) => f.id === 'intern')!)
     expect(game.S.mem[internAt], 'предложение стажировки не штампануло ход').toBe(game.S.stats.sent)
     expect(pool(game), 'после предложения стажировки строки нет').toContain(LINE)
+  })
+})
+
+describe('эпизод арки даёт отклик в свой ход (#1192)', () => {
+  const beats: Array<[number, typeof collectorsTea | typeof collectorsRecruited | typeof collectorsTurned, string]> = [
+    [2, collectorsTea, 'чай'],
+    [3, collectorsRecruited, 'работают'],
+    [4, collectorsTurned, 'работают на меня'],
+  ]
+  const body = (fact: string): string => {
+    const entry = collectorsEpPool().find((e) => (spec(e as Line).when ?? []).some((c) => c.key === fact && c.op === '=='))
+    const raw = valueOf(entry!)
+    return typeof raw === 'string' ? raw : String((raw as { t?: unknown }).t ?? '')
+  }
+  const button = (game: Game) => {
+    game.S.choices = null
+    return game.buildChoices().find((c) => c.act === 'collectorsEp')
+  }
+
+  it('окно — три строки фактов, не весь follow', () => {
+    expect(collectorsEpPool().length, 'в гарантированное окно уехал весь follow').toBe(3)
+    expect(ARCS.collectors.follow.length, 'follow пуст — проверка окна пустеет').toBeGreaterThan(3)
+  })
+
+  it('ход эпизода с фактом — в блоке его строка; до факта строка скрыта', async () => {
+    for (const [i, fact, mark] of beats) {
+      const { game } = makeGame()
+      expect(game.open(ARCS.collectors.follow), `${mark}: строка до факта`).not.toContain(body(fact))
+      expect(button(game), `${mark}: отклик до эпизода`).toBeUndefined()
+      await game.playEpisode(ARCS.collectors.eps[i], 'collectors')
+      const btn = button(game)
+      expect(btn, 'эпизод без отклика').toBeTruthy()
+      expect(btn!.text.toLowerCase(), fact).toContain(body(fact).slice(1).toLowerCase())
+      const from = game.S.msgs.length
+      await game.send(btn!)
+      const said = game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' ? [m.text] : [])).join(' ')
+      const reply = fact === collectorsTea ? 'дольше, чем про срок'
+        : fact === collectorsRecruited ? 'Долг пока на месте'
+          : 'Чай длиннее срока'
+      expect(said, `${mark}: ответ не про факт эпизода`).toContain(reply)
+      expect(button(game), `${mark}: ответ не закрыл окно`).toBeUndefined()
+    }
   })
 })
 

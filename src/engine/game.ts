@@ -1633,6 +1633,8 @@ export class Game {
       // прямые вопросы и первые сообщения персонажей (#958): отклик в ближайшем блоке — ход и три после
       lawyerFresh: S.stats.sent - Number(S.mem[memkeys.lawyerAt] ?? -99) <= 3,
       collectorsAskFresh: S.stats.sent - Number(S.mem[memkeys.collectorsAskAt] ?? -99) <= 3,
+      // эпизод, поставивший факт арки: отклик в ход эпизода и три после, не в каденсе follow (#1192)
+      collectorsEpFresh: S.stats.sent - Number(S.mem[memkeys.collectorsEpAt] ?? -99) <= 3,
       internFresh: S.stats.sent - Number(S.mem[memkeys.internAt] ?? -99) <= 3,
       rubikHoleFresh: S.stats.sent - Number(S.mem[memkeys.rubikHoleAt] ?? -99) <= 3,
       // перевод 50 ₽ (#1003): реакция на него — ход перевода и ещё TRANSFER_FRESH_TURNS; сумма — для подстановки
