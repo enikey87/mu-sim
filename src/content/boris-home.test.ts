@@ -24,8 +24,8 @@ const EPISODES = {
   },
   receipts: {
     ep: 2,
-    home: 'Борису лучше. Но теперь он ест только квитанции. Твои тоже съел, извини.',
-    player: 'Борису лучше. Он теперь ест только квитанции — проверь свои, я предупредил.',
+    home: 'Борису лучше. Но теперь он ест только квитанции.',
+    player: 'Борису лучше. Он теперь ест только квитанции. Мои доел ещё у меня.',
   },
   wedding: {
     ep: 4,
@@ -145,6 +145,23 @@ describe('одиночные реплики про Бориса: место ба
     giveBoris(atPlayer)
     expect(line(atPlayer), 'при баране у игрока реплика осталась прежней').not.toBe('Борис, не ешь квитанции')
     expect(line(atPlayer), 'у игрока нет своей формулировки').toContain('Мои уже съедены')
+  })
+})
+
+describe('квитанции Бориса не зовут вещи игрока (#1193)', () => {
+  const UNINTRODUCED = ['Твои тоже съел', 'проверь свои']
+
+  it('серия называет диету барана, а не съеденные квитанции игрока', async () => {
+    for (const owner of [false, true]) {
+      const { game } = makeGame()
+      if (owner) giveBoris(game)
+      for (let i = 0; i < 3; i++) await game.playArc('boris')
+      const said = alikTexts(game.S.msgs)
+      const line = said.find((t) => t.includes('ест только квитанции'))
+      const where = owner ? 'баран у игрока' : 'баран у Алика'
+      expect(line, `${where}: серии не было — проверка пустеет`).toBeTruthy()
+      for (const bit of UNINTRODUCED) expect(line, 'ссылка на не введённое').not.toContain(bit)
+    }
   })
 })
 

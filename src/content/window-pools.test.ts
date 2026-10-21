@@ -14,7 +14,7 @@ import * as W from './world'
 import {
   RAM_PHOTO, BORIS_SALE, VACANCY, AVITO_REVIEW, RUBIK_ASK, KETTLE,
   CREW_CALL_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, GRANT_TILE_B, DEBUT_NIVA_B, DEBUT_BORIS_B, MOUSTACHE_PHOTO_B, MAMA_MARKET_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, GRANT_HOUSE_B, COURT_VERDICT_B, TILE_SLIP_B, NUNE_DEBUT_B, DEBUT_GRANT_B, SOLD_B,
-  LAWYER_B, COLLECTORS_ASK_B, INTERN_B, HOLE_B, COUNTERSUIT_B,
+  LAWYER_B, COLLECTORS_ASK_B, COLLECTORS_EP_B, INTERN_B, HOLE_B, COUNTERSUIT_B,
 } from './world'
 
 /** Метки линтера: имена персонажей и объекты классов #970/#974/#982. Список узкий и осознанный —
@@ -62,6 +62,7 @@ const WINDOWS: Window[] = [
   { pool: 'P_COLLECTORS_DEBUT', lines: PP.P_COLLECTORS_DEBUT, marks: { поручител: null } },
   { pool: 'P_COLLECTORS_ASK', lines: PP.P_COLLECTORS_ASK, marks: { поручител: null } },
   { pool: 'COLLECTORS_ASK_B', lines: COLLECTORS_ASK_B, marks: { поручител: null } },
+  { pool: 'COLLECTORS_EP_B', lines: COLLECTORS_EP_B, marks: {} },
   { pool: 'P_INTERN', lines: PP.P_INTERN, marks: { стажировк: null, ведомост: null } },
   { pool: 'INTERN_B', lines: INTERN_B, marks: { стажировк: null, ведомост: null } },
   { pool: 'P_HOLE', lines: PP.P_HOLE, marks: {} },
