@@ -1,7 +1,7 @@
-import { type Entry, type FactOp, type LineSpec, type Said, gate, gte, lte, eq, ne, is, missing, set } from './fact'
+import { type Entry, type FactOp, type LineSpec, type Said, gate, gte, lte, eq, ne, is, exists, missing, set } from './fact'
 import { type When } from './excuses'
 import { needs, WORLD } from './world'
-import { avitoReviewAt, bloodGiven, borisSaleAt, count, endgame, evicted, fraudLoan, paydayScene, saidHash, vacancyAt, wedding } from './memkeys'
+import { avitoReviewAt, bloodGiven, borisSaleAt, count, endgame, evicted, fraudLoan, paydayScene, saidHash, threatClaim, vacancyAt, wedding } from './memkeys'
 import { sold, momHelp, momDachaDays } from './credit'
 import { billStreak } from './bills'
 
@@ -26,7 +26,9 @@ export const IDLE: Entry<Said>[] = [
   'ты спишь?', 'не молчи, мне страшно.', 'ты с другим подрядчиком, да? Признайся.', 'я тут подумал о тебе. Хорошо подумал.',
   'ты на меня злишься? Не злись, давление.', 'ау. Я тут.', 'ты мне снился. Ты был с деньгами. Моими.', 'а ты знаешь, что молчание — золото? Вот, считай, заплатил.',
   'ты поел? Мама спрашивает.', 'скучно без тебя, брат.', 'я сейчас мимо объекта проезжал, вспомнил тебя. Плитка блестит!',
-  'ты не пишешь, и я не пишу. Так и живём.', 'проверка связи. Раз, два. Деньги — три.', 'ты там не в суде, случайно?',
+  'ты не пишешь, и я не пишу. Так и живём.', 'проверка связи. Раз, два. Деньги — три.',
+  // threat.claim — id инстанции, не true: is() после «Я иду в суд!» так и остался бы закрыт
+  gate(exists(threatClaim))('ты там не в суде, случайно?'),
 ];
 
 export type PeriodLine = string | { t: string; remember?: FactOp[] }
