@@ -718,3 +718,52 @@ describe('конверты Самвела: вопрос открывает ре�
     expect(open(game), 'после реплики вопроса про пустой конверт нет').toContain(EMPTY)
   })
 })
+
+describe('поминки: «50 рублей» введены серией похорон до варианта (#1204)', () => {
+  const FEE = /50 рублей/
+  const wake = () => ARCS.alik_death.follow.map(valueOf).find((t) => /поминки/.test(t))
+  const funeralTexts = () => ARCS.alik_death.eps[1].m.map((m) => {
+    const v = valueOf(m)
+    return typeof v === 'string' ? v : v.t
+  })
+  const spoken = (game: ReturnType<typeof makeGame>['game'], from: number) =>
+    game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' ? [m.text] : []))
+
+  it('сумма есть в обеих ветках серии похорон, либо вариант без суммы', async () => {
+    const line = wake()
+    expect(line, 'вариант про поминки пропал — проверка пустеет').toEqual(expect.any(String))
+    const texts = funeralTexts()
+    expect(texts, 'серия похорон без двух веток — проверка пустеет').toHaveLength(2)
+
+    const { game } = makeGame()
+    game.S.arcs.alik_death = { i: 1, last: -99 }
+    expect(game.open(ARCS.alik_death.follow), 'до серии похорон варианта нет').not.toContain(line)
+
+    if (FEE.test(line!)) {
+      for (const t of texts) expect(t, 'сумма до введения').toMatch(FEE)
+    } else {
+      expect(line, 'вариант без суммы').not.toMatch(FEE)
+    }
+
+    const hear = async (gone: boolean) => {
+      const { game: g } = makeGame()
+      if (gone) g.S.mem['finale.rubik'] = 'karine'
+      g.S.arcs.alik_death = { i: 1, last: -99 }
+      const from = g.S.msgs.length
+      g.S.day += 5
+      await g.playArc('alik_death')
+      const lines = spoken(g, from)
+      expect(lines.length, 'серия похорон молчит — проверка пустеет').toBeGreaterThan(0)
+      if (FEE.test(line!)) {
+        expect(lines.join('\n'), 'сумма до введения').toMatch(FEE)
+        expect(g.open(ARCS.alik_death.follow), 'после ввода вариант есть').toContain(line)
+      } else {
+        expect(g.open(ARCS.alik_death.follow), 'вариант без суммы всё равно после похорон').toContain(line)
+      }
+      return lines.join('\n')
+    }
+    const home = await hear(false)
+    const away = await hear(true)
+    expect(home, 'обе ветки серии схлопнулись в одну — проверка одной пустеет').not.toBe(away)
+  })
+})
