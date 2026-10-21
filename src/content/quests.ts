@@ -4,7 +4,7 @@
 import type { Scene } from './scenes'
 import { gate, missing, set } from './fact'
 import { needs } from './world'
-import { courtVerdict, courtVerdictAt, cryptoHodl, intro, kettleAt, mamaMarketAt, saidHash } from './memkeys'
+import { courtVerdict, courtVerdictAt, cryptoHodl, intro, kettleAt, mamaMarketAt, saidHash, tileAdAt } from './memkeys'
 
 export const QUESTS: Record<string, Scene> = {
   q_hash: {
@@ -160,7 +160,8 @@ export const QUESTS: Record<string, Scene> = {
       send: {
         fx: { ach: 'q_photo' },
         sys: 'Вы отправили фото. Через час его выложили с подписью «Плитка от Алика Воздухонесяна. Сам клал».',
-        a: ['Уже три заказа! Люди в восторге от моей работы. Твой процент — моё уважение. Это много.'],
+        // событие с окном отклика (#1216): подпись, «три заказа» и «процент — уважение» звучат в этом же бите
+        a: [{ t: 'Уже три заказа! Люди в восторге от моей работы. Твой процент — моё уважение. Это много.', stamp: tileAdAt }],
       },
       pct: { a: ['Десять процентов. От уважения. Уважения у меня к тебе — на миллион.'], opts: [{ t: 'Ладно, отправлю', go: 'send' }, { t: 'Нет уж', go: 'no' }] },
       // отказ — шутка Алика, а не тупик: фото не уходит, ach.q_photo нет, рекламы в памяти и на выплате нет (#582)
