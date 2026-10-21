@@ -337,6 +337,27 @@ describe('упрёк по звонку с объекта', () => {
     }
   })
 
+  it('вокатив «я всё прочитал» только пока звонок свеж (#1210)', async () => {
+    const VOCATIVE = 'Тарон, я всё прочитал. Мне не заплатили — это я понял.'
+    const INFERENCE = 'Значит, я последний в очереди. Очередь из одного. Меня.'
+    const { game } = makeGame()
+    game.S.day = 210
+    const draw = game.draw.bind(game)
+    vi.spyOn(game, 'draw').mockImplementation(((key: string, arr: readonly unknown[]) =>
+      key === 'CREW_CALL' ? (valueOf(CREW_CALL[2]) as readonly [string, string])[1] : draw(key as never, arr as never)) as unknown as typeof game.draw)
+    await game.fire('AlikIdle')
+    expect(game.S.mem[crewAllPaid], 'вариант «следующий раз» поставил «всем»').toBeUndefined()
+    expect(game.S.stats.sent - Number(game.S.mem[crewPaidAt]), 'звонок только что').toBe(0)
+    expect(game.open(P_CREW_PAID), 'в окне свежести вокатив открыт').toContain(VOCATIVE)
+    game.S.stats.sent += CREW_FRESH_TURNS
+    expect(game.open(P_CREW_PAID), 'на границе окна вокатив ещё открыт').toContain(VOCATIVE)
+    game.S.stats.sent += 1
+    const late = game.open(P_CREW_PAID)
+    expect(late, 'вне окна свежести вокатива нет').not.toContain(VOCATIVE)
+    expect(late, 'безымянная инференция остаётся').toContain(INFERENCE)
+    expect(late.length, 'пул вне окна не пуст').toBeGreaterThan(0)
+  })
+
   it('«кто звонил» и «спроси у него» звучат только несколько ходов после звонка (#928)', async () => {
     const caller = 'Спроси у того, кто звонил. Он всё видел и всё перепутал. Перепутал — значит, и не видел.'
     const tea = 'Я чаем рассчитался. Он согласился, он чайный человек. Спроси у него — он подтвердит.'
