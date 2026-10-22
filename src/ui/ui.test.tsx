@@ -9,6 +9,7 @@ import { DEBT_MS } from './Header'
 import { makeGame, setMoney, memStorage, flush } from '../test/helpers'
 import { SAVE_KEY, loadState, DEBT0, type Msg } from '../engine/state'
 import { nextTransfer } from '../content/memkeys'
+import { ENDING_MIN_DAY } from '../content/finales'
 import { fmtDate } from '../engine/time'
 import type { Game } from '../engine/game'
 import { introOf, uiOf } from './view'
@@ -767,7 +768,7 @@ describe('App', () => {
     const { game } = makeGame()
     game.S.arcs.samvel = { i: 8, last: 0 }
     game.S.mem['finale.samvel'] = 'groom'
-    game.S.day = 320
+    game.S.day = ENDING_MIN_DAY
     await game.fire('CheckEnding')
     const { onReset } = renderApp(game)
     const end = screen.getByRole('dialog', { name: /Породнились/ })
@@ -814,7 +815,7 @@ describe('App', () => {
     const { game } = makeGame()
     game.S.arcs.samvel = { i: 8, last: 0 }
     game.S.mem['finale.samvel'] = 'groom'
-    game.S.day = 320
+    game.S.day = ENDING_MIN_DAY
     renderApp(game)
     fireEvent.click(screen.getByTitle('Обещания и ачивки'))
     expect(screen.getByRole('dialog', { name: 'Досье на Алика' })).toBeInTheDocument()
@@ -827,7 +828,7 @@ describe('App', () => {
     const { game } = makeGame()
     game.S.arcs.samvel = { i: 8, last: 0 }
     game.S.mem['finale.samvel'] = 'groom'
-    game.S.day = 320
+    game.S.day = ENDING_MIN_DAY
     await game.fire('CheckEnding')
     renderApp(game)
     const end = screen.getByRole('dialog', { name: /Породнились/ })
@@ -910,7 +911,7 @@ describe('App', () => {
     const { game } = makeGame()
     game.S.arcs.samvel = { i: 8, last: 0 }
     game.S.mem['finale.samvel'] = 'groom'
-    game.S.day = 320
+    game.S.day = ENDING_MIN_DAY
     await game.fire('CheckEnding')
     renderApp(game)
     const end = screen.getByRole('dialog', { name: /Породнились/ })
@@ -942,7 +943,7 @@ describe('App', () => {
     const { game } = makeGame()
     game.S.arcs.samvel = { i: 8, last: 0 }
     game.S.mem['finale.samvel'] = 'groom'
-    game.S.day = 320
+    game.S.day = ENDING_MIN_DAY
     await game.fire('CheckEnding')
     renderApp(game)
     expect(document.querySelector('.phone-surface')).toHaveAttribute('inert')

@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest'
 import { makeGame, alikTexts } from '../test/helpers'
 import { ARCS, ARC_DONE, CAST } from './arcs'
 import { ACH } from './achievements'
-import { FINALES, ENDINGS, DEFAULT_FINALE } from './finales'
+import { FINALES, ENDINGS, DEFAULT_FINALE, ENDING_MIN_DAY } from './finales'
 import type { Game } from '../engine/game'
 import { valueOf } from '../engine/rules'
 import { NOTIF } from './life'
@@ -330,7 +330,7 @@ describe('новые сериалы: фундамент, Рубик, Разми�
 
 describe('концовки игры', () => {
   const check = async (game: Game) => { await game.fire('CheckEnding'); return game.S.ending }
-  const late = () => { const t = makeGame(); t.game.S.day = 320; return t }
+  const late = () => { const t = makeGame(); t.game.S.day = ENDING_MIN_DAY; return t }
   it('нет финалов — нет концовки', async () => {
     const { game } = makeGame()
     expect(await check(game)).toBeNull()
@@ -345,10 +345,28 @@ describe('концовки игры', () => {
     expect(game.S.ending).toBeNull()
     expect(await check(game)).toBeNull()
   })
-  it('до ~300-го дня концовок нет: это развязка, а не начало', async () => {
+  it('до границы третьего акта концовок нет: это развязка, а не начало (#1254)', async () => {
     const { game } = makeGame()
     game.S.mem['finale.samvel'] = 'groom'
+    game.S.day = ENDING_MIN_DAY - 1
     expect(await check(game)).toBeNull()
+    // НК: вернуть `gte('day', 300)` — на 329-й день концовка снова срабатывает, тест краснеет на «ранней концовке»
+    game.S.day = ENDING_MIN_DAY
+    expect(await check(game)).toBe('family')
+  })
+  it('финал, сыгранный в конце второго акта, не врывается концовкой назавтра (#1254)', async () => {
+    // партия №5: Борис ушёл к игроку 4 января (день 292), концовка «Бараном» выстрелила ровно на 300-й,
+    // первый день готовности — «играл играл и резко конец». Теперь развязка ждёт третьего акта.
+    const { game } = makeGame()
+    game.S.day = 292
+    game.S.mem['finale.boris'] = 'toyou'
+    game.nextDay(300 - 292)
+    expect(game.S.day).toBe(300)
+    expect(await check(game), 'концовка на первом дне готовности').toBeNull()
+    game.nextDay(ENDING_MIN_DAY - 1 - game.S.day)
+    expect(await check(game), 'концовка до третьего акта').toBeNull()
+    game.nextDay(1)
+    expect(await check(game), 'третий акт начался — развязка ждать больше нечего').toBe('ram')
   })
   it('«Честные деньги» — один факт Гранта: ни Бориса, ни «Нивы»; сумма — из финала', async () => {
     const { game } = late()
@@ -497,7 +515,7 @@ describe('«Бараном»: баран Бориса — путём игрок�
     toLast(game, 'boris')
     await game.playArc('boris')
     expect(game.S.mem['finale.boris']).toBe('toyou')
-    game.nextDay(320 - game.day)
+    game.nextDay(Math.max(0, ENDING_MIN_DAY - game.day))
     await game.fire('CheckEnding')
     expect(game.S.ending).toBe('ram')
   })
@@ -718,7 +736,7 @@ describe('«Бараном»: барахолка доходит до игрок�
     toLast(game, 'boris')
     await game.playArc('boris')
     expect(game.S.mem['finale.boris']).toBe('toyou')
-    game.nextDay(Math.max(0, 320 - game.day))
+    game.nextDay(Math.max(0, ENDING_MIN_DAY - game.day))
     await game.fire('CheckEnding')
     expect(game.S.ending).toBe('ram')
   }, 120_000)

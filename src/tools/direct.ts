@@ -8,6 +8,7 @@ import type { Facts } from '../engine/rules'
 import { during } from '../engine/rules'
 import { START_DAY, ARC_MARINATION_DAYS } from '../engine/state'
 import { HEAT, legendDay, legendId, nuneKeyPassed, payday, sorryAt } from '../content/memkeys'
+import { ENDING_MIN_DAY } from '../content/finales'
 
 export type DirectCase = { event: string; facts?: Facts; target?: string; setup?: (g: Game) => void }
 
@@ -79,8 +80,8 @@ export const DIRECT: Record<string, DirectCase> = {
   // Finale_alik_death_default: { event: 'ArcFinale', facts: { arc: 'alik_death' }, setup: (g) => { g.S.mem['asked.alik_death'] = 1 } }
   Finale_rubik_bribe: { event: 'ArcFinale', facts: { arc: 'rubik' }, setup: (g) => { g.S.ach.redo = 1 } },
   Finale_samvel_tamada: { event: 'ArcFinale', facts: { arc: 'samvel' }, setup: (g) => { g.S.ach.toast = 1 } },
-  Ending_alik: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem['finale.garik'] = 'cutter' } },
-  Ending_heir: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem['finale.alik_death'] = 'will' } },
+  Ending_alik: { event: 'CheckEnding', setup: (g) => { g.S.day = ENDING_MIN_DAY; g.S.mem['finale.garik'] = 'cutter' } },
+  Ending_heir: { event: 'CheckEnding', setup: (g) => { g.S.day = ENDING_MIN_DAY; g.S.mem['finale.alik_death'] = 'will' } },
   Says_via_boris: { event: 'PlayerSays', facts: { intent: 'via', arg: 'boris' }, setup: (g) => { g.S.mem.blocked = true } },
   // с колкостями (#683) PromiseDue в открытом экране выплаты ловят сами выборки — случай снят по порогу гейта
   // стенд мёртвого телефона больше не доходит и в выборках (#133): оставшиеся редкие окна держатся случаями ниже
@@ -101,7 +102,7 @@ export const DIRECT: Record<string, DirectCase> = {
   },
   Ending_ram: {
     event: 'CheckEnding',
-    setup: (g) => { g.S.day = 300; g.S.mem['finale.boris'] = 'toyou' },
+    setup: (g) => { g.S.day = ENDING_MIN_DAY; g.S.mem['finale.boris'] = 'toyou' },
   },
   Finale_boris_toyou: { event: 'ArcFinale', facts: { arc: 'boris' }, setup: (g) => { g.S.items.push('баран Борис') } },
   Finale_niva_chose: { event: 'ArcFinale', facts: { arc: 'niva' }, setup: (g) => { g.S.items.push('«Нива» 1987 года') } },
@@ -137,11 +138,11 @@ export const DIRECT: Record<string, DirectCase> = {
   Finale_samvel_groom: { event: 'ArcFinale', facts: { arc: 'samvel' }, setup: (g) => { g.S.ach.saint = 1; g.S.mem['count.rude'] = 3 } },
   Finale_boris_brigadir: { event: 'ArcFinale', facts: { arc: 'boris' }, setup: (g) => { g.S.mem['asked.boris'] = 6 } },
   Finale_alik_death_sulk: { event: 'ArcFinale', facts: { arc: 'alik_death' }, setup: () => {} },
-  Ending_family: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem['finale.samvel'] = 'groom' } },
-  Ending_vendetta: { event: 'CheckEnding', setup: (g) => { g.S.day = 300; g.S.mem.vendetta = true } },
+  Ending_family: { event: 'CheckEnding', setup: (g) => { g.S.day = ENDING_MIN_DAY; g.S.mem['finale.samvel'] = 'groom' } },
+  Ending_vendetta: { event: 'CheckEnding', setup: (g) => { g.S.day = ENDING_MIN_DAY; g.S.mem.vendetta = true } },
   Ending_honest: {
     event: 'CheckEnding',
-    setup: (g) => { g.S.day = 300; g.S.mem['finale.grant'] = 'ally' },
+    setup: (g) => { g.S.day = ENDING_MIN_DAY; g.S.mem['finale.grant'] = 'ally' },
   },
   Ending_payday_real: { event: 'CheckEnding', setup: (g) => { g.S.mem.payday = 'real' } },
   Tone_Thanks: { event: 'PlayerMessage', facts: { tone: 'polite', category: 'gratitude' } },
