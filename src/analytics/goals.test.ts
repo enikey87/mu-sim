@@ -3,7 +3,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { enable, boot, shown, left, track, GAME_HOST } from './metrics'
 import { makeGame } from '../test/helpers'
-import { PAYDAY_OUTCOMES } from '../content/finales'
+import { PAYDAY_OUTCOMES, ENDING_MIN_DAY } from '../content/finales'
 
 type Call = [number, string, ...unknown[]]
 
@@ -130,7 +130,7 @@ describe('ending, endgame, copied: экран концовки и её хвос�
     const { game } = makeGame()
     game.S.arcs.samvel = { i: 8, last: 0 }
     game.S.mem['finale.samvel'] = 'groom'
-    game.S.day = 320
+    game.S.day = ENDING_MIN_DAY
     await game.fire('CheckEnding')
     const ending = goals().find(([n]) => n === 'ending')
     expect(ending).toEqual(['ending', { id: 'family' }])

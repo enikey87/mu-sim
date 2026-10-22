@@ -6,6 +6,7 @@ import { type Criterion, type Entry, is, gte, lte, eq, set, gate, missing } from
 import type { Episode } from './arcs'
 import { needs, meet } from './world'
 import { HEAT, caughtCount, count, court, garikConcrete, grantPaid, houseOnGarik, internAt, internDeclined, intro, karineKnowsDebt, nivaAway, nivaPlayer, paydayScene, rubikFined, tileCornerRemoved, vendetta, wedding, endgame } from './memkeys'
+import { PAYDAY_HARD_DAY } from './rules/payday'
 
 export interface Finale extends Episode {
   id: string
@@ -224,8 +225,12 @@ export interface Ending {
   inEndgame?: boolean
 }
 
-// концовка — развязка, а не начало: не раньше конца второго акта (~300-й день)
-const late = gte('day', 300)
+// концовка — развязка, а не начало: не раньше границы третьего акта (#1254), а не «первого дня готовности».
+// Третий акт открывается за ~100 дней до Дня выплаты — там же, где может зазвучать подводка `Beat_PaydayLead_First`
+// (#893): финал, сыгранный в конце второго акта, не врывается концовкой назавтра, а ждёт, пока партия дойдёт
+// до места, где линии сходятся. Срок Дня выплаты — один, `PAYDAY_HARD_DAY` (#1119): второй копии числа нет.
+export const ENDING_MIN_DAY = PAYDAY_HARD_DAY - 100
+const late = gte('day', ENDING_MIN_DAY)
 
 export const ENDINGS: Ending[] = [
   {
