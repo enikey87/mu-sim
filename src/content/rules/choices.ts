@@ -12,7 +12,7 @@ import { GROUP_Q } from '../misc'
 import { P_LIE } from '../lies'
 import { TOPICS } from '../topics'
 import { P_CREW_PAID, CREW_FRESH_TURNS } from '../crew'
-import { MONEY_ASK, moneyPlaceOf } from '../money-ask'
+import { MONEY_ASK, moneyPlaceOf, moneyAskOwn } from '../money-ask'
 import { P_HOLIDAY, holidayBefore, type Holiday } from '../holidays'
 import { WORLD, SPEAKS } from '../world'
 import { fmtDayMonth, fmtDays } from '../../engine/time'
@@ -23,7 +23,7 @@ import {
   STRASBOURG_THREAT,
   P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE,
   P_CREW_CALL, P_LAWYER, P_COLLECTORS_ASK, P_INTERN, P_HOLE, P_COUNTERSUIT,
-  P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_BORIS, P_DEBUT_NIVA, P_NUNE_DEBUT, P_DEBUT_GRANT, P_GRANT_TILE, P_MOUSTACHE_PHOTO, P_MAMA_MARKET, P_TILE_AD, P_TAMADA_DONE, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_COURT_VERDICT, P_TILE_SLIP, P_SOLD, P_GRANT_HOUSE,
+  P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_BORIS, P_DEBUT_NIVA, P_NUNE_DEBUT, P_DEBUT_GRANT, P_GRANT_TILE, P_MOUSTACHE_PHOTO, P_MAMA_MARKET, P_TILE_AD, P_TAMADA_DONE, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_COURT_VERDICT, P_TILE_SLIP, P_SOLD, P_GRANT_HOUSE, P_BORIS_MEMORY,
 } from './player-choice-pools'
 
 type R = Rule<ContentApi, GameEvent, Offer>
@@ -230,6 +230,9 @@ export const choiceRules: R[] = [
   // финал квеста-тамады (#1222): узел `yes` квеста `q_tamada` — заметное событие, отклик в окне события
   // (ход и три после). bonus 5: рядом стоят вопросы общего блока — реакция должна попасть в слот
   offer({ name: 'TamadaDone', when: [is('tamadaDoneFresh')], act: 'tamadaDone', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_TAMADA_DONE', P_TAMADA_DONE) }),
+  // вопрос о баране по памяти партии (#1252): Turn_Memory спрашивает «Всё ещё у тебя?» — отклик в окне
+  // события (ход вопроса и три после). bonus 5: рядом стоят общие вопросы блока — реакция должна попасть в слот
+  offer({ name: 'BorisMemory', when: [is('borisAskFresh')], act: 'borisMemory', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_BORIS_MEMORY', P_BORIS_MEMORY) }),
   // голосовое-плач мамы (#1085): событие серии звонков — отклик в окне события (ход и три после).
   // bonus 5: рядом стоят извинение и мычание (6) — событийная реакция обязана попасть в блок
   offer({ name: 'MamaVoice', when: [is('mamaVoiceFresh')], act: 'mamaVoice', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_MAMA_VOICE', P_MAMA_VOICE) }),
@@ -421,12 +424,23 @@ export const choiceRules: R[] = [
   // где они сейчас. Место — из легенды (банк/фундамент/сейф/крипта/«Нива»), формулировки по месту не
   // повторяются, слот свой: тема может стоять рядом, а не вместо. Ответ — следующая реплика той же легенды
   // (`Says_money` в replies.ts), то есть вопрос ведёт сюжет денег, а не только отвечает на сказанное.
-  offer({
-    name: 'Money', slot: 'money', when: [exists('legend')], act: 'money', tone: 'neutral', bonus: 3, odds: 0.9,
-    text: (g, f) => { const place = moneyPlaceOf(f.legend); return place ? freshFromArr(g, 'MONEY_ASK_' + place, MONEY_ASK[place]) : '' },
-    topic: (_g, f) => { const place = moneyPlaceOf(f.legend); return place ? MONEY_TOPIC[place] : undefined },
-    arg: (_g, f) => String(f.legend),
-  }),
+  // У выбора со своим ответом (#1252) номер строки уезжает с arg — ответ идёт по выбранной строке, как в #1017.
+  ...(() => {
+    let arg = ''
+    return [offer({
+      name: 'Money', slot: 'money', when: [exists('legend')], act: 'money', tone: 'neutral', bonus: 3, odds: 0.9,
+      text: (g, f) => {
+        const place = moneyPlaceOf(f.legend)
+        if (!place) return ''
+        const q = freshFromArr(g, 'MONEY_ASK_' + place, MONEY_ASK[place])
+        const i = q ? MONEY_ASK[place].findIndex((e) => valueOf(e) === q) : -1
+        arg = q && i >= 0 && moneyAskOwn(place, i) ? `${String(f.legend)}|${i}` : String(f.legend ?? '')
+        return q
+      },
+      topic: (_g, f) => { const place = moneyPlaceOf(f.legend); return place ? MONEY_TOPIC[place] : undefined },
+      arg: () => arg,
+    })]
+  })(),
   // ответ по теме: игрок цепляется за то, что Алик только что сказал (после серии сериала — вопрос про сериал важнее)
   offer({
     name: 'Topic', when: [exists('ctx.topic'), missing('ctx.arc')], act: 'topic', tone: 'neutral', odds: 0.85,
