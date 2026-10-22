@@ -219,7 +219,7 @@ describe('отчаяние от бедности', () => {
       { level: 'low', ask: 'банк уже спрашивает про вас', reply: /банк.*имени/i },
       { level: 'low', ask: 'до списания. Оно не ждёт', pool: pol },
       { level: 'low', ask: 'карта худеет', pool: neu },
-      { level: 'low', ask: 'низкий остаток', pool: neu },
+      { level: 'low', ask: 'про терпение', pool: neu },
       { level: 'low', ask: 'у меня мало', pool: neu },
       { level: 'bottom', ask: 'всё ещё вежливый', pool: pol },
       { level: 'bottom', ask: 'не берёт трубку', pool: pol },
