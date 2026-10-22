@@ -15,6 +15,12 @@ export const stampMoneyPlace = (game: { applyFacts: (ops: FactOp[]) => void }, p
   game.applyFacts([set(moneyAskAt[place], sent)])
 }
 
+/** Выбор «часть дома» в пуле фундамента (#1252): у него свой отклик Алика — комната и угол.
+ *  Строка остаётся в пуле места: формулировку меняет отдельная задача рецензии, здесь только ответ. */
+export const ASK_ROOM = 'Раз дом на моих деньгах — мне должна часть дома. Хотя бы комната. Угловая.'
+/** Ответ ровно на выбор про комнату (#1252): про угол, в котором лежат те же деньги, — не генерик легенды. */
+export const REPLY_ROOM = 'Комната — пожалуйста, брат. Угловая — нет: в том углу деньги лежат, они там уже как родные. Родных не сдаю.'
+
 /** Утверждения журнала о месте денег (#981): какое утверждение какому месту отвечает. */
 const PLACE_CLAIMS: Partial<Record<ClaimKey, MoneyPlace>> = {
   money_deposit: 'bank', money_safe: 'safe', money_foundation: 'beton', money_niva: 'niva', money_crypto: 'crypto',
@@ -53,8 +59,8 @@ export const MONEY_ASK: Record<MoneyPlace, Entry<string>[]> = {
     // триггер действия, а не только вопрос о состоянии (#889): предложение достать — в духе «с перфоратором»
     'Может, всё-таки достанем деньги из фундамента?',
     stateQuestion('beton', 'Дом стоит на моих деньгах?'),
-    // живая линия бетона: доля дома, а не ещё один вопрос «где» (#920)
-    'Раз дом на моих деньгах — мне должна часть дома. Хотя бы комната. Угловая.',
+    // живая линия бетона: доля дома, а не ещё один вопрос «где» (#920); у строки свой ответ (#1252)
+    ASK_ROOM,
     stateQuestion('beton', 'Фундамент ещё целый?'),
     stateQuestion('beton', 'Под фундаментом всё лежит?'),
   ],
@@ -85,3 +91,11 @@ export const MONEY_ASK: Record<MoneyPlace, Entry<string>[]> = {
     needs('niva')(gate(is(nivaBack))(stateQuestion('niva', 'Покупатель на колёса нашёлся?'))),
   ],
 }
+
+/** Свои ответы на выбор игрока в пуле места (#1252): номер строки уезжает с `arg` оффера `Money`
+ *  (образец — ответ по выбранной строке, #1017). Место без записи отвечает легендой, как раньше. */
+export const MONEY_ASK_OWN: Partial<Record<MoneyPlace, Readonly<Record<number, string>>>> = {
+  beton: { [MONEY_ASK.beton.findIndex((e) => e === ASK_ROOM)]: REPLY_ROOM },
+}
+/** Ответ на самой строке: undefined — отвечает легенда места, как раньше (#1252). */
+export const moneyAskOwn = (place: MoneyPlace, i: number): string | undefined => MONEY_ASK_OWN[place]?.[i]

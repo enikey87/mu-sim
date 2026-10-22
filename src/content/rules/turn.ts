@@ -8,7 +8,7 @@ import { IDLE } from '../life'
 import { MEMORY } from '../memory'
 import { LEGENDS } from '../legends'
 import { moneyPlaceOf, stampMoneyPlace } from '../money-ask'
-import { count, creditBroke, endgame, payday, polite, thanksAt, vendetta, nivaPlayer, alikDead } from '../memkeys'
+import { count, creditBroke, endgame, payday, polite, thanksAt, vendetta, nivaPlayer, alikDead, borisAskAt } from '../memkeys'
 import { GREET, GREET_MORNING, GREET_NIGHT, THANKS, THANKS_THIRD } from '../misc'
 
 type R = Rule<ContentApi, GameEvent, Offer>
@@ -156,7 +156,13 @@ export const turnRules: R[] = [
         : itemLine
       const pool = gated ? [gated, ...MEMORY] : MEMORY
       const t = game.line('MEMORY', pool)
-      if (t) { await game.say([t]); game.unlock('memory') } else await game.excuseTurn()
+      if (t) {
+        // вопрос именно о баране — заметное событие с окном отклика (#1252): штампуем ход здесь,
+        // как узлы квестов штампуют свой бит; другие воспоминания окна не открывают
+        if (itemLine && /Борис/.test(item) && t === itemLine.t) game.applyFacts([set(borisAskAt, Number(facts.sent))])
+        await game.say([t])
+        game.unlock('memory')
+      } else await game.excuseTurn()
     },
   },
   // «помнишь, деньги в сейфе?» — после Дня выплаты деньги «отданы», старые версии уже не продолжаются

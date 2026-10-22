@@ -3,7 +3,7 @@
 // случайной кнопки «как там X?» по неозвученной арке больше нет.
 import { describe, it, expect } from 'vitest'
 import { makeGame } from '../test/helpers'
-import { MONEY_ASK, MONEY_PLACES, MONEY_ASK_TURNS, moneyPlaceOf, type MoneyPlace } from './money-ask'
+import { MONEY_ASK, MONEY_PLACES, MONEY_ASK_TURNS, ASK_ROOM, REPLY_ROOM, moneyPlaceOf, type MoneyPlace } from './money-ask'
 import { ARCS } from './arcs'
 import { LEGENDS } from './legends'
 import { valueOf, isOpen, Gated } from '../engine/rules'
@@ -385,5 +385,43 @@ describe('follow-пул бетона и посторонние подтверж�
     // у бита 120 есть legend beton_law: окно он штампует и без клейма, поэтому проверяем бухгалтерию лжи
     await game.playEpisode(ARCS.beton.eps[3], 'beton')
     expect(found(), 'бит «по бумагам» место не публикует').toHaveLength(1)
+  })
+})
+
+describe('выбор со своим ответом (#1252): «часть дома»', () => {
+  /** Алик сказал за ход: строки его ответов после отправки выбора. */
+  const answers = (game: Game, from: number): string[] =>
+    game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : []))
+
+  it('на выбор про комнату Алик отвечает про комнату и угол, а не генериком легенды', async () => {
+    const game = withLegend('beton_money')
+    let picked: Choice | undefined
+    // строка пула показывается не в каждом кадре: пул места рисуется по очереди (#491)
+    for (let i = 0; i < 80 && !picked; i++) {
+      const m = findMoney(frame(game))
+      if (m?.text === ASK_ROOM) picked = m
+    }
+    expect(picked, 'строка выбора не показалась — проверка пустеет').toBeDefined()
+    const from = game.S.msgs.length
+    await game.send(picked!)
+    const said = answers(game, from)
+    expect(said, `ответ не про комнату/угол: ${said.join(' | ')}`).toContain(REPLY_ROOM)
+    expect(game.S.mem['legend.id'], 'легенда места закрылась после своего ответа').toBe('beton_money')
+  })
+
+  it('другой вопрос пула по-прежнему получает легенду — свой ответ привязан к строке, не к месту', async () => {
+    const game = withLegend('beton_money')
+    const legend = LEGENDS.beton_money.lines.map((l) => { const v = valueOf(l); return typeof v === 'string' ? v : v.t })
+    let picked: Choice | undefined
+    for (let i = 0; i < 80 && !picked; i++) {
+      const m = findMoney(frame(game))
+      if (m && m.text !== ASK_ROOM) picked = m
+    }
+    expect(picked, 'строка пула не показалась — проверка пустеет').toBeDefined()
+    const from = game.S.msgs.length
+    await game.send(picked!)
+    const said = answers(game, from)
+    expect(said, `вместо легенды свой ответ: ${said.join(' | ')}`).not.toContain(REPLY_ROOM)
+    expect(said.some((t) => legend.includes(t)), `ответ не из легенды места: ${said.join(' | ')}`).toBe(true)
   })
 })
