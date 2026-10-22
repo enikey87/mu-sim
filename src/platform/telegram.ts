@@ -6,6 +6,12 @@ const SCRIPT = 'https://telegram.org/js/telegram-web-app.js'
 const INIT_MS = 8000
 
 /**
+ * Ссылка на Stars-инвойс «Чашка хаша для Алика» из `.env.telegram` (её создаёт оператор один раз в
+ * BotFather/`createInvoiceLink`); пусто — покупки в сборке нет, как пустой `VITE_YANDEX_PRODUCT_ID`.
+ */
+const invoiceUrl = (): string => String(import.meta.env.VITE_TELEGRAM_INVOICE_URL ?? '').trim()
+
+/**
  * Клиент Mini App (`window.Telegram.WebApp`). Все методы необязательны: версия клиента у игрока
  * неизвестна, старый клиент просто не имеет новых вызовов (Bot API 7.7 — свайпы, 8.0 — фуллскрин).
  */
@@ -19,6 +25,11 @@ interface TgWebApp {
   colorScheme?: string
   /** Палитра клиента (`#rrggbb`): нужна, когда `colorScheme` старый клиент не прислал. */
   themeParams?: Record<string, string>
+  /**
+   * Stars-инвойс (Bot API 6.1): окно оплаты поверх Mini App. Статус приходит в колбэк —
+   * `paid` | `cancelled` | `failed` | `pending`; у старого клиента метода нет.
+   */
+  openInvoice?(url: string, callback?: (status: string) => void): unknown
   onEvent?(event: string, listener: () => void): void
 }
 
@@ -66,6 +77,26 @@ export function telegramPlatform(deps: TelegramDeps = {}): Platform {
     } catch { /* синхронный отказ клиента — остаёмся в обычном режиме */ }
   }
 
+  /**
+   * Stars-инвойс (#1235): `openInvoice` открывает окно оплаты, итог приходит в колбэк.
+   * `paid` — деньги списаны; `cancelled`/`failed`/`pending`, старый клиент без метода и отказ
+   * клиента — `closed`: партия не меняется, а об оплате карточка не врёт.
+   */
+  const payStars = (url: string): Promise<'paid' | 'closed'> => new Promise((resolve) => {
+    const app = tg()
+    const open = app?.openInvoice
+    if (!app || !open) { resolve('closed'); return }
+    let settled = false
+    const done = (status: string) => {
+      if (settled) return // клиент может позвать колбэк дважды — итог один
+      settled = true
+      resolve(status === 'paid' ? 'paid' : 'closed')
+    }
+    try {
+      open.call(app, url, done)
+    } catch { done('failed') }
+  })
+
   const platform: Platform = {
     id: 'telegram',
     // цифровые товары в Telegram продаются только за Stars: внешней ссылки на DonationAlerts здесь нет
@@ -98,5 +129,8 @@ export function telegramPlatform(deps: TelegramDeps = {}): Platform {
     gameplayStart() {},
     gameplayStop() {},
   }
+  // инвойс-ссылки нет в конфиге — карточки покупки в сборке нет вовсе (как пустой товар Яндекса)
+  const invoice = invoiceUrl()
+  if (invoice) platform.pay50 = () => payStars(invoice)
   return platform
 }

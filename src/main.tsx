@@ -20,6 +20,7 @@ void bootPlatform().then(() => {
   const storage = safeStorage(platform().storage?.())
   const hadSave = storage?.getItem(SAVE_KEY) != null
   const newGame = () => {
+    const p = platform()
     const game = new Game({
       clock: realClock(q.has('fast') ? 0.03 : 1),
       audio: browserAudio(),
@@ -27,12 +28,13 @@ void bootPlatform().then(() => {
       away: q.has('away') ? Number(q.get('away')) : null,
       debug: q.has('debug'),
       storage,
-      externalPay: platform().externalPay,
-      joinGroup: platform().joinGroup != null,
-      pay50: platform().pay50 != null,
+      externalPay: p.externalPay,
+      joinGroup: p.joinGroup != null,
+      // где карточка «займи 50» — покупка, там имя витрины: текст карточки у Яндекса и Telegram разный
+      pay50: p.pay50 != null && (p.id === 'yandex' || p.id === 'telegram') ? p.id : undefined,
     })
     // Незакрытую покупку адаптер закрыл при старте (п. 1.13.1) — спонсорский итог выдаём партии один раз.
-    if (platform().takeSponsor?.()) game.lend50Sponsor()
+    if (p.takeSponsor?.()) game.lend50Sponsor()
     ;(window as unknown as { __alik: Game }).__alik = game // API для scripts/playtest-tech.mjs (и консоли): что он вызывает, проверяет src/tools/window-api.test.ts
     return game
   }
