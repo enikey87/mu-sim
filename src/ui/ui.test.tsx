@@ -14,7 +14,7 @@ import type { Game } from '../engine/game'
 import { introOf, uiOf } from './view'
 import { introDateLine, introVowLine, LINE_MS, FADE_MS } from './Intro'
 import { enable, GAME_HOST } from '../analytics/metrics'
-import { EPILOGUE_BANNER, LEND50_LINK, LEND50_RENAME, LEND50_SYS, LEND50_VK_SYS } from '../content/endgame'
+import { EPILOGUE_BANNER, LEND50_LINK, LEND50_RENAME, LEND50_SYS, LEND50_VK_SYS, LEND50_YA_SYS } from '../content/endgame'
 import { adoptPlatform, webPlatform } from '../platform'
 
 function renderApp(game: Game, onReset = vi.fn()) {
@@ -405,6 +405,61 @@ describe('App', () => {
     try {
       const { game } = makeGame()
       game.push({ kind: 'lend50', text: LEND50_VK_SYS, join: true })
+      renderApp(game)
+      expect(screen.queryByTestId('lend50-card')).toBeNull()
+    } finally {
+      adoptPlatform(webPlatform())
+    }
+  })
+
+  it('Яндекс: покупка без ссылки, цена от площадки, успех выдаёт спонсорское имя (#1241)', async () => {
+    const pay50 = vi.fn(async () => 'paid' as const)
+    adoptPlatform({ ...webPlatform(), externalPay: false, pay50, price50: () => '49 YAN' })
+    try {
+      const { game } = makeGame()
+      game.push({ kind: 'lend50', text: LEND50_YA_SYS, buy: true })
+      renderApp(game)
+      const card = screen.getByTestId('lend50-card')
+      expect(within(card).getByText('49 YAN'), 'цена — от площадки, а не из кода').toBeInTheDocument()
+      expect(within(card).getByText(LEND50_YA_SYS)).toBeInTheDocument()
+      expect(within(card).queryByRole('link'), 'внешней ссылки на площадке нет').toBeNull()
+      expect(within(card).queryByText(/donationalerts/i)).toBeNull()
+
+      await act(async () => { fireEvent.click(within(card).getByRole('button', { name: 'Купить «Чашку хаша»' })) })
+      await act(async () => { await flush() })
+      expect(pay50).toHaveBeenCalledOnce()
+      expect(game.S.mem['lend50.sponsor']).toBe(true)
+      expect(within(card).getByText('Спасибо! Оплата прошла')).toBeInTheDocument()
+      expect(within(card).queryByRole('button'), 'после покупки нажимать нечего').toBeNull()
+      expect(screen.getByText(`Алик изменил название группы на «${LEND50_RENAME}»`)).toBeInTheDocument()
+    } finally {
+      adoptPlatform(webPlatform())
+    }
+  })
+
+  it('Яндекс: отказ от покупки ничего не меняет (#1241)', async () => {
+    const pay50 = vi.fn(async () => 'closed' as const)
+    adoptPlatform({ ...webPlatform(), externalPay: false, pay50, price50: () => '49 YAN' })
+    try {
+      const { game } = makeGame()
+      game.push({ kind: 'lend50', text: LEND50_YA_SYS, buy: true })
+      renderApp(game)
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Купить «Чашку хаша»' })) })
+      await act(async () => { await flush() })
+      expect(pay50).toHaveBeenCalledOnce()
+      expect(game.S.mem['lend50.sponsor']).toBeUndefined()
+      expect(screen.queryByText(`Алик изменил название группы на «${LEND50_RENAME}»`)).toBeNull()
+      expect(screen.getByRole('button', { name: 'Купить «Чашку хаша»' })).toBeInTheDocument()
+    } finally {
+      adoptPlatform(webPlatform())
+    }
+  })
+
+  it('Яндекс без цены от площадки карточку покупки не рисует (#1241, п. 1.13.4)', () => {
+    adoptPlatform({ ...webPlatform(), externalPay: false, pay50: async () => 'paid' as const, price50: () => null })
+    try {
+      const { game } = makeGame()
+      game.push({ kind: 'lend50', text: LEND50_YA_SYS, buy: true })
       renderApp(game)
       expect(screen.queryByTestId('lend50-card')).toBeNull()
     } finally {

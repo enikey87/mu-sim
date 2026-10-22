@@ -9,7 +9,7 @@ import type { Msg } from '../engine/state'
 import { uiOf, viewOf } from '../ui/view'
 import {
   ENDGAME_CHOICES, ENDGAME_GROUP, ENDGAME_INTRO, ENDGAME_OPEN, EPILOGUE_BANNER, LEND50_ASK, LEND50_ASK_AGAIN, LEND50_LINK,
-  LEND50_LOCKED, LEND50_NO, LEND50_NUNE, LEND50_RENAME, LEND50_SERIOUS, LEND50_SERIOUS_ELSE, LEND50_SYS, LEND50_VK_SYS, LEND50_YES,
+  LEND50_LOCKED, LEND50_NO, LEND50_NUNE, LEND50_RENAME, LEND50_SERIOUS, LEND50_SERIOUS_ELSE, LEND50_SYS, LEND50_VK_SYS, LEND50_YA_SYS, LEND50_YES,
 } from './endgame'
 
 const texts = (g: Game, from = 0) => g.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' || m.kind === 'sys' ? [m.text] : []))
@@ -436,6 +436,23 @@ describe('«Займи 50»', () => {
     expect(sysTexts(game, at).filter((t) => t.includes(LEND50_RENAME))).toHaveLength(1)
     expect(game.S.mem['lend50.sponsor']).toBe(true)
     expect(game.S.mem['endgame.renames']).toBe(1)
+  })
+
+  it('Яндекс: карточка покупки вместо ссылки, спонсорское имя по успеху (#1241)', async () => {
+    const { game } = makeGame({ externalPay: false, pay50: true })
+    const from = await enter(game)
+    const card = cards(game, from)[0]
+    expect(card).toMatchObject({ text: LEND50_YA_SYS, buy: true })
+    expect(card.link, 'внешней ссылки на площадке нет').toBeUndefined()
+    expect(JSON.stringify(game.S.msgs.slice(from))).not.toContain('donationalerts')
+    expect(game.S.mem['lend50.answer'], 'покупка — не ответ на шутку').toBeUndefined()
+    expect(game.choices.map((c) => c.act)).toEqual(['lend50Yes', 'lend50Serious', 'lend50No'])
+
+    const at = game.S.msgs.length
+    game.lend50Sponsor()
+    expect(sysTexts(game, at)).toContain(`Алик изменил название группы на «${LEND50_RENAME}»`)
+    expect(game.S.mem['lend50.sponsor']).toBe(true)
+    expect(game.S.mem['lend50.answer']).toBeUndefined()
   })
 
   it('ответы Алика на кнопки без опечаток (#248)', async () => {
