@@ -4,7 +4,9 @@ import { bootPlatform, platform } from './index'
 import { yandexPlatform } from './yandex'
 import { vkPlatform } from './vk'
 import { safeStorage } from './storage'
-import { makeGame } from '../test/helpers'
+import { makeGame, flush } from '../test/helpers'
+import { SAVE_KEY } from '../engine/state'
+import { SYNC_KEY } from './cloud'
 
 const send = vi.hoisted(() => vi.fn())
 vi.mock('@vkontakte/vk-bridge', () => ({ default: { send } }))
@@ -112,6 +114,38 @@ describe('адаптер витрины (#688)', () => {
     vi.doUnmock('./yandex')
     vi.unstubAllEnvs()
     vi.resetModules()
+  })
+
+  it('яндекс: прогресс читается из player data и уходит туда же (#1240)', async () => {
+    const setData = vi.fn(async () => {})
+    const getPlayer = vi.fn(async () => ({
+      getData: async () => ({ [SAVE_KEY]: '{"msgs":[{"text":"с телефона"}]}', [SYNC_KEY]: JSON.stringify({ at: 1000, device: 'phone' }) }),
+      setData,
+    }))
+    const p = yandexPlatform({ load: async () => {}, ya: () => ({ init: async () => ({ getPlayer }) }) })
+    await p.init()
+    const store = p.storage?.()
+    if (!store) throw new Error('у витрины нет хранилища прогресса')
+
+    expect(getPlayer, 'player data без профиля: у неавторизованного игрока она живёт на устройстве').toHaveBeenCalledWith({ scopes: false })
+    expect(store.getItem(SAVE_KEY), 'прогресс с другого устройства виден до первого хода').toContain('с телефона')
+
+    store.setItem(SAVE_KEY, '{"msgs":[{"text":"с ноутбука"}]}')
+    await flush()
+    expect(setData).toHaveBeenCalledWith(expect.objectContaining({ [SAVE_KEY]: '{"msgs":[{"text":"с ноутбука"}]}' }), true)
+  })
+
+  it('яндекс: без player data хранилище локальное, партия идёт', async () => {
+    const p = yandexPlatform({ load: async () => {}, ya: () => ({ init: async () => ({}) }) })
+    await p.init()
+    const store = p.storage?.()
+    if (!store) throw new Error('у витрины нет хранилища прогресса')
+    localStorage.setItem(SAVE_KEY, '{"msgs":[{"text":"локальная"}]}')
+
+    expect(store.getItem(SAVE_KEY)).toContain('локальная')
+    store.setItem(SAVE_KEY, '{"msgs":[{"text":"новая"}]}')
+    expect(localStorage.getItem(SAVE_KEY), 'локальная копия пишется всегда').toContain('новая')
+    localStorage.clear()
   })
 
   it('бросающий storage не роняет старт партии', () => {
