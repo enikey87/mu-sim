@@ -49,7 +49,7 @@ const MONEY_REPLY_POOLS = [
 const hasMoneyBottom = (e: unknown): e is Gated<string> =>
   e instanceof Gated && e.when.some((c) => c.key === 'moneyBottom' && c.op === '==' && c.value === true)
 const bottomReplies = (pool: readonly unknown[]): string[] =>
-  pool.filter(hasMoneyBottom).map((e) => valueOf(e))
+  pool.filter(hasMoneyBottom).map((e) => poolText(e))
 const BOTTOM_REPLIES = MONEY_REPLY_POOLS.flatMap(([, pool]) => bottomReplies(pool))
 const choiceWith = (game: Game, text: string): Choice => {
   for (let i = 0; i < 160; i++) {
@@ -290,7 +290,7 @@ describe('отчаяние от бедности', () => {
   })
 
   it('вежливый режим Алика отвечает на деньги голосом регламента (#480)', async () => {
-    const regiment = new Set(MONEY_REPLY_REGIMENT.map(valueOf))
+    const regiment = new Set(MONEY_REPLY_REGIMENT.map((e) => poolText(e)))
     const shout = new Set(DESPERATE_REPLY.map(valueOf))
     const game = makeGame({ seed: 7 }).game
     setMoney(game, Game.MONEY_BOTTOM)

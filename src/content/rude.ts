@@ -2,7 +2,7 @@
 import { type Line, type Entry, is, eq, gate, missing, during, set } from './fact'
 import { type ClaimKey } from './ids'
 import { needs } from './world'
-import { arsenTrack, bathAsked, met, phoneKarine, threatClaim } from './memkeys'
+import { arsenTrack, bathAsked, met, phoneKarine, saidRegiment, threatClaim } from './memkeys'
 // Реплика участника: [кто, текст]; кто — ключ CAST. Текст может нести явную семантику (claims, #426).
 export type Said = readonly [string, string | { t: string; claims: ClaimKey[] }]
 
@@ -130,11 +130,11 @@ export const POLITE_TURN = [
   'Доброе утро! Сообщаем, что Ваш долг по-прежнему существует. Он в надёжных руках. В моих.',
   'Пожалуйста, оцените качество обслуживания от 1 до 5. Оценки ниже 5 рассматриваются как крик.',
 ]
-export const POLITE_RUDE = [
+export const POLITE_RUDE: Line[] = [
   'Ваш крик зарегистрирован под номером 0048. Благодарим за обратную связь. Мы стали на 1% лучше.',
   'Уважаемый Плиточник, мы видим, что Вы расстроены. Предлагаем Вам стакан воды. Воду не прикладываем.',
-  'Согласно регламенту, крик не является способом оплаты. Как и ожидание. Как и всё остальное.',
-  'Ответ в рамках регламента: «Сам такой». С уважением.',
+  { t: 'Согласно регламенту, крик не является способом оплаты. Как и ожидание. Как и всё остальное.', remember: [set(saidRegiment, true)] },
+  { t: 'Ответ в рамках регламента: «Сам такой». С уважением.', remember: [set(saidRegiment, true)] },
 ]
 
 // финал · вендетта
