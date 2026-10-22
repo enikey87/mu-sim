@@ -1,4 +1,4 @@
-import { memo, useRef, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { memo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import type { Msg } from '../engine/state'
 import { useGame, useGameApi } from './useGame'
 import { PhotoSvg } from './PhotoSvg'
@@ -103,7 +103,11 @@ export const Message = memo(function Message({ m }: { m: Msg }) {
   const press = usePressToCopy(copyable, game, annotate)
   if (m.kind === 'sep') return <div className="sep">{m.text}</div>
   if (m.kind === 'sys') return <div className={'sys' + (m.unread ? ' unread' : '')}>{linkified(m.text)}</div>
-  if (m.kind === 'lend50') return platform().externalPay ? <Lend50Card m={m} /> : null
+  if (m.kind === 'lend50') {
+    // двойная защита, как в движке: ссылку рисует только веб, вступление — только площадка с мостом
+    if (m.join) return platform().joinGroup ? <Lend50JoinCard m={m} /> : null
+    return platform().externalPay && m.link ? <Lend50Card m={m} link={m.link} /> : null
+  }
   if (m.kind === 'card') return <PhoneCard m={m} />
 
   const cls = ['msg', m.from]
@@ -134,13 +138,35 @@ export const Message = memo(function Message({ m }: { m: Msg }) {
 
 /** Честная просьба поддержать автора: одна карточка в цвете перевода, кнопка-ссылка вместо голого адреса (#616).
  *  Текст — голос игры (не пузырь Алика), сумма — крупно, как в переводе; адрес видно мелким текстом. */
-function Lend50Card({ m }: { m: Extract<Msg, { kind: 'lend50' }> }) {
+function Lend50Card({ m, link }: { m: Extract<Msg, { kind: 'lend50' }>; link: string }) {
   return (
     <div className="lend50 transfer" data-testid="lend50-card">
       <div className="sum">50 ₽</div>
       <div>{m.text}</div>
-      <a className="lend50-btn" href={m.link} target="_blank" rel="noopener">Перевести</a>
-      <div className="lend50-url">{m.link}</div>
+      <a className="lend50-btn" href={link} target="_blank" rel="noopener">Перевести</a>
+      <div className="lend50-url">{link}</div>
+    </div>
+  )
+}
+
+/** VK: внешние платежи запрещены, поэтому кнопка карточки — вступление в сообщество игры (#1239).
+ *  Успех засчитывает спонсорское имя группы; отказ и отсутствие моста не меняют ничего. */
+function Lend50JoinCard({ m }: { m: Extract<Msg, { kind: 'lend50' }> }) {
+  const game = useGame()
+  const [joined, setJoined] = useState(false)
+  const busy = game.ui.busy || game.battery.dead
+  const join = async () => {
+    if (!(await platform().joinGroup?.())) return
+    setJoined(true)
+    game.lend50Sponsor()
+  }
+  return (
+    <div className="lend50 transfer" data-testid="lend50-card">
+      <div className="sum">50 ₽</div>
+      <div>{m.text}</div>
+      {joined
+        ? <div className="lend50-joined">Вы в сообществе игры</div>
+        : <button className="lend50-btn" disabled={busy} onClick={() => void join()}>Вступить в сообщество игры</button>}
     </div>
   )
 }

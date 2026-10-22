@@ -1,8 +1,12 @@
 import bridge from '@vkontakte/vk-bridge'
 import type { Platform } from './types'
 
+/** id официального сообщества игры из `.env.vk`; пусто или не число — сообщества в этой сборке нет. */
+const groupId = (): number => Number(String(import.meta.env.VITE_VK_GROUP_ID ?? '').trim())
+
 export function vkPlatform(): Platform {
-  return {
+  const id = groupId()
+  const platform: Platform = {
     id: 'vk',
     externalPay: false,
     async init() {
@@ -19,4 +23,15 @@ export function vkPlatform(): Platform {
     gameplayStart() {},
     gameplayStop() {},
   }
+  // кнопки вступления нет, пока оператор не завёл сообщество и не дал его id: пустая кнопка хуже отсутствия
+  if (Number.isInteger(id) && id > 0) {
+    // Вступление опционально: отказ или отсутствие моста — `false`, игра идёт дальше (п. 2.6.1).
+    platform.joinGroup = async () => {
+      try {
+        await bridge.send('VKWebAppJoinGroup', { group_id: id })
+        return true
+      } catch { return false }
+    }
+  }
+  return platform
 }

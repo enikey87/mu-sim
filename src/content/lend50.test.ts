@@ -9,7 +9,7 @@ import type { Msg } from '../engine/state'
 import { uiOf, viewOf } from '../ui/view'
 import {
   ENDGAME_CHOICES, ENDGAME_GROUP, ENDGAME_INTRO, ENDGAME_OPEN, EPILOGUE_BANNER, LEND50_ASK, LEND50_ASK_AGAIN, LEND50_LINK,
-  LEND50_LOCKED, LEND50_NO, LEND50_NUNE, LEND50_RENAME, LEND50_SERIOUS, LEND50_SERIOUS_ELSE, LEND50_SYS, LEND50_YES,
+  LEND50_LOCKED, LEND50_NO, LEND50_NUNE, LEND50_RENAME, LEND50_SERIOUS, LEND50_SERIOUS_ELSE, LEND50_SYS, LEND50_VK_SYS, LEND50_YES,
 } from './endgame'
 
 const texts = (g: Game, from = 0) => g.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' || m.kind === 'sys' ? [m.text] : []))
@@ -399,6 +399,43 @@ describe('«Займи 50»', () => {
     const webFrom = await enter(web.game)
     expect(cards(web.game, webFrom)).toHaveLength(1)
     expect(cards(web.game, webFrom)[0]).toMatchObject({ text: LEND50_SYS, link: LEND50_LINK })
+  })
+
+  it('VK: карточка без ссылки ведёт в сообщество, вступление выдаёт спонсорское имя (#1239)', async () => {
+    const { game } = makeGame({ externalPay: false, joinGroup: true })
+    const from = await enter(game)
+    const card = cards(game, from)[0]
+    expect(card).toMatchObject({ text: LEND50_VK_SYS, join: true })
+    expect(card.link, 'на витрине внешней ссылки нет').toBeUndefined()
+    expect(JSON.stringify(game.S.msgs.slice(from))).not.toContain('donationalerts')
+    expect(game.S.mem['lend50.answer'], 'вступление — не ответ на шутку').toBeUndefined()
+    expect(game.choices.map((c) => c.act)).toEqual(['lend50Yes', 'lend50Serious', 'lend50No'])
+
+    const at = game.S.msgs.length
+    game.lend50Sponsor()
+    expect(sysTexts(game, at)).toContain(`Алик изменил название группы на «${LEND50_RENAME}»`)
+    expect(game.S.mem['lend50.sponsor']).toBe(true)
+    expect(game.S.mem['endgame.renames']).toBe(1)
+    expect(game.S.mem['lend50.answer']).toBeUndefined()
+
+    // повторное вступление и ответ «Перевёл» спонсорского имени не дублируют
+    game.lend50Sponsor()
+    await pick(game, 'lend50Yes')
+    expect(texts(game, at).filter((t) => t.includes(LEND50_RENAME))).toHaveLength(1)
+    expect(game.S.mem['lend50.answer']).toBe('yes')
+  })
+
+  it('VK: ответ «Перевёл» раньше вступления — второго переименования нет (#1239)', async () => {
+    const { game } = makeGame({ externalPay: false, joinGroup: true })
+    const from = await enter(game)
+    const at = game.S.msgs.length
+    await pick(game, 'lend50Yes')
+    expect(texts(game, from).filter((t) => t.includes(LEND50_RENAME))).toHaveLength(1)
+
+    game.lend50Sponsor()
+    expect(sysTexts(game, at).filter((t) => t.includes(LEND50_RENAME))).toHaveLength(1)
+    expect(game.S.mem['lend50.sponsor']).toBe(true)
+    expect(game.S.mem['endgame.renames']).toBe(1)
   })
 
   it('ответы Алика на кнопки без опечаток (#248)', async () => {

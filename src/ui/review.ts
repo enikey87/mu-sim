@@ -124,7 +124,7 @@ export function reviewLine(m: Msg, nameOf: (who?: string) => string): string {
       const btns = m.offer ? ` [кнопки: ${[m.offer.take, m.offer.sell, 'Не сейчас'].filter(Boolean).join(' / ')}]` : ''
       return `(карточка в ленте: ${m.icon} ${m.app} — ${[m.text, ...(m.lines ?? [])].join(' · ')}${btns}${m.result ? ` → ${m.result}` : ''})`
     }
-    case 'lend50': return `${t}(карточка просьбы: 50 ₽ — ${m.text} → Перевести: ${m.link})`
+    case 'lend50': return `${t}(карточка просьбы: 50 ₽ — ${m.text} → ${m.join ? 'Вступить в сообщество игры' : `Перевести: ${m.link ?? '—'}`})`
   }
 }
 

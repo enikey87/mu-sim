@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { bootPlatform, platform } from './index'
 import { yandexPlatform } from './yandex'
+import { webPlatform } from './web'
 import { vkPlatform } from './vk'
 import { safeStorage } from './storage'
 import { makeGame, flush } from '../test/helpers'
@@ -84,6 +85,29 @@ describe('адаптер витрины (#688)', () => {
     expect(send).toHaveBeenCalledWith('VKWebAppInit')
     send.mockRejectedValue(new Error('no parent'))
     await expect(vkPlatform().init()).resolves.toBeUndefined()
+  })
+
+  it('VK: вступление в сообщество уходит мостом с group_id из конфига (#1239)', async () => {
+    vi.stubEnv('VITE_VK_GROUP_ID', '215848333')
+    send.mockClear()
+    try {
+      send.mockResolvedValue({ access: 1 })
+      await expect(vkPlatform().joinGroup?.()).resolves.toBe(true)
+      expect(send, 'group_id — числом: мост не принимает строку').toHaveBeenCalledWith('VKWebAppJoinGroup', { group_id: 215848333 })
+
+      send.mockRejectedValue(new Error('User denied'))
+      await expect(vkPlatform().joinGroup?.()).resolves.toBe(false)
+    } finally { vi.unstubAllEnvs() }
+    expect(webPlatform().joinGroup, 'у веба карточка остаётся ссылкой').toBeUndefined()
+  })
+
+  it('VK: без group_id вступления в сборке нет и мост молчит (#1239)', async () => {
+    vi.stubEnv('VITE_VK_GROUP_ID', '')
+    try {
+      send.mockClear()
+      expect(vkPlatform().joinGroup, 'пустой id — карточки-кнопки на VK нет').toBeUndefined()
+      expect(send).not.toHaveBeenCalled()
+    } finally { vi.unstubAllEnvs() }
   })
 
   // #710: чанк адаптера грузится динамическим import — его сбой уносил рендер корня (белый экран).

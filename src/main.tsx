@@ -28,6 +28,7 @@ void bootPlatform().then(() => {
       debug: q.has('debug'),
       storage,
       externalPay: platform().externalPay,
+      joinGroup: platform().joinGroup != null,
     })
     ;(window as unknown as { __alik: Game }).__alik = game // API для scripts/playtest-tech.mjs (и консоли): что он вызывает, проверяет src/tools/window-api.test.ts
     return game
