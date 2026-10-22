@@ -110,6 +110,125 @@ describe('адаптер витрины (#688)', () => {
     } finally { vi.unstubAllEnvs() }
   })
 
+  it('яндекс: покупка lend50 по ID из конфига, консумирование на успехе, цена из каталога (#1241)', async () => {
+    vi.stubEnv('VITE_YANDEX_PRODUCT_ID', 'hash-cup')
+    try {
+      const consumePurchase = vi.fn(async (_token: string) => {})
+      const purchase = vi.fn(async (_opts: { id: string }) => ({ productID: 'hash-cup', purchaseToken: 'tok-1' }))
+      const p = yandexPlatform({
+        load: async () => {},
+        ya: () => ({ init: async () => ({
+          deviceInfo: { type: 'desktop' },
+          getPayments: async () => ({
+            purchase,
+            consumePurchase,
+            getPurchases: async () => [],
+            getCatalog: async () => [{ id: 'hash-cup', price: '49 YAN' }],
+          }),
+        }) }),
+      })
+      await p.init()
+      expect(p.takeSponsor?.(), 'покупок не было — итога нет').toBe(false)
+      expect(p.price50?.(), 'цена — из каталога площадки в портальной валюте (п. 1.13.4)').toBe('49 YAN')
+      await expect(p.pay50?.()).resolves.toBe('paid')
+      expect(purchase, 'ID товара — из конфига, не из кода').toHaveBeenCalledWith({ id: 'hash-cup' })
+      expect(consumePurchase, 'успешная покупка закрывается консумированием (п. 1.13.1)').toHaveBeenCalledWith('tok-1')
+
+      purchase.mockRejectedValueOnce(new Error('closed by player'))
+      await expect(p.pay50?.(), 'окно закрыто — партия ничего не получает').resolves.toBe('closed')
+    } finally { vi.unstubAllEnvs() }
+  })
+
+  it('яндекс: незакрытая покупка закрывается при старте и даёт спонсорский итог один раз (#1241, п. 1.13.1)', async () => {
+    vi.stubEnv('VITE_YANDEX_PRODUCT_ID', 'hash-cup')
+    try {
+      const consumePurchase = vi.fn(async (_token: string) => {})
+      const p = yandexPlatform({
+        load: async () => {},
+        ya: () => ({ init: async () => ({
+          deviceInfo: { type: 'desktop' },
+          getPayments: async () => ({
+            purchase: async () => ({ productID: 'hash-cup', purchaseToken: 'new' }),
+            consumePurchase,
+            getPurchases: async () => [
+              { productID: 'hash-cup', purchaseToken: 'tok-open' },
+              { productID: 'other-game-item', purchaseToken: 'tok-foreign' },
+            ],
+            getCatalog: async () => [{ id: 'hash-cup', price: '49 YAN' }],
+          }),
+        }) }),
+      })
+      await p.init()
+      expect(consumePurchase, 'незакрытый платёж закрыт при старте').toHaveBeenCalledWith('tok-open')
+      expect(consumePurchase, 'чужой товар — не наш платёж').not.toHaveBeenCalledWith('tok-foreign')
+      expect(p.takeSponsor?.(), 'первая партия после покупки получает итог').toBe(true)
+      expect(p.takeSponsor?.(), 'итог выдаётся один раз').toBe(false)
+    } finally { vi.unstubAllEnvs() }
+  })
+
+  it('яндекс: консумирование сорвалось — итог не выдаём, платёж остаётся на следующий старт (#1241)', async () => {
+    vi.stubEnv('VITE_YANDEX_PRODUCT_ID', 'hash-cup')
+    try {
+      const p = yandexPlatform({
+        load: async () => {},
+        ya: () => ({ init: async () => ({
+          getPayments: async () => ({
+            purchase: async () => ({ productID: 'hash-cup', purchaseToken: 'x' }),
+            consumePurchase: async () => { throw new Error('PAYMENT_FAILURE') },
+            getPurchases: async () => [{ productID: 'hash-cup', purchaseToken: 'tok-open' }],
+            getCatalog: async () => [{ id: 'hash-cup', price: '49 YAN' }],
+          }),
+        }) }),
+      })
+      await expect(p.init()).resolves.toBeUndefined()
+      expect(p.takeSponsor?.(), 'платёж не закрыт — итог не засчитан').toBe(false)
+    } finally { vi.unstubAllEnvs() }
+  })
+
+  it('яндекс: на ТВ покупки нет, незакрытый платёж всё равно закрывается (#1241, п. 1.6.3.4)', async () => {
+    vi.stubEnv('VITE_YANDEX_PRODUCT_ID', 'hash-cup')
+    try {
+      const consumePurchase = vi.fn(async (_token: string) => {})
+      const p = yandexPlatform({
+        load: async () => {},
+        ya: () => ({ init: async () => ({
+          deviceInfo: { type: 'tv' },
+          getPayments: async () => ({
+            purchase: async () => ({ productID: 'hash-cup', purchaseToken: 'x' }),
+            consumePurchase,
+            getPurchases: async () => [{ productID: 'hash-cup', purchaseToken: 'tv-open' }],
+            getCatalog: async () => [{ id: 'hash-cup', price: '49 YAN' }],
+          }),
+        }) }),
+      })
+      await p.init()
+      expect(p.pay50, 'инап-покупки на ТВ запрещены — кнопки нет').toBeUndefined()
+      expect(p.price50, 'цены без кнопки не показываем').toBeUndefined()
+      expect(consumePurchase, 'закрытие платежа от устройства не зависит').toHaveBeenCalledWith('tv-open')
+    } finally { vi.unstubAllEnvs() }
+  })
+
+  it('яндекс: без ID товара и без SDK платежей покупки в сборке нет (#1241)', async () => {
+    vi.stubEnv('VITE_YANDEX_PRODUCT_ID', '')
+    try {
+      const getPayments = vi.fn(async () => ({ purchase: vi.fn(), getCatalog: vi.fn(async () => []) }))
+      const p = yandexPlatform({ load: async () => {}, ya: () => ({ init: async () => ({ getPayments }) }) })
+      await p.init()
+      expect(getPayments, 'товара нет — платежи не трогаем').not.toHaveBeenCalled()
+      expect(p.pay50).toBeUndefined()
+    } finally { vi.unstubAllEnvs() }
+
+    vi.stubEnv('VITE_YANDEX_PRODUCT_ID', 'hash-cup')
+    try {
+      const p = yandexPlatform({
+        load: async () => {},
+        ya: () => ({ init: async () => ({ getPayments: async () => { throw new Error('PAYMENT_FAILURE') } }) }),
+      })
+      await expect(p.init(), 'отказ платежей не роняет старт').resolves.toBeUndefined()
+      expect(p.pay50).toBeUndefined()
+    } finally { vi.unstubAllEnvs() }
+  })
+
   // #710: чанк адаптера грузится динамическим import — его сбой уносил рендер корня (белый экран).
   // Фолбэк молчаливый, как у отказа SDK внутри адаптера.
   it('недогруз чанка адаптера — игра всё равно стартует, на веб-адаптере', async () => {

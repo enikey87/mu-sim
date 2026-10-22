@@ -29,7 +29,10 @@ void bootPlatform().then(() => {
       storage,
       externalPay: platform().externalPay,
       joinGroup: platform().joinGroup != null,
+      pay50: platform().pay50 != null,
     })
+    // Незакрытую покупку адаптер закрыл при старте (п. 1.13.1) — спонсорский итог выдаём партии один раз.
+    if (platform().takeSponsor?.()) game.lend50Sponsor()
     ;(window as unknown as { __alik: Game }).__alik = game // API для scripts/playtest-tech.mjs (и консоли): что он вызывает, проверяет src/tools/window-api.test.ts
     return game
   }

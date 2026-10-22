@@ -104,8 +104,10 @@ export const Message = memo(function Message({ m }: { m: Msg }) {
   if (m.kind === 'sep') return <div className="sep">{m.text}</div>
   if (m.kind === 'sys') return <div className={'sys' + (m.unread ? ' unread' : '')}>{linkified(m.text)}</div>
   if (m.kind === 'lend50') {
-    // двойная защита, как в движке: ссылку рисует только веб, вступление — только площадка с мостом
+    // двойная защита, как в движке: ссылку рисует только веб, вступление — только площадка с мостом,
+    // покупку — только площадка с товаром и ценой (#688, #1239, #1241)
     if (m.join) return platform().joinGroup ? <Lend50JoinCard m={m} /> : null
+    if (m.buy) return platform().pay50 ? <Lend50BuyCard m={m} /> : null
     return platform().externalPay && m.link ? <Lend50Card m={m} link={m.link} /> : null
   }
   if (m.kind === 'card') return <PhoneCard m={m} />
@@ -167,6 +169,31 @@ function Lend50JoinCard({ m }: { m: Extract<Msg, { kind: 'lend50' }> }) {
       {joined
         ? <div className="lend50-joined">Вы в сообществе игры</div>
         : <button className="lend50-btn" disabled={busy} onClick={() => void join()}>Вступить в сообщество игры</button>}
+    </div>
+  )
+}
+
+/** Яндекс Игры: деньги принимает только SDK площадки (п. 1.4), поэтому кнопка — инап-покупка (#1241).
+ *  Цена — из каталога SDK в портальной валюте (п. 1.13.4): без неё кнопку не рисуем. Успех покупки
+ *  засчитывает спонсорское имя группы, отказ не меняет ничего. */
+function Lend50BuyCard({ m }: { m: Extract<Msg, { kind: 'lend50' }> }) {
+  const game = useGame()
+  const [paid, setPaid] = useState(false)
+  const price = platform().price50?.()
+  const busy = game.ui.busy || game.battery.dead
+  if (!price) return null
+  const buy = async () => {
+    if (await platform().pay50?.() !== 'paid') return
+    setPaid(true)
+    game.lend50Sponsor()
+  }
+  return (
+    <div className="lend50 transfer" data-testid="lend50-card">
+      <div className="sum">{price}</div>
+      <div>{m.text}</div>
+      {paid
+        ? <div className="lend50-joined">Спасибо! Оплата прошла</div>
+        : <button className="lend50-btn" disabled={busy} onClick={() => void buy()}>Купить «Чашку хаша»</button>}
     </div>
   )
 }
