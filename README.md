@@ -40,6 +40,8 @@ PLAYTEST_OUT=pt PLAYTEST_SEEDS=1-8 PLAYTEST_TURNS=300 npm run playtest  # пар
 
 CI (`.github/workflows/pages.yml`): `tests`, `coverage` и `e2e` параллельно; обязательный чек `build` зелёный, когда зелёны все три. PR, где каждый файл — `*.md` или `docs/*`, эти три job'а пропускает (остаются `changes` и `build`).
 
+Аналитика в прод-сборке включается переменными репозитория `VITE_METRIKA_COUNTER`, `VITE_POSTHOG_KEY`, `VITE_UMAMI_WEBSITE_ID` (Settings → Secrets and variables → Actions → Variables; что это и где взять — таблица в [docs/design/analytics.md](docs/design/analytics.md)). В репозитории значений нет: сборка зелёная, приёмники молчат.
+
 Параметры адреса для проверки: `?fast` — паузы в ~30 раз короче, `?hour=3` — подменить реальный час, `?away=90` — «игрока не было 90 минут», `?debug` — панель «какое правило выбрано и почему» и память Алика.
 
 `typescript` в deps — API 6.x для ESLint (`typescript-eslint` пока не умеет TS 7); компиляция — `typescript-7` (`npm run typecheck`).
@@ -75,7 +77,7 @@ src/
             view.ts — единственный вход к состоянию: фасад GameUi (без S) и плоский снимок для показа
             (S, memkeys и контент-константы не покидают его; страж импортов и фасада — view.test.ts;
             исключения — корень App.tsx и DebugPanel)
-  analytics/ счётчик Яндекс Метрики: track() с закрытым типом целей, пока номер пуст — молчит (#611)
+  analytics/ приёмники Метрики, PostHog и Umami: track() с закрытым типом целей; ключи — переменные сборки, пусто — молчат (#611, #1258)
   platform/ адаптер витрины: web (нулевой), Яндекс Игры, VK, Telegram Mini App; см. docs/platforms.md
   test/     помощники и большая симуляция
   tools/    бот для плейтестов, отчёт по правилам, прямые случаи гейта покрытия (direct.ts)
