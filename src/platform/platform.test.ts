@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { bootPlatform, platform } from './index'
 import { yandexPlatform } from './yandex'
+import { telegramPlatform } from './telegram'
 import { webPlatform } from './web'
 import { vkPlatform } from './vk'
 import { safeStorage } from './storage'
@@ -227,6 +228,50 @@ describe('адаптер витрины (#688)', () => {
       await expect(p.init(), 'отказ платежей не роняет старт').resolves.toBeUndefined()
       expect(p.pay50).toBeUndefined()
     } finally { vi.unstubAllEnvs() }
+  })
+
+  it('Telegram: Stars-инвойс из конфига, статус клиента решает оплату (#1235)', async () => {
+    vi.stubEnv('VITE_TELEGRAM_INVOICE_URL', 'https://t.me/$hash-cup')
+    const status = (s: string) => (_url: string, cb?: (status: string) => void) => { cb?.(s) }
+    try {
+      const openInvoice = vi.fn(status('paid'))
+      ;(window as unknown as { Telegram?: unknown }).Telegram = { WebApp: { openInvoice } }
+      const p = telegramPlatform({ load: async () => {} })
+      await p.init()
+      expect(p.externalPay, 'внешняя платёжная ссылка в Telegram запрещена').toBe(false)
+      await expect(p.pay50?.(), 'paid — деньги списаны').resolves.toBe('paid')
+      expect(openInvoice, 'ссылка инвойса — из конфига, не из кода').toHaveBeenCalledWith('https://t.me/$hash-cup', expect.any(Function))
+
+      // окно закрыто, платёж не прошёл, статус ещё висит — партия ничего не получает
+      for (const s of ['cancelled', 'failed', 'pending']) {
+        ;(window as unknown as { Telegram?: unknown }).Telegram = { WebApp: { openInvoice: vi.fn(status(s)) } }
+        await expect(telegramPlatform({ load: async () => {} }).pay50?.()).resolves.toBe('closed')
+      }
+
+      // клиент отказал на вызове — отказ не всплывает и не превращается в оплату
+      ;(window as unknown as { Telegram?: unknown }).Telegram = { WebApp: { openInvoice: () => { throw new Error('closed by client') } } }
+      await expect(telegramPlatform({ load: async () => {} }).pay50?.()).resolves.toBe('closed')
+    } finally {
+      delete (window as unknown as { Telegram?: unknown }).Telegram
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it('Telegram: без инвойса в конфиге и без openInvoice покупки нет (#1235)', async () => {
+    vi.stubEnv('VITE_TELEGRAM_INVOICE_URL', '')
+    try {
+      expect(telegramPlatform({ load: async () => {} }).pay50, 'пустой инвойс — карточки покупки нет').toBeUndefined()
+
+      vi.stubEnv('VITE_TELEGRAM_INVOICE_URL', 'https://t.me/$hash-cup')
+      // старый клиент (до Bot API 6.1) метода не знает: карточка есть, окно не открывается
+      ;(window as unknown as { Telegram?: unknown }).Telegram = { WebApp: {} }
+      const p = telegramPlatform({ load: async () => {} })
+      await p.init()
+      await expect(p.pay50?.(), 'клиент без openInvoice — оплаты нет, партия не меняется').resolves.toBe('closed')
+    } finally {
+      delete (window as unknown as { Telegram?: unknown }).Telegram
+      vi.unstubAllEnvs()
+    }
   })
 
   // #710: чанк адаптера грузится динамическим import — его сбой уносил рендер корня (белый экран).

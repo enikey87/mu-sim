@@ -14,7 +14,7 @@ import type { Game } from '../engine/game'
 import { introOf, uiOf } from './view'
 import { introDateLine, introVowLine, LINE_MS, FADE_MS } from './Intro'
 import { enable, GAME_HOST } from '../analytics/metrics'
-import { EPILOGUE_BANNER, LEND50_LINK, LEND50_RENAME, LEND50_SYS, LEND50_VK_SYS, LEND50_YA_SYS } from '../content/endgame'
+import { EPILOGUE_BANNER, LEND50_LINK, LEND50_RENAME, LEND50_SYS, LEND50_TG_SYS, LEND50_VK_SYS, LEND50_YA_SYS } from '../content/endgame'
 import { adoptPlatform, webPlatform } from '../platform'
 
 function renderApp(game: Game, onReset = vi.fn()) {
@@ -461,6 +461,68 @@ describe('App', () => {
       const { game } = makeGame()
       game.push({ kind: 'lend50', text: LEND50_YA_SYS, buy: true })
       renderApp(game)
+      expect(screen.queryByTestId('lend50-card')).toBeNull()
+    } finally {
+      adoptPlatform(webPlatform())
+    }
+  })
+
+  it('Telegram: Stars-покупка кнопкой, без ссылки, адреса и рублёвой суммы, успех выдаёт спонсорское имя (#1235)', async () => {
+    const pay50 = vi.fn(async () => 'paid' as const)
+    adoptPlatform({ ...webPlatform(), id: 'telegram', externalPay: false, pay50 })
+    try {
+      const { game } = makeGame()
+      game.push({ kind: 'lend50', text: LEND50_TG_SYS, stars: true })
+      renderApp(game)
+      const card = screen.getByTestId('lend50-card')
+      expect(within(card).getByText(LEND50_TG_SYS)).toBeInTheDocument()
+      expect(within(card).queryByRole('link'), 'внешней платёжной ссылки в Telegram нет').toBeNull()
+      expect(within(card).queryByText(/donationalerts/i)).toBeNull()
+      expect(within(card).queryByText('50 ₽'), 'платят звёздами, а не рублями — суммы в рублях на карточке нет').toBeNull()
+
+      await act(async () => { fireEvent.click(within(card).getByRole('button', { name: 'Купить «Чашку хаша»' })) })
+      await act(async () => { await flush() })
+      expect(pay50).toHaveBeenCalledOnce()
+      expect(game.S.mem['lend50.sponsor']).toBe(true)
+      expect(within(card).getByText('Спасибо! Оплата прошла')).toBeInTheDocument()
+      expect(within(card).queryByRole('button'), 'после оплаты нажимать нечего').toBeNull()
+      expect(screen.getByText(`Алик изменил название группы на «${LEND50_RENAME}»`)).toBeInTheDocument()
+    } finally {
+      adoptPlatform(webPlatform())
+    }
+  })
+
+  it('Telegram: закрытый инвойс ничего не меняет (#1235)', async () => {
+    const pay50 = vi.fn(async () => 'closed' as const)
+    adoptPlatform({ ...webPlatform(), id: 'telegram', externalPay: false, pay50 })
+    try {
+      const { game } = makeGame()
+      game.push({ kind: 'lend50', text: LEND50_TG_SYS, stars: true })
+      renderApp(game)
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Купить «Чашку хаша»' })) })
+      await act(async () => { await flush() })
+      expect(pay50).toHaveBeenCalledOnce()
+      expect(game.S.mem['lend50.sponsor']).toBeUndefined()
+      expect(screen.queryByText(`Алик изменил название группы на «${LEND50_RENAME}»`)).toBeNull()
+      expect(screen.getByRole('button', { name: 'Купить «Чашку хаша»' })).toBeInTheDocument()
+    } finally {
+      adoptPlatform(webPlatform())
+    }
+  })
+
+  it('карточка Stars-покупки рисуется только на Telegram (#1235)', () => {
+    // веб: ссылка DonationAlerts вместо Stars-покупки
+    const web = makeGame()
+    web.game.push({ kind: 'lend50', text: LEND50_TG_SYS, stars: true })
+    renderApp(web.game)
+    expect(screen.queryByTestId('lend50-card')).toBeNull()
+
+    // Яндекс умеет pay50, но это не Telegram: чужой вид карточки не рисуется
+    adoptPlatform({ ...webPlatform(), id: 'yandex', externalPay: false, pay50: async () => 'paid' as const, price50: () => '49 YAN' })
+    try {
+      const ya = makeGame()
+      ya.game.push({ kind: 'lend50', text: LEND50_TG_SYS, stars: true })
+      renderApp(ya.game)
       expect(screen.queryByTestId('lend50-card')).toBeNull()
     } finally {
       adoptPlatform(webPlatform())

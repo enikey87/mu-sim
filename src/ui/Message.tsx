@@ -105,7 +105,8 @@ export const Message = memo(function Message({ m }: { m: Msg }) {
   if (m.kind === 'sys') return <div className={'sys' + (m.unread ? ' unread' : '')}>{linkified(m.text)}</div>
   if (m.kind === 'lend50') {
     // двойная защита, как в движке: ссылку рисует только веб, вступление — только площадка с мостом,
-    // покупку — только площадка с товаром и ценой (#688, #1239, #1241)
+    // покупку — только площадка с товаром и ценой (#688, #1239, #1241), Stars — только Telegram (#1235)
+    if (m.stars) return platform().id === 'telegram' && platform().pay50 ? <Lend50StarsCard m={m} /> : null
     if (m.join) return platform().joinGroup ? <Lend50JoinCard m={m} /> : null
     if (m.buy) return platform().pay50 ? <Lend50BuyCard m={m} /> : null
     return platform().externalPay && m.link ? <Lend50Card m={m} link={m.link} /> : null
@@ -190,6 +191,28 @@ function Lend50BuyCard({ m }: { m: Extract<Msg, { kind: 'lend50' }> }) {
   return (
     <div className="lend50 transfer" data-testid="lend50-card">
       <div className="sum">{price}</div>
+      <div>{m.text}</div>
+      {paid
+        ? <div className="lend50-joined">Спасибо! Оплата прошла</div>
+        : <button className="lend50-btn" disabled={busy} onClick={() => void buy()}>Купить «Чашку хаша»</button>}
+    </div>
+  )
+}
+
+/** Telegram: цифровые товары продаются только за Stars, внешняя платёжная ссылка запрещена — карточка
+ *  открывает Stars-инвойс (`WebApp.openInvoice`, #1235). Суммы на карточке нет: её и валюту задаёт инвойс,
+ *  а не код. Успех засчитывает то же спонсорское имя группы, отказ не меняет ничего. */
+function Lend50StarsCard({ m }: { m: Extract<Msg, { kind: 'lend50' }> }) {
+  const game = useGame()
+  const [paid, setPaid] = useState(false)
+  const busy = game.ui.busy || game.battery.dead
+  const buy = async () => {
+    if (await platform().pay50?.() !== 'paid') return
+    setPaid(true)
+    game.lend50Sponsor()
+  }
+  return (
+    <div className="lend50 transfer" data-testid="lend50-card">
       <div>{m.text}</div>
       {paid
         ? <div className="lend50-joined">Спасибо! Оплата прошла</div>
