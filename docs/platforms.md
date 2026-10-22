@@ -1,4 +1,4 @@
-# Яндекс Игры и VK (мини-приложение)
+# Яндекс Игры, VK и Telegram (мини-приложения)
 
 Веб-сборка GitHub Pages не меняется: `npm run build` без `VITE_PLATFORM`. Платформенные сборки — тот же клиент с другим адаптером (`src/platform/`). Скрипты в `package.json` не добавлялись.
 
@@ -9,21 +9,24 @@ npm run typecheck
 npx vite build                         # веб, dist/
 npx vite build --mode yandex --outDir dist-yandex
 npx vite build --mode vk --outDir dist-vk
+npx vite build --mode telegram --outDir dist-telegram
 ```
 
-`--mode` читает `.env.yandex` / `.env.vk` (`VITE_PLATFORM`). В веб-бандле нет запроса к `/sdk.js` и нет пакета `@vkontakte/vk-bridge`: ветки вырезаются по константе режима.
+`--mode` читает `.env.yandex` / `.env.vk` / `.env.telegram` (`VITE_PLATFORM`). В веб-бандле нет запроса к `/sdk.js`, нет пакета `@vkontakte/vk-bridge` и нет скрипта `telegram-web-app.js`: ветки вырезаются по константе режима.
 
 Архив для Консоли Яндекса — содержимое `dist-yandex`, `index.html` в корне ZIP. В `index.html` скрипт SDK не вшит: игра грузит `/sdk.js` сама, только в режиме `yandex`.
 
 ## Что вызывает адаптер
 
-| | web | yandex | vk |
-|---|---|---|---|
-| Старт | ничего | `YaGames.init()` | `VKWebAppInit` |
-| После первого кадра | ничего | `LoadingAPI.ready()` | ничего |
-| Игрок может ходить / оверлей или вкладка скрыта | ничего | `GameplayAPI.start()` / `stop()` | ничего |
-| Карточка «займи 50» | внешняя ссылка | инап-покупка «Чашка хаша для Алика» (`payments.purchase()`) | кнопка «Вступить в сообщество игры» (`VKWebAppJoinGroup`) |
-| Прогресс | `localStorage` | облако `player data` (`getData`/`setData`), копия в `localStorage` | `localStorage` |
+| | web | yandex | vk | telegram |
+|---|---|---|---|---|
+| Старт | ничего | `YaGames.init()` | `VKWebAppInit` | `WebApp.ready()` + `expand()` |
+| Полный экран | системный | — | — | `requestFullscreen()` при поддержке; вертикальные свайпы закрыты (Bot API 7.7) |
+| После первого кадра | ничего | `LoadingAPI.ready()` | ничего | ничего |
+| Игрок может ходить / оверлей или вкладка скрыта | ничего | `GameplayAPI.start()` / `stop()` | ничего | ничего |
+| Тема | системная (`prefers-color-scheme`) | системная | системная | `WebApp.colorScheme` (`data-theme` на `:root`) |
+| Карточка «займи 50» | внешняя ссылка | инап-покупка «Чашка хаша для Алика» (`payments.purchase()`) | кнопка «Вступить в сообщество игры» (`VKWebAppJoinGroup`) | нет: внешние платежи запрещены, Stars-инвойс — #1235 |
+| Прогресс | `localStorage` | облако `player data` (`getData`/`setData`), копия в `localStorage` | `localStorage` | `localStorage` |
 
 Облачный сейв (`src/platform/cloud.ts`, #1240): игра читает прогресс синхронно, поэтому облако стоит за
 копией в памяти. `init()` Яндекса читает `getData()` до создания партии; каждая запись сначала ложится в
@@ -74,7 +77,25 @@ npx vite build --mode vk --outDir dist-vk
 ответа «Перевёл»), отказ не меняет ничего. Ответ на шутку остаётся за игроком, ачивка «Кредитор Алика» —
 по-прежнему по ответу.
 
+## Telegram Mini App (#1234)
+
+Сборка — тот же веб-клиент в WebView Telegram. Скрипт `https://telegram.org/js/telegram-web-app.js` грузит
+сам адаптер (`src/platform/telegram.ts`), и только в telegram-сборке: веб и витрины его не запрашивают.
+
+- `WebApp.ready()` и `expand()` — на старте; `disableVerticalSwipes()` (Bot API 7.7) не даёт вертикальному
+  свайпу закрыть игру посреди хода; `requestFullscreen()` (Bot API 8.0) — при поддержке и если игра ещё
+  не на весь экран. У старого клиента метода нет — вызов пропускается, старт не падает.
+- Тема: `colorScheme` клиента ставит `data-theme` на `:root` (палитры — в `styles.css`), `themeChanged`
+  переносит её на ходу. Клиент без `colorScheme` определяется по яркости `themeParams.bg_color`.
+  Системная тема WebView не важна: телефон у игрока может быть светлым, а Telegram — тёмным.
+- `externalPay: false`: внешняя платёжная ссылка (DonationAlerts) в Telegram запрещена, цифровые товары
+  продаются только за Stars. Карточки «займи 50» в этой сборке нет; Stars-инвойс — задача #1235.
+- `gameplayStart`/`gameplayStop` — пустые: игрового API площадки у Mini App нет.
+- Скрипт не доехал (блокировщик, нет сети) или клиент ответил отказом — партия идёт как обычно, адаптер
+  остаётся telegram-адаптером: молчаливый фолбэк на веб вернул бы запрещённую внешнюю ссылку.
+- Постоянный URL Mini App (подпуть `/t/` на GH Pages) — задача #1236; CloudStorage/DeviceStorage не подключены.
+
 ## Чего сборка не делает
 
-CI по-прежнему собирает только веб. Загрузка в консоли — вручную, этими командами. Реклама, лидерборды и
+CI по-прежнему собирает только веб. Загрузка в консоли площадки и выкладка Telegram-сборки в `/t/` (#1236) — вручную, этими командами. Реклама, лидерборды и
 проверка подписи покупок на сервере — не в этой сборке.

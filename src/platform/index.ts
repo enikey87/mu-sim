@@ -40,5 +40,9 @@ async function createPlatform(): Promise<Platform> {
     const { vkPlatform } = await import('./vk')
     return vkPlatform()
   }
+  if (import.meta.env.VITE_PLATFORM === 'telegram') {
+    const { telegramPlatform } = await import('./telegram')
+    return telegramPlatform()
+  }
   return webPlatform()
 }
