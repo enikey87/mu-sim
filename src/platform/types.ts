@@ -1,6 +1,6 @@
 import type { Storage } from '../engine/state'
 
-export type PlatformId = 'web' | 'yandex' | 'vk'
+export type PlatformId = 'web' | 'yandex' | 'vk' | 'telegram'
 
 /** Адаптер витрины. Веб — нулевой: ни SDK, ни запрета внешних ссылок. */
 export interface Platform {

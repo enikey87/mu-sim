@@ -16,7 +16,7 @@
   --safe-left: env(safe-area-inset-left, 0px);
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --page: #0b0e12;
     --bg: #0f1a1f;
     --panel: #17212b;
@@ -27,6 +27,19 @@
     --accent: #5fc98a;
     --sys: rgba(255, 255, 255, .12);
   }
+}
+/* Telegram Mini App: тему диктует клиент, а не системная тема WebView — адаптер ставит атрибут
+   (src/platform/telegram.ts). Палитра — та же, что в media-блоке выше: менять вместе. */
+:root[data-theme="dark"] {
+  --page: #0b0e12;
+  --bg: #0f1a1f;
+  --panel: #17212b;
+  --text: #e9edf1;
+  --muted: #8a97a4;
+  --me: #2b5278;
+  --them: #1f2c38;
+  --accent: #5fc98a;
+  --sys: rgba(255, 255, 255, .12);
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
@@ -163,7 +176,8 @@ body {
   max-width: 90%;
 }
 .transfer { background: #e3f6e9; color: #135c2e; }
-@media (prefers-color-scheme: dark) { .transfer { background: #1d3b2a; color: #9be3b5; } }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .transfer { background: #1d3b2a; color: #9be3b5; } }
+:root[data-theme="dark"] .transfer { background: #1d3b2a; color: #9be3b5; }
 .transfer .sum { font-size: 20px; font-weight: 800; }
 /* Карточка просьбы «займи 50» (#616): цвета перевода, крупная сумма, кнопка-ссылка вместо голого адреса. */
 .lend50 {
@@ -331,7 +345,8 @@ body {
   box-shadow: 0 8px 24px rgba(0, 0, 0, .25); font-size: 13px; cursor: pointer;
   transform: translateY(-130%); transition: transform .35s ease;
 }
-@media (prefers-color-scheme: dark) { .notif { background: rgba(40, 44, 52, .96); color: #eee; } }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .notif { background: rgba(40, 44, 52, .96); color: #eee; } }
+:root[data-theme="dark"] .notif { background: rgba(40, 44, 52, .96); color: #eee; }
 .notif.show { transform: translateY(0); }
 .n-icon { font-size: 24px; }
 .n-body { flex: 1; min-width: 0; }
