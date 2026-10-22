@@ -8,7 +8,7 @@ import { is, valueOf } from './fact'
 import { Gated, type Criterion } from '../engine/rules'
 import { ARC_DONE } from './arcs'
 import { CHORUS } from './world'
-import { garikConcrete, garikCut, grantPaid, houseOnGarik, intro, taxFrozen, wedding } from './memkeys'
+import { borisForeman, garikConcrete, garikCut, grantPaid, houseOnGarik, intro, taxFrozen, wedding } from './memkeys'
 
 const lineText = (m: unknown) => (typeof m === 'string' ? m : (m as { t: string }).t)
 
@@ -319,8 +319,22 @@ describe('follow Бориса и остальных арок: строка с ф
   it('серия болезни не играла — «смету съел» нет; сыграла — кнопка перед ней', async () => {
     await followBefore('boris', 'Что нового у Бориса? Смету он съел, а долг всё висит.', /Съел смету/, 'Как там Борис? Шерсть-то ладно, а деньги когда?')
   })
-  it('«профессия» — факт серии про прораба: раньше её кнопки нет', async () => {
-    await followBefore('boris', 'Алик, как Борис-то? Профессия у него серьёзная, а денег у меня всё нет.', /прораб/, 'Как там Борис? Шерсть-то ладно, а деньги когда?')
+  it('«профессия» — факт реплики про прораба, не номер шага арки (#1253)', async () => {
+    const { game } = makeGame()
+    const LINE = 'Алик, как Борис-то? Профессия у него серьёзная, а денег у меня всё нет.'
+    const keep = 'Как там Борис? Шерсть-то ладно, а деньги когда?'
+    const pool = () => game.open(ARCS.boris.follow)
+    // серия профессии следующая, счётчик арки её уже обогнал (playArc поднимает i до показа строк)
+    game.S.arcs.boris = { i: 7, last: 0 }
+    expect(game.S.mem[borisForeman], 'факт профессии без реплики').toBeUndefined()
+    expect(pool(), 'строка сослалась на незвучавшую профессию').not.toContain(LINE)
+    expect(pool(), 'пул пуст — негатив ничего не доказывает').toContain(keep)
+
+    game.S.day += 5
+    await game.playArc('boris')
+    expect(game.S.mem[borisForeman], 'реплика про прораба не поставила факт').toBe(true)
+    expect(pool(), 'после реплики строки нет').toContain(LINE)
+    expect(pool(), 'соседняя строка пропала').toContain(keep)
   })
   it('«Борис женился?» — вопрос перед серией-приглашением, без утверждения подарка (#974)', () => {
     const { game } = makeGame()
