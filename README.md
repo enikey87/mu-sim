@@ -94,6 +94,7 @@ src/
 
 Диз-док — [DESIGN.md](DESIGN.md): что уже есть в игре. Документы отдельных механик и порядок, как обсуждают новое, — в [docs/design/](docs/design/README.md), например [эндгейм](docs/design/endgame.md). Журналы и аудиты — в `docs/`:
 
+- [marketing/](docs/marketing/README.md) — материалы анонса: черновик поста на Пикабу, сценарий нарезки с координатами, паспорт публикации;
 - [android.md](docs/android.md) — сборка APK через Capacitor: что поставить, команды от чистого клона, ограничения;
 - [PLAYTEST_ISSUES.md](docs/PLAYTEST_ISSUES.md) — огрехи плейтестов и раунды аудита;
 - [TECH_DEFECTS.md](docs/TECH_DEFECTS.md) — технические дефекты UI;
