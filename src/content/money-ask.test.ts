@@ -365,4 +365,25 @@ describe('follow-пул бетона и посторонние подтверж�
     for (const t of askOpen) expect(game.open(MONEY_ASK.safe), `money-ask за окном: «${t}»`).toContain(t)
     for (const t of followOpen) expect(game.open(ARCS.nune.follow), `follow за окном: «${t}»`).toContain(t)
   })
+
+  it('бит «кум из банка» подтверждает место клеймом, а не легендой (#1226)', async () => {
+    const { game } = makeGame()
+    const { ask } = stateLines()
+    expect(game.open(MONEY_ASK.beton), 'до бита state-вопросы открыты — проверка пустеет').toEqual(expect.arrayContaining(ask))
+    // бит 122 (eps[4]) своей легенды не несёт: окно штампует только клейм места в самой строке
+    expect(ARCS.beton.eps[4].legend, 'у бита появилась легенда — проверка перестаёт видеть клейм').toBeUndefined()
+    await game.playEpisode(ARCS.beton.eps[4], 'beton')
+    expect(game.S.ledger.claims.map((c) => c.value), 'клейм места не опубликован').toContain('foundation')
+    expect(game.S.mem[moneyAskAt.beton], 'бит «кум из банка» место не штампует').toBe(game.S.stats.sent)
+    expectWindow(game)
+  })
+
+  it('бит «фундамент не вскрывали» публикует клейм места в журнал (#1226)', async () => {
+    const { game } = makeGame()
+    const found = () => game.S.ledger.claims.filter((c) => c.value === 'foundation')
+    expect(found(), 'журнал не пуст до бита — проверка пустеет').toHaveLength(0)
+    // у бита 120 есть legend beton_law: окно он штампует и без клейма, поэтому проверяем бухгалтерию лжи
+    await game.playEpisode(ARCS.beton.eps[3], 'beton')
+    expect(found(), 'бит «по бумагам» место не публикует').toHaveLength(1)
+  })
 })

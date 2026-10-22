@@ -149,7 +149,7 @@ describe('регрессии первоначального аудита', () =>
 
   it('формулировки фиксируют границы долга и обследования фундамента', () => {
     expect(String(ARCS.tile.eps.at(-1)?.m[0])).toContain('Основной долг остался')
-    expect(String(ARCS.beton.eps[3].m[0])).toContain('Фундамент не вскрывали')
+    expect((valueOf(ARCS.beton.eps[3].m[0]) as { t: string }).t).toContain('Фундамент не вскрывали')
     expect((valueOf(ARCS.grant.eps[3].m[0]) as { t: string }).t).toContain('Ваш долг — его обязательство')
   })
 })
@@ -225,7 +225,7 @@ describe('регрессии раунда 16', () => {
     expect((D.WHEN as Entry<When>[]).map(valueOf).map((w) => w.t).join(' ')).not.toMatch(/кран вернётся/)
     // «Банк правда работает?» — только если Алик говорил о банке, а не о Лос-Анджелесе
     expect(TOPICS.customs.need?.[4]?.test('Грант в Лос-Анджелесе. Поэтому денег нет')).toBe(false)
-    expect(String(ARCS.beton.eps[3].m[0])).toContain('Дом — заказчика, Гранта')
+    expect((valueOf(ARCS.beton.eps[3].m[0]) as { t: string }).t).toContain('Дом — заказчика, Гранта')
     expect(JSON.stringify(LEGENDS.niva_gone.talk)).not.toMatch(/не заводится/)
     const { game } = makeGame()
     const sys = (game.scenes.redo.nodes.look.sys as unknown as ((v: Record<string, string>) => string)[])[0]
