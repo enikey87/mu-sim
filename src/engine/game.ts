@@ -1732,6 +1732,8 @@ export class Game {
       'ctx.whenDate': c.whenAt !== undefined && (c.whenKind === 'clear' || c.whenKind === 'dodge') ? fmtDayMonth(c.whenAt) : undefined,
       'ctx.whenKind': c.whenKind, 'ctx.whenDays': whenDays,
       'ctx.whenHorizon': whenDays === undefined ? undefined : whenDays <= 7 ? 'near' : whenDays <= 30 ? 'far' : 'veryFar',
+      // число дней из служебной оценки — не обещанный срок: кнопка такого числа не называет (#1255)
+      'ctx.whenEst': c.whenEst,
       'ctx.rel': c.rel?.n, 'ctx.relYou': c.rel?.you ?? c.rel?.n, 'ctx.sad': c.sad, 'ctx.festive': c.festive, 'ctx.revived': c.revived,
       'ctx.constr': c.constr, 'ctx.legendary': c.legendary, 'ctx.arc': c.arc, 'ctx.debtMoved': c.debtMoved, 'ctx.quote': c.quote,
       // спросить про сериал есть смысл: будет новая серия, или сериал закончен и сегодня про финал ещё не спрашивали
@@ -2211,7 +2213,11 @@ export class Game {
   ctxFromPromise(p?: Promise3): Ctx {
     if (!p) return {}
     const due = p.d == null ? null : this.S.day + (p.due ? dueIn(p.due, this.S.day) : p.d)
-    return { when: p.t, whenNever: p.d == null, whenMade: this.S.day, whenDue: due, whenKind: p.kind, whenAt: this.horizonAt(p, due) }
+    return { when: p.t, whenNever: p.d == null, whenMade: this.S.day, whenDue: due, whenKind: p.kind, whenAt: this.horizonAt(p, due), whenEst: this.horizonFromEst(p) }
+  }
+  /** Горизонт события — служебная оценка `est`, а не конец идущего состояния мира (#1255): игроку это не срок. */
+  private horizonFromEst(p?: When): boolean {
+    return p?.kind === 'event' && p.est !== undefined && (p.state === undefined || this.stateEnd(p.state) === undefined)
   }
   /** Абсолютный день горизонта: срок по дате (у увёртки — поздняя из двух), событие — остаток идущего состояния или оценка, праздник — календарь; «никогда» и абсурд — нет. */
   private horizonAt(p: When, due: number | null): number | undefined {
@@ -2403,7 +2409,7 @@ export class Game {
         if (named === undefined) delete rec.days
         else rec.days = Math.max(0, named - this.S.day)
       }
-      this.S.ctx = { ...this.S.ctx, when: w, whenNever: due == null, whenKind: term.kind, whenAt: named, whenMade: this.S.day, whenDue: due }
+      this.S.ctx = { ...this.S.ctx, when: w, whenNever: due == null, whenKind: term.kind, whenAt: named, whenMade: this.S.day, whenDue: due, whenEst: this.horizonFromEst(term) }
     } else {
       text = m.text.replace(/[.!]?$/, this.draw('EDIT_SUFFIX', L.EDIT_SUFFIX) + '.')
     }

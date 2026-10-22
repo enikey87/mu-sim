@@ -49,7 +49,7 @@ describe('пулы кнопок на срок', () => {
   })
 
   it('в пулах ясного и близкого срока нет «по-русски»; «— с {date}. Жду» ушло совсем', () => {
-    for (const k of ['P_WHEN', 'P_WHEN_OK', 'P_WHEN_OK_EVENT', 'P_WHEN_PENCIL', 'P_WHEN_FAR']) {
+    for (const k of ['P_WHEN', 'P_WHEN_OK', 'P_WHEN_OK_EVENT', 'P_WHEN_PENCIL', 'P_WHEN_PENCIL_GUESS', 'P_WHEN_FAR']) {
       expect(pool(k).length, k).toBeGreaterThanOrEqual(3)
       for (const s of pool(k)) expect(s, `${k}: ${s}`).not.toMatch(/по-русски/i)
     }
@@ -59,9 +59,9 @@ describe('пулы кнопок на срок', () => {
 
   it('дата и дни стоят только там, где есть факт: {date} — у пула с датой, {days} — у далёких', () => {
     for (const s of pool('P_WHEN_OK')) expect(s).toContain('{date}')
-    for (const k of ['P_WHEN', 'P_WHEN_OK_EVENT', 'P_WHEN_PENCIL', 'P_WHEN_FAR', 'P_WHEN_NEVER', 'P_WHEN_CALENDAR', 'P_WHEN_EVENT']) for (const s of pool(k)) expect(s, `${k}: ${s}`).not.toContain('{date}')
+    for (const k of ['P_WHEN', 'P_WHEN_OK_EVENT', 'P_WHEN_PENCIL', 'P_WHEN_PENCIL_GUESS', 'P_WHEN_FAR', 'P_WHEN_NEVER', 'P_WHEN_CALENDAR', 'P_WHEN_EVENT']) for (const s of pool(k)) expect(s, `${k}: ${s}`).not.toContain('{date}')
     for (const k of ['P_WHEN_PENCIL', 'P_WHEN_FAR']) for (const s of pool(k)) expect(s, `${k}: ${s}`).toContain('{days}')
-    for (const k of ['P_WHEN', 'P_WHEN_OK', 'P_WHEN_OK_EVENT', 'P_WHEN_NEVER', 'P_WHEN_CALENDAR', 'P_WHEN_EVENT']) for (const s of pool(k)) expect(s, `${k}: ${s}`).not.toContain('{days}')
+    for (const k of ['P_WHEN', 'P_WHEN_OK', 'P_WHEN_OK_EVENT', 'P_WHEN_PENCIL_GUESS', 'P_WHEN_NEVER', 'P_WHEN_CALENDAR', 'P_WHEN_EVENT']) for (const s of pool(k)) expect(s, `${k}: ${s}`).not.toContain('{days}')
   })
 })
 
@@ -79,6 +79,55 @@ describe('число дней в кнопке — из факта, со скло
     // полнолуние — календарь (#861): число в кнопке — из реальной даты, а не из оценки 15
     const moonDays = fmtDays(Number(far.facts()['ctx.whenDays'] ?? -1))
     for (const x of buttons(far)) expect(x.text, x.text).toContain(moonDays)
+  })
+})
+
+describe('оценка est — служебная, не обещанный срок (#1255)', () => {
+  it('«как плитку в углу снимешь»: кнопка числа не называет, а срок с датой число по-прежнему называет', async () => {
+    const w = byText('как плитку в углу снимешь')
+    expect([w.est, w.d], 'проверка про событие с одной оценкой').toEqual([30, null])
+    const f = (await said(w)).facts()
+    expect([f['ctx.whenKind'], f['ctx.whenHorizon'], f['ctx.whenEst']], 'горизонт — из оценки').toEqual(['event', 'far', true])
+    const texts = await shownWhen(w)
+    for (const text of texts) {
+      expect(text, `число из оценки не названо: ${text}`).not.toMatch(/\d+ (день|дня|дней)/)
+      expect(fromPool('P_WHEN_PENCIL_GUESS', text), text).toBe(true)
+    }
+    expect(texts.some((t) => /карандаш/i.test(t)), texts.join(' | ')).toBe(true)
+    // форма датного срока не тронута: у него число дней остаётся
+    const dated = await shownWhen({ t: 'через три недели', d: 21, kind: 'clear' })
+    expect(dated.length, 'кнопки датного срока строятся').toBeGreaterThan(0)
+    for (const text of dated) {
+      expect(text, `дата называет дни: ${text}`).toContain('21 день')
+      expect(fromPool('P_WHEN_PENCIL', text), text).toBe(true)
+    }
+  })
+
+  it('у праздника дата в мире есть, хотя d в журнале null: число дней остаётся', async () => {
+    const g = await said(byText('после Навасарда'))
+    expect([g.S.ctx?.whenNever, g.S.ctx?.whenKind], 'd: null, но род — календарь').toEqual([true, 'holiday'])
+    g.S.day = g.S.ctx!.whenAt! - 20
+    expect([g.facts()['ctx.whenEst'], g.facts()['ctx.whenHorizon']], 'календарь — не оценка').toEqual([false, 'far'])
+    const texts = new Set<string>()
+    for (let i = 0; i < 60; i++) { g.S.choices = null; for (const c of g.buildChoices()) if (c.act?.startsWith('promise')) texts.add(c.text) }
+    expect(texts.size, 'кнопки срока строятся — проверка не пустая').toBeGreaterThan(0)
+    for (const text of texts) {
+      expect(text, `дата в мире есть — дни называются: ${text}`).toContain('20 дней')
+      expect(fromPool('P_WHEN_PENCIL', text), text).toBe(true)
+    }
+  })
+
+  it('оценка события не выходит за 30 дней: иначе число снова назвал бы пул «очень далеко»', async () => {
+    let checked = 0
+    for (const [where, w] of terms()) {
+      if (w.kind !== 'event' || w.est === undefined) continue
+      const f = (await said(w)).facts()
+      // идущее состояние в мире — настоящий конец срока, а не оценка: его горизонт может быть любым
+      if (!f['ctx.whenEst']) continue
+      checked++
+      expect(f['ctx.whenHorizon'], `${where}: «${w.t}» — оценка в ${String(w.est)} дней`).not.toBe('veryFar')
+    }
+    expect(checked, 'оценок в пулах меньше известных — проверка пустеет').toBeGreaterThanOrEqual(3)
   })
 })
 
@@ -108,10 +157,13 @@ describe('матрица: кнопка по роду и горизонту — �
     let checked = 0
     for (const [where, w] of terms()) {
       const g = await said(w)
+      // горизонт из служебной оценки — не срок: числа дней такая кнопка не называет ни при каком роде (#1255)
+      const est = !!g.facts()['ctx.whenEst']
       for (const b of buttons(g)) {
         const at = `${where}: «${w.t}» → ${b.rule}: ${b.text}`
         checked++
         expect(b.text, at).not.toMatch(/\{|\}|\(\)/)
+        if (est) expect(b.text, `${at}: число из оценки`).not.toMatch(/\d+ (день|дня|дней)/)
         if (w.kind === 'never' || w.kind === 'absurd') expect(b.text, at).not.toMatch(SERIOUS)
         if (w.kind === 'clear') expect(b.text, at).not.toMatch(/по-русски/i)
         const dated = w.kind === 'clear' || w.kind === 'dodge'
