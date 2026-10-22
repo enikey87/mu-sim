@@ -92,8 +92,14 @@ jobs:
       - run: npx vitest run --exclude 'src/tools/coverage-gate.test.ts'
       - run: npm run test:rules   # движок правил — покрытие 100%
       # на PR прод-сборку гоняет e2e (webServer собирает dist), здесь она нужна только артефакту Pages
+      # Ключи аналитики — из переменных репозитория (Settings → Secrets and variables → Actions → Variables);
+      # не заданы — пустые строки, приёмники молчат, сборка зелёная (docs/design/analytics.md).
       - if: github.event_name != 'pull_request'
         run: npm run build
+        env:
+          VITE_METRIKA_COUNTER: ${{ vars.VITE_METRIKA_COUNTER }}
+          VITE_POSTHOG_KEY: ${{ vars.VITE_POSTHOG_KEY }}
+          VITE_UMAMI_WEBSITE_ID: ${{ vars.VITE_UMAMI_WEBSITE_ID }}
       - if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
         with:

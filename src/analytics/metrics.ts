@@ -3,14 +3,20 @@
 // и своим пустым ключом. В тестах клиенты подставные, живой сети прогон не трогает.
 import type { EndingId, PaydayId } from '../content/finales'
 
-/** Номер счётчика Метрики. Пусто — приёмник молчит; вписывает автор (docs/design/analytics.md). */
-export const COUNTER_ID = ''
+/**
+ * Сборочная переменная: значение из окружения сборки, вокруг — пробелы прочь.
+ * Не задана или пуста — пустая строка, и это исправное состояние: приёмник молчит.
+ */
+const buildVar = (value: string | undefined): string => String(value ?? '').trim()
 
-/** Ключ проекта PostHog (EU). Пусто — приёмник молчит; вписывает автор. */
-export const POSTHOG_KEY = ''
+/** Номер счётчика Метрики: `VITE_METRIKA_COUNTER`. Пусто — приёмник молчит (docs/design/analytics.md). */
+export const COUNTER_ID = buildVar(import.meta.env.VITE_METRIKA_COUNTER)
 
-/** Ключ сайта Umami. Пусто — приёмник молчит; вписывает автор. */
-export const UMAMI_KEY = '61b6d936-045b-40c3-a021-f20c63d10359'
+/** Ключ проекта PostHog (EU): `VITE_POSTHOG_KEY`. Пусто — приёмник молчит. */
+export const POSTHOG_KEY = buildVar(import.meta.env.VITE_POSTHOG_KEY)
+
+/** Ключ сайта Umami: `VITE_UMAMI_WEBSITE_ID`. Пусто — приёмник молчит. */
+export const UMAMI_KEY = buildVar(import.meta.env.VITE_UMAMI_WEBSITE_ID)
 
 /** Хост, на котором приёмники включаются: localhost, превью и e2e молчат. */
 export const GAME_HOST = 'enikey87.github.io'

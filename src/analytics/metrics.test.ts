@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // #611: счётчик Метрики. Приёмник подставной — живая Метрика не зовётся.
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import { enable, firstGesture, isOn, track, COUNTER_ID, GAME_HOST, type Goal } from './metrics'
 import { ENDINGS, PAYDAY_OUTCOMES } from '../content/finales'
 
@@ -165,5 +165,63 @@ describe('один просмотр за загрузку (#611)', () => {
     expect(calls.filter((c) => c[1] === 'init')).toHaveLength(1)
     expect(calls.filter((c) => c[1] === 'hit')).toHaveLength(1)
     expect(scripts()).toHaveLength(1)
+  })
+})
+
+// #1258: ключи живут в переменных сборки, а не в коде. Модуль читает их при загрузке,
+// поэтому каждый случай — свой импорт после подмены окружения.
+const receiversTags = () =>
+  [...document.querySelectorAll('script[src*="mc.yandex.ru"], script[src*="posthog"], script[src*="umami"]')]
+
+describe('ключи приёмников — из переменных сборки, а не из кода (#1258)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.resetModules()
+    receiversTags().forEach((s) => s.remove())
+  })
+
+  it('переменные не заданы — все три ключа пусты, приёмники молчат, тегов нет', async () => {
+    vi.resetModules()
+    vi.stubEnv('VITE_METRIKA_COUNTER', '')
+    vi.stubEnv('VITE_POSTHOG_KEY', '')
+    vi.stubEnv('VITE_UMAMI_WEBSITE_ID', '')
+    const fresh = await import('./metrics')
+    // захардкоженный ключ в модуле провалит ровно это утверждение
+    expect([fresh.COUNTER_ID, fresh.POSTHOG_KEY, fresh.UMAMI_KEY]).toEqual(['', '', ''])
+    expect(fresh.enable({ host: fresh.GAME_HOST, search: '' })).toBe(false)
+    expect(fresh.isOn()).toBe(false)
+    fresh.firstGesture()
+    expect(receiversTags()).toHaveLength(0)
+  })
+
+  it('переменные заполнены — ключи из окружения, теги встают по первому жесту', async () => {
+    vi.resetModules()
+    vi.stubEnv('VITE_METRIKA_COUNTER', '4242')
+    vi.stubEnv('VITE_POSTHOG_KEY', 'phc_test')
+    vi.stubEnv('VITE_UMAMI_WEBSITE_ID', 'umami-test')
+    const fresh = await import('./metrics')
+    expect([fresh.COUNTER_ID, fresh.POSTHOG_KEY, fresh.UMAMI_KEY]).toEqual(['4242', 'phc_test', 'umami-test'])
+    const calls = receiver()
+    expect(fresh.enable({ host: fresh.GAME_HOST, search: '' })).toBe(true)
+    fresh.firstGesture()
+    expect(calls.some((c) => c[0] === 4242 && c[1] === 'init')).toBe(true)
+    const srcs = receiversTags().map((s) => (s as HTMLScriptElement).src)
+    expect(srcs).toEqual(expect.arrayContaining([
+      expect.stringContaining('mc.yandex.ru/metrika/tag.js'),
+      expect.stringContaining('array.js'),
+      expect.stringContaining('cloud.umami.is/script.js'),
+    ]))
+    const umamiTag = document.querySelector('script[src*="cloud.umami.is"]')
+    expect(umamiTag?.getAttribute('data-website-id')).toBe('umami-test')
+  })
+
+  it('пробелы вокруг значения ключом не считаются', async () => {
+    vi.resetModules()
+    vi.stubEnv('VITE_METRIKA_COUNTER', '   ')
+    vi.stubEnv('VITE_POSTHOG_KEY', '  ')
+    vi.stubEnv('VITE_UMAMI_WEBSITE_ID', ' ')
+    const fresh = await import('./metrics')
+    expect([fresh.COUNTER_ID, fresh.POSTHOG_KEY, fresh.UMAMI_KEY]).toEqual(['', '', ''])
+    expect(fresh.enable({ host: fresh.GAME_HOST, search: '' })).toBe(false)
   })
 })
