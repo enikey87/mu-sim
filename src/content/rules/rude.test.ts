@@ -267,7 +267,7 @@ describe('лестница грубости: ступени', () => {
     game.rules.applyOps([{ key: 'polite', op: '=', value: true, forDays: 10 }], {})
     const t = await fire(game, 'rude')
     expect(t.r).toBe('Rude_Polite')
-    expect(T.POLITE_RUDE).toContain(texts(game, t.n).at(-1))
+    expect(T.POLITE_RUDE.map((e) => spec(e).t)).toContain(texts(game, t.n).at(-1))
     const n = game.S.msgs.length
     expect((await game.fire('AlikTurn'))?.name).toBe('Turn_Polite')
     expect(texts(game, n).some((x) => T.POLITE_TURN.includes(x))).toBe(true)

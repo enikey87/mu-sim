@@ -111,6 +111,9 @@ export const saidGrantEnvelope = 'said.grant.envelope'
 /** Алик сравнил деньги с усами («Деньги — как усы. Отрастут.») — строкой сбривания или ответом на
  *  «как усы?»: цитата «деньги — как усы, говоришь?» в пуле «как усы?» ждёт прозвучавшей фразы (#1171). */
 export const saidMoneyMoustache = 'said.moneyMoustache'
+/** Алик хоть раз произнёс «регламент» в окне вежливости (ответ на крик или дно-ответ на деньги) —
+ *  вариант «Какой ещё регламент?!» ждёт именно этого слова, а не самого факта `polite` (#1230, рецидив #831-2). */
+export const saidRegiment = 'said.regiment'
 
 export const payday = {
   at: 'payday.at', sum: 'payday.sum', chain: 'payday.chain', caught: 'payday.caught',
@@ -309,7 +312,7 @@ export const MEM_KEYS: ReadonlySet<string> = new Set([
   ritualCount, ritualCut, caughtCount, caughtAt, garikDenied, cryptoHodl, bathAsked, mamaCalls, phoneKarine, karineKnowsDebt, karineThinksTax, alikShaved, moustacheKept, moustacheAskAt, alikDay, mooAt, sorryAt, courtReferral, judgeApology, saidStrasburg,
   rudeAt, thanksAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway, nivaPlayer, carGone,
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, taxFrozen, taxThawed,
-  actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday, saidKonak, saidHash, saidOath, saidNuneNoWrite, saidGrantEnvelope, saidMoneyMoustache,
+  actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, paydayScene, threatClaim, saidTomorrow, saidFriday, saidKonak, saidHash, saidOath, saidNuneNoWrite, saidGrantEnvelope, saidMoneyMoustache, saidRegiment,
   lightOff, netRation, phoneWarn, holidayGreeted,
   creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, collectorsTurned, collectorsTea, collectorsEpAt, criticalAt, creditOfferSum, momDachaAt, crewPaid, crewPaidAt, crewAllPaid, rubikBath, whenYears, ...Object.values(moneyAskAt), transferAt, transferAmount, moustachePhotoAt, moustacheStakeSaid, mamaMarketAt, mamaVoiceAt, samvelDivorceAt, courtVerdictAt, tileSlipAt, saleAt, saleWhat, fraudLoan, blockLifted, internDeclined, grantHouseAt, photoAt, tileAdAt, tamadaDoneAt, debutWho, debutAt, arsenTrack,
   ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt, countersuitAt, grantTileAt,
