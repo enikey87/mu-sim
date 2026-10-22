@@ -4,7 +4,7 @@ import { type Entry, type FactOp, type Criterion, type FactKey, type Said, set, 
 import { type ClaimKey } from './ids'
 import type { LedgerEvent } from './fact-types'
 import { needs, meet, WORLD, MENTION_RE } from './world'
-import { actSigned, alikDead, betonSet, borisMarried, collectorsAskAt, collectorsEpAt, collectorsRecruited, collectorsTea, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantHouseAt, grantPaid, grantTileAt, houseOnGarik, internAt, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, rubikHoleAt, saidNuneNoWrite, samvelDivorceAt, sick, taxFrozen, tileSlipAt, wedding, wrote } from './memkeys'
+import { actSigned, alikDead, betonSet, borisForeman, borisMarried, collectorsAskAt, collectorsEpAt, collectorsRecruited, collectorsTea, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantHouseAt, grantPaid, grantTileAt, houseOnGarik, internAt, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, rubikHoleAt, saidNuneNoWrite, samvelDivorceAt, sick, taxFrozen, tileSlipAt, wedding, wrote } from './memkeys'
 import { stateQuestion } from './money-ask'
 
 export type ArcMsg = Said | { w: string; t: string; claims?: LedgerEvent[]; remember?: FactOp[]; stamp?: string } | { t: string; claims: LedgerEvent[]; remember?: FactOp[]; stamp?: string }
@@ -56,8 +56,8 @@ export const ARCS: Record<string, Arc> = {
       // кнопка стоит ровно перед серией, которая на неё отвечает: «смету съел» — до серии болезни факт не называется (#604, #926)
       gate(eq('arc.boris', 1))('Что нового у Бориса? Смету он съел, а долг всё висит.'),
       'Передайте привет Борису. И спросите, кто за шерсть платить будет.',
-      // «профессия» — прораб: факт седьмой серии (#926)
-      gate(eq('arc.boris', 7))('Алик, как Борис-то? Профессия у него серьёзная, а денег у меня всё нет.'),
+      // «профессия» — прораб: факт серии, а не номер шага (#926, #1253)
+      gate(is(borisForeman))('Алик, как Борис-то? Профессия у него серьёзная, а денег у меня всё нет.'),
       gate(eq('arc.boris', 2))('Борису лучше? А квитанции мои он доест или свои?'),
       gate(eq('arc.boris', 5))('Борис женился? Подарок им везти или деньгами обойдёмся?'),
       gate(eq('arc.boris', 9))(stateQuestion('bank', 'Бориса в налоговую забрали? Значит, деньги приморозили.')),
@@ -90,7 +90,8 @@ export const ARCS: Record<string, Arc> = {
       // «после свадьбы» наступает, когда свадьба (5 дней) прошла, а не в день приглашения
       { remember: [set(borisMarried, true, { delay: 5 })], m: ['Свадьба Бориса! Приходи! Подарок — деньгами, кстати. Можешь из моего долга вычесть. То есть прибавить.'], state: { key: wedding('boris'), days: 5 }, legend: 'boris_wedding' },
       { m: [{ w: 'boris', t: 'Бее-бее. Бее.' }, 'Он говорит: «Алик, заплати человеку». Я ему сказал: не лезь, ты баран.'] },
-      { m: ['Борис стал прорабом. Серьёзно. Бригада слушается его лучше, чем меня. Сдаём объект раньше срока!'], then: 'promise', legend: 'boris_object' },
+      // факт ставит сама реплика, которая профессию называет: счётчик арки растёт до её показа (#1253)
+      { m: [{ t: 'Борис стал прорабом. Серьёзно. Бригада слушается его лучше, чем меня. Сдаём объект раньше срока!', claims: [], remember: [set(borisForeman, true)] }], then: 'promise', legend: 'boris_object' },
       { remember: [set(taxFrozen, true)], m: ['Беда. Бориса забрали в налоговую. Свидетелем. Он всё знает, брат. Счета заморозили до выяснения.'], legend: 'frozen' },
       { m: [{ w: 'boris', t: 'Бее. Я всё рассказал.' }, 'Борис дал показания. Счета теперь заморожены официально: из-за тебя, кстати: первое, что он написал в жизни, — тебе.'], fx: { ach: 'arc_boris' } },
     ],
