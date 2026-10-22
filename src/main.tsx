@@ -12,40 +12,42 @@ import './styles.css'
 // Параметры адреса: ?fast — паузы в ~30 раз короче, ?hour=3 — подменить час, ?away=90 — «не было 90 минут»,
 // ?debug — панель «какое правило выбрано и почему», ?nointro — без интро новой партии (e2e, бот, плейтест)
 const q = new URLSearchParams(location.search)
-const storage = safeStorage()
-const hadSave = storage?.getItem(SAVE_KEY) != null
-const newGame = () => {
-  const game = new Game({
-    clock: realClock(q.has('fast') ? 0.03 : 1),
-    audio: browserAudio(),
-    hour: q.has('hour') ? Number(q.get('hour')) : null,
-    away: q.has('away') ? Number(q.get('away')) : null,
-    debug: q.has('debug'),
-    storage,
-    externalPay: platform().externalPay,
-  })
-  ;(window as unknown as { __alik: Game }).__alik = game // API для scripts/playtest-tech.mjs (и консоли): что он вызывает, проверяет src/tools/window-api.test.ts
-  return game
-}
-
-// Счётчик Метрики включает только вход страницы и только когда заданы номер, хост игры и адрес без debug/fast;
-// тег грузится первым жестом — тем же, что разрешает звук (docs/design/analytics.md).
-if (enable({ host: location.hostname, search: location.search })) {
-  const gesture = () => {
-    firstGesture()
-    // первый жест один: `boot` — про этот жест, а не про загрузку файла
-    boot(hadSave ? 'yes' : 'no')
-    document.removeEventListener('pointerdown', gesture)
-    document.removeEventListener('keydown', gesture)
-  }
-  document.addEventListener('pointerdown', gesture)
-  document.addEventListener('keydown', gesture)
-  shown() // с этой секунды идут секунды видимости: до жеста страница тоже на экране
-}
 
 // Игра создаётся вне React: StrictMode вызывает инициализаторы дважды, а у игры есть таймеры.
 // Сначала адаптер витрины: отказ SDK не должен оставить белый экран.
 void bootPlatform().then(() => {
+  // Хранилище прогресса: у витрины своё (облако площадки, #1240), у веба и VK — localStorage.
+  const storage = safeStorage(platform().storage?.())
+  const hadSave = storage?.getItem(SAVE_KEY) != null
+  const newGame = () => {
+    const game = new Game({
+      clock: realClock(q.has('fast') ? 0.03 : 1),
+      audio: browserAudio(),
+      hour: q.has('hour') ? Number(q.get('hour')) : null,
+      away: q.has('away') ? Number(q.get('away')) : null,
+      debug: q.has('debug'),
+      storage,
+      externalPay: platform().externalPay,
+    })
+    ;(window as unknown as { __alik: Game }).__alik = game // API для scripts/playtest-tech.mjs (и консоли): что он вызывает, проверяет src/tools/window-api.test.ts
+    return game
+  }
+
+  // Счётчик Метрики включает только вход страницы и только когда заданы номер, хост игры и адрес без debug/fast;
+  // тег грузится первым жестом — тем же, что разрешает звук (docs/design/analytics.md).
+  if (enable({ host: location.hostname, search: location.search })) {
+    const gesture = () => {
+      firstGesture()
+      // первый жест один: `boot` — про этот жест, а не про загрузку файла
+      boot(hadSave ? 'yes' : 'no')
+      document.removeEventListener('pointerdown', gesture)
+      document.removeEventListener('keydown', gesture)
+    }
+    document.addEventListener('pointerdown', gesture)
+    document.addEventListener('keydown', gesture)
+    shown() // с этой секунды идут секунды видимости: до жеста страница тоже на экране
+  }
+
   const first = newGame()
 
   function Root() {
