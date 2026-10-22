@@ -145,8 +145,8 @@ export const endgame = {
 /** Праздник, который партия уже поздравила: «newYear@2026» — год начала окна (#255). */
 export const holidayGreeted = 'holiday.greeted'
 
-/** «Займи 50» в эндгейме: просьба прозвучала и что игрок ответил (docs/design/lend-50.md). */
-export const lend50 = { asked: 'lend50.asked', answer: 'lend50.answer' } as const
+/** «Займи 50» в эндгейме: просьба прозвучала, что игрок ответил, и выдано ли спонсорское имя группы (#1239). */
+export const lend50 = { asked: 'lend50.asked', answer: 'lend50.answer', sponsor: 'lend50.sponsor' } as const
 
 export const cb = <C extends string>(claim: C): `cb.${C}` => `cb.${claim}`
 export const met = <W extends string>(who: W): `met.${W}` => `met.${who}`

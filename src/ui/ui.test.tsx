@@ -14,7 +14,7 @@ import type { Game } from '../engine/game'
 import { introOf, uiOf } from './view'
 import { introDateLine, introVowLine, LINE_MS, FADE_MS } from './Intro'
 import { enable, GAME_HOST } from '../analytics/metrics'
-import { EPILOGUE_BANNER, LEND50_LINK, LEND50_SYS } from '../content/endgame'
+import { EPILOGUE_BANNER, LEND50_LINK, LEND50_RENAME, LEND50_SYS, LEND50_VK_SYS } from '../content/endgame'
 import { adoptPlatform, webPlatform } from '../platform'
 
 function renderApp(game: Game, onReset = vi.fn()) {
@@ -349,6 +349,62 @@ describe('App', () => {
     try {
       const { game } = makeGame()
       game.push({ kind: 'lend50', text: LEND50_SYS, link: LEND50_LINK })
+      renderApp(game)
+      expect(screen.queryByTestId('lend50-card')).toBeNull()
+    } finally {
+      adoptPlatform(webPlatform())
+    }
+  })
+
+  it('VK: карточка без ссылки, вступление в сообщество выдаёт спонсорское имя (#1239)', async () => {
+    const joinGroup = vi.fn(async () => true)
+    adoptPlatform({ ...webPlatform(), externalPay: false, joinGroup })
+    try {
+      const { game } = makeGame()
+      game.push({ kind: 'lend50', text: LEND50_VK_SYS, join: true })
+      renderApp(game)
+      const card = screen.getByTestId('lend50-card')
+      expect(within(card).getByText('50 ₽')).toBeInTheDocument()
+      expect(within(card).getByText(LEND50_VK_SYS)).toBeInTheDocument()
+      expect(within(card).queryByRole('link'), 'внешней ссылки на витрине нет').toBeNull()
+      expect(within(card).queryByText(/donationalerts/i)).toBeNull()
+
+      await act(async () => { fireEvent.click(within(card).getByRole('button', { name: 'Вступить в сообщество игры' })) })
+      await act(async () => { await flush() })
+      expect(joinGroup).toHaveBeenCalledOnce()
+      expect(game.S.mem['lend50.sponsor']).toBe(true)
+      expect(within(card).getByText('Вы в сообществе игры')).toBeInTheDocument()
+      expect(within(card).queryByRole('button'), 'после вступления нажимать нечего').toBeNull()
+      expect(screen.getByText(`Алик изменил название группы на «${LEND50_RENAME}»`)).toBeInTheDocument()
+    } finally {
+      adoptPlatform(webPlatform())
+    }
+  })
+
+  it('VK: отказ во вступлении ничего не меняет (#1239)', async () => {
+    const joinGroup = vi.fn(async () => false)
+    adoptPlatform({ ...webPlatform(), externalPay: false, joinGroup })
+    try {
+      const { game } = makeGame()
+      game.push({ kind: 'lend50', text: LEND50_VK_SYS, join: true })
+      renderApp(game)
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Вступить в сообщество игры' })) })
+      await act(async () => { await flush() })
+      expect(joinGroup).toHaveBeenCalledOnce()
+      expect(game.S.mem['lend50.sponsor']).toBeUndefined()
+      expect(game.S.mem['endgame.renames']).toBeUndefined()
+      expect(screen.queryByText(`Алик изменил название группы на «${LEND50_RENAME}»`)).toBeNull()
+      expect(screen.getByRole('button', { name: 'Вступить в сообщество игры' })).toBeInTheDocument()
+    } finally {
+      adoptPlatform(webPlatform())
+    }
+  })
+
+  it('витрина без моста не рисует карточку вступления, даже если она в сейве (#1239)', () => {
+    adoptPlatform({ ...webPlatform(), externalPay: false })
+    try {
+      const { game } = makeGame()
+      game.push({ kind: 'lend50', text: LEND50_VK_SYS, join: true })
       renderApp(game)
       expect(screen.queryByTestId('lend50-card')).toBeNull()
     } finally {

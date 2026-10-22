@@ -174,9 +174,12 @@ body {
 }
 .lend50-btn {
   display: block; width: 100%; box-sizing: border-box; text-align: center; text-decoration: none;
+  border: 0; font: inherit; cursor: pointer;
   border-radius: 12px; padding: 10px 16px; background: var(--accent); color: #fff; font-weight: 600;
 }
+.lend50-btn:disabled { opacity: .6; cursor: default; }
 .lend50-url { font-size: 11px; opacity: .75; word-break: break-all; }
+.lend50-joined { font-size: 11px; opacity: .75; }
 .voice { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
 .voice .play {
   width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: #fff;

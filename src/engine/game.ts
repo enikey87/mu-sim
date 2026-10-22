@@ -35,7 +35,7 @@ import {
   ENDGAME_ARCH, ENDGAME_ARCH_LIE, ENDGAME_CHOICES, ENDGAME_FALLBACK, ENDGAME_FORMALITIES, ENDGAME_GROUP, ENDGAME_INTRO, ENDGAME_JUBILEES,
   ENDGAME_LEAVE, ENDGAME_MONEY, ENDGAME_MUTE, ENDGAME_OPEN, ENDGAME_RENAMES, ENDGAME_RETURNER_LINES, ENDGAME_RETURNERS, ENDGAME_VENDETTA, ENDGAME_ALIK_BACK,
   EPILOGUE_BANNER,
-  LEND50_ASK, LEND50_ASK_AGAIN, LEND50_CHOICES, LEND50_LINK, LEND50_MEMORY, LEND50_NO, LEND50_NUNE, LEND50_RENAME, LEND50_SERIOUS, LEND50_SERIOUS_ELSE, LEND50_SYS, LEND50_YES,
+  LEND50_ASK, LEND50_ASK_AGAIN, LEND50_CHOICES, LEND50_LINK, LEND50_MEMORY, LEND50_NO, LEND50_NUNE, LEND50_RENAME, LEND50_SERIOUS, LEND50_SERIOUS_ELSE, LEND50_SYS, LEND50_VK_SYS, LEND50_YES,
 } from '../content/endgame'
 import { type Rng, mathRng, rndInt, shuffle, chance } from './rng'
 import { Decks, type Bag } from './deck'
@@ -115,6 +115,8 @@ export interface GameOptions {
   strictTurns?: boolean
   /** Карточка с внешней ссылкой «займи 50». На витрине платформы — false. */
   externalPay?: boolean
+  /** На витрине карточка «займи 50» ведёт в сообщество игры (VK), а не к внешней ссылке (#1239). */
+  joinGroup?: boolean
 }
 
 
@@ -186,6 +188,7 @@ export class Game {
   /** Оборванный ошибкой ход — падение партии бота (гейт покрытия, плейтест), а не тихое восстановление. */
   private strictTurns: boolean
   private externalPay: boolean
+  private joinGroup: boolean
   private hiddenAt = 0
   /** Ход игрока: nextDay уже был (offline / fx.days) — обычный +1…3 в конце не дублируем. */
   private inPlayerTurn = false
@@ -205,6 +208,7 @@ export class Game {
     this.typos = opts.typos ?? true
     this.strictTurns = !!opts.strictTurns
     this.externalPay = opts.externalPay !== false
+    this.joinGroup = !!opts.joinGroup
     this.S = loadState(this.storage) ?? freshState()
     if (this.S.mem[momHelp('dacha')] && this.S.mem[momDachaAt] == null) this.S.mem[momDachaAt] = this.S.day
     // колбеки батареи — в узком хосте, а не в публичном интерфейсе Game: game.dead() путался бы со смертью Алика
@@ -2780,8 +2784,9 @@ export class Game {
     for (const text of lines) await this.endgameLine(text)
     await this.sleep(500)
     // одна карточка вместо двух системных плашек: фраза игры, сумма и кнопка «Перевести» (#616)
-    // на витрине внешняя ссылка запрещена — просьба остаётся, карточки нет
+    // на витрине внешняя ссылка запрещена: у VK карточка ведёт в сообщество игры, у остальных её нет (#1239)
     if (this.externalPay) this.push({ kind: 'lend50', text: LEND50_SYS, link: LEND50_LINK })
+    else if (this.joinGroup) this.push({ kind: 'lend50', text: LEND50_VK_SYS, join: true })
     this.storage?.setItem(LEND50_SEEN_KEY, '1') // отметка устройства, а не партии: она только выбирает текст
     S.mem[memkeys.lend50.asked] = true
     S.choices = null // buildChoices отдаст LEND50_CHOICES
@@ -2820,6 +2825,25 @@ export class Game {
     this.touchMsgs(at)
   }
 
+  /** Вступление в официальное сообщество игры на VK засчитано платформой (успех `joinGroup`) — #1239.
+   *  Итог тот же, что у «Перевёл»: группа получает спонсорское имя. Ответ на шутку не подменяется —
+   *  `lend50.answer` ставит только сам ответ, поэтому кнопки и ачивка «Кредитор Алика» остаются прежними. */
+  lend50Sponsor(): void {
+    const S = this.S
+    // «Перевёл» уже переименовал группу — второго «ПЛИТОЧНИК — СПОНСОР» не будет
+    if (S.mem[memkeys.lend50.sponsor] || S.mem[memkeys.lend50.answer] === 'yes') return
+    this.sponsorRename()
+    this.save()
+  }
+
+  /** Спонсорское имя группы: общий итог вступления в сообщество и ответа «Перевёл» (#1239). */
+  private sponsorRename(): void {
+    const S = this.S
+    S.mem[memkeys.lend50.sponsor] = true
+    S.mem[memkeys.endgame.renames] = Number(S.mem[memkeys.endgame.renames] ?? 0) + 1
+    this.sys(`Алик изменил название группы на «${LEND50_RENAME}»`)
+  }
+
   /** Ответ на «займи 50»: реплики и ачивка — без движения денег и долга; без опечаток (#248). */
   async endgameLend50(answer: string): Promise<void> {
     const S = this.S
@@ -2830,8 +2854,7 @@ export class Game {
     try {
       if (answer === 'yes') {
         await this.say([LEND50_YES])
-        S.mem[memkeys.endgame.renames] = Number(S.mem[memkeys.endgame.renames] ?? 0) + 1
-        this.sys(`Алик изменил название группы на «${LEND50_RENAME}»`)
+        if (!S.mem[memkeys.lend50.sponsor]) this.sponsorRename()
         if (this.canSpeak('nune')) await this.say([{ w: 'nune', t: LEND50_NUNE }])
       } else if (answer === 'no') await this.say([this.draw('LEND50_NO', LEND50_NO)])
       else await this.say([isOpen(LEND50_SERIOUS, this.lineFacts()) ? valueOf(LEND50_SERIOUS) : LEND50_SERIOUS_ELSE])
