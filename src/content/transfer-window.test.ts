@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest'
 import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
-import { TRANSFER_FRESH_TURNS } from './excuses'
+import { D, TRANSFER_FRESH_TURNS } from './excuses'
 
 const findReply = (game: Game) => { game.S.choices = null; return game.buildChoices().find((c) => c.act === 'transferQ') }
 
@@ -55,6 +55,33 @@ describe('окно отклика на перевод (#1003)', () => {
     expect(offered.length, 'окно перевода ничего не предложило — проверка пустеет').toBe(TRANSFER_FRESH_TURNS + 1)
     expect(offered, `повтор строки пула внутри окна: ${offered.join(' → ')}`).toEqual([...new Set(offered)])
     expect(offered.some((t) => t.includes('50')), 'сумма не подставлена в выбранную строку').toBe(true)
+  })
+
+  it('новый перевод не возвращает ту же реакцию внутри окна повтора (#1299)', async () => {
+    // Пул один на все переводы, а окно события (2 хода) своё у каждого: строка возвращалась дословно
+    // через 12–17 ходов (партия 328117: «Спасибо за 50 ₽… А остальные?» 44→56; 322117: 78→95).
+    // Долгоживущее окно повтора (#824): показанная строка молчит 20 ходов, исчерпанный в окне пул —
+    // до конца окна (#1078), как у «Мууу» (#1291). Переводы идут раз в 7 ходов — прежнее окно их не держит.
+    const { game } = makeGame()
+    const shown: { t: string; at: number }[] = []
+    for (let i = 1; i <= 12; i++) {
+      const turn = i * 7
+      game.S.stats.sent = turn
+      await game.transfer()
+      const b = findReply(game)
+      if (b) shown.push({ t: b.text, at: turn })
+    }
+    expect(shown.length, 'кнопка реакции ни разу не показана — проверка пустеет').toBeGreaterThan(D.P_TRANSFER.length)
+    const last = new Map<string, number>()
+    const bad: string[] = []
+    for (const s of shown) {
+      const prev = last.get(s.t)
+      if (prev !== undefined && s.at - prev < 20) bad.push(`«${s.t}» ходы ${prev}→${s.at}`)
+      last.set(s.t, s.at)
+    }
+    expect(bad.slice(0, 3), 'повтор строки пула внутри окна повтора').toEqual([])
+    // и окно отпускает: за 12 переводов пул вернулся — иначе проверка выше доказывала бы только молчание
+    expect(shown.length, 'за окном пул не вернулся — проверка пустеет').toBeGreaterThan(new Set(shown.map((s) => s.t)).size)
   })
 
   it('перевод в пачке «пока тебя не было» тоже штампует окно', async () => {

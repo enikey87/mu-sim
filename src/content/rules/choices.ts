@@ -4,7 +4,7 @@ import type { ContentApi } from '../../engine/game'
 import type { Choice, Tone } from '../../engine/state'
 import { type Rule, type Facts, type Criterion, type Entry, type Line, eq, ne, is, exists, missing, gt, gte, lte, isOpen, spec, valueOf, sinceWithin } from '../fact'
 import type { GameEvent, Offer } from './events'
-import { D, cap, WHEN_YEARS, EVENT_FRESH_TURNS, PHOTO_FRESH_TURNS, TRANSFER_FRESH_TURNS } from '../excuses'
+import { D, cap, WHEN_YEARS, EVENT_FRESH_TURNS, PHOTO_FRESH_TURNS } from '../excuses'
 import { talkPairs, talkId } from '../talk'
 import { ARCS, WRONG_Q } from '../arcs'
 import * as L from '../life'
@@ -88,11 +88,13 @@ const freshFromArr = (game: ContentApi, key: string, arr: readonly Entry<unknown
 /** D-пул того же класса, что `freshFromArr`, но текст — из словаря отмазок. Пул приходит с каждым
  *  событием (у «Мууу» окно — один ход, а пул один и тот же), поэтому он долгоживущий: держит окно
  *  повтора (#824), а не окно события. С окном события та же формулировка возвращалась через два
- *  хода и через 10–17 (партия 312117: «Алик, это у вас корова мычит?» 64→66, #1291).
+ *  хода и через 10–17 (партия 312117: «Алик, это у вас корова мычит?» 64→66, #1291; перевод 50 ₽ —
+ *  44→56 и 78→95, #1299). `freshPlayerTurn` держит выбор до конца хода: `freshPlayer` тратил на
+ *  каждую пересборку следующую строку, и кнопка менялась под пальцем (#826).
  *  Интерполяция — после выбора строки, как у `windowFromD` (#1003). */
 const freshFromD = (game: ContentApi, key: string, map: Record<string, string> = {}) => {
   requirePlayerPool(`D.${key}`, D[key])
-  const raw = game.freshPlayer(key, D[key])
+  const raw = game.freshPlayerTurn(key, D[key])
   return raw === null ? '' : game.X.fill(raw, map)
 }
 /** Пул собственного окна события (#927): показ ограничен `*Fresh`-фактом, поэтому окно повтора (#824)
@@ -327,8 +329,11 @@ export const choiceRules: R[] = [
   offer({ name: 'Photo', when: [is('photoFresh')], act: 'photo', tone: 'neutral', bonus: 3, text: (g) => windowFromD(g, 'P_PHOTO', PHOTO_FRESH_TURNS) }),
   offer({ name: 'VoiceCow', slot: 'voice', weight: 0.4, when: [eq('ctx.type', 'voice')], act: 'voice', tone: 'neutral', bonus: 3, text: (g) => fromD(g, 'P_VOICE') }),
   offer({ name: 'VoiceText', slot: 'voice', weight: 0.6, when: [eq('ctx.type', 'voice')], act: 'voiceText', tone: 'neutral', bonus: 3, text: (g) => fromD(g, 'P_VOICE2') }),
-  // перевод 50 ₽ — заметное событие с окном отклика (#1003): кнопка из пула реакций живёт и когда ctx ушёл дальше
-  offer({ name: 'Transfer', when: [is('transferFresh')], act: 'transferQ', tone: 'neutral', bonus: 3, text: (g, f) => windowFromD(g, 'P_TRANSFER', TRANSFER_FRESH_TURNS, { amount: String(f['transferAmount'] ?? 50) }) }),
+  // перевод 50 ₽ — заметное событие с окном отклика (#1003): кнопка из пула реакций живёт и когда ctx ушёл
+  // дальше. Пул один на все переводы, поэтому он долгоживущий: окно события (2 хода) строку между
+  // переводами не держало и возвращало её дословно через 12–17 ходов (#1299) — окно повтора (#824)
+  // и молчание исчерпанного пула (#1078), как у «Мууу» (#1291). Окно самого события не трогаем.
+  offer({ name: 'Transfer', when: [is('transferFresh')], act: 'transferQ', tone: 'neutral', bonus: 3, text: (g, f) => freshFromD(g, 'P_TRANSFER', { amount: String(f['transferAmount'] ?? 50) }) }),
   offer({ name: 'Ping', when: [eq('ctx.type', 'readonly')], act: 'ping', tone: 'neutral', bonus: 3, text: (g) => fromD(g, 'P_PING') }),
   // «Завтра» → «это когда?», а «Брат, в пути» → «А подробнее?»
   offer({
