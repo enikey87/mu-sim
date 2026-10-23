@@ -35,7 +35,9 @@ function useOptionPress(onAnnotate?: () => void) {
 export function Choices() {
   const game = useGame()
   const review = useReview()
-  const locked = game.ui.busy || game.battery.dead
+  // masked — пересборка вне хода (карточка, «Мууу»): ряд прячется за ту же анимацию «?»,
+  // но ход мира не идёт — презентация, не блокировка (23.10).
+  const locked = game.ui.busy || game.ui.masked || game.battery.dead
   // Ряд заморожен на весь ход мира: пересборка вариантов посреди хода (сцена, эндгейм, серия) меняла число «?»,
   // добавляла/убирала кнопки и перезапускала анимацию — ряд мигал (#657). Число берём с последнего кадра без busy:
   // того самого ряда, который игрок видел перед ходом; подписи ждут конца хода.

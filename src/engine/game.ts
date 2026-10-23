@@ -1135,6 +1135,29 @@ export class Game {
     return thing.done
   }
   /** Кнопка карточки банка: выбор пишется в мир, Алику не уходит (#287). */
+  /** Пересборка вариантов за маской «?»: мгновенная смена ряда на ходу выглядела прыжком
+   *  (23.10, баги 1–2: клик по карточке и «Мууу» меняли варианты без фазы «?»).
+   *  Ряд пересобирается синхронно — сразу за маской (бот и рендер не видят старого ряда);
+   *  маска — презентация (ui.masked), не блокировка: ходы и отправка остаются доступны.
+   *  Во время хода мира ничего не делает — ход сам пересоберёт ряд в конце. */
+  private async maskedChoicesRebuild(delayMs = 420): Promise<void> {
+    if (this.disposed || this.ui.busy) return
+    this.ui.masked = true
+    this.S.choices = this.buildChoices()
+    this.save()
+    this.emit()
+    try {
+      await this.sleep(delayMs)
+    } catch (e) {
+      // dispose прервал маску: утилизированная игра не роняет прогон необработанным отказом
+      if (!(e instanceof GameDisposed)) throw e
+      return
+    }
+    if (this.disposed) { this.ui.masked = false; this.emit(); return }
+    this.ui.masked = false
+    this.emit()
+  }
+
   answerCard(id: number, pick: 'take' | 'sell' | 'later'): void {
     const m = this.S.msgs.find((x) => x.id === id)
     if (!m || m.kind !== 'card' || !m.offer || m.answered || this.disposed) return
@@ -1181,8 +1204,9 @@ export class Game {
         this.pendingSellOffer = undefined
         this.maybeCreditOffer(why)
       }
-      // уровень денег сменился — варианты отчаяния уходят сразу, не через ход
-      if (!this.ui.busy) this.S.choices = this.buildChoices()
+      // уровень денег сменился — варианты отчаяния пересобираются сразу, но через маску «?»,
+      // как ход мира: мгновенная смена ряда на ходу выглядела прыжком (23.10, баг 2)
+      void this.maskedChoicesRebuild()
     }
     this.save()
     this.emit()
@@ -1424,7 +1448,9 @@ export class Game {
   moo(): void {
     this.S.stats.moo++
     this.S.mem[memkeys.mooAt] = this.S.stats.sent
-    if (!this.ui.busy && !this.S.scene) this.S.choices = null // появится «Это корова?»
+    // «Это корова?» появится в новом ряду — через маску «?», не прыжком (23.10, баг 1);
+    // во время хода мира пересборку делает сам ход, сцену вариант-кнопки не трогают
+    if (!this.S.scene) void this.maskedChoicesRebuild()
     if (this.S.stats.moo >= 10) this.unlock('moo10')
     const m: Moo = { id: this.seq++, text: 'М' + 'у'.repeat(4 + this.rnd(8)), left: 5 + this.rnd(45), top: 15 + this.rnd(60) }
     this.ui.moos.push(m)

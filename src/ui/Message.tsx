@@ -224,7 +224,11 @@ function Lend50StarsCard({ m }: { m: Extract<Msg, { kind: 'lend50' }> }) {
 /** Банк, мама, Авито — компактная карточка посреди ленты: не реплика Алика и не игрока, нажимать не нужно (#287). */
 function PhoneCard({ m }: { m: Extract<Msg, { kind: 'card' }> }) {
   const game = useGame()
-  const off = game.ui.busy || game.battery.dead
+  // Карточки кликабельны и во время хода мира (23.10, баг 3): answerCard синхронен,
+  // его мутации (деньги, mem, замена карточки) консистентны на любом await-шаге хода,
+  // пересборка вариантов в нём уже была ограждена busy — ход сам соберёт новый ряд.
+  // Офферы работ (answerJob) — асинхронные ходы, их маска остаётся в JobButtons.
+  const off = game.battery.dead
   const o = m.offer
   return (
     <div className="card" data-testid="card">

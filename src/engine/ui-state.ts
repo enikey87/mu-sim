@@ -16,6 +16,9 @@ export class UiState {
   notif: Notif | null = null
   moos: Moo[] = []
   busy = false
+  /** Маска «?» на ряде вариантов: пересборка вне хода мира (карточка, «Мууу») прячется
+   *  за ту же анимацию, но не блокирует ходы и отправку — презентация, не замок (23.10). */
+  masked = false
   unread = 0
   feel: SendFeel | null = null
   feelId = 0
