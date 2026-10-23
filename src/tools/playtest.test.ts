@@ -248,8 +248,10 @@ describe('PLAYTEST_PROFILE=agreeable', () => {
     ].filter((k) => k !== '')
     // #1222 (окно финала квеста-тамады) сдвинул розыгрыш — замер 1–30: согласие глубже нейтральной партии
     // только на 10, 23 и 28 (на 19 баран есть обеим); берём наименьший — 10.
-    const neutral = await playtest(10, 300)
-    const agree = await playtest(10, 300, undefined, undefined, 'agreeable')
+    // #1270 (кнопки-действия окон событий без хвостов) сдвинул розыгрыш — замер 1–30: согласие глубже
+    // нейтральной партии только на 4, 6, 19, 23 и 28 (на 16 наоборот); берём наименьший — 4.
+    const neutral = await playtest(4, 300)
+    const agree = await playtest(4, 300, undefined, undefined, 'agreeable')
     const deeper = facts(agree.game).filter((k) => !facts(neutral.game).includes(k))
     expect(deeper).toEqual(['has.boris'])
   }, 60_000)
