@@ -1103,6 +1103,8 @@ describe('Game: деньги на карте', () => {
     expect(line(300)).toBeNull() // пул исчерпан — повтор той же строки молчит
     expect(line(301)).toBeNull() // и в пределах окна сказанное не возвращается
     expect(line(300 + 13)).toBeNull()
+    // окно повтора (#1290) считает ходы: календарь отпустил строку, но 20 ходов ещё не прошло
+    game.S.stats.sent += 20
     const back = Array.from({ length: n }, (_, i) => line(300 + 14 + i)).filter((x): x is string => x !== null)
     expect(back).toHaveLength(n) // окно прошло — пул звучит снова, а не замолкает навсегда
     for (const b of back) expect(fresh.some((f) => b.startsWith(f))).toBe(true) // повторяет сказанное, но другими словами
@@ -1165,18 +1167,29 @@ describe('Game: деньги на карте', () => {
     expect(back).not.toBeNull()
     expect(fresh.some((f) => back!.startsWith(f))).toBe(true)
   })
-  it('отчаяние не пропадает с исчерпанным пулом: строку окна перефразируем, а не глушим (#167/#240)', () => {
+  it('исчерпанный пул отчаяния молчит окно, а намерение у слота остаётся (#167/#240/#1290)', () => {
     const { game } = makeGame()
     setMoney(game, 1000)
-    const at = (day: number): string | null => {
-      game.S.day = day
+    game.S.day = 300
+    const at = (sent: number): string | null => {
+      game.S.stats.sent = sent
       return game.poorLine('P_DESPERATE_bottom', P_DESPERATE.bottom, { act: true })
     }
-    const fresh = [at(300), at(300), at(300), at(300)]
-    expect(new Set(fresh).size).toBe(4)
-    const again = at(301)
-    expect(again).not.toBeNull() // акт «desperate» не исчезает вместе с копирайтом
-    expect(fresh).not.toContain(again) // но и не повторяет сказанное слово в слово
+    const fresh = [0, 1, 2, 3].map(at).filter((x): x is string => x !== null)
+    expect(new Set(fresh).size).toBe(4) // четыре открытые строки пула — без повторов
+    // все строки в окне — пул молчит: новый хвост базу не открывает (#1290, плейтест 119)
+    for (let sent = 4; sent < 20; sent++) expect(at(sent), `ход ${sent}: повтор базы с хвостом`).toBeNull()
+    // кнопка-намерение не пропадает: денежную реплику с «отчаянием» даёт пул уровня
+    game.chance = () => true
+    game.S.choices = null
+    const money = [...P_MONEY.bottom.polite, ...P_MONEY.bottom.neutral].map((e) => valueOf(e as never))
+    const slot = game.buildChoices().find((c) => c.act === 'desperate' && money.some((m) => c.text.startsWith(m)))
+    expect(slot, 'намерение «отчаяние» ушло из кадра вместе с пулом').toBeTruthy()
+    // за окном повтор базы законен, но не дословный: строку различает хвост (PSUF задуман)
+    const back = at(20)
+    expect(back).not.toBeNull()
+    expect(fresh.some((f) => back!.startsWith(f))).toBe(true)
+    expect(fresh).not.toContain(back)
   })
   // #1268: окно повтора считает ходы, а не сутки, и принадлежит пулу, а не ключу колоды
   it('окно повтора: четыре строки — четыре показа, дальше кнопка молчит (#824/#1268)', () => {
@@ -1402,12 +1415,14 @@ describe('Game: окно дословного повтора вариантов 
     expect(bad.slice(0, 3)).toEqual([])
   }, 120_000)
 
-  // #1268: денежные строки несут `act: 'desperate'` и потому мимо спек-теста выше — а повторялись
-  // они дословно (плейтест 114/115), пока пул отпускал строку по календарю, а не по ходам
+  // #1268/#1290: денежные строки несут `act: 'desperate'` и потому мимо спек-теста выше — а повторялись
+  // они дословно (плейтест 114/115), пока пул отпускал строку по календарю, а не по ходам; строки
+  // отчаяния возвращались в соседних ходах ещё и с новым хвостом (плейтест 119), потому и база
   it('строки пула денег не повторяются дословно в окне 20 ходов: партия 300 ходов', async () => {
     const { game } = makeGame({ seed: 128031 })
     setMoney(game, Game.MONEY_BOTTOM)
-    const pool = [P_MONEY.low.polite, P_MONEY.low.neutral, P_MONEY.bottom.polite, P_MONEY.bottom.neutral]
+    const pool = [P_MONEY.low.polite, P_MONEY.low.neutral, P_MONEY.bottom.polite, P_MONEY.bottom.neutral,
+      P_DESPERATE.low, P_DESPERATE.bottom]
       .flat().map((e) => { const v = valueOf(e); return typeof v === 'string' ? v : v.t })
     const offered: Array<{ turn: number; text: string }> = []
     for (let t = 0; t < 300; t++) {

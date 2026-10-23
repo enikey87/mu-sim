@@ -730,7 +730,11 @@ export class Game {
   /**
    * Бедность: свежие без повторов; исчерпанный пул молчит, пока строку не отпустит POOR_REPEAT_DAYS,
    * а отпущенную перефразирует — сказанное слово в слово не возвращается (#184/#240).
-   * `act` — строка несёт намерение игрока: пул не молчит, даже когда окно не отпустило ни одной (#167).
+   * Окно повтора (#824) держит базу строки, а не только украшенный текст: хвост-суффикс не делает
+   * повтор новой репликой, поэтому одна формулировка с разными хвостами молчит PLAYER_REPEAT_TURNS
+   * ходов (#1290: «…Это соболезнования, АЛИК. Очень жду.» / «😢» соседними ходами).
+   * `act` — строка несёт намерение игрока: календарь её не глушит (#167/#240), но окно повтора держит:
+   * повтор базы законен только за ним, иначе слот отдаёт намерение другому пулу (P_MONEY).
    */
   poorChoice<T extends PoorText>(key: string, arr: readonly Entry<T>[], opts?: { act?: boolean }): { value: T; text: string } | null {
     const fresh = this.decks.pick(key, arr, this.lineFacts(), { eligible: (e) => !this.shown.has(poorText(valueOf(e))) && !this.seen.has(poorText(valueOf(e))) })
@@ -741,12 +745,15 @@ export class Game {
       return { value: fresh, text }
     }
     const said = (t: string): number => this.S.poorSaid[t] ?? -POOR_REPEAT_DAYS
-    const open = arr.filter((e) => isOpen(e, this.lineFacts())).map(valueOf)
+    // показанную в окне базу не открывает и новый хвост: короткий пул отчаяния звучал одним текстом
+    // с разными эмодзи соседними ходами (плейтест 119, #1290)
+    const open = arr.filter((e) => isOpen(e, this.lineFacts()) && !this.recentOffer(poorText(valueOf(e)))).map(valueOf)
     if (!open.length) return null
     const ready = open.filter((t) => this.S.day - said(poorText(t)) >= POOR_REPEAT_DAYS)
     if (!ready.length && !opts?.act) return null
-    const raw = ready.length ? ready.reduce((a, b) => (said(poorText(b)) < said(poorText(a)) ? b : a))
-      : open[Math.floor(this.S.day / POOR_REPEAT_DAYS) % open.length]!
+    // act без календаря берёт самую давнюю: она прошла окно повтора, а дня ещё не дождалась
+    const raw = (ready.length ? ready : open)
+      .reduce((a, b) => (said(poorText(b)) < said(poorText(a)) ? b : a))
     // отметка на исходной строке тоже: иначе самая старая так и остаётся самой старой, и пул
     // перефразирует её одну, а не идёт по кругу
     this.S.poorSaid[poorText(raw)] = this.S.day

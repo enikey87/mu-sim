@@ -165,14 +165,18 @@ describe('отчаяние от бедности', () => {
     expect(new Set(DESPERATE_REPLY.map(valueOf)).has(firstReply(game, from)!)).toBe(true)
   })
 
-  it('перефразированная конкретная реплика сохраняет адрес ответа (#446)', () => {
+  it('база пула держит окно повтора и с хвостом; после окна адрес ответа сохранён (#446/#1290)', () => {
     const { game } = makeGame({ seed: 7 })
     const pool = [{ t: DESPERATE_PAIRS.atm.ask, arg: 'atm' }]
-    const first = game.poorChoice('ATM_REPEAT', pool, { act: true })
-    const repeated = game.poorChoice('ATM_REPEAT', pool, { act: true })
+    const at = (sent: number) => { game.S.stats.sent = sent; return game.poorChoice('ATM_REPEAT', pool, { act: true }) }
+    const first = at(0)
     expect(first?.text).toBe(DESPERATE_PAIRS.atm.ask)
+    // эмодзи-хвост не делает повтор новой репликой: внутри окна 20 ходов пул молчит (#1290)
+    for (let sent = 1; sent < 20; sent++) expect(at(sent), `ход ${sent}: база с новым хвостом`).toBeNull()
+    // за окном повтор законен: та же строка пула, но с хвостом и с прежним адресом ответа
+    const repeated = at(20)
     expect(repeated?.text).toContain(DESPERATE_PAIRS.atm.ask)
-    expect(repeated?.text).not.toBe(first?.text)
+    expect(repeated?.text).not.toBe(DESPERATE_PAIRS.atm.ask)
     expect(repeated?.value).toEqual(pool[0])
   })
 
@@ -355,8 +359,10 @@ describe('отчаяние от бедности', () => {
     const after = rebuilds(game, 100).flat().map((c) => c.text)
     expect(after.some((t) => t.includes(SELL_TILE))).toBe(false)
     expect(after.some((t) => t.includes(SOLD_TILE))).toBe(true)
-    // негативный контроль: вернуть плитку — снова «продам»
+    // негативный контроль: вернуть плитку — снова «продам». Окно повтора (#1290) считает ходы:
+    // строка «продам» показана выше, поэтому сначала отступаем на окно, иначе пул законно молчит
     delete game.S.mem[sold('tile')]
+    game.S.stats.sent += 20
     expect(rebuilds(game, 100).flat().some((c) => c.text.includes(SELL_TILE))).toBe(true)
   })
 
