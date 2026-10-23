@@ -55,6 +55,12 @@ const fromD = (game: ContentApi, key: string, map: Record<string, string> = {}) 
   requirePlayerPool(`D.${key}`, D[key])
   return game.playerLine(() => game.X.fill(game.draw(key, D[key]), map))
 }
+/**
+ * Пул события: сырой draw. Так можно только там, где показ сам ограничен окном — `*Fresh`-факт,
+ * окно первого сообщения, один вариант на праздник/окно контекста: за окном кнопка исчезает,
+ * и окно повтора (#824) ей не нужно. Долгоживущий пул (факт постоянный, кнопка возвращается)
+ * идёт через `freshFromArr`, иначе строка звучит дословно через 15–19 ходов (#1078 → #1268).
+ */
 const fromArr = (game: ContentApi, key: string, arr: readonly Entry<unknown>[]) => {
   requirePlayerPool(key, arr)
   return game.playerLine(() => game.draw(key, arr as readonly Entry<string>[]))
@@ -64,6 +70,8 @@ const plainFromArr = (game: ContentApi, key: string, arr: readonly Entry<unknown
   requirePlayerPool(key, arr)
   return game.draw(key, arr as readonly Entry<string>[])
 }
+/** Долгоживущий пул: окно повтора (#824) — показанное молчит PLAYER_REPEAT_TURNS ходов, исчерпанный
+ *  пул молчит совсем (пустой текст — оффер не предлагается), а не повторяется дословно (#1078, #1268). */
 const freshFromArr = (game: ContentApi, key: string, arr: readonly Entry<unknown>[]) => {
   requirePlayerPool(key.startsWith('F_') ? `ARCS.${key.slice(2)}.follow` : key, arr)
   return game.freshPlayer(key, arr as readonly Entry<string>[]) ?? ''
@@ -108,13 +116,15 @@ export const choiceRules: R[] = [
     act: 'catchLie', tone: 'neutral', bonus: 6,
     text: (g) => { const l = g.lie()!; return g.playerLine(() => g.X.fill(g.draw('P_LIE', P_LIE), { old: l.old.say, new: l.new.say })) },
   }),
-  // упрёк по звонку с объекта: пул живёт только под фактом звонка, в окнах молчания — молчит (#577)
+  // упрёк по звонку с объекта: пул живёт только под фактом звонка, в окнах молчания — молчит (#577).
+  // Факт звонка постоянный, а кнопка возвращается после перерыва — значит, пул долгоживущий: окно повтора
+  // (#824) вместо сырого draw, иначе «Получка — не про меня» звучала дословно через 19 ходов (#1268)
   offer({
     name: 'CrewPaid',
     when: [is(crewPaid), missing(blocked), missing(alikDead)],
     act: 'crewPaid', tone: 'neutral', bonus: 4,
     cooldown: { turns: 10 }, // иначе кнопка занимает слот в 94% кадров выбора до конца партии (#592 → #789)
-    text: (g) => fromArr(g, 'P_CREW_PAID', P_CREW_PAID),
+    text: (g) => freshFromArr(g, 'P_CREW_PAID', P_CREW_PAID),
   }),
   // праздник в календаре переписки: деньги под ним, один вариант на окно (#585); в окне молчания — молчит.
   // Слот только до дня: «на носу» 1 января — праздник уже прошёл (#828). Пул и окно Алика те же.

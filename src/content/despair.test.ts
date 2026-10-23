@@ -411,3 +411,54 @@ describe('отчаяние от бедности', () => {
     expect(all).not.toMatch(/я ел|голод|есть нечего|не ем|голодаю/i)
   })
 })
+
+// #1268: пул денег — долгоживущий: кнопка возвращается каждый ход, а суточное окно пула бедности
+// (#184, 14 дней) отпускало строку раньше окна повтора (#824, 20 ходов) — та же формулировка звучала
+// дословно через 9–19 реплик (плейтест 114/115). Теперь окно повтора считает ходы, а не дни.
+describe('окно повтора денежных пулов (#1268)', () => {
+  type Level = 'low' | 'bottom'
+  const poolTexts = (level: Level): string[] =>
+    [...P_MONEY[level].polite, ...P_MONEY[level].neutral].map(poolText)
+  /** Строка пула в тексте варианта: пул молчит пустым текстом, но повтор узнаём по вхождению. */
+  const moneyLine = (text: string, level: Level): string | undefined =>
+    poolTexts(level).find((t) => text.includes(t))
+  const rebuild = (g: Game): Choice[] => { g.S.choices = null; return g.buildChoices() }
+  const offered = (g: Game, level: Level): string[] =>
+    rebuild(g).flatMap((c) => { const t = moneyLine(c.text, level); return t ? [t] : [] })
+
+  it('исчерпанный пул уровня молчит в окне, а не возвращает строку дословно', () => {
+    const { game } = makeGame({ seed: 7 })
+    setMoney(game, Game.MONEY_BOTTOM)
+    const shown: string[] = []
+    // дни идут быстрее ходов: суточному окну (#184) трёх перерисовок хватает, окну повтора — нет
+    for (let i = 0; i < 40; i++) {
+      game.S.day += 5
+      for (const t of offered(game, 'bottom')) {
+        expect(shown, `«${t.slice(0, 44)}…» повторён дословно внутри окна`).not.toContain(t)
+        shown.push(t)
+      }
+    }
+    expect(shown.length, 'пул уровня показывался').toBeGreaterThan(0)
+    expect(new Set(shown).size, 'повторов нет').toBe(shown.length)
+    expect(shown.length, 'показан весь пул уровня').toBeLessThanOrEqual(poolTexts('bottom').length)
+    // пул исчерпан — вежливая кнопка остаётся общей репликой, строк пула бедности в кадре нет
+    game.S.day += 5
+    expect(offered(game, 'bottom'), 'исчерпанный пул молчит').toEqual([])
+    expect(rebuild(game).some((c) => c.tone === 'polite'), 'вежливый вариант не пропал').toBe(true)
+    // окно прошло — пул звучит снова: повтор за пределами 20 ходов законен (#824)
+    game.S.stats.sent += 20
+    const back = Array.from({ length: 30 }, () => offered(game, 'bottom')).flat()
+    expect(back.length, 'за окном пул звучит снова').toBeGreaterThan(0)
+    for (const t of back) expect(poolTexts('bottom'), 'за окном вернулась строка своего пула').toContain(t)
+  })
+
+  it('вежливая строка не теряет адрес ответа: arg едет вместе с ней (#446)', () => {
+    const { game } = makeGame({ seed: 7 })
+    setMoney(game, Game.MONEY_LOW)
+    const BANK = DESPERATE_PAIRS.bankAsk.ask
+    const ask = Array.from({ length: 30 }, () => rebuild(game)).flat().find((c) => c.text.includes(BANK))
+    expect(ask, 'строка «банк спрашивает про вас» попадалась').toBeTruthy()
+    expect(ask!.act).toBe('desperate')
+    expect(ask!.arg, 'ответ на строку — про банк, а не общий').toBe('bankAsk')
+  })
+})
