@@ -277,8 +277,9 @@ export const choiceRules: R[] = [
   // (ход и три после). bonus 5: рядом стоят вопросы общего блока — реакция должна попасть в слот
   offer({ name: 'TamadaDone', when: [is('tamadaDoneFresh')], act: 'tamadaDone', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_TAMADA_DONE', P_TAMADA_DONE) }),
   // вопрос о баране по памяти партии (#1252): Turn_Memory спрашивает «Всё ещё у тебя?» — отклик в окне
-  // события (ход вопроса и три после). bonus 5: рядом стоят общие вопросы блока — реакция должна попасть в слот
-  offer({ name: 'BorisMemory', when: [is('borisAskFresh')], act: 'borisMemory', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_BORIS_MEMORY', P_BORIS_MEMORY) }),
+  // события (ход вопроса и три после). bonus 5: рядом стоят общие вопросы блока — реакция должна попасть в слот.
+  // Мёртвому не отвечают (#1293): вопрос зависшего собеседника не должен висеть в пуле после alikDead
+  offer({ name: 'BorisMemory', when: [is('borisAskFresh'), missing(alikDead)], act: 'borisMemory', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_BORIS_MEMORY', P_BORIS_MEMORY) }),
   // голосовое-плач мамы (#1085): событие серии звонков — отклик в окне события (ход и три после).
   // bonus 5: рядом стоят извинение и мычание (6) — событийная реакция обязана попасть в блок
   offer({ name: 'MamaVoice', when: [is('mamaVoiceFresh')], act: 'mamaVoice', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_MAMA_VOICE', P_MAMA_VOICE) }),

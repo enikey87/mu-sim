@@ -98,6 +98,17 @@ describe('лестница грубости: ступени', () => {
     const eligible = game.lines.eligible('RF_samvel', T.RUDE_FAMILY.samvel, game.lineFacts())
     expect(eligible.map((p) => p.text)).toEqual(['Мальчик, я Самвел. На моего племянника кричу только я. Встань в очередь, она с 1987 года.'])
   })
+  it('Арсен называет сумму долга только пока долг договорный (#1293)', () => {
+    const { game } = makeGame()
+    const line = 'Я посчитал: на ваши крики дядя тратит 40 минут в день. Это 240 часов в год. Столько же, сколько он вам должен. Совпадение?'
+    const open = () => game.lines.eligible('RF_arsen', T.RUDE_FAMILY.arsen, game.lineFacts()).map((p) => p.text)
+    // шутка сравнивает 240 часов с 240 000 договора — на старте она верна
+    expect(open(), 'на договорном долге шутки нет').toContain(line)
+    expect(game.adjustDebt(29650), 'долг не сдвинулся — проверка пустеет').toBe(true)
+    expect(game.S.debt, 'акт и допработы не доехали до долга').toBe(269650)
+    expect(open(), 'реплика называет устаревшую сумму').not.toContain(line)
+    expect(open().length, 'пул Арсена опустел').toBeGreaterThan(0)
+  })
   it('голосовое от Самвела и альтернативный отправитель «Нива» уместны только после знакомства', () => {
     const { game } = makeGame()
     const open = (pool: readonly Entry<T.Said>[], match: string) => pool.filter((e) => isOpen(e, game.lineFacts())).map(valueOf).some(([, t]) => saidText(t).includes(match))
