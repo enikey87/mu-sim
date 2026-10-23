@@ -12,7 +12,7 @@ import { reviewStamp, reviewTranscript, type ReviewSession } from './review'
 /** Граница между движком и интерфейсом: единственный модуль UI, который знает устройство S и ключей памяти.
  *  Компоненты получают фасад GameUi и плоский снимок; контент и memkeys не импортируют (страж — view.test.ts). */
 
-type UiView = Readonly<Pick<UiState, 'status' | 'typing' | 'toast' | 'notif' | 'moos' | 'busy' | 'feel' | 'feelId' | 'title'>> & { sheetOpen: boolean }
+type UiView = Readonly<Pick<UiState, 'status' | 'typing' | 'toast' | 'notif' | 'moos' | 'busy' | 'masked' | 'feel' | 'feelId' | 'title'>> & { sheetOpen: boolean }
 type BatteryView = Readonly<Pick<Game['battery'], 'level' | 'dead' | 'charging'>> & Pick<Game['battery'], 'charge'>
 
 /** Игра глазами компонента: действия, подписка, эфемерное состояние экрана. S нет ни в типе, ни в объекте —
@@ -32,6 +32,7 @@ export function uiOf(g: Game): GameUi {
   const ui: UiView = {
     get status() { return g.ui.status }, get typing() { return g.ui.typing }, get toast() { return g.ui.toast },
     get notif() { return g.ui.notif }, get moos() { return g.ui.moos }, get busy() { return g.ui.busy },
+    get masked() { return g.ui.masked },
     get feel() { return g.ui.feel }, get feelId() { return g.ui.feelId }, get title() { return g.ui.title },
     get sheetOpen() { return g.ui.sheetOpen }, set sheetOpen(v) { g.ui.sheetOpen = v },
   }

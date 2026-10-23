@@ -217,7 +217,8 @@ body {
   border: 0; border-radius: 10px; padding: 7px 10px; cursor: pointer;
   background: rgba(127, 127, 127, .15); color: var(--text); font: inherit; text-align: left;
 }
-.job-btns button:hover, .choices button:hover { background: rgba(127, 127, 127, .28); }
+.job-btns button:disabled, .card-btns button:disabled { opacity: .45; cursor: default; }
+.job-btns button:hover:not(:disabled), .choices button:hover:not(:disabled) { background: rgba(127, 127, 127, .28); }
 .typing-bubble { align-self: flex-start; background: var(--them); border-radius: 14px; padding: 10px 14px; z-index: 1; }
 .typing-bubble span {
   display: inline-block; width: 7px; height: 7px; margin: 0 2px; border-radius: 50%;

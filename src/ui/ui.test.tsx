@@ -2072,3 +2072,25 @@ describe('рецензирование вариантов ответа (#878)', 
     expect(document.querySelector('.review-badge')).toBeNull()
   })
 })
+
+describe('карточки во время хода мира (баги оператора 23.10)', () => {
+  it('карточка кликабельна в ходе: busy не глушит кнопки, клик отвечает карточку', async () => {
+    const { game } = makeGame()
+    const card = game.push({ kind: 'card', time: '12:00', icon: '🏦', app: 'Банк', text: 'Кредит «Всё будет»', offer: { take: 'Взять кредит', sell: 'Продать микроволновку' } })
+    game.ui.busy = true // ход окружающего мира
+    renderApp(game)
+    const later = screen.getByRole('button', { name: 'Не сейчас' })
+    expect(later, 'карточные кнопки не глушатся ходом мира — расследование 23.10').toBeEnabled()
+    await act(async () => { fireEvent.click(later); await flush() })
+    const after = game.S.msgs.find((x) => x.id === card.id)
+    expect(after?.kind === 'card' && after.answered, 'клик в ходе отвечает карточку').toBe(true)
+  })
+
+  it('офферы работ в ходе остаются замаскированы: кнопка задания disabled', () => {
+    const { game } = makeGame()
+    game.push({ kind: 'job', from: 'alik', text: 'Дорогой, у Жоры с рынка прилавок сделать надо.' })
+    game.ui.busy = true
+    renderApp(game)
+    expect(screen.getByRole('button', { name: 'Ладно, сделаю' }), 'работа — асинхронный ход, маска остаётся').toBeDisabled()
+  })
+})
