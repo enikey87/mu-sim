@@ -18,6 +18,7 @@ import { WORLD, SPEAKS } from '../world'
 import { fmtDayMonth, fmtDays } from '../../engine/time'
 import { HEAT, alikDead, alikShaved, intro, moustacheAskAt, blocked, court, mourning, phoneKarine, crewPaid, endgame, collectorsTea, collectorsRecruited, collectorsTurned } from '../memkeys'
 import { collectorsEpPool, requirePlayerPool } from '../player-pools'
+import { isEventWindow } from '../first-windows'
 import {
   P_VIA_BORIS, P_VIA_KARINE, P_VIA_MAMA, P_MOO, P_MOUSTACHE, P_COURT, P_COLLECTORS_DEBUT,
   STRASBOURG_THREAT,
@@ -91,7 +92,10 @@ const offer = (o: OfferSpec): R => ({
   cooldown: o.cooldown,
   // пустой текст — нечего предложить (весь пул недавно показывали)
   offer: ({ game, facts }): Choice | null => {
-    const text = o.text(game, facts)
+    // кнопка-действие окна события — лейбл, а не реплика игрока: суффикс-хвост к ней не клеится (#1270).
+    // Окно определяет условие оффера (isEventWindow), а не имя кнопки; кнопки срока — окно контекста,
+    // реплика игрока там звучит как речь, и хвост у неё остаётся.
+    const text = isEventWindow(o.when) ? game.actionLabel(() => o.text(game, facts)) : o.text(game, facts)
     return text ? { text, tone: o.tone, act: o.act, arg: o.arg?.(game, facts), topic: o.topic?.(game, facts) } : null
   },
 })

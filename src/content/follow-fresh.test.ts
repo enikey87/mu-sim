@@ -3,11 +3,20 @@
 // пока контекст жив) — не цикл пула. Цикл — текст пропал и вернулся раньше 20 сообщений.
 // С #857 talk-вопрос тоже в окне: неотвеченный вопрос к живому контексту не возвращается дословно
 // 20 ходов (раньше он висел, пока жива легенда, и повторялся внутри окна).
+// С #1270 лейбл кнопки-действия окна события хвостов не несёт по замыслу — его строка может
+// вернуться дословно, пока окно живо (ход события и 1–3 после): окно само ограничивает повтор,
+// это не цикл пула. Набор строк окна — из реестров first-windows, а не списком текстов.
 import { describe, it, expect } from 'vitest'
 import { makeGame } from '../test/helpers'
 import type { Choice } from '../engine/state'
+import { valueOf } from './fact'
+import { FIRST_WINDOWS, EVENT_SOURCES } from './first-windows'
+import { playerPool } from './player-pools'
 
 const chat = (c: Choice): boolean => !c.scene && !c.go
+/** Строки пулов окон событий: вернуться дословно внутри своего окна — их норма (#1270). */
+const WINDOW_LINES = new Set([...FIRST_WINDOWS, ...EVENT_SOURCES]
+  .flatMap((w) => (playerPool(w.pool) ?? []).map((e) => String(valueOf(e)))))
 
 describe('окно свежести кнопок с намерением (#833)', () => {
   it('кнопка чата, включая act, не возвращается дословно внутри 20 сообщений', async () => {
@@ -19,7 +28,7 @@ describe('окно свежести кнопок с намерением (#833)'
       game.S.choices = null
       const cs = game.buildChoices()
       const at = game.S.stats.sent
-      for (const c of cs) if (chat(c)) log.push({ text: c.text, at })
+      for (const c of cs) if (chat(c) && !WINDOW_LINES.has(c.text)) log.push({ text: c.text, at })
       const pick = cs.find((c) => c.act === 'arc') ?? cs[0]
       if (!pick) break
       await game.send(pick)

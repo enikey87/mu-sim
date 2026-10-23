@@ -4,6 +4,18 @@
 // участник красит сюит на месте, а не в плейтесте через раунд. Офферы и потребление окна ответом —
 // как были (#951), тексты пулов не менялись.
 import { avitoReviewAt, borisAskAt, borisSaleAt, collectorsAskAt, collectorsEpAt, countersuitAt, courtVerdictAt, crewPaidAt, grantHouseAt, grantTileAt, internAt, kettleAt, lawyerAt, mamaMarketAt, mamaVoiceAt, mooAt, moustachePhotoAt, photoAt, ramPhotoAt, rubikAskAt, rubikHoleAt, samvelDivorceAt, saleAt, tamadaDoneAt, tileAdAt, tileSlipAt, transferAt, vacancyAt } from './memkeys'
+import type { Criterion } from '../engine/rules'
+
+/**
+ * Окно события: в условии оффера есть стемп свежести `<событие>Fresh` — ход события и 1–3 после.
+ * Кнопки срока (`ctx.whenFresh`) — окно контекста, а не событие: у них свой документ
+ * (docs/design/deadline-replies.md). Тот же признак ищет окно без записи в реестре (сюит #1030),
+ * и по нему же сборщик вариантов берёт режим лейбла: кнопка-действие окна не несёт хвостов игрока (#1270).
+ */
+export const isEventWindow = (when: readonly Criterion[]): boolean =>
+  when.some((c) => (c.op === 'all'
+    ? isEventWindow(c.all ?? [])
+    : String(c.key).endsWith('Fresh') && !String(c.key).startsWith('ctx.when')))
 
 /** Общий дебютный слот (#973): `wrote.<who>`/`debutWho`/`debutAt` ставит первое сообщение участника. */
 export const DEBUT_SLOT = 'debut'

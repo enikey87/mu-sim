@@ -548,9 +548,24 @@ export class Game {
   playerDecor = (t: string): string => {
     // вокатив третьему лицу в начале строки («Тарон, …») — адресат уже есть, префикс к Алику не клеим (#1108)
     if (PLAYER_ADDRESSEES.has(t.split(',', 1)[0]!)) return t
-    if (/^Алик/.test(t)) return t + this.draw('PSUF', PLAYER_SUFFIX)
+    // лейбл кнопки-действия — не реплика: хвост к нему не клеится (#1270)
+    if (/^Алик/.test(t)) return this.labelDepth ? t : t + this.draw('PSUF', PLAYER_SUFFIX)
     const pre = this.draw('PPRE', PLAYER_PREFIX)
     return pre + (pre.endsWith(', ') ? low(t) : t)
+  }
+  /**
+   * Сколько раз сейчас собирается текст кнопки-действия (окно события или вариант сцены). Пока собирается,
+   * суффикс-хвост игрока к лейблу не клеится: «Забрать чайник у кума Очень жду.» — это две реплики (#1270).
+   */
+  private labelDepth = 0
+  /**
+   * Собрать текст кнопки-действия в режиме лейбла: хвосты игрока к нему не клеятся (#1270).
+   * Режим ставит `offer` по условию окна события (isEventWindow, choices.ts) и сборка варианта сцены —
+   * список действий выводится из признака окна/навигации, а не из имён кнопок.
+   */
+  actionLabel = <T>(fn: () => T): T => {
+    this.labelDepth++
+    try { return fn() } finally { this.labelDepth-- }
   }
   /** Реплика Алика, которой ещё не было. */
   uniq = <T extends Keyed>(gen: () => T): T => {
@@ -574,7 +589,7 @@ export class Game {
     }
     // колода вся в окне — слот не молчит (#731), но между сообщениями это уже не дословный повтор (#833)
     const at = this.shownAt.get(t)
-    if (this.recentOffer(t) && at !== undefined && this.S.stats.sent > at) {
+    if (!this.labelDepth && this.recentOffer(t) && at !== undefined && this.S.stats.sent > at) {
       const raw = t
       for (let i = 0; i < PLAYER_SUFFIX.length; i++) {
         const alt = raw + this.draw('PSUF', PLAYER_SUFFIX)
@@ -648,7 +663,7 @@ export class Game {
     const shown = at(line)
     this.playerSaid.set(line, this.S.stats.sent)
     // внутри окна — не дословно: иначе строка уходит и возвращается раньше 20 ходов (#833)
-    if (shown !== -1e9 && this.S.stats.sent > shown && this.S.stats.sent - shown < PLAYER_REPEAT_TURNS) {
+    if (!this.labelDepth && shown !== -1e9 && this.S.stats.sent > shown && this.S.stats.sent - shown < PLAYER_REPEAT_TURNS) {
       return line + this.draw('PSUF', PLAYER_SUFFIX)
     }
     this.rememberShown(line)
@@ -681,12 +696,14 @@ export class Game {
     // полный текст тоже в окне 20 ходов: иначе один и тот же хвост возвращается дословно (#833)
     const base = poorText(raw)
     let t = base
-    for (let i = 0; i < PLAYER_SUFFIX.length; i++) {
-      t = base + this.draw('PSUF', PLAYER_SUFFIX)
-      if (!this.recentOffer(t)) break
+    if (!this.labelDepth) {
+      for (let i = 0; i < PLAYER_SUFFIX.length; i++) {
+        t = base + this.draw('PSUF', PLAYER_SUFFIX)
+        if (!this.recentOffer(t)) break
+      }
+      // восемь хвостов кончаются раньше окна: следующий хвост клеится к уже занятому, а не повторяет его
+      for (let i = 0; i < 4 && this.recentOffer(t); i++) t += this.draw('PSUF', PLAYER_SUFFIX)
     }
-    // восемь хвостов кончаются раньше окна: следующий хвост клеится к уже занятому, а не повторяет его
-    for (let i = 0; i < 4 && this.recentOffer(t); i++) t += this.draw('PSUF', PLAYER_SUFFIX)
     this.rememberShown(base)
     this.rememberShown(t)
     this.S.poorSaid[t] = this.S.day
@@ -1871,7 +1888,8 @@ export class Game {
           const raw = typeof o.t === 'function' ? o.t(S.scene!.vars) : Array.isArray(o.t) ? this.draw<string>(`${S.scene!.id}.${S.scene!.node}.o${i}`, o.t) : o.t
           return this.fillMoney(typeof raw === 'string' ? raw : raw.t)
         }
-        const t = gen().length > 8 ? this.playerLine(gen) : gen()
+        // вариант сцены — навигация, а не реплика: хвост игрока к лейблу-действию не клеится (#1270)
+        const t = gen().length > 8 ? this.actionLabel(() => this.playerLine(gen)) : gen()
         return { text: t, tone: o.tone ?? 'polite', scene: S.scene!.id, go: o.go } as Choice
       })]
     }
@@ -3391,7 +3409,7 @@ export type ContentApi = Pick<Game,
   | 'lie' | 'caught' | 'callback'
   // колоды и реплики
   | 'draw' | 'open' | 'uniq' | 'pair' | 'line' | 'linePicked' | 'lines' | 'seen' | 'decks' | 'X'
-  | 'addrSaidLine' | 'playerLine' | 'freshPlayer' | 'oldestShown' | 'offeredInWindow' | 'rememberShown' | 'rnd' | 'chance' | 'bagOf' | 'restoreBag'
+  | 'addrSaidLine' | 'playerLine' | 'actionLabel' | 'freshPlayer' | 'oldestShown' | 'offeredInWindow' | 'rememberShown' | 'rnd' | 'chance' | 'bagOf' | 'restoreBag'
   // контекст последней реплики
   | 'ctx' | 'setCtx'
   // режимы
