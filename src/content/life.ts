@@ -1,7 +1,7 @@
 import { type Entry, type FactOp, type LineSpec, type Said, gate, gte, lte, eq, ne, is, exists, missing, set } from './fact'
 import { type When } from './excuses'
 import { needs, WORLD } from './world'
-import { avitoReviewAt, bloodGiven, borisSaleAt, count, endgame, evicted, fraudLoan, paydayScene, saidHash, threatClaim, vacancyAt, wedding } from './memkeys'
+import { avitoReviewAt, bloodGiven, borisSaleAt, count, endgame, evicted, fraudLoan, paydayScene, saidHash, seryogaAskAt, threatClaim, vacancyAt, wedding } from './memkeys'
 import { sold, momHelp, momDachaDays } from './credit'
 import { billStreak } from './bills'
 
@@ -22,7 +22,7 @@ const moneyOpen = [missing(paydayScene), missing(endgame.active)] as const
 // опечатки, реакции, уведомления телефона.
 // Алик пишет первым, если игрок молчит
 export const IDLE: Entry<Said>[] = [
-  'ты куда пропал?', 'ты обиделся?', { t: 'ты там живой? Я волнуюсь. Денег нет, но волнуюсь.', claims: ['no_money'] }, 'почему молчишь? Я уже почти перевёл.',
+  'ты куда пропал?', { t: 'ты там живой? Я волнуюсь. Денег нет, но волнуюсь.', claims: ['no_money'] }, 'почему молчишь? Я уже почти перевёл.',
   'ты спишь?', 'не молчи, мне страшно.', 'ты с другим подрядчиком, да? Признайся.', 'я тут подумал о тебе. Хорошо подумал.',
   'ты на меня злишься? Не злись, давление.', 'ау. Я тут.', 'ты мне снился. Ты был с деньгами. Моими.', 'а ты знаешь, что молчание — золото? Вот, считай, заплатил.',
   'ты поел? Мама спрашивает.', 'скучно без тебя, брат.', 'я сейчас мимо объекта проезжал, вспомнил тебя. Плитка блестит!',
@@ -30,6 +30,11 @@ export const IDLE: Entry<Said>[] = [
   // threat.claim — id инстанции, не true: is() после «Я иду в суд!» так и остался бы закрыт
   gate(exists(threatClaim))('ты там не в суде, случайно?'),
 ];
+
+/** Вопрос Алика «ты обиделся?» после тишины (#1292): заметное событие, а не рядовая болтовня, — поэтому
+ *  у него свой пул и свой штамп хода. Штамп ставит производитель события (`Idle_Offended`,
+ *  `Away_Offended`), а не сравнение готового текста: строка из `IDLE` переехала сюда целиком. */
+export const IDLE_ASK: Entry<Said>[] = ['ты обиделся?'];
 
 export type PeriodLine = string | { t: string; remember?: FactOp[] }
 export const periodText = (line: PeriodLine): string => (typeof line === 'string' ? line : line.t)
@@ -161,7 +166,7 @@ export const NOTIF: Notif[] = [
   { icon: '🏠', app: 'Хозяин квартиры', t: 'Жду до пятницы. Пятница — это не Аликова пятница.', when: [missing(evicted), ne('dow', 5)] },
   { icon: '💼', app: 'hh.ru', t: 'Новая вакансия: плиточник, оплата сразу! Работодатель: Алик В.', stamp: vacancyAt },
   { icon: '💼', app: 'hh.ru', t: 'Вакансия: плиточник, 150 000 ₽, оплата каждую пятницу. Откликнуться?' },
-  { icon: '🧑', app: 'Серёга', t: 'Ну что, заплатил твой Алик?', ...often }, { icon: '🧑', app: 'Серёга', t: 'Братан, займи до зарплаты. А, у тебя ж тоже нет.' },
+  { icon: '🧑', app: 'Серёга', t: 'Ну что, заплатил твой Алик?', stamp: seryogaAskAt, ...often }, { icon: '🧑', app: 'Серёга', t: 'Братан, займи до зарплаты. А, у тебя ж тоже нет.' },
   { icon: '📺', app: 'Новости', t: 'В Ереване бетон отказался застывать. Эксперты разводят руками.' },
   // «сдал объект» — новость финала Бориса, не серии о назначении
   { icon: '📺', app: 'Новости', t: 'Баран-прораб из Абовяна дал первое интервью. На вопрос «как платить людям» ответил «бее».', when: [WORLD.baran, gte('arc.boris', 8)] },

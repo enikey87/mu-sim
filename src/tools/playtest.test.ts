@@ -253,8 +253,10 @@ describe('PLAYTEST_PROFILE=agreeable', () => {
     // Маска пересборки вариантов (баги оператора 23.10: карточка и «Мууу» без прыжка) сдвинула
     // розыгрыш — замер 1–16: баран только у согласника на 1, 7 и 10, но на 1 согласник вдобавок
     // единственно берёт микрозайм; берём 7.
-    const neutral = await playtest(7, 300)
-    const agree = await playtest(7, 300, undefined, undefined, 'agreeable')
+    // #1292 (окна карточки Серёги, «не тот чат» Гранта, вопроса «ты обиделся?» и ответ-нить вакансии)
+    // сдвинул розыгрыш — замер 1–30: баран только у согласника на 2; берём 2.
+    const neutral = await playtest(2, 300)
+    const agree = await playtest(2, 300, undefined, undefined, 'agreeable')
     const deeper = facts(agree.game).filter((k) => !facts(neutral.game).includes(k))
     expect(deeper).toEqual(['has.boris'])
   }, 60_000)

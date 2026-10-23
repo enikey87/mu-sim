@@ -271,6 +271,17 @@ export const borisAskAt = 'boris.askAt'
 /** Развод дяди Самвела на свадьбе (#1037): заметное событие серии — ход строки серии, ход и три
  *  после которого кнопка отклика жива; окно потребляет ответ игрока. */
 export const samvelDivorceAt = 'samvel.divorceAt'
+/** Карточка друга Серёги «Ну что, заплатил твой Алик?» (#1292): заметное событие — карточка штампует
+ *  ход, окно отклика живёт ход и три после; повторная карточка (перерыв 40 ходов) открывает окно заново.
+ *  Окно потребляет ответ игрока. */
+export const seryogaAskAt = 'seryoga.askAt'
+/** Строка Гранта «Алик, завтра в бане как договорились. Ой. Не тот чат.» (#1292): заметное событие
+ *  серии — ход строки и три после; окно потребляет ответ игрока, серия идёт дальше. */
+export const grantBathAt = 'grant.bathAt'
+/** Вопрос Алика «ты обиделся?» после тишины (#1292): заметное событие Idle_Offended / Away_Offended —
+ *  ход вопроса и три после. Строка живёт в своём пуле (`IDLE_ASK`), поэтому штамп ставит производитель
+ *  события, а не сравнение готового текста. Окно потребляет ответ игрока. */
+export const offendedAskAt = 'offended.askAt'
 /** Вердикт суда (#1058): кульминация линии — ход строки вердикта, ход и три после которого живёт
  *  окно отклика; сам вердикт уже хранит `courtVerdict`, это только штамп хода. */
 export const courtVerdictAt = 'court.verdictAt'
@@ -301,7 +312,7 @@ export const EVENT_KEY_LIST = [
   'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sinceCrew', 'sorrySwing', 'promiseLive', 'promisePassed', 'promiseStake',
   'debutWho', 'debutFresh', 'transferFresh', 'transferAmount',
   'ramPhotoFresh', 'borisSaleFresh', 'vacancyFresh', 'avitoReviewFresh', 'rubikAskFresh', 'kettleFresh',
-  'lawyerFresh', 'collectorsAskFresh', 'collectorsEpFresh', 'internFresh', 'rubikHoleFresh', 'countersuitFresh', 'grantTileFresh', 'moustachePhotoFresh', 'mamaMarketFresh', 'mamaVoiceFresh', 'photoFresh', 'tileAdFresh', 'tamadaDoneFresh', 'samvelDivorceFresh', 'courtVerdictFresh', 'tileSlipFresh', 'saleFresh', 'saleItem', 'grantHouseFresh', 'borisAskFresh',
+  'lawyerFresh', 'collectorsAskFresh', 'collectorsEpFresh', 'internFresh', 'rubikHoleFresh', 'countersuitFresh', 'grantTileFresh', 'moustachePhotoFresh', 'mamaMarketFresh', 'mamaVoiceFresh', 'photoFresh', 'tileAdFresh', 'tamadaDoneFresh', 'samvelDivorceFresh', 'courtVerdictFresh', 'tileSlipFresh', 'saleFresh', 'saleItem', 'grantHouseFresh', 'borisAskFresh', 'seryogaFresh', 'grantBathFresh', 'offendedAskFresh',
   'period', 'night', 'offline', 'scene', 'sinceAlik', 'lateCount', 'arcAvailable',
   'arcsStarted', 'arcsDone', 'arcsMature', 'quests', 'callbackReady', 'lieOpen', 'lieKind', 'lieAlikOld', 'deathCanAdvance', 'collectorsCanAdvance',
   'intent', 'tone', 'arg', 'category', 'arc', 'argArcDone', 'greet', 'promise', 'somedayCount', 'promiseRecordDays', 'promiseRecordNew', 'promiseRecordSeen', 'promiseRecordVoice', 'promiseRecordDue', momDachaDays,
@@ -322,5 +333,6 @@ export const MEM_KEYS: ReadonlySet<string> = new Set([
   lightOff, netRation, phoneWarn, holidayGreeted,
   creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, collectorsTurned, collectorsTea, collectorsEpAt, criticalAt, creditOfferSum, momDachaAt, crewPaid, crewPaidAt, crewAllPaid, rubikBath, whenYears, ...Object.values(moneyAskAt), transferAt, transferAmount, moustachePhotoAt, moustacheStakeSaid, mamaMarketAt, mamaVoiceAt, samvelDivorceAt, courtVerdictAt, tileSlipAt, saleAt, saleWhat, fraudLoan, blockLifted, internDeclined, grantHouseAt, photoAt, tileAdAt, tamadaDoneAt, borisAskAt, debutWho, debutAt, arsenTrack,
   ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt, countersuitAt, grantTileAt,
+  seryogaAskAt, grantBathAt, offendedAskAt,
   ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lend50),
 ])

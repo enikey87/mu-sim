@@ -134,7 +134,7 @@ export type SayItem = Said | { w?: string; t: string; claims?: LedgerEvent[]; st
 /** Тема эпизода противоречия — выбирает предметный ответ Алика. */
 export type LieKind = 'money' | 'grandpa' | 'customer'
 /** Что пришло, пока игрока не было: виды сообщений пачки непрочитанных. */
-export type AwayKind = 'text' | 'sticker' | 'fwd' | 'deleted' | 'voice' | 'transfer' | 'excuse' | 'formality' | 'coldWar'
+export type AwayKind = 'text' | 'sticker' | 'fwd' | 'deleted' | 'voice' | 'transfer' | 'excuse' | 'formality' | 'coldWar' | 'offended'
 
 const POOR_REPEAT_DAYS = 14
 /** Окно дословного повтора реплик игрока, в ходах: та же формулировка не раньше (#824, шире по #826). */
@@ -1760,6 +1760,12 @@ export class Game {
       tamadaDoneFresh: S.stats.sent - Number(S.mem[memkeys.tamadaDoneAt] ?? -99) <= 3,
       // вопрос о «баране Борисе» по памяти партии (#1252): заметное событие — отклик живёт ход вопроса и три после
       borisAskFresh: S.stats.sent - Number(S.mem[memkeys.borisAskAt] ?? -99) <= 3,
+      // карточка друга Серёги «Ну что, заплатил твой Алик?» (#1292): отклик живёт ход карточки и три после
+      seryogaFresh: S.stats.sent - Number(S.mem[memkeys.seryogaAskAt] ?? -99) <= 3,
+      // строка Гранта «Ой. Не тот чат.» (#1292): событие серии — окно то же
+      grantBathFresh: S.stats.sent - Number(S.mem[memkeys.grantBathAt] ?? -99) <= 3,
+      // вопрос Алика «ты обиделся?» после тишины (#1292): заметное событие — окно то же
+      offendedAskFresh: S.stats.sent - Number(S.mem[memkeys.offendedAskAt] ?? -99) <= 3,
       // голосовое-плач мамы в серии звонков (#1085): отклик живёт ход голосового и три после
       mamaVoiceFresh: S.stats.sent - Number(S.mem[memkeys.mamaVoiceAt] ?? -99) <= 3,
       // развод дяди Самвела на свадьбе (#1037): событие серии — отклик живёт ход события и три после
@@ -3337,6 +3343,13 @@ export class Game {
       }
       case 'deleted': deliver({ kind: 'text', from: 'alik', text: '', deleted: true }); return
       case 'voice': deliver({ kind: 'voice', from: 'alik', len: 10 + this.rnd(50) }); return
+      // вопрос «ты обиделся?» после тишины (#1292): строка своего пула, ход вопроса — штамп события
+      case 'offended': {
+        const line = this.addrSaidLine('IDLE_ASK', L.IDLE_ASK)
+        deliver({ kind: 'text', from: 'alik', text: saidText(line) }, saidClaims(line))
+        this.S.mem[memkeys.offendedAskAt] = this.S.stats.sent
+        return
+      }
       case 'transfer':
         if (!this.adjustDebt(-50)) return // после выплаты перевода нет — и пузыря тоже
         this.adjustMoney(50, 'Перевод от Алика')

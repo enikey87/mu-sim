@@ -24,7 +24,7 @@ import {
   STRASBOURG_THREAT,
   P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE,
   P_CREW_CALL, P_LAWYER, P_COLLECTORS_ASK, P_INTERN, P_HOLE, P_COUNTERSUIT,
-  P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_BORIS, P_DEBUT_NIVA, P_NUNE_DEBUT, P_DEBUT_GRANT, P_GRANT_TILE, P_MOUSTACHE_PHOTO, P_MAMA_MARKET, P_TILE_AD, P_TAMADA_DONE, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_COURT_VERDICT, P_TILE_SLIP, P_SOLD, P_GRANT_HOUSE, P_BORIS_MEMORY,
+  P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_BORIS, P_DEBUT_NIVA, P_NUNE_DEBUT, P_DEBUT_GRANT, P_GRANT_TILE, P_MOUSTACHE_PHOTO, P_MAMA_MARKET, P_TILE_AD, P_TAMADA_DONE, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_COURT_VERDICT, P_TILE_SLIP, P_SOLD, P_GRANT_HOUSE, P_BORIS_MEMORY, P_SERYOGA, P_GRANT_BATH, P_OFFENDED_ASK,
 } from './player-choice-pools'
 
 type R = Rule<ContentApi, GameEvent, Offer>
@@ -191,7 +191,16 @@ export const choiceRules: R[] = [
   // заметные системные события (#927): 1–2 варианта-реакции, пока свежо событие — ход и три после
   offer({ name: 'RamPhoto', when: [is('ramPhotoFresh')], act: 'ramPhoto', tone: 'neutral', bonus: 3, text: (g) => windowFromArr(g, 'P_RAM_PHOTO', P_RAM_PHOTO) }),
   offer({ name: 'BorisSale', when: [is('borisSaleFresh')], act: 'borisSale', tone: 'neutral', bonus: 3, text: (g) => windowFromArr(g, 'P_BORIS_SALE', P_BORIS_SALE) }),
-  offer({ name: 'Vacancy', when: [is('vacancyFresh')], act: 'vacancy', tone: 'neutral', bonus: 3, text: (g) => windowFromArr(g, 'P_VACANCY', P_VACANCY) }),
+  // окно вакансии (событие карточки hh.ru): номер выбранной строки уезжает с arg — согласие
+  // «Беру. Когда выходить?» получает ответ-нить о сроке, а не отмазку в сторону (#1292)
+  ...(() => {
+    let arg = ''
+    return [offer({
+      name: 'Vacancy', when: [is('vacancyFresh')], act: 'vacancy', tone: 'neutral', bonus: 3,
+      text: (g) => windowFromArrNum(g, 'P_VACANCY', P_VACANCY, (i) => { arg = String(i) }),
+      arg: () => arg,
+    })]
+  })(),
   offer({ name: 'AvitoReview', when: [is('avitoReviewFresh')], act: 'avitoReview', tone: 'neutral', bonus: 3, text: (g) => windowFromArr(g, 'P_AVITO_REVIEW', P_AVITO_REVIEW) }),
   offer({ name: 'RubikAsk', when: [is('rubikAskFresh')], act: 'rubikAsk', tone: 'neutral', bonus: 3, text: (g) => windowFromArr(g, 'P_RUBIK_ASK', P_RUBIK_ASK) }),
   offer({ name: 'Kettle', when: [is('kettleFresh')], act: 'kettle', tone: 'neutral', bonus: 3, text: (g) => windowFromArr(g, 'P_KETTLE', P_KETTLE) }),
@@ -294,6 +303,12 @@ export const choiceRules: R[] = [
   // продажа имущества со дна (#1084): заметное системное событие — отклик в окне события (ход продажи и три после).
   // bonus 5: карточку продажи собирает дно денег — рядом стоят вопросы отчаяния (6–7); реакция обязана попасть в блок
   offer({ name: 'Sold', when: [is('saleFresh')], act: 'soldQ', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_SOLD', P_SOLD) }),
+  // глубокие раунды 119–121 (#1292): заметные события без отклика — карточка Серёги, «не тот чат»
+  // Гранта и вопрос Алика «ты обиделся?». Окно события (ход и три после), bonus 5: рядом стоят
+  // общие вопросы блока (извинение и мычание — 6) — событийная реакция обязана попасть в слот
+  offer({ name: 'Seryoga', when: [is('seryogaFresh')], act: 'seryoga', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_SERYOGA', P_SERYOGA) }),
+  offer({ name: 'GrantBath', when: [is('grantBathFresh')], act: 'grantBath', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_GRANT_BATH', P_GRANT_BATH) }),
+  offer({ name: 'OffendedAsk', when: [is('offendedAskFresh')], act: 'offendedAsk', tone: 'polite', bonus: 5, text: (g) => windowFromArr(g, 'P_OFFENDED_ASK', P_OFFENDED_ASK) }),
   // встречный иск — заметное событие с окном отклика (#964): ход и три после
   offer({ name: 'Countersuit', when: [is('countersuitFresh')], act: 'countersuitAsk', tone: 'neutral', bonus: 3, text: (g) => windowFromArr(g, 'P_COUNTERSUIT', P_COUNTERSUIT) }),
 
