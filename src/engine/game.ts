@@ -1617,18 +1617,32 @@ export class Game {
     // сам себя рекордом не делает — иначе «больше всего названного» не сработало бы никогда.
     // Старое сохранение (до #1118) дней не хранит: считаем по дате записи — у увёртки с `est` это меньше
     // названного, то есть ошибка в пользу «не помню» на сроке, который, возможно, уже звучал.
-    const promiseRecordDays = (() => {
+    const promiseRecord = (() => {
       let max = 0
+      let holder: PromiseRec | undefined
       for (const p of S.promises) {
         const days = p.days ?? (p.due == null ? undefined : p.due - p.made)
         // день записи и абсолютная дата, не остаток whenDays: на следующий день остаток уже меньше
         // названного горизонта, и обещание становилось собственным рекордом (#1132)
         if (days === undefined || (p.made === c.whenMade && (p.due ?? undefined) === (c.whenDue ?? undefined))) continue
-        if (days > max) max = days
+        // из равных рекордов берём тот, который назван числом: дата-анкер не должен вытеснять число (#1269)
+        if (days > max || (days === max && p.daysNamed && holder?.daysNamed !== true)) { max = days; holder = p }
       }
-      return max
+      return { days: max, holder }
     })()
+    const promiseRecordDays = promiseRecord.days
+    // чем рекорд назван в партии (#1269): число дней — только если его игрок слышал («через 50 дней»);
+    // у даты («до Нового года») span календаря не звучал, и хвост называет дату записи; у события и
+    // «никогда» без даты — «обещание без даты».
+    // Отдельным объектом под спред, а не полем литерала: литерал фактов уже на границе, за которой
+    // V8 строит его медленным путём (facts() ×3000: 66 мс против 694 — замер #1269), и ещё два поля в нём
+    // стоят дороже, чем выглядят.
+    const recordVoice: Facts = {
+      promiseRecordVoice: promiseRecord.holder?.daysNamed === true ? 'days' : promiseRecord.holder?.due != null ? 'date' : '',
+      promiseRecordDue: promiseRecord.holder?.daysNamed !== true && promiseRecord.holder?.due != null ? fmtDayMonth(promiseRecord.holder.due) : '',
+    }
     return {
+      ...recordVoice,
       day: S.day, tier: S.tier, mood: S.mood, sent: S.stats.sent, moo: S.stats.moo, patience: S.patience, money: S.money, debt: S.debt, fifty: S.stats.fifty, paid: S.stats.paid,
       moneyNormal: moneyLv === 'normal', moneyLow: moneyLv === 'low', moneyBottom: moneyLv === 'bottom',
       // завтра списывают: только если банк уже предупредил (bill.due после BillWarn с SMS, #251)
@@ -2168,7 +2182,7 @@ export class Game {
       ? due ?? undefined
       : this.horizonAt({ t: p.text, d: p.d, kind: p.kind, due: p.due, condition: p.condition, est: p.est, holiday: p.holiday, state: p.state }, due)
     const days = whenAt === undefined ? undefined : Math.max(0, whenAt - this.S.day)
-    this.S.promises.push({ t: p.text, made: this.S.day, due, days, condition: p.condition, stake: p.stake })
+    this.S.promises.push({ t: p.text, made: this.S.day, due, days, daysNamed: this.namedInDays(p) ? true : undefined, condition: p.condition, stake: p.stake })
     // «сегодня» (due === day) тоже планируем — иначе d:0 молчит (#307)
     if (due !== null && due >= this.S.day) this.scheduleEvent(due, 'PromiseDue', { promise: this.S.promises.length - 1 })
     if (this.S.promises.length >= 20) this.unlock('promises20')
@@ -2238,6 +2252,12 @@ export class Game {
   /** Горизонт события — служебная оценка `est`, а не конец идущего состояния мира (#1255): игроку это не срок. */
   private horizonFromEst(p?: When): boolean {
     return p?.kind === 'event' && p.est !== undefined && (p.state === undefined || this.stateEnd(p.state) === undefined)
+  }
+  /** Срок назван игроку числом дней, а не датой (#1269): ясный срок или увёртка без календарной даты —
+   *  такая запись обещана «через N дней», и N игрок слышал. У даты (`due`), праздника, события и оценки
+   *  `est` число — производный span календаря: «до Нового года» от 17 марта это 290 дней, которых не звучало. */
+  private namedInDays(p: { d: number | null; due?: Due; kind?: WhenKind; est?: number }): boolean {
+    return (p.kind === 'clear' || p.kind === 'dodge') && p.d != null && p.due === undefined && p.est === undefined
   }
   /** Абсолютный день горизонта: срок по дате (у увёртки — поздняя из двух), событие — остаток идущего состояния или оценка, праздник — календарь; «никогда» и абсурд — нет. */
   private horizonAt(p: When, due: number | null): number | undefined {
@@ -2428,6 +2448,9 @@ export class Game {
         // тот же горизонт, что пишет recordPromise: без пересчёта days оставался от старого срока (#1132)
         if (named === undefined) delete rec.days
         else rec.days = Math.max(0, named - this.S.day)
+        // правка меняет и то, чем срок назван (#1269): «в следующем году» — дата, а не число дней
+        if (this.namedInDays(term)) rec.daysNamed = true
+        else delete rec.daysNamed
       }
       this.S.ctx = { ...this.S.ctx, when: w, whenNever: due == null, whenKind: term.kind, whenAt: named, whenMade: this.S.day, whenDue: due, whenEst: this.horizonFromEst(term) }
     } else {

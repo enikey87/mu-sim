@@ -314,7 +314,7 @@ describe('хвост «столько долгов не помню» — по р
   /** Тексты стены кнопок на срок `w` в партии, где раньше называли `record` дней (0 — не называли). */
   const far = async (record: number, w: When): Promise<{ texts: string[]; facts: Record<string, unknown> }> => {
     const g = await said(w)
-    if (record > 0) g.recordPromise({ text: 'до Нового года — отдам', d: record, kind: 'clear' })
+    if (record > 0) g.recordPromise({ text: `через ${record} дней — отдам`, d: record, kind: 'clear' })
     const texts = new Set<string>()
     for (let i = 0; i < 60; i++) {
       g.S.choices = null
@@ -394,8 +394,84 @@ describe('хвост «столько долгов не помню» — по р
       for (const c of game.buildChoices()) if (c.act === 'promiseFar') texts.add(c.text)
     }
     expect(texts.size, 'кнопки далёкого срока живы — проверка не пустая').toBeGreaterThan(0)
-    expect([...texts].some((t) => t.includes(`Было и ${fmtDays(horizon)}`)), [...texts].join(' | ')).toBe(true)
+    // правленый срок назван датой («в следующем году»), а не числом дней: хвост называет дату, а не span (#1269)
+    expect([...texts].some((t) => t.includes(`Было и обещание до ${fmtDayMonth(rec.due!)}`)), [...texts].join(' | ')).toBe(true)
+    for (const text of texts) expect(text, text).not.toContain(`Было и ${fmtDays(horizon)}`)
     for (const text of texts) expect(text, text).not.toContain('не помню')
+  })
+
+  it('рекорд, названный датой, хвост называет датой записи, а не её span (#1269)', async () => {
+    const g = await said({ t: 'после Навасарда', d: 91, kind: 'clear' })
+    // «до Нового года» от марта — это 290 дней до 1 января: число никто не называл, названа дата
+    g.recordPromise({ text: 'до Нового года — отдам', d: 90, kind: 'clear', due: { newYear: true } })
+    const rec = g.S.promises.at(-1)!
+    const span = rec.days!
+    expect(span, 'span даты больше текущего срока — иначе хвост не про рекорд').toBeGreaterThan(91)
+    const date = fmtDayMonth(rec.due!)
+    const facts = g.facts()
+    expect([facts['promiseRecordDays'], facts['promiseRecordSeen'], facts['promiseRecordVoice'], facts['promiseRecordDue']]).toEqual([span, true, 'date', date])
+    const texts = new Set<string>()
+    for (let i = 0; i < 60; i++) {
+      g.S.choices = null
+      for (const c of g.buildChoices()) if (c.act === 'promiseFar') texts.add(c.text)
+    }
+    expect(texts.size, 'кнопки далёкого срока живы — проверка не пустая').toBeGreaterThan(0)
+    expect([...texts].some((t) => t.includes(`Было и обещание до ${date}`)), [...texts].join(' | ')).toBe(true)
+    for (const text of texts) expect(text, 'число, которого не звучало').not.toContain(fmtDays(span))
+    for (const text of texts) expect(text, text).not.toContain('не помню')
+  })
+
+  it('рекорд, названный числом дней, хвост называет числом (#1269)', async () => {
+    const g = await said({ t: 'после Навасарда', d: 91, kind: 'clear' })
+    g.recordPromise({ text: 'через 140 дней — отдам', d: 140, kind: 'clear' })
+    const facts = g.facts()
+    expect([facts['promiseRecordDays'], facts['promiseRecordSeen'], facts['promiseRecordVoice'], facts['promiseRecordDue']]).toEqual([140, true, 'days', ''])
+    const texts = new Set<string>()
+    for (let i = 0; i < 60; i++) {
+      g.S.choices = null
+      for (const c of g.buildChoices()) if (c.act === 'promiseFar') texts.add(c.text)
+    }
+    expect(texts.size, 'кнопки далёкого срока живы — проверка не пустая').toBeGreaterThan(0)
+    expect([...texts].some((t) => t.includes(`Было и ${fmtDays(140)}`)), [...texts].join(' | ')).toBe(true)
+    for (const text of texts) expect(text, text).not.toContain('обещание до')
+  })
+
+  it('рекорд события без даты — хвост говорит «обещание без даты», а не число оценки (#1269)', async () => {
+    const g = await said({ t: 'до Нового года', d: 90, kind: 'clear', due: { newYear: true } })
+    // событие с оценкой (#1255): ни числа, ни даты игрок не слышал
+    g.recordPromise({ text: 'как объект в Абовяне сдадим — всё отдам', d: null, kind: 'event', est: 400 })
+    const facts = g.facts()
+    expect([facts['promiseRecordDays'], facts['promiseRecordSeen'], facts['promiseRecordVoice'], facts['promiseRecordDue']]).toEqual([400, true, '', ''])
+    const texts = new Set<string>()
+    for (let i = 0; i < 60; i++) {
+      g.S.choices = null
+      for (const c of g.buildChoices()) if (c.act === 'promiseFar') texts.add(c.text)
+    }
+    expect(texts.size, 'кнопки далёкого срока живы — проверка не пустая').toBeGreaterThan(0)
+    expect([...texts].some((t) => t.includes('Было и обещание без даты')), [...texts].join(' | ')).toBe(true)
+    for (const text of texts) expect(text, 'число из оценки').not.toContain(fmtDays(400))
+  })
+
+  it('правка срока на дату снимает «названо числом», на число — ставит (#1269)', async () => {
+    const { game } = makeGame({ seed: 1 })
+    const p = { text: 'через 40 дней — всё отдам', t: 'через 40 дней', d: 40, kind: 'clear' as const }
+    game.recordPromise(p)
+    expect(game.S.promises.at(-1)!.daysNamed, 'числовая формулировка — число названо').toBe(true)
+    game.S.ctx = game.ctxFromPromise(p)
+    const m = game.push({ kind: 'text', from: 'alik', text: 'Через 40 дней — всё отдам.' })
+    const year = (L.EDIT_WHEN as Entry<When>[]).map(valueOf).find((w) => w.t === 'в следующем году')!
+    const orig = game.draw
+    vi.spyOn(game, 'draw').mockImplementation((key, arr) => (key === 'EDIT_WHEN' ? year : orig(key, arr)))
+    await game.editLast(m, p)
+    const rec = game.S.promises.at(-1)!
+    expect(rec.daysNamed, 'правка на дату — span календаря, числа не было').toBeUndefined()
+    // ответ на короткий срок: рекорд — правленый срок, и хвост называет его дату, а не span
+    const next = { text: 'завтра — всё отдам', t: 'завтра', d: 1, kind: 'clear' as const }
+    game.recordPromise(next)
+    game.S.ctx = game.ctxFromPromise(next)
+    const facts = game.facts()
+    expect(facts['promiseRecordSeen'], 'правленый срок — рекорд, текущий меньше').toBe(true)
+    expect([facts['promiseRecordVoice'], facts['promiseRecordDue']]).toEqual(['date', fmtDayMonth(rec.due!)])
   })
 })
 
