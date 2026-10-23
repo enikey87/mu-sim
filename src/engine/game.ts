@@ -1146,7 +1146,13 @@ export class Game {
     this.S.choices = this.buildChoices()
     this.save()
     this.emit()
-    await this.sleep(delayMs)
+    try {
+      await this.sleep(delayMs)
+    } catch (e) {
+      // dispose прервал маску: утилизированная игра не роняет прогон необработанным отказом
+      if (!(e instanceof GameDisposed)) throw e
+      return
+    }
     if (this.disposed) { this.ui.masked = false; this.emit(); return }
     this.ui.masked = false
     this.emit()
