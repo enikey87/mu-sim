@@ -100,10 +100,26 @@ jobs:
           VITE_METRIKA_COUNTER: ${{ vars.VITE_METRIKA_COUNTER }}
           VITE_POSTHOG_KEY: ${{ vars.VITE_POSTHOG_KEY }}
           VITE_UMAMI_WEBSITE_ID: ${{ vars.VITE_UMAMI_WEBSITE_ID }}
+      # Telegram Mini App (#1236): та же витрина с адаптером telegram — в подпуть /t/ того же
+      # Pages-сайта (base './' относительный: бандл сам решает пути, отдельный base не нужен).
+      # Инвойс Stars — из переменных репозитория: пусто → pay50 нет → карточки доната нет (#1249).
+      # Аналитика — та же, что в веб-корне: обе точки входа мерятся одинаково (#790).
+      - if: github.event_name != 'pull_request'
+        run: mv dist site
+      - if: github.event_name != 'pull_request'
+        run: npm run build
+        env:
+          VITE_PLATFORM: telegram
+          VITE_TELEGRAM_INVOICE_URL: ${{ vars.VITE_TELEGRAM_INVOICE_URL }}
+          VITE_METRIKA_COUNTER: ${{ vars.VITE_METRIKA_COUNTER }}
+          VITE_POSTHOG_KEY: ${{ vars.VITE_POSTHOG_KEY }}
+          VITE_UMAMI_WEBSITE_ID: ${{ vars.VITE_UMAMI_WEBSITE_ID }}
+      - if: github.event_name != 'pull_request'
+        run: mv dist site/t
       - if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: site
 
   coverage:
     needs: [changes]
