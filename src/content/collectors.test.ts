@@ -298,6 +298,45 @@ describe('коллекторы (#128)', () => {
   })
 })
 
+describe('вопрос про коллекторов — окно повтора follow-пула (#1291)', () => {
+  const LINE = 'Теперь они работают на меня? И отчего долг всё равно растёт?'
+  /** Кнопка вопроса про текущий сериал: `act: 'arc'`, `arg: 'collectors'` (offer `Arc`). */
+  const ask = (g: Game) => {
+    g.S.choices = null
+    return g.buildChoices().find((c) => c.act === 'arc' && c.arg === 'collectors')?.text
+  }
+
+  it('строка follow не возвращается внутри 20 ходов и возвращается за окном', () => {
+    // #1289 накрыл follow-путь: `Opt_Arc` берёт строку через `freshPlayer` (#824/#1078). Проверка
+    // закрепляет это на пуле коллекторов: раунды 119–121 видели «Теперь они работают на меня?» ×3
+    // за три хода — маркер того класса, что окно события не держит.
+    const { game } = makeGame()
+    game.S.mem[creditBroke] = true
+    game.S.mem[collectorsRecruited] = true
+    game.S.mem[collectorsTurned] = true
+    game.S.arcs.collectors = { i: 2, last: 0 }
+    game.S.day = 10
+    game.S.ctx = { arc: 'collectors' }
+    const shown: { t: string; at: number }[] = []
+    for (let turn = 0; turn < 60; turn++) {
+      game.S.stats.sent = turn
+      const t = ask(game)
+      if (t) shown.push({ t, at: turn })
+    }
+    expect(shown.length, 'вопрос про коллекторов ни разу не предложен — проверка пустеет').toBeGreaterThan(1)
+    expect(shown.map((s) => s.t), 'вопрос ушёл из follow-пула — проверка не про ту строку').toContain(LINE)
+    const last = new Map<string, number>()
+    const bad: string[] = []
+    for (const s of shown) {
+      const prev = last.get(s.t)
+      if (prev !== undefined && s.at - prev < 20) bad.push(`«${s.t}» ходы ${prev}→${s.at}`)
+      last.set(s.t, s.at)
+    }
+    expect(bad.slice(0, 3), 'повтор строки follow внутри окна повтора').toEqual([])
+    expect(shown.length, 'за окном пул не вернулся — проверка пустеет').toBeGreaterThan(new Set(shown.map((s) => s.t)).size)
+  })
+})
+
 describe('дебют коллекторов знает, клиент ли им игрок (#1022)', () => {
   const pool = (g: Game) => g.open(P_COLLECTORS_DEBUT)
 

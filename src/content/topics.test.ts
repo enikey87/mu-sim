@@ -302,6 +302,31 @@ describe('«Мууу» и корова', () => {
     await game.send({ text: 'Алик, добрый день', tone: 'polite' })
     expect(offered(game, cow)).toBe(false)
   })
+  it('новое «Мууу» не возвращает ту же коровью формулировку внутри окна повтора (#1291)', () => {
+    // Пул приходит с каждым событием, а окно у «Мууу» своё — один ход. Окно события строку не держало:
+    // партия 312117, «Алик, это у вас корова мычит?» на ходах 64→66 (остальные повторы — 314117/316117).
+    // Пул долгоживущий: одна формулировка — не раньше окна повтора (#824), исчерпанный пул молчит.
+    const { game } = makeGame({ seed: 5 })
+    const shown: { t: string; at: number }[] = []
+    for (let turn = 0; turn < 60; turn++) {
+      game.S.stats.sent = turn
+      game.moo()
+      const c = (game.S.choices ?? []).find((x) => x.tone === 'cow')
+      if (c) shown.push({ t: c.text, at: turn })
+    }
+    expect(shown.length, 'коровья кнопка ни разу не показана — проверка пустеет').toBeGreaterThan(D.P_COW.length)
+    for (const s of shown) expect(D.P_COW, `строка вне пула: ${s.t}`).toContain(s.t)
+    const last = new Map<string, number>()
+    const bad: string[] = []
+    for (const s of shown) {
+      const prev = last.get(s.t)
+      if (prev !== undefined && s.at - prev < 20) bad.push(`«${s.t}» ходы ${prev}→${s.at}`)
+      last.set(s.t, s.at)
+    }
+    expect(bad.slice(0, 3), 'повтор строки пула внутри окна повтора').toEqual([])
+    // и окно отпускает: за 60 ходов пул вернулся — иначе проверка выше доказывала бы только молчание
+    expect(shown.length, 'за окном пул не вернулся — проверка пустеет').toBeGreaterThan(new Set(shown.map((s) => s.t)).size)
+  })
   it('после «Нива выбрала тебя» нельзя продать «Ниву» Алика — она у игрока (#256)', () => {
     const { game } = makeGame()
     Object.assign(game.S.mem, { 'intro.niva': true, 'niva.away': false, 'niva.player': true, 'finale.niva': 'chose' })
