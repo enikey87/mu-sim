@@ -4,7 +4,7 @@ import type { ContentApi } from '../../engine/game'
 import type { Choice, Tone } from '../../engine/state'
 import { type Rule, type Facts, type Criterion, type Entry, type Line, eq, ne, is, exists, missing, gt, gte, lte, isOpen, spec, valueOf, sinceWithin } from '../fact'
 import type { GameEvent, Offer } from './events'
-import { D, cap, WHEN_YEARS, EVENT_FRESH_TURNS } from '../excuses'
+import { D, cap, WHEN_YEARS, EVENT_FRESH_TURNS, PHOTO_FRESH_TURNS, TRANSFER_FRESH_TURNS } from '../excuses'
 import { talkPairs, talkId } from '../talk'
 import { ARCS, WRONG_Q } from '../arcs'
 import * as L from '../life'
@@ -56,10 +56,11 @@ const fromD = (game: ContentApi, key: string, map: Record<string, string> = {}) 
   return game.playerLine(() => game.X.fill(game.draw(key, D[key]), map))
 }
 /**
- * Пул события: сырой draw. Так можно только там, где показ сам ограничен окном — `*Fresh`-факт,
- * окно первого сообщения, один вариант на праздник/окно контекста: за окном кнопка исчезает,
- * и окно повтора (#824) ей не нужно. Долгоживущий пул (факт постоянный, кнопка возвращается)
- * идёт через `freshFromArr`, иначе строка звучит дословно через 15–19 ходов (#1078 → #1268).
+ * Пул контекста: сырой draw. Так можно только там, где показ ограничен самим контекстом — один вариант
+ * на праздник, на тип входящего (`ctx.type`), на окно контекста: сменился контекст — кнопки нет, и окно
+ * повтора (#824) ей не нужно. Пул окна события (ход и три после) — `windowFromArr`, долгоживущий пул
+ * (факт постоянный, кнопка возвращается) — `freshFromArr`: сырой draw повторял строку дословно
+ * в окне (#1283) и через 15–19 ходов (#1078 → #1268).
  */
 const fromArr = (game: ContentApi, key: string, arr: readonly Entry<unknown>[]) => {
   requirePlayerPool(key, arr)
@@ -88,20 +89,31 @@ const freshFromArr = (game: ContentApi, key: string, arr: readonly Entry<unknown
  *  ему не нужно — но окно события (ход и три после) длиннее колоды (2–3 строки), и сырой `draw` после
  *  исчерпания рефиллил колоду и возвращал показанную строку дословно (партия 305117: «…Или баран?»
  *  предложен 2 и 3 ноября, #1283). Внутри окна строка предлагается один раз; исчерпанный в окне пул
- *  молчит до конца окна — кнопка уходит, а не повторяется. Тексты и гейты строк не меняются. */
-const windowFromArr = (game: ContentApi, key: string, arr: readonly Entry<unknown>[]): string => {
+ *  молчит до конца окна — кнопка уходит, а не повторяется. Тексты и гейты строк не меняются.
+ *  `window` — длина окна события, та же, что в условии оффера (`*Fresh`-факт): у звонка с объекта она
+ *  своя, и пул обязан жить ровно ею, а не общей (`#1287`). */
+const windowFromArr = (game: ContentApi, key: string, arr: readonly Entry<unknown>[], window = EVENT_FRESH_TURNS): string => {
   requirePlayerPool(key, arr)
-  return game.windowLine(key, arr as readonly Entry<string>[], EVENT_FRESH_TURNS) ?? ''
+  return game.windowLine(key, arr as readonly Entry<string>[], window) ?? ''
+}
+/** D-пул окна события (#1287): тот же `windowLine`, но текст — из словаря отмазок, и интерполяция
+ *  (`{ amount }` перевода, #1003) идёт уже после выбора строки: окно помнит строку пула, а не
+ *  подставленное число — иначе шаблон и его подстановка считались бы разными строками. */
+const windowFromD = (game: ContentApi, key: string, window: number, map: Record<string, string> = {}): string => {
+  requirePlayerPool(`D.${key}`, D[key])
+  const raw = game.windowLine(key, D[key], window)
+  return raw === null ? '' : game.X.fill(raw, map)
 }
 /** Линия игрока из плоского пула вместе с её номером: ответ окна подбирается по выбранной строке,
- *  а не колодой (#1017). Номер уезжает с arg, как у угрозы «до Страсбурга» (#982). */
-const fromArrNum = (game: ContentApi, key: string, arr: readonly string[], set: (i: number) => void): string => {
+ *  а не колодой (#1017). Номер уезжает с arg, как у угрозы «до Страсбурга» (#982). Окно события —
+ *  `windowFromArrNum`: строка предлагается один раз за окно, номер берётся у выбранной строки,
+ *  поэтому порядок пула не меняется (у `P_INTERN` индекс 1 — отказ, #1041). */
+const windowFromArrNum = (game: ContentApi, key: string, arr: readonly string[], set: (i: number) => void): string => {
   requirePlayerPool(key, arr)
-  return game.playerLine(() => {
-    const raw = game.draw(key, arr)
-    set(arr.indexOf(raw))
-    return raw
-  })
+  const line = game.windowLine(key, arr, EVENT_FRESH_TURNS)
+  if (line === null) return ''
+  set(arr.indexOf(line))
+  return line
 }
 
 
@@ -184,9 +196,9 @@ export const choiceRules: R[] = [
   offer({ name: 'RubikAsk', when: [is('rubikAskFresh')], act: 'rubikAsk', tone: 'neutral', bonus: 3, text: (g) => windowFromArr(g, 'P_RUBIK_ASK', P_RUBIK_ASK) }),
   offer({ name: 'Kettle', when: [is('kettleFresh')], act: 'kettle', tone: 'neutral', bonus: 3, text: (g) => windowFromArr(g, 'P_KETTLE', P_KETTLE) }),
   // прямые вопросы и первые сообщения персонажей (#958): отклик в окне события — ход и три после
-  offer({ name: 'CrewCall', when: [lte('sinceCrew', CREW_FRESH_TURNS)], act: 'crewCall', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_CREW_CALL', P_CREW_CALL) }),
-  offer({ name: 'LawyerFirst', when: [is('lawyerFresh')], act: 'lawyerAsk', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_LAWYER', P_LAWYER) }),
-  offer({ name: 'CollectorsAsk', when: [is('collectorsAskFresh')], act: 'collectorsAsk', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_COLLECTORS_ASK', P_COLLECTORS_ASK) }),
+  offer({ name: 'CrewCall', when: [lte('sinceCrew', CREW_FRESH_TURNS)], act: 'crewCall', tone: 'neutral', bonus: 3, text: (g) => windowFromArr(g, 'P_CREW_CALL', P_CREW_CALL, CREW_FRESH_TURNS) }),
+  offer({ name: 'LawyerFirst', when: [is('lawyerFresh')], act: 'lawyerAsk', tone: 'neutral', bonus: 3, text: (g) => windowFromArr(g, 'P_LAWYER', P_LAWYER) }),
+  offer({ name: 'CollectorsAsk', when: [is('collectorsAskFresh')], act: 'collectorsAsk', tone: 'neutral', bonus: 3, text: (g) => windowFromArr(g, 'P_COLLECTORS_ASK', P_COLLECTORS_ASK) }),
   // эпизод поставил факт — в блок идёт строка этого факта, не сосед из follow (#1192).
   // bonus 12: ловлю лжи (11) и звонок с объекта (7) окно не вытесняет.
   ...(() => {
@@ -205,7 +217,10 @@ export const choiceRules: R[] = [
           const raw = valueOf(entry)
           fact = key
           const text = typeof raw === 'string' ? raw : String((raw as { t?: unknown }).t ?? '')
-          return g.playerLine(() => text)
+          // строка факта одна, но окно эпизода длиннее хода: без окна она показывалась каждый ход
+          // (партия 309117: «Коллекторы на объекте расселись…» 1179 → 1189, #1287). Одиночный пул
+          // в `windowLine` — ровно один показ за окно, дальше кнопка молчит до его конца.
+          return g.windowLine('P_COLLECTORS_EP', [text], EVENT_FRESH_TURNS) ?? ''
         }
         fact = ''
         return ''
@@ -222,7 +237,7 @@ export const choiceRules: R[] = [
     let arg = ''
     return [offer({
       name: 'InternOffer', when: [is('internFresh')], act: 'internOffer', tone: 'neutral', bonus: 5,
-      text: (g) => fromArrNum(g, 'P_INTERN', P_INTERN, (i) => { arg = String(i) }),
+      text: (g) => windowFromArrNum(g, 'P_INTERN', P_INTERN, (i) => { arg = String(i) }),
       arg: () => arg,
     })]
   })(),
@@ -230,7 +245,7 @@ export const choiceRules: R[] = [
     let arg = ''
     return [offer({
       name: 'RubikHole', when: [is('rubikHoleFresh')], act: 'rubikHole', tone: 'neutral', bonus: 3,
-      text: (g) => fromArrNum(g, 'P_HOLE', P_HOLE, (i) => { arg = String(i) }),
+      text: (g) => windowFromArrNum(g, 'P_HOLE', P_HOLE, (i) => { arg = String(i) }),
       arg: () => arg,
     })]
   })(),
@@ -238,56 +253,56 @@ export const choiceRules: R[] = [
   // bonus 5: на rude-пути окно конкурирует с извинением (6) и мычанием (6) — дебют должен попадать в блок.
   // Пул Арсена под воротами (#982): пустой пул даёт пустой текст — freshFromArr, не draw
   offer({ name: 'DebutArsen', when: [is('debutFresh'), eq('debutWho', 'arsen')], act: 'debutArsen', tone: 'neutral', bonus: 5, text: (g) => freshFromArr(g, 'P_DEBUT_ARSEN', P_DEBUT_ARSEN) }),
-  offer({ name: 'DebutSamvel', when: [is('debutFresh'), eq('debutWho', 'samvel')], act: 'debutSamvel', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_DEBUT_SAMVEL', P_DEBUT_SAMVEL) }),
-  offer({ name: 'DebutBoris', when: [is('debutFresh'), eq('debutWho', 'boris')], act: 'debutBoris', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_DEBUT_BORIS', P_DEBUT_BORIS) }),
-  offer({ name: 'DebutNiva', when: [is('debutFresh'), eq('debutWho', 'niva')], act: 'debutNiva', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_DEBUT_NIVA', P_DEBUT_NIVA) }),
+  offer({ name: 'DebutSamvel', when: [is('debutFresh'), eq('debutWho', 'samvel')], act: 'debutSamvel', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_DEBUT_SAMVEL', P_DEBUT_SAMVEL) }),
+  offer({ name: 'DebutBoris', when: [is('debutFresh'), eq('debutWho', 'boris')], act: 'debutBoris', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_DEBUT_BORIS', P_DEBUT_BORIS) }),
+  offer({ name: 'DebutNiva', when: [is('debutFresh'), eq('debutWho', 'niva')], act: 'debutNiva', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_DEBUT_NIVA', P_DEBUT_NIVA) }),
   // пул Нуне тоже под воротами (#1170): финал бетона даёт первое письмо без сейфа — пустой пул не должен бросать draw
   offer({ name: 'DebutNune', when: [is('debutFresh'), eq('debutWho', 'nune')], act: 'debutNune', tone: 'neutral', bonus: 5, text: (g) => freshFromArr(g, 'P_NUNE_DEBUT', P_NUNE_DEBUT) }),
   // дебют Гранта хором (#1179): общий слот, пул про конверт. Пустой пул (первое письмо было другим) не бросает draw
   offer({ name: 'DebutGrant', when: [is('debutFresh'), eq('debutWho', 'grant')], act: 'debutGrant', tone: 'neutral', bonus: 5, text: (g) => freshFromArr(g, 'P_DEBUT_GRANT', P_DEBUT_GRANT) }),
   // первое сообщение заказчика Гранта (#983): свой штамп, не общее окно дебюта — текст только про эту реплику
-  offer({ name: 'GrantTile', when: [is('grantTileFresh')], act: 'grantTile', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_GRANT_TILE', P_GRANT_TILE) }),
+  offer({ name: 'GrantTile', when: [is('grantTileFresh')], act: 'grantTile', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_GRANT_TILE', P_GRANT_TILE) }),
   // смена фото без усов (#1013): заметное событие ставки — отклик в окне события (ход и три после).
   // bonus 5: рядом стоит обычная кнопка «как усы?» (специфичность 5) — событийная реакция должна попасть в блок
-  offer({ name: 'MoustachePhoto', when: [is('moustachePhotoFresh')], act: 'moustachePhoto', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_MOUSTACHE_PHOTO', P_MOUSTACHE_PHOTO) }),
+  offer({ name: 'MoustachePhoto', when: [is('moustachePhotoFresh')], act: 'moustachePhoto', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_MOUSTACHE_PHOTO', P_MOUSTACHE_PHOTO) }),
   // второй дебют Гранта (#1041): дом «с кладом» — заметное событие, отклик в окне события (ход и три после)
-  offer({ name: 'GrantHouse', when: [is('grantHouseFresh')], act: 'grantHouse', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_GRANT_HOUSE', P_GRANT_HOUSE) }),
+  offer({ name: 'GrantHouse', when: [is('grantHouseFresh')], act: 'grantHouse', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_GRANT_HOUSE', P_GRANT_HOUSE) }),
   // конец квеста «мама на рынке» (#1030): заметное событие — отклик в окне события (ход и три после).
   // bonus 5: рядом стоят извинение и мычание (6) — событийная реакция обязана попасть в блок
-  offer({ name: 'MamaMarket', when: [is('mamaMarketFresh')], act: 'mamaMarket', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_MAMA_MARKET', P_MAMA_MARKET) }),
+  offer({ name: 'MamaMarket', when: [is('mamaMarketFresh')], act: 'mamaMarket', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_MAMA_MARKET', P_MAMA_MARKET) }),
   // кража плиточной рекламы (#1216): финал узла `send` квеста `q_photo` — заметное событие, отклик в окне
   // события (ход и три после). bonus 5: на этом ходу рядом стоят вопросы общего блока — реакция должна попасть в слот
-  offer({ name: 'TileAd', when: [is('tileAdFresh')], act: 'tileAd', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_TILE_AD', P_TILE_AD) }),
+  offer({ name: 'TileAd', when: [is('tileAdFresh')], act: 'tileAd', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_TILE_AD', P_TILE_AD) }),
   // финал квеста-тамады (#1222): узел `yes` квеста `q_tamada` — заметное событие, отклик в окне события
   // (ход и три после). bonus 5: рядом стоят вопросы общего блока — реакция должна попасть в слот
-  offer({ name: 'TamadaDone', when: [is('tamadaDoneFresh')], act: 'tamadaDone', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_TAMADA_DONE', P_TAMADA_DONE) }),
+  offer({ name: 'TamadaDone', when: [is('tamadaDoneFresh')], act: 'tamadaDone', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_TAMADA_DONE', P_TAMADA_DONE) }),
   // вопрос о баране по памяти партии (#1252): Turn_Memory спрашивает «Всё ещё у тебя?» — отклик в окне
   // события (ход вопроса и три после). bonus 5: рядом стоят общие вопросы блока — реакция должна попасть в слот
-  offer({ name: 'BorisMemory', when: [is('borisAskFresh')], act: 'borisMemory', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_BORIS_MEMORY', P_BORIS_MEMORY) }),
+  offer({ name: 'BorisMemory', when: [is('borisAskFresh')], act: 'borisMemory', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_BORIS_MEMORY', P_BORIS_MEMORY) }),
   // голосовое-плач мамы (#1085): событие серии звонков — отклик в окне события (ход и три после).
   // bonus 5: рядом стоят извинение и мычание (6) — событийная реакция обязана попасть в блок
-  offer({ name: 'MamaVoice', when: [is('mamaVoiceFresh')], act: 'mamaVoice', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_MAMA_VOICE', P_MAMA_VOICE) }),
+  offer({ name: 'MamaVoice', when: [is('mamaVoiceFresh')], act: 'mamaVoice', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_MAMA_VOICE', P_MAMA_VOICE) }),
   // развод дяди Самвела на свадьбе (#1037): событие серии — отклик в окне события (ход и три после).
   // bonus 5: после серии рядом стоит вопрос арки (1) — реакция обязана попасть в блок
-  offer({ name: 'SamvelDivorce', when: [is('samvelDivorceFresh')], act: 'samvelDivorce', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_SAMVEL_DIVORCE', P_SAMVEL_DIVORCE) }),
+  offer({ name: 'SamvelDivorce', when: [is('samvelDivorceFresh')], act: 'samvelDivorce', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_SAMVEL_DIVORCE', P_SAMVEL_DIVORCE) }),
   // вердикт суда (#1058): кульминация линии — отклик в окне события (ход и три после).
   // bonus 5: после сцены блок собирают общие деньги — реакция обязана попасть в блок
-  offer({ name: 'CourtVerdict', when: [is('courtVerdictFresh')], act: 'courtVerdict', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_COURT_VERDICT', P_COURT_VERDICT) }),
+  offer({ name: 'CourtVerdict', when: [is('courtVerdictFresh')], act: 'courtVerdict', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_COURT_VERDICT', P_COURT_VERDICT) }),
   // первая серия плиточной арки (#1059): падение заказчика — отклик в окне события (ход и три после)
-  offer({ name: 'TileSlip', when: [is('tileSlipFresh')], act: 'tileSlip', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_TILE_SLIP', P_TILE_SLIP) }),
+  offer({ name: 'TileSlip', when: [is('tileSlipFresh')], act: 'tileSlip', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_TILE_SLIP', P_TILE_SLIP) }),
   // продажа имущества со дна (#1084): заметное системное событие — отклик в окне события (ход продажи и три после).
   // bonus 5: карточку продажи собирает дно денег — рядом стоят вопросы отчаяния (6–7); реакция обязана попасть в блок
-  offer({ name: 'Sold', when: [is('saleFresh')], act: 'soldQ', tone: 'neutral', bonus: 5, text: (g) => fromArr(g, 'P_SOLD', P_SOLD) }),
+  offer({ name: 'Sold', when: [is('saleFresh')], act: 'soldQ', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_SOLD', P_SOLD) }),
   // встречный иск — заметное событие с окном отклика (#964): ход и три после
-  offer({ name: 'Countersuit', when: [is('countersuitFresh')], act: 'countersuitAsk', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_COUNTERSUIT', P_COUNTERSUIT) }),
+  offer({ name: 'Countersuit', when: [is('countersuitFresh')], act: 'countersuitAsk', tone: 'neutral', bonus: 3, text: (g) => windowFromArr(g, 'P_COUNTERSUIT', P_COUNTERSUIT) }),
 
   // ответ на то, ЧТО прислал Алик
   // фото «платёжки» — заметное событие с окном отклика (#1017): кнопка из пула реакций живёт и когда ctx ушёл дальше
-  offer({ name: 'Photo', when: [is('photoFresh')], act: 'photo', tone: 'neutral', bonus: 3, text: (g) => fromD(g, 'P_PHOTO') }),
+  offer({ name: 'Photo', when: [is('photoFresh')], act: 'photo', tone: 'neutral', bonus: 3, text: (g) => windowFromD(g, 'P_PHOTO', PHOTO_FRESH_TURNS) }),
   offer({ name: 'VoiceCow', slot: 'voice', weight: 0.4, when: [eq('ctx.type', 'voice')], act: 'voice', tone: 'neutral', bonus: 3, text: (g) => fromD(g, 'P_VOICE') }),
   offer({ name: 'VoiceText', slot: 'voice', weight: 0.6, when: [eq('ctx.type', 'voice')], act: 'voiceText', tone: 'neutral', bonus: 3, text: (g) => fromD(g, 'P_VOICE2') }),
   // перевод 50 ₽ — заметное событие с окном отклика (#1003): кнопка из пула реакций живёт и когда ctx ушёл дальше
-  offer({ name: 'Transfer', when: [is('transferFresh')], act: 'transferQ', tone: 'neutral', bonus: 3, text: (g, f) => fromD(g, 'P_TRANSFER', { amount: String(f['transferAmount'] ?? 50) }) }),
+  offer({ name: 'Transfer', when: [is('transferFresh')], act: 'transferQ', tone: 'neutral', bonus: 3, text: (g, f) => windowFromD(g, 'P_TRANSFER', TRANSFER_FRESH_TURNS, { amount: String(f['transferAmount'] ?? 50) }) }),
   offer({ name: 'Ping', when: [eq('ctx.type', 'readonly')], act: 'ping', tone: 'neutral', bonus: 3, text: (g) => fromD(g, 'P_PING') }),
   // «Завтра» → «это когда?», а «Брат, в пути» → «А подробнее?»
   offer({
@@ -450,7 +465,9 @@ export const choiceRules: R[] = [
       arg: () => arg,
     })
   }),
-  offer({ name: 'Cow', when: [is('mooFresh')], odds: 0.8, bonus: 2, tone: 'cow', text: (g) => fromD(g, 'P_COW') }),
+  // «муу» живёт только на своём ходу (`mooFresh` — `=== sent`), поэтому окно пула — 0: пересборка
+  // того же хода вернёт ту же строку, а следующий ход кнопки уже нет (#1287)
+  offer({ name: 'Cow', when: [is('mooFresh')], odds: 0.8, bonus: 2, tone: 'cow', text: (g) => windowFromD(g, 'P_COW', 0) }),
   // денежный вопрос — первичная контекстная кнопка (#795): пока открыта легенда денег, игрок спрашивает,
   // где они сейчас. Место — из легенды (банк/фундамент/сейф/крипта/«Нива»), формулировки по месту не
   // повторяются, слот свой: тема может стоять рядом, а не вместо. Ответ — следующая реплика той же легенды

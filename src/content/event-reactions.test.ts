@@ -5,7 +5,7 @@ import type { Game } from '../engine/game'
 import { NOTIF } from './life'
 import { D } from './excuses'
 import { sold } from './credit'
-import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE, P_DEBUT_GRANT, P_MAMA_MARKET, P_TILE_AD, P_TAMADA_DONE, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_GRANT_HOUSE, P_TILE_SLIP, P_SOLD, P_BORIS_MEMORY } from './rules/player-choice-pools'
+import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_NIVA, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE, P_DEBUT_GRANT, P_MAMA_MARKET, P_TILE_AD, P_TAMADA_DONE, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_GRANT_HOUSE, P_TILE_SLIP, P_SOLD, P_BORIS_MEMORY } from './rules/player-choice-pools'
 import { BORIS_MEMORY_B, BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, DEBUT_GRANT_B, GRANT_HOUSE_B, INTERN_B, HOLE_B, AVITO_REVIEW, MAMA_MARKET_B, TILE_AD_B, TAMADA_DONE_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, TILE_SLIP_B, SOLD_B } from './world'
 import { ARCS } from './arcs'
 import { turnRules } from './rules/turn'
@@ -320,6 +320,9 @@ describe('прямые вопросы и первые сообщения (#958):
 
   it('фото «платёжки»: окно отклика с хода события, ответ потребляет, новое фото открывает заново (#1017)', async () => {
     const { game } = makeGame()
+    // пул реакции — четыре строки, три из них гейтнуты на фото барана: без него открыта одна строка,
+    // и окно (#1287) молчит уже со второго хода. Проверка про длину окна, а не про гейты пула
+    game.S.mem['intro.baran'] = true
     const button = () => { game.S.choices = null; return game.buildChoices().find((c) => c.act === 'photo') }
     const lowFirst = (t: string) => t.charAt(0).toLowerCase() + t.slice(1)
     expect(button(), 'без фото варианта нет').toBeUndefined()
@@ -395,6 +398,27 @@ describe('дебюты участников через rude/хор (#973)', () =
     // повторное сообщение персонажа окно не открывает
     await game.say([{ w: who, t: `${name}: второе сообщение` }])
     expect(has(game, act), `${name}: повторное сообщение окна не открыло`).toBe(false)
+  })
+
+  it('окно дебюта Нивы не повторяет строку: показ по разу, дальше пул молчит (#1287)', async () => {
+    // партия 311117: «Нива, передай Алику про бардачок» предлагалась трижды за окно дебюта
+    // 26–30.12.2026 — двухстрочный пул исчерпывался, и сырой draw возвращал показанную строку дословно
+    const { game } = makeGame()
+    game.S.mem['heard.money_niva'] = true // вторая строка (бардачок) введена местом денег — открыты обе
+    await game.playEpisode(ARCS.niva.eps[4], 'niva')
+    const at = Number(game.S.mem[debutAt])
+    expect(Number.isFinite(at), 'дебют не штампанул ход — проверка пустеет').toBe(true)
+    const pool = game.open(P_DEBUT_NIVA)
+    expect(pool.length, 'у дебюта Нивы меньше двух строк — проверка пустеет').toBe(2)
+    const offered: string[] = []
+    for (let turn = 0; turn <= 3; turn++) {
+      game.S.stats.sent = at + turn
+      game.S.choices = null
+      const b = game.buildChoices().find((c) => c.act === 'debutNiva')
+      if (b) offered.push(b.text)
+    }
+    expect(offered, `повтор строки пула внутри окна: ${offered.join(' → ')}`).toEqual([...new Set(offered)])
+    expect([...offered].sort(), 'окно показало не весь пул').toEqual([...pool].sort())
   })
 })
 
@@ -597,18 +621,28 @@ describe('пулы Арсена держат только утверждённо
   })
 
   it('отклик Арсена про Страсбург — только после оглашения', async () => {
-    const { game } = makeGame()
-    game.S.mem['intro.arsen'] = true
-    game.S.mem[lawyerAt] = game.S.stats.sent
-    const offered = () => { const c = frame(game).find((x) => x.act === 'lawyerAsk'); return c ? [c.text] : [] }
-    const before = new Set<string>()
-    for (let i = 0; i < 40; i++) for (const t of offered()) before.add(t)
+    // пул окна теперь предлагает строку один раз за окно (#1287): выборку берём по ходам окна,
+    // а не пересборками одного хода — пересборка в том же ходу обязана вернуть ту же строку (#826)
+    const overWindow = (prepare: (g: Game) => void) => {
+      const { game } = makeGame()
+      game.S.mem['intro.arsen'] = true
+      game.S.mem[lawyerAt] = game.S.stats.sent
+      prepare(game)
+      const at = Number(game.S.mem[lawyerAt])
+      const seen = new Set<string>()
+      for (let turn = 0; turn <= 3; turn++) {
+        game.S.stats.sent = at + turn
+        game.S.choices = null
+        const c = game.buildChoices().find((x) => x.act === 'lawyerAsk')
+        if (c) seen.add(c.text)
+      }
+      return seen
+    }
+    const before = overWindow(() => {})
     expect(before.size, 'окно Арсена ничего не предложило — проверка пустеет').toBeGreaterThan(0)
     expect([...before], 'Страсбург без оглашения игроком').not.toContain('Арсен, а Страсбург — это долго ждать?')
-    game.S.mem[saidStrasburg] = true
-    let saw = false
-    for (let i = 0; i < 80 && !saw; i++) saw = offered().includes('Арсен, а Страсбург — это долго ждать?')
-    expect(saw, 'после оглашения Страсбург не предлагается').toBe(true)
+    const after = overWindow((g) => { g.S.mem[saidStrasburg] = true })
+    expect([...after], 'после оглашения Страсбург не предлагается').toContain('Арсен, а Страсбург — это долго ждать?')
   })
 })
 
@@ -618,11 +652,16 @@ describe('дебют Самвела не предлагает свадьбу, п
   const INTRO = 'Мальчик, я Самвел. На моего племянника кричу только я. Встань в очередь, она с 1987 года.'
   const frame = (game: Game) => { game.S.choices = null; return game.buildChoices() }
   const debutTexts = (game: Game) => {
+    // пул окна предлагает строку один раз за окно (#1287): варианты собираем по ходам окна,
+    // пересборки одного хода дают ту же строку — кнопка не меняется под пальцем (#826)
+    const at = game.S.stats.sent
     const seen = new Set<string>()
-    for (let i = 0; i < 12; i++) {
+    for (let turn = 0; turn <= 3; turn++) {
+      game.S.stats.sent = at + turn
       const b = frame(game).find((c) => c.act === 'debutSamvel')
       if (b) seen.add(b.text)
     }
+    game.S.stats.sent = at
     return [...seen]
   }
   const rudeDebut = async (game: Game) => {
@@ -1033,6 +1072,27 @@ describe('окно продажи имущества (#1084)', () => {
     game.clearFact(saleAt) // окно потреблено (ответом или протухшим)
     expect(button(game), 'без штампа хода кнопки нет').toBeUndefined()
     expect(game.S.mem[sold('microwave')], 'факт продажи вещи остаётся').toBe(true)
+  })
+
+  it('пул окна продажи не повторяет строку: четыре хода окна — каждая строка один раз (#1287)', () => {
+    // партии 309117/311117: две строки пула на вещь, окно — ход и три после; сырой draw рефиллил колоду
+    // и возвращал показанную строку дословно («Микроволновку забрали…» 542 → 552). Инвариант #1283
+    // распространён на все оконные офферы: строка предлагается один раз, исчерпанный пул молчит.
+    const { game } = bottom()
+    game.answerCard(openCard(game).id, 'sell')
+    const at = Number(game.S.mem[saleAt])
+    expect(Number.isFinite(at), 'продажа не штампанула ход — проверка пустеет').toBe(true)
+    const pool = game.open(P_SOLD)
+    expect(pool.length, 'у проданной вещи меньше двух строк — проверка пустеет').toBe(2)
+    const offered: string[] = []
+    for (let turn = 0; turn <= 3; turn++) {
+      game.S.stats.sent = at + turn
+      game.S.choices = null
+      const b = game.buildChoices().find((c) => c.act === 'soldQ')
+      if (b) offered.push(b.text)
+    }
+    expect(offered, `повтор строки пула внутри окна: ${offered.join(' → ')}`).toEqual([...new Set(offered)])
+    expect([...offered].sort(), 'окно показало не весь пул').toEqual([...pool].sort())
   })
 })
 

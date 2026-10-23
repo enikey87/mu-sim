@@ -35,6 +35,28 @@ describe('окно отклика на перевод (#1003)', () => {
     expect(findReply(game), 'за окном кнопка осталась').toBeUndefined()
   })
 
+  it('пул окна перевода держит одну строку в ходу, не повторяет её в окне и подставляет сумму (#1287)', async () => {
+    // D-пул шёл через `fromD`: сырой draw в режиме лейбла перерисовывался на каждой пересборке хода
+    // (кнопка менялась под пальцем, #826) и после исчерпания колоды возвращал ту же формулировку.
+    // `windowFromD` выбирает строку в окне и подставляет `{ amount }` уже в неё
+    const { game } = makeGame()
+    await game.transfer()
+    const at = Number(game.S.mem['transfer.at'])
+    expect(Number.isFinite(at), 'перевод не штампанул ход — проверка пустеет').toBe(true)
+    const turnTexts = new Set<string>()
+    for (let i = 0; i < 10; i++) { const b = findReply(game); if (b) turnTexts.add(b.text) }
+    expect([...turnTexts].length, `пересборка хода меняет кнопку: ${[...turnTexts].join(' → ')}`).toBe(1)
+    const offered: string[] = []
+    for (let turn = 0; turn <= TRANSFER_FRESH_TURNS; turn++) {
+      game.S.stats.sent = at + turn
+      const b = findReply(game)
+      if (b) offered.push(b.text)
+    }
+    expect(offered.length, 'окно перевода ничего не предложило — проверка пустеет').toBe(TRANSFER_FRESH_TURNS + 1)
+    expect(offered, `повтор строки пула внутри окна: ${offered.join(' → ')}`).toEqual([...new Set(offered)])
+    expect(offered.some((t) => t.includes('50')), 'сумма не подставлена в выбранную строку').toBe(true)
+  })
+
   it('перевод в пачке «пока тебя не было» тоже штампует окно', async () => {
     const { game } = makeGame()
     await game.awayMsg('transfer')

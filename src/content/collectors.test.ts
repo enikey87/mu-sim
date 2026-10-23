@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import { makeGame, setMoney, cards } from '../test/helpers'
 import { START_DAY, ARC_MARINATION_DAYS } from '../engine/state'
-import { collectorsRecruited, collectorsTea, collectorsTurned, count, creditBroke, creditStage, endgame, finaleOf, internAt, internDeclined, intro, paydayScene, threatClaim } from './memkeys'
+import { collectorsRecruited, collectorsTea, collectorsTurned, count, creditBroke, creditStage, endgame, finaleOf, internAt, internDeclined, intro, paydayScene, threatClaim, collectorsEpAt } from './memkeys'
 import { loanTaken, loanDueAt } from './credit'
 import { D } from './excuses'
 import { P_COLLECTORS_DEBUT } from './rules/player-choice-pools'
@@ -404,6 +404,24 @@ describe('эпизод арки даёт отклик в свой ход (#1192)
       expect(said, `${mark}: ответ не про факт эпизода`).toContain(reply)
       expect(button(game), `${mark}: ответ не закрыл окно`).toBeUndefined()
     }
+  })
+
+  it('строка факта в окне эпизода показывается один раз, дальше пул молчит (#1287)', async () => {
+    // партия 309117: «Коллекторы на объекте расселись…» 1179 → 1189 — строка факта детерминирована
+    // и предлагалась каждый ход окна эпизода (ход и три после)
+    const { game } = makeGame()
+    await game.playEpisode(ARCS.collectors.eps[2], 'collectors')
+    const at = Number(game.S.mem[collectorsEpAt])
+    expect(Number.isFinite(at), 'эпизод не штампанул ход — проверка пустеет').toBe(true)
+    expect(game.S.mem[collectorsTea], 'сцена чая не записала факт — проверка не про ту строку').toBe(true)
+    const offered: string[] = []
+    for (let turn = 0; turn <= 3; turn++) {
+      game.S.stats.sent = at + turn
+      const b = button(game)
+      if (b) offered.push(b.text)
+    }
+    expect(offered, `строка факта повторена в окне: ${offered.join(' → ')}`).toHaveLength(1)
+    expect(offered[0]!.toLowerCase(), 'не строка факта чая').toContain(body(collectorsTea).slice(1).toLowerCase())
   })
 })
 
