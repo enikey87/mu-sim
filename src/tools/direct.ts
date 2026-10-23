@@ -35,6 +35,9 @@ export const DIRECT: Record<string, DirectCase> = {
   // #926: гейты follow Бориса сдвинули розыгрыш обратно — тон в блоке снова в выборках (7 партий,
   // порог 7) — прямой случай снят
   Says_catchLie_lieKind_grandpa: { event: 'PlayerSays', facts: { intent: 'catchLie' }, setup: (g) => { g.noteClaims(['grandpa_dead']); g.noteClaims(['grandpa_alive']) } },
+  // #1306: окно возврата «Нивы» сдвинуло розыгрыш — вопрос о баране по памяти партии (Turn_Memory) в CI-выборках
+  // больше не звучит, и отклик на него ни разу не сыграл; правило цело, держим прямым случаем (как #826/#926)
+  Says_borisMemory: { event: 'PlayerSays', facts: { intent: 'borisMemory' } },
   // #426: sys-claim Гранта («всё заплатил») противоречит «заказчик мне не платит» — бот ловит это сам, 34 партии
   Turn_BorisSick: { event: 'AlikTurn', setup: (g) => { g.S.arcs.boris = { i: 2, last: 0 }; g.S.actors.boris = { sick: true } } },
   Opt_Cow: { event: 'BuildChoices', setup: (g) => { g.S.mem.mooAt = g.S.stats.sent } },

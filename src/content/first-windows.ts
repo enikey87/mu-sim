@@ -3,7 +3,7 @@
 // участник, умеющий писать сам (SPEAKS), обязан быть здесь или в исключениях с причиной — новый
 // участник красит сюит на месте, а не в плейтесте через раунд. Офферы и потребление окна ответом —
 // как были (#951), тексты пулов не менялись.
-import { avitoReviewAt, borisAskAt, borisSaleAt, collectorsAskAt, collectorsEpAt, countersuitAt, courtVerdictAt, crewPaidAt, grantBathAt, grantHouseAt, grantTileAt, internAt, kettleAt, lawyerAt, mamaMarketAt, mamaVoiceAt, mooAt, moustachePhotoAt, offendedAskAt, photoAt, ramPhotoAt, rubikAskAt, rubikHoleAt, samvelDivorceAt, saleAt, seryogaAskAt, tamadaDoneAt, tileAdAt, tileLawyerAt, tileSlipAt, transferAt, vacancyAt } from './memkeys'
+import { avitoReviewAt, borisAskAt, borisSaleAt, collectorsAskAt, collectorsEpAt, countersuitAt, courtVerdictAt, crewPaidAt, grantBathAt, grantHouseAt, grantTileAt, internAt, kettleAt, lawyerAt, mamaMarketAt, mamaVoiceAt, mooAt, moustachePhotoAt, nivaBackAt, offendedAskAt, photoAt, ramPhotoAt, rubikAskAt, rubikHoleAt, samvelDivorceAt, saleAt, seryogaAskAt, tamadaDoneAt, tileAdAt, tileLawyerAt, tileSlipAt, transferAt, vacancyAt } from './memkeys'
 import type { Criterion } from '../engine/rules'
 
 /**
@@ -103,6 +103,7 @@ export const EVENT_SOURCES: readonly EventSource[] = [
   { source: 'вердикт суда (сцена court, узлы debt/screens/moo, stamp)', at: courtVerdictAt, offer: 'CourtVerdict', pool: 'P_COURT_VERDICT' },
   { source: 'первая серия плиточной арки: заказчик упал на плитке (серия, stamp)', at: tileSlipAt, offer: 'TileSlip', pool: 'P_TILE_SLIP' },
   { source: 'эпизод плиточной арки «я твой адвокат»: вычет 10 000 ₽ из долга (серия, stamp)', at: tileLawyerAt, offer: 'TileLawyer', pool: 'P_TILE_LAWYER' },
+  { source: 'эпизод арки «Нива» — возврат машины без денег, с новыми колёсами (серия, stamp)', at: nivaBackAt, offer: 'NivaBack', pool: 'P_NIVA_BACK' },
   { source: 'продажа имущества со дна (карточка банка, sellThing)', at: saleAt, offer: 'Sold', pool: 'P_SOLD' },
   // глубокие раунды 119–121 (#1292): заметные события без окна отклика
   { source: 'карточка друга Серёги «Ну что, заплатил твой Алик?» (уведомление телефона, stamp)', at: seryogaAskAt, offer: 'Seryoga', pool: 'P_SERYOGA' },

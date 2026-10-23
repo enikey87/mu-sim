@@ -4,7 +4,7 @@ import { type Entry, type FactOp, type Criterion, type FactKey, type Said, set, 
 import { type ClaimKey } from './ids'
 import type { LedgerEvent } from './fact-types'
 import { needs, meet, WORLD, MENTION_RE } from './world'
-import { actSigned, alikDead, betonSet, borisForeman, borisMarried, collectorsAskAt, collectorsEpAt, collectorsRecruited, collectorsTea, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantBathAt, grantHouseAt, grantPaid, grantTileAt, houseOnGarik, internAt, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, rubikHoleAt, saidNuneNoWrite, samvelDivorceAt, sick, taxFrozen, tileLawyerAt, tileSlipAt, wedding, wrote } from './memkeys'
+import { actSigned, alikDead, betonSet, borisForeman, borisMarried, collectorsAskAt, collectorsEpAt, collectorsRecruited, collectorsTea, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantBathAt, grantHouseAt, grantPaid, grantTileAt, houseOnGarik, internAt, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nivaBackAt, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, rubikHoleAt, saidNuneNoWrite, samvelDivorceAt, sick, taxFrozen, tileLawyerAt, tileSlipAt, wedding, wrote } from './memkeys'
 import { stateQuestion } from './money-ask'
 
 export type ArcMsg = Said | { w: string; t: string; claims?: LedgerEvent[]; remember?: FactOp[]; stamp?: string } | { t: string; claims: LedgerEvent[]; remember?: FactOp[]; stamp?: string }
@@ -181,7 +181,7 @@ export const ARCS: Record<string, Arc> = {
       { m: ['«Ниву» видели в Гюмри. Заправилась и не заплатила.', 'Вся в меня.'], legend: 'niva_gone' }, // ещё в Армении — Грузия со следующей серии
       { m: ['«Нива» пересекла границу с Грузией. Без документов. Пропустили — узнали.'], legend: 'niva_abroad' },
       { m: [{ w: 'niva', t: 'Би-бип.' }, 'Это «Нива» тебе из Тбилиси. Роуминг, брат, дорого. Она за мой счёт звонит.'] },
-      { m: [{ t: '«Нива» вернулась! Без денег. Но с новыми колёсами и грузинскими номерами. Кто-то её любил.', claims: [{ retract: 'money_niva' }] }], remember: [set(nivaAway, false), set(nivaBack, true)], then: 'promise', legend: 'niva_back' },
+      { m: [{ t: '«Нива» вернулась! Без денег. Но с новыми колёсами и грузинскими номерами. Кто-то её любил.', claims: [{ retract: 'money_niva' }], stamp: nivaBackAt }], remember: [set(nivaAway, false), set(nivaBack, true)], then: 'promise', legend: 'niva_back' },
       { m: ['«Нива» опять уехала. Оставила записку: «Не ищи».', 'Уважаю её выбор.'], remember: [set(nivaAway, true)], fx: { ach: 'arc_niva' }, legend: null },
     ],
   },

@@ -1800,6 +1800,7 @@ export class Game {
       tileSlipFresh: S.stats.sent - Number(S.mem[memkeys.tileSlipAt] ?? -99) <= 3,
       // четвёртый эпизод плиточной арки (#1303): роль адвоката и вычет 10 000 ₽ из долга — окно то же
       tileLawyerFresh: S.stats.sent - Number(S.mem[memkeys.tileLawyerAt] ?? -99) <= 3,
+      nivaBackFresh: S.stats.sent - Number(S.mem[memkeys.nivaBackAt] ?? -99) <= 3,
       // продажа имущества со дна (#1084): заметное событие — отклик живёт ход продажи и три после;
       // что продано — якорь пула: кнопка говорит про проданную вещь, а не про любую из проданных
       saleFresh: S.stats.sent - Number(S.mem[memkeys.saleAt] ?? -99) <= 3,
