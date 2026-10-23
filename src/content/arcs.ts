@@ -4,7 +4,7 @@ import { type Entry, type FactOp, type Criterion, type FactKey, type Said, set, 
 import { type ClaimKey } from './ids'
 import type { LedgerEvent } from './fact-types'
 import { needs, meet, WORLD, MENTION_RE } from './world'
-import { actSigned, alikDead, betonSet, borisForeman, borisMarried, collectorsAskAt, collectorsEpAt, collectorsRecruited, collectorsTea, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantBathAt, grantHouseAt, grantPaid, grantTileAt, houseOnGarik, internAt, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, rubikHoleAt, saidNuneNoWrite, samvelDivorceAt, sick, taxFrozen, tileSlipAt, wedding, wrote } from './memkeys'
+import { actSigned, alikDead, betonSet, borisForeman, borisMarried, collectorsAskAt, collectorsEpAt, collectorsRecruited, collectorsTea, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantBathAt, grantHouseAt, grantPaid, grantTileAt, houseOnGarik, internAt, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, rubikHoleAt, saidNuneNoWrite, samvelDivorceAt, sick, taxFrozen, tileLawyerAt, tileSlipAt, wedding, wrote } from './memkeys'
 import { stateQuestion } from './money-ask'
 
 export type ArcMsg = Said | { w: string; t: string; claims?: LedgerEvent[]; remember?: FactOp[]; stamp?: string } | { t: string; claims: LedgerEvent[]; remember?: FactOp[]; stamp?: string }
@@ -395,7 +395,7 @@ export const ARCS: Record<string, Arc> = {
       { m: [{ t: 'Брат, проблема. На твоей плитке поскользнулся заказчик. Говорит, слишком гладкая. Как лёд.', claims: [], stamp: tileSlipAt }] },
       { m: ['Заказчик в гипсе. Подаёт в суд. На тебя. Я ни при чём — я только деньги не платил.'], legend: 'court_tile' },
       { m: [{ w: 'grant', t: 'Молодой человек, ваша плитка — орудие. Мой адвокат с вами свяжется.', stamp: grantTileAt }] },
-      { m: [gate(is('ctx.debtMoved'))('Хорошая новость: я твой адвокат! Бесплатно. Ну как бесплатно — из твоего долга вычту.')], fx: { debt: -10000 }, sys: 'Алик вычел из долга 10 000 ₽ за адвокатские услуги.' },
+      { m: [gate(is('ctx.debtMoved'))({ t: 'Хорошая новость: я твой адвокат! Бесплатно. Ну как бесплатно — из твоего долга вычту.', claims: [], stamp: tileLawyerAt })], fx: { debt: -10000 }, sys: 'Алик вычел из долга 10 000 ₽ за адвокатские услуги.' },
       { m: ['Твою плитку внесли в реестр памятников. Теперь с неё нельзя ничего требовать. Как с меня, брат.'] },
       { m: ['Суд решил: плитка невиновна. Виноват пол под ней. Пол клал я. По этому делу мы квиты, брат. Основной долг остался — суд его даже трогать побоялся.'], fx: { ach: 'arc_tile' }, then: 'promise', legend: null },
     ],
