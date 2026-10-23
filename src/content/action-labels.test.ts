@@ -44,23 +44,33 @@ describe('кнопки-действия без хвостов игрока (#127
     expect(tail(option!.text), '«Стою, занимаю Очень жду.» — две реплики на одной кнопке').toBe('')
   })
 
-  it('окно чайника: в блоке и в «Я:» — строка пула, даже когда пул исчерпан (#1270)', async () => {
+  it('окно чайника: в блоке и в «Я:» — строка пула без хвоста (#1270, #1283)', async () => {
     const { game } = makeGame({ seed: 7 })
     await game.enterNode('q_lottery', 'draw')
     const at = Number(game.S.mem['lottery.kettleAt'])
     const pool: string[] = P_KETTLE.map(valueOf)
-    // окно — ход события и три после; сборка блока зовётся несколько раз за ход, колода пула
-    // при этом исчерпывается — раньше именно здесь к лейблу приклеивался хвост
-    for (let turn = 0; turn <= 3; turn++) {
-      game.S.stats.sent = at + turn
-      for (let build = 0; build < 3; build++) {
-        game.S.choices = null
-        const kettle = game.buildChoices().find((x) => x.act === 'kettle')
-        expect(kettle, `ход +${turn}, сборка ${build}: кнопка ушла из окна`).toBeDefined()
-        expect(pool, `«${kettle!.text}» — не строка пула`).toContain(kettle!.text)
-        expect(tail(kettle!.text), '«Забрать чайник у кума Очень жду.» — две реплики на одной кнопке').toBe('')
-      }
+    // окно — ход события и три после; сборка блока зовётся несколько раз за ход. Пересчёт того же хода
+    // отдаёт ту же строку пула (#1283): кнопка не меняется и не съедает следующую строку окна под пальцем,
+    // а раньше именно здесь на исчерпанной колоде к лейблу приклеивался хвост
+    game.S.stats.sent = at
+    let first = ''
+    for (let build = 0; build < 3; build++) {
+      game.S.choices = null
+      const kettle = game.buildChoices().find((x) => x.act === 'kettle')
+      expect(kettle, `сборка ${build}: кнопка ушла из окна`).toBeDefined()
+      expect(pool, `«${kettle!.text}» — не строка пула`).toContain(kettle!.text)
+      expect(tail(kettle!.text), '«Забрать чайник у кума Очень жду.» — две реплики на одной кнопке').toBe('')
+      if (build === 0) first = kettle!.text
+      else expect(kettle!.text, 'пересчёт хода сменил строку пула').toBe(first)
     }
+    // следующий ход окна — вторая и последняя строка пула: внутри окна строка не повторяется (#1283)
+    game.S.stats.sent = at + 1
+    game.S.choices = null
+    const next = game.buildChoices().find((x) => x.act === 'kettle')
+    expect(next, 'на втором ходу окна кнопки нет').toBeDefined()
+    expect(next!.text, 'строка пула повторилась внутри окна').not.toBe(first)
+    expect(pool, `«${next!.text}» — не строка пула`).toContain(next!.text)
+    expect(tail(next!.text), 'у второй строки тоже не должно быть хвоста').toBe('')
     // отправка: в «Я:» тот же лейбл, без хвоста
     game.S.stats.sent = at
     game.S.choices = null

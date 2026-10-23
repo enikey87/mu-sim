@@ -4,7 +4,7 @@ import type { ContentApi } from '../../engine/game'
 import type { Choice, Tone } from '../../engine/state'
 import { type Rule, type Facts, type Criterion, type Entry, type Line, eq, ne, is, exists, missing, gt, gte, lte, isOpen, spec, valueOf, sinceWithin } from '../fact'
 import type { GameEvent, Offer } from './events'
-import { D, cap, WHEN_YEARS } from '../excuses'
+import { D, cap, WHEN_YEARS, EVENT_FRESH_TURNS } from '../excuses'
 import { talkPairs, talkId } from '../talk'
 import { ARCS, WRONG_Q } from '../arcs'
 import * as L from '../life'
@@ -83,6 +83,15 @@ const viaFromArr = (game: ContentApi, key: string, arr: readonly Entry<unknown>[
 const freshFromArr = (game: ContentApi, key: string, arr: readonly Entry<unknown>[]) => {
   requirePlayerPool(key.startsWith('F_') ? `ARCS.${key.slice(2)}.follow` : key, arr)
   return game.freshPlayer(key, arr as readonly Entry<string>[]) ?? ''
+}
+/** Пул собственного окна события (#927): показ ограничен `*Fresh`-фактом, поэтому окно повтора (#824)
+ *  ему не нужно — но окно события (ход и три после) длиннее колоды (2–3 строки), и сырой `draw` после
+ *  исчерпания рефиллил колоду и возвращал показанную строку дословно (партия 305117: «…Или баран?»
+ *  предложен 2 и 3 ноября, #1283). Внутри окна строка предлагается один раз; исчерпанный в окне пул
+ *  молчит до конца окна — кнопка уходит, а не повторяется. Тексты и гейты строк не меняются. */
+const windowFromArr = (game: ContentApi, key: string, arr: readonly Entry<unknown>[]): string => {
+  requirePlayerPool(key, arr)
+  return game.windowLine(key, arr as readonly Entry<string>[], EVENT_FRESH_TURNS) ?? ''
 }
 /** Линия игрока из плоского пула вместе с её номером: ответ окна подбирается по выбранной строке,
  *  а не колодой (#1017). Номер уезжает с arg, как у угрозы «до Страсбурга» (#982). */
@@ -168,12 +177,12 @@ export const choiceRules: R[] = [
   },
 
   // заметные системные события (#927): 1–2 варианта-реакции, пока свежо событие — ход и три после
-  offer({ name: 'RamPhoto', when: [is('ramPhotoFresh')], act: 'ramPhoto', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_RAM_PHOTO', P_RAM_PHOTO) }),
-  offer({ name: 'BorisSale', when: [is('borisSaleFresh')], act: 'borisSale', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_BORIS_SALE', P_BORIS_SALE) }),
-  offer({ name: 'Vacancy', when: [is('vacancyFresh')], act: 'vacancy', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_VACANCY', P_VACANCY) }),
-  offer({ name: 'AvitoReview', when: [is('avitoReviewFresh')], act: 'avitoReview', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_AVITO_REVIEW', P_AVITO_REVIEW) }),
-  offer({ name: 'RubikAsk', when: [is('rubikAskFresh')], act: 'rubikAsk', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_RUBIK_ASK', P_RUBIK_ASK) }),
-  offer({ name: 'Kettle', when: [is('kettleFresh')], act: 'kettle', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_KETTLE', P_KETTLE) }),
+  offer({ name: 'RamPhoto', when: [is('ramPhotoFresh')], act: 'ramPhoto', tone: 'neutral', bonus: 3, text: (g) => windowFromArr(g, 'P_RAM_PHOTO', P_RAM_PHOTO) }),
+  offer({ name: 'BorisSale', when: [is('borisSaleFresh')], act: 'borisSale', tone: 'neutral', bonus: 3, text: (g) => windowFromArr(g, 'P_BORIS_SALE', P_BORIS_SALE) }),
+  offer({ name: 'Vacancy', when: [is('vacancyFresh')], act: 'vacancy', tone: 'neutral', bonus: 3, text: (g) => windowFromArr(g, 'P_VACANCY', P_VACANCY) }),
+  offer({ name: 'AvitoReview', when: [is('avitoReviewFresh')], act: 'avitoReview', tone: 'neutral', bonus: 3, text: (g) => windowFromArr(g, 'P_AVITO_REVIEW', P_AVITO_REVIEW) }),
+  offer({ name: 'RubikAsk', when: [is('rubikAskFresh')], act: 'rubikAsk', tone: 'neutral', bonus: 3, text: (g) => windowFromArr(g, 'P_RUBIK_ASK', P_RUBIK_ASK) }),
+  offer({ name: 'Kettle', when: [is('kettleFresh')], act: 'kettle', tone: 'neutral', bonus: 3, text: (g) => windowFromArr(g, 'P_KETTLE', P_KETTLE) }),
   // прямые вопросы и первые сообщения персонажей (#958): отклик в окне события — ход и три после
   offer({ name: 'CrewCall', when: [lte('sinceCrew', CREW_FRESH_TURNS)], act: 'crewCall', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_CREW_CALL', P_CREW_CALL) }),
   offer({ name: 'LawyerFirst', when: [is('lawyerFresh')], act: 'lawyerAsk', tone: 'neutral', bonus: 3, text: (g) => fromArr(g, 'P_LAWYER', P_LAWYER) }),

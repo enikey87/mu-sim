@@ -61,7 +61,9 @@ describe('нейтральные пулы длинной партии (#1117)', 
   })
 
   it('400 ходов на дне: дословный повтор строки «дна» не ближе 20 ходов', async () => {
-    const { game } = makeGame({ seed: 1117 })
+    // #1283 (пул окна события не повторяет строку) сдвинул розыгрыш: на сиде 1117 журнал ужался
+    // до 7 строк при пороге больше 8 — проверка стала бы пустой. Сид 303 даёт 10 строк при том же пороге.
+    const { game } = makeGame({ seed: 303 })
     const bases = new Set([...P_MONEY.bottom.polite, ...P_MONEY.bottom.neutral].map(text))
     const strip = (t: string): string => {
       let s = t
