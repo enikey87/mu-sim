@@ -12,7 +12,7 @@ import { turnRules } from './rules/turn'
 import { FINALES } from './finales'
 import { COURT_LAWYER_AGAIN } from './quests'
 import { RUDE_CALLS_VOICE, MAMA_VOICE_CRY } from './rude'
-import { count, collectorsRecruited, court, crewPaid, crewPaidAt, HEAT, internAt, lawyerAt, debutWho, debutAt, arsenTrack, saidStrasburg, saidGrantEnvelope, grantTileAt, grantHouseAt, mamaMarketAt, tileAdAt, tamadaDoneAt, borisAskAt, mamaVoiceAt, mamaCalls, samvelDivorceAt, tileSlipAt, saleAt, saleWhat } from './memkeys'
+import { count, collectorsRecruited, court, crewPaid, crewPaidAt, HEAT, internAt, lawyerAt, debutWho, debutAt, arsenTrack, saidStrasburg, saidGrantEnvelope, grantTileAt, grantHouseAt, mamaMarketAt, tileAdAt, tamadaDoneAt, borisAskAt, mamaVoiceAt, mamaCalls, samvelDivorceAt, tileSlipAt, saleAt, saleWhat, alikDead } from './memkeys'
 import { valueOf, type Line } from './fact'
 import type { Choice } from '../engine/state'
 
@@ -1116,6 +1116,15 @@ describe('окно вопроса о баране по памяти партии
     expect(button(game), 'кнопка про барана без вопроса о нём').toBeUndefined()
   })
 
+  it('после «смерти» Алика ответ на его вопрос в пуле не висит (#1293)', async () => {
+    const { game } = makeGame()
+    await ask(game, 'баран Борис')
+    expect(button(game), 'до смерти кнопка есть — проверка пустеет').toBeTruthy()
+    game.S.mem[alikDead] = true
+    expect(button(game), 'отвечают на вопрос мёртвого собеседника').toBeUndefined()
+    game.S.mem[alikDead] = false
+    expect(button(game), 'вернулся — окно снова доступно').toBeTruthy()
+  })
   it('вопрос штампует ход, кнопка в блоке, окно три хода, ответ потребляет', async () => {
     const { game } = makeGame()
     expect(button(game), 'до вопроса кнопки нет').toBeUndefined()

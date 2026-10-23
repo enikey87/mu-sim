@@ -3,6 +3,7 @@ import { type Line, type Entry, is, eq, gate, missing, during, set } from './fac
 import { type ClaimKey } from './ids'
 import { needs } from './world'
 import { arsenTrack, bathAsked, met, phoneKarine, saidRegiment, threatClaim } from './memkeys'
+import { DEBT0 } from '../engine/state'
 // Реплика участника: [кто, текст]; кто — ключ CAST. Текст может нести явную семантику (claims, #426).
 export type Said = readonly [string, string | { t: string; claims: ClaimKey[] }]
 
@@ -52,7 +53,8 @@ export const RUDE_FAMILY: Record<string, Line[]> = {
     'Дядя сказал ответить вам «сам такой». Отвечаю: сам такой. Это не я, это дядя.',
     // крик, бит и трек одной строкой — событие; факт ставит сама прозвучавшая строка (#982)
     { t: 'Это Арсен. Я записал ваш крик на диктофон и сделал бит. Трек называется «Плиточник». Уже сто прослушиваний.', remember: [set(arsenTrack, true)] },
-    'Я посчитал: на ваши крики дядя тратит 40 минут в день. Это 240 часов в год. Столько же, сколько он вам должен. Совпадение?',
+    // сравнивает 240 часов с 240 000 договора: шутка верна, только пока долг — договорная сумма (#1293)
+    gate(eq('debt', DEBT0))('Я посчитал: на ваши крики дядя тратит 40 минут в день. Это 240 часов в год. Столько же, сколько он вам должен. Совпадение?'),
     'Дядя попросил узнать, вы кричите по работе или лично. Для отчётности.',
   ],
 }
