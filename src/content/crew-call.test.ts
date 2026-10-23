@@ -262,46 +262,47 @@ describe('упрёк по звонку с объекта', () => {
   // плейтест-раунд 46 / аудит раунда 38 (#731): префикс декора ронял первую букву имени — «Алик, тарон звонил»
   // #1068: пул делится фактом crewAllPaid — открытые строки собираем в обоих состояниях мира
   // #1108: вокатив «Тарон, …» — уже адресат, префикс-обращение к Алику на него не клеится (двойного адресата нет)
-  it('упрёк с Тароном — с заглавной и без двойного адресата, в кнопке и в отправленной реплике', async () => {
+  // #1268: упрёк — долгоживущий пул и идёт через окно повтора, поэтому строка показывается как есть один раз,
+  // а не «перефразируется» префиксом на повторе; исчерпанный в окне пул молчит, а не возвращает строку дословно
+  it('упрёк с Тароном — с заглавной и без двойного адресата, каждая открытая строка показана как есть', async () => {
     const pass = async (game: Game) => {
       const rules = optCrewPaid(game)
       expect(rules).toHaveLength(1)
       const offer = () => rules[0].offer!(game.rules.ctx(game, rules[0], { event: 'BuildChoices' }, game.facts()))
-      // первый показ строки — как есть; префикс клеится на повтор уже сказанного (pickFresh в playerLine)
-      const raw = new Map<string, Choice>()
+      const open = game.open(P_CREW_PAID)
+      const shown = new Map<string, Choice>()
+      const history: string[] = []
       for (let i = 0; i < 60; i++) {
         const c = offer()
-        if (c) raw.set(c.text, c)
+        if (!c) continue
+        expect(history, `«${c.text.slice(0, 44)}…» повторён дословно внутри окна`).not.toContain(c.text)
+        history.push(c.text)
+        shown.set(c.text, c)
       }
-      expect(raw.size, 'открытые строки пула показаны как есть').toBe(game.open(P_CREW_PAID).length)
-      for (const c of raw.values()) await game.send(c)
-
-      const decorated = new Map<string, Choice>()
-      for (let i = 0; i < 120; i++) {
-        const c = offer()
-        if (c) decorated.set(c.text, c)
-      }
-      const taron = [...decorated.entries()].filter(([t]) => /Тарон/.test(t))
+      expect([...shown.keys()].sort(), 'открытые строки пула показаны как есть, каждая по одному разу').toEqual([...open].sort())
+      const taron = [...shown.entries()].filter(([t]) => /Тарон/.test(t))
       expect(taron.length, 'вариант с Тароном попадался').toBeGreaterThan(0)
-      for (const [t] of taron) expect(t, t).toMatch(/Тарон/)
       const vocative = taron.filter(([t]) => /^Тарон,/.test(t))
       const about = taron.filter(([t]) => /Тарон писал/.test(t))
-      // #1108: вокатив третьему лицу префикса не получает; сообщение о Тароне («Тарон писал: …») — получает как раньше
+      // #1108: вокатив третьему лицу идёт без обращения к Алику; строка-сообщение о Тароне — тоже как есть
       if (game.S.mem[crewAllPaid]) {
         expect(about.length, 'строка-сообщение о Тароне в мире «всем заплатили»').toBeGreaterThan(0)
         expect(vocative, 'вокатив живёт только в мире без «всем»').toEqual([])
-        expect(about.some(([t]) => /^(Алик, |Слушайте, |Так, |Алик-джан, |Секунду\. |Эм… )Тарон писал/.test(t)), 'строка-сообщение декорируется префиксом').toBe(true)
+        expect(about.every(([t]) => open.includes(t)), 'строка-сообщение показана без префикса').toBe(true)
       } else {
-        expect(vocative.length, 'вокатив «Тарон, …» попадался среди повторов').toBeGreaterThan(0)
+        expect(vocative.length, 'вокатив «Тарон, …» попадался').toBeGreaterThan(0)
         expect(about, 'строки-сообщения в этом мире нет').toEqual([])
         for (const [t] of vocative) expect(t, `вокатив без двойного адресата: «${t}»`).not.toMatch(/^(Алик|Слушайте|Так)/)
       }
 
-      const c = taron[0]![1]
-      const n = game.S.msgs.length
-      await game.send(c)
-      const mine = game.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' && m.from === 'me' ? [m.text] : []))
-      expect(mine[0], 'отправленная реплика — показанная строка').toBe(c.text)
+      // отправили всё показанное — в окне повтора упрёк молчит: дословного возврата сказанного нет (#824)
+      for (const c of shown.values()) {
+        const n = game.S.msgs.length
+        await game.send(c)
+        const mine = game.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' && m.from === 'me' ? [m.text] : []))
+        expect(mine[0], 'отправленная реплика — показанная строка').toBe(c.text)
+      }
+      for (let i = 0; i < 5; i++) expect(offer(), 'в окне повтора упрёк молчит').toBeNull()
     }
     const callWith = async (variant: readonly [string, string]): Promise<Game> => {
       const { game } = makeGame()

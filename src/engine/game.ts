@@ -638,22 +638,32 @@ export class Game {
    * Раньше повтор выдавал `draw` у вызывающего — та же формулировка возвращалась на следующий день (#824).
    */
   freshPlayer(key: string, arr: readonly Entry<string>[]): string | null {
-    const remember = (t: string): string => {
+    return this.freshPlayerEntry<string>(key, arr)?.text ?? null
+  }
+  /**
+   * То же, что `freshPlayer`, но вместе с самой строкой пула: её `arg` нужен ответу на выбранный
+   * вариант (деньги на карте — `bankAsk`, #446). Окно повтора — по тексту строки, а не по ключу
+   * колоды: пул, показанный другим оффером под своим ключом, всё равно держит окно (#1268).
+   */
+  freshPlayerEntry<T extends PoorText>(key: string, arr: readonly Entry<T>[]): { value: T; text: string } | null {
+    const text = (e: Entry<T>): string => poorText(valueOf(e))
+    const remember = (value: T): { value: T; text: string } => {
+      const t = poorText(value)
       this.rememberShown(t)
       this.playerSaid.set(t, this.S.stats.sent)
-      return t
+      return { value, text: t }
     }
-    const fresh = this.decks.pick(key, arr, this.lineFacts(), { eligible: (e) => !this.shown.has(valueOf(e)) && !this.seen.has(valueOf(e)) })
+    const fresh = this.decks.pick(key, arr, this.lineFacts(), { eligible: (e) => !this.shown.has(text(e)) && !this.seen.has(text(e)) })
     // показанное держится окном ходов (#826): записи вылетают не по числу, а по возрасту —
     // дословный повтор пула молчит все PLAYER_REPEAT_TURNS, как и у слотов выше
     if (fresh !== null) return remember(fresh)
     // повтор — самая давняя по показу открытая строка пула, без жребия: так окно не тратит розыгрыш.
     // Ворота строки проверяются и здесь: повтор не имеет права вернуть закрытую строку (#824)
     const at = (t: string) => this.playerSaid.get(t) ?? -1e9
-    const ready = arr.filter((e) => isOpen(e, this.lineFacts()) && !this.seen.has(valueOf(e)))
-      .filter((e) => this.S.stats.sent - at(valueOf(e)) >= PLAYER_REPEAT_TURNS)
+    const ready = arr.filter((e) => isOpen(e, this.lineFacts()) && !this.seen.has(text(e)))
+      .filter((e) => this.S.stats.sent - at(text(e)) >= PLAYER_REPEAT_TURNS)
     if (!ready.length) return null
-    return remember(valueOf(ready.reduce((a, b) => (at(valueOf(b)) < at(valueOf(a)) ? b : a))))
+    return remember(valueOf(ready.reduce((a, b) => (at(text(b)) < at(text(a)) ? b : a))))
   }
   /** Окно не отпустило ни одной строки, а вопрос молчать не может: самая давняя открытая, даже уже отправленная (#880). */
   oldestShown(arr: readonly Entry<string>[]): string {
@@ -1931,8 +1941,9 @@ export class Game {
     const money = level && P_MONEY[level]
     if (S.mem[memkeys.polite] && this.chance(0.6)) out.push({ text: one('P_POL_POLITE', P_POL_POLITE), tone: 'polite' })
     else {
-      // бедность — своими словами: пул уровня без повторов, исчерпанный звучит редко (#184)
-      const poor = money && this.chance(level === 'bottom' ? 0.7 : 0.4) ? this.poorChoice(`P_MONEY_${level}_POL`, money.polite) : null
+      // бедность — своими словами: пул уровня через окно повтора (#824), исчерпанный пул молчит,
+      // а не возвращает дословно строку, показанную 15 ходов назад по календарю (#1268)
+      const poor = money && this.chance(level === 'bottom' ? 0.7 : 0.4) ? this.freshPlayerEntry<PoorText>(`P_MONEY_${level}_POL`, money.polite) : null
       const arg = poor && typeof poor.value !== 'string' ? poor.value.arg : undefined
       // любая реплика о своих деньгах несёт намерение: ответ на неё — раньше фоновых последствий (#459)
       out.push({ text: poor?.text ?? P2('P_POL_A', 'P_POL_B'), tone: 'polite', ...(poor ? { act: 'desperate', arg } : {}) })
@@ -1941,7 +1952,7 @@ export class Game {
       const period = this.period()
       // отчаяние — своё намерение, чаще на дне; вежливый вариант выше остаётся при любом уровне
       const cry = money && level && this.chance(level === 'bottom' ? 0.6 : 0.3) ? this.poorChoice(`P_DESPERATE_${level}`, P_DESPERATE[level], { act: true }) : null
-      const poor = !cry && money && this.chance(0.5) ? this.poorChoice<PoorText>(`P_MONEY_${level}_NEU`, money.neutral) : null
+      const poor = !cry && money && this.chance(0.5) ? this.freshPlayerEntry<PoorText>(`P_MONEY_${level}_NEU`, money.neutral) : null
       if (cry) out.push({ text: cry.text, tone: 'neutral', act: 'desperate', arg: typeof cry.value === 'string' ? 'shout' : cry.value.arg })
       else if (poor) out.push({ text: poor.text, tone: 'neutral', act: 'desperate', arg: typeof poor.value === 'string' ? undefined : poor.value.arg })
       else {

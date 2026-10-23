@@ -1178,6 +1178,36 @@ describe('Game: деньги на карте', () => {
     expect(again).not.toBeNull() // акт «desperate» не исчезает вместе с копирайтом
     expect(fresh).not.toContain(again) // но и не повторяет сказанное слово в слово
   })
+  // #1268: окно повтора считает ходы, а не сутки, и принадлежит пулу, а не ключу колоды
+  it('окно повтора: четыре строки — четыре показа, дальше кнопка молчит (#824/#1268)', () => {
+    const { game } = makeGame()
+    const pool = ['раз', 'два', 'три', 'четыре']
+    const shown = Array.from({ length: 4 }, () => game.freshPlayerEntry('POOL4', pool))
+    expect(new Set(shown.map((e) => e!.text)).size, 'каждая строка пула показана').toBe(4)
+    expect(game.freshPlayerEntry('POOL4', pool), 'исчерпанный в окне пул молчит, а не повторяется').toBeNull()
+    // дни идут, ходы — нет: суточное окно пула бедности (#184) здесь не при чём, окно повтора держит
+    game.S.day += 30
+    expect(game.freshPlayerEntry('POOL4', pool), 'календарь не отпускает строку раньше окна').toBeNull()
+    // окно прошло — самая давняя строка возвращается (повтор за пределами 20 ходов законен)
+    game.S.stats.sent += 20
+    expect(game.freshPlayerEntry('POOL4', pool)?.text, 'за окном пул звучит снова').toBe('раз')
+  })
+  it('окно повтора принадлежит пулу, а не ключу колоды: второй оффер не показывает показанное первым (#1268)', () => {
+    const { game } = makeGame()
+    const pool = ['раз', 'два', 'три', 'четыре']
+    const viaA = new Set(Array.from({ length: 4 }, () => game.freshPlayerEntry('OFFER_A', pool)!.text))
+    expect(viaA.size).toBe(4)
+    // тот же пул под ключом другого оффера: собственная колода — да, окно — общее
+    expect(game.freshPlayerEntry('OFFER_B', pool), 'ключ колоды не открывает окно заново').toBeNull()
+  })
+  it('окно повтора видит текст строки с arg: объект пула не проскакивает мимо окна (#446/#1268)', () => {
+    const { game } = makeGame()
+    const pool = [{ t: 'Алик, банк спрашивает про вас', arg: 'bankAsk' }]
+    const first = game.freshPlayerEntry('ATM_ARG', pool)
+    expect(first?.value).toEqual(pool[0])
+    expect(first?.text).toBe('Алик, банк спрашивает про вас')
+    expect(game.freshPlayerEntry('ATM_ARG', pool), 'та же строка в окне — молчание').toBeNull()
+  })
   it('после выплаты и в эндгейме деньги не меняются', () => {
     const { game } = makeGame()
     game.S.mem.payday = 'default'
@@ -1363,6 +1393,34 @@ describe('Game: окно дословного повтора вариантов 
       if (game.battery.dead) await game.battery.charge()
       game.S.offlineDays = 0
     }
+    const bad: string[] = []
+    for (let i = 0; i < offered.length; i++) {
+      for (let j = i + 1; j < offered.length && offered[j].turn - offered[i].turn < 20; j++) {
+        if (offered[j].text === offered[i].text) bad.push(`ходы ${offered[i].turn} и ${offered[j].turn}: «${offered[i].text}»`)
+      }
+    }
+    expect(bad.slice(0, 3)).toEqual([])
+  }, 120_000)
+
+  // #1268: денежные строки несут `act: 'desperate'` и потому мимо спек-теста выше — а повторялись
+  // они дословно (плейтест 114/115), пока пул отпускал строку по календарю, а не по ходам
+  it('строки пула денег не повторяются дословно в окне 20 ходов: партия 300 ходов', async () => {
+    const { game } = makeGame({ seed: 128031 })
+    setMoney(game, Game.MONEY_BOTTOM)
+    const pool = [P_MONEY.low.polite, P_MONEY.low.neutral, P_MONEY.bottom.polite, P_MONEY.bottom.neutral]
+      .flat().map((e) => { const v = valueOf(e); return typeof v === 'string' ? v : v.t })
+    const offered: Array<{ turn: number; text: string }> = []
+    for (let t = 0; t < 300; t++) {
+      const cs = game.buildChoices()
+      for (const c of cs) {
+        const line = pool.find((p) => c.text.startsWith(p))
+        if (line) offered.push({ turn: game.S.stats.sent, text: line })
+      }
+      if (cs[0]) await game.send(cs[0])
+      if (game.battery.dead) await game.battery.charge()
+      game.S.offlineDays = 0
+    }
+    expect(offered.length, 'пул денег в партии показывался').toBeGreaterThan(0)
     const bad: string[] = []
     for (let i = 0; i < offered.length; i++) {
       for (let j = i + 1; j < offered.length && offered[j].turn - offered[i].turn < 20; j++) {
