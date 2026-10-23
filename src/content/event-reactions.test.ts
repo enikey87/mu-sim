@@ -46,6 +46,29 @@ describe('реакции на системные события (#927)', () => {
     expect(has(), 'вне окна — варианта нет').toBe(false)
   })
 
+  it('пул окна события не повторяет строку: четыре сборки окна — каждая строка один раз (#1283)', async () => {
+    // партия 305117: событие фото-барана 31 октября, две строки пула показаны 1–2 ноября, и та же
+    // строка вернулась 3 ноября — сырой `draw` рефиллил исчерпанную за окно колоду (строки 276 → 285)
+    const { game } = makeGame()
+    game.S.stats.sent = 24
+    await game.send('привет')
+    const at = Number(game.S.mem['ram.photoAt'])
+    expect(at, 'фото-баран не сработал — проверка пустеет').toBe(game.S.stats.sent)
+    const pool = P_RAM_PHOTO.map(valueOf)
+    const offered: string[] = []
+    // окно — ход события и три после: строки не выбираем, смотрим, что предлагает блок
+    for (let turn = 0; turn <= 3; turn++) {
+      game.S.stats.sent = at + turn
+      game.S.choices = null
+      const c = game.buildChoices().find((x) => x.act === 'ramPhoto')
+      if (c) offered.push(c.text)
+    }
+    expect(offered, `повтор строки пула внутри окна: ${offered.join(' → ')}`).toEqual([...new Set(offered)])
+    // каждая открытая строка окна показана один раз; исчерпанный в окне пул молчит до его конца
+    expect(offered.length, 'пул показан не целиком — проверка пустеет').toBe(pool.length)
+    expect([...offered].sort(), offered.join(' → ')).toEqual([...pool].sort())
+  })
+
   it('объявление о продаже Бориса: вариант в блоке в окне и ответ из пула события', async () => {
     const { game } = makeGame()
     game.S.mem['intro.baran'] = true

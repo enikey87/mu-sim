@@ -1,6 +1,6 @@
 // Игра: состояние, сообщения, ход Алика, «живость». Решения — что ответить, что предложить игроку,
 // что сделать Алику — принимает система правил (engine/rules/, content/rules/*).
-import { make, D, TRANSFER_FRESH_TURNS, PHOTO_FRESH_TURNS, low, cap, type ExcuseApi, type Promise3, type PromiseCondition, type Rel, type When, type WhenKind } from '../content/excuses'
+import { make, D, TRANSFER_FRESH_TURNS, PHOTO_FRESH_TURNS, EVENT_FRESH_TURNS, low, cap, type ExcuseApi, type Promise3, type PromiseCondition, type Rel, type When, type WhenKind } from '../content/excuses'
 import { makeScenes, invKey, type Scene, type Line } from '../content/scenes'
 import { BLOCK_LIFTED_LINE, BLOCK_LIFTED_SYS, COLD_WAR, TRIBUNAL } from '../content/rude'
 import { MIRROR, MIRROR_AGAIN, MIRROR_OPEN, MIRROR_REPLY, type Mirror } from '../content/mirror'
@@ -665,6 +665,37 @@ export class Game {
     if (!ready.length) return null
     return remember(valueOf(ready.reduce((a, b) => (at(text(b)) < at(text(a)) ? b : a))))
   }
+  /**
+   * Строка пула, живущего своим окном события (#927): внутри окна строка не предлагается дважды, а
+   * исчерпанный в окне пул молчит до конца окна — кнопка уходит, а не повторяется дословно (#1283).
+   * Окно — то же, что у `*Fresh`-факта (сообщения Алика), а не окно повтора (#824): эти пулы живут
+   * окном события. Пересчёт вариантов в том же ходу отдаёт ту же строку — сборка зовётся несколько
+   * раз за ход (#826), кнопка не должна меняться под пальцем и съедать следующую строку окна.
+   * Сырой `draw` рефиллил колоду и возвращал показанную строку через ход: партия 305117, «…Или баран?»
+   * предложен 2 и 3 ноября после исчерпания двухстрочного пула.
+   */
+  windowLine(key: string, arr: readonly Entry<string>[], window: number): string | null {
+    const facts = this.lineFacts()
+    const shownInWindow = (e: Entry<string>): boolean => {
+      const at = this.shownAt.get(valueOf(e))
+      return at !== undefined && this.S.stats.sent > at && this.S.stats.sent - at <= window
+    }
+    const last = this.windowPick.get(key)
+    if (last && last.at === this.S.stats.sent) {
+      const entry = arr.find((e) => valueOf(e) === last.line)
+      if (entry && isOpen(entry, facts)) return last.line
+    }
+    // все строки окна уже предложены — пул молчит: `pick` без уместных строк отдал бы последнюю из колоды
+    if (!arr.some((e) => isOpen(e, facts) && !shownInWindow(e))) return null
+    const line = this.decks.pick(key, arr, facts, { eligible: (e) => !shownInWindow(e) })
+    if (line === null) return null
+    // показ помним на строке пула, а не на украшенном тексте: окно считает строки, а не хвосты игрока
+    this.rememberShown(line)
+    this.windowPick.set(key, { line, at: this.S.stats.sent })
+    return line
+  }
+  /** Последняя строка окна события по ключу пула: пересчёт того же хода не двигает окно (#1283). */
+  private windowPick = new Map<string, { line: string; at: number }>()
   /** Окно не отпустило ни одной строки, а вопрос молчать не может: самая давняя открытая, даже уже отправленная (#880). */
   oldestShown(arr: readonly Entry<string>[]): string {
     const at = (t: string) => this.playerSaid.get(t) ?? -1e9
@@ -1700,12 +1731,12 @@ export class Game {
       // «Мууу» прозвучало после последнего сообщения игрока — только тогда про корову и спрашивают
       mooFresh: S.mem[memkeys.mooAt] === S.stats.sent,
       // заметные системные события (#927): реакция живёт ход события и 1–3 хода после него
-      ramPhotoFresh: S.stats.sent - Number(S.mem[memkeys.ramPhotoAt] ?? -99) <= 3,
-      borisSaleFresh: S.stats.sent - Number(S.mem[memkeys.borisSaleAt] ?? -99) <= 3,
-      vacancyFresh: S.stats.sent - Number(S.mem[memkeys.vacancyAt] ?? -99) <= 3,
-      avitoReviewFresh: S.stats.sent - Number(S.mem[memkeys.avitoReviewAt] ?? -99) <= 3,
-      rubikAskFresh: S.stats.sent - Number(S.mem[memkeys.rubikAskAt] ?? -99) <= 3,
-      kettleFresh: S.stats.sent - Number(S.mem[memkeys.kettleAt] ?? -99) <= 3,
+      ramPhotoFresh: S.stats.sent - Number(S.mem[memkeys.ramPhotoAt] ?? -99) <= EVENT_FRESH_TURNS,
+      borisSaleFresh: S.stats.sent - Number(S.mem[memkeys.borisSaleAt] ?? -99) <= EVENT_FRESH_TURNS,
+      vacancyFresh: S.stats.sent - Number(S.mem[memkeys.vacancyAt] ?? -99) <= EVENT_FRESH_TURNS,
+      avitoReviewFresh: S.stats.sent - Number(S.mem[memkeys.avitoReviewAt] ?? -99) <= EVENT_FRESH_TURNS,
+      rubikAskFresh: S.stats.sent - Number(S.mem[memkeys.rubikAskAt] ?? -99) <= EVENT_FRESH_TURNS,
+      kettleFresh: S.stats.sent - Number(S.mem[memkeys.kettleAt] ?? -99) <= EVENT_FRESH_TURNS,
       // прямые вопросы и первые сообщения персонажей (#958): отклик в ближайшем блоке — ход и три после
       lawyerFresh: S.stats.sent - Number(S.mem[memkeys.lawyerAt] ?? -99) <= 3,
       collectorsAskFresh: S.stats.sent - Number(S.mem[memkeys.collectorsAskAt] ?? -99) <= 3,
@@ -3469,7 +3500,7 @@ export type ContentApi = Pick<Game,
   | 'lie' | 'caught' | 'callback'
   // колоды и реплики
   | 'draw' | 'open' | 'uniq' | 'pair' | 'line' | 'linePicked' | 'lines' | 'seen' | 'decks' | 'X'
-  | 'addrSaidLine' | 'playerLine' | 'actionLabel' | 'freshPlayer' | 'oldestShown' | 'offeredInWindow' | 'rememberShown' | 'rnd' | 'chance' | 'bagOf' | 'restoreBag'
+  | 'addrSaidLine' | 'playerLine' | 'actionLabel' | 'freshPlayer' | 'windowLine' | 'oldestShown' | 'offeredInWindow' | 'rememberShown' | 'rnd' | 'chance' | 'bagOf' | 'restoreBag'
   // контекст последней реплики
   | 'ctx' | 'setCtx'
   // режимы
