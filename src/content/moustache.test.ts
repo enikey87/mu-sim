@@ -79,20 +79,35 @@ describe('ставка «усы»', () => {
   })
 
   it('вопрос «Ставка сыграла?» открывается, только когда Алик назвал ставку (#1029)', async () => {
-    const { game } = makeGame()
-    game.S.mood = 3
-    game.recordPromise({ text: 'завтра — всё отдам', d: 1, stake: 'moustache' })
-    game.S.day += 1
-    const stakeQuestion = () => { game.S.choices = null; return game.buildChoices().some((c) => c.act === 'moustachePhoto' && /ставк/i.test(c.text)) }
-    // строка сбривания, называющая ставку, в этой партии ещё не звучала: событие приходит без слова «ставка»
-    game.lines.mark(lineId('DUE_SHAVE', 'Карине довольна: усы сбриты. Ты — тоже, надеюсь. Денег по-прежнему нет, но ставка сыграла.'))
-    expect(game.holds(WORLD.stakeSaid), 'ставка сказана до события — проверка пустеет').toBe(false)
-    expect((await game.fire('PromiseDue', { promise: 0 }))?.name).toBe('Due_StakeShave')
-    expect(stakeQuestion(), 'на ходу события вопрос про ставку ссылается на невведённое слово').toBe(false)
-    // Алик называет ставку настоящим ответом на «как усы?» (окно фото ещё живо: ход события и три после)
-    for (let i = 0; i < 8 && !game.holds(WORLD.stakeSaid); i++) await game.fire('PlayerSays', { intent: 'moustacheAsk' })
-    expect(game.holds(WORLD.stakeSaid), 'Алик так и не назвал ставку за восемь ответов — проверка пустеет').toBe(true)
-    expect(stakeQuestion(), 'после слова «ставка» вопроса в блоке нет').toBe(true)
+    // пул окна предлагает строку по разу за окно (#1287): варианты собираем по ходам окна, как их
+    // увидел бы игрок, а не пересборками одного хода — пересборка обязана вернуть ту же строку (#826)
+    const stakeQuestions = async (nameStake: boolean): Promise<string[]> => {
+      const { game } = makeGame()
+      game.S.mood = 3
+      game.recordPromise({ text: 'завтра — всё отдам', d: 1, stake: 'moustache' })
+      game.S.day += 1
+      // строка сбривания, называющая ставку, в этой партии ещё не звучала: событие приходит без слова «ставка»
+      game.lines.mark(lineId('DUE_SHAVE', 'Карине довольна: усы сбриты. Ты — тоже, надеюсь. Денег по-прежнему нет, но ставка сыграла.'))
+      expect((await game.fire('PromiseDue', { promise: 0 }))?.name).toBe('Due_StakeShave')
+      const at = Number(game.S.mem[moustachePhotoAt])
+      if (nameStake) {
+        // Алик называет ставку настоящим ответом на «как усы?» (окно фото ещё живо: ход события и три после)
+        for (let i = 0; i < 8 && !game.holds(WORLD.stakeSaid); i++) await game.fire('PlayerSays', { intent: 'moustacheAsk' })
+        expect(game.holds(WORLD.stakeSaid), 'Алик так и не назвал ставку за восемь ответов — проверка пустеет').toBe(true)
+      } else {
+        expect(game.holds(WORLD.stakeSaid), 'ставка сказана до события — проверка пустеет').toBe(false)
+      }
+      const seen: string[] = []
+      for (let turn = 0; turn <= 3; turn++) {
+        game.S.stats.sent = at + turn
+        game.S.choices = null
+        const c = game.buildChoices().find((x) => x.act === 'moustachePhoto' && /ставк/i.test(x.text))
+        if (c) seen.push(c.text)
+      }
+      return seen
+    }
+    expect(await stakeQuestions(false), 'вопрос про ставку до слова «ставка»').toEqual([])
+    expect((await stakeQuestions(true)).length, 'после слова «ставка» вопроса в блоке нет').toBeGreaterThan(0)
   })
 
   it('ответ окна, называющий ставку, ставит факт сам (#1029)', async () => {
