@@ -4,7 +4,7 @@ import { type Entry, type FactOp, type Criterion, type FactKey, type Said, set, 
 import { type ClaimKey } from './ids'
 import type { LedgerEvent } from './fact-types'
 import { needs, meet, WORLD, MENTION_RE } from './world'
-import { actSigned, alikDead, betonSet, borisForeman, borisMarried, collectorsAskAt, collectorsEpAt, collectorsRecruited, collectorsTea, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantHouseAt, grantPaid, grantTileAt, houseOnGarik, internAt, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, rubikHoleAt, saidNuneNoWrite, samvelDivorceAt, sick, taxFrozen, tileSlipAt, wedding, wrote } from './memkeys'
+import { actSigned, alikDead, betonSet, borisForeman, borisMarried, collectorsAskAt, collectorsEpAt, collectorsRecruited, collectorsTea, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantBathAt, grantHouseAt, grantPaid, grantTileAt, houseOnGarik, internAt, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, rubikHoleAt, saidNuneNoWrite, samvelDivorceAt, sick, taxFrozen, tileSlipAt, wedding, wrote } from './memkeys'
 import { stateQuestion } from './money-ask'
 
 export type ArcMsg = Said | { w: string; t: string; claims?: LedgerEvent[]; remember?: FactOp[]; stamp?: string } | { t: string; claims: LedgerEvent[]; remember?: FactOp[]; stamp?: string }
@@ -231,7 +231,7 @@ export const ARCS: Record<string, Arc> = {
     ],
     eps: [
       { remember: meet('grant'), m: [{ t: 'Заказчик Грант мне не платит. Говорит, заплатит в идеальный день. Ждёт. Ни одного идеального дня с марта, брат.', claims: ['customer_owes'] }], then: 'promise', legend: 'grant' },
-      { m: [{ w: 'grant', t: 'Алик, завтра в бане как договорились. Ой. Не тот чат.' }] },
+      { m: [{ w: 'grant', t: 'Алик, завтра в бане как договорились. Ой. Не тот чат.', stamp: grantBathAt }] },
       { m: ['Грант улетел в Лос-Анджелес. Сказал, вернётся, когда Арарат вернут.'], legend: 'grant_la' },
       {
         m: [

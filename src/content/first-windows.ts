@@ -3,7 +3,7 @@
 // участник, умеющий писать сам (SPEAKS), обязан быть здесь или в исключениях с причиной — новый
 // участник красит сюит на месте, а не в плейтесте через раунд. Офферы и потребление окна ответом —
 // как были (#951), тексты пулов не менялись.
-import { avitoReviewAt, borisAskAt, borisSaleAt, collectorsAskAt, collectorsEpAt, countersuitAt, courtVerdictAt, crewPaidAt, grantHouseAt, grantTileAt, internAt, kettleAt, lawyerAt, mamaMarketAt, mamaVoiceAt, mooAt, moustachePhotoAt, photoAt, ramPhotoAt, rubikAskAt, rubikHoleAt, samvelDivorceAt, saleAt, tamadaDoneAt, tileAdAt, tileSlipAt, transferAt, vacancyAt } from './memkeys'
+import { avitoReviewAt, borisAskAt, borisSaleAt, collectorsAskAt, collectorsEpAt, countersuitAt, courtVerdictAt, crewPaidAt, grantBathAt, grantHouseAt, grantTileAt, internAt, kettleAt, lawyerAt, mamaMarketAt, mamaVoiceAt, mooAt, moustachePhotoAt, offendedAskAt, photoAt, ramPhotoAt, rubikAskAt, rubikHoleAt, samvelDivorceAt, saleAt, seryogaAskAt, tamadaDoneAt, tileAdAt, tileSlipAt, transferAt, vacancyAt } from './memkeys'
 import type { Criterion } from '../engine/rules'
 
 /**
@@ -103,4 +103,8 @@ export const EVENT_SOURCES: readonly EventSource[] = [
   { source: 'вердикт суда (сцена court, узлы debt/screens/moo, stamp)', at: courtVerdictAt, offer: 'CourtVerdict', pool: 'P_COURT_VERDICT' },
   { source: 'первая серия плиточной арки: заказчик упал на плитке (серия, stamp)', at: tileSlipAt, offer: 'TileSlip', pool: 'P_TILE_SLIP' },
   { source: 'продажа имущества со дна (карточка банка, sellThing)', at: saleAt, offer: 'Sold', pool: 'P_SOLD' },
+  // глубокие раунды 119–121 (#1292): заметные события без окна отклика
+  { source: 'карточка друга Серёги «Ну что, заплатил твой Алик?» (уведомление телефона, stamp)', at: seryogaAskAt, offer: 'Seryoga', pool: 'P_SERYOGA' },
+  { source: 'строка Гранта «Алик, завтра в бане как договорились. Ой. Не тот чат.» (серия, stamp)', at: grantBathAt, offer: 'GrantBath', pool: 'P_GRANT_BATH' },
+  { source: 'вопрос Алика «ты обиделся?» после тишины (Idle_Offended / Away_Offended, stamp)', at: offendedAskAt, offer: 'OffendedAsk', pool: 'P_OFFENDED_ASK' },
 ]

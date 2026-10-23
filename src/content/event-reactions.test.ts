@@ -2,17 +2,17 @@
 import { describe, it, expect, vi } from 'vitest'
 import { makeGame, setMoney, cards, respondCtx } from '../test/helpers'
 import type { Game } from '../engine/game'
-import { NOTIF } from './life'
+import { NOTIF, IDLE } from './life'
 import { D } from './excuses'
 import { sold } from './credit'
-import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_NIVA, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE, P_DEBUT_GRANT, P_MAMA_MARKET, P_TILE_AD, P_TAMADA_DONE, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_GRANT_HOUSE, P_TILE_SLIP, P_SOLD, P_BORIS_MEMORY } from './rules/player-choice-pools'
-import { BORIS_MEMORY_B, BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, DEBUT_GRANT_B, GRANT_HOUSE_B, INTERN_B, HOLE_B, AVITO_REVIEW, MAMA_MARKET_B, TILE_AD_B, TAMADA_DONE_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, TILE_SLIP_B, SOLD_B } from './world'
+import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_NIVA, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE, P_DEBUT_GRANT, P_MAMA_MARKET, P_TILE_AD, P_TAMADA_DONE, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_GRANT_HOUSE, P_TILE_SLIP, P_SOLD, P_BORIS_MEMORY, P_SERYOGA, P_GRANT_BATH, P_OFFENDED_ASK } from './rules/player-choice-pools'
+import { BORIS_MEMORY_B, BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, DEBUT_GRANT_B, GRANT_HOUSE_B, INTERN_B, HOLE_B, AVITO_REVIEW, MAMA_MARKET_B, TILE_AD_B, TAMADA_DONE_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, TILE_SLIP_B, SOLD_B, VACANCY, VACANCY_START_B, VACANCY_SOON_B, SERYOGA_B, GRANT_BATH_B, OFFENDED_ASK_B } from './world'
 import { ARCS } from './arcs'
 import { turnRules } from './rules/turn'
 import { FINALES } from './finales'
 import { COURT_LAWYER_AGAIN } from './quests'
 import { RUDE_CALLS_VOICE, MAMA_VOICE_CRY } from './rude'
-import { count, collectorsRecruited, court, crewPaid, crewPaidAt, HEAT, internAt, lawyerAt, debutWho, debutAt, arsenTrack, saidStrasburg, saidGrantEnvelope, grantTileAt, grantHouseAt, mamaMarketAt, tileAdAt, tamadaDoneAt, borisAskAt, mamaVoiceAt, mamaCalls, samvelDivorceAt, tileSlipAt, saleAt, saleWhat, alikDead } from './memkeys'
+import { count, collectorsRecruited, court, crewPaid, crewPaidAt, HEAT, internAt, lawyerAt, debutWho, debutAt, arsenTrack, saidStrasburg, saidGrantEnvelope, grantTileAt, grantHouseAt, mamaMarketAt, tileAdAt, tamadaDoneAt, borisAskAt, mamaVoiceAt, mamaCalls, samvelDivorceAt, tileSlipAt, saleAt, saleWhat, alikDead, seryogaAskAt, grantBathAt, offendedAskAt } from './memkeys'
 import { valueOf, type Line } from './fact'
 import type { Choice } from '../engine/state'
 
@@ -1151,5 +1151,147 @@ describe('окно вопроса о баране по памяти партии
     expect(said.some((t) => answers.some((p) => t.includes(p))), `ответ не из пула события: ${said.join(' | ')}`).toBe(true)
     expect(game.S.mem[borisAskAt], 'ответ не потребил окно').toBeUndefined()
     expect(button(game), 'после ответа окно закрыто').toBeUndefined()
+  })
+})
+
+// Глубокие раунды 119–121 (#1292): четыре события, у которых не было окна отклика.
+// Каждое — штамп на событие + гейтнутая строка в пуле окна; вакансия: принятие получает ответ-нить.
+describe('окна отклика глубоких раундов (#1292)', () => {
+  const text = (e: unknown): string => { const v = valueOf(e as never); return typeof v === 'string' ? v : (v as { t: string }).t }
+  const low = (t: string) => t.charAt(0).toLowerCase() + t.slice(1)
+  const button = (game: Game, act: string) => { game.S.choices = null; return game.buildChoices().find((c) => c.act === act) }
+  const alikSaid = (game: Game, from: number): string[] =>
+    game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : []))
+  const SERYOGA_CARD = 'Ну что, заплатил твой Алик?'
+
+  it('карточка Серёги штампует ход, кнопка в блоке, окно три хода, ответ потребляет', async () => {
+    const { game } = makeGame()
+    expect(button(game, 'seryoga'), 'до карточки кнопки нет').toBeUndefined()
+    showCard(game, SERYOGA_CARD)
+    const at = Number(game.S.mem[seryogaAskAt])
+    expect(at, 'карточка не штампанула ход события').toBe(game.S.stats.sent)
+    expect(button(game, 'seryoga'), 'на ходу карточки кнопки нет').toBeTruthy()
+    // в ближайшем блоке вариант — из пула окна, а не общая кнопка
+    const texts = new Set<string>()
+    for (let i = 0; i < 60; i++) { const b = button(game, 'seryoga'); if (b) texts.add(b.text) }
+    const pool = P_SERYOGA.map(text)
+    expect(texts.size, 'пул окна не прозвучал — проверка пустеет').toBeGreaterThan(0)
+    for (const t of texts) expect(pool.some((p) => t.includes(p) || t.includes(low(p))), `кнопка не из пула: ${t}`).toBe(true)
+    game.S.stats.sent = at + 3
+    expect(button(game, 'seryoga'), 'третий ход после карточки — ещё окно').toBeTruthy()
+    game.S.stats.sent = at + 4
+    expect(button(game, 'seryoga'), 'вне окна — кнопки нет').toBeUndefined()
+    game.S.stats.sent = at
+    const n = game.S.msgs.length
+    await game.fire('PlayerSays', { intent: 'seryoga' })
+    const said = alikSaid(game, n)
+    const answers = SERYOGA_B.map(text)
+    expect(said.some((t) => answers.some((p) => t.includes(p))), `ответ не из пула события: ${said.join(' | ')}`).toBe(true)
+    expect(game.S.mem[seryogaAskAt], 'ответ не потребил окно').toBeUndefined()
+    expect(button(game, 'seryoga'), 'после ответа окно закрыто').toBeUndefined()
+  })
+
+  it('строка Гранта «Ой. Не тот чат.» штампует ход, окно три хода, отвечает Грант', async () => {
+    const { game } = makeGame()
+    expect(button(game, 'grantBath'), 'до серии кнопки нет').toBeUndefined()
+    // настоящий путь: серии арки до строки «не тот чат» (eps[1])
+    for (let i = 0; i < ARCS.grant.eps.length && !game.S.mem[grantBathAt]; i++) await game.playArc('grant')
+    expect(game.S.msgs.some((m) => m.kind === 'text' && m.text.includes('Не тот чат')), 'строка не прозвучала — проверка пустеет').toBe(true)
+    const at = Number(game.S.mem[grantBathAt])
+    expect(Number.isFinite(at), 'строка серии не штампанула ход события').toBe(true)
+    expect(at, 'штамп не на ходу строки').toBe(game.S.stats.sent)
+    expect(button(game, 'grantBath'), 'на ходу события кнопки нет').toBeTruthy()
+    const texts = new Set<string>()
+    for (let i = 0; i < 60; i++) { const b = button(game, 'grantBath'); if (b) texts.add(b.text) }
+    const pool = P_GRANT_BATH.map(text)
+    expect(texts.size, 'пул окна не прозвучал — проверка пустеет').toBeGreaterThan(0)
+    for (const t of texts) expect(pool.some((p) => t.includes(p) || t.includes(low(p))), `кнопка не из пула: ${t}`).toBe(true)
+    game.S.stats.sent = at + 3
+    expect(button(game, 'grantBath'), 'третий ход после строки — ещё окно').toBeTruthy()
+    game.S.stats.sent = at + 4
+    expect(button(game, 'grantBath'), 'вне окна — кнопки нет').toBeUndefined()
+    game.S.stats.sent = at
+    const n = game.S.msgs.length
+    await game.fire('PlayerSays', { intent: 'grantBath' })
+    const said = alikSaid(game, n)
+    const answers = GRANT_BATH_B.map(text)
+    expect(said.some((t) => answers.some((p) => t.includes(p))), `ответ не из пула события: ${said.join(' | ')}`).toBe(true)
+    expect(game.S.mem[grantBathAt], 'ответ не потребил окно').toBeUndefined()
+    expect(button(game, 'grantBath'), 'после ответа окно закрыто').toBeUndefined()
+  })
+
+  it('вопрос «ты обиделся?» штампует ход, кнопка в блоке, окно три хода, ответ потребляет', async () => {
+    const { game } = makeGame()
+    expect(button(game, 'offendedAsk'), 'до вопроса кнопки нет').toBeUndefined()
+    game.awayMsg('offended') // настоящий путь: пачка после тишины
+    expect(game.S.msgs.some((m) => m.kind === 'text' && m.text.endsWith('ты обиделся?')), 'вопрос не прозвучал — проверка пустеет').toBe(true)
+    const at = Number(game.S.mem[offendedAskAt])
+    expect(at, 'вопрос не штампанул ход события').toBe(game.S.stats.sent)
+    expect(button(game, 'offendedAsk'), 'на ходу вопроса кнопки нет').toBeTruthy()
+    const texts = new Set<string>()
+    for (let i = 0; i < 60; i++) { const b = button(game, 'offendedAsk'); if (b) texts.add(b.text) }
+    const pool = P_OFFENDED_ASK.map(text)
+    expect(texts.size, 'пул окна не прозвучал — проверка пустеет').toBeGreaterThan(0)
+    for (const t of texts) expect(pool.some((p) => t.includes(p) || t.includes(low(p))), `кнопка не из пула: ${t}`).toBe(true)
+    game.S.stats.sent = at + 3
+    expect(button(game, 'offendedAsk'), 'третий ход после вопроса — ещё окно').toBeTruthy()
+    game.S.stats.sent = at + 4
+    expect(button(game, 'offendedAsk'), 'вне окна — кнопки нет').toBeUndefined()
+    game.S.stats.sent = at
+    const n = game.S.msgs.length
+    await game.fire('PlayerSays', { intent: 'offendedAsk' })
+    const said = alikSaid(game, n)
+    const answers = OFFENDED_ASK_B.map(text)
+    expect(said.some((t) => answers.some((p) => t.includes(p))), `ответ не из пула события: ${said.join(' | ')}`).toBe(true)
+    expect(game.S.mem[offendedAskAt], 'ответ не потребил окно').toBeUndefined()
+    expect(button(game, 'offendedAsk'), 'после ответа окно закрыто').toBeUndefined()
+  })
+
+  it('обычная болтовня после тишины окна не открывает — негативный контроль', () => {
+    // вопрос живёт в своём пуле: строка в общем IDLE ставила бы окно мимо производителя события
+    expect(IDLE.map((e) => valueOf(e as never)).some((x) => String(x) === 'ты обиделся?'), 'строка осталась в общем пуле').toBe(false)
+    const { game } = makeGame()
+    game.awayMsg('text')
+    expect(game.S.mem[offendedAskAt], 'рядовая болтовня штампанула окно').toBeUndefined()
+    expect(button(game, 'offendedAsk'), 'кнопка про обиду без вопроса').toBeUndefined()
+  })
+
+  it('принятие вакансии получает ответ-нить о сроке выхода — вопрос не висит', async () => {
+    const { game } = makeGame()
+    showCard(game, 'Новая вакансия: плиточник, оплата сразу! Работодатель: Алик В.')
+    const at = Number(game.S.mem['vacancy.at'])
+    expect(at, 'карточка не штампанула ход события').toBe(game.S.stats.sent)
+    // кнопка-согласие — вторая строка пула: её номер уезжает с arg, по нему ответ и выбирается.
+    // Окно показывает строку один раз за окно (#1283) — согласие приходит следующим блоком того же окна
+    const first = button(game, 'vacancy')
+    expect(first?.text, 'первая строка окна — вопрос об оплате').toMatch(/Оплата сразу/)
+    expect(first?.arg, 'номер строки вопроса уехал неверно').toBe('0')
+    game.S.stats.sent = at + 1
+    const accept = button(game, 'vacancy')
+    expect(accept?.text.includes('Беру'), `в блоке нет строки согласия: ${accept?.text}`).toBe(true)
+    expect(accept?.arg, 'согласие уехало без номера строки').toBe('1')
+    game.S.stats.sent = at
+    const n = game.S.msgs.length
+    await game.fire('PlayerSays', { intent: 'vacancy', arg: '1' })
+    const said = alikSaid(game, n)
+    // нить: срок выхода называется прямо, «сразу» получает определение — вопрос игрока не остаётся висеть
+    expect(said.length, `ответ-нить не прозвучала: ${said.join(' | ')}`).toBe(2)
+    const start = VACANCY_START_B.map(text)
+    const soon = VACANCY_SOON_B.map(text)
+    expect(start.some((p) => said[0].includes(p) || said[0].includes(low(p))), `первое сообщение не о сроке: ${said[0]}`).toBe(true)
+    expect(soon.some((p) => said[1].includes(p) || said[1].includes(low(p))), `второе сообщение не о «сразу»: ${said[1]}`).toBe(true)
+    expect(said[0], 'срок выхода не назван').toMatch(/завтра/)
+    expect(game.S.mem['vacancy.at'], 'ответ не потребил окно').toBeUndefined()
+  })
+
+  it('вопрос «оплата сразу — это как?» — не согласие: общий пул, не нить — негативный контроль', async () => {
+    const { game } = makeGame()
+    showCard(game, 'Новая вакансия: плиточник, оплата сразу! Работодатель: Алик В.')
+    const n = game.S.msgs.length
+    await game.fire('PlayerSays', { intent: 'vacancy', arg: '0' })
+    const said = alikSaid(game, n)
+    expect(said.length, `на вопрос ответили нитью о сроке: ${said.join(' | ')}`).toBe(1)
+    const generic = VACANCY.map(text)
+    expect(generic.some((p) => said[0].includes(p)), `ответ не из общего пула: ${said[0]}`).toBe(true)
   })
 })

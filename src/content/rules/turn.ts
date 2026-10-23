@@ -4,11 +4,11 @@ import { type Rule, eq, ne, gte, lte, is, exists, missing, add, set, gate } from
 import type { GameEvent, Offer } from './events'
 import { meet } from '../world'
 import { AlikOffline } from './criteria'
-import { IDLE } from '../life'
+import { IDLE, IDLE_ASK } from '../life'
 import { MEMORY } from '../memory'
 import { LEGENDS } from '../legends'
 import { moneyPlaceOf, stampMoneyPlace } from '../money-ask'
-import { count, creditBroke, endgame, payday, polite, thanksAt, vendetta, nivaPlayer, alikDead, borisAskAt } from '../memkeys'
+import { count, creditBroke, endgame, offendedAskAt, payday, polite, thanksAt, vendetta, nivaPlayer, alikDead, borisAskAt } from '../memkeys'
 import { GREET, GREET_MORNING, GREET_NIGHT, THANKS, THANKS_THIRD } from '../misc'
 
 type R = Rule<ContentApi, GameEvent, Offer>
@@ -189,7 +189,7 @@ export const turnRules: R[] = [
 ]
 
 // Событие AlikIdle — Алик пишет сам, если игрок молчит
-const idleW = { notif: 15, text: 35, sticker: 12, fwd: 14, deleted: 10, voice: 8, period: 6 }
+const idleW = { notif: 15, text: 35, sticker: 12, fwd: 14, deleted: 10, voice: 8, period: 6, offended: 10 }
 export const idleRules: R[] = [
   // пока Алик «пропал» — только уведомления телефона. Посреди сцены болтовня Алика (приоритет chatter)
   // отклоняется порогом приоритета, остаются уведомления (system) — отдельное правило больше не нужно
@@ -204,6 +204,18 @@ export const idleRules: R[] = [
       game.setCtx({ type: 'idle' })
     },
   },
+  // «ты обиделся?» после тишины (#1292): заметное событие, а не рядовая болтовня, — свой пул и штамп хода,
+  // окно отклика собирает `Opt_OffendedAsk`. Контекст тот же idle: без ответа окна вопрос не висит
+  {
+    name: 'Idle_Offended', event: 'AlikIdle', when: [], specificity: 0, priority: 'chatter', weight: idleW.offended,
+    respond: async ({ game, facts }) => {
+      await game.sleep(300)
+      await game.say([game.addrSaidLine('IDLE_ASK', IDLE_ASK)])
+      game.applyFacts([set(offendedAskAt, Number(facts.sent))])
+      game.unlock('idle')
+      game.setCtx({ type: 'idle' })
+    },
+  },
   { name: 'Idle_Sticker', event: 'AlikIdle', when: [], specificity: 0, priority: 'chatter', weight: idleW.sticker, respond: ({ game }) => game.sticker() },
   { name: 'Idle_Forward', event: 'AlikIdle', when: [], specificity: 0, priority: 'chatter', weight: idleW.fwd, respond: ({ game }) => game.forward() },
   { name: 'Idle_Deleted', event: 'AlikIdle', when: [], specificity: 0, priority: 'chatter', weight: idleW.deleted, respond: async ({ game }) => { game.setCtx(null); await game.deletedMsg() } },
@@ -212,7 +224,7 @@ export const idleRules: R[] = [
 ]
 
 // Событие AlikAway — одно сообщение пачки «пока тебя не было»; смерть, блок, телефон у Карине молчат правилами Quiet_* своих состояний
-const awayW = { text: 35, sticker: 15, fwd: 15, deleted: 10, voice: 10, transfer: 7, excuse: 8 }
+const awayW = { text: 35, sticker: 15, fwd: 15, deleted: 10, voice: 10, transfer: 7, excuse: 8, offended: 10 }
 export const awayRules: R[] = [
   // пропал — не пишет; уведомление телефона, как у Idle_Offline, в пачке ни к чему
   { name: 'Away_Offline', event: 'AlikAway', when: [AlikOffline], respond: () => {} },
