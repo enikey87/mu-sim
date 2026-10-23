@@ -641,6 +641,23 @@ export class Game {
     return this.freshPlayerEntry<string>(key, arr)?.text ?? null
   }
   /**
+   * Долгоживущий пул в варианте, который не меняется при пересборке того же хода (#826): `freshPlayer`
+   * каждый вызов тратит следующую строку, а варианты собираются за ход несколько раз — кнопка менялась
+   * бы под пальцем. Выбор держится до конца хода; новый ход — новый выбор.
+   */
+  freshPlayerTurn(key: string, arr: readonly Entry<string>[]): string | null {
+    const last = this.freshTurnPick.get(key)
+    if (last && last.at === this.S.stats.sent) {
+      const entry = arr.find((e) => valueOf(e) === last.line)
+      if (entry && isOpen(entry, this.lineFacts()) && !this.seen.has(last.line)) return last.line
+    }
+    const line = this.freshPlayer(key, arr)
+    if (line !== null) this.freshTurnPick.set(key, { line, at: this.S.stats.sent })
+    return line
+  }
+  /** Последняя строка долгоживущего пула по ключу: пересчёт того же хода не двигает выбор (#826). */
+  private freshTurnPick = new Map<string, { line: string; at: number }>()
+  /**
    * То же, что `freshPlayer`, но вместе с самой строкой пула: её `arg` нужен ответу на выбранный
    * вариант (деньги на карте — `bankAsk`, #446). Окно повтора — по тексту строки, а не по ключу
    * колоды: пул, показанный другим оффером под своим ключом, всё равно держит окно (#1268).
@@ -3513,7 +3530,7 @@ export type ContentApi = Pick<Game,
   | 'lie' | 'caught' | 'callback'
   // колоды и реплики
   | 'draw' | 'open' | 'uniq' | 'pair' | 'line' | 'linePicked' | 'lines' | 'seen' | 'decks' | 'X'
-  | 'addrSaidLine' | 'playerLine' | 'actionLabel' | 'freshPlayer' | 'windowLine' | 'oldestShown' | 'offeredInWindow' | 'rememberShown' | 'rnd' | 'chance' | 'bagOf' | 'restoreBag'
+  | 'addrSaidLine' | 'playerLine' | 'actionLabel' | 'freshPlayer' | 'freshPlayerTurn' | 'windowLine' | 'oldestShown' | 'offeredInWindow' | 'rememberShown' | 'rnd' | 'chance' | 'bagOf' | 'restoreBag'
   // контекст последней реплики
   | 'ctx' | 'setCtx'
   // режимы
