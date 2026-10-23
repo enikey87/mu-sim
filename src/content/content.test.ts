@@ -8,7 +8,8 @@ import { ARCS, ARC_DONE, CAST, GROUP } from './arcs'
 import { ACH } from './achievements'
 import { FINALES, ENDINGS } from './finales'
 import { P_MONEY } from './topics'
-import { P_INTERN, P_MAMA_VOICE } from './rules/player-choice-pools'
+import { P_INTERN, P_MAMA_VOICE, P_DEBUT_ARSEN } from './rules/player-choice-pools'
+import { ASK_ROOM } from './money-ask'
 import { P_CREW_PAID } from './crew'
 import * as L from './life'
 import { allRules } from './rules'
@@ -126,6 +127,27 @@ describe('живая рецензия №1: точечные правки (#891)
 
 const sources = import.meta.glob(['../**/*.ts', '../**/*.tsx', '!../**/*.test.*'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>
 const allSource = Object.values(sources).join('\n')
+
+// живая рецензия №5 (#1251): три строки игрока спотыкались у живого автора — переписаны без смены
+// референтов: дом на деньгах / комната под углом, остаток против терпения, доля автора с процентов
+describe('три строки живой рецензии №5 (#1251)', () => {
+  it('старые формулировки ушли из исходников', () => {
+    for (const old of [
+      'Раз дом на моих деньгах — мне должна часть дома',
+      'Алик, низкий остаток. Высокое терпение. Поменяемся?',
+      'Я как автор — с процентов',
+    ]) expect(allSource, `старая строка на месте: «${old}»`).not.toContain(old)
+  })
+  it('новые формулировки на месте — в самих пулах, не только в комментариях', () => {
+    expect(ASK_ROOM, 'выбор фундамента').toBe('Раз мои деньги заложены в фундамент, дом отчасти мой. Я попросил бы комнату. Угловую.')
+    expect(P_MONEY.low.polite.map(valueOf), 'вежливая реплика на низком остатке').toContain('Алик, у меня остаток низкий, а терпение — высокое. Поменяемся?')
+    expect(P_DEBUT_ARSEN.map(valueOf), 'дебют Арсена: трек, крик, бит').toEqual([
+      'Арсен, а трек «Плиточник» где послушать?',
+      'Арсен, трек из моего крика? Я как соавтор — требую долю.',
+      'Арсен, а бит из чего собран? Из крика?',
+    ])
+  })
+})
 
 describe('обида Алика не ссылается на несостоявшееся прошлое (#963)', () => {
   it('«хлеб давал» ушёл из корпуса, неутверждающая форма на месте', () => {
