@@ -65,10 +65,18 @@ const fromArr = (game: ContentApi, key: string, arr: readonly Entry<unknown>[]) 
   requirePlayerPool(key, arr)
   return game.playerLine(() => game.draw(key, arr as readonly Entry<string>[]))
 }
-// пул — в реестре кнопок (#491), но строка — как есть, без украшения обращением: обращаемся к посреднику, а не к Алику (#512)
-const plainFromArr = (game: ContentApi, key: string, arr: readonly Entry<unknown>[]) => {
+/**
+ * Пул посредника в блоке: строка — как есть, без украшения обращением, ведь обращаемся к Борису/Карине/маме,
+ * а не к Алику (#512), и без суффикса-хвоста — это лейбл, а не реплика (#1270). Но пул долгоживущий:
+ * блок идёт четыре дня, кнопка возвращается каждый ход, поэтому строка живёт по окну повтора (#824) —
+ * иначе одна и та же формулировка звучала дословно через ход (плейтест 114/115: строки 333/344 и 746/840 → #1275).
+ */
+const viaFromArr = (game: ContentApi, key: string, arr: readonly Entry<unknown>[]) => {
   requirePlayerPool(key, arr)
-  return game.draw(key, arr as readonly Entry<string>[])
+  const pool = arr as readonly Entry<string>[]
+  // исчерпанный в окне пул не молчит: via — единственный готовый выход из блока (#880), поэтому самая
+  // давняя открытая строка возвращается как есть — в режиме лейбла, без суффикса-хвоста (#1270)
+  return game.freshPlayer(key, pool) ?? game.actionLabel(() => game.oldestShown(pool))
 }
 /** Долгоживущий пул: окно повтора (#824) — показанное молчит PLAYER_REPEAT_TURNS ходов, исчерпанный
  *  пул молчит совсем (пустой текст — оффер не предлагается), а не повторяется дословно (#1078, #1268). */
@@ -142,9 +150,9 @@ export const choiceRules: R[] = [
   offer({ name: 'Sorry', when: [is('ctx.offended')], act: 'sorry', tone: 'polite', bonus: 5, text: (g) => fromD(g, 'P_SORRY') }),
   // лестница грубости: заблокирован — извиниться можно только через Бориса; ссора горячая — можно мычать
   // посредник — лучший из тех, кто есть: Борис, Карине, мама Алика (один вариант на слот); обращение к посреднику — без «Алик, …»
-  offer({ name: 'Via_boris', slot: 'via', when: [is(blocked), SPEAKS.boris], act: 'via', arg: () => 'boris', tone: 'polite', bonus: 7, text: (g) => plainFromArr(g, 'P_VIA_BORIS', P_VIA_BORIS) }),
-  offer({ name: 'Via_karine', slot: 'via', when: [is(blocked), WORLD.karineHome, WORLD.karine], act: 'via', arg: () => 'karine', tone: 'polite', bonus: 6, text: (g) => plainFromArr(g, 'P_VIA_KARINE', P_VIA_KARINE) }),
-  offer({ name: 'Via_mama', slot: 'via', when: [is(blocked)], act: 'via', arg: () => 'mama', tone: 'polite', bonus: 6, text: (g) => plainFromArr(g, 'P_VIA_MAMA', P_VIA_MAMA) }),
+  offer({ name: 'Via_boris', slot: 'via', when: [is(blocked), SPEAKS.boris], act: 'via', arg: () => 'boris', tone: 'polite', bonus: 7, text: (g) => viaFromArr(g, 'P_VIA_BORIS', P_VIA_BORIS) }),
+  offer({ name: 'Via_karine', slot: 'via', when: [is(blocked), WORLD.karineHome, WORLD.karine], act: 'via', arg: () => 'karine', tone: 'polite', bonus: 6, text: (g) => viaFromArr(g, 'P_VIA_KARINE', P_VIA_KARINE) }),
+  offer({ name: 'Via_mama', slot: 'via', when: [is(blocked)], act: 'via', arg: () => 'mama', tone: 'polite', bonus: 6, text: (g) => viaFromArr(g, 'P_VIA_MAMA', P_VIA_MAMA) }),
   offer({ name: 'Moo', when: [is('ctx.offended'), gte(HEAT, 1)], odds: 0.5, act: 'moo', tone: 'neutral', bonus: 4, text: (g) => fromArr(g, 'P_MOO', P_MOO) }),
 
   // пока усы отрастают — подколоть Алика (#352); не чаще раза в 5 дней после вопроса,

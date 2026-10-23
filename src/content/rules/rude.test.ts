@@ -243,6 +243,47 @@ describe('лестница грубости: ступени', () => {
       }
     }
   })
+  // #1275: посредник — единственный готовый выход из блока (#880), поэтому его пул не молчит, но и не
+  // возвращает строку дословно через ход: показанное живёт по окну повтора (#824), а исчерпанный в окне
+  // пул отдаёт самую давнюю открытую строку как есть — без суффикса-хвоста, это лейбл (#1270).
+  // Плейтест 114/115: «Попросить маму Алика передать извинения» на 333 и 344, «Борис, передай Алику…» на 746 и 840.
+  it('пул посредника живёт по окну повтора: свежая строка не повторяется, фолбэк — самая давняя', async () => {
+    const setups: Array<[string, readonly Entry<string>[], (g: Game) => void]> = [
+      ['boris', P_VIA_BORIS, (g) => { g.S.arcs.boris = { i: 4, last: 0 } }],
+      ['karine', P_VIA_KARINE, (g) => { g.S.mem['intro.karine'] = true }],
+      ['mama', P_VIA_MAMA, () => { /* мама — запасной посредник всегда */ }],
+    ]
+    for (const [arg, pool, setup] of setups) {
+      const { game } = makeGame()
+      setup(game)
+      const lines = pool.map(valueOf)
+      const shown: string[] = []
+      const lastShow = new Map<string, number>()
+      for (let i = 0; i < 15; i++) {
+        // одна сборка — один ход блока: кнопку увидели, пауза окна пошла (штамп при сборке вариантов)
+        game.S.stats.sent += 1
+        game.S.mem.blocked = true
+        const via = fresh(game).find((c) => c.act === 'via')
+        expect(via, `${arg}, сборка ${i + 1}: слот via не пуст`).toBeTruthy()
+        expect(via!.arg).toBe(arg)
+        // строка пула как есть: лейбл-обращение к посреднику, без «Алик, …» (#512) и без хвоста (#1270)
+        expect(lines, `${arg}, сборка ${i + 1}: «${via!.text}» — строка пула`).toContain(via!.text)
+        // дословный повтор внутри окна законен только как фолбэк: между двумя показами строки
+        // обязаны прозвучать все остальные открытые строки пула, иначе это обход окна (#1078)
+        const prev = lastShow.get(via!.text)
+        if (prev !== undefined) {
+          expect([...new Set(shown.slice(prev + 1))].sort(), `${arg}, сборка ${i + 1}: «${via!.text}» вернулась раньше остальных строк пула`)
+            .toEqual(lines.filter((t) => t !== via!.text).sort())
+        }
+        lastShow.set(via!.text, i)
+        shown.push(via!.text)
+      }
+      // свежая фаза: до исчерпания пула каждая строка показана по одному разу
+      expect([...new Set(shown.slice(0, lines.length))], `${arg}: строки пула показаны свежими`).toEqual(expect.arrayContaining(lines))
+      // пятнадцать сборок длиннее окна не отпускают — значит, подряд идёт фолбэк по кругу, а не случайная строка
+      expect(new Set(shown).size, `${arg}: пул не отдаёт строку дважды, пока есть непоказанная`).toBe(lines.length)
+    }
+  })
   it('S4 — семейный суд в группе (один раз): прелюдия, голосование, приговор — 10 дней вежливости', async () => {
     const { game } = makeGame()
     game.S.arcs.boris = { i: 4, last: 0 } // Борис уже пишет — он свидетель в суде
