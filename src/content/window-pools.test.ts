@@ -13,7 +13,7 @@ import { intro } from './memkeys'
 import * as W from './world'
 import {
   RAM_PHOTO, BORIS_SALE, VACANCY, AVITO_REVIEW, RUBIK_ASK, KETTLE,
-  CREW_CALL_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, GRANT_TILE_B, DEBUT_NIVA_B, DEBUT_BORIS_B, MOUSTACHE_PHOTO_B, MAMA_MARKET_B, TILE_AD_B, TAMADA_DONE_B, BORIS_MEMORY_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, GRANT_HOUSE_B, COURT_VERDICT_B, TILE_SLIP_B, TILE_LAWYER_B, NIVA_BACK_B, NUNE_DEBUT_B, DEBUT_GRANT_B, SOLD_B,
+  CREW_CALL_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, GRANT_TILE_B, DEBUT_NIVA_B, DEBUT_BORIS_B, MOUSTACHE_PHOTO_B, MAMA_MARKET_B, TILE_AD_B, TAMADA_DONE_B, BORIS_MEMORY_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, GRANT_HOUSE_B, COURT_VERDICT_B, TILE_SLIP_B, TILE_COURT_B, TILE_LAWYER_B, TILE_MONUMENT_B, NIVA_BACK_B, NUNE_DEBUT_B, DEBUT_GRANT_B, SOLD_B,
   LAWYER_B, COLLECTORS_ASK_B, COLLECTORS_EP_B, INTERN_B, HOLE_B, COUNTERSUIT_B, VACANCY_START_B, VACANCY_SOON_B, SERYOGA_B, GRANT_BATH_B, OFFENDED_ASK_B,
 } from './world'
 
@@ -119,9 +119,15 @@ const WINDOWS: Window[] = [
   // первая серия плиточной арки (#1059): падение заказчика — своих меток пул не требует
   { pool: 'P_TILE_SLIP', lines: PP.P_TILE_SLIP, marks: {} },
   { pool: 'TILE_SLIP_B', lines: TILE_SLIP_B, marks: {} },
+  // эпизод «заказчик подаёт в суд. На тебя» (#1317): гипс, иск и «я ни при чём» называет сама серия — меток нет
+  { pool: 'P_TILE_COURT', lines: PP.P_TILE_COURT, marks: {} },
+  { pool: 'TILE_COURT_B', lines: TILE_COURT_B, marks: {} },
   // эпизод «я твой адвокат» (#1303): роль адвоката и вычет 10 000 ₽ из долга называет сама серия — меток нет
   { pool: 'P_TILE_LAWYER', lines: PP.P_TILE_LAWYER, marks: {} },
   { pool: 'TILE_LAWYER_B', lines: TILE_LAWYER_B, marks: {} },
+  // реестр памятников (#1317): смену статуса плитки и требований называет сама серия — меток пул не требует
+  { pool: 'P_TILE_MONUMENT', lines: PP.P_TILE_MONUMENT, marks: {} },
+  { pool: 'TILE_MONUMENT_B', lines: TILE_MONUMENT_B, marks: {} },
   // возврат «Нивы» (#1306): денег в бардачке нет, колёса новые, номера грузинские — всё это называет
   // сама серия; имени «Нива» в пулах нет, поэтому меток пул не требует
   { pool: 'P_NIVA_BACK', lines: PP.P_NIVA_BACK, marks: {} },
