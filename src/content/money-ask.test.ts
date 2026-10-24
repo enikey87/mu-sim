@@ -386,6 +386,20 @@ describe('follow-пул бетона и посторонние подтверж�
     await game.playEpisode(ARCS.beton.eps[3], 'beton')
     expect(found(), 'бит «по бумагам» место не публикует').toHaveLength(1)
   })
+
+  it('бит экскурсий подтверждает место клеймом, а не легендой (#1310)', async () => {
+    const { game } = makeGame()
+    const { ask } = stateLines()
+    expect(game.open(MONEY_ASK.beton), 'до бита state-вопросы открыты — проверка пустеет').toEqual(expect.arrayContaining(ask))
+    // бит 126 (eps[6]) своей легенды не несёт: окно штампует только клейм места в самой строке
+    expect(ARCS.beton.eps[6].legend, 'у бита появилась легенда — проверка перестаёт видеть клейм').toBeUndefined()
+    const found = () => game.S.ledger.claims.filter((c) => c.value === 'foundation')
+    expect(found(), 'журнал не пуст до бита — проверка пустеет').toHaveLength(0)
+    await game.playEpisode(ARCS.beton.eps[6], 'beton')
+    expect(found(), 'бит экскурсий место не публикует').toHaveLength(1)
+    expect(game.S.mem[moneyAskAt.beton], 'бит экскурсий место не штампует').toBe(game.S.stats.sent)
+    expectWindow(game)
+  })
 })
 
 describe('выбор со своим ответом (#1252): «часть дома»', () => {
