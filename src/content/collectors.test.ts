@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import { makeGame, setMoney, cards } from '../test/helpers'
 import { START_DAY, ARC_MARINATION_DAYS } from '../engine/state'
-import { alikShaved, collectorsRecruited, collectorsTea, collectorsTurned, count, creditBroke, creditStage, endgame, finaleOf, internAt, internDeclined, intro, moustachePhotoAt, paydayScene, threatClaim, collectorsEpAt } from './memkeys'
+import { alikShaved, collectorsRecruited, collectorsTea, collectorsTurned, count, creditBroke, creditStage, endgame, finaleOf, internAccepted, internAt, internDeclined, intro, moustachePhotoAt, paydayScene, threatClaim, collectorsEpAt } from './memkeys'
 import { loanTaken, loanDueAt } from './credit'
 import { D } from './excuses'
 import { P_COLLECTORS_DEBUT } from './rules/player-choice-pools'
@@ -542,8 +542,9 @@ describe('отказ от стажировки переключает финал
       // реальный порядок: финал записан до оффера и после отказа не переписывается
       expect(chosen(game), 'финал не записан до оффера').toBe('intern')
       const before = game.open(ENDGAME_ARCH).map((l) => l.slug)
-      expect(before, 'до отказа строка стажировки закрыта — проверка не про то').toContain('fin.collectors.intern')
-      expect(before).not.toContain('collectors.intern.declined')
+      expect(before, 'до ответа эпилог утверждает стажировку — проверка не про то').not.toContain('fin.collectors.intern')
+      expect(before, 'молчание окна осталось без строки эпилога').toContain('collectors.intern.silent')
+      expect(before, 'молчание выдано за отказ').not.toContain('collectors.intern.declined')
       game.S.choices = null
       const btn = game.buildChoices().find((c) => c.act === 'internOffer' && c.arg === '1')
       if (!btn) continue
@@ -553,8 +554,64 @@ describe('отказ от стажировки переключает финал
       const after = game.open(ENDGAME_ARCH).map((l) => l.slug)
       expect(after, 'эпилог утверждает стажировку после отказа').not.toContain('fin.collectors.intern')
       expect(after, 'замены нет: эпилог арки пустует').toContain('collectors.intern.declined')
+      expect(after, 'после отказа звучит и строка молчания').not.toContain('collectors.intern.silent')
       declined = true
     }
     expect(declined, 'ни в одной из двадцати партий окна стажировки не было — проверка пустеет').toBe(true)
+  })
+})
+
+describe('эпилог различает согласие, отказ и молчание оффера стажировки (#1335)', () => {
+  const slugs = (g: Game) => g.open(ENDGAME_ARCH).map((l) => l.slug)
+  /** Кнопка оффера на настоящем ходу: окно открывает финал арки, номер строки едет с `arg` (#1017). */
+  const offer = (g: Game, arg: string) => {
+    g.S.choices = null
+    return g.buildChoices().find((c) => c.act === 'internOffer' && c.arg === arg)
+  }
+  /** Партия дошла до финала «Стажёр-коллектор»: финал записан до оффера, окно штамповано ходом (#1056). */
+  const toOffer = async (seed: number): Promise<Game> => {
+    const { game } = makeGame({ seed })
+    game.S.mem[count.rude] = 6
+    await game.playFinale('collectors', FINALES.collectors.find((f) => f.id === 'intern')!)
+    expect(game.S.mem[finaleOf('collectors')], 'финал не записан до оффера').toBe('intern')
+    expect(game.S.mem[internAt], 'предложение стажировки не штампануло ход').toBe(game.S.stats.sent)
+    return game
+  }
+  /** Кнопка попадает в блок не в каждой партии (два слота) — идём по сидам, как в окне #958. */
+  const withOffer = async (arg: string): Promise<Game> => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const game = await toOffer(seed)
+      if (offer(game, arg)) return game
+    }
+    throw new Error(`ни в одной из двадцати партий кнопки «${arg}» не было — проверка пустеет`)
+  }
+
+  it('молчание окна: ни стажировки, ни отказа, а эпилог арки не пустует', async () => {
+    const game = await withOffer('0')
+    // игрок тянет с ответом: окно события живёт ход и три после, дальше оффера в блоке нет
+    game.S.stats.sent += 4
+    expect(game.holds(is('internFresh')), 'окно ещё живо — проверка не про то').toBe(false)
+    expect(offer(game, '0'), 'оффер всё ещё в блоке').toBeUndefined()
+    expect(game.holds(is(internAccepted)), 'молчание записало согласие').toBe(false)
+    expect(game.holds(is(internDeclined)), 'молчание записало отказ').toBe(false)
+    const ep = slugs(game)
+    expect(ep, 'эпилог утверждает стажировку, которой игрок не выбирал').not.toContain('fin.collectors.intern')
+    expect(ep, 'молчание выдано за отказ — «ты отказался» не звучит тому, кто не отвечал').not.toContain('collectors.intern.declined')
+    expect(ep, 'молчанию не оставлено строки: эпилог арки пустует').toContain('collectors.intern.silent')
+  })
+
+  it('обе строки согласия пишут факт, и только он открывает стажировку в эпилоге', async () => {
+    for (const arg of ['0', '2']) {
+      const game = await withOffer(arg)
+      await game.send(offer(game, arg)!)
+      expect(game.holds(is(internAccepted)), `согласие «${arg}» не записало факт`).toBe(true)
+      expect(game.holds(is(internDeclined)), `согласие «${arg}» записало отказ`).toBe(false)
+      expect(game.S.mem[finaleOf('collectors')], 'stored finale переписан — проверка не про то').toBe('intern')
+      expect(game.holds(is(internAt)), 'ответ не погасил окно — строка молчания останется').toBe(false)
+      const ep = slugs(game)
+      expect(ep, `эпилог молчит о стажировке после согласия «${arg}»`).toContain('fin.collectors.intern')
+      expect(ep, 'согласие выдано за отказ').not.toContain('collectors.intern.declined')
+      expect(ep, 'согласие выдано за молчание').not.toContain('collectors.intern.silent')
+    }
   })
 })
