@@ -1,7 +1,7 @@
 import type { Choice } from '../engine/state'
-import { type Entry, type Line, type Said, eq, exists, gate, is, missing } from './fact'
+import { type Entry, type Line, type Said, eq, exists, gate, is } from './fact'
 import { needs, samvelLine, WORLD } from './world'
-import { finaleOf, internDeclined, lend50, met, moustacheKept, saidFriday, taxFrozen } from './memkeys'
+import { finaleOf, internAccepted, internAt, internDeclined, lend50, met, moustacheKept, saidFriday, taxFrozen } from './memkeys'
 
 export const ENDGAME_GROUP = 'ВЫПЛАТА ЗАКРЫТА ✅ (не выходить)'
 /** Первая строка эпилога: группа открывается после концовки — игрок видит, что это эпилог, а не «дальше» (#797). */
@@ -666,10 +666,13 @@ export const ENDGAME_ARCH: Entry<ArchiveLine>[] = [
   gate(eq(finaleOf('razmik'), 'shift'), WORLD.razmik)({ slug: 'fin.razmik.shift', line: 'Ты отработал смену в кабине крана вместо Размика. Оплата потом, всё вместе.' }),
   gate(eq(finaleOf('razmik'), 'default'), WORLD.razmik, WORLD.crane)({ slug: 'fin.razmik.default', line: 'Размик слез с крана — и ты теперь первый в очереди. Денег нет, зато очередь твоя.' }),
 
-  // отказ от стажировки (#1056): stored finale остаётся «intern» (финал играется до оффера), поэтому
-  // строку о стажировке закрывает сам факт отказа — тем же internDeclined, что пишет ответ #1041
-  gate(eq(finaleOf('collectors'), 'intern'), missing(internDeclined), WORLD.collectors)({ slug: 'fin.collectors.intern', line: 'Коллекторы взяли тебя на стажировку. Учат взыскивать с меня профессионально — три чая за смену.' }),
+  // стажировка коллекторов (#1056, #1335): stored finale остаётся «intern» (финал играется до оффера),
+  // поэтому строки эпилога читают выбор игрока, а не значение финала: «взяли на стажировку» звучит
+  // только после строки согласия (`internAccepted`), отказ — по своему факту, а молчание окна
+  // (оффер был, ответа нет — `internAt` не погашен ответом) не выдаётся ни за согласие, ни за отказ
+  gate(eq(finaleOf('collectors'), 'intern'), is(internAccepted), WORLD.collectors)({ slug: 'fin.collectors.intern', line: 'Коллекторы взяли тебя на стажировку. Учат взыскивать с меня профессионально — три чая за смену.' }),
   gate(eq(finaleOf('collectors'), 'intern'), is(internDeclined), WORLD.collectors)({ slug: 'collectors.intern.declined', line: 'Коллекторы звали тебя в стажёры — ты отказался. Взыскивать с меня будешь по старинке, без чая.' }),
+  gate(eq(finaleOf('collectors'), 'intern'), exists(internAt), WORLD.collectors)({ slug: 'collectors.intern.silent', line: 'Коллекторы предлагали тебе стажировку: три чая за смену. Согласия в деле нет — чай пока не наливают.' }),
   gate(eq(finaleOf('collectors'), 'default'), WORLD.collectors)({ slug: 'fin.collectors.default', line: 'Коллекторы теперь взыскивают с меня в твою пользу. Работают медленно: чай длинный, долг — тоже.' }),
 
   // ставка усами: сбрил — ачивка навсегда (`alik.shaved` к эпилогу часто уже погашен),
