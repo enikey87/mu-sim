@@ -13,7 +13,7 @@ import { turnRules } from './rules/turn'
 import { FINALES } from './finales'
 import { COURT_LAWYER_AGAIN } from './quests'
 import { RUDE_CALLS_VOICE, MAMA_VOICE_CRY } from './rude'
-import { count, collectorsRecruited, court, crewPaid, crewPaidAt, HEAT, internAt, lawyerAt, debutWho, debutAt, arsenTrack, saidStrasburg, saidGrantEnvelope, grantTileAt, grantHouseAt, mamaMarketAt, tileAdAt, tamadaDoneAt, borisAskAt, mamaVoiceAt, mamaCalls, samvelDivorceAt, tileSlipAt, tileCourtAt, tileLawyerAt, tileMonumentAt, legendOf, nivaAway, nivaBack, nivaBackAt, saleAt, saleWhat, alikDead, paydayScene, seryogaAskAt, grantBathAt, offendedAskAt } from './memkeys'
+import { count, collectorsRecruited, court, crewPaid, crewPaidAt, HEAT, internAt, lawyerAt, debutWho, debutAt, arsenTrack, saidStrasburg, saidGrantEnvelope, grantTileAt, grantHouseAt, mamaMarketAt, tileAdAt, tamadaDoneAt, borisAskAt, mamaVoiceAt, mamaCalls, samvelDivorceAt, tileSlipAt, tileCourtAt, tileLawyerAt, tileMonumentAt, legendOf, nivaAway, nivaBack, nivaBackAt, saleAt, saleWhat, alikDead, paydayScene, seryogaAskAt, grantBathAt, offendedAskAt, intro, kettleAt } from './memkeys'
 import { valueOf, type Line } from './fact'
 import type { Choice } from '../engine/state'
 
@@ -490,6 +490,27 @@ describe('реакции: вопрос Рубика и чайник (#953)', () 
     const said = game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : []))
     expect(said.some((t) => KETTLE.map(valueOf).includes(t)), 'ответ не из пула').toBe(true)
     expect(has(game, 'kettle'), 'после ответа окно закрыто').toBe(false)
+  })
+
+  it('выигрыш с «Забери у Гарика» тоже открывает окно (#1341)', async () => {
+    const garikLine = 'Выиграли! Чайник. Чайник тебе, в счёт долга — я оценил в семьсот. Забери у Гарика, он уже вскипятил.'
+    const { game } = makeGame()
+    // Гарик в истории и не в фундаменте — узел draw предлагает его вариант, а не «кума»
+    game.S.mem[intro('garik')] = true
+    // колода узла отдаёт первую (гариковскую) строку: при двух открытых выбор сидом не гарантирован
+    game.S.bags['q_lottery.draw.a'] = { n: 2, left: [0], last: -1 }
+    await game.enterNode('q_lottery', 'draw')
+    const said = game.S.msgs.flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : []))
+    expect(said.includes(garikLine), 'розыгрыш выбрал не строку Гарика — проверка пустеет').toBe(true)
+    const at = Number(game.S.mem[kettleAt])
+    expect(at, 'строка Гарика не штампанула ход — окно чайника не открылось').toBe(game.S.stats.sent)
+    expect(has(game, 'kettle'), 'ход события — кнопка есть').toBe(true)
+    const kettleText = game.buildChoices().find((c) => c.act === 'kettle')!.text.toLowerCase()
+    expect(P_KETTLE.some((t) => kettleText.includes(t.slice(0, 12).toLowerCase())), kettleText).toBe(true)
+    game.S.stats.sent = at + 3
+    expect(has(game, 'kettle'), 'третий ход после события — ещё окно').toBe(true)
+    game.S.stats.sent = at + 4
+    expect(has(game, 'kettle'), 'вне окна — кнопки нет').toBe(false)
   })
 })
 
