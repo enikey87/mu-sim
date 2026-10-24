@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import { makeGame, setMoney, cards } from '../test/helpers'
 import { START_DAY, ARC_MARINATION_DAYS } from '../engine/state'
-import { collectorsRecruited, collectorsTea, collectorsTurned, count, creditBroke, creditStage, endgame, finaleOf, internAt, internDeclined, intro, paydayScene, threatClaim, collectorsEpAt } from './memkeys'
+import { alikShaved, collectorsRecruited, collectorsTea, collectorsTurned, count, creditBroke, creditStage, endgame, finaleOf, internAt, internDeclined, intro, moustachePhotoAt, paydayScene, threatClaim, collectorsEpAt } from './memkeys'
 import { loanTaken, loanDueAt } from './credit'
 import { D } from './excuses'
 import { P_COLLECTORS_DEBUT } from './rules/player-choice-pools'
@@ -382,6 +382,29 @@ describe('окно дебюта коллекторов молчит на исч�
     game.S.stats.sent += 10
     const again = debut(game)
     expect(again && shown.includes(again), 'за окном вопрос возвращается строкой пула').toBe(true)
+  })
+})
+
+describe('дебют коллекторов попадает в блок в единственном кадре окна (#1314)', () => {
+  const frame = (g: Game) => { g.S.choices = null; return g.buildChoices() }
+
+  it('после eps[0] вариант о коллекторах стоит в блоке рядом с бонус-5 событием и бонус-2 кнопкой усов', async () => {
+    const { game } = makeGame()
+    game.S.mem[creditBroke] = true
+    // конкуренты того же кадра, что в партии 329117: событие «смена фото» (бонус 5) и долгоживущая
+    // кнопка «а усы?» (бонус 2) — при bonus 2 у дебюта была с ней ничья, и слот забирала кнопка
+    game.S.mem[moustachePhotoAt] = game.S.stats.sent
+    game.S.mem[alikShaved] = true
+    game.S.ach.shaved = game.S.day - 1
+    expect((await game.fire('StoryBeat'))?.name, 'серия eps[0] не сыграла — проверка пустеет').toBe('Beat_Collectors')
+    expect(game.S.mem[intro('collectors')], 'дебют коллекторов не открылся').toBe(true)
+    expect(game.S.arcs.collectors?.i, 'серия уже двинула счётчик — кадр не тот').toBe(1)
+    const open = game.rules.collect({ event: 'BuildChoices' }, game.facts()).map((r) => r.name)
+    expect(open, 'событие-конкурент не открыто — проверка пустеет').toContain('Opt_MoustachePhoto')
+    expect(open, 'кнопка усов не открыта — проверка пустеет').toContain('Opt_Moustache')
+    const debut = frame(game).find((c) => c.act === 'arc' && c.arg === 'collectors')
+    expect(debut, 'в кадре дебюта варианта о коллекторах нет').toBeTruthy()
+    expect(game.open(P_COLLECTORS_DEBUT), 'вариант не из пула дебюта').toContain(debut!.text)
   })
 })
 
