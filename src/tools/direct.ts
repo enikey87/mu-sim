@@ -286,15 +286,7 @@ export const DIRECT: Record<string, DirectCase> = {
   // #1179: дебют Гранта — хор легенды с шансом 0.3; окно живёт, только если первая фраза была про конверт
   // #1321: запись была нужна, пока общий слот дебюта никто не читал; 1b05ae5 научил окно читать его — с тех пор бот
   // доходит сам: 32 партии в CI-выборках при пороге 7, семьи +2000/+4000/+6000 = 31/32/27, нулей нет — запись отпущена
-  // Opt_DebutGrant: {
-  //   event: 'BuildChoices',
-  //   setup: (g) => {
-  //     g.S.mem['intro.grant'] = true
-  //     g.S.mem['said.grant.envelope'] = true
-  //     g.S.mem['debut.who'] = 'grant'
-  //     g.S.mem['debut.at'] = g.S.stats.sent
-  //   },
-  // },
+  // Opt_DebutGrant: { event: 'BuildChoices', setup: (g) => { intro.grant, said.grant.envelope, debut.who='grant', debut.at=sent } }
   Says_debutGrant: {
     event: 'PlayerSays', facts: { intent: 'debutGrant' },
     setup: (g) => { g.S.mem['intro.grant'] = true; g.S.mem['said.grant.envelope'] = true },
