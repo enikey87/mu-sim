@@ -7,7 +7,7 @@ import type { Game } from '../engine/game'
 import type { Facts } from '../engine/rules'
 import { during } from '../engine/rules'
 import { START_DAY, ARC_MARINATION_DAYS } from '../engine/state'
-import { HEAT, legendDay, legendId, nuneKeyPassed, payday, sorryAt } from '../content/memkeys'
+import { HEAT, borisAskAt, legendDay, legendId, nuneKeyPassed, payday, sorryAt } from '../content/memkeys'
 import { ENDING_MIN_DAY } from '../content/finales'
 
 export type DirectCase = { event: string; facts?: Facts; target?: string; setup?: (g: Game) => void }
@@ -38,6 +38,16 @@ export const DIRECT: Record<string, DirectCase> = {
   // #1306: окно возврата «Нивы» сдвинуло розыгрыш — вопрос о баране по памяти партии (Turn_Memory) в CI-выборках
   // больше не звучит, и отклик на него ни разу не сыграл; правило цело, держим прямым случаем (как #826/#926)
   Says_borisMemory: { event: 'PlayerSays', facts: { intent: 'borisMemory' } },
+  // #1321: тот же вопрос в кнопках — окно живёт три хода после «Всё ещё у тебя?», и в семье +2000 бот до него не
+  // доходит (0 партий, в +4000/+6000 — по одной): единое условие такую запись не отпускает, второй гейт требует страховку.
+  // Штамп и предмет — те же, что ставит Turn_Memory: барана спрашивают только по досье, иначе пул окна пуст.
+  Opt_BorisMemory: {
+    event: 'BuildChoices',
+    setup: (g) => {
+      g.S.items.push('баран Борис')
+      g.S.mem[borisAskAt] = g.S.stats.sent
+    },
+  },
   // #426: sys-claim Гранта («всё заплатил») противоречит «заказчик мне не платит» — бот ловит это сам, 34 партии
   Turn_BorisSick: { event: 'AlikTurn', setup: (g) => { g.S.arcs.boris = { i: 2, last: 0 }; g.S.actors.boris = { sick: true } } },
   Opt_Cow: { event: 'BuildChoices', setup: (g) => { g.S.mem.mooAt = g.S.stats.sent } },
@@ -274,15 +284,17 @@ export const DIRECT: Record<string, DirectCase> = {
   // #982 (пул дебюта Арсена ждёт события трека) — ответ окну дебюта в выборках больше не собирается
   Says_debutArsen: { event: 'PlayerSays', facts: { intent: 'debutArsen' } },
   // #1179: дебют Гранта — хор легенды с шансом 0.3; окно живёт, только если первая фраза была про конверт
-  Opt_DebutGrant: {
-    event: 'BuildChoices',
-    setup: (g) => {
-      g.S.mem['intro.grant'] = true
-      g.S.mem['said.grant.envelope'] = true
-      g.S.mem['debut.who'] = 'grant'
-      g.S.mem['debut.at'] = g.S.stats.sent
-    },
-  },
+  // #1321: запись была нужна, пока общий слот дебюта никто не читал; 1b05ae5 научил окно читать его — с тех пор бот
+  // доходит сам: 32 партии в CI-выборках при пороге 7, семьи +2000/+4000/+6000 = 31/32/27, нулей нет — запись отпущена
+  // Opt_DebutGrant: {
+  //   event: 'BuildChoices',
+  //   setup: (g) => {
+  //     g.S.mem['intro.grant'] = true
+  //     g.S.mem['said.grant.envelope'] = true
+  //     g.S.mem['debut.who'] = 'grant'
+  //     g.S.mem['debut.at'] = g.S.stats.sent
+  //   },
+  // },
   Says_debutGrant: {
     event: 'PlayerSays', facts: { intent: 'debutGrant' },
     setup: (g) => { g.S.mem['intro.grant'] = true; g.S.mem['said.grant.envelope'] = true },
