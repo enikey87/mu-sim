@@ -2514,6 +2514,7 @@ export class Game {
     const { key, pool } = this.fwdPool()
     const f = this.seen.pickFresh(() => this.draw(key, pool), (x) => x)
     this.seen.mark(f.t)
+    this.commitRemember(f) // карточка может знакомить с отправителем: факт ставит тот, кто её показывает (#1329)
     this.alikMsg({ kind: 'fwd', from: 'alik', f: f.f, text: f.t })
     this.unlock('fwd')
     if (this.chance(0.5)) await this.say([this.uniq(() => this.draw('FWD_NOTE', L.FWD_NOTE))])
@@ -3371,6 +3372,7 @@ export class Game {
         const { key, pool } = this.fwdPool()
         const f = this.seen.pickFresh(() => this.draw(key, pool), (x) => x)
         this.seen.mark(f.t)
+        this.commitRemember(f)
         deliver({ kind: 'fwd', from: 'alik', f: f.f, text: f.t })
         return
       }

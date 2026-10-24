@@ -1,7 +1,7 @@
 import { type Entry, type FactOp, type LineSpec, type Said, gate, gte, lte, eq, ne, is, exists, missing, set } from './fact'
 import { type When } from './excuses'
 import { needs, WORLD } from './world'
-import { avitoReviewAt, bloodGiven, borisSaleAt, count, endgame, evicted, fraudLoan, paydayScene, saidHash, seryogaAskAt, threatClaim, vacancyAt, wedding } from './memkeys'
+import { avitoReviewAt, asmikCard, bloodGiven, borisSaleAt, count, endgame, evicted, fraudLoan, paydayScene, saidHash, seryogaAskAt, threatClaim, vacancyAt, wedding } from './memkeys'
 import { sold, momHelp, momDachaDays } from './credit'
 import { billStreak } from './bills'
 
@@ -63,7 +63,9 @@ export const STICKERS = [
 export const STICKER_Q = ['Это не ответ, Алик.', 'Алик, стикер — это не деньги.', 'А словами?', 'Мне бы перевод, а не стикер.'];
 export const STICKER_A = ['Стикер — это тоже ответ.', needs('arsen')('Это Арсен мне сделал, красиво, да?'), 'Словами больно, брат.', 'Картинка стоит тысячи слов. А тысячи рублей — нет.', 'Я старый, мне стикером проще.'];
 
-export const FWD = [
+/** Пересылка: отправитель, текст и что она запоминает — по образцу PeriodLine и Notif (#1329). */
+export interface Fwd { f: string; t: string; remember?: FactOp[] }
+export const FWD: Entry<Fwd>[] = [
   { f: 'Мама', t: 'Сынок, никому не отдавай деньги, времена сейчас тяжёлые. Мама.' },
   // открытка знает день недели и месяц — по календарю переписки
   gate(eq('dow', 5))({ f: 'Дзен-открытки 🌹', t: 'Доброе утро, пятница! 🌹 Пусть ваши деньги работают, а вы — отдыхаете!' }),
@@ -75,14 +77,14 @@ export const FWD = [
   needs('dekretNow', 'nune')({ f: 'Нуне', t: 'Отчёт: денег нет. Подробности — после декрета.' }),
   { f: 'Армянское радио', t: 'Вопрос: можно ли получить зарплату у Алика? Ответ: можно, но не нужно.' },
   needs('grachik')({ f: 'Дедушка Грачик', t: 'Алик, не плати в високосный год. Дедушка.' }),
-  { f: 'Бабушка Асмик', t: 'Алик-джан, связала тебе носки. Денег не трать.' },
+  { f: 'Бабушка Асмик', t: 'Алик-джан, связала тебе носки. Денег не трать.', remember: [set(asmikCard, true)] },
   { f: 'Банк (наверное)', t: 'Уважаемый клиент! Ваш перевод отклонён: получатель слишком хороший человек.' },
   needs('karineHome', 'karine')({ f: 'Карине', t: 'Купи хлеб. И никому ничего не переводи. Я всё вижу.' }),
   { f: 'Гороскоп для Скорпионов', t: 'Сегодня не лучший день для финансовых решений. И завтра тоже.' },
   needs('crane', 'samvel')({ f: 'Самвел', t: 'Кто взял мой кран? Верните кран, у меня свадьба.' }),
 ];
 /** Праздничные открытки — отдельный пул: закрытый гейт в FWD сдвигает колоду Decks (#148). */
-export const FWD_HOLIDAY = [
+export const FWD_HOLIDAY: Entry<Fwd>[] = [
   newYear({ f: 'Дзен-открытки 🌹', t: 'С Новым годом! 🎄 Пусть в новом году застынет бетон и оттают долги!' }),
   newYear({ f: 'Дзен-открытки 🌹', t: 'С Новым годом! 🥂 Шампанское открыто, сейф — на следующий год.' }),
   march8({ f: 'Дзен-открытки 🌹', t: 'С 8 Марта! 🌷 Пусть мужчины дарят цветы, а подрядчики — зарплату!' }),

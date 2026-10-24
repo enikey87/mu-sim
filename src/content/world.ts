@@ -1,7 +1,7 @@
 // Тексты для новых возможностей системы правил: обещания, которые наступают, хор персонажей,
 // состояния мира со сроком (свадьба, болезнь Бориса, «Алик умер»).
 import { type Criterion, type Line, type Entry, named, exists, is, eq, gte, ne, missing, set, gate } from './fact'
-import { arsenTrack, cryptoHodl, courtVerdict, garikConcrete, garikCut, garikDenied, grandpaDying, grantPaid, intro, karineKnowsDebt, karineThinksTax, met, mourning, moustacheStakeSaid, nivaAway, nivaPlayer, nuneDekretOver, payday, saidFriday, saidGrantEnvelope, saidMoneyMoustache, saidStrasburg, saidTomorrow, alikShaved, wedding, collectorsRecruited, collectorsTea, collectorsTurned, rubikBath } from './memkeys'
+import { arsenTrack, asmikCard, cryptoHodl, courtVerdict, garikConcrete, garikCut, garikDenied, grandpaDying, grantPaid, intro, karineKnowsDebt, karineThinksTax, met, mourning, moustacheStakeSaid, nivaAway, nivaPlayer, nuneDekretOver, payday, saidFriday, saidGrantEnvelope, saidMoneyMoustache, saidStrasburg, saidTomorrow, alikShaved, wedding, collectorsRecruited, collectorsTea, collectorsTurned, rubikBath } from './memkeys'
 import type { WhoId } from './ids'
 
 // Мир последователен: кто и что есть в истории и в каком оно положении — факты, их ставит серия (remember), ступень суда
@@ -42,6 +42,8 @@ export const WORLD = {
   gagik: named('gagik', is(intro('gagik'))),
   /** Алик — тамада (свадьба Самвела). */
   tamada: named('tamada', is(intro('tamada'))),
+  /** Бабушка Асмик вошла в историю — пришла её открытка с носками (#1329): до неё имя в отмазках не звучит. */
+  asmik: named('asmik', is(asmikCard)),
   /** История с декретом Нуне началась (о нём можно говорить). */
   dekret: named('dekret', exists('arc.nune')),
   /** Декрет идёт: Нуне из него не вышла и её не уволили (финал «Настоящая ведомость»). */

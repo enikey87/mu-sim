@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest'
 import { CAST } from './arcs'
 import { D, low } from './excuses'
-import { valueOf } from './fact'
+import { valueOf, type Entry } from './fact'
 import { PLAYER_ADDRESSEES } from './misc'
 import { allPlayerPools, PLAYER_CHOICE_POOLS, PLAYER_PAIR_POOLS } from './player-pools'
 import { forEachSceneOpt } from './scene-walk'
@@ -120,5 +120,23 @@ describe('вокатив третьему лицу не адресуется А�
       expect(game.playerDecor(vocative), 'вокатив — без префикса и без обращения к Алику').toBe(vocative)
       expect(game.playerDecor(about), 'строка-сообщение о Тароне декорируется префиксом').toMatch(/^(Алик, |Слушайте, |Так, |Эм… |Алик-джан, |Секунду\. )Тарон писал/)
     }
+  })
+})
+
+// #1329: отмазка называла «бабушку Асмик» до её введения в партии (живая рецензия №6, день 194).
+// Единственное событие, которое её вводит, — открытка с носками; имя в D.REL ждёт его факта.
+describe('бабушка Асмик — в отмазке только после своей карточки (#1329)', () => {
+  const ASMIK = 'бабушка Асмик|бабушки Асмик'
+  it('до карточки имя закрыто, карточка ставит факт и открывает его', async () => {
+    const { game } = makeGame({ seed: 5 })
+    expect(D.REL.map(valueOf), 'строки нет в пуле — проверка пустеет').toContain(ASMIK)
+    expect(game.open(D.REL as Entry<string>[]), 'имя до введения бабушки').not.toContain(ASMIK)
+    let arrived = false
+    for (let i = 0; i < 30 && !arrived; i++) {
+      await game.forward()
+      arrived = game.S.mem['asmik.card'] === true
+    }
+    expect(arrived, 'карточка бабушки Асмик не пришла за 30 пересылок — проверка пустеет').toBe(true)
+    expect(game.open(D.REL as Entry<string>[]), 'имя после карточки').toContain(ASMIK)
   })
 })
