@@ -241,13 +241,13 @@ describe('плавающий событийный срок (#1002)', () => {
     const b = buttons(g, 6)
     expect(b.some((x) => x.rule === 'Opt_When_Floating'), 'плавающей кнопки нет').toBe(true)
     expect(b.some((x) => x.rule === 'Opt_When_never' || x.rule === 'Opt_When_absurd'), 'never-эхо на плавающем сроке').toBe(false)
-    expect(buttons(g, 1).find((x) => x.rule === 'Opt_When_Floating')!.text).toMatch(/Вот это хотя бы срок|Плавающий|не «никогда»|живое после/)
+    expect(buttons(g, 1).find((x) => x.rule === 'Opt_When_Floating')!.text).toMatch(/Вот это хотя бы срок|плавающ|не «никогда»|живое после/i)
   })
 
   it('тексты задачи в плавающем пуле', () => {
     const pool = D.P_WHEN_FLOATING.map(valueOf)
     expect(pool).toContain('Вот это хотя бы срок. Разбудить его можно?')
-    expect(pool).toContain('Срок плавающий. Значит, придёт, но без даты.')
+    expect(pool).toContain('Срок плавающий. Придёт, когда захочет. Как и деньги, впрочем.')
     // возврат водной метафоры без референта — красный (#1115)
     expect(pool, 'читатель снова спотыкается о «доплывёт»').not.toContain('Плавающий. Значит, доплывёт.')
   })
