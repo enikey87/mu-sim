@@ -5,15 +5,15 @@ import type { Game } from '../engine/game'
 import { NOTIF, IDLE } from './life'
 import { D } from './excuses'
 import { sold } from './credit'
-import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_NIVA, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE, P_DEBUT_GRANT, P_MAMA_MARKET, P_TILE_AD, P_TAMADA_DONE, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_GRANT_HOUSE, P_TILE_SLIP, P_TILE_LAWYER, P_NIVA_BACK, P_SOLD, P_BORIS_MEMORY, P_SERYOGA, P_GRANT_BATH, P_OFFENDED_ASK } from './rules/player-choice-pools'
-import { BORIS_MEMORY_B, BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, DEBUT_GRANT_B, GRANT_HOUSE_B, INTERN_B, HOLE_B, AVITO_REVIEW, MAMA_MARKET_B, TILE_AD_B, TAMADA_DONE_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, TILE_SLIP_B, TILE_LAWYER_B, NIVA_BACK_B, SOLD_B, VACANCY, VACANCY_START_B, VACANCY_SOON_B, SERYOGA_B, GRANT_BATH_B, OFFENDED_ASK_B } from './world'
+import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_NIVA, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE, P_DEBUT_GRANT, P_MAMA_MARKET, P_TILE_AD, P_TAMADA_DONE, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_GRANT_HOUSE, P_TILE_SLIP, P_TILE_COURT, P_TILE_LAWYER, P_TILE_MONUMENT, P_NIVA_BACK, P_SOLD, P_BORIS_MEMORY, P_SERYOGA, P_GRANT_BATH, P_OFFENDED_ASK } from './rules/player-choice-pools'
+import { BORIS_MEMORY_B, BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, DEBUT_GRANT_B, GRANT_HOUSE_B, INTERN_B, HOLE_B, AVITO_REVIEW, MAMA_MARKET_B, TILE_AD_B, TAMADA_DONE_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, TILE_SLIP_B, TILE_COURT_B, TILE_LAWYER_B, TILE_MONUMENT_B, NIVA_BACK_B, SOLD_B, VACANCY, VACANCY_START_B, VACANCY_SOON_B, SERYOGA_B, GRANT_BATH_B, OFFENDED_ASK_B } from './world'
 import { TOPICS } from './topics'
 import { ARCS } from './arcs'
 import { turnRules } from './rules/turn'
 import { FINALES } from './finales'
 import { COURT_LAWYER_AGAIN } from './quests'
 import { RUDE_CALLS_VOICE, MAMA_VOICE_CRY } from './rude'
-import { count, collectorsRecruited, court, crewPaid, crewPaidAt, HEAT, internAt, lawyerAt, debutWho, debutAt, arsenTrack, saidStrasburg, saidGrantEnvelope, grantTileAt, grantHouseAt, mamaMarketAt, tileAdAt, tamadaDoneAt, borisAskAt, mamaVoiceAt, mamaCalls, samvelDivorceAt, tileSlipAt, tileLawyerAt, nivaAway, nivaBack, nivaBackAt, saleAt, saleWhat, alikDead, paydayScene, seryogaAskAt, grantBathAt, offendedAskAt } from './memkeys'
+import { count, collectorsRecruited, court, crewPaid, crewPaidAt, HEAT, internAt, lawyerAt, debutWho, debutAt, arsenTrack, saidStrasburg, saidGrantEnvelope, grantTileAt, grantHouseAt, mamaMarketAt, tileAdAt, tamadaDoneAt, borisAskAt, mamaVoiceAt, mamaCalls, samvelDivorceAt, tileSlipAt, tileCourtAt, tileLawyerAt, tileMonumentAt, legendOf, nivaAway, nivaBack, nivaBackAt, saleAt, saleWhat, alikDead, paydayScene, seryogaAskAt, grantBathAt, offendedAskAt } from './memkeys'
 import { valueOf, type Line } from './fact'
 import type { Choice } from '../engine/state'
 
@@ -1118,6 +1118,95 @@ describe('окно эпизода «я твой адвокат» плиточн�
     expect(game.S.mem[tileLawyerAt], 'окно открылось без события').toBeUndefined()
     game.S.choices = null
     expect(game.buildChoices().find((c) => c.act === 'tileLawyer'), 'кнопка окна без события').toBeUndefined()
+  })
+})
+
+describe('окно эпизода «заказчик подаёт в суд» плиточной арки (#1317)', () => {
+  const text = (e: unknown): string => { const v = valueOf(e as never); return typeof v === 'string' ? v : (v as { t: string }).t }
+  const low = (t: string) => t.charAt(0).toLowerCase() + t.slice(1)
+
+  it('эпизод штампует ход иска, кнопка в блоке рядом с вопросом арки и денежным вопросом, окно три хода, ответ потребляет', async () => {
+    const { game } = makeGame()
+    // как после playArc: линия открыта, ctx несёт арку; серия ставит легенду суда — кадр тот же, что в партии
+    game.S.arcs.tile = { i: 1, last: 0 }
+    game.S.ctx = { arc: 'tile' }
+    const button = () => { game.S.choices = null; return game.buildChoices().find((c) => c.act === 'tileCourt') }
+    expect(button(), 'до эпизода кнопки нет').toBeUndefined()
+    await game.playEpisode(ARCS.tile.eps[1], 'tile')
+    expect(game.S.msgs.some((m) => m.kind === 'text' && m.text.includes('Подаёт в суд')), 'эпизод не прозвучал — проверка пустеет').toBe(true)
+    expect(game.S.ctx?.legend, 'легенда суда не поставлена — кадр не тот').toBe('court_tile')
+    const at = Number(game.S.mem[tileCourtAt])
+    expect(Number.isFinite(at), 'эпизод не штампанул ход события').toBe(true)
+    expect(at, 'штамп не на ходу строки').toBe(game.S.stats.sent)
+    // конкуренты этого кадра: вопрос арки (bonus 2) и денежный вопрос (bonus 3) — два слота блока.
+    // При bonus 1 у окна специфичность 2: оба конкурента (4) забирают слоты, и суда в блоке нет
+    const open = game.rules.collect({ event: 'BuildChoices' }, game.facts()).map((r) => r.name)
+    expect(open, 'вопрос арки не открыт — проверка пустеет').toContain('Opt_Arc')
+    expect(open, 'денежный вопрос не открыт — проверка пустеет').toContain('Opt_Money')
+    expect(button(), 'в кадре с вопросами арки и денег варианта про суд нет').toBeTruthy()
+    const texts = new Set<string>()
+    for (let i = 0; i < 60; i++) { const b = button(); if (b) texts.add(b.text) }
+    const pool = P_TILE_COURT.map(text)
+    expect(texts.size, 'пул окна не прозвучал — проверка пустеет').toBeGreaterThan(0)
+    for (const t of texts) expect(pool.some((p) => t.includes(p) || t.includes(low(p))), `кнопка не из пула: ${t}`).toBe(true)
+    game.S.stats.sent = at + 3
+    expect(button(), 'третий ход после эпизода — ещё окно').toBeTruthy()
+    game.S.stats.sent = at + 4
+    expect(button(), 'вне окна — кнопки нет').toBeUndefined()
+    game.S.stats.sent = at
+    const n = game.S.msgs.length
+    await game.fire('PlayerSays', { intent: 'tileCourt' })
+    const said = game.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : []))
+    const answers = TILE_COURT_B.map(text)
+    expect(said.some((t) => answers.some((p) => t.includes(p))), `ответ не из пула события: ${said.join(' | ')}`).toBe(true)
+    expect(game.S.mem[tileCourtAt], 'ответ не потребил окно').toBeUndefined()
+    expect(button(), 'после ответа окно закрыто').toBeUndefined()
+  })
+})
+
+describe('окно реестра памятников плиточной арки (#1317)', () => {
+  const text = (e: unknown): string => { const v = valueOf(e as never); return typeof v === 'string' ? v : (v as { t: string }).t }
+  const low = (t: string) => t.charAt(0).toLowerCase() + t.slice(1)
+
+  it('эпизод штампует смену статуса плитки, кнопка в блоке рядом с вопросом арки и денежным вопросом, ответ потребляет', async () => {
+    const { game } = makeGame()
+    game.S.arcs.tile = { i: 4, last: 0 }
+    game.S.ctx = { arc: 'tile' }
+    // легенда суда жива с eps[1] (30 дней или до новой легенды): на этом ходу партии серия её возвращает,
+    // а с ней открыт денежный вопрос — тот же кадр, что в игре
+    game.S.mem[legendOf('tile')] = 'court_tile'
+    const button = () => { game.S.choices = null; return game.buildChoices().find((c) => c.act === 'tileMonument') }
+    expect(button(), 'до эпизода кнопки нет').toBeUndefined()
+    await game.playEpisode(ARCS.tile.eps[4], 'tile')
+    expect(game.S.msgs.some((m) => m.kind === 'text' && m.text.includes('реестр памятников')), 'эпизод не прозвучал — проверка пустеет').toBe(true)
+    const at = Number(game.S.mem[tileMonumentAt])
+    expect(Number.isFinite(at), 'эпизод не штампанул ход события').toBe(true)
+    expect(at, 'штамп не на ходу строки').toBe(game.S.stats.sent)
+    // конкуренты кадра: вопрос арки (4) и денежный вопрос (4). Их собственный текст — лотерея (месту денег
+    // нужна легенда с местом, вопросу арки — незаезженная формулировка), поэтому «кнопка в блоке» само по
+    // себе зеленело бы и при bonus 1; гарантию даёт первый слот кадра, а его держит специфичность события
+    const open = game.rules.collect({ event: 'BuildChoices' }, game.facts()).map((r) => r.name)
+    expect(open[0], 'реакция на событие обязана стоять первой в кадре').toBe('Opt_TileMonument')
+    expect(open, 'вопрос арки не открыт — проверка пустеет').toContain('Opt_Arc')
+    expect(open, 'денежный вопрос не открыт — проверка пустеет').toContain('Opt_Money')
+    expect(button(), 'в кадре с вопросами арки и денег варианта про памятник нет').toBeTruthy()
+    const texts = new Set<string>()
+    for (let i = 0; i < 60; i++) { const b = button(); if (b) texts.add(b.text) }
+    const pool = P_TILE_MONUMENT.map(text)
+    expect(texts.size, 'пул окна не прозвучал — проверка пустеет').toBeGreaterThan(0)
+    for (const t of texts) expect(pool.some((p) => t.includes(p) || t.includes(low(p))), `кнопка не из пула: ${t}`).toBe(true)
+    game.S.stats.sent = at + 3
+    expect(button(), 'третий ход после эпизода — ещё окно').toBeTruthy()
+    game.S.stats.sent = at + 4
+    expect(button(), 'вне окна — кнопки нет').toBeUndefined()
+    game.S.stats.sent = at
+    const n = game.S.msgs.length
+    await game.fire('PlayerSays', { intent: 'tileMonument' })
+    const said = game.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : []))
+    const answers = TILE_MONUMENT_B.map(text)
+    expect(said.some((t) => answers.some((p) => t.includes(p))), `ответ не из пула события: ${said.join(' | ')}`).toBe(true)
+    expect(game.S.mem[tileMonumentAt], 'ответ не потребил окно').toBeUndefined()
+    expect(button(), 'после ответа окно закрыто').toBeUndefined()
   })
 })
 

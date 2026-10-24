@@ -1798,8 +1798,14 @@ export class Game {
       courtVerdictFresh: S.stats.sent - Number(S.mem[memkeys.courtVerdictAt] ?? -99) <= 3,
       // первая серия плиточной арки (#1059): падение заказчика — отклик живёт ход серии и три после
       tileSlipFresh: S.stats.sent - Number(S.mem[memkeys.tileSlipAt] ?? -99) <= 3,
+      // второй эпизод плиточной арки (#1317): «заказчик подаёт в суд. На тебя» — первое событие про
+      // фигурантство игрока; окно то же, что у соседних эпизодов
+      tileCourtFresh: S.stats.sent - Number(S.mem[memkeys.tileCourtAt] ?? -99) <= 3,
       // четвёртый эпизод плиточной арки (#1303): роль адвоката и вычет 10 000 ₽ из долга — окно то же
       tileLawyerFresh: S.stats.sent - Number(S.mem[memkeys.tileLawyerAt] ?? -99) <= 3,
+      // пятый эпизод плиточной арки (#1317): «внесли в реестр памятников, требовать нельзя» — строка сама
+      // объявляет смену статуса плитки, окно то же
+      tileMonumentFresh: S.stats.sent - Number(S.mem[memkeys.tileMonumentAt] ?? -99) <= 3,
       nivaBackFresh: S.stats.sent - Number(S.mem[memkeys.nivaBackAt] ?? -99) <= 3,
       // продажа имущества со дна (#1084): заметное событие — отклик живёт ход продажи и три после;
       // что продано — якорь пула: кнопка говорит про проданную вещь, а не про любую из проданных
