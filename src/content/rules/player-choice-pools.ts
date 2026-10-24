@@ -1,7 +1,7 @@
 // Именованные пулы кнопок из rules/choices — вынесены, чтобы попасть в PLAYER_POOLS (#491).
 import { needs, WORLD } from '../world'
 import { gate, eq, gte, is, missing, exists } from '../fact'
-import { court, courtVerdict, crewAllPaid, saidGrantEnvelope, saidMoneyMoustache, saidNuneNoWrite } from '../memkeys'
+import { court, courtVerdict, crewAllPaid, arsenTrack, saidGrantEnvelope, saidMoneyMoustache, saidNuneNoWrite } from '../memkeys'
 import { sold } from '../credit'
 
 export const P_VIA_BORIS = [
@@ -261,8 +261,12 @@ export const P_HOLE = [
 ] as const
 
 /** Дебют Арсена в rude-цепочке (#973): трек «Плиточник» и записанный крик. Пул — только после
- *  события, которое всё это утверждает (#982): юристский дебют трека, крика и бита не вводит. */
+ *  события, которое всё это утверждает (#982): юристский дебют трека, крика и бита не вводит.
+ *  Строка-ёмкость (#753) держит окно, пока трека нет: вопрос про новое лицо, без референтов (#1309).
+ *  Гейт обратный треку: с треком открыты три трек-вопроса, и ответ у каждого свой — пул дебюта
+ *  никогда не пустеет, а вопрос и ответ остаются парой (DEBUT_ARSEN_B). */
 export const P_DEBUT_ARSEN = [
+  gate(missing(arsenTrack))('Арсен, а вы на чьей стороне — Алика или правды?'),
   needs('arsenTrack')('Арсен, а трек «Плиточник» где послушать?'),
   needs('arsenTrack')('Арсен, трек из моего крика? Я как соавтор — требую долю.'),
   needs('arsenTrack')('Арсен, а бит из чего собран? Из крика?'),
