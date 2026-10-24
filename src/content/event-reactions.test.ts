@@ -580,7 +580,11 @@ describe('дебют Гранта хором легенды (#1179)', () => {
 
 describe('пулы Арсена держат только утверждённое (#982)', () => {
   const frame = (game: Game) => { game.S.choices = null; return game.buildChoices() }
-  const has = (game: Game, act: string) => frame(game).some((c) => c.act === act)
+  const TRACK = [
+    'Арсен, а трек «Плиточник» где послушать?',
+    'Арсен, трек из моего крика? Я как соавтор — требую долю.',
+    'Арсен, а бит из чего собран? Из крика?',
+  ]
 
   it('юристский дебют не открывает вопросы про трек, крик и бит: пул ждёт своё событие', async () => {
     const { game } = makeGame()
@@ -588,11 +592,15 @@ describe('пулы Арсена держат только утверждённо
     // законный путь дебюта: Арсен-юрист, трек/крик/бит в нём не звучат
     await game.fire('PlayerMessage', { tone: 'threat' })
     expect(game.S.mem[debutWho], 'дебют Арсена не состоялся — проверка пустеет').toBe('arsen')
-    expect(has(game, 'debutArsen'), 'вопросы про трек раньше трека').toBe(false)
+    // окно не пустеет: до трека в нём строка-ёмкость (#753/#1309), и она не про трек
+    const before = frame(game).find((c) => c.act === 'debutArsen')
+    expect(before, 'окно дебюта до трека пустое').toBeTruthy()
+    expect(TRACK, 'вопросы про трек раньше трека').not.toContain(before!.text)
     // событие случилось (крик записан, трек собран) — вопросы появляются, и они из пула дебюта
     game.S.mem[arsenTrack] = true
     const btn = frame(game).find((c) => c.act === 'debutArsen')
     expect(btn, 'после события кнопки нет').toBeTruthy()
+    expect(TRACK, 'после события нет трек-вопроса').toContain(btn!.text)
     expect(P_DEBUT_ARSEN.map(valueOf), 'кнопка не из пула дебюта').toContain(btn!.text)
   })
 
@@ -644,6 +652,62 @@ describe('пулы Арсена держат только утверждённо
     expect([...before], 'Страсбург без оглашения игроком').not.toContain('Арсен, а Страсбург — это долго ждать?')
     const after = overWindow((g) => { g.S.mem[saidStrasburg] = true })
     expect([...after], 'после оглашения Страсбург не предлагается').toContain('Арсен, а Страсбург — это долго ждать?')
+  })
+})
+
+describe('дебют Арсена: окно не пустеет вне трека (#1309)', () => {
+  const SELF = 'Дядя сказал ответить вам «сам такой». Отвечаю: сам такой. Это не я, это дядя.'
+  const CAP = 'Арсен, а вы на чьей стороне — Алика или правды?'
+  const CAP_REPLY = 'На стороне Алика. Он попросил — я ответил. Кто прав, разберёмся по ходу.'
+  const TRACK = [
+    'Арсен, а трек «Плиточник» где послушать?',
+    'Арсен, трек из моего крика? Я как соавтор — требую долю.',
+    'Арсен, а бит из чего собран? Из крика?',
+  ]
+  const frame = (game: Game) => { game.S.choices = null; return game.buildChoices() }
+  const debut = async (game: Game) => {
+    // первое сообщение семьи, не трек-строка: факт arsenTrack не ставится
+    await game.say([{ w: 'arsen', t: SELF }])
+    expect(game.S.mem[debutWho], 'дебют Арсена не состоялся — проверка пустеет').toBe('arsen')
+    expect(game.S.mem[arsenTrack], 'трек прозвучал в дебюте — проверка не про этот путь').toBeFalsy()
+  }
+
+  it('после первого сообщения семьи в блоке есть вариант об Арсене — про новое лицо, не про трек', async () => {
+    const { game } = makeGame()
+    await debut(game)
+    const btn = frame(game).find((c) => c.act === 'debutArsen')
+    expect(btn, 'окно дебюта пустое — варианта об Арсене нет').toBeTruthy()
+    expect(btn!.text, 'строка-ёмкость не из пула дебюта').toBe(CAP)
+    expect(TRACK, 'вопрос про трек раньше трека').not.toContain(btn!.text)
+  })
+
+  it('строка-ёмкость получает ответ Арсена, а не пустую колоду', async () => {
+    const { game } = makeGame()
+    await debut(game)
+    const btn = frame(game).find((c) => c.act === 'debutArsen')!
+    const from = game.S.msgs.length
+    await game.send(btn)
+    const said = game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' && m.who === 'arsen' ? [m.text] : []))
+    expect(said, 'ответ на строку-ёмкость').toContain(CAP_REPLY)
+    expect(frame(game).find((c) => c.act === 'debutArsen'), 'ответ не закрыл окно').toBeUndefined()
+  })
+
+  it('после трек-строки окно отдаёт трек-вопросы, а строка-ёмкость молчит', async () => {
+    const { game } = makeGame()
+    await debut(game)
+    game.S.mem[arsenTrack] = true
+    // окно дебюта — ход и три после: собираем предложения по ходам, как у Самвела (#1287)
+    const at = game.S.stats.sent
+    const seen = new Set<string>()
+    for (let turn = 0; turn <= 3; turn++) {
+      game.S.stats.sent = at + turn
+      game.S.choices = null
+      const b = game.buildChoices().find((c) => c.act === 'debutArsen')
+      if (b) seen.add(b.text)
+    }
+    expect(seen.size, 'окно с треком ничего не предложило — проверка пустеет').toBeGreaterThan(0)
+    expect([...seen], 'вопрос про трек не открылся').toEqual(expect.arrayContaining(TRACK))
+    expect([...seen], 'строка-ёмкость вернулась при треке').not.toContain(CAP)
   })
 })
 
