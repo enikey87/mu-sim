@@ -5,6 +5,8 @@ import { ARCS } from './arcs'
 import { LEGENDS, CHORUS_LEGEND } from './legends'
 import { talkId } from './talk'
 import { meet } from './world'
+import { is } from './fact'
+import { garikCode } from './memkeys'
 import { spec, lintLines, valueOf } from '../engine/rules'
 import type { Game } from '../engine/game'
 
@@ -337,9 +339,48 @@ describe('торг за код: Гарик торгуется после при�
     expect(game.open(tradeLines).map((l) => spec(l).t).join(' '), 'Алик — раздражённый посредник').toMatch(/не торгуйся с бетоном/)
   })
 
-  it('официальная версия до признания осталась: вопрос «спросить Гарика» открыт', async () => {
+  it('официальная версия до признания осталась: вопрос «спросить Гарика» открыт после введения кода', async () => {
     const before = await played(5)
+    // вопрос спрашивает про код — до строки, которая его вводит, его нет (#1338)
+    expect(before.game.open([ask('Может, спросить Гарика? Он же код знает')]), 'до введения кода вопроса нет').toEqual([])
+    before.game.linePicked('LEG_garik', LEGENDS.garik.lines) // легенда ещё не звучала — выбор один: вводящая строка
     expect(before.game.open([ask('Может, спросить Гарика? Он же код знает')]), 'старый вопрос не потерян').toHaveLength(1)
+  })
+})
+
+describe('«код» в легенде Гарика — только после строки, которая его вводит (#1338)', () => {
+  const first = 'Код от сейфа знает только Гарик. А Гарик в фундаменте. Кричу ему в трубочку — он не слышит, бетон толстый.'
+  const second = 'Гарику передали в трубочку бумагу и ручку — пусть напишет код. Он написал «помогите». Это не код.'
+  // путь игрока: первая серия Гарика ставит легенду, ни одна строка пула LEG_garik ещё не звучала
+  const legendGame = async () => {
+    const { game } = makeGame()
+    await game.playArc('garik')
+    expect(game.legend(), 'легенда Гарика жива').toBe('garik')
+    return game
+  }
+
+  it('до введения код не называет ни одна доступная строка легенды и ни один вопрос игрока', async () => {
+    const game = await legendGame()
+    const open = game.open(LEGENDS.garik.lines).map((l) => spec(l).t)
+    expect(open, 'до введения открыта только вводящая строка').toEqual([first])
+    expect(open.filter((t) => /код/i.test(t)), '«код» до введения называет только вводящая строка').toEqual([first])
+    expect(game.open(LEGENDS.garik.talk ?? []), 'вопросов про код до введения нет').toEqual([])
+  })
+
+  it('вводящая строка ставит факт: после неё открыты 407 и вопросы про код', async () => {
+    const game = await legendGame()
+    expect(game.holds(is(garikCode)), 'свежая партия: код ещё не введён').toBe(false)
+    const picked = game.linePicked('LEG_garik', LEGENDS.garik.lines)
+    expect(picked?.text, 'первым звучит вводящая строка').toBe(first)
+    expect(game.S.mem[garikCode], 'строка не поставила факт о коде').toBe(true)
+    expect(game.open(LEGENDS.garik.lines).map((l) => spec(l).t), '407 открыта после введения').toContain(second)
+    expect(game.open(LEGENDS.garik.talk ?? []), 'вопросы про код открыты после введения').toHaveLength(3)
+  })
+
+  it('принудительный розыгрыш 407 первым блоком до введения не даёт «код»', async () => {
+    const game = await legendGame()
+    const onlySecond = LEGENDS.garik.lines.filter((l) => spec(l).t !== first)
+    expect(game.linePicked('LEG_garik', onlySecond), '407 без вводящей строки не звучит').toBeNull()
   })
 })
 
