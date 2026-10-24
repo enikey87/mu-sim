@@ -32,6 +32,8 @@ export const ritualCut = 'ritual.cut'
 export const caughtCount = 'caught'
 /** Гарик сам сказал «ничего не брал»: признание в колкости ссылается на это отрицание, а не спорит с ним (#784). */
 export const garikDenied = 'garik.denied'
+/** Алик впервые назвал код от сейфа (первая строка легенды Гарика): строки и вопросы про «код» звучат только после неё (#1338). */
+export const garikCode = 'garik.code'
 /** День последней поимки на лжи: по нему архив эндгейма отличает свежую поимку от старой (#777).
  *  Имя — по правилу фактов-дней (`mooAt`, `sorryAt`, `thanksAt`): `caught.at` попал бы в легаси-пространство
  *  `caught.<пара утверждений>` и в сторож «новая партия не пишет старые ключи» (`lies.test.ts`). */
@@ -348,7 +350,7 @@ export const ACTOR_KEYS: ReadonlySet<string> = new Set(ACTOR_KEY_LIST)
 
 export const MEM_KEYS: ReadonlySet<string> = new Set([
   HEAT, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, evicted, vendetta, court, courtVerdict,
-  ritualCount, ritualCut, caughtCount, caughtAt, garikDenied, cryptoHodl, bathAsked, mamaCalls, phoneKarine, karineKnowsDebt, karineThinksTax, alikShaved, moustacheKept, moustacheAskAt, alikDay, mooAt, sorryAt, courtReferral, judgeApology, saidStrasburg,
+  ritualCount, ritualCut, caughtCount, caughtAt, garikDenied, garikCode, cryptoHodl, bathAsked, mamaCalls, phoneKarine, karineKnowsDebt, karineThinksTax, alikShaved, moustacheKept, moustacheAskAt, alikDay, mooAt, sorryAt, courtReferral, judgeApology, saidStrasburg,
   rudeAt, thanksAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway, nivaPlayer, carGone,
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, borisForeman, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, asmikCard, paydayScene, threatClaim, saidTomorrow, saidFriday, saidKonak, saidHash, saidOath, saidNuneNoWrite, saidGrantEnvelope, saidMoneyMoustache, saidRegiment,
