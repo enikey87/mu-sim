@@ -676,7 +676,9 @@ export class Game {
     if (fresh !== null) return remember(fresh)
     // повтор — самая давняя по показу открытая строка пула, без жребия: так окно не тратит розыгрыш.
     // Ворота строки проверяются и здесь: повтор не имеет права вернуть закрытую строку (#824)
-    const at = (t: string) => this.playerSaid.get(t) ?? -1e9
+    // Последний показ считает любой механизм (#1348): строку, показанную окном события (`windowLine`),
+    // помнит только `shownAt`, и фолбэк возвращал её дословно через 11 ходов, пока окно повтора — 20.
+    const at = (t: string) => Math.max(this.playerSaid.get(t) ?? -1e9, this.shownAt.get(t) ?? -1e9)
     const ready = arr.filter((e) => isOpen(e, this.lineFacts()) && !this.seen.has(text(e)))
       .filter((e) => this.S.stats.sent - at(text(e)) >= PLAYER_REPEAT_TURNS)
     if (!ready.length) return null
