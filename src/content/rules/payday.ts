@@ -120,13 +120,20 @@ export const PAYDAY_HOOKS: Record<string, (game: ContentApi) => Promise<void>> =
 }
 
 // ---- исходы: самый частный побеждает ----
+/** Монета 10 ₽ — сталь с латунным покрытием, 5,63 г (2012+). Вес мешка монет выводится из долга, а не зашит (#1355). */
+const COIN_10_G = 5.63
+const coinBagKg = (debt: number): number => Math.round(((debt / 10) * COIN_10_G) / 1000)
 const outcome = (id: string, when: R['when'], extra: Partial<R> = {}): R => ({
   name: `Payday_${id}`, event: 'PaydayOutcome', when, priority: 'system', ...extra,
   respond: async ({ game }) => {
     const o = OUTCOME[id]
     await game.sleep(900)
-    // «перевёл {sum}» — ровно то, что осталось «к выплате» после всех долей, а не 240 000 из воздуха
-    if (o.sys) game.sys(o.sys.replace('{debt}', fmt(game.debt)).replace('{sum}', fmt(Number(game.mem()[pd.sum] ?? game.debt))))
+    // «перевёл {sum}» — ровно то, что осталось «к выплате» после всех долей, а не 240 000 из воздуха;
+    // «{weight}» — вес мешка монет, посчитанный из той же суммы долга
+    if (o.sys) {
+      const sum = Number(game.mem()[pd.sum] ?? game.debt)
+      game.sys(o.sys.replace('{debt}', fmt(game.debt)).replace('{sum}', fmt(sum)).replace('{weight}', String(coinBagKg(game.debt))))
+    }
     // строка исхода — реплика или пара [кто, текст]; объект с `claims` идёт как есть (утверждение о курсе, #815)
     for (const l of game.open(o.lines)) await game.say([typeof l === 'string' ? l : Array.isArray(l) ? { w: l[0], t: l[1] } : { t: l.t, claims: l.claims ?? [] }])
     // долг меняем до печати выплаты: после paydayScene adjustDebt уже не пустит
