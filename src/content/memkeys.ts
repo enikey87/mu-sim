@@ -215,6 +215,9 @@ export const debutWho = 'debut.who'
 export const debutAt = 'debut.at'
 /** Арсен записал крик игрока на диктофон и собрал трек «Плиточник» (rude-дебют): до этого трек, крик и бит не упоминаются (#982). */
 export const arsenTrack = 'arsen.track'
+/** Ход строки трека (#1351): у самой строки своё окно отклика — трек приходит из rude-цепочки
+ *  независимо от дебюта Арсена, и окно дебюта (три отправки) к тому времени почти всегда закрыто. */
+export const arsenTrackAt = 'arsen.trackAt'
 /** Участник уже писал сам: повторные сообщения окно дебюта не открывают (#973); пара суда спрашивает
  *  именно письмо, а не знакомство-упоминание (#1017) — generic хранит литерал для типизированных условий. */
 export const wrote = <W extends string>(who: W): `wrote.${W}` => `wrote.${who}`
@@ -334,7 +337,7 @@ export const EVENT_KEY_LIST = [
   'day', 'dow', 'month', 'dom', 'holiday', 'sent', 'moo', 'tier', 'mood', 'patience', 'money', 'debt', 'fifty', 'paid',
   'moneyNormal', 'moneyLow', 'moneyBottom', 'paymentDueTomorrow',
   'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sinceCrew', 'sorrySwing', 'promiseLive', 'promisePassed', 'promiseStake',
-  'debutWho', 'debutFresh', 'transferFresh', 'transferAmount',
+  'debutWho', 'debutFresh', 'arsenTrackFresh', 'transferFresh', 'transferAmount',
   'ramPhotoFresh', 'borisSaleFresh', 'vacancyFresh', 'avitoReviewFresh', 'rubikAskFresh', 'kettleFresh',
   'lawyerFresh', 'collectorsAskFresh', 'collectorsEpFresh', 'internFresh', 'rubikHoleFresh', 'countersuitFresh', 'grantTileFresh', 'moustachePhotoFresh', 'mamaMarketFresh', 'mamaVoiceFresh', 'photoFresh', 'tileAdFresh', 'tamadaDoneFresh', 'samvelDivorceFresh', 'courtVerdictFresh', 'tileSlipFresh', 'tileCourtFresh', 'tileLawyerFresh', 'tileMonumentFresh', 'nivaBackFresh', 'saleFresh', 'saleItem', 'grantHouseFresh', 'borisAskFresh', 'seryogaFresh', 'grantBathFresh', 'offendedAskFresh',
   'period', 'night', 'offline', 'scene', 'sinceAlik', 'lateCount', 'arcAvailable',
@@ -355,7 +358,7 @@ export const MEM_KEYS: ReadonlySet<string> = new Set([
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, borisForeman, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, asmikCard, paydayScene, threatClaim, saidTomorrow, saidFriday, saidKonak, saidHash, saidOath, saidNuneNoWrite, saidGrantEnvelope, saidMoneyMoustache, saidRegiment,
   lightOff, netRation, phoneWarn, holidayGreeted,
-  creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, collectorsTurned, collectorsTea, collectorsEpAt, criticalAt, creditOfferSum, momDachaAt, crewPaid, crewPaidAt, crewAllPaid, rubikBath, whenYears, ...Object.values(moneyAskAt), transferAt, transferAmount, moustachePhotoAt, moustacheStakeSaid, mamaMarketAt, mamaVoiceAt, samvelDivorceAt, courtVerdictAt, tileSlipAt, tileCourtAt, tileLawyerAt, tileMonumentAt, nivaBackAt, saleAt, saleWhat, fraudLoan, blockLifted, internDeclined, internAccepted, grantHouseAt, photoAt, tileAdAt, tamadaDoneAt, borisAskAt, debutWho, debutAt, arsenTrack,
+  creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, collectorsTurned, collectorsTea, collectorsEpAt, criticalAt, creditOfferSum, momDachaAt, crewPaid, crewPaidAt, crewAllPaid, rubikBath, whenYears, ...Object.values(moneyAskAt), transferAt, transferAmount, moustachePhotoAt, moustacheStakeSaid, mamaMarketAt, mamaVoiceAt, samvelDivorceAt, courtVerdictAt, tileSlipAt, tileCourtAt, tileLawyerAt, tileMonumentAt, nivaBackAt, saleAt, saleWhat, fraudLoan, blockLifted, internDeclined, internAccepted, grantHouseAt, photoAt, tileAdAt, tamadaDoneAt, borisAskAt, debutWho, debutAt, arsenTrack, arsenTrackAt,
   ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt, countersuitAt, grantTileAt,
   seryogaAskAt, grantBathAt, offendedAskAt,
   ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lend50),

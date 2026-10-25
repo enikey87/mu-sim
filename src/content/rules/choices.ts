@@ -274,6 +274,11 @@ export const choiceRules: R[] = [
   // bonus 5: на rude-пути окно конкурирует с извинением (6) и мычанием (6) — дебют должен попадать в блок.
   // Пул Арсена под воротами (#982): пустой пул даёт пустой текст — freshFromArr, не draw
   offer({ name: 'DebutArsen', when: [is('debutFresh'), eq('debutWho', 'arsen')], act: 'debutArsen', tone: 'neutral', bonus: 5, text: (g) => freshFromArr(g, 'P_DEBUT_ARSEN', P_DEBUT_ARSEN) }),
+  // трек «Плиточник» (#1351): событие rude-цепочки, приходит независимо от дебюта и почти всегда позже
+  // его окна (три отправки) — своих трек-вопросов без него не было. Окно у события своё, пул тот же:
+  // с фактом трека в нём только трек-вопросы, ответы DEBUT_ARSEN_B остаются парой (#973). Слот дебюта
+  // общий: на ходу, где живы оба окна, одна и та же кнопка не встаёт дважды — берёт более специфичный оффер
+  offer({ name: 'ArsenTrack', slot: 'DebutArsen', when: [is('arsenTrackFresh')], act: 'arsenTrack', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_DEBUT_ARSEN', P_DEBUT_ARSEN) }),
   offer({ name: 'DebutSamvel', when: [is('debutFresh'), eq('debutWho', 'samvel')], act: 'debutSamvel', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_DEBUT_SAMVEL', P_DEBUT_SAMVEL) }),
   offer({ name: 'DebutBoris', when: [is('debutFresh'), eq('debutWho', 'boris')], act: 'debutBoris', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_DEBUT_BORIS', P_DEBUT_BORIS) }),
   offer({ name: 'DebutNiva', when: [is('debutFresh'), eq('debutWho', 'niva')], act: 'debutNiva', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_DEBUT_NIVA', P_DEBUT_NIVA) }),

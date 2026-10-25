@@ -19,6 +19,9 @@ export interface LineSpec {
   cooldown?: { turns?: number; days?: number }
   /** Что запомнить, когда реплика прозвучала. */
   remember?: FactOp[]
+  /** Ход, на котором реплика прозвучала: штамп события в память мира — тот же смысл, что у `stamp`
+   *  строки-реплики в `say` (#1351: у события из пула реплик своё окно отклика). */
+  stamp?: string
 }
 export type Line = string | LineSpec | Gated<string | LineSpec>
 
