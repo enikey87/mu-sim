@@ -103,6 +103,29 @@ describe('День выплаты', () => {
     expect(g2.S.day).toBe(stuck) // не прыгаем ещё на день от уже прошедшего «завтра»
     expect(texts(g2).join(' ')).toMatch(/День выплаты/)
   })
+  // #1355: вес мешка — из фактического долга (монета 10 ₽ — сталь с латунным покрытием, 5,63 г), а не константа
+  it('вес мешка монет выводится из долга, а не зашит константой (#1355)', async () => {
+    const bag = async (debt: number) => {
+      const { game } = makeGame()
+      game.S.mem['payday.caught'] = true
+      // дележ уже случился: «к выплате» — 50 ₽, а мешок закрывает весь долг
+      game.S.mem['payday.sum'] = 50
+      game.adjustDebt(debt - game.debt)
+      expect(game.S.debt).toBe(debt)
+      const n = game.S.msgs.length
+      expect((await game.fire('PaydayOutcome'))?.name).toBe('Payday_coins')
+      const line = texts(game, n).find((t) => t.includes('мешок монет'))
+      expect(line, 'системная строка мешка').toBeDefined()
+      return line!
+    }
+    // долг партии 380117: 30 990 монет × 5,63 г = 174,5 кг
+    expect(await bag(309_900)).toBe('У вашей двери мешок монет по 10 рублей. Долг закрыт. Вес — 174 кг.')
+    expect(await bag(240_000), 'минимальный долг Дня выплаты').toContain('Вес — 135 кг')
+    // 195 375 ₽ по 5,63 г — ровно 110 кг: та же цифра, но выведенная, а не зашитая
+    expect(await bag(195_375)).toContain('Вес — 110 кг')
+    for (const line of [await bag(309_900), await bag(100_000)]) expect(line, 'незаполненный плейсхолдер').not.toContain('{')
+    expect(await bag(100_000)).toContain('Вес — 56 кг')
+  })
   it('без поимки — 50 ₽ «остатка», а на следующий день кнопка: «Повторим через год?»', async () => {
     const { game } = makeGame()
     game.S.day = 340
