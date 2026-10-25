@@ -12,7 +12,7 @@ import { ARCS } from '../content/arcs'
 import { COLD_WAR, NOT_DELIVERED } from '../content/rude'
 import { HEAT, bloodGiven } from '../content/memkeys'
 import { valueOf, spec, type Facts, type Entry } from './rules'
-import { type When } from '../content/excuses'
+import { EVENT_FRESH_TURNS, type When } from '../content/excuses'
 import * as L from '../content/life'
 import type { GameEvent } from '../content/rules/events'
 import { MENTION_RE } from '../content/world'
@@ -1220,6 +1220,20 @@ describe('Game: деньги на карте', () => {
     expect(first?.value).toEqual(pool[0])
     expect(first?.text).toBe('Алик, банк спрашивает про вас')
     expect(game.freshPlayerEntry('ATM_ARG', pool), 'та же строка в окне — молчание').toBeNull()
+  })
+  // #1348: показ окном события (`windowLine`) — такой же показ строки, как у пула, и держит окно повтора
+  it('строка, показанная окном события, не возвращается фолбэком раньше окна повтора (#1348)', () => {
+    const { game } = makeGame()
+    const line = 'Коллекторы на объекте расселись: чай длинный, долг тоже.'
+    expect(game.windowLine('EP_COLLECTORS', [line], EVENT_FRESH_TURNS), 'строка показана окном события').toBe(line)
+    // 11 отправок: окно события закрылось, окно повтора (#824) — ещё нет
+    game.S.stats.sent = 11
+    const follow = [line, 'Коллекторы заходили, чай не пили']
+    expect(game.freshPlayerEntry('F_COLLECTORS', follow)?.text, 'свежая строка пула идёт первой').toBe('Коллекторы заходили, чай не пили')
+    expect(game.freshPlayerEntry('F_COLLECTORS', follow), 'фолбэк не повторяет показанное окном дословно').toBeNull()
+    // 20 отправок — окно повтора прошло: самая давняя строка пула возвращается
+    game.S.stats.sent = 20
+    expect(game.freshPlayerEntry('F_COLLECTORS', follow)?.text, 'за окном строка звучит снова').toBe(line)
   })
   it('после выплаты и в эндгейме деньги не меняются', () => {
     const { game } = makeGame()
