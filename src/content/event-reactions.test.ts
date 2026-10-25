@@ -6,14 +6,14 @@ import { NOTIF, IDLE } from './life'
 import { D } from './excuses'
 import { sold } from './credit'
 import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_NIVA, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE, P_DEBUT_GRANT, P_MAMA_MARKET, P_TILE_AD, P_TAMADA_DONE, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_GRANT_HOUSE, P_TILE_SLIP, P_TILE_COURT, P_TILE_LAWYER, P_TILE_MONUMENT, P_NIVA_BACK, P_SOLD, P_BORIS_MEMORY, P_SERYOGA, P_GRANT_BATH, P_OFFENDED_ASK } from './rules/player-choice-pools'
-import { BORIS_MEMORY_B, BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, DEBUT_GRANT_B, GRANT_HOUSE_B, INTERN_B, HOLE_B, AVITO_REVIEW, MAMA_MARKET_B, TILE_AD_B, TAMADA_DONE_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, TILE_SLIP_B, TILE_COURT_B, TILE_LAWYER_B, TILE_MONUMENT_B, NIVA_BACK_B, SOLD_B, VACANCY, VACANCY_START_B, VACANCY_SOON_B, SERYOGA_B, GRANT_BATH_B, OFFENDED_ASK_B } from './world'
+import { BORIS_MEMORY_B, BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, DEBUT_GRANT_B, GRANT_HOUSE_B, INTERN_B, HOLE_B, AVITO_REVIEW, MAMA_MARKET_B, TILE_AD_B, TAMADA_DONE_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, TILE_SLIP_B, TILE_COURT_B, TILE_LAWYER_B, TILE_MONUMENT_B, NIVA_BACK_B, SOLD_B, VACANCY, VACANCY_START_B, VACANCY_SOON_B, SERYOGA_B, GRANT_BATH_B, OFFENDED_ASK_B, DEBUT_ARSEN_B } from './world'
 import { TOPICS } from './topics'
 import { ARCS } from './arcs'
 import { turnRules } from './rules/turn'
 import { FINALES } from './finales'
 import { COURT_LAWYER_AGAIN } from './quests'
 import { RUDE_CALLS_VOICE, MAMA_VOICE_CRY } from './rude'
-import { count, collectorsRecruited, court, crewPaid, crewPaidAt, HEAT, internAt, lawyerAt, debutWho, debutAt, arsenTrack, saidStrasburg, saidGrantEnvelope, grantTileAt, grantHouseAt, mamaMarketAt, tileAdAt, tamadaDoneAt, borisAskAt, mamaVoiceAt, mamaCalls, samvelDivorceAt, tileSlipAt, tileCourtAt, tileLawyerAt, tileMonumentAt, legendOf, nivaAway, nivaBack, nivaBackAt, saleAt, saleWhat, alikDead, paydayScene, seryogaAskAt, grantBathAt, offendedAskAt, intro, kettleAt } from './memkeys'
+import { count, collectorsRecruited, court, crewPaid, crewPaidAt, HEAT, internAt, lawyerAt, debutWho, debutAt, arsenTrack, arsenTrackAt, saidStrasburg, saidGrantEnvelope, grantTileAt, grantHouseAt, mamaMarketAt, tileAdAt, tamadaDoneAt, borisAskAt, mamaVoiceAt, mamaCalls, samvelDivorceAt, tileSlipAt, tileCourtAt, tileLawyerAt, tileMonumentAt, legendOf, nivaAway, nivaBack, nivaBackAt, saleAt, saleWhat, alikDead, paydayScene, seryogaAskAt, grantBathAt, offendedAskAt, intro, kettleAt } from './memkeys'
 import { valueOf, type Line } from './fact'
 import type { Choice } from '../engine/state'
 
@@ -729,6 +729,89 @@ describe('дебют Арсена: окно не пустеет вне трек�
     expect(seen.size, 'окно с треком ничего не предложило — проверка пустеет').toBeGreaterThan(0)
     expect([...seen], 'вопрос про трек не открылся').toEqual(expect.arrayContaining(TRACK))
     expect([...seen], 'строка-ёмкость вернулась при треке').not.toContain(CAP)
+  })
+})
+
+describe('трек «Плиточник» открывает своё окно после закрытого дебюта (#1351)', () => {
+  const TRACK = [
+    'Арсен, а трек «Плиточник» где послушать?',
+    'Арсен, трек из моего крика? Я как соавтор — требую долю.',
+    'Арсен, а бит из чего собран? Из крика?',
+  ]
+  const CAP = 'Арсен, а вы на чьей стороне — Алика или правды?'
+  const CAP_REPLY = 'На стороне Алика. Он попросил — я ответил. Кто прав, разберёмся по ходу.'
+  const frame = (game: Game) => { game.S.choices = null; return game.buildChoices() }
+  /** Дебют Арсена был, но окно закрылось: с той поры прошло больше трёх отправок (как в партиях 374117/seed-17). */
+  const closedDebut = (game: Game) => {
+    game.S.mem['wrote.arsen'] = true
+    game.S.mem[debutWho] = 'arsen'
+    game.S.mem[debutAt] = game.S.stats.sent - 10
+  }
+  /** Строка трека настоящим путём: rude-семья Арсена (перерыв — 4 дня между попытками). */
+  const sayTrack = async (game: Game) => {
+    game.S.mem['intro.arsen'] = true
+    for (let i = 0; i < 20; i++) {
+      game.S.day += 5
+      game.S.mem[HEAT] = 1
+      await game.fire('PlayerMessage', { tone: 'rude' })
+      if (game.S.msgs.some((m) => m.kind === 'text' && m.text.includes('Плиточник'))) return
+    }
+    expect.fail('строка трека не прозвучала — проверка пустеет')
+  }
+
+  it('до трека трек-вопросов нет: окно дебюта закрыто, пул ждёт своё событие', async () => {
+    const { game } = makeGame()
+    closedDebut(game)
+    expect(game.buildChoices().some((c) => c.act === 'arsenTrack' || c.act === 'debutArsen'), 'окно открыто без трека').toBe(false)
+  })
+
+  it('трек после окна дебюта: вопрос в блоке хода трека и три после, ответ — пара DEBUT_ARSEN_B', async () => {
+    const { game } = makeGame()
+    closedDebut(game)
+    await sayTrack(game)
+    expect(game.S.mem[arsenTrack], 'факт трека не встал — проверка пустеет').toBe(true)
+    const at = Number(game.S.mem[arsenTrackAt])
+    expect(at, 'строка трека не штампует ход').toBe(game.S.stats.sent)
+    const offered: string[] = []
+    for (let turn = 0; turn <= 3; turn++) {
+      game.S.stats.sent = at + turn
+      const c = frame(game).find((x) => x.act === 'arsenTrack')
+      if (c) offered.push(c.text)
+    }
+    expect(offered.length, 'вопросов про трек нет — канал мёртв').toBeGreaterThan(0)
+    expect(offered.filter((t) => !TRACK.includes(t)), 'вопрос не из трек-пула').toEqual([])
+    expect(offered, 'строка-ёмкость вернулась при треке').not.toContain(CAP)
+    // граница окна — по факту, а не по пулу: пул из трёх строк исчерпывается раньше, чем кончается окно
+    game.S.stats.sent = at + 3
+    expect(game.facts().arsenTrackFresh, 'третий ход после события — уже вне окна').toBe(true)
+    game.S.stats.sent = at + 4
+    expect(game.facts().arsenTrackFresh, 'окно живёт дольше трёх ходов').toBe(false)
+    expect(frame(game).some((c) => c.act === 'arsenTrack'), 'окно не закрылось на четвёртый ход').toBe(false)
+    // ответ на трек-вопрос — парная строка DEBUT_ARSEN_B, окно съедено
+    game.S.stats.sent = at
+    const btn = frame(game).find((c) => c.act === 'arsenTrack')!
+    const from = game.S.msgs.length
+    await game.send(btn)
+    const said = game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' && m.who === 'arsen' ? [m.text] : []))
+    expect(said.length, 'ответа Арсена нет').toBeGreaterThan(0)
+    // ответы Арсена — пары [кто, текст]: сверяем текст, а не обёртку
+    const answers = DEBUT_ARSEN_B.map((e) => (valueOf(e) as { t: string }).t)
+    expect(answers, `ответ не из пары: ${said.join(' | ')}`).toContain(said[0])
+    expect(said, 'ответ на трек-вопрос — пара трек-вопроса, а не строка-ёмкость').not.toContain(CAP_REPLY)
+    expect(game.S.mem[arsenTrackAt], 'ответ не потребил окно').toBeUndefined()
+    expect(frame(game).some((c) => c.act === 'arsenTrack'), 'после ответа окно живо').toBe(false)
+  })
+
+  it('дебют и трек на одном ходу: одна кнопка, а не две одинаковые', async () => {
+    const { game } = makeGame()
+    game.S.mem['wrote.arsen'] = true
+    game.S.mem[debutWho] = 'arsen'
+    game.S.mem[debutAt] = game.S.stats.sent
+    game.S.mem[arsenTrack] = true
+    game.S.mem[arsenTrackAt] = game.S.stats.sent
+    const btns = frame(game).filter((c) => c.act === 'debutArsen' || c.act === 'arsenTrack')
+    expect(btns.length, 'одна и та же кнопка встала дважды').toBe(1)
+    expect(TRACK, 'на ходу с треком кнопка не про трек').toContain(btns[0].text)
   })
 })
 

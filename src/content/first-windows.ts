@@ -3,7 +3,7 @@
 // участник, умеющий писать сам (SPEAKS), обязан быть здесь или в исключениях с причиной — новый
 // участник красит сюит на месте, а не в плейтесте через раунд. Офферы и потребление окна ответом —
 // как были (#951), тексты пулов не менялись.
-import { avitoReviewAt, borisAskAt, borisSaleAt, collectorsAskAt, collectorsEpAt, countersuitAt, courtVerdictAt, crewPaidAt, grantBathAt, grantHouseAt, grantTileAt, internAt, kettleAt, lawyerAt, mamaMarketAt, mamaVoiceAt, mooAt, moustachePhotoAt, nivaBackAt, offendedAskAt, photoAt, ramPhotoAt, rubikAskAt, rubikHoleAt, samvelDivorceAt, saleAt, seryogaAskAt, tamadaDoneAt, tileAdAt, tileCourtAt, tileLawyerAt, tileMonumentAt, tileSlipAt, transferAt, vacancyAt } from './memkeys'
+import { arsenTrackAt, avitoReviewAt, borisAskAt, borisSaleAt, collectorsAskAt, collectorsEpAt, countersuitAt, courtVerdictAt, crewPaidAt, grantBathAt, grantHouseAt, grantTileAt, internAt, kettleAt, lawyerAt, mamaMarketAt, mamaVoiceAt, mooAt, moustachePhotoAt, nivaBackAt, offendedAskAt, photoAt, ramPhotoAt, rubikAskAt, rubikHoleAt, samvelDivorceAt, saleAt, seryogaAskAt, tamadaDoneAt, tileAdAt, tileCourtAt, tileLawyerAt, tileMonumentAt, tileSlipAt, transferAt, vacancyAt } from './memkeys'
 import type { Criterion } from '../engine/rules'
 
 /**
@@ -36,6 +36,9 @@ export interface FirstWindow {
 
 export const FIRST_WINDOWS: readonly FirstWindow[] = [
   { who: 'arsen', source: 'rude-цепочка, строка семьи (RUDE_FAMILY.arsen)', at: DEBUT_SLOT, offer: 'DebutArsen', pool: 'P_DEBUT_ARSEN' },
+  // трек «Плиточник» — событие rude-цепочки со своим штампом (#1351): окно дебюта к этому ходу обычно
+  // закрыто (три отправки), а трек-вопросы жили мёртвым контентом. Пул и контракт ответа те же, слот общий
+  { who: 'arsen', source: 'rude-цепочка, строка трека «Плиточник» (stamp строки)', at: arsenTrackAt, offer: 'ArsenTrack', pool: 'P_DEBUT_ARSEN' },
   { who: 'arsen', source: 'судовая ступень 1: первое сообщение юриста (COURT[1], COURT_LAWYER_AGAIN)', at: lawyerAt, offer: 'LawyerFirst', pool: 'P_LAWYER' },
   { who: 'samvel', source: 'хор (CHORUS.samvel)', at: DEBUT_SLOT, offer: 'DebutSamvel', pool: 'P_DEBUT_SAMVEL' },
   { who: 'boris', source: 'хор (CHORUS.boris, «Бее»)', at: DEBUT_SLOT, offer: 'DebutBoris', pool: 'P_DEBUT_BORIS' },

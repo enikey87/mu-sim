@@ -491,6 +491,8 @@ export class Game {
     this.lines.mark(p.id)
     this.seen.mark(p.text)
     if (p.spec.remember) this.rules.applyOps(p.spec.remember, {})
+    // реплика пула — событие со своим штампом хода (#1351): тем же счётом хода, что и у строки в `say`
+    if (p.spec.stamp) this.S.mem[p.spec.stamp] = this.S.stats.sent
     return p
   }
   /**
@@ -1825,6 +1827,9 @@ export class Game {
       // дебют участника (#973): окно отклика на первое сообщение — ход и три после
       debutWho: String(S.mem[memkeys.debutWho] ?? ''),
       debutFresh: S.stats.sent - Number(S.mem[memkeys.debutAt] ?? -99) <= 3,
+      // трек «Плиточник» (#1351): у события своё окно отклика — трек приходит из rude-цепочки,
+      // обычно позже окна дебюта Арсена (три отправки), и трек-вопросы жили мёртвым контентом
+      arsenTrackFresh: S.stats.sent - Number(S.mem[memkeys.arsenTrackAt] ?? -99) <= 3,
       // сколько раз игрок извинялся за последние 6 ходов («крик → мир → крик → мир»)
       sorrySwing: String(S.mem[memkeys.sorryAt] ?? '').split(',').filter((n) => n && S.stats.sent - Number(n) <= 6).length,
       // температура ссоры не уходит ниже нуля (после примирения ещё тикают отложенные «остывания»)

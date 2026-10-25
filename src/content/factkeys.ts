@@ -25,7 +25,7 @@ import {
   paydayScene, lightOff, netRation, phoneWarn, creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited,
   collectorsTurned, collectorsTea, collectorsEpAt,
   criticalAt, creditOfferSum, crewPaid, crewPaidAt, crewAllPaid, moneyAskAt, rubikBath, whenYears, ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt, countersuitAt, grantTileAt, transferAt, transferAmount, moustachePhotoAt, moustacheStakeSaid, mamaMarketAt, mamaVoiceAt, samvelDivorceAt, courtVerdictAt, tileSlipAt, tileCourtAt, tileLawyerAt, tileMonumentAt, nivaBackAt, saleAt, saleWhat, fraudLoan, blockLifted, internDeclined, internAccepted, grantHouseAt, photoAt, tileAdAt, tamadaDoneAt, borisAskAt, seryogaAskAt, grantBathAt, offendedAskAt,
-  debutWho, debutAt, arsenTrack,
+  debutWho, debutAt, arsenTrack, arsenTrackAt,
 } from './memkeys'
 import { momDachaAt, momDachaDays, type LoanId, type MomId, type ThingId } from './credit'
 import { valueOf } from '../engine/rules'
@@ -58,7 +58,7 @@ export type MemExactKey =
   | typeof borisSmetaReady | typeof borisForeman | typeof taxFrozen | typeof taxThawed | typeof actSigned | typeof grantPaid
   | typeof rubikFined | typeof threatClaim | typeof nuneKeyPassed | typeof nuneDekretOver | typeof grandpaDying
   | typeof betonSet | typeof cardSent | typeof asmikCard | typeof saidTomorrow | typeof saidFriday | typeof saidKonak | typeof saidHash | typeof saidOath | typeof saidNuneNoWrite | typeof saidGrantEnvelope | typeof saidMoneyMoustache | typeof saidRegiment | typeof paydayScene
-  | typeof debutWho | typeof debutAt | typeof arsenTrack | typeof transferAt | typeof transferAmount
+  | typeof debutWho | typeof debutAt | typeof arsenTrack | typeof arsenTrackAt | typeof transferAt | typeof transferAmount
   | typeof lightOff | typeof netRation | typeof phoneWarn | typeof holidayGreeted
   | typeof creditStage | typeof creditOffer | typeof creditBroke | typeof momDone | typeof creditDeclined | typeof moneyPoor | typeof collectorsRecruited
   | typeof collectorsTurned | typeof collectorsTea | typeof collectorsEpAt
