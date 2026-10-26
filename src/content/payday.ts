@@ -181,7 +181,7 @@ export const GRAND_FALLBACK: Record<Slot, Entry<string>[]> = {
   court: ['участковый Вардан составил протокол,', 'кум созвал совет старейшин,'],
   verdict: ['и решили: не трогать до весны. Весна — понятие растяжимое.', 'и теперь это семейная ценность. Ценности не выплачивают, брат.'],
 }
-export const GRAND_OPEN = 'Брат, сядь. Сейчас объясню, где остальные пятьдесят рублей. Всё логично, слушай внимательно.'
+export const GRAND_OPEN = 'Брат, сядь. Осталось пятьдесят рублей. Сейчас объясню, почему даже их отдать — целая история.'
 /** Противоречие внутри великой отмазки (для «Поймать»): звено спорит с тем, что было в партии. */
 /** Исходы (правила PaydayOutcome) и шутка на следующий день. */
 /** button — варианты шутки на следующий день: звучит первый уместный. */
@@ -274,9 +274,9 @@ export const PAYDAY_SCENE: Scene = {
     shareSamvel: { who: 'samvel', a: ['Вот это воспитание! Начинаем.'], hook: 'claims' },
     refuse: { fx: { set: { [payday.refused]: true } }, who: 'karine', a: [
       gate(is(bathAsked))('Ни рубля? Тогда за ванную удержим без твоего согласия. Остальные, занимайте очередь.'),
-      gate(missing(bathAsked), is(met('karine')), is(karineKnowsDebt))('Ни рубля? Тогда я забираю ванную. Переложишь нам — считай, отдал. И все за мной.'),
-      gate(missing(bathAsked), is(met('karine')), missing(karineKnowsDebt))('Ни рубля? Тогда я забираю ванную. И все за мной.'),
-      gate(missing(bathAsked), missing(met('karine')), WORLD.karineHome)('Я жена Алика, если что. Ни рубля? Тогда я забираю ванную. И все за мной.'),
+      gate(missing(bathAsked), is(met('karine')), is(karineKnowsDebt))('Ни рубля? А нашу ванную кто переложит? Переложишь нам — считай, отдал. Остальные, занимайте очередь.'),
+      gate(missing(bathAsked), is(met('karine')), missing(karineKnowsDebt))('Ни рубля? А нашу ванную кто переложит? Остальные, занимайте очередь.'),
+      gate(missing(bathAsked), missing(met('karine')), WORLD.karineHome)('Я жена Алика, если что. Ни рубля? А нашу ванную кто переложит? Остальные, занимайте очередь.'),
     ], a2: ['Брат, ты сказал «ни рубля» — родня услышала «по рублю». Я бессилен.'], hook: 'claims' },
     grand: {
       a: [GRAND_OPEN], hook: 'grand',

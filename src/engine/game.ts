@@ -2339,8 +2339,8 @@ export class Game {
     const pending = seen.condition ? seen.met === undefined : seen.due != null && seen.due >= day
     if (p.stake && pending) seen.stake ??= p.stake
   }
-  private alignPromise(p: Promise3, until: When): Promise3 {
-    p.text = p.text.replace(p.t, until.t)
+  private alignPromise(p: Promise3, until: When, text?: string): Promise3 {
+    p.text = text ?? p.text.replace(p.t, until.t)
     const { t, d, due, condition, kind, est, state, holiday } = until
     // срок из легенды — не «завтра»: иначе said.tomorrow без слова «завтра»
     return Object.assign(p, { t, d, due, condition, kind, est, state, holiday, tomorrow: undefined })
@@ -2363,7 +2363,7 @@ export class Game {
     }
     const p = this.uniq(() => {
       const q = this.X.promise()
-      if (fromLegend) this.alignPromise(q, until!)
+      if (fromLegend) this.alignPromise(q, until!, legendSpec?.promise)
       if (prefix) return { text: `${prefix} ${low(q.text)}.`, q, stake: undefined as undefined | 'moustache', oath: false }
       // форма клятвы — из пула (одна формула в каждом втором сообщении приедается); ставка — только на срок, который может наступить
       const form = this.linePicked('OATH_FORMS', OATH_FORMS, { filter: (s) => s.id !== OATH_STAKE_MOUSTACHE || q.d != null || !!q.condition })
@@ -3438,7 +3438,7 @@ export class Game {
         const legend = this.legend()
         if (legend && this.legendDue()) {
           const spec = LEGENDS[legend]
-          const promise = this.alignPromise(this.X.promise(), spec.until)
+          const promise = this.alignPromise(this.X.promise(), spec.until, spec.promise)
           this.S.mem[memkeys.legendPromiseAt] = this.S.stats.sent
           // то же напоминание сроком легенды, что в promiseLine: место денег подтверждено — окно (#981)
           const place = moneyPlaceOf(legend)
