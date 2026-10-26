@@ -1185,7 +1185,7 @@ export class Game {
     if (got === 0) return
     // без «Нивы» продажа резины убирает и машину (has.car гаснет): факт — там же, где это происходит (#530)
     // штамп продажи (#1084): ход и что продано — окно отклика игрока живёт ход продажи и три после
-    const ops = [set(creditOffer, false), set(sold(thing.id), true), set(memkeys.saleAt, this.S.stats.sent), set(memkeys.saleWhat, thing.id)]
+    const ops = [set(creditOffer, false), set(sold(thing.id), true), set(memkeys.saleAt, this.S.stats.sent), set(memkeys.saleWhat, thing.id), set(memkeys.moneyAt, this.S.stats.sent)]
     if (thing.id === 'tires' && !this.nivaAtPlayer()) ops.push(set(memkeys.carGone, true))
     this.rules.applyOps(ops, {})
     delete this.S.mem[memkeys.creditOfferSum]
@@ -1727,6 +1727,8 @@ export class Game {
     for (const c of S.ledger.claims) if (c.claimKey) progress['heard.' + c.claimKey] = true
     const lie = this.lie()
     const moneyLv = this.moneyLevel()
+    // ход последнего перевода: окно отклика на него (#1003) и сравнение с новейшим денежным событием (#1376)
+    const transferTurn = Number(S.mem[memkeys.transferAt] ?? -99)
     const whenDays = c.whenAt === undefined ? undefined : Math.max(0, c.whenAt - S.day)
     // рекорд названных сроков (#1118): «долгов на 91 день? Было и 343». Срок, на который отвечает кнопка,
     // сам себя рекордом не делает — иначе «больше всего названного» не сработало бы никогда.
@@ -1792,8 +1794,11 @@ export class Game {
       collectorsEpFresh: S.stats.sent - Number(S.mem[memkeys.collectorsEpAt] ?? -99) <= 3,
       internFresh: S.stats.sent - Number(S.mem[memkeys.internAt] ?? -99) <= 3,
       rubikHoleFresh: S.stats.sent - Number(S.mem[memkeys.rubikHoleAt] ?? -99) <= 3,
-      // перевод 50 ₽ (#1003): реакция на него — ход перевода и ещё TRANSFER_FRESH_TURNS; сумма — для подстановки
-      transferFresh: S.stats.sent - Number(S.mem[memkeys.transferAt] ?? -99) <= TRANSFER_FRESH_TURNS,
+      // перевод 50 ₽ (#1003): реакция на него — ход перевода и ещё TRANSFER_FRESH_TURNS; сумма — для подстановки.
+      // Новейшее денежное событие выигрывает (#1376): эпизод со своей суммой после перевода (допработа,
+      // вычет хаша, чайник в счёт долга, аванс пирожками) перекрывает «50 рублей?!» — кнопка ссылалась бы
+      // на то, что чат уже оставил позади. Перевод — единственное денежное событие партии до `money.at`.
+      transferFresh: S.stats.sent - transferTurn <= TRANSFER_FRESH_TURNS && Number(S.mem[memkeys.moneyAt] ?? -99) <= transferTurn,
       transferAmount: Number(S.mem[memkeys.transferAmount] ?? 50),
       countersuitFresh: S.stats.sent - Number(S.mem[memkeys.countersuitAt] ?? -99) <= 3,
       // первое сообщение заказчика Гранта (#983): ход реплики и три после
@@ -2774,6 +2779,8 @@ export class Game {
       this.noteAlikPay(ep.fx.pay)
       debtMoved = true
     }
+    // денежное событие серии (#1376): вычет или доплата двигают долг — ход перекрывает реакцию на перевод
+    if (debtMoved) this.S.mem[memkeys.moneyAt] = this.S.stats.sent
     if (debtFx) (this.S.ctx ??= {}).debtMoved = debtMoved
     const m = this.open(ep.m)
     // факт пишет строка, которая его утверждает: remember строки применяется, только если строка звучала (#588)
@@ -3204,6 +3211,9 @@ export class Game {
     if (fx.barter && this.adjustDebt(-v.v)) { S.items.push(v.n); debtMoved = true }
     const invoiced = !!fx.invoice && this.adjustDebt(-v.total)
     debtMoved ||= invoiced
+    // денежное событие узла (#1376): узел сдвинул долг или счёт — его ход перекрывает реакцию на перевод.
+    // Штамп ставит сам сдвиг: отказанный платёж и запечатанный долг события не делают.
+    if (debtMoved || (!!fx.money && paid)) S.mem[memkeys.moneyAt] = S.stats.sent
     if (fx.ach && paid) this.unlock(fx.ach)
     if (fx.amnesty) this.amnesty()
     if (fx.legend !== undefined) this.setLegend(fx.legend)
@@ -3306,6 +3316,8 @@ export class Game {
         // после Дня выплаты работа ничего не двигает — ни долг, ни календарь
         if (!this.debtSealed()) this.nextDay(2 + this.rnd(3))
         if (this.adjustDebt(add)) {
+          // допработа — денежное событие со своей суммой (#1376): ход перекрывает реакцию на перевод
+          this.S.mem[memkeys.moneyAt] = this.S.stats.sent
           this.sys(`Вы сделали работу. Долг Алика вырос на ${add.toLocaleString('ru-RU')} ₽`)
           this.mood(2)
           this.unlock('fence')
