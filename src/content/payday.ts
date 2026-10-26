@@ -5,7 +5,8 @@
 import { type Line, type LineSpec, type Entry, is, eq, ne, exists, gte, lte, gate, missing, set } from './fact'
 import type { Scene, SceneNode } from './scenes'
 import { needs, samvelLine, WORLD } from './world'
-import { bathAsked, court, cryptoHodl, garikConcrete, judgeApology, karineKnowsDebt, met, payday, rubikFined, taxFrozen, taxThawed } from './memkeys'
+import { bathAsked, bathAnswered, court, cryptoHodl, garikConcrete, judgeApology, karineKnowsDebt, met, payday, rubikFined, taxFrozen, taxThawed } from './memkeys'
+import { BATH_ANSWER } from './rules/player-choice-pools'
 
 export const ANNOUNCE = [
   // капитуляция дедлайна (#1119): лестница отмазок исчерпана — Алик сдаётся сам, обычные анонсы молчат
@@ -273,7 +274,9 @@ export const PAYDAY_SCENE: Scene = {
     share: { a: ['Вот это воспитание! Начинаем.'], hook: 'claims' },
     shareSamvel: { who: 'samvel', a: ['Вот это воспитание! Начинаем.'], hook: 'claims' },
     refuse: { fx: { set: { [payday.refused]: true } }, who: 'karine', a: [
-      gate(is(bathAsked))('Ни рубля? Тогда за ванную удержим без твоего согласия. Остальные, занимайте очередь.'),
+      // «в счёт долга» — согласие игрока на вычет: строка отказа ссылается на его выбор, а не спорит с ним (#1382)
+      gate(exists(bathAnswered), eq(bathAnswered, BATH_ANSWER[0]))('Ни рубля? Ванную ты сам записал в счёт долга — вот и вычтем. Остальные, занимайте очередь.'),
+      gate(is(bathAsked), ne(bathAnswered, BATH_ANSWER[0]))('Ни рубля? Тогда за ванную удержим без твоего согласия. Остальные, занимайте очередь.'),
       gate(missing(bathAsked), is(met('karine')), is(karineKnowsDebt))('Ни рубля? Тогда я забираю ванную. Переложишь нам — считай, отдал. И все за мной.'),
       gate(missing(bathAsked), is(met('karine')), missing(karineKnowsDebt))('Ни рубля? Тогда я забираю ванную. И все за мной.'),
       gate(missing(bathAsked), missing(met('karine')), WORLD.karineHome)('Я жена Алика, если что. Ни рубля? Тогда я забираю ванную. И все за мной.'),
