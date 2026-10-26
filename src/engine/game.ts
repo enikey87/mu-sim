@@ -2312,12 +2312,21 @@ export class Game {
   meetRel(r?: Rel): void {
     if (r?.id) this.rules.applyOps(meet(r.id), {})
   }
+  /** Абсолютный день срока: у праздника — календарь (`holidayDays`), а не `made + d` (#1386).
+   *  У праздника `d` — журнальная оценка, а дату называет календарь: до полнолуния бывает 16 дней при `d: 15`,
+   *  и срок наступал на день раньше того, что говорит карандаш (`horizonAt`), — живое ли обещание, решает
+   *  тот же день (`promiseLive`), так что планировать по оценке нельзя. */
+  private promiseDue(p: { d: number | null; due?: Due; kind?: WhenKind; holiday?: When['holiday'] }, day = this.S.day): number | null {
+    if (p.d == null) return null
+    if (p.kind === 'holiday' && p.holiday !== undefined) return day + holidayDays(p.holiday, day)
+    return day + (p.due ? dueIn(p.due, day) : p.d)
+  }
   recordPromise(p?: PromiseInput | null): void {
     if (!p) return
     if (p.condition && this.conditionHolds(p.condition)) return
     if (p.tomorrow) this.rules.applyOps([set(memkeys.saidTomorrow, true)], {})
     if (p.due && 'weekday' in p.due && p.due.weekday === 5) this.rules.applyOps([set(memkeys.saidFriday, true)], {})
-    const due = p.d == null ? null : this.S.day + (p.due ? dueIn(p.due, this.S.day) : p.d)
+    const due = this.promiseDue(p)
     // названный горизонт — тот же, из которого строится `ctx.whenDays` (#1118): у увёртки это поздняя
     // из двух дат, у праздника — календарь, у события — остаток состояния или оценка
     const whenAt = p.kind === undefined
@@ -2388,7 +2397,7 @@ export class Game {
   }
   ctxFromPromise(p?: Promise3): Ctx {
     if (!p) return {}
-    const due = p.d == null ? null : this.S.day + (p.due ? dueIn(p.due, this.S.day) : p.d)
+    const due = this.promiseDue(p)
     return { when: p.t, whenNever: p.d == null, whenMade: this.S.day, whenDue: due, whenKind: p.kind, whenAt: this.horizonAt(p, due), whenEst: this.horizonFromEst(p) }
   }
   /** Горизонт события — служебная оценка `est`, а не конец идущего состояния мира (#1255): игроку это не срок. */
@@ -2582,7 +2591,7 @@ export class Game {
       const repl = orig[0] !== orig[0].toLowerCase() ? cap(w) : w
       text = m.text.slice(0, at) + repl + m.text.slice(at + p.t.length)
       // род и горизонт правленого срока — от разметки термина (#923): «в следующем году» — дата, а не «никогда»
-      const due = term.d == null ? null : this.S.day + (term.due ? dueIn(term.due, this.S.day) : term.d)
+      const due = this.promiseDue(term)
       const named = this.horizonAt(term, due)
       const rec = this.S.promises[this.S.promises.length - 1]
       if (rec && rec.t.includes(p.t)) {
