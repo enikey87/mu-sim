@@ -146,6 +146,12 @@ const LEGEND_VOW_GAP = 8
 /** Пороги цели `milestone`: сколько сообщений игрока отправлено (docs/design/analytics.md). */
 const MILESTONES = [1, 10, 25, 50, 100, 200] as const
 
+/** Пол реального времени на доставку: `?fast` сжимает игровые паузы в 1/speed, но то, что человек должен
+ *  успеть прочитать, короче пола не становится (#1370). При speed=1 полы не действуют — обычная игра прежняя. */
+export const READ_FLOOR_TYPING_MS = 800
+export const READ_FLOOR_BUBBLE_MS = 350
+export const READ_FLOOR_STATUS_MS = 2000
+
 export class Game {
   /** Только чтение: подмена состояния целиком (`this.S = …`) — один из обходов долга из аудита #142. */
   readonly S: GameState
@@ -516,6 +522,14 @@ export class Game {
   }
   rnd = (n: number): number => rndInt(this.rng, n)
   chance = (p: number): boolean => chance(this.rng, p)
+  /** Пауза доставки в игровых мс: `?fast` сжимает её в 1/speed, но не ниже floor реальных мс (#1370).
+   *  При speed=1 (обычная игра, ручные часы) возвращает ms нетронутой — темп прежний. */
+  private readFloor(ms: number, floor: number): number {
+    const speed = this.clock.speed
+    // обычное время, замедление и часы без ускорения (свои в тестах) — пол не действует
+    if (!(speed < 1)) return ms
+    return Math.max(ms, floor / speed)
+  }
   sleep = (ms: number): Promise<void> => {
     if (this.disposed) return Promise.reject(new GameDisposed())
     return new Promise((resolve, reject) => {
@@ -1402,14 +1416,15 @@ export class Game {
   async typingFor(ms: number, label = 'печатает…'): Promise<void> {
     ms = Math.min(5000, Math.max(800, ms)) * (this.isNight() ? 1.5 : 1)
     // в блоке / «смерти» / у Карине шапка не врёт «печатает…» → «в сети» (#257)
-    if (this.alikSilent()) { this.quietHeader(); this.emit(); await this.sleep(ms); return }
+    if (this.alikSilent()) { this.quietHeader(); this.emit(); await this.sleep(this.readFloor(ms, READ_FLOOR_TYPING_MS)); return }
     const show = () => { this.ui.typing = label; this.ui.status = { text: label, cls: 'typing' }; this.emit() }
     const hide = () => { this.ui.typing = null; this.ui.status = { text: 'в сети', cls: 'online' }; this.emit() }
     show()
     if (this.chance(0.2)) {
-      await this.sleep(ms * 0.6); hide(); await this.sleep(1000 + this.rnd(1200)); show()
+      // видимый кусок до «пропал из сети» — тот же пол чтения, что и у основного (#1370)
+      await this.sleep(this.readFloor(ms * 0.6, READ_FLOOR_TYPING_MS)); hide(); await this.sleep(1000 + this.rnd(1200)); show()
     }
-    await this.sleep(ms)
+    await this.sleep(this.readFloor(ms, READ_FLOOR_TYPING_MS))
     hide()
   }
 
@@ -1450,7 +1465,8 @@ export class Game {
         this.alikMsg({ kind: 'text', from: 'alik', text: fix })
         this.unlock('typo')
       }
-      await this.sleep(250)
+      // пауза между пузырями: в ?fast не короче floor реальных мс, иначе реплика падает стеной (#1370)
+      await this.sleep(this.readFloor(250, READ_FLOOR_BUBBLE_MS))
     }
     return out
   }
@@ -2921,7 +2937,8 @@ export class Game {
     if (this.disposed) throw new GameDisposed()
     this.alikMsg({ kind: 'text', from: 'alik', text })
     this.save()
-    await this.sleep(250)
+    // та же пауза между пузырями, что в say: в ?fast не короче пола чтения (#1370)
+    await this.sleep(this.readFloor(250, READ_FLOOR_BUBBLE_MS))
   }
 
   /** Создание группы и вступление — по одному сообщению; маркер ставится только после полной цепочки. */
@@ -3316,9 +3333,10 @@ export class Game {
     // ?noidle — режим спокойного чата: Алик отвечает только на ходы игрока, сам первым не пишет;
     // глушится одна эта линия, статусы шапки, сцены и арки остаются (#1371)
     if (this.noIdle) return
-    // Алик пишет сам редко: не в начале игры, не раньше чем через 1,5–3 минуты тишины, не больше двух раз подряд
+    // Алик пишет сам редко: не в начале игры, не раньше чем через 4–8 минут тишины, не больше двух раз подряд
+    // (множители прежние: вторая инициатива — через 12–24 минуты, #1370)
     if (this.disposed || this.noTimers || this.battery.dead || this.idleCount >= 2 || this.S.stats.sent < 5) return
-    this.idleT = this.schedule(() => void this.onIdle(), (90000 + this.rnd(90000)) * (this.idleCount + 1) * 1.5 ** this.idleCount)
+    this.idleT = this.schedule(() => void this.onIdle(), (240000 + this.rnd(240000)) * (this.idleCount + 1) * 1.5 ** this.idleCount)
   }
   async onIdle(): Promise<void> {
     try {
@@ -3341,6 +3359,7 @@ export class Game {
   armStatus(): void {
     this.clearSchedule(this.statusT)
     if (this.disposed || this.noTimers || this.battery.dead) return
+    // re-arm статуса: в ?fast не чаще, чем раз в floor реальных мс — шапка не мигает (#1370)
     this.statusT = this.schedule(async () => {
       try {
         if (this.disposed) return
@@ -3348,10 +3367,10 @@ export class Game {
           if (this.alikSilent()) {
             this.setStatus('не в сети')
           } else if (this.chance(0.2)) {
-            // «печатает…» — и ничего не приходит
+            // «печатает…» — и ничего не приходит; в ?fast держим пол чтения, иначе шапка мигает (#1370)
             this.ui.typing = 'печатает…'
             this.setStatus('печатает…', 'typing')
-            await this.sleep(1500 + this.rnd(2500))
+            await this.sleep(this.readFloor(1500 + this.rnd(2500), READ_FLOOR_TYPING_MS))
             if (this.disposed) return
             this.ui.typing = null
             if (!this.ui.busy) this.setStatus('в сети', 'online')
@@ -3360,7 +3379,7 @@ export class Game {
         }
         this.armStatus()
       } catch (e) { this.swallowDisposed(e) }
-    }, 7000 + this.rnd(9000))
+    }, this.readFloor(7000 + this.rnd(9000), READ_FLOOR_STATUS_MS))
   }
 
   // ---------- возвращение после паузы ----------

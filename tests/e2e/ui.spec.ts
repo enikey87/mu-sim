@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test'
 
+/** Ход Алика в ?fast: доставка держит пол реального времени (#1370) — реплика из нескольких пузырей идёт
+ *  секунды, а не доли. Ожидание то же (composer перестал быть busy), только с запасом на медленный раннер. */
+const TURN_IDLE = { timeout: 20_000 }
+
 test.beforeEach(async ({ page }) => {
   // ?nointro — интро новой партии ~10 с анимации, e2e не должны её ждать
   await page.goto('/?fast&nointro')
@@ -31,7 +35,7 @@ test('готовый вариант отправляется и открывае
   await choice.click()
 
   await expect(page.locator('.msg.me').filter({ hasText: text })).toBeVisible()
-  await expect(page.locator('#composer')).toHaveAttribute('aria-busy', 'false')
+  await expect(page.locator('#composer')).toHaveAttribute('aria-busy', 'false', TURN_IDLE)
   await expect(page.locator('#choices button:not([disabled])').first()).toBeVisible()
 })
 
@@ -44,7 +48,7 @@ test('ручной ответ отправляется, очищает поле 
 
   await expect(page.locator('.msg.me').filter({ hasText: text })).toBeVisible()
   await expect(input).toHaveValue('')
-  await expect(page.locator('#composer')).toHaveAttribute('aria-busy', 'false')
+  await expect(page.locator('#composer')).toHaveAttribute('aria-busy', 'false', TURN_IDLE)
 
   await page.reload()
   await expect(page.locator('.msg.me').filter({ hasText: text })).toBeVisible()
@@ -197,7 +201,7 @@ test('длинная история: прокрутка, непрочитанн�
   await input.fill('моя реплика после длинной истории')
   await page.getByLabel('Отправить').click()
   await expect(page.locator('.msg.me').filter({ hasText: 'моя реплика после длинной истории' })).toBeVisible()
-  await expect(page.locator('#composer')).toHaveAttribute('aria-busy', 'false')
+  await expect(page.locator('#composer')).toHaveAttribute('aria-busy', 'false', TURN_IDLE)
   const atBottom = await chat.evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop <= 30)
   expect(atBottom).toBe(true)
 })
@@ -211,7 +215,7 @@ test('сброс во время ответа Алика: старая парт�
   await page.getByRole('button', { name: 'Начать заново' }).click()
 
   await expect(page.locator('.chat-head .name')).toHaveText('Алик Воздухонесян')
-  await expect(page.locator('#composer')).toHaveAttribute('aria-busy', 'false')
+  await expect(page.locator('#composer')).toHaveAttribute('aria-busy', 'false', TURN_IDLE)
   const introCount = await page.locator('.msg').count()
 
   await page.waitForTimeout(800)

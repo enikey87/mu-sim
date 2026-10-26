@@ -5,6 +5,9 @@ export type GameTimer = number & { readonly __clock: 'game' }
 export type WallTimer = number & { readonly __clock: 'wall' }
 
 export interface Clock {
+  /** Во сколько раз сжимаются игровые паузы: `?fast` — 0.03, обычная игра и ручные часы — 1.
+   *  Читает доставка сообщений: пол реального времени на то, что человек должен успеть прочитать (#1370). */
+  readonly speed: number
   sleep(ms: number): Promise<void>
   setTimeout(fn: () => void, ms: number): GameTimer
   clearTimeout(id: GameTimer): void
@@ -13,6 +16,8 @@ export interface Clock {
 
 export function realClock(speed = 1): Clock {
   return {
+    // часы помнят своё ускорение: ms здесь — игровые, реальные получаются умножением на speed
+    speed,
     sleep: (ms) => new Promise((r) => setTimeout(r, ms * speed)),
     // в браузере globalThis.setTimeout возвращает number, в node-прогоне тестов — Timeout: каст через unknown
     setTimeout: (fn, ms) => globalThis.setTimeout(fn, ms * speed) as unknown as GameTimer,
@@ -44,6 +49,8 @@ export function manualClock(start = Date.parse('2026-09-18T12:00:00Z')): ManualC
   let seq = 1
   const timers = new Map<number, () => void>()
   return {
+    // ручные часы идут в обычном времени: пол чтения доставки в тестах не действует (#1370)
+    speed: 1,
     sleep: () => Promise.resolve(),
     setTimeout(fn) {
       const id = seq++ as GameTimer

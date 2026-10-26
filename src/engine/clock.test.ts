@@ -1,8 +1,14 @@
 // Часы: игровой и настенный таймеры различимы типами — перепутанные часы не компилируются.
 import { describe, it, expect } from 'vitest'
-import { manualClock, wallClock } from './clock'
+import { manualClock, realClock, wallClock } from './clock'
 
 describe('часы', () => {
+  it('часы помнят своё ускорение: доставка видит ?fast (#1370)', () => {
+    expect(realClock().speed).toBe(1)
+    expect(realClock(0.03).speed).toBe(0.03)
+    expect(manualClock().speed).toBe(1)
+  })
+
   it('ручные часы: setTimeout/clearTimeout', () => {
     const clock = manualClock()
     let ran = false
