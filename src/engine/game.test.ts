@@ -695,6 +695,47 @@ describe('Game: Алик пишет сам (таймеры)', () => {
     expect(Math.min(...idle())).toBeGreaterThanOrEqual(90000)
     game.dispose()
   })
+  it('?noidle: armIdle не ставит таймер инициативы, а без режима — ставит (#1371)', () => {
+    // одна точка — все пути: ход игрока, возврат из оффлайна, зарядка, конец onIdle зовут именно armIdle
+    const armed = (noIdle: boolean) => {
+      const clock = manualClock()
+      const delays: number[] = []
+      const set = clock.setTimeout.bind(clock)
+      clock.setTimeout = (fn, ms) => { delays.push(ms); return set(fn, ms) }
+      const game = new Game({ storage: memStorage(), clock, rng: seededRng(4), hour: 14, noIdle })
+      game.S.stats.sent = 6
+      game.armIdle()
+      const idle = delays.filter((d) => d >= 90000)
+      game.dispose()
+      return idle
+    }
+    expect(armed(false)).toHaveLength(1) // контроль: без режима таймер инициативы действительно ставится
+    expect(armed(true)).toEqual([])
+  })
+  it('?noidle: долгое бездействие не рождает инициатив, ход игрока и шапка живут (#1371)', async () => {
+    const run = async (noIdle: boolean) => {
+      const clock = manualClock()
+      const game = new Game({ storage: memStorage(), clock, rng: seededRng(4), hour: 14, noIdle })
+      let idles = 0
+      const idle = game.onIdle.bind(game)
+      game.onIdle = async () => { idles++; return idle() }
+      game.S.stats.sent = 6
+      game.S.offlineDays = 0
+      await game.send(game.choices[0])
+      const replied = alikTexts(game.S.msgs).length > 1 // ответ на ход игрока пришёл
+      // восемь пауз по две минуты игрового времени: с таймером инициативы это гарантированно AlikIdle
+      for (let i = 0; i < 8; i++) { clock.advance(120_000); clock.runTimers(); await flush() }
+      const alive = game.pendingTimers() > 0 // шапка перевооружилась: глушится одна линия, а не все таймеры
+      game.dispose()
+      return { idles, replied, alive }
+    }
+    const loud = await run(false)
+    expect(loud.idles).toBeGreaterThan(0) // контроль: без режима Алик пишет сам
+    const quiet = await run(true)
+    expect(quiet.idles).toBe(0)
+    expect(quiet.replied).toBe(true)
+    expect(quiet.alive).toBe(true)
+  })
   it('status «печатает…» и прочие статусы меняются сами', () => {
     const clock = manualClock()
     const game = new Game({ storage: memStorage(), clock, rng: seededRng(4), hour: 3 })
