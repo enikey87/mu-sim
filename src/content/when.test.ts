@@ -1,6 +1,6 @@
 // Род и горизонт срока: разметка всех сроков и факты контекста (docs/design/deadline-replies.md, #163). Кнопки и ответы Алика не меняются.
 import { describe, it, expect, vi } from 'vitest'
-import { makeGame } from '../test/helpers'
+import { alikTexts, makeGame } from '../test/helpers'
 import { D, type When, type WhenKind } from './excuses'
 import * as L from './life'
 import { LEGENDS } from './legends'
@@ -263,5 +263,48 @@ describe('факты контекста: род и горизонт', () => {
     for (const t of ['после Навасарда', 'как Нуне из декрета выйдет', 'когда рак на Арагаце свистнет', 'в следующем веке, в начале']) {
       expect((await said(byText(t))).facts()['ctx.whenDate'], t).toBeUndefined()
     }
+  })
+})
+
+describe('срок праздника ведёт календарь, а не статическая оценка пула (#1386)', () => {
+  // 4 мая 2027: ближайшее полнолуние — 20 мая, то есть через 16 дней при `d: 15` в пуле
+  const made = dayOf(2027, 5, 4)
+  const moon = dayOf(2027, 5, 20)
+  const term = (): When => byText('после полнолуния')
+  const promiseText = 'после полнолуния — отдам'
+  const about = (g: Game, from: number): string[] => alikTexts(g.S.msgs.slice(from)).filter((t) => t.includes('полнолуни'))
+
+  it('карандаш, журнал и событие срока называют один день полнолуния', async () => {
+    expect(term().d, 'оценка пула перестала расходиться с календарём — тест ничего не различает').toBe(15)
+    expect(holidayDays('fullmoon', made), 'полнолуние не в 16 днях — тест ничего не различает').toBe(16)
+    const g = await said(term(), (x) => { x.S.day = made })
+    const rec = g.S.promises.at(-1)!
+    expect(rec.due, 'журнал держит календарь, а не made + 15').toBe(moon)
+    expect(rec.days, 'карандаш называет календарь').toBe(16)
+    expect(g.S.rules.schedule.filter((s) => s.kind === 'event' && s.event === 'PromiseDue').at(-1), 'событие срока')
+      .toMatchObject({ event: 'PromiseDue', at: moon })
+    const i = g.S.promises.length - 1
+    g.S.day = moon - 1
+    expect(g.facts({ promise: i }).promiseLive, 'накануне полнолуния срок ещё не наступил').toBe(false)
+    g.S.day = moon
+    expect(g.facts({ promise: i }).promiseLive, 'в день полнолуния срок наступил').toBe(true)
+  })
+
+  it('«срок — сегодня» звучит в день полнолуния, а накануне — нет', async () => {
+    for (let seed = 1; seed <= 12; seed++) {
+      const { game } = makeGame({ seed })
+      vi.spyOn(game.X, 'promise').mockImplementation(() => ({ text: promiseText, ...term() }))
+      game.S.day = made
+      await game.promiseLine()
+      game.S.day = moon - 1
+      const eve = game.S.msgs.length
+      await game.afterTurn()
+      expect(about(game, eve), `сид ${seed}: срок прозвучал днём раньше полнолуния`).toEqual([])
+      game.S.day = moon
+      const day = game.S.msgs.length
+      await game.afterTurn()
+      if (about(game, day).length > 0) return
+    }
+    throw new Error('ни в одной из 12 партий срок не прозвучал в день полнолуния')
   })
 })
