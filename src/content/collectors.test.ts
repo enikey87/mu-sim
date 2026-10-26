@@ -13,6 +13,7 @@ import { FINALES } from './finales'
 import { meet } from './world'
 import { is, isOpen, spec, test, valueOf, type Entry, type Facts, type Line } from '../engine/rules'
 import { collectorsEpPool } from './player-pools'
+import { saidText } from './fact'
 import { ENDGAME_ARCH } from './endgame'
 import { playtest } from '../tools/playtest'
 
@@ -613,5 +614,81 @@ describe('эпилог различает согласие, отказ и мол
       expect(ep, 'согласие выдано за отказ').not.toContain('collectors.intern.declined')
       expect(ep, 'согласие выдано за молчание').not.toContain('collectors.intern.silent')
     }
+  })
+})
+
+describe('«как там коллекторы?» читает выбор игрока, а не факт финала (#1381)', () => {
+  /** Утверждение идущего процесса: без согласия звучать не может (плейтест r153, 975 → 979). */
+  const ONGOING = /идёт|наливают|хвалят|научился/i
+  const lines = (g: Game) => g.open(g.arcDoneLines('collectors')).map((e) => saidText(valueOf(e)))
+  const offer = (g: Game, arg: string) => {
+    g.S.choices = null
+    return g.buildChoices().find((c) => c.act === 'internOffer' && c.arg === arg)
+  }
+  /** Партия дошла до финала «Стажёр-коллектор»: финал записан, оффер прозвучал, окно открыто. */
+  const toOffer = async (seed: number): Promise<Game> => {
+    const { game } = makeGame({ seed })
+    game.S.mem[count.rude] = 6
+    await game.playFinale('collectors', FINALES.collectors.find((f) => f.id === 'intern')!)
+    expect(game.S.mem[finaleOf('collectors')], 'финал не записан до оффера').toBe('intern')
+    return game
+  }
+  /** Кнопка попадает в блок не в каждой партии (два слота) — идём по сидам, как в окне #958. */
+  const withOffer = async (arg: string): Promise<Game> => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const game = await toOffer(seed)
+      if (offer(game, arg)) return game
+    }
+    throw new Error(`ни в одной из двадцати партий кнопки «${arg}» не было — проверка пустеет`)
+  }
+
+  it('молчание окна: ни «идёт», ни отказа — предложение на столе, и так же отвечает посторонний вопрос', async () => {
+    const game = await withOffer('0')
+    // игрок тянет с ответом: окно оффера истекло, факта выбора нет
+    game.S.stats.sent += 4
+    expect(game.holds(is('internFresh')), 'окно ещё живо — проверка не про то').toBe(false)
+    expect(game.holds(is(internAccepted)), 'молчание записало согласие').toBe(false)
+    expect(game.holds(is(internDeclined)), 'молчание записало отказ').toBe(false)
+    const offered = lines(game)
+    expect(offered, 'в silent пул пуст — «Как там коллекторы?» упадёт на draw').toHaveLength(1)
+    expect(offered.filter((t) => ONGOING.test(t)), `silent: «идёт» звучит без согласия: ${offered.join(' → ')}`).toEqual([])
+    // тот же путь, что в плейтесте r153: вопрос про коллекторов после финала отвечается пулом done
+    const from = game.S.msgs.length
+    await game.fire('PlayerSays', { intent: 'arc', arg: 'collectors', argArcDone: true })
+    const reply = texts(game, from).at(-1)!
+    expect(reply, 'ответ на вопрос выдал стажировку за идущую без согласия').not.toMatch(ONGOING)
+    expect(offered, 'ответ пришёл не из пула финала').toContain(reply)
+  })
+
+  it('согласие: пул говорит о идущей стажировке, предложения и отказа в нём нет', async () => {
+    const game = await withOffer('0')
+    await game.send(offer(game, '0')!)
+    expect(game.holds(is(internAccepted)), 'согласие не записало факт').toBe(true)
+    const offered = lines(game)
+    expect(offered, 'после согласия пул не говорит о стажировке').toHaveLength(2)
+    expect(offered.filter((t) => ONGOING.test(t)), `accepted: ${offered.join(' → ')}`).toHaveLength(2)
+    expect(offered.join(' '), 'после согласия звучит предложение без ответа').not.toContain('лежит на столе')
+  })
+
+  it('отказ: пул не утверждает ни идущую стажировку, ни ожидание ответа', async () => {
+    const game = await withOffer('1')
+    await game.send(offer(game, '1')!)
+    expect(game.holds(is(internDeclined)), 'отказ не записал факт').toBe(true)
+    const offered = lines(game)
+    expect(offered, 'отказ остался без своей строки').toHaveLength(1)
+    expect(offered.filter((t) => ONGOING.test(t)), `declined: «идёт» звучит после отказа: ${offered.join(' → ')}`).toEqual([])
+    expect(offered.join(' '), 'после отказа звучит «предложение на столе»').not.toContain('лежит на столе')
+  })
+
+  it('старое сохранение: финал без фактов оффера не оставляет пул пустым', () => {
+    // партия, записанная до `internAt` (#1056): финал «Стажёр» есть, оффер окна не штамповал
+    const { game } = makeGame()
+    game.S.mem[finaleOf('collectors')] = 'intern'
+    expect(game.holds(is(internAt)), 'в свежей партии уже есть факт оффера — проверка не про то').toBe(false)
+    expect(game.holds(is(internAccepted)), 'проверка не про то: согласие есть').toBe(false)
+    expect(game.holds(is(internDeclined)), 'проверка не про то: отказ есть').toBe(false)
+    const offered = lines(game)
+    expect(offered, 'без фактов выбора draw упадёт на «Как там коллекторы?»').not.toHaveLength(0)
+    expect(offered.filter((t) => ONGOING.test(t)), `без фактов: «идёт» звучит без согласия: ${offered.join(' → ')}`).toEqual([])
   })
 })
