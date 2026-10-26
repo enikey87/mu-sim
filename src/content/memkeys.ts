@@ -40,6 +40,14 @@ export const garikCode = 'garik.code'
 export const caughtAt = 'caughtAt'
 export const cryptoHodl = 'crypto.hodl'
 export const bathAsked = 'bath.asked'
+/** Ход, на котором условие Карине про ванную прозвучало (#1382): сцена мира ставит факт, но своего окна
+ *  отклика у условия не было — игрок не мог ответить, пока условие актуально. Штамп ставит сама строка
+ *  о ванной (`stamp`), окно живёт ход события и три после, ответ игрока его потребляет. */
+export const bathAskedAt = 'bath.askedAt'
+/** Ответ игрока на условие про ванную (#1382): ветка выбора, а не «ответил вообще» — `debt` значит
+ *  «переложу в счёт долга» (согласие на вычет в День выплаты), `later` и `tile` согласия на вычет не дают.
+ *  На этот факт опираются строки отказа в Дне выплаты вместо голого `bath.asked` (#862). */
+export const bathAnswered = 'bath.answered'
 export const mamaCalls = 'mama.calls'
 export const phoneKarine = 'phone.karine'
 /** Игрок сказал Карине, что Алик ему должен (сцена жены, ветка tell). */
@@ -342,7 +350,7 @@ export const EVENT_KEY_LIST = [
   'day', 'dow', 'month', 'dom', 'holiday', 'sent', 'moo', 'tier', 'mood', 'patience', 'money', 'debt', 'fifty', 'paid',
   'moneyNormal', 'moneyLow', 'moneyBottom', 'paymentDueTomorrow',
   'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sinceCrew', 'sorrySwing', 'promiseLive', 'promisePassed', 'promiseStake',
-  'debutWho', 'debutFresh', 'arsenTrackFresh', 'transferFresh', 'transferAmount',
+  'debutWho', 'debutFresh', 'arsenTrackFresh', 'bathAskFresh', 'transferFresh', 'transferAmount',
   'ramPhotoFresh', 'borisSaleFresh', 'vacancyFresh', 'avitoReviewFresh', 'rubikAskFresh', 'kettleFresh',
   'lawyerFresh', 'collectorsAskFresh', 'collectorsEpFresh', 'internFresh', 'rubikHoleFresh', 'countersuitFresh', 'grantTileFresh', 'moustachePhotoFresh', 'mamaMarketFresh', 'mamaVoiceFresh', 'photoFresh', 'tileAdFresh', 'tamadaDoneFresh', 'samvelDivorceFresh', 'courtVerdictFresh', 'tileSlipFresh', 'tileCourtFresh', 'tileLawyerFresh', 'tileMonumentFresh', 'nivaBackFresh', 'saleFresh', 'saleItem', 'grantHouseFresh', 'borisAskFresh', 'seryogaFresh', 'grantBathFresh', 'offendedAskFresh',
   'period', 'night', 'offline', 'scene', 'sinceAlik', 'lateCount', 'arcAvailable',
@@ -358,7 +366,7 @@ export const ACTOR_KEYS: ReadonlySet<string> = new Set(ACTOR_KEY_LIST)
 
 export const MEM_KEYS: ReadonlySet<string> = new Set([
   HEAT, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, evicted, vendetta, court, courtVerdict,
-  ritualCount, ritualCut, caughtCount, caughtAt, garikDenied, garikCode, cryptoHodl, bathAsked, mamaCalls, phoneKarine, karineKnowsDebt, karineThinksTax, alikShaved, moustacheKept, moustacheAskAt, alikDay, mooAt, sorryAt, courtReferral, judgeApology, saidStrasburg,
+  ritualCount, ritualCut, caughtCount, caughtAt, garikDenied, garikCode, cryptoHodl, bathAsked, bathAskedAt, bathAnswered, mamaCalls, phoneKarine, karineKnowsDebt, karineThinksTax, alikShaved, moustacheKept, moustacheAskAt, alikDay, mooAt, sorryAt, courtReferral, judgeApology, saidStrasburg,
   rudeAt, thanksAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway, nivaPlayer, carGone,
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, borisForeman, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, asmikCard, paydayScene, threatClaim, saidTomorrow, saidFriday, saidKonak, saidHash, saidOath, saidNuneNoWrite, saidGrantEnvelope, saidMoneyMoustache, saidRegiment,
