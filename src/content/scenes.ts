@@ -13,7 +13,7 @@ import { HEAT, bathAsked, blocked, cardSent, fraudLoan, grantPaid, intro, karine
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- форма переменных задаётся сценой
 export type Vars = Record<string, any>
-export type Line = string | Claimed | { w: string; t: string } | { t: string; stamp?: string; remember?: FactOp[] } | ((v: Vars) => string | Claimed)
+export type Line = string | Claimed | { w: string; t: string; remember?: FactOp[] } | { t: string; stamp?: string; remember?: FactOp[] } | ((v: Vars) => string | Claimed)
 export interface SceneOpt { t: Line | Entry<string>[]; go: string | null; tone?: 'polite' | 'neutral' | 'rude' }
 export interface SceneFx {
   days?: number; debt?: number; money?: number; mood?: number; ach?: string; barter?: boolean; invoice?: boolean
@@ -724,16 +724,18 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
         },
         // условие Карине — ванная: запоминается, на него потом ссылаются (родня на крик, День выплаты)
         text: {
-          fx: { mood: 1, set: { [HEAT]: 1, [bathAsked]: true } },
+          // факт «ванную уже называли» ставит сама реплика: иначе первое «условие то же» ссылается на то,
+          // чего в партии не звучало (#1365)
+          fx: { mood: 1, set: { [HEAT]: 1 } },
           a: [needs('karineHome', 'karine')('Текстом — только через Карине.'), gate(WORLD.karineHome, missing(intro('karine')))('Текстом — только через жену. Она передаст.'), needs('karineGone')('Текстом — только через маму. Она передаст. С комментариями.')],
           who2: 'karine', a2: [
-            gate(lte(ritualCount, 1), WORLD.karineHome)('Я одобрила мир. Условие: переложите нам ванную. Бесплатно. Вы же теперь почти брат.'),
-            gate(gte(ritualCount, 2), WORLD.karineHome)('Опять мириться? Условие то же: ванная. Я её уже третий раз обещаю соседке показать.'),
-            gate(gte(ritualCount, 2), WORLD.karineHome)('Мир одобрен. Ванная всё ещё не переложена. Я считаю, это тоже долг.'),
+            gate(missing(bathAsked), WORLD.karineHome)({ t: 'Я одобрила мир. Условие: переложите нам ванную. Бесплатно. Вы же теперь почти брат.', remember: [set(bathAsked, true)] }),
+            gate(is(bathAsked), gte(ritualCount, 2), WORLD.karineHome)({ t: 'Опять мириться? Условие то же: ванная. Я её уже третий раз обещаю соседке показать.', remember: [set(bathAsked, true)] }),
+            gate(is(bathAsked), gte(ritualCount, 2), WORLD.karineHome)({ t: 'Мир одобрен. Ванная всё ещё не переложена. Я считаю, это тоже долг.', remember: [set(bathAsked, true)] }),
             // Карине ушла: условие мира говорит мама, тем же фактом ванной
-            gate(lte(ritualCount, 1), WORLD.karineGone)({ w: 'mama', t: 'Мир я одобрила, сынок. Условие: ванную переложите. Бесплатно. Алику так и передам.' }),
-            gate(gte(ritualCount, 2), WORLD.karineGone)({ w: 'mama', t: 'Опять мириться, сынок? Условие то же: ванная. Я её уже соседке обещала.' }),
-            gate(gte(ritualCount, 2), WORLD.karineGone)({ w: 'mama', t: 'Мир одобрен. Ванная всё ещё не переложена. Я так и записала, сынок.' }),
+            gate(missing(bathAsked), WORLD.karineGone)({ w: 'mama', t: 'Мир я одобрила, сынок. Условие: ванную переложите. Бесплатно. Алику так и передам.', remember: [set(bathAsked, true)] }),
+            gate(is(bathAsked), gte(ritualCount, 2), WORLD.karineGone)({ w: 'mama', t: 'Опять мириться, сынок? Условие то же: ванная. Я её уже соседке обещала.', remember: [set(bathAsked, true)] }),
+            gate(is(bathAsked), gte(ritualCount, 2), WORLD.karineGone)({ w: 'mama', t: 'Мир одобрен. Ванная всё ещё не переложена. Я так и записала, сынок.', remember: [set(bathAsked, true)] }),
           ],
         },
         moo: {
