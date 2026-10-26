@@ -529,7 +529,7 @@ describe('День выплаты', () => {
       if (line) await game.playArc('samvel') // линия партии — настоящим производителем, не памятью
       await game.enterNode('payday', 'announce')
       await choose(game, 'bag')
-      const hostLine = game.S.msgs.find((m) => m.kind === 'text' && /по традиции, доли/.test(m.text))
+      const hostLine = game.S.msgs.find((m) => m.kind === 'text' && /по традиции, каждому долю/.test(m.text))
       expect(hostLine, 'дележ звучит').toBeDefined()
       const pool = (p: ReturnType<typeof game.lines.eligible>) => p.map((x) => (x.spec as { who?: string }).who)
       return {

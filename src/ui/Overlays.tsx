@@ -134,7 +134,7 @@ export function EndingScreen({ onReset }: { onReset: () => void }) {
         )}
         <p>{e.text}</p>
         <ul className="ending-stats">
-          <li>{v.day} дней после сдачи объекта</li>
+          <li>Дней после сдачи объекта: {v.day}</li>
           <li>Долг Алика: {v.debt.toLocaleString('ru-RU')} ₽</li>
           <li>Обещаний в журнале: {v.promises.length}</li>
           {v.finales.map((f) => <li key={f.id}>{f.title}: «{f.finale}»</li>)}

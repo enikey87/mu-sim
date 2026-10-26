@@ -183,13 +183,13 @@ describe('долг: объявление звучит ровно тогда, к�
     const day = game.S.day
     await game.playEpisode(cutter, 'garik')
     expect(game.S.day).toBe(day + 7)
-    expect(sys(game)).toMatch(/Неделя на выковыривании/)
+    expect(sys(game)).toMatch(/Неделю выковыривали Гарика из фундамента/)
 
     const { game: after } = makeGame()
     const sealedDay = sealed(after).S.day
     await after.playEpisode(cutter, 'garik')
     expect(after.S.day).toBe(sealedDay)
-    expect(sys(after)).not.toMatch(/Неделя на выковыривании/)
+    expect(sys(after)).not.toMatch(/Неделю выковыривали Гарика из фундамента/)
   })
 
   // узел сцены (тамада): те же правила отказа, что у серии — календарь/долг/sys глушатся; ach/mood/set остаются (#237/#259)

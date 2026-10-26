@@ -71,9 +71,9 @@ describe('несостыковки из партии пользователя', 
     game.rules.applyOps([set(nuneKeyPassed, true)], {})
     expect(texts(GROUP.nune).some((t) => /Ключ от сейфа/.test(t)), 'ключ ушёл — строки нет').toBe(false)
     // кран: на свадьбу он встаёт с шестой серии Размика — до той «опять» не на что опереть
-    expect(texts(GROUP.mkrtich).some((t) => /Кран опять на свадьбу/.test(t)), 'до свадьбы строки нет').toBe(false)
+    expect(texts(GROUP.mkrtich).some((t) => /Кто опять кран на свадьбу забрал/.test(t)), 'до свадьбы строки нет').toBe(false)
     game.S.arcs.razmik = { i: 6, last: 0 }
-    expect(texts(GROUP.mkrtich).some((t) => /Кран опять на свадьбу/.test(t)), 'на шестой серии кран на свадьбе').toBe(true)
+    expect(texts(GROUP.mkrtich).some((t) => /Кто опять кран на свадьбу забрал/.test(t)), 'на шестой серии кран на свадьбе').toBe(true)
   })
 
   it('«Опять» на отправке номера карты звучит только со второго раза', async () => {

@@ -25,7 +25,7 @@ describe('память Алика', () => {
     const law = LEGENDS.beton_law
     const lawText = [...law.lines.map((l) => spec(l).t), ...(law.talk ?? []).flat()].join(' ')
     expect(lawText, 'легенда о втором курсе пропала — проверка пустеет').toMatch(/второ[йм] курс/i)
-    const arsenal = MEMORY.filter((e) => /юрфак/.test(spec(e).t)).map((e) => spec(e).t)
+    const arsenal = MEMORY.filter((e) => /Арсен после твоего дела/.test(spec(e).t)).map((e) => spec(e).t)
     expect(arsenal.length, 'строка про юрфак не найдена — проверка пустеет').toBeGreaterThan(0)
     for (const t of arsenal) {
       expect(t, `«${t}» подаёт поступление как следствие дела`).not.toMatch(/поступил/i)
@@ -33,7 +33,7 @@ describe('память Алика', () => {
       expect(t, `«${t}» объявляет учёбу законченной, а Арсен на втором курсе`).not.toMatch(/доучил|закончил|выпустил|получил диплом/i)
     }
     // и наоборот: незавершённость названа прямо
-    expect(arsenal.join(' '), 'нет формулировки про незаконченную учёбу').toMatch(/досдаёт|учится/i)
+    expect(arsenal.join(' '), 'нет формулировки про незаконченную учёбу').toMatch(/учебник|учится/i)
   })
 
   it('пулы без пустых реплик и повторов', () => {

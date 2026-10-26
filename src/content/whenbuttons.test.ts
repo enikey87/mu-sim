@@ -308,9 +308,9 @@ describe('игрок видит кнопки настоящим путём', () 
   })
 })
 
-/** Хвост кнопки на очень далёкий срок сверяется с рекордом журнала обещаний (#1118): «не помню» — только
+/** Хвост кнопки на очень далёкий срок сверяется с рекордом журнала обещаний (#1118): «ещё не откладывали» — только
  *  за новым рекордом партии, срок меньше уже названного — это число из журнала, а не забывчивость. */
-describe('хвост «столько обещаний не помню» — по рекорду журнала обещаний (#1118, #1328)', () => {
+describe('хвост «на столько вы ещё не откладывали» — по рекорду журнала обещаний (#1118, #1328)', () => {
   /** Тексты стены кнопок на срок `w` в партии, где раньше называли `record` дней (0 — не называли). */
   const far = async (record: number, w: When): Promise<{ texts: string[]; facts: Record<string, unknown> }> => {
     const g = await said(w)
@@ -324,37 +324,35 @@ describe('хвост «столько обещаний не помню» — п�
     return { texts: [...texts], facts: g.facts() }
   }
 
-  // (#1328) долг игрока на доске один — 240 000, и он не меняется, меняются обещания Алика.
-  // Значит, «не помню» может относиться только к множеству обещаний: множественного «долгов»
-  // от лица игрока в хвосте быть не может.
-  it('«не помню» называет обещания Алика, а не долги игрока (#1328)', () => {
-    const tails = pool('P_WHEN_FAR').filter((s) => s.includes('не помню'))
-    expect(tails.length, 'хвост «не помню» в пуле').toBe(1)
+  // Рекорд сравнивает дни отсрочки, а не количество обязательств игрока.
+  it('новый рекорд сравнивает длительность отсрочки, а не количество долгов (#1328)', () => {
+    const tails = pool('P_WHEN_FAR').filter((s) => s.includes('ещё не откладывали'))
+    expect(tails.length, 'хвост «ещё не откладывали» в пуле').toBe(1)
     for (const s of tails) {
       expect(s, `долги игрока во множественном: «${s}»`).not.toMatch(/долг/i)
-      expect(s, `хвост не назвал обещания: «${s}»`).toMatch(/обещани/i)
+      expect(s, `хвост не сравнивает длительность: «${s}»`).toContain('На столько')
     }
   })
 
-  it('срок меньше рекорда: вспоминает прежнее число, а не «не помню»', async () => {
+  it('срок меньше рекорда: вспоминает прежнее число, а не «ещё не откладывали»', async () => {
     const { texts, facts } = await far(343, { t: 'после Навасарда', d: 91, kind: 'clear' })
     expect([facts['promiseRecordDays'], facts['promiseRecordNew'], facts['promiseRecordSeen']]).toEqual([343, false, true])
     expect(texts.some((t) => t.includes('343 дня')), texts.join(' | ')).toBe(true)
-    for (const text of texts) expect(text, text).not.toContain('не помню')
+    for (const text of texts) expect(text, text).not.toContain('ещё не откладывали')
   })
 
-  it('срок больше всех прежних: рекорд обновляется, и звучит «не помню»', async () => {
+  it('срок больше всех прежних: рекорд обновляется, и звучит «ещё не откладывали»', async () => {
     const { texts, facts } = await far(343, { t: 'через год, не раньше', d: 400, kind: 'clear' })
     // сам срок в рекорд не входит: иначе «больше всего названного» не сработало бы никогда
     expect([facts['promiseRecordDays'], facts['promiseRecordNew'], facts['promiseRecordSeen']]).toEqual([343, true, false])
-    expect(texts.some((t) => t.includes('не помню')), texts.join(' | ')).toBe(true)
+    expect(texts.some((t) => t.includes('ещё не откладывали')), texts.join(' | ')).toBe(true)
     for (const text of texts) expect(text, text).not.toContain('343')
   })
 
-  it('первый далёкий срок партии — тоже «не помню», рекорда ещё нет', async () => {
+  it('первый далёкий срок партии — тоже «ещё не откладывали», рекорда ещё нет', async () => {
     const { texts, facts } = await far(0, { t: 'после Навасарда', d: 91, kind: 'clear' })
     expect([facts['promiseRecordDays'], facts['promiseRecordNew']]).toEqual([0, true])
-    expect(texts.some((t) => t.includes('не помню')), texts.join(' | ')).toBe(true)
+    expect(texts.some((t) => t.includes('ещё не откладывали')), texts.join(' | ')).toBe(true)
   })
 
   it('запись без дней (старое сохранение) в рекорде считается по дате', async () => {
@@ -409,7 +407,7 @@ describe('хвост «столько обещаний не помню» — п�
     // правленый срок назван датой («в следующем году»), а не числом дней: хвост называет дату, а не span (#1269)
     expect([...texts].some((t) => t.includes(`Было и обещание до ${fmtDayMonth(rec.due!)}`)), [...texts].join(' | ')).toBe(true)
     for (const text of texts) expect(text, text).not.toContain(`Было и ${fmtDays(horizon)}`)
-    for (const text of texts) expect(text, text).not.toContain('не помню')
+    for (const text of texts) expect(text, text).not.toContain('ещё не откладывали')
   })
 
   it('рекорд, названный датой, хвост называет датой записи, а не её span (#1269)', async () => {
@@ -430,7 +428,7 @@ describe('хвост «столько обещаний не помню» — п�
     expect(texts.size, 'кнопки далёкого срока живы — проверка не пустая').toBeGreaterThan(0)
     expect([...texts].some((t) => t.includes(`Было и обещание до ${date}`)), [...texts].join(' | ')).toBe(true)
     for (const text of texts) expect(text, 'число, которого не звучало').not.toContain(fmtDays(span))
-    for (const text of texts) expect(text, text).not.toContain('не помню')
+    for (const text of texts) expect(text, text).not.toContain('ещё не откладывали')
   })
 
   it('рекорд, названный числом дней, хвост называет числом (#1269)', async () => {

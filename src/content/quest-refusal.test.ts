@@ -22,7 +22,7 @@ async function walk(id: string, go: string[], game: Game): Promise<string> {
 
 const REFUSALS: Record<string, { ask: string; refuse: string; line: RegExp; agree: string; ach: string }> = {
   q_lottery: { ask: 'serious', refuse: 'no', line: /Билет всё равно твой/, agree: 'draw', ach: 'q_lottery' },
-  q_mama: { ask: 'why', refuse: 'no', line: /Нанёс помидоры лично/, agree: 'drive', ach: 'q_mama' },
+  q_mama: { ask: 'why', refuse: 'no', line: /Сам маме помидоры тащил/, agree: 'drive', ach: 'q_mama' },
   q_goat: { ask: 'mchs', refuse: 'no', line: /Козу снял/, agree: 'climb', ach: 'q_goat' },
 }
 

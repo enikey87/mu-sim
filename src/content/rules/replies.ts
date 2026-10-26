@@ -2,7 +2,7 @@
 // Общее правило по intent + более специфичные для частных случаев (память, контекст).
 import type { ContentApi } from '../../engine/game'
 import { fmtDays } from '../../engine/time'
-import { type Rule, eq, ne, is, gte, add, set, matches, spec, valueOf } from '../fact'
+import { type Rule, eq, ne, is, gte, add, set, matches, spec, valueOf, isOpen } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { AlikOffline, ThickJournal } from './criteria'
 import { cooldown } from './rude'
@@ -455,7 +455,7 @@ export const replyRules: R[] = [
       // «ровно/криво/за плату» получают свой ответ B-пула (#1017), а не случайный из колоды
       const i = Number(facts.arg)
       const line = Number.isInteger(i) ? HOLE_B[i] : undefined
-      await game.say([line ? valueOf(line) : game.draw('HOLE_B', HOLE_B)])
+      await game.say([line && isOpen(line, game.lineFacts()) ? valueOf(line) : game.draw('HOLE_B', HOLE_B)])
       game.clearFact(rubikHoleAt)
       game.setCtx(null)
     },

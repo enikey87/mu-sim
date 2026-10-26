@@ -203,7 +203,7 @@ describe('коллекторы (#128)', () => {
   it('GROUP и ARC_DONE: после разворота «свои» закрыты, взыскание для игрока открыто (#679)', () => {
     const gated = (arr: Entry<unknown>[], re: RegExp) => arr.filter((e) => re.test(String(valueOf(e))))
     const ours = gated(GROUP.collectors as Entry<unknown>[], /мы теперь свои|Смена на объекте/)
-    const turned = gated(GROUP.collectors as Entry<unknown>[], /взыскиваем в пользу плиточника|Чай длинный/)
+    const turned = gated(GROUP.collectors as Entry<unknown>[], /взыскиваем в пользу плиточника|Ваше дело в работе/)
     expect(ours.length).toBe(2)
     expect(turned.length).toBe(2)
     for (const e of ours) expect(isOpen(e, { [collectorsRecruited]: true, [collectorsTurned]: true }), 'после разворота «свои» закрыты').toBe(false)
@@ -460,9 +460,9 @@ describe('эпизод арки даёт отклик в свой ход (#1192)
       const from = game.S.msgs.length
       await game.send(btn!)
       const said = game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' ? [m.text] : [])).join(' ')
-      const reply = fact === collectorsTea ? 'дольше, чем про срок'
+      const reply = fact === collectorsTea ? 'обсуждают, что вообще значит «вернуть»'
         : fact === collectorsRecruited ? 'Долг пока на месте'
-          : 'Чай длиннее срока'
+          : 'У них на каждый вопрос — ещё чашечка'
       expect(said, `${mark}: ответ не про факт эпизода`).toContain(reply)
       expect(button(game), `${mark}: ответ не закрыл окно`).toBeUndefined()
     }
@@ -488,7 +488,7 @@ describe('эпизод арки даёт отклик в свой ход (#1192)
 })
 
 describe('«чай длинный» ждёт сцены чая (#1158)', () => {
-  const LINE = 'Коллекторы на объекте расселись: чай длинный, долг тоже.'
+  const LINE = 'Коллекторы у тебя уже расселись. Чай хоть кончится раньше моего терпения?'
   const pool = (g: Game) => g.open(ARCS.collectors.follow)
 
   it('до третьей серии строка молчит, после сцены чая — звучит; пул не пустеет', async () => {

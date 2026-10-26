@@ -116,7 +116,7 @@ describe('реакции на системные события (#927)', () => {
   })
 
   it('отзыв Авито: коньячная строка в пуле и выбирается (#1025)', async () => {
-    const line = 'Отзыв выдержанный, как коньяк. Пять звёзд — это букет. Основная сумма — сама выдержка.'
+    const line = 'Пять звёзд, брат. Как на коньяке. За такую выдержку тебе уже медаль положена. Только не проси деньгами.'
     expect(AVITO_REVIEW.map(valueOf), 'коньячной строки нет в пуле').toContain(line)
     const { game } = makeGame()
     const seen = new Set<string>()
@@ -303,6 +303,7 @@ describe('прямые вопросы и первые сообщения (#958):
     const seen = new Map<number, string>()
     for (let seed = 1; seed <= 60 && seen.size < 3; seed++) {
       const { game } = makeGame({ seed })
+      game.S.arcs.rubik = { i: 4, last: game.S.day }
       await game.playEpisode(ARCS.rubik.eps[3], 'rubik')
       game.S.choices = null
       const c = game.buildChoices().find((x) => x.act === 'rubikHole')
@@ -490,6 +491,36 @@ describe('реакции: вопрос Рубика и чайник (#953)', () 
     const said = game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : []))
     expect(said.some((t) => KETTLE.map(valueOf).includes(t)), 'ответ не из пула').toBe(true)
     expect(has(game, 'kettle'), 'после ответа окно закрыто').toBe(false)
+  })
+
+  it.each([
+    { holder: 'Гарика', index: 0 },
+    { holder: 'кума', index: 1 },
+  ])('чайник у $holder: общая реакция не меняет держателя и не зачитывает выигрыш повторно', async ({ holder, index }) => {
+    const { game } = makeGame()
+    game.S.mem[intro('garik')] = true
+    game.S.bags['q_lottery.draw.a'] = { n: 2, left: [index], last: -1 }
+    const debtBefore = game.S.debt
+    const moneyBefore = game.S.money
+    await game.enterNode('q_lottery', 'draw')
+    const source = game.S.msgs.flatMap((m) => m.kind === 'text' && m.from === 'alik' ? [m.text] : [])
+    expect(source.some((t) => t.includes(`Забери у ${holder}`)), 'не выбран нужный держатель').toBe(true)
+    expect(game.S.debt).toBe(debtBefore - 700)
+    expect(game.S.money).toBe(moneyBefore)
+    expect(game.S.mem[kettleAt]).toBe(game.S.stats.sent)
+    const choice = game.buildChoices().find((c) => c.act === 'kettle')
+    expect(choice).toBeDefined()
+    for (const text of P_KETTLE) expect.soft(text).not.toMatch(/кум|гарик/i)
+    game.S.bags.KETTLE = { n: 2, left: [0], last: -1 }
+    const from = game.S.msgs.length
+    await game.fire('PlayerSays', { intent: 'kettle' })
+    const reply = game.S.msgs.slice(from).flatMap((m) => m.kind === 'text' && m.from === 'alik' ? [m.text] : [])
+    expect(reply).toContain(valueOf(KETTLE[0]))
+    for (const text of reply) expect.soft(text).not.toMatch(/кум|гарик/i)
+    expect(game.S.debt).toBe(debtBefore - 700)
+    expect(game.S.money).toBe(moneyBefore)
+    expect(game.S.mem[kettleAt]).toBeUndefined()
+    expect(has(game, 'kettle')).toBe(false)
   })
 
   it('выигрыш с «Забери у Гарика» тоже открывает окно (#1341)', async () => {
@@ -947,7 +978,7 @@ describe('окно финала квеста-тамады (#1222)', () => {
   const low = (t: string) => t.charAt(0).toLowerCase() + t.slice(1)
   const button = (game: Game) => { game.S.choices = null; return game.buildChoices().find((c) => c.act === 'tamadaDone') }
 
-  it('до взятия микрофона, после «Я не умею тосты» и после «Сначала деньги» реакции нет — негативный контроль', async () => {
+  it('до взятия микрофона, после «Я тосты говорить не умею» и после «Сначала деньги» реакции нет — негативный контроль', async () => {
     for (const path of ['cant', 'no'] as const) {
       const { game } = makeGame()
       expect(button(game), `до квеста (${path}) кнопки нет`).toBeUndefined()
@@ -960,7 +991,11 @@ describe('окно финала квеста-тамады (#1222)', () => {
   it('финал yes штампует ход, кнопка в блоке, окно три хода, ответ потребляет', async () => {
     const { game } = makeGame()
     expect(button(game), 'до события кнопки нет').toBeUndefined()
+    const debtBefore = game.S.debt
+    const moneyBefore = game.S.money
     await game.enterNode('q_tamada', 'yes') // настоящий путь: узел финала сцены
+    expect(game.S.debt).toBe(debtBefore - 1000)
+    expect(game.S.money).toBe(moneyBefore)
     expect(game.S.msgs.some((m) => m.kind === 'sys' && m.text.includes('Сервиз тёти Гоар')), 'событие не прозвучало — проверка пустеет').toBe(true)
     const at = Number(game.S.mem[tamadaDoneAt])
     expect(at, 'узел квеста не штампанул ход события').toBe(game.S.stats.sent)

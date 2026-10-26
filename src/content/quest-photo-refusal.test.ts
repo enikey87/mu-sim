@@ -24,7 +24,7 @@ describe('q_photo: отказ от фото для рекламы', () => {
     it(`отказ ${what}: шутка в чате, фото не ушло, сцена закрыта`, async () => {
       const { game } = makeGame()
       const said = await walk(game, path)
-      expect(said, 'реплика отказа в чате').toMatch(/Без фотографии клиенты поверят/)
+      expect(said, 'реплика отказа в чате').toMatch(/Буду клиентам словами объяснять/)
       expect(game.S.ach.q_photo, 'достижение отправки не поставлено').toBeUndefined()
       expect(game.S.msgs.some((m) => m.kind === 'sys' && /выложили/.test(m.text)), 'системной строки про рекламу нет').toBe(false)
       expect(game.S.scene, 'сцена закрыта').toBeNull()
