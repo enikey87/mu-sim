@@ -4,7 +4,7 @@
 import type { Scene } from './scenes'
 import { gate, missing, set } from './fact'
 import { needs } from './world'
-import { courtVerdict, courtVerdictAt, cryptoHodl, intro, kettleAt, mamaMarketAt, saidHash, tamadaDoneAt, tileAdAt } from './memkeys'
+import { courtVerdict, courtVerdictAt, cryptoHodl, intro, kettleAt, mamaMarketAt, moneyAt, saidHash, tamadaDoneAt, tileAdAt } from './memkeys'
 
 export const QUESTS: Record<string, Scene> = {
   q_hash: {
@@ -124,7 +124,8 @@ export const QUESTS: Record<string, Scene> = {
         fx: { days: 1, mood: 2, ach: 'q_mama' },
         sys: 'Вы возили маму Алика по рынку четыре часа. Она торговалась за каждый помидор.',
         who: 'mama', a: [{ t: 'Спасибо, сынок. Вот тебе пирожки. Деньги — это Алик должен, я не вмешиваюсь.', stamp: mamaMarketAt }],
-        a2: ['Мама довольна! Пирожки — это аванс, брат. С картошкой — две тысячи, с мясом — три.'],
+        // аванс пирожками — денежное событие со своей суммой (#1376): ход перекрывает реакцию на перевод
+        a2: [{ t: 'Мама довольна! Пирожки — это аванс, брат. С картошкой — две тысячи, с мясом — три.', stamp: moneyAt }],
       },
       why: { a: ['Я занят. Я в банке. За твоими деньгами. Ты что, хочешь, чтобы я бросил банк?'], opts: [{ t: 'Ладно, отвезу', go: 'drive' }, { t: 'Не отвезу', go: 'no' }] },
       no: { a: ['Эх. Сам маме помидоры тащил. Просила она тебя, а спина болит у меня. Вот и подумай.'] },

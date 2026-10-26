@@ -4,6 +4,8 @@ import { describe, it, expect } from 'vitest'
 import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
 import { D, TRANSFER_FRESH_TURNS } from './excuses'
+import { creditOffer, moneyAt, paydayScene, transferAt } from './memkeys'
+import { ARCS } from './arcs'
 
 const findReply = (game: Game) => { game.S.choices = null; return game.buildChoices().find((c) => c.act === 'transferQ') }
 
@@ -90,5 +92,64 @@ describe('окно отклика на перевод (#1003)', () => {
     expect(findReply(game), 'перевод из пачки без окна').toBeDefined()
     game.S.stats.sent += TRANSFER_FRESH_TURNS + 1
     expect(findReply(game), 'за окном кнопка осталась').toBeUndefined()
+  })
+})
+
+// Новейшее денежное событие выигрывает (#1376): «50 рублей?!» ссылается на сумму, которую чат уже
+// перекрыл своим денежным ходом. Окно по счётчику ходов при этом остаётся прежним — гасит его только
+// эпизод со своей суммой, а не любой ход.
+describe('новейшее денежное событие гасит окно перевода (#1376)', () => {
+  const transferTurn = (game: Game) => Number(game.S.mem[transferAt])
+
+  it('аванс пирожками после перевода: реакции на перевод нет; без эпизода — есть', async () => {
+    const { game } = makeGame()
+    await game.transfer()
+    const at = transferTurn(game)
+    expect(findReply(game), 'на ходу перевода кнопки нет').toBeDefined()
+    // ход между переводом и эпизодом: окно ещё открыто — эпизод не «второй ход окна», а другой денежный ход
+    game.S.stats.sent = at + 1
+    expect(findReply(game), 'через ход после перевода окно закрыто — проверка пустеет').toBeDefined()
+    await game.enterNode('q_mama', 'drive')
+    expect(game.S.mem[moneyAt], 'аванс пирожками не штампанул денежный ход').toBe(at + 1)
+    expect(findReply(game), 'реакция на перевод поверх аванса пирожками').toBeUndefined()
+
+    // тот же ход без промежуточного денежного эпизода: кнопка на месте — гасит эпизод, а не время
+    const { game: clean } = makeGame()
+    await clean.transfer()
+    clean.S.stats.sent = transferTurn(clean) + 1
+    expect(findReply(clean), 'без денежного эпизода окно перевода пропало').toBeDefined()
+  })
+
+  // Каждый денежный эпизод пишет ход сам: допработа, вычет хаша, застолье, чайник, вычет серии,
+  // продажа вещи, счёт сцены. Штамп ставит сдвиг денег, а не текст: запечатанный долг его не ставит.
+  it('денежные эпизоды штампуют ход: допработа, хаш, застолье, чайник, серия, продажа, сцена', async () => {
+    const cases: Array<[string, (game: Game) => Promise<void> | void]> = [
+      ['допработа', async (game) => {
+        game.alikMsg({ kind: 'job', from: 'alik', text: 'Сделаешь забор?' })
+        const job = game.S.msgs.find((m) => m.kind === 'job')!
+        expect(job, 'оффера допработы нет — проверка пустеет').toBeDefined()
+        await game.answerJob(job.id, true)
+      }],
+      ['вычет хаша', (game) => game.enterNode('q_hash', 'eat')],
+      ['застолье', (game) => game.enterNode('q_tamada', 'yes')],
+      ['чайник в счёт долга', (game) => game.enterNode('q_lottery', 'draw')],
+      ['вычет серии «я твой адвокат»', (game) => game.playEpisode(ARCS.tile.eps[3], 'tile')],
+      ['счёт сцены (кофе и хачапури)', (game) => game.enterNode('meet', 'cafe3')],
+      ['продажа вещи', (game) => { game.S.mem[creditOffer] = true; game.sellThing() }],
+    ]
+    for (const [what, play] of cases) {
+      const { game } = makeGame()
+      const debt = game.S.debt
+      const money = game.S.money
+      await play(game)
+      expect(game.S.debt !== debt || game.S.money !== money, `${what}: деньги не двигались — проверка пустеет`).toBe(true)
+      expect(game.S.mem[moneyAt], `${what}: денежный ход не штампанул`).toBe(game.S.stats.sent)
+    }
+
+    // штамп ставит сам сдвиг: запечатанный долг узел не двигает — и денежного хода нет
+    const { game: sealed } = makeGame()
+    sealed.S.mem[paydayScene] = true
+    await sealed.enterNode('meet', 'cafe3')
+    expect(sealed.S.mem[moneyAt], 'запечатанный долг штампанул денежный ход').toBeUndefined()
   })
 })
