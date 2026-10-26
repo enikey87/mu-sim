@@ -10,7 +10,8 @@ import { bootPlatform, platform, safeStorage } from './platform'
 import './styles.css'
 
 // Параметры адреса: ?fast — паузы в ~30 раз короче, ?hour=3 — подменить час, ?away=90 — «не было 90 минут»,
-// ?debug — панель «какое правило выбрано и почему», ?nointro — без интро новой партии (e2e, бот, плейтест)
+// ?debug — панель «какое правило выбрано и почему», ?nointro — без интро новой партии (e2e, бот, плейтест),
+// ?noidle — режим спокойного чата: инициативы Алика по бездействию не подаются
 const q = new URLSearchParams(location.search)
 
 // Игра создаётся вне React: StrictMode вызывает инициализаторы дважды, а у игры есть таймеры.
@@ -27,6 +28,7 @@ void bootPlatform().then(() => {
       hour: q.has('hour') ? Number(q.get('hour')) : null,
       away: q.has('away') ? Number(q.get('away')) : null,
       debug: q.has('debug'),
+      noIdle: q.has('noidle'),
       storage,
       externalPay: p.externalPay,
       joinGroup: p.joinGroup != null,

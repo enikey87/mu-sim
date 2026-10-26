@@ -248,13 +248,13 @@ export const isOn = (): boolean => receivers.some((r) => r.on)
 
 /**
  * Включает приёмники. Звать может только вход страницы (src/main.tsx) и только когда
- * заданы все три условия: ключ приёмника, хост игры и адрес без `debug`/`fast`.
+ * заданы все три условия: ключ приёмника, хост игры и адрес без `debug`/`fast`/`noidle`.
  * `id` — номер Метрики, `posthogKey` — ключ PostHog, `umamiKey` — ключ Umami: подстановки
  * для теста с приёмником; игра передаёт константы `COUNTER_ID`, `POSTHOG_KEY` и `UMAMI_KEY`.
  */
 export function enable(opts: { host: string; search: string; id?: string; posthogKey?: string; umamiKey?: string }): boolean {
   const url = new URLSearchParams(opts.search)
-  const allowed = opts.host === GAME_HOST && !url.has('debug') && !url.has('fast')
+  const allowed = opts.host === GAME_HOST && !url.has('debug') && !url.has('fast') && !url.has('noidle')
   const ya = allowed && (opts.id ?? COUNTER_ID) ? Number(opts.id ?? COUNTER_ID) : 0
   const ph = allowed ? (opts.posthogKey ?? POSTHOG_KEY) : ''
   const um = allowed ? (opts.umamiKey ?? UMAMI_KEY) : ''

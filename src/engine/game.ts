@@ -105,6 +105,8 @@ export interface GameOptions {
   away?: number | null
   /** Не запускать фоновые таймеры (для тестов) */
   noTimers?: boolean
+  /** Режим спокойного чата (?noidle): инициативы по бездействию не подаются вовсе, остальные таймеры живут */
+  noIdle?: boolean
   /** Записывать, какое правило выбрано и почему (?debug) */
   debug?: boolean
   /** Опечатки Алика (в тестах выключены, чтобы проверять тексты дословно) */
@@ -187,6 +189,7 @@ export class Game {
   private timerIds = new Set<GameTimer>()
   private sleepWaiters = new Set<(err?: GameDisposed) => void>()
   private noTimers: boolean
+  private noIdle: boolean
   private typos: boolean
   /** Оборванный ошибкой ход — падение партии бота (гейт покрытия, плейтест), а не тихое восстановление. */
   private strictTurns: boolean
@@ -209,6 +212,7 @@ export class Game {
     this.rawAudio = opts.audio ?? silentAudio
     this.hour = opts.hour ?? null
     this.noTimers = !!opts.noTimers
+    this.noIdle = !!opts.noIdle
     this.typos = opts.typos ?? true
     this.strictTurns = !!opts.strictTurns
     this.externalPay = opts.externalPay !== false
@@ -3309,6 +3313,9 @@ export class Game {
   // ---------- Алик живёт сам ----------
   armIdle(): void {
     this.clearSchedule(this.idleT)
+    // ?noidle — режим спокойного чата: Алик отвечает только на ходы игрока, сам первым не пишет;
+    // глушится одна эта линия, статусы шапки, сцены и арки остаются (#1371)
+    if (this.noIdle) return
     // Алик пишет сам редко: не в начале игры, не раньше чем через 1,5–3 минуты тишины, не больше двух раз подряд
     if (this.disposed || this.noTimers || this.battery.dead || this.idleCount >= 2 || this.S.stats.sent < 5) return
     this.idleT = this.schedule(() => void this.onIdle(), (90000 + this.rnd(90000)) * (this.idleCount + 1) * 1.5 ** this.idleCount)
