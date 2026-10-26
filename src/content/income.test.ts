@@ -107,7 +107,7 @@ describe('приход после дна (#322)', () => {
     expect(lastCard(game, 'Мама').text).toContain(`перевела с пенсии ${rub(1_500)}`)
     game.tryMomHelp() // закатки 4 000 при месте 2 500
     expect(game.S.money).toBe(Game.MONEY_LOW)
-    expect(lastCard(game, 'Мама').text).toContain(`закатки, ${rub(2_500)}`)
+    expect(lastCard(game, 'Мама').text).toContain(`Перевела тебе ${rub(2_500)}`)
     expect(game.S.bank?.lines['+Мама'].sum).toBe(1_500 + 2_500)
     game.tryMomHelp() // места нет — дача остаётся на потом
     expect(game.S.mem[momHelp('dacha')]).toBeFalsy()

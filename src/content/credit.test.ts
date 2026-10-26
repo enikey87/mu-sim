@@ -540,7 +540,7 @@ describe('негативные контроли', () => {
 
   it('реплика про микроволновку — только при sold.microwave', () => {
     const { game } = makeGame()
-    const open = () => game.lines.eligible('NOTIF', NOTIF, game.lineFacts()).some((p) => p.text.includes('Микроволновку'))
+    const open = () => game.lines.eligible('NOTIF', NOTIF, game.lineFacts()).some((p) => /микроволновк/i.test(p.text))
     expect(open()).toBe(false)
     game.S.mem[sold('microwave')] = true
     expect(open()).toBe(true)
@@ -548,7 +548,7 @@ describe('негативные контроли', () => {
 
   it('сломанный gate sold — тест красный (NC)', () => {
     const { game } = makeGame()
-    const open = () => game.lines.eligible('NOTIF', NOTIF, game.lineFacts()).some((p) => p.text.includes('Микроволновку'))
+    const open = () => game.lines.eligible('NOTIF', NOTIF, game.lineFacts()).some((p) => /микроволновк/i.test(p.text))
     game.S.mem[sold('microwave')] = true
     expect(open()).toBe(true)
     delete game.S.mem[sold('microwave')]

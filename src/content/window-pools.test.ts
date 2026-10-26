@@ -66,7 +66,7 @@ const WINDOWS: Window[] = [
   { pool: 'P_INTERN', lines: PP.P_INTERN, marks: { стажировк: null, ведомост: null } },
   { pool: 'INTERN_B', lines: INTERN_B, marks: { стажировк: null, ведомост: null } },
   { pool: 'P_HOLE', lines: PP.P_HOLE, marks: {} },
-  { pool: 'HOLE_B', lines: HOLE_B, marks: {} },
+  { pool: 'HOLE_B', lines: HOLE_B, marks: { Рубик: 'arc.rubik' } },
   // --- окна заметных системных событий (#927)
   { pool: 'P_RAM_PHOTO', lines: PP.P_RAM_PHOTO, marks: { Борис: null } },
   { pool: 'RAM_PHOTO', lines: RAM_PHOTO, marks: {} },
@@ -214,6 +214,15 @@ const markIssues = (w: Window): string[] => {
 }
 
 describe('окна держат только утверждённое (#996)', () => {
+  it('ответ про ровную плитку называет Рубика только после начала его линии', () => {
+    const window = WINDOWS.find((w) => w.pool === 'HOLE_B')!
+    const line = HOLE_B.find((entry) => lineText(entry).includes('Рубику для отчётности'))!
+    expect(window).toBeDefined()
+    expect(line).toBeDefined()
+    expect(markIssues({ ...window, lines: [line] })).toEqual([])
+    expect(markIssues({ ...window, lines: [valueOf(line)] }).join(' ')).toContain('без гейта на arc.rubik')
+  })
+
   it('каждая строка окна ссылается лишь на объявленное, либо несёт гейт на факт, либо оправдана в allow', () => {
     // пулы кнопок и ответов + follow-пулы арок (#1013): вопрос про сериал — то же окно, что кнопка
     const issues = [...WINDOWS, ...arcWindows()].flatMap(markIssues)

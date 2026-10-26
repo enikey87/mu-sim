@@ -31,7 +31,7 @@ describe('уникальные варианты битов (#920)', () => {
     const c = untilOffered(game, DECIDE)
     expect(c, 'в окне предложения есть свой вариант').toBeDefined()
     await game.send(c!)
-    expect(game.S.msgs.some((m) => m.kind === 'text' && m.from === 'alik' && m.text === 'Решай. Акт я не торгую. Я его жду.')).toBe(true)
+    expect(game.S.msgs.some((m) => m.kind === 'text' && m.from === 'alik' && m.text === 'Решай. Я женой не торгую. Я просто акт жду.')).toBe(true)
     expect(game.S.arcs.rubik!.i, 'вариант не двигает серию').toBe(7)
   })
 
