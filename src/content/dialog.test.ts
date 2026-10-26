@@ -10,12 +10,13 @@ import { CONDOLE_REVIVED, GREET_A, FLOOR } from './misc'
 import { SPEND } from './life'
 import { WORLD, needs, meet } from './world'
 import { set } from './fact'
-import { nuneKeyPassed } from './memkeys'
+import { bathAsked, nuneKeyPassed } from './memkeys'
 import { turnRules } from './rules/turn'
 import { valueOf, type Entry } from '../engine/rules'
 import { wedding, polite, blocked } from './memkeys'
 import { is, saidText, type Said } from './fact'
 import type { Game } from '../engine/game'
+import type { Line } from './scenes'
 
 const texts = (g: Game, n = 0) => g.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' ? [m.text] : []))
 
@@ -634,6 +635,65 @@ describe('сцена примирения (#744)', () => {
     const spoken = game.S.msgs.flatMap((m) => (m.kind === 'text' ? [m] : []))
     expect(spoken.some((m) => m.who === 'karine' && m.text.startsWith('Я одобрила мир'))).toBe(true)
     expect(spoken.some((m) => m.who === 'mama')).toBe(false)
+  })
+})
+
+describe('ванная Карине вводится, а не пересказывается как известная (#1365)', () => {
+  const a2 = (g: Game) => g.scenes.ritual.nodes.text.a2 as Entry<Line>[]
+  // текст уместных сейчас реплик узла — гейты ротации проверяются до розыгрыша, без зависимости от сида
+  const eligible = (g: Game) => g.open(a2(g)).map((x) => (typeof x === 'string' ? x : 't' in x ? x.t : ''))
+  const intro = 'Я одобрила мир. Условие: переложите нам ванную'
+  const mamaIntro = 'Мир я одобрила, сынок. Условие: ванную переложите'
+  const repeats = [/Условие то же/, /всё ещё не переложена/]
+  const saidTexts = (g: Game) => g.S.msgs.flatMap((m) => (m.kind === 'text' ? [{ who: m.who, text: m.text }] : []))
+
+  it('первое примирение прошло хашем — «текстом» вводит ванную вводной строкой', async () => {
+    const { game } = makeGame({ seed: 1 })
+    game.S.mem['intro.karine'] = true
+    game.S.mem['ritual.count'] = 1
+    // первое примирение — хаш: узел text не посещался, ванная в партии не звучала
+    await game.enterNode('ritual', 'ask')
+    game.S.choices = null
+    const hash = game.choices.find((x) => x.go === 'hash')
+    expect(hash, 'вариант хаша есть').toBeDefined()
+    await game.send(hash!)
+    expect(game.S.mem[bathAsked], 'хаш не вводит условие Карине').toBeFalsy()
+
+    game.S.mem['ritual.count'] = 2 // второе примирение — «Может, просто текстом?»
+    const before = eligible(game)
+    expect(before.some((t) => t.startsWith(intro)), 'вводная строка доступна на первом заходе').toBe(true)
+    expect(before.filter((t) => repeats.some((r) => r.test(t))), '«условие то же» не звучит до ввода').toEqual([])
+
+    await game.enterNode('ritual', 'ask')
+    game.S.choices = null
+    const text = game.choices.find((x) => x.go === 'text')
+    expect(text, 'вариант «текстом» есть').toBeDefined()
+    const before2 = saidTexts(game).length
+    await game.send(text!)
+    const said = saidTexts(game).slice(before2)
+    expect(said.some((m) => m.text.startsWith(intro)), 'ванная введена вводной строкой').toBe(true)
+    expect(said.some((m) => repeats.some((r) => r.test(m.text))), 'ссылки на прошлое условие нет').toBe(false)
+    expect(game.S.mem[bathAsked], 'условие названо — факт на доске').toBe(true)
+
+    game.S.mem['ritual.count'] = 3 // повторное примирение: теперь «условие то же» законно
+    const again = eligible(game)
+    expect(again.length, 'пул повторов не пуст').toBeGreaterThan(0)
+    expect(again.every((t) => repeats.some((r) => r.test(t))), 'вводная больше не выпадает').toBe(true)
+  })
+
+  it('та же ротация у мамы, когда Карине ушла', async () => {
+    const { game } = makeGame({ seed: 1 })
+    game.S.mem['finale.rubik'] = 'karine'
+    game.S.mem['ritual.count'] = 2
+    const before = eligible(game)
+    expect(before.some((t) => t.startsWith(mamaIntro)), 'мама вводит условие первой').toBe(true)
+    expect(before.filter((t) => repeats.some((r) => r.test(t)))).toEqual([])
+
+    await game.enterNode('ritual', 'text')
+    const said = saidTexts(game)
+    expect(said.some((m) => m.who === 'mama' && m.text.startsWith(mamaIntro))).toBe(true)
+    expect(said.some((m) => repeats.some((r) => r.test(m.text)))).toBe(false)
+    expect(game.S.mem[bathAsked]).toBe(true)
   })
 })
 
