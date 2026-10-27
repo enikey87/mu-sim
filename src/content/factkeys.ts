@@ -24,7 +24,7 @@ import {
   betonSet, cardSent, asmikCard, saidTomorrow, saidFriday, saidKonak, saidHash, saidOath, saidNuneNoWrite, saidGrantEnvelope, saidMoneyMoustache, saidRegiment, payday, count, endgame, holidayGreeted, lend50,
   paydayScene, lightOff, netRation, phoneWarn, creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited,
   collectorsTurned, collectorsTea, collectorsEpAt,
-  criticalAt, creditOfferSum, crewPaid, crewPaidAt, crewAllPaid, moneyAskAt, rubikBath, whenYears, ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt, countersuitAt, grantTileAt, transferAt, transferAmount, moneyAt, moustachePhotoAt, moustacheStakeSaid, mamaMarketAt, mamaVoiceAt, samvelDivorceAt, courtVerdictAt, tileSlipAt, tileCourtAt, tileLawyerAt, tileMonumentAt, nivaBackAt, saleAt, saleWhat, fraudLoan, blockLifted, internDeclined, internAccepted, grantHouseAt, photoAt, tileAdAt, tamadaDoneAt, borisAskAt, seryogaAskAt, grantBathAt, offendedAskAt,
+  criticalAt, creditOfferSum, crewPaid, crewPaidAt, crewAllPaid, moneyAskAt, rubikBath, whenYears, ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt, countersuitAt, grantTileAt, transferAt, transferAmount, moneyAt, moustachePhotoAt, moustacheStakeSaid, mamaMarketAt, mamaVoiceAt, samvelDivorceAt, courtVerdictAt, tileSlipAt, tileCourtAt, tileLawyerAt, tileMonumentAt, nivaBackAt, saleAt, saleWhat, fraudLoan, blockLifted, internDeclined, internAccepted, grantHouseAt, photoAt, tileAdAt, inhDoneAt, inhBurned, inhRefused, tamadaDoneAt, borisAskAt, seryogaAskAt, grantBathAt, offendedAskAt,
   debutWho, debutAt, arsenTrack, arsenTrackAt,
 } from './memkeys'
 import { momDachaAt, momDachaDays, type LoanId, type MomId, type ThingId } from './credit'
@@ -65,7 +65,7 @@ export type MemExactKey =
   | typeof criticalAt | typeof creditOfferSum | typeof crewPaid | typeof crewPaidAt | typeof crewAllPaid | typeof moneyAskAt[keyof typeof moneyAskAt] | typeof rubikBath | typeof whenYears
   | typeof ramPhotoAt | typeof borisSaleAt | typeof vacancyAt | typeof avitoReviewAt
   | typeof rubikAskAt | typeof kettleAt | typeof lawyerAt | typeof collectorsAskAt | typeof internAt | typeof rubikHoleAt | typeof countersuitAt | typeof grantTileAt | typeof moustachePhotoAt | typeof moustacheStakeSaid | typeof mamaMarketAt | typeof mamaVoiceAt | typeof samvelDivorceAt | typeof courtVerdictAt | typeof tileSlipAt | typeof tileCourtAt | typeof tileLawyerAt | typeof tileMonumentAt | typeof nivaBackAt | typeof saleAt | typeof saleWhat | typeof fraudLoan | typeof blockLifted | typeof internDeclined | typeof internAccepted | typeof grantHouseAt | typeof photoAt | typeof tileAdAt | typeof tamadaDoneAt | typeof borisAskAt
-  | typeof seryogaAskAt | typeof grantBathAt | typeof offendedAskAt
+  | typeof seryogaAskAt | typeof grantBathAt | typeof offendedAskAt | typeof inhDoneAt | typeof inhBurned | typeof inhRefused
   | typeof payday[keyof typeof payday] | typeof count[keyof typeof count]
   | typeof endgame[keyof typeof endgame] | typeof lend50[keyof typeof lend50]
 

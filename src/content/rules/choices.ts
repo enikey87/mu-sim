@@ -16,7 +16,7 @@ import { MONEY_ASK, moneyPlaceOf, moneyAskOwn } from '../money-ask'
 import { P_HOLIDAY, holidayBefore, type Holiday } from '../holidays'
 import { WORLD, SPEAKS } from '../world'
 import { fmtDayMonth, fmtDays } from '../../engine/time'
-import { HEAT, alikDead, alikShaved, intro, moustacheAskAt, blocked, court, mourning, phoneKarine, crewPaid, endgame, collectorsTea, collectorsRecruited, collectorsTurned, paydayScene, bathAsked, muenAnswered } from '../memkeys'
+import { HEAT, alikDead, alikShaved, inhBurned, inhRefused, intro, moustacheAskAt, blocked, court, mourning, phoneKarine, crewPaid, endgame, collectorsTea, collectorsRecruited, collectorsTurned, paydayScene, bathAsked, muenAnswered } from '../memkeys'
 import { collectorsEpPool, requirePlayerPool } from '../player-pools'
 import { isEventWindow } from '../first-windows'
 import {
@@ -24,7 +24,7 @@ import {
   STRASBOURG_THREAT,
   P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE,
   P_CREW_CALL, P_LAWYER, P_COLLECTORS_ASK, P_INTERN, P_HOLE, P_COUNTERSUIT,
-  P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_BORIS, P_DEBUT_NIVA, P_NUNE_DEBUT, P_DEBUT_GRANT, P_GRANT_TILE, P_MOUSTACHE_PHOTO, P_MAMA_MARKET, P_TILE_AD, P_TAMADA_DONE, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_COURT_VERDICT, P_TILE_SLIP, P_TILE_COURT, P_TILE_LAWYER, P_TILE_MONUMENT, P_NIVA_BACK, P_SOLD, P_GRANT_HOUSE, P_BORIS_MEMORY, P_SERYOGA, P_GRANT_BATH, P_OFFENDED_ASK, P_BATH_ASK, P_MUEN,
+  P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_BORIS, P_DEBUT_NIVA, P_NUNE_DEBUT, P_DEBUT_GRANT, P_GRANT_TILE, P_MOUSTACHE_PHOTO, P_MAMA_MARKET, P_TILE_AD, P_TAMADA_DONE, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_COURT_VERDICT, P_TILE_SLIP, P_TILE_COURT, P_TILE_LAWYER, P_TILE_MONUMENT, P_NIVA_BACK, P_SOLD, P_GRANT_HOUSE, P_BORIS_MEMORY, P_SERYOGA, P_GRANT_BATH, P_OFFENDED_ASK, P_BATH_ASK, P_MUEN, P_INH_BURNED, P_INH_REFUSED,
 } from './player-choice-pools'
 
 type R = Rule<ContentApi, GameEvent, Offer>
@@ -364,6 +364,24 @@ export const choiceRules: R[] = [
       text: (g) => windowFromArrNum(g, 'P_MUEN', P_MUEN, (i) => { arg = String(i) }),
       arg: () => arg,
     })]
+  })(),
+  // развязка «Наследства дяди Тиграна» (#1439): обе ветки квеста `q_inherit` кончаются заметным
+  // событием — сгоревшими нотариальными 54 000 ₽ Алика или его обидой. Окно как у семейства #927:
+  // штамп `inhDoneAt` ставит последняя строка ветки, ответ игрока его потребляет (`clearFact`).
+  // Пул у каждой ветки свой, ответ идёт по выбранной строке (arg), как у ванной и стажёра (#1017).
+  ...(() => {
+    let burn = ''
+    let no = ''
+    return [
+      offer({
+        name: 'InhBurned', when: [is('inhDoneFresh'), is(inhBurned)], act: 'inhDone', tone: 'neutral', bonus: 5,
+        text: (g) => windowFromArrNum(g, 'P_INH_BURNED', P_INH_BURNED, (i) => { burn = String(i) }), arg: () => burn,
+      }),
+      offer({
+        name: 'InhRefused', when: [is('inhDoneFresh'), is(inhRefused)], act: 'inhDone', tone: 'neutral', bonus: 5,
+        text: (g) => windowFromArrNum(g, 'P_INH_REFUSED', P_INH_REFUSED, (i) => { no = String(i) }), arg: () => no,
+      }),
+    ]
   })(),
   // встречный иск — заметное событие с окном отклика (#964): ход и три после
   offer({ name: 'Countersuit', when: [is('countersuitFresh')], act: 'countersuitAsk', tone: 'neutral', bonus: 3, text: (g) => windowFromArr(g, 'P_COUNTERSUIT', P_COUNTERSUIT) }),

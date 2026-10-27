@@ -12,6 +12,8 @@ import { pairKey } from './memkeys'
 export type MoneyLocation =
   | 'bank' | 'dubai' | 'noah' | 'wife' | 'apricots' | 'deposit' | 'wall'
   | 'mattress' | 'crypto' | 'garni' | 'ferry' | 'safe' | 'foundation' | 'niva'
+  /** Наследство дяди Тиграна из Глендейла (#1439): деньги «уже в пути», пока нотариус берёт своё. */
+  | 'inheritance'
 
 /** Предметы и значения MVP. Первые три взаимоисключающи; остальные — знания без противоречий. */
 export interface LedgerValueMap {
@@ -203,6 +205,7 @@ export const CLAIM_LEDGER: Record<ClaimKey, LedgerPoint> = {
   money_safe: point('money.location', 'safe'),
   money_foundation: point('money.location', 'foundation'),
   money_niva: point('money.location', 'niva'),
+  money_inheritance: point('money.location', 'inheritance'),
   sent: point('money.sent', 'transferred'),
   no_money: point('money.none', 'gone'),
   grandpa_dead: point('grandpa.life', 'dead'),
