@@ -92,8 +92,9 @@ jobs:
       - run: npx vitest run --exclude 'src/tools/coverage-gate.test.ts'
       - run: npm run test:rules   # движок правил — покрытие 100%
       # на PR прод-сборку гоняет e2e (webServer собирает dist), здесь она нужна только артефакту Pages
-      # Ключи аналитики — из переменных репозитория (Settings → Secrets and variables → Actions → Variables);
-      # не заданы — пустые строки, приёмники молчат, сборка зелёная (docs/design/analytics.md).
+      # Ключи аналитики — из переменных репозитория (Settings → Secrets and variables → Actions → Variables).
+      # Их наличие охраняет guard в job'е build: обязательные (Метрика, Umami) роняют чек, ждущие
+      # (PostHog, Telegram-инвойс) предупреждают (docs/design/analytics.md, урок #1263).
       - if: github.event_name != 'pull_request'
         run: npm run build
         env:
@@ -170,6 +171,30 @@ jobs:
       group: pages-build-${{ github.ref }}
       cancel-in-progress: true
     steps:
+      - name: "Аналитика: переменные репозитория на месте (урок #1263)"
+        # Значение однажды потерялось на пересадке «код → build-переменная» (Umami, PR #820 →
+        # #1263: из кода изъяли, в Settings → Variables не перенесли — приёмник молчал молча).
+        # Обязательные ключи обязаны существовать на каждом событии (PR и push): пропажа роняет
+        # обязательный чек, а с ним и деплой. Ждущие ключи — предупреждение, не блок.
+        # Список обязательных расширяется, когда оператор вписывает новый ключ (#790).
+        env:
+          VARS_JSON: ${{ toJSON(vars) }}
+        run: |
+          miss=0
+          for k in VITE_METRIKA_COUNTER VITE_UMAMI_WEBSITE_ID; do
+            v=$(printf '%s' "$VARS_JSON" | jq -r --arg k "$k" '.[$k] // ""')
+            if [ -z "$v" ]; then
+              echo "::error title=Аналитика::$k пуст — приёмник мёртв. Вписать: Settings → Secrets and variables → Actions → Variables (урок #1263)"
+              miss=1
+            else
+              echo "$k на месте (длина значения ${#v})"
+            fi
+          done
+          for k in VITE_POSTHOG_KEY VITE_TELEGRAM_INVOICE_URL; do
+            v=$(printf '%s' "$VARS_JSON" | jq -r --arg k "$k" '.[$k] // ""')
+            [ -z "$v" ] && echo "::warning::$k не задан — ожидается (шаг оператора, #790/#1237)" || echo "$k на месте (длина ${#v})"
+          done
+          exit "$miss"
       - name: Все три job'а зелёные (или PR только с документацией)
         run: |
           echo "event=${{ github.event_name }} code=${{ needs.changes.outputs.code }} tests=${{ needs.tests.result }} coverage=${{ needs.coverage.result }} e2e=${{ needs.e2e.result }}"
