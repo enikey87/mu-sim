@@ -73,10 +73,9 @@ function syncMessageNodes(cache: NodeCache, next: Msg[], dirtyFrom: number, wind
   return { len: next.length, nodes, windowStart }
 }
 
-/** Список пузырей: подписан только на эпоху сообщений, не на status/typing. */
-const MessageList = memo(function MessageList() {
+/** Список пузырей: перерисовывается только при смене эпохи сообщений — не на status/typing. */
+const MessageList = memo(function MessageList({ epoch }: { epoch: number }) {
   const game = useGameApi()
-  const epoch = useSyncExternalStore(game.subscribe, game.getMsgsEpoch)
   if (import.meta.env.MODE === 'test') messageListRenderStats.count++
   const cache = useRef<NodeCache>({ len: 0, nodes: [], windowStart: 0 })
   const applied = useRef(-1)
@@ -90,7 +89,7 @@ const MessageList = memo(function MessageList() {
     applied.current = epoch
   }
   useLayoutEffect(() => { game.ackMsgsDirty() }, [epoch, game])
-  // новый массив — иначе React может не увидеть in-place push в кэш
+  // новый массив — иначе in-place push в кэш не заметен рендеру
   if (windowStart > 0) {
     return [<div key="__cap" className="sep" aria-hidden="true">···</div>, ...cache.current.nodes]
   }
@@ -103,6 +102,10 @@ export function Chat() {
   const ref = useRef<HTMLElement>(null)
   const following = useRef(true)
   const feed = feedMsgs(game)
+  // Эпоха ленты читается здесь, а не в списке: рендер списка идёт одной волной с этим эффектом,
+  // поэтому прокрутка внизу считается по итоговой высоте (в preact отдельная подписка списка
+  // приходит вторым проходом — уже после прокрутки).
+  const epoch = useSyncExternalStore(game.subscribe, game.getMsgsEpoch)
   const previousCount = useRef(feed.length)
   const [unread, setUnread] = useState(0)
   const count = feed.length
@@ -155,7 +158,7 @@ export function Chat() {
             <div key={m.id} className="moo" style={{ left: `${m.left}%`, top: `${m.top}%` }}>{m.text}</div>
           ))}
         </div>
-        <MessageList />
+        <MessageList epoch={epoch} />
         {game.ui.typing && (
           // внутри живой ленты «печатает…» дублировало бы каждое входящее — читалке достаточно самого сообщения
           <div className="typing-bubble" aria-hidden="true"><span /><span /><span /></div>
