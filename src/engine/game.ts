@@ -2138,7 +2138,7 @@ export class Game {
     if (o.act === 'moo' || cat === 'cow') return 'moo'
     if (o.act === 'sorry' || cat === 'apology') return 'sorry'
     if (cat === 'intimidation' || cat === 'violent-threat') return 'intimidate'
-    if (o.tone === 'rude' || o.tone === 'threat' || cat === 'rude') return 'shake'
+    if (o.tone === 'rude' || o.tone === 'threat' || cat === 'rude' || cat === 'threat') return 'shake'
     return null
   }
 
@@ -2175,8 +2175,10 @@ export class Game {
     let tone = o.tone
     // Готовая кнопка может быть помечена как rude, но текст с судом всё равно двигает ветку угроз.
     if (tone === 'rude' && !o.scene && this.classifyInput(o.text).category === 'threat') tone = 'threat'
+    // Официальное обращение в суд приходит вежливым тоном (#1435): инстанцию и ачивку оно называет так же
+    const courtClaim = !o.scene && (tone === 'threat' || (tone === 'polite' && o.category === 'threat'))
     // ответ ищет ту же инстанцию, которую назвал игрок
-    if (tone === 'threat' && !o.scene) S.mem[memkeys.threatClaim] = legalClaim(o.text)
+    if (courtClaim) S.mem[memkeys.threatClaim] = legalClaim(o.text)
     this.tick(1 + this.rnd(5))
     const mine = this.push({ kind: 'text', from: 'me', text: o.text, time: fmtTime(S.clock) })
     this.seen.mark(o.text)
@@ -2185,7 +2187,8 @@ export class Game {
     this.unlock('first')
     if (this.isNight()) this.unlock('nightowl')
     if (tone === 'polite') { if (++S.politeStreak >= 10) this.unlock('saint') } else S.politeStreak = 0
-    if ((tone === 'rude' || tone === 'threat') && !o.scene) this.unlock(tone)
+    if (tone === 'rude' && !o.scene) this.unlock('rude')
+    if (courtClaim) this.unlock('threat')
     if (tone === 'cow') this.unlock('cow')
     if (!o.scene) this.triggerFeel(o)
     if (o.act !== 'topic') S.mem[memkeys.topicRun] = 0 // серия вопросов по одной теме прервалась
