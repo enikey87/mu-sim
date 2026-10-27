@@ -73,7 +73,8 @@ const CONTENT: Array<[string, string]> = ['src/content', 'src/engine'].flatMap((
 
 /** Трассировка повторённой строки до источника: константа (HARDCODED) или место в пуле. */
 const trace = (text: string): string => {
-  const probe = text.slice(0, 24).replace(/[«»]/g, '')
+  // sys-строки приходят с префиксом отчёта — источник ищем по тексту без него
+  const probe = text.replace(/^SYS: /, '').slice(0, 24).replace(/[«»]/g, '')
   if (probe.trim().length < 12) return 'источник не найден (строка короткая/шаблонная)'
   for (const [f, body] of CONTENT) {
     const idx = body.indexOf(probe)
@@ -85,7 +86,9 @@ const trace = (text: string): string => {
         const cand = (lines[line - 1 - k] ?? '').trim()
         if (/export const [A-Z_0-9]+ = ['"`]/.test(cand)) return `HARDCODED ${f}:${line - k} — ${cand.slice(0, 56)}`
       }
-      if (/^\s*'/.test(lines[line - 1] ?? '')) return `POOL ${f}:${line}`
+      const cur = lines[line - 1] ?? ''
+      // строка пула: литерал или needs-обёртка (пул с гейтами) — оба случая пул, не HARDCODED
+      if (/^\s*('|needs\()/.test(cur)) return `POOL ${f}:${line}`
       return `ДРУГОЕ ${f}:${line}`
     }
   }
@@ -102,18 +105,44 @@ describe('сканер исчерпания пула (POOL_SCAN)', () => {
       const p = PROFILES.find((x) => x.name === name)
       if (!p) throw new Error('неизвестный профиль: ' + name + ' (доступны: ' + PROFILES.map((x) => x.name).join(', ') + ')')
       const { game } = makeGame({ seed })
-      for (let i = 0; i < turns; i++) await game.send({ text: p.texts[i % p.texts.length], tone: p.tone })
-      const msgs = game.S.msgs
-        .filter((m) => (m.kind === 'text' && m.from !== 'me') || m.kind === 'sys')
-        .map((m) => (m.kind === 'sys' ? `SYS: ${m.text}` : String((m as { text: string }).text)))
+      // события с номером хода: окно повторов (порог скилла — половина пула в окне 20) требует знать ход показа
+      const events: Array<{ text: string; turn: number }> = []
+      const collect = (turn: number) => {
+        for (const m of game.S.msgs) {
+          if (m.kind === 'sys') events.push({ text: `SYS: ${m.text}`, turn })
+          else if (m.kind === 'text' && m.from !== 'me') events.push({ text: String((m as { text: string }).text), turn })
+        }
+      }
+      collect(0)
+      for (let i = 0; i < turns; i++) {
+        const seen = game.S.msgs.length
+        await game.send({ text: p.texts[i % p.texts.length], tone: p.tone })
+        for (const m of game.S.msgs.slice(seen)) {
+          if (m.kind === 'sys') events.push({ text: `SYS: ${m.text}`, turn: i + 1 })
+          else if (m.kind === 'text' && m.from !== 'me') events.push({ text: String((m as { text: string }).text), turn: i + 1 })
+        }
+      }
+      const msgs = events.map((e) => e.text)
       const counts = new Map<string, number>()
       for (const t of msgs) counts.set(t, (counts.get(t) ?? 0) + 1)
-      const top = [...counts.entries()].filter(([t, n]) => n >= 3 && t.length > 8).sort((a, b) => b[1] - a[1]).slice(0, 10)
+      /** Макс. показов одной строки в любом скользящем окне 20 ходов. */
+      const maxInWindow = (t: string): number => {
+        const ts = events.filter((e) => e.text === t).map((e) => e.turn)
+        let m = 0
+        for (let i = 0; i < ts.length; i++) {
+          let c = 0
+          for (let j = i; j < ts.length && ts[j] - ts[i] <= 20; j++) c++
+          m = Math.max(m, c)
+        }
+        return m
+      }
+      // сначала кандидаты окна (макс в окне 20 desc), потом счётчику: порог скилла — окно, не сумма за партию
+      const top = [...counts.entries()].filter(([t, n]) => n >= 3 && t.length > 8).sort((a, b) => maxInWindow(b[0]) - maxInWindow(a[0]) || b[1] - a[1]).slice(0, 10)
       const report = [
         `# pool-scan: профиль ${p.name} (сид ${seed}, ${turns} ходов)`,
         `Профиль: ${p.note}. Реплик+системных: ${msgs.length}, уникальных: ${counts.size}.`,
         '',
-        ...top.map(([t, n]) => `- ${n}× ${trace(t)}\n    «${t.slice(0, 100)}»`),
+        ...top.map(([t, n]) => `- ${n}× (макс ${maxInWindow(t)} в окне 20) ${trace(t)}\n    «${t.slice(0, 100)}»`),
       ].join('\n')
       const out = `/tmp/opencode/pool-scan-${p.name}.md`
       writeFileSync(out, report)
