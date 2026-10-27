@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest'
 import { makeGame, alikTexts } from '../test/helpers'
 import { ARCS, ARC_DONE, CAST } from './arcs'
 import { ACH } from './achievements'
-import { FINALES, ENDINGS, DEFAULT_FINALE, ENDING_MIN_DAY } from './finales'
+import { FINALES, ENDINGS, DEFAULT_FINALE, ENDING_MIN_DAY, CHRONIC_RUDE_AFTER_VENDETTA } from './finales'
 import type { Game } from '../engine/game'
 import { valueOf } from '../engine/rules'
 import { NOTIF } from './life'
@@ -397,6 +397,9 @@ describe('концовки игры', () => {
       honest: (g) => { g.S.mem['finale.grant'] = 'ally' },
       multiverse: (g) => { g.S.day = 800; g.S.stats.sent = 300; g.S.mem['endgame.active'] = true },
       vendetta: (g) => { g.S.mem.vendetta = true },
+      // ранний финал хроники (#1425): сход плюс порог криков после него; проверяется и в третьем акте,
+      // где уточнение обязано перебить «Вендетту»
+      bloodfeud: (g) => { g.S.mem.vendetta = true; g.S.mem['count.rudeAfterVendetta'] = CHRONIC_RUDE_AFTER_VENDETTA },
     }
     // исходы Дня выплаты: концовка по факту payday = id
     for (const e of ENDINGS) if (e.id.startsWith('payday_')) setups[e.id] = (g) => { g.S.mem.payday = e.id.slice(7) }
@@ -433,6 +436,16 @@ describe('концовки игры', () => {
       alik: [finale('garik.cutter')],
       honest: [finale('grant.ally')],
       vendetta: [async (g) => { Object.assign(g.S.mem, { 'count.rude': 25, 'rude.heat': 5 }); await g.send({ text: 'АЛИК!!! ТЫ ВРЁШЬ!!!', tone: 'rude' }); expect(g.S.mem.vendetta).toBe(true) }],
+      // ранний финал хроники (#1425): сход объявляется своим путём, порог криков после него добирается
+      // настоящим грубым ходом — счётчик ставит движок, а не поле в памяти
+      bloodfeud: [
+        async (g) => { Object.assign(g.S.mem, { 'count.rude': 25, 'rude.heat': 5 }); await g.send({ text: 'АЛИК!!! ТЫ ВРЁШЬ!!!', tone: 'rude' }); expect(g.S.mem.vendetta).toBe(true) },
+        async (g) => {
+          g.S.mem['count.rudeAfterVendetta'] = CHRONIC_RUDE_AFTER_VENDETTA - 1
+          await g.send({ text: 'ТЫ МНЕ ДОЛЖЕН, СЛЫШИШЬ?!', tone: 'rude' })
+          expect(g.S.mem['count.rudeAfterVendetta']).toBe(CHRONIC_RUDE_AFTER_VENDETTA)
+        },
+      ],
       // единственная концовка эндгейма: группа открылась выплатой и живёт до 800-го дня
       multiverse: [async (g) => { await payday(false)(g); g.closeEnding(); expect(g.S.mem['endgame.active']).toBe(true) }],
       payday_default: [payday(false)],
@@ -469,6 +482,69 @@ describe('концовки игры', () => {
     game.S.mem['finale.alik_death'] = 'will'
     await game.send({ text: 'Алик, добрый день', tone: 'polite' })
     expect(game.S.ending).toBe('heir')
+  })
+})
+
+// #1425: хронический грубиян после схода не досиживает до Дня выплаты — агрессия кончается развязкой.
+// Счётчик хроники ставит движок на каждом грубом ходу (game.ts), поэтому его рост проверяется живыми ходами,
+// а не полем в памяти: правило, перехватившее ответ (блок, чужие каналы), тоже обязано накручивать счётчик.
+describe('ранний финал «Кровный враг»', () => {
+  const CRY = { text: 'АЛИК!!! ТЫ ВРЁШЬ!!!', tone: 'rude' as const }
+  /** Довести партию до факта Вендетты её собственным путём: 15-й крик за партию без извинений. */
+  const toVendetta = async (game: Game) => {
+    Object.assign(game.S.mem, { 'count.rude': 14, 'rude.heat': 5 })
+    await game.send(CRY)
+    expect(game.S.mem.vendetta, 'вендетта').toBe(true)
+  }
+  const cry = async (game: Game, n: number) => { for (let i = 0; i < n; i++) await game.send(CRY) }
+
+  it('крики после схода копятся, сход не ждёт Дня выплаты: 15-й — ранний финал', async () => {
+    const { game } = makeGame()
+    await toVendetta(game)
+    await cry(game, CHRONIC_RUDE_AFTER_VENDETTA - 1)
+    expect(game.S.mem['count.rudeAfterVendetta'], 'счётчик хроники').toBe(CHRONIC_RUDE_AFTER_VENDETTA - 1)
+    expect(game.S.day, 'партия ещё далеко от Дня выплаты').toBeLessThan(ENDING_MIN_DAY)
+    expect(game.S.ending, 'порог не набран — финала нет').toBeNull()
+    await game.send(CRY)
+    expect(game.S.mem['count.rudeAfterVendetta']).toBe(CHRONIC_RUDE_AFTER_VENDETTA)
+    expect(game.S.ending, 'ранний финал').toBe('bloodfeud')
+    expect(game.S.ach.end_bloodfeud, 'экран записан в досье').toBe(game.S.day)
+  })
+  it('без извинения, но и без хроники: 14 криков после схода — ещё «Вендетта», а не ранний финал', async () => {
+    const { game } = makeGame()
+    await toVendetta(game)
+    await cry(game, CHRONIC_RUDE_AFTER_VENDETTA - 1)
+    game.S.day = ENDING_MIN_DAY // третий акт: обычный финал вендетты уже было бы пора
+    await game.fire('CheckEnding')
+    expect(game.S.ending).toBe('vendetta')
+  })
+  it('извинение после схода остаётся выходом: хроника не даёт раннего финала', async () => {
+    const { game } = makeGame()
+    await toVendetta(game)
+    await game.send({ text: 'Прости, брат', tone: 'polite', act: 'sorry' })
+    expect(game.S.mem['count.sorry'], 'извинение записано').toBe(1)
+    await cry(game, CHRONIC_RUDE_AFTER_VENDETTA + 2)
+    expect(game.S.mem['count.rudeAfterVendetta']).toBeGreaterThan(CHRONIC_RUDE_AFTER_VENDETTA)
+    expect(game.S.ending, 'извинился — развязки нет').toBeNull()
+  })
+  it('без схода хроника не копится: сколько угодно криков — раннего финала нет', async () => {
+    const { game } = makeGame()
+    game.S.mem['count.sorry'] = 1 // извинялся раньше — вендетта не объявляется, хронике не с чего начаться
+    await game.send({ text: 'ВЕРНИ ДЕНЬГИ, АЛИК!', tone: 'rude' })
+    await cry(game, CHRONIC_RUDE_AFTER_VENDETTA + 2)
+    expect(game.S.mem.vendetta, 'схода не было').toBeUndefined()
+    expect(game.S.mem['count.rudeAfterVendetta'], 'счётчик без вендетты').toBeUndefined()
+    expect(game.S.ending).toBeNull()
+  })
+  it('в третьем акте уточнение побеждает: хроника даёт «Кровного врага», а не розыгрыш с «Вендеттой»', async () => {
+    // НК: снять условие `lte(count.sorry, 0)` — специфичность падает до вендеттиной, и тест мигает на розыгрыше
+    for (const seed of [1, 2, 3, 4, 5]) {
+      const { game: g } = makeGame({ seed })
+      g.S.day = ENDING_MIN_DAY
+      Object.assign(g.S.mem, { vendetta: true, 'count.rudeAfterVendetta': CHRONIC_RUDE_AFTER_VENDETTA })
+      await g.fire('CheckEnding')
+      expect(g.S.ending, `сид ${seed}`).toBe('bloodfeud')
+    }
   })
 })
 
