@@ -6,3 +6,5 @@
 export const SAVE_KEY = 'alik-save-v4'
 /** Отметка устройства, а не партии: просьба «займи 50» уже звучала — вторая партия говорит другим текстом. */
 export const LEND50_SEEN_KEY = 'alik-lend50-seen'
+/** Коллекция концовок — тоже отметка устройства (#1437): «Начать заново» её не стирает, в облако она не едет. */
+export const ENDINGS_SEEN_KEY = 'alik-endings-seen'

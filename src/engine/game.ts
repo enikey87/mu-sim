@@ -2,7 +2,7 @@
 // что сделать Алику — принимает система правил (engine/rules/, content/rules/*).
 import { make, D, TRANSFER_FRESH_TURNS, PHOTO_FRESH_TURNS, EVENT_FRESH_TURNS, low, cap, type ExcuseApi, type Promise3, type PromiseCondition, type Rel, type When, type WhenKind } from '../content/excuses'
 import { makeScenes, invKey, type Scene, type Line } from '../content/scenes'
-import { BLOCK_LIFTED_LINE, BLOCK_LIFTED_SYS, COLD_WAR, TRIBUNAL } from '../content/rude'
+import { BLOCK_LIFTED_LINE, BLOCK_LIFTED_SYS, COLD_WAR, COLD_WAR_TURNS, COLD_WAR_WINDOW, TRIBUNAL } from '../content/rude'
 import { MIRROR, MIRROR_AGAIN, MIRROR_OPEN, MIRROR_REPLY, type Mirror } from '../content/mirror'
 import { PAYDAY_HOOKS } from '../content/rules/payday'
 import { QUEST_WHEN } from '../content/rules/world'
@@ -42,7 +42,7 @@ import { Decks, type Bag } from './deck'
 import { Battery } from './battery'
 import { Seen, type Keyed } from './uniq'
 import {
-  RuleSet, makeHub, Lines, resolver, test, isOpen, valueOf, set, spec, daysSince,
+  RuleSet, makeHub, Lines, resolver, test, isOpen, valueOf, set, spec, daysSince, lineId,
   type Criterion, type Entry, type FactOp, type Facts, type Resolver, type Rule, type Query, type Priority, type Line as PoolLine, type LineOpts, type Picked,
 } from './rules'
 import { MENTION_RE, WORLD } from '../content/world'
@@ -54,7 +54,7 @@ import { classifyUserInput, legalClaim, type ClassifiedInput } from './input'
 import { track, left, shown, type Phase } from '../analytics/metrics'
 import { holidayOf, holidayGreetKey, holidayDays, HOLIDAY_EXCUSES } from '../content/holidays'
 import { dueIn, dateOf, fmtDate, fmtDayMonth, fmtShortDate, fmtTime, weekOf, nightHour, periodOf, tierOf, TIERS, type Due, type Period } from './time'
-import { type GameState, type BankWeek, type Msg, type NewMsg, type Card, type PhoneEvent, type Choice, type Ctx, type Tone, type Storage, type InputCategory, freshState, loadState, saveState, SAVE_KEY, LEND50_SEEN_KEY, MAX_PATIENCE, ARC_MARINATION_DAYS, START_DAY, isLate, countOf, setCount, type PromiseRec } from './state'
+import { type GameState, type BankWeek, type Msg, type NewMsg, type Card, type PhoneEvent, type Choice, type Ctx, type Tone, type Storage, type InputCategory, freshState, loadState, saveState, SAVE_KEY, LEND50_SEEN_KEY, ENDINGS_SEEN_KEY, endingsOnDevice, withEndingOnDevice, MAX_PATIENCE, ARC_MARINATION_DAYS, START_DAY, isLate, countOf, setCount, type PromiseRec } from './state'
 
 /** Текст срока как буквальный шаблон без учёта регистра; кэш — topicOfLast зовётся из facts() на каждую реплику. */
 const LITERAL = new Map<string, RegExp>()
@@ -397,6 +397,8 @@ export class Game {
 
   reset(): void {
     this.resetting = true
+    // коллекция концовок — отметка устройства, а не партии: «Начать заново» её не стирает (#1437)
+    for (const id of Object.keys(this.S.endings)) this.markEndingOnDevice(id)
     this.storage?.removeItem(SAVE_KEY)
   }
 
@@ -498,6 +500,17 @@ export class Game {
     if (!p) return o.fallback ? this.uniq(o.fallback) : null
     return p.text
   }
+  /**
+   * Строки пула, прозвучавшие в последние `turns` ходов под общим ключом `key` (#1441): окно повтора
+   * считается по тексту, а не по ключу колоды — показ строки одним путём держит её и для другого.
+   * Колодам с одной и той же строкой в двух пулах без этого не видно показов друг друга.
+   */
+  recentLines(key: string, pool: readonly Entry<string>[], turns: number): Set<string> {
+    const open = new Set(this.lines.eligible(key, pool, this.lineFacts(), { repeat: true, cooldown: { turns } }).map((p) => p.text))
+    return new Set(pool.map(valueOf).filter((t) => !open.has(t)))
+  }
+  /** Показать строку в общем окне повтора (#1441): тот же ключ, что читает `recentLines`. */
+  noteLine(key: string, text: string): void { this.lines.mark(lineId(key, text)) }
   /** То же, но с самой репликой (её поля: сумма в День выплаты, кто говорит, явная семантика). */
   linePicked(key: string, pool: readonly PoolLine[], o: LineOpts = {}): (Picked & { spec: ContentLineSpec }) | null {
     const p = this.lines.pick(key, pool, this.lineFacts(), o) as (Picked & { spec: ContentLineSpec }) | null
@@ -2892,11 +2905,26 @@ export class Game {
   }
 
   // ---------- концовки ----------
+  /** Открытые на устройстве концовки: `S.endings` живёт в партии, а коллекция переживает и сброс партии (#1437). */
+  endingsSeen(): ReadonlySet<string> {
+    return endingsOnDevice(this.storage?.getItem(ENDINGS_SEEN_KEY) ?? null)
+  }
+
+  /** Отметка устройства после концовки: в облако не едет, поэтому коллекция не переезжает на другое устройство. */
+  private markEndingOnDevice(id: string): void {
+    const storage = this.storage
+    if (!storage) return
+    try {
+      storage.setItem(ENDINGS_SEEN_KEY, withEndingOnDevice(storage.getItem(ENDINGS_SEEN_KEY), id))
+    } catch { /* устройство без записи — коллекция живёт только в партии */ }
+  }
+
   async reachEnding(id: string): Promise<void> {
     const e = ENDINGS.find((x) => x.id === id)!
     await this.sleep(800)
     await this.say(this.open(e.m))
     this.S.endings[id] = this.S.day
+    this.markEndingOnDevice(id)
     this.S.ending = id
     this.unlock('end_' + id)
     track('ending', { id: e.id })
@@ -3467,8 +3495,11 @@ export class Game {
         return
       case 'formality': for (const text of this.formalityLines()) deliver({ kind: 'text', from: 'alik', text: saidText(text) }, saidClaims(text)); return
       case 'coldWar': {
-        const text = this.decks.pick('COLD_WAR', COLD_WAR, this.lineFacts(), { mode: 'sequential', noRepeat: true })
+        // те же общие ворота окна, что у правила Idle_ColdWar (#1441): инициатива и ответ делят одну строку
+        const blocked = this.recentLines(COLD_WAR_WINDOW, COLD_WAR, COLD_WAR_TURNS)
+        const text = this.decks.pick('COLD_WAR', COLD_WAR, this.lineFacts(), { mode: 'sequential', noRepeat: true, eligible: (e) => !blocked.has(valueOf(e)) })
         if (!text) return false
+        this.noteLine(COLD_WAR_WINDOW, text)
         deliver({ kind: 'text', from: 'alik', text })
         return
       }
@@ -3619,6 +3650,7 @@ export type ContentApi = Pick<Game,
   | 'lie' | 'caught' | 'callback'
   // колоды и реплики
   | 'draw' | 'open' | 'uniq' | 'pair' | 'line' | 'linePicked' | 'lines' | 'seen' | 'decks' | 'X'
+  | 'recentLines' | 'noteLine'
   | 'addrSaidLine' | 'playerLine' | 'actionLabel' | 'freshPlayer' | 'freshPlayerTurn' | 'windowLine' | 'oldestShown' | 'offeredInWindow' | 'rememberShown' | 'rnd' | 'chance' | 'bagOf' | 'restoreBag'
   // контекст последней реплики
   | 'ctx' | 'setCtx'

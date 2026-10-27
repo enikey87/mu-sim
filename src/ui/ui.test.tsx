@@ -9,7 +9,7 @@ import { DEBT_MS } from './Header'
 import { makeGame, setMoney, memStorage, flush } from '../test/helpers'
 import { SAVE_KEY, loadState, DEBT0, type Msg } from '../engine/state'
 import { nextTransfer } from '../content/memkeys'
-import { ENDING_MIN_DAY } from '../content/finales'
+import { ENDING_MIN_DAY, ENDINGS } from '../content/finales'
 import { fmtDate } from '../engine/time'
 import type { Game } from '../engine/game'
 import { introOf, uiOf } from './view'
@@ -669,6 +669,25 @@ describe('App', () => {
     expect(promises.querySelectorAll('li')).toHaveLength(1)
     expect(document.getElementById('arcs')!.matches('.list')).toBe(true)
     expect(document.getElementById('items')!.matches('.list')).toBe(true)
+  })
+
+  it('досье: коллекция открытых концовок — устройства, а не партии (#1437)', async () => {
+    const storage = memStorage()
+    const first = makeGame({ storage }).game
+    await first.reachEnding('family')
+    first.reset()
+    // новая партия на том же устройстве: партия пустая, а коллекция — нет
+    const { game } = makeGame({ storage })
+    renderApp(game)
+    fireEvent.click(screen.getByTitle('Обещания и ачивки'))
+    const endings = document.getElementById('endings')!
+    const got = within(endings).getByText('Породнились').closest('.tile')!
+    expect(got.className).toBe('tile')
+    expect(got.querySelector('.tile-icon')!.textContent).toBe('💍')
+    expect(document.getElementById('endCount')!.textContent).toBe(`1/${ENDINGS.length}`)
+    // незаработанные остаются силуэтами без названий и без намёка на условие
+    expect(within(endings).getAllByText('???')).toHaveLength(ENDINGS.length - 1)
+    expect(within(endings).queryByText('Честные деньги')).toBeNull()
   })
 
   it('досье: плитки не кнопки и не ссылки — фокус с «Закрыть» доходит до «Начать заново»', async () => {
