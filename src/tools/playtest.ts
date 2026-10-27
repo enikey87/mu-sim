@@ -11,6 +11,7 @@ import { PLAYER_PREFIX, PLAYER_SUFFIX } from '../content/misc'
 import { alikDead } from '../content/memkeys'
 import { type Criterion, type Rule } from '../engine/rules'
 import type { Choice, Msg, NewMsg, PhoneEvent } from '../engine/state'
+import { mooClock } from '../engine/moo'
 import { RUDE_SHOUTS } from './shouts'
 
 export type Style = 'curious' | 'polite' | 'hothead'
@@ -353,7 +354,7 @@ function line(m: Msg): string {
       return `${t}${who}: ${m.text}${marks.length ? `  (${marks.join(', ')})` : ''}`
     }
     case 'transfer': return `${t}Алик: 💸 перевод ${m.amount ?? 50} ₽ — «${m.text}»`
-    case 'voice': return `${t}Алик: 🎤 голосовое 0:${String(m.len).padStart(2, '0')}${m.feast ? ' (шум застолья)' : ''}`
+    case 'voice': return `${t}Алик: 🎤 голосовое ${mooClock(m)}${m.feast ? ' (шум застолья)' : ''}`
     case 'photo': return `${t}Алик: 📷 фото «платёжки» (на снимке — баран на фоне Арарата), подпись: ${m.text}`
     case 'sticker': return `${t}Алик: [стикер ${m.e} ${m.c}]`
     case 'fwd': return `${t}Алик: ↪ переслано от «${m.f}»: ${m.text}`

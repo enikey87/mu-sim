@@ -2,6 +2,7 @@
 // Заметки живут в sessionStorage (не в сохранении игры), переживают перезагрузку страницы и не уходят в аналитику.
 // Формат транскрипта — тот же, что у плейтест-дампов (`transcript()` в `src/tools/playtest.ts`).
 import type { Msg } from '../engine/state'
+import { mooClock } from '../engine/moo'
 
 export type ReviewCategory = 'несостыковка' | 'плохой_вариант' | 'строка_на_переделку' | 'идея'
 /** Типы сообщений, которые можно аннотировать: типы из ТЗ #872; `scene_button` — кнопка сцены, не сообщение ленты. */
@@ -79,7 +80,7 @@ const textOf = (m: Msg): string => {
   switch (m.kind) {
     case 'text': case 'sys': case 'card': case 'photo': case 'fwd': case 'job': return m.text
     case 'transfer': return `💸 перевод ${m.amount ?? 50} ₽ — «${m.text}»`
-    case 'voice': return `🎤 голосовое 0:${String(m.len).padStart(2, '0')}`
+    case 'voice': return `🎤 голосовое ${mooClock(m)}`
     case 'sticker': return `[стикер ${m.e} ${m.c}]`
     default: return ''
   }
@@ -114,7 +115,7 @@ export function reviewLine(m: Msg, nameOf: (who?: string) => string): string {
       return `${t}${who}: ${m.text}${marks.length ? `  (${marks.join(', ')})` : ''}`
     }
     case 'transfer': return `${t}Алик: 💸 перевод ${m.amount ?? 50} ₽ — «${m.text}»`
-    case 'voice': return `${t}Алик: 🎤 голосовое 0:${String(m.len).padStart(2, '0')}${m.feast ? ' (шум застолья)' : ''}`
+    case 'voice': return `${t}Алик: 🎤 голосовое ${mooClock(m)}${m.feast ? ' (шум застолья)' : ''}`
     case 'photo': return `${t}Алик: 📷 фото «платёжки» (на снимке — баран на фоне Арарата), подпись: ${m.text}`
     case 'sticker': return `${t}Алик: [стикер ${m.e} ${m.c}]`
     case 'fwd': return `${t}Алик: ↪ переслано от «${m.f}»: ${m.text}`

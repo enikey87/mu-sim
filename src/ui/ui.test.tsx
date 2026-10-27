@@ -11,6 +11,7 @@ import { SAVE_KEY, loadState, DEBT0, type Msg } from '../engine/state'
 import { nextTransfer } from '../content/memkeys'
 import { ENDING_MIN_DAY, ENDINGS } from '../content/finales'
 import { fmtDate } from '../engine/time'
+import { mooClock } from '../engine/moo'
 import type { Game } from '../engine/game'
 import { introOf, uiOf } from './view'
 import { introDateLine, introVowLine, LINE_MS, FADE_MS } from '../intro/cards'
@@ -971,6 +972,14 @@ describe('App', () => {
     expect(toast).toHaveTextContent('Скопировано')
     expect(toast.closest('.phone-surface')).toBeNull()
     expect(toast.closest('[inert]')).toBeNull()
+  })
+
+  it('голосовое показывает длительность закреплённой фразы, а не выдуманный len', () => {
+    const { game } = makeGame()
+    const v = game.push({ kind: 'voice', from: 'alik', len: 47 })
+    renderApp(game)
+    expect(screen.getByText(mooClock(v))).toBeInTheDocument()
+    expect(screen.queryByText('0:47')).toBeNull()
   })
 
   it('голосовое доступно с клавиатуры', () => {
