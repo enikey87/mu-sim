@@ -175,6 +175,15 @@ const receiversTags = () =>
   [...document.querySelectorAll('script[src*="mc.yandex.ru"], script[src*="posthog"], script[src*="umami"]')]
 
 describe('ключи приёмников — из переменных сборки, а не из кода (#1258)', () => {
+  // isolate: false (vite.config) — jsdom-документ и модульный реестр общие на воркере:
+  // чужой файл мог оставить свой тег приёмника в документе, а этот блок меряет абсолютную
+  // чистоту. Чистим ДО каждого теста тоже — утверждение про «наш модуль ничего не грузит»,
+  // а не про «в общем документе ничего нет» (флейк CI 27.10: посторонний posthog-тег).
+  beforeEach(() => {
+    vi.unstubAllEnvs()
+    vi.resetModules()
+    receiversTags().forEach((s) => s.remove())
+  })
   afterEach(() => {
     vi.unstubAllEnvs()
     vi.resetModules()
