@@ -2,7 +2,7 @@
 import type { ContentApi } from '../../engine/game'
 import { type Rule, eq, gte, is, exists, missing, set, during, lt } from '../fact'
 import type { GameEvent, Offer } from './events'
-import { SOURCES, SOURCES_TOPUP, ROLL, CLAIMS, DETECTIVE_CLAIMS, DETECTIVE_CHAIN, DETECTIVE_CATCHES, detectiveDue, GRAND, GRAND_FALLBACK, SLOTS, CONTRADICTIONS, MORNING_CONTRA, OUTCOME, LEAD, type Source, type Call, type Claim, type Lead } from '../payday'
+import { SOURCES, SOURCES_TOPUP, ROLL, CLAIMS, COINS_BRIDGE_CATCHES, DETECTIVE_CLAIMS, DETECTIVE_CHAIN, DETECTIVE_CATCHES, detectiveDue, GRAND, GRAND_FALLBACK, SLOTS, CONTRADICTIONS, MORNING_CONTRA, OUTCOME, LEAD, type Source, type Call, type Claim, type Lead } from '../payday'
 import { alikDead, caughtCount, cryptoHodl, payday as pd, paydayScene, taxFrozen, taxThawed } from '../memkeys'
 import { samvelLine } from '../world'
 
@@ -229,6 +229,10 @@ export const paydayRules: R[] = [
   outcome('detective', [gte(caughtCount, DETECTIVE_CATCHES), missing(pd.caught)], { bonus: 1 }),
   // поимка и «Нива выбрала тебя» — заслуга игрока: важнее исходов «по стилю партии»; между собой жребий допустим
   outcome('coins', [is(pd.caught)], { bonus: 1 }),
+  // мост поимок (#1433): две мидгейм-поимки отдают мешок и без поимки в самой сцене. Специфичность 1 — самая
+  // нижняя из заслуженных: сцена (2), «Нива» (2), «Следователь» (3), «Лаваш» (3), «Настоящие» (4) остаются выше,
+  // а со «Страсбургом» и «Не тебе» мост не спорит вовсе — их исключают условия. Выше только default (0).
+  outcome('coins', [gte(caughtCount, COINS_BRIDGE_CATCHES), missing(pd.caught), missing('ach.strasbourg'), missing('finale.razmik')], { name: 'Payday_coinsByCatch', specificity: 1 }),
   outcome('lavash', [is(cryptoHodl)], { bonus: 2 }),
   outcome('niva', [eq('finale.niva', 'chose')], { bonus: 1 }),
   // исходы «по стилю партии» — одной специфичности: подходит несколько — выбор случайный, а не всегда один
