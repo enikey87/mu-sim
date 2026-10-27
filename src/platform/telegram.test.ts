@@ -34,7 +34,7 @@ describe('адаптер Telegram Mini App (#1234)', () => {
     const disableVerticalSwipes = vi.fn()
     const requestFullscreen = vi.fn()
     // скрипт, доехав, сам ставит window.Telegram.WebApp — до загрузки клиента нет
-    const load = vi.fn(async (_src: string) => { tg({ colorScheme: 'dark', ready, expand, disableVerticalSwipes, requestFullscreen }) })
+    const load = vi.fn(async (_src: string) => { tg({ platform: 'android', colorScheme: 'dark', ready, expand, disableVerticalSwipes, requestFullscreen }) })
     const p = telegramPlatform({ load })
 
     await p.init()
@@ -116,9 +116,91 @@ describe('адаптер Telegram Mini App (#1234)', () => {
 
   it('уже фуллскрин — второй раз не просим', async () => {
     const requestFullscreen = vi.fn()
-    tg({ isFullscreen: true, requestFullscreen })
+    const exitFullscreen = vi.fn()
+    tg({ platform: 'ios', isFullscreen: true, requestFullscreen, exitFullscreen })
     await telegramPlatform({ load: async () => {} }).init()
     expect(requestFullscreen).not.toHaveBeenCalled()
+    expect(exitFullscreen).not.toHaveBeenCalled()
+  })
+
+  it('отказ expand не мешает мобильному fullscreen и остальному старту', async () => {
+    const expand = vi.fn(() => { throw new Error('unsupported') })
+    const requestFullscreen = vi.fn()
+    const onEvent = vi.fn()
+    tg({ platform: 'android', expand, requestFullscreen, onEvent })
+    await expect(telegramPlatform().init()).resolves.toBeUndefined()
+    expect(expand).toHaveBeenCalledOnce()
+    expect(requestFullscreen).toHaveBeenCalledOnce()
+    expect(onEvent).toHaveBeenCalledWith('themeChanged', expect.any(Function))
+  })
+
+  it.each(['android', 'android_x', 'ios'])('%s разворачивается и просит fullscreen', async (platform) => {
+    const expand = vi.fn()
+    const requestFullscreen = vi.fn()
+    const exitFullscreen = vi.fn()
+    tg({ platform, expand, requestFullscreen, exitFullscreen })
+    await telegramPlatform().init()
+    expect(expand).toHaveBeenCalledOnce()
+    expect(requestFullscreen).toHaveBeenCalledOnce()
+    expect(exitFullscreen).not.toHaveBeenCalled()
+  })
+
+  it.each(['web', 'weba', 'webk', 'tdesktop', 'macos', 'unknown', undefined])(
+    '%s сохраняет обычное окно без разворачивания', async (platform) => {
+      const ready = vi.fn()
+      const expand = vi.fn()
+      const requestFullscreen = vi.fn()
+      const exitFullscreen = vi.fn()
+      tg({ platform, ready, expand, requestFullscreen, exitFullscreen, isFullscreen: false })
+      await telegramPlatform().init()
+      expect(ready).toHaveBeenCalledOnce()
+      expect(expand).not.toHaveBeenCalled()
+      expect(requestFullscreen).not.toHaveBeenCalled()
+      expect(exitFullscreen).not.toHaveBeenCalled()
+    },
+  )
+
+  it.each(['web', 'weba', 'webk', 'tdesktop', 'macos'])(
+    '%s выходит из fullscreen, если клиент уже открыл его так', async (platform) => {
+      const app = {
+        platform, isFullscreen: true, expand: vi.fn(), requestFullscreen: vi.fn(),
+        exitFullscreen: vi.fn(),
+      }
+      tg(app)
+      await telegramPlatform().init()
+      expect(app.exitFullscreen).toHaveBeenCalledOnce()
+      expect(app.exitFullscreen.mock.contexts[0]).toBe(app)
+      expect(app.expand).not.toHaveBeenCalled()
+      expect(app.requestFullscreen).not.toHaveBeenCalled()
+    },
+  )
+
+  it.each(['android', 'ios', 'web'])(
+    '%s без новых методов продолжает запуск', async (platform) => {
+      tg({ platform, isFullscreen: platform === 'web' })
+      await expect(telegramPlatform().init()).resolves.toBeUndefined()
+    },
+  )
+
+  it.each(['android', 'web'])('%s переносит отказ сменить режим окна', async (platform) => {
+    for (const asynchronous of [false, true]) {
+      const themeListener = vi.fn()
+      const app = {
+        platform, isFullscreen: platform === 'web', expand: vi.fn(),
+        requestFullscreen() { return change.call(this) },
+        exitFullscreen() { return change.call(this) },
+        onEvent: themeListener,
+      }
+      const change = vi.fn(function (this: unknown) {
+        if (asynchronous) return Promise.reject(new Error('unsupported'))
+        throw new Error('unsupported')
+      })
+      tg(app)
+      await expect(telegramPlatform().init()).resolves.toBeUndefined()
+      expect(change).toHaveBeenCalledOnce()
+      expect(change.mock.contexts[0]).toBe(app)
+      expect(themeListener).toHaveBeenCalledWith('themeChanged', expect.any(Function))
+    }
   })
 
   it('VITE_PLATFORM=telegram выбирает сборку Mini App', async () => {
