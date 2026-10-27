@@ -11,17 +11,21 @@ import { PLAYER_PREFIX, PLAYER_SUFFIX } from '../content/misc'
 import { alikDead } from '../content/memkeys'
 import { type Criterion, type Rule } from '../engine/rules'
 import type { Choice, Msg, NewMsg, PhoneEvent } from '../engine/state'
+import { RUDE_SHOUTS } from './shouts'
 
 export type Style = 'curious' | 'polite' | 'hothead'
-export type PlayProfile = 'neutral' | 'agreeable'
+export type PlayProfile = 'neutral' | 'agreeable' | 'rude'
+/** Окно повтора кричалок: дословно не ближе 20 ходов — конвенция пулов. */
+const SHOUT_WINDOW = 20
 /** Фон-мычание в расшифровке: одна формулировка на все мычания партии (#876). */
 export const MOO_ASIDE = '(на фоне кто-то протяжно: «Мууууу»)'
 export const STYLES: Style[] = ['curious', 'polite', 'hothead']
 const HOURS = [14, 20, 9, 2, 17, 12]
 
-/** Что бот сделал за ход: выбрал вариант i из offered, ответил на допработу, зарядил телефон, промолчал. */
+/** Что бот сделал за ход: выбрал вариант i из offered, ответил на допработу, зарядил телефон, промолчал.
+ *  `free` — свободный текст вместо кнопки (грубый профиль); тогда `i` = -1. */
 export type Act =
-  | { kind: 'send'; i: number; offered: string[]; at: number }
+  | { kind: 'send'; i: number; offered: string[]; at: number; free?: string }
   | { kind: 'job'; yes: boolean | 'mirror'; at?: number }
   | { kind: 'card'; pick: 'take' | 'sell' | 'later' }
   | { kind: 'charge' }
@@ -47,7 +51,7 @@ export interface WorldFrame {
   /** event — что за событие (сводка, отказ, предложение…); repeat — строка пула объявлена повторяемой: по ним оракул судит повтор (#304). */
   notif: { text: string; fails: string[]; event: PhoneEvent; repeat: boolean }[]
 }
-export interface Played { seed: number; style: Style; hour: number; acts: Act[]; asides: Aside[]; world: WorldFrame[]; game: Game }
+export interface Played { seed: number; style: Style; hour: number; profile: PlayProfile; acts: Act[]; asides: Aside[]; world: WorldFrame[]; game: Game }
 
 /** Ключи мира для оракула; сериалы — из `facts()`, они живут в `S.arcs`, а не в `S.mem`. */
 const WORLD_KEYS = ['alik_dead', 'mourning', 'blood.given', 'said.friday', 'endgame.mutes', 'credit.offer'] as const
@@ -86,6 +90,11 @@ const PROFILE: Record<Style, { ctx: number; rude: number; idle: number; polite: 
 }
 
 const agreeableProfile = (profile: PlayProfile): boolean => profile === 'agreeable'
+const rudeProfile = (profile: PlayProfile): boolean => profile === 'rude'
+
+/** Извинение — свой ход: грубый профиль их не берёт и не пишет (#1432). */
+const SORRY_RE = /^(извин|прости|сорри|sorry)/
+const isApology = (c: Choice): boolean => c.act === 'sorry' || SORRY_RE.test(buttonStem(c.text))
 
 /** Обращение и хвост прячут основу: «Алик, согласен… 🙏» и «Беру!» — одна и та же кнопка. */
 function buttonStem(text: string): string {
@@ -115,6 +124,12 @@ export function pickChoice(rng: Rng, style: Style, cs: Choice[], profile: PlayPr
   const p = PROFILE[style]
   const idx = (f: (c: Choice) => boolean) => cs.map((c, i) => (f(c) ? i : -1)).filter((i) => i >= 0)
   const any = (ids: number[]) => ids[Math.floor(rng.random() * ids.length)]
+  // грубый профиль: крик или угроза из предложенных, извинение — никогда;
+  // грубой кнопки нет — -1: свободный крик из пула, а не смягчение хода
+  if (rudeProfile(profile)) {
+    const rude = idx((c) => (c.tone === 'rude' || c.tone === 'threat') && !isApology(c))
+    return rude.length ? any(rude) : -1
+  }
   if (agreeableProfile(profile)) {
     const yes = idx(agrees)
     // весь блок — согласие или его нет: тот же розыгрыш, что у нейтрального
@@ -128,6 +143,14 @@ export function pickChoice(rng: Rng, style: Style, cs: Choice[], profile: PlayPr
   if (polite.length && rng.random() < p.polite) return any(polite)
   const safe = idx((c) => c.tone !== 'rude' && c.tone !== 'threat')
   return safe.length ? any(safe) : 0
+}
+
+/** Крик свободным текстом: дословно не ближе окна 20 ходов — конвенция пулов (#1432). */
+export function pickShout(rng: Rng, history: readonly string[]): string {
+  const recent = new Set(history.slice(-SHOUT_WINDOW))
+  const fresh = RUDE_SHOUTS.filter((t) => !recent.has(t))
+  const pool = fresh.length ? fresh : RUDE_SHOUTS
+  return pool[Math.floor(rng.random() * pool.length)]
 }
 
 /** Открытое предложение банка в ленте (кнопки не нажаты). */
@@ -226,6 +249,8 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
     const job = game.S.msgs.find((m) => m.kind === 'job' && !m.answered)
     if (job) {
       if (agreeableProfile(profile)) return { kind: 'job', yes: true, at: game.S.msgs.length }
+      // грубиян допработ не берёт: его ход — крик, а не согласие на подработку (#1432)
+      if (rudeProfile(profile)) return { kind: 'job', yes: false, at: game.S.msgs.length }
       // иногда зеркало — иначе оракул не видит его в партиях (#256)
       const yes: boolean | 'mirror' = game.canMirror() && bot.random() < 0.25 ? 'mirror' : bot.random() < 0.5
       return { kind: 'job', yes, at: game.S.msgs.length }
@@ -236,9 +261,13 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
     // повтор take, который карточку не закрыл, не съедает следующие ходы
     if (agreeableProfile(profile) && offer?.offer?.take && !(last?.kind === 'card' && last.pick === 'take')) return { kind: 'card', pick: 'take' }
     if (offer && bot.random() < 0.7) { const r = bot.random(); return { kind: 'card', pick: r < 0.5 ? 'take' : r < 0.85 ? 'sell' : 'later' } }
-    if (game.S.stats.sent >= 5 && bot.random() < PROFILE[style].idle) return { kind: 'idle' }
+    // грубиян не отмалчивается: каждый ход — крик
+    if (!rudeProfile(profile) && game.S.stats.sent >= 5 && bot.random() < PROFILE[style].idle) return { kind: 'idle' }
     const offered = game.choices.map((c) => c.text)
-    return { kind: 'send', i: pickChoice(bot, style, game.choices, profile), offered, at: game.S.msgs.length }
+    const i = pickChoice(bot, style, game.choices, profile)
+    // -1 от грубого профиля: грубой кнопки нет — свободный крик, пул помнит окно повтора
+    const free = i < 0 ? pickShout(bot, acts.flatMap((a) => (a.kind === 'send' && a.free !== undefined ? [a.free] : []))) : undefined
+    return { kind: 'send', i, offered, free, at: game.S.msgs.length }
   }
   for (let k = 0; k < (replay?.length ?? turns); k++) {
     const a = replay ? replay[k] : next()
@@ -253,7 +282,7 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
     else if (a.kind === 'card') game.answerCard(openOffer(game)!.id, a.pick)
     else if (a.kind === 'idle') await game.onIdle()
     else {
-      await game.send(game.choices[a.i])
+      await game.send(a.free !== undefined ? { text: a.free, tone: 'rude' } : game.choices[a.i])
       // перед репликой игрока может встать разделитель дня — варианты привязываем к самой реплике
       if (!replay) a.at = game.S.msgs.findIndex((m, i) => i >= a.at && m.kind === 'text' && m.from === 'me')
     }
@@ -267,7 +296,7 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
     clock.runTimers() // «Мууу» и прочее отложенное
     snap(k)
   }
-  return { seed, style, hour, acts, asides, world, game }
+  return { seed, style, hour, profile, acts, asides, world, game }
 }
 
 /** Сцены по кадрам партии: сколько раз каждая (`Scene_<id>`) выпала в `PickScene` — замер весов одной командой (#778). */
@@ -280,6 +309,11 @@ export function sceneCounts(p: Played): Record<string, number> {
     }
   }
   return scenes
+}
+
+/** Запись действий в json рядом с расшифровкой: профиль бота виден и в машинном выхлопе (#1432). */
+export function seedJson(p: Played): string {
+  return JSON.stringify({ seed: p.seed, style: p.style, hour: p.hour, ...(p.profile === 'neutral' ? {} : { profile: p.profile }), acts: p.acts })
 }
 
 /** Машиночитаемый лог фактов для оракула (рядом с seed-*.txt, не вместо). */
@@ -341,7 +375,9 @@ export function transcript(p: Played): string {
   const jobs = new Set(p.acts.flatMap((a) => (a.kind === 'job' && a.at !== undefined ? [a.at] : [])))
   const ending = p.game.S.ending ? ENDINGS.find((e) => e.id === p.game.S.ending) : null
   const sent = p.game.S.msgs.filter((m) => m.kind === 'text' && m.from === 'me').length
-  const out = [`Партия ${p.seed}: сообщений игрока — ${sent}, в конце — ${p.game.S.day}-й день ожидания денег${ending ? `, концовка «${ending.title}»` : ''}`]
+  // профиль бота виден в заголовке: согласник и грубиян читаются в дампе, а не угадываются по ходам (#1432)
+  const profileNote = p.profile === 'neutral' ? '' : ` (профиль: ${p.profile})`
+  const out = [`Партия ${p.seed}${profileNote}: сообщений игрока — ${sent}, в конце — ${p.game.S.day}-й день ожидания денег${ending ? `, концовка «${ending.title}»` : ''}`]
   const aside = (i: number) => { for (const a of p.asides) if (a.at === i) out.push(a.text) }
   p.game.S.msgs.forEach((m, i) => {
     aside(i)

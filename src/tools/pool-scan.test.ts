@@ -11,19 +11,14 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { makeGame } from '../test/helpers'
+import { RUDE_SHOUTS } from './shouts'
 
 type Profile = { name: string; tone: 'rude' | 'polite' | 'neutral'; texts: string[]; note: string }
 
 const PROFILES: Profile[] = [
   {
     name: 'rude', tone: 'rude', note: 'хроническая грубость без извинений: блок-цикл, лестница S0–S5',
-    texts: [
-      'АЛИК!!! ВЕРНИ ДЕНЬГИ!!!', 'Ты мошенник!!!', 'Где мои 240 000?!', 'Хватит врать!!!',
-      'Я устал от твоих отмазок!!', 'Ты не подрядчик, ты вор!!!', 'АЛИК ВОЗДУХОНЕСЯН!!! ГДЕ ДЕНЬГИ?!',
-      'Мне плевать на твою родню!!! ПЛАТИ!', 'Сколько можно ждать?!', 'Ты меня за дурака держишь?!',
-      'Я всё расскажу всем!!!', 'ХВАТИТ!!!', 'Плита кривая, деньги где?!', 'Ты кричал, что заплатишь — я записал!!!',
-      'Никаких больше «завтра»!!!', 'Верни хотя бы тысячу!!!',
-    ],
+    texts: RUDE_SHOUTS,
   },
   {
     name: 'money', tone: 'neutral', note: 'денежное давление каждый ход: терпение, капитулизации, переводы',

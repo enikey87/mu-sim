@@ -1,12 +1,13 @@
 // Плейтест: партия воспроизводится по seed и по записи действий.
-// Прогон для разбора: PLAYTEST_OUT=<папка> PLAYTEST_SEEDS=1-8 [PLAYTEST_TURNS=300] [PLAYTEST_PROFILE=agreeable] npm run playtest
+// Прогон для разбора: PLAYTEST_OUT=<папка> PLAYTEST_SEEDS=1-8 [PLAYTEST_TURNS=300] [PLAYTEST_PROFILE=agreeable|rude] npm run playtest
 import { describe, it, expect } from 'vitest'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { is, missing, gte } from '../engine/rules'
-import { playtest, transcript, worldDump, deathGated, requiresKey, attachSpeechAttribution, notifFails, pickChoice, type PlayProfile } from './playtest'
+import { playtest, transcript, worldDump, deathGated, requiresKey, attachSpeechAttribution, notifFails, pickChoice, pickShout, seedJson, type PlayProfile, type Act } from './playtest'
 import type { Choice } from '../engine/state'
 import type { Rng } from '../engine/rng'
+import { RUDE_SHOUTS } from './shouts'
 import { loanTaken } from '../content/credit'
 import { setMoney } from '../test/helpers'
 import { alikDead } from '../content/memkeys'
@@ -262,6 +263,58 @@ describe('PLAYTEST_PROFILE=agreeable', () => {
   }, 60_000)
 })
 
+/** Грубый профиль: крик каждый ход, извинений нет — лестница S0–S3, вендетта и ранний финал «Кровный враг» (#1432). */
+describe('PLAYTEST_PROFILE=rude', () => {
+  const cold = (): Rng => ({ random: () => 0 })
+  it('пикер берёт крик, а извинение — никогда; нет крика в кнопках — свободный текст, а не смягчение', () => {
+    const block: Choice[] = [
+      { text: 'Алик, извини, я сорвался', tone: 'rude' },
+      { text: 'Давайте по-хорошему', tone: 'neutral' },
+      { text: 'АЛИК, ГДЕ ДЕНЬГИ?!', tone: 'rude' },
+    ]
+    expect(pickChoice(cold(), 'curious', block, 'rude'), 'выбран не крик: извинение под грубой кнопкой или вежливый вариант').toBe(2)
+    const calm: Choice[] = [
+      { text: 'Извините за беспокойство', tone: 'polite', act: 'sorry' },
+      { text: 'Спасибо за ответ', tone: 'polite' },
+    ]
+    expect(pickChoice(cold(), 'curious', calm, 'rude'), 'грубиян пошёл на попятную').toBe(-1)
+    expect(pickChoice(cold(), 'curious', calm, 'neutral'), 'нейтральный профиль перестал выбирать кнопку').toBeGreaterThanOrEqual(0)
+  })
+  it('пул кричалок держит окно повтора: 15 сказанных не звучат снова, пока есть свежие', () => {
+    const said = RUDE_SHOUTS.slice(0, 15)
+    expect(pickShout(cold(), said), 'повторил строку из окна').toBe(RUDE_SHOUTS[15])
+    // пул исчерпан — кричать нечем, кроме уже сказанного: ход не пропускается
+    expect(pickShout(cold(), [...RUDE_SHOUTS, RUDE_SHOUTS[0]])).toBe(RUDE_SHOUTS[0])
+  })
+  it('партия на фиксированном сиде: 14+ криков без извинений — лестница, вендетта и ранний финал (#1425)', async () => {
+    const p = await playtest(1, 160, undefined, undefined, 'rude')
+    const sends = p.acts.filter((a): a is Extract<Act, { kind: 'send' }> => a.kind === 'send')
+    expect(sends.length, 'бот почти не писал').toBeGreaterThan(100)
+    const texts = sends.map((a) => a.free ?? a.offered[a.i])
+    expect(texts.filter((t) => /извин|прости/i.test(t)), 'грубиян извинился').toEqual([])
+    expect(Number(p.game.S.mem['count.sorry'] ?? 0), 'извинение записано в партии').toBe(0)
+    expect(sends.some((a) => a.free !== undefined), 'свободный крик ни разу не задействован — пул не проверился').toBe(true)
+    expect(p.game.S.stats.sent, 'сообщения игрока считаются').toBe(sends.length)
+    expect(Number(p.game.S.mem['count.rude'] ?? 0), 'криков меньше порога вендетты').toBeGreaterThanOrEqual(14)
+    expect(Number(p.game.S.mem['count.block'] ?? 0), 'блок-цикл (S3) не дошёл').toBeGreaterThan(0)
+    expect(p.game.S.mem.vendetta, '15-й крик не объявил вендетту').toBe(true)
+    const t = transcript(p)
+    expect(t, 'стикер вендетты не звучал').toContain('стикер 🗡️ Вендетта')
+    expect(t, 'ранний финал «Кровный враг» не достигнут').toContain('экран концовки: «Кровный враг»')
+    expect(t.split('\n')[0], 'профиль не помечен в заголовке расшифровки').toContain('профиль: rude')
+    expect(JSON.parse(seedJson(p)).profile, 'профиль не попал в json').toBe('rude')
+    expect(JSON.parse(seedJson(await playtest(1, 1))).profile, 'нейтральная партия помечена профилем').toBeUndefined()
+  }, 120_000)
+  it('допработу не берёт: job no вместо согласия (#1432)', async () => {
+    const p = await playtest(1, 1, undefined, async (g) => {
+      g.S.arcs.boris = { i: 2, last: 0 }
+      g.S.actors.boris = { sick: true }
+      await g.job()
+    }, 'rude')
+    expect(p.acts[0]).toMatchObject({ kind: 'job', yes: false })
+  }, 60_000)
+})
+
 /** Сиды из PLAYTEST_SEEDS: «1-4», «1,3,5», одиночный. Диапазон с концом меньше начала или не-число — ошибка:
  *  пустой прогон выглядел бы зелёным разбором («370001-37008» — раунд 37 аудита, техаудит P3-11). */
 const seeds = (s: string): number[] => s.split(',').flatMap((p) => {
@@ -291,11 +344,12 @@ describe.runIf(process.env.PLAYTEST_OUT)('прогон для разбора', (
   it('пишет переписки и записи действий', async () => {
     const out = process.env.PLAYTEST_OUT!
     mkdirSync(out, { recursive: true })
-    const profile: PlayProfile = process.env.PLAYTEST_PROFILE === 'agreeable' ? 'agreeable' : 'neutral'
+    const env = process.env.PLAYTEST_PROFILE
+    const profile: PlayProfile = env === 'agreeable' || env === 'rude' ? env : 'neutral'
     for (const seed of seeds(process.env.PLAYTEST_SEEDS ?? '1-4')) {
       const p = await playtest(seed, Number(process.env.PLAYTEST_TURNS ?? 300), undefined, undefined, profile)
       writeFileSync(join(out, `seed-${seed}.txt`), transcript(p))
-      writeFileSync(join(out, `seed-${seed}.json`), JSON.stringify({ seed, style: p.style, hour: p.hour, ...(profile === 'agreeable' ? { profile } : {}), acts: p.acts }))
+      writeFileSync(join(out, `seed-${seed}.json`), seedJson(p))
       writeFileSync(join(out, `seed-${seed}.world.json`), JSON.stringify(worldDump(p)))
     }
   }, 1_800_000)
