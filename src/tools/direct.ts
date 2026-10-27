@@ -191,7 +191,8 @@ export const DIRECT: Record<string, DirectCase> = {
       Object.assign(g.S.ach, { saint: 1, court: 1 })
     },
   },
-  // #1435: вторая дверь «Настоящих денег» — вежливость и три поимки вместо заседания; бот до неё не доходит
+  // #1435: вторая дверь «Настоящих денег» — вежливость и три поимки вместо заседания; бот до неё не доходит.
+  // `caught = 3` здесь — не откат #729: поимки снова часть условия real, но второй дверью (saint И (court ИЛИ caught≥3))
   Payday_real_detective: {
     event: 'PaydayOutcome',
     setup: (g) => {
