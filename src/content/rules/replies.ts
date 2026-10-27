@@ -3,6 +3,7 @@
 import type { ContentApi } from '../../engine/game'
 import { fmtDays } from '../../engine/time'
 import { type Rule, eq, ne, is, gte, add, set, matches, spec, valueOf, isOpen } from '../fact'
+import { muenTurn } from './muen'
 import type { GameEvent, Offer } from './events'
 import { AlikOffline, ThickJournal } from './criteria'
 import { cooldown } from './rude'
@@ -143,7 +144,16 @@ export const replyRules: R[] = [
       game.setCtx(null)
     },
   }),
-  simple('voice', (g) => g.uniq(g.X.cow)),
+  // «Что за „Мууу“ на фоне?» — второй путь коровьего вопроса: тот же счётчик и та же
+  // эскалация mu-en, что у Tone_Cow (порог в muenTurn считают оба)
+  says('voice', {
+    remember: [add(count.cow)],
+    respond: async ({ game, facts }) => {
+      if (await muenTurn(game, facts)) return
+      await game.say([game.uniq(game.X.cow)])
+      game.setCtx(null)
+    },
+  }),
   simple('voiceText', (g) => g.pair('VOICE_A', D.VOICE_A, 'VOICE_B', D.VOICE_B)),
   says('transferQ', {
     respond: async ({ game }) => {

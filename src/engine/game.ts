@@ -3581,7 +3581,7 @@ export class Game {
  */
 export type ContentApi = Pick<Game,
   // речь, лента и интерфейсные эффекты
-  | 'say' | 'sys' | 'emit' | 'notify' | 'typingFor' | 'markTopical' | 'awayMsg' | 'deletedMsg'
+  | 'say' | 'sys' | 'emit' | 'notify' | 'typingFor' | 'markTopical' | 'awayMsg' | 'deletedMsg' | 'push'
   | 'sticker' | 'voice' | 'photo' | 'forward' | 'transfer' | 'job' | 'groupChat' | 'wrongChat'
   | 'shortReply' | 'randomNotif' | 'readOnly' | 'unlock' | 'mood' | 'sleep'
   // ход и события

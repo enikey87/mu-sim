@@ -111,6 +111,7 @@ export const Message = memo(function Message({ m }: { m: Msg }) {
     if (m.buy) return platform().pay50 ? <Lend50BuyCard m={m} /> : null
     return platform().externalPay && m.link ? <Lend50Card m={m} link={m.link} /> : null
   }
+  if (m.kind === 'muen') return <MuenCard m={m} />
   if (m.kind === 'card') return <PhoneCard m={m} />
 
   const cls = ['msg', m.from]
@@ -148,6 +149,19 @@ function Lend50Card({ m, link }: { m: Extract<Msg, { kind: 'lend50' }>; link: st
       <div>{m.text}</div>
       <a className="lend50-btn" href={link} target="_blank" rel="noopener">Перевести</a>
       <div className="lend50-url">{link}</div>
+    </div>
+  )
+}
+
+/** Карточка курса «Английский с Быничем» (mu-en): стиль карточки просьбы,
+ *  но без суммы и платформенных гейтов — обычная внешняя ссылка, рисуется везде. */
+function MuenCard({ m }: { m: Extract<Msg, { kind: 'muen' }> }) {
+  return (
+    <div className="lend50 transfer" data-testid="muen-card">
+      <div className="sum">🎓</div>
+      <div>{m.text}</div>
+      <a className="lend50-btn" href={m.link} target="_blank" rel="noopener">Научиться</a>
+      <div className="lend50-url">{m.link}</div>
     </div>
   )
 }
