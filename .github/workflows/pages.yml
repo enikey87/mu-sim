@@ -176,12 +176,13 @@ jobs:
         # #1263: из кода изъяли, в Settings → Variables не перенесли — приёмник молчал молча).
         # Обязательные ключи обязаны существовать на каждом событии (PR и push): пропажа роняет
         # обязательный чек, а с ним и деплой. Ждущие ключи — предупреждение, не блок.
-        # Список обязательных расширяется, когда оператор вписывает новый ключ (#790).
+        # Список обязательных расширяется, когда оператор вписывает новый ключ (#790): PostHog
+        # стал обязательным 27.10, когда оператор зарегистрировал проект (EU-инстанс — HOST_PH).
         env:
           VARS_JSON: ${{ toJSON(vars) }}
         run: |
           miss=0
-          for k in VITE_METRIKA_COUNTER VITE_UMAMI_WEBSITE_ID; do
+          for k in VITE_METRIKA_COUNTER VITE_UMAMI_WEBSITE_ID VITE_POSTHOG_KEY; do
             v=$(printf '%s' "$VARS_JSON" | jq -r --arg k "$k" '.[$k] // ""')
             if [ -z "$v" ]; then
               echo "::error title=Аналитика::$k пуст — приёмник мёртв. Вписать: Settings → Secrets and variables → Actions → Variables (урок #1263)"
@@ -190,7 +191,7 @@ jobs:
               echo "$k на месте (длина значения ${#v})"
             fi
           done
-          for k in VITE_POSTHOG_KEY VITE_TELEGRAM_INVOICE_URL; do
+          for k in VITE_TELEGRAM_INVOICE_URL; do
             v=$(printf '%s' "$VARS_JSON" | jq -r --arg k "$k" '.[$k] // ""')
             [ -z "$v" ] && echo "::warning::$k не задан — ожидается (шаг оператора, #790/#1237)" || echo "$k на месте (длина ${#v})"
           done
