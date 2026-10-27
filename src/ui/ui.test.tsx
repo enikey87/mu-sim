@@ -647,7 +647,7 @@ describe('App', () => {
     expect(locked.querySelector('.tile-icon')!.textContent).toBe('🔒')
     expect(within(endings).queryByText('Наследство долга')).toBeNull()
     // счётчик на месте
-    expect(within(dialog).getByText('1/15')).toBeInTheDocument()
+    expect(within(dialog).getByText('1/16')).toBeInTheDocument()
 
     // полученная ачивка — плитка с кубком, названием и описанием
     const ach = document.getElementById('achList')!
@@ -660,7 +660,7 @@ describe('App', () => {
     expect(lockedAch.className).toBe('tile locked')
     expect(lockedAch.querySelector('.tile-icon')!.textContent).toBe('🔒')
     expect(lockedAch.querySelector('.tile-desc')!.textContent).toBe('Алик назвал тебя «брат джан»')
-    expect(within(dialog).getByText('1/15')).toBeInTheDocument() // счётчики — в заголовках секций
+    expect(within(dialog).getByText('1/16')).toBeInTheDocument() // счётчики — в заголовках секций
     expect(document.getElementById('achCount')!.textContent).toBe('1/' + document.querySelectorAll('#achList .tile').length)
 
     // журнал обещаний и сериалы — по-прежнему список строк
@@ -785,7 +785,7 @@ describe('App', () => {
     const dialog = screen.getByRole('dialog', { name: 'Досье на Алика' })
     expect(within(dialog).getByText(/финал «Жених»/)).toBeInTheDocument()
     expect(within(dialog).getByText('Породнились')).toBeInTheDocument()
-    expect(within(dialog).getByText('1/15')).toBeInTheDocument()
+    expect(within(dialog).getByText('1/16')).toBeInTheDocument()
   })
 
   it('после концовки кнопка ведёт в «Эпилог»: строка «—— Эпилог ——» перед группой, и только одна (#797)', async () => {
