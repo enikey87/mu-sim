@@ -4,7 +4,7 @@
 
 *Основано на реальных событиях. Но все реальные совпадения случайны.*
 
-**[▶ Играть в браузере](https://enikey87.github.io/mu-sim/)**
+**[▶ Играть в браузере](https://enikey87.github.io/mu-sim/)** · **[▶ Играть в Telegram](https://t.me/alik_where_money_bot/game)**
 
 ## Вдохновение и GDC
 
