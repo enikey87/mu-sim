@@ -5,7 +5,7 @@ import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
 import type { Criterion } from '../engine/rules'
 import { spec } from '../engine/rules/lines'
-import { ANNOUNCE, CLAIMS, LEAD, MORNING_CONTRA, OUTCOME, ROLL, SOURCES, type Claim, type Lead } from './payday'
+import { ANNOUNCE, CLAIMS, COINS_BRIDGE_CATCHES, LEAD, MORNING_CONTRA, OUTCOME, ROLL, SOURCES, type Claim, type Lead } from './payday'
 import { LEGENDS } from './legends'
 import { CLAIM_LEDGER } from './ledger'
 import { ENDGAME_ARCH } from './endgame'
@@ -203,6 +203,45 @@ describe('День выплаты', () => {
     game.S.mem.caught = 3
     game.S.mem['payday.caught'] = true
     expect((await game.fire('PaydayOutcome'))?.name).toBe('Payday_coins')
+  })
+  // #1433: мост поимок — две мидгейм-поимки дают мешок и без поимки в самой сцене
+  it('Мост поимок: две мидгейм-поимки — «Мешок мелочи» без поимки в сцене (#1433)', async () => {
+    const { game } = makeGame()
+    game.S.mem.caught = COINS_BRIDGE_CATCHES
+    const debt = game.debt
+    const n = game.S.msgs.length
+    expect(game.S.mem['payday.caught'], 'поимки в сцене нет').toBeUndefined()
+    expect((await game.fire('PaydayOutcome'))?.name).toBe('Payday_coinsByCatch')
+    const out = texts(game, n).join('\n')
+    expect(game.S.mem.payday).toBe('coins')
+    expect(game.S.debt).toBe(0)
+    expect(game.S.money).toBeGreaterThanOrEqual(debt)
+    // строка-мост называет счётчик поимок; строка про поимку в сцене при этом неправдива
+    expect(out).toMatch(/поймал дважды/)
+    expect(out, 'сцена не поймана — строка про День выплаты врёт').not.toMatch(/поймал меня в День выплаты/)
+    expect(out).toMatch(/мешок монет/)
+  })
+  it('Мост поимок: одна поимка мешок не открывает — порог 2, не 1 (#1433)', async () => {
+    const pick = async (caught: number) => {
+      const { game } = makeGame()
+      game.S.mem.caught = caught
+      return (await game.fire('PaydayOutcome'))?.name
+    }
+    expect(await pick(1)).toBe('Payday_default')
+    expect(await pick(COINS_BRIDGE_CATCHES)).toBe('Payday_coinsByCatch')
+  })
+  it('Мост поимок не спорит с заслуженным: Страсбург, «Не тебе», «Нива», Следователь (#1433)', async () => {
+    const pick = async (caught: number, setup: (g: Game) => void) => {
+      const { game } = makeGame()
+      game.S.mem.caught = caught
+      setup(game)
+      return (await game.fire('PaydayOutcome'))?.name
+    }
+    expect(await pick(2, (g) => { g.S.ach.strasbourg = 1 })).toBe('Payday_strasbourg')
+    expect(await pick(2, (g) => { g.S.mem['finale.razmik'] = 'default' })).toBe('Payday_notyou')
+    expect(await pick(2, (g) => { g.S.mem['finale.niva'] = 'chose' })).toBe('Payday_niva')
+    // три поимки — уже «Следователь»: мост уступает и ему
+    expect(await pick(3, () => {})).toBe('Payday_detective')
   })
 
   it('переводы 50 ₽ вычитаются один раз: суд и выплата считают от одного долга (#832)', async () => {
