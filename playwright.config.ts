@@ -13,6 +13,9 @@ export default defineConfig({
     baseURL: 'http://127.0.0.1:4173',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+    // Воркер приложения (#1446) кэширует шелл и ассеты — его проверяет tests/e2e/sw.spec.ts, где
+    // блок снят. Остальным сценариям кэш не нужен: решения по нему не должны менять их исход.
+    serviceWorkers: 'block',
   },
   projects: [
     { name: 'desktop-chromium', use: { ...devices['Desktop Chrome'] } },
