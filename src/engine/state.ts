@@ -8,6 +8,8 @@ import { freshLedger, migrateLedger, type LedgerState } from '../content/ledger'
 export const SAVE_KEY = 'alik-save-v4'
 /** Отметка устройства, а не партии: просьба «займи 50» уже звучала — вторая партия говорит другим текстом. */
 export const LEND50_SEEN_KEY = 'alik-lend50-seen'
+/** Коллекция концовок — тоже отметка устройства (#1437): «Начать заново» её не стирает, в облако она не едет. */
+export const ENDINGS_SEEN_KEY = 'alik-endings-seen'
 export const DEBT0 = 240000
 /** Старт с запасом: дно должно наступить по пути к Дню выплаты, а не в первые ходы (#184). */
 export const START_MONEY = 28000
@@ -270,4 +272,23 @@ export function saveState(storage: Storage | null, s: GameState): void {
     // в сохранение — только последние 150 сообщений; живая история на экране не обрезается
     storage.setItem(SAVE_KEY, JSON.stringify({ ...s, msgs: s.msgs.slice(-150) }))
   } catch { /* нет storage — играем без сохранения */ }
+}
+
+/** Отметка устройства → id открытых концовок. Битая строка (старая сборка, чужая правка) — пустая коллекция,
+ *  а не падение: отметка живёт дольше одной версии сборки. */
+export function endingsOnDevice(raw: string | null): Set<string> {
+  if (!raw) return new Set()
+  try {
+    const ids: unknown = JSON.parse(raw)
+    return new Set(Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : [])
+  } catch {
+    return new Set()
+  }
+}
+
+/** Отметка после концовки: прежние id на месте, одна и та же концовка не двоится. */
+export function withEndingOnDevice(raw: string | null, id: string): string {
+  const ids = [...endingsOnDevice(raw)]
+  if (!ids.includes(id)) ids.push(id)
+  return JSON.stringify(ids)
 }

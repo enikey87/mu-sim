@@ -54,7 +54,7 @@ import { classifyUserInput, legalClaim, type ClassifiedInput } from './input'
 import { track, left, shown, type Phase } from '../analytics/metrics'
 import { holidayOf, holidayGreetKey, holidayDays, HOLIDAY_EXCUSES } from '../content/holidays'
 import { dueIn, dateOf, fmtDate, fmtDayMonth, fmtShortDate, fmtTime, weekOf, nightHour, periodOf, tierOf, TIERS, type Due, type Period } from './time'
-import { type GameState, type BankWeek, type Msg, type NewMsg, type Card, type PhoneEvent, type Choice, type Ctx, type Tone, type Storage, type InputCategory, freshState, loadState, saveState, SAVE_KEY, LEND50_SEEN_KEY, MAX_PATIENCE, ARC_MARINATION_DAYS, START_DAY, isLate, countOf, setCount, type PromiseRec } from './state'
+import { type GameState, type BankWeek, type Msg, type NewMsg, type Card, type PhoneEvent, type Choice, type Ctx, type Tone, type Storage, type InputCategory, freshState, loadState, saveState, SAVE_KEY, LEND50_SEEN_KEY, ENDINGS_SEEN_KEY, endingsOnDevice, withEndingOnDevice, MAX_PATIENCE, ARC_MARINATION_DAYS, START_DAY, isLate, countOf, setCount, type PromiseRec } from './state'
 
 /** Текст срока как буквальный шаблон без учёта регистра; кэш — topicOfLast зовётся из facts() на каждую реплику. */
 const LITERAL = new Map<string, RegExp>()
@@ -393,6 +393,8 @@ export class Game {
 
   reset(): void {
     this.resetting = true
+    // коллекция концовок — отметка устройства, а не партии: «Начать заново» её не стирает (#1437)
+    for (const id of Object.keys(this.S.endings)) this.markEndingOnDevice(id)
     this.storage?.removeItem(SAVE_KEY)
   }
 
@@ -2888,11 +2890,26 @@ export class Game {
   }
 
   // ---------- концовки ----------
+  /** Открытые на устройстве концовки: `S.endings` живёт в партии, а коллекция переживает и сброс партии (#1437). */
+  endingsSeen(): ReadonlySet<string> {
+    return endingsOnDevice(this.storage?.getItem(ENDINGS_SEEN_KEY) ?? null)
+  }
+
+  /** Отметка устройства после концовки: в облако не едет, поэтому коллекция не переезжает на другое устройство. */
+  private markEndingOnDevice(id: string): void {
+    const storage = this.storage
+    if (!storage) return
+    try {
+      storage.setItem(ENDINGS_SEEN_KEY, withEndingOnDevice(storage.getItem(ENDINGS_SEEN_KEY), id))
+    } catch { /* устройство без записи — коллекция живёт только в партии */ }
+  }
+
   async reachEnding(id: string): Promise<void> {
     const e = ENDINGS.find((x) => x.id === id)!
     await this.sleep(800)
     await this.say(this.open(e.m))
     this.S.endings[id] = this.S.day
+    this.markEndingOnDevice(id)
     this.S.ending = id
     this.unlock('end_' + id)
     track('ending', { id: e.id })
