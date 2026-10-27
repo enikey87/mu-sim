@@ -1811,6 +1811,9 @@ export class Game {
       tileAdFresh: S.stats.sent - Number(S.mem[memkeys.tileAdAt] ?? -99) <= 3,
       // финал квеста-тамады (#1222): узел `yes` квеста `q_tamada` — заметное событие, отклик живёт ход события и три после
       tamadaDoneFresh: S.stats.sent - Number(S.mem[memkeys.tamadaDoneAt] ?? -99) <= 3,
+      // развязка «Наследства дяди Тиграна» (#1439): последняя строка обеих веток квеста `q_inherit` —
+      // заметное событие, отклик живёт ход события и три после
+      inhDoneFresh: S.stats.sent - Number(S.mem[memkeys.inhDoneAt] ?? -99) <= EVENT_FRESH_TURNS,
       // вопрос о «баране Борисе» по памяти партии (#1252): заметное событие — отклик живёт ход вопроса и три после
       borisAskFresh: S.stats.sent - Number(S.mem[memkeys.borisAskAt] ?? -99) <= 3,
       // карточка друга Серёги «Ну что, заплатил твой Алик?» (#1292): отклик живёт ход карточки и три после
