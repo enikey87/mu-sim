@@ -3,6 +3,7 @@
 // палитры — цвета шелла берутся из styles.css, а не выдумываются. Что шелл действительно рисует первый кадр
 // и исчезает при монтировании, проверяет tests/e2e/boot-shell.spec.ts: jsdom не считает вёрстку и анимацию.
 import { readFileSync } from 'node:fs'
+import { gzipSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
 
 const html = readFileSync('index.html', 'utf8')
@@ -61,9 +62,17 @@ describe('шелл холодной загрузки в index.html', () => {
     expect(style).not.toContain('@import')
   })
 
-  it('инлайн-часть укладывается в бюджет 3 кБ', () => {
-    const bytes = Buffer.byteLength(`<style>${style}</style>${shell}`, 'utf8')
-    expect(bytes).toBeLessThanOrEqual(3072)
+  it('инлайн-часть укладывается в бюджет: шелл 3 кБ, кадр и титры интро 4,5 кБ, страница — 30 кБ gzip', () => {
+    // бюджет по частям: шелл холодной загрузки (#1443) и титры интро (#1444) — разные ответственные блоки
+    // одного инлайна, и растут они по отдельности (кадр #intro-frame + блок intro-css + правила титров)
+    const atIntro = style.indexOf('/* Рамка титров шелла')
+    expect(atIntro, 'в инлайне нет блока кадра и титров интро').toBeGreaterThan(0)
+    const boot = Buffer.byteLength(`<style>${style.slice(0, atIntro)}</style>${shell}`, 'utf8')
+    const intro = Buffer.byteLength(style.slice(atIntro), 'utf8')
+    expect(boot).toBeLessThanOrEqual(3072)
+    expect(intro).toBeLessThanOrEqual(4608)
+    // приёмка #1444: шелл и титры вместе — не больше 30 кБ gzip; страница целиком и есть их носитель
+    expect(gzipSync(html, { level: 9 }).length).toBeLessThanOrEqual(30 * 1024)
   })
 
   it('палитра — копия styles.css, а не свои цвета', () => {

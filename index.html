@@ -18,7 +18,9 @@
   <meta name="theme-color" content="#0b0e12" media="(prefers-color-scheme: dark)">
   <!-- Шелл холодной загрузки (#1443): первый кадр без JS и без внешних файлов. Это инлайн-копия рамки
        телефона, шапки чата и пузыря «печатает…» из src/styles.css — палитру и размеры менять вместе.
-       React стирает содержимое #root при монтировании, поэтому шелл исчезает сам (тест: tests/e2e/boot-shell.spec.ts). -->
+       React стирает содержимое #root при монтировании, поэтому шелл исчезает сам (тест: tests/e2e/boot-shell.spec.ts).
+       Ниже — титры интро (#1444): блок intro-css дословно повторяет правила src/styles.css, чтобы экран
+       блокировки рисовался до прихода пакета; рамку #intro-frame создаёт вход страницы (src/intro/shell.ts). -->
   <style>
     html, body { height: 100%; margin: 0; }
     body {
@@ -63,6 +65,75 @@
       #boot .boot-status { color: #5fc98a; }
       #boot .boot-bubble i { background: #8a97a4; }
     }
+    /* Рамка титров шелла (#1444): та же, что у .phone из src/styles.css — приложение грузится параллельно
+       и появляется ровно в этой коробке. Копия рамки, менять вместе с .phone. */
+    #intro-frame {
+      position: fixed; inset: 0; margin: auto; z-index: 10;
+      width: 400px; height: min(820px, 100vh);
+      border: 10px solid #111; border-radius: 36px; overflow: hidden;
+    }
+    @media (max-width: 500px) {
+      #intro-frame {
+        width: 100%; height: 100dvh; border: 0; border-radius: 0;
+        padding-top: env(safe-area-inset-top, 0px);
+      }
+    }
+
+    /* intro-css:start — блок дословно повторён в index.html: те же правила рисуют титры шелла холодной
+       загрузки (#1444) до прихода этого файла. Менять в двух местах сразу: расхождение ловит
+       src/tools/intro-shell.test.ts. */
+    /* Интро v2: приглушённый экран блокировки, пять строк-титров по одной, титул, уезд в чат */
+    .intro {
+      position: absolute; inset: 0; z-index: 70; overflow: hidden;
+      color: #fff; cursor: pointer; user-select: none;
+      background: linear-gradient(160deg, #3a2a5a, #1a1f3a 55%, #0e1424);
+    }
+    .intro-leave { transform: translateY(-100%); transition: transform .45s ease-in; }
+    .intro-clock { position: absolute; top: 44px; left: 0; right: 0; text-align: center; opacity: .35; }
+    .intro-date { font-size: 14px; opacity: .85; }
+    .intro-time { font-size: 60px; font-weight: 300; letter-spacing: -1px; line-height: 1.05; }
+    .intro-line {
+      position: absolute; left: 22px; right: 22px; top: 42%; transform: translateY(-50%);
+      text-align: center; font-weight: 700; font-size: 28px; line-height: 1.2;
+      text-shadow: 0 2px 12px rgba(0,0,0,.55);
+      pointer-events: none;
+      opacity: 0;
+    }
+    .intro-line.on { animation: intro-line-in .28s ease both; }
+    .intro-line.out { animation: intro-line-out .28s ease both; }
+    @keyframes intro-line-in { from { opacity: 0 } to { opacity: 1 } }
+    @keyframes intro-line-out { from { opacity: 1 } to { opacity: 0 } }
+    .intro-hint { position: absolute; bottom: 22px; left: 0; right: 0; text-align: center; font-size: 13px; opacity: .85; animation: intro-pulse 1.6s ease-in-out infinite; }
+    /* строка о счётчике: на интро — над подсказкой, в досье — в потоке (#611) */
+    .intro .track-note { position: absolute; bottom: 50px; left: 22px; right: 22px; }
+    .track-note { margin: 0; font-size: 12px; opacity: .6; text-align: center; }
+    @keyframes intro-pulse { 50% { opacity: .35 } }
+    .intro-title {
+      position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 14px; background: rgba(8,10,18,.72); opacity: 0; transition: opacity .28s ease; pointer-events: none;
+    }
+    .intro-title.on { opacity: 1; }
+    .intro-title-big { font-weight: 700; font-size: 38px; text-align: center; line-height: 1.05; }
+    .intro-moo {
+      font-weight: 700; font-size: 22px; color: #ffe9a8;
+      text-shadow: 0 2px 8px rgba(0,0,0,.4);
+      animation: intro-moo 1.8s ease-out both;
+    }
+    @keyframes intro-moo { 0% { opacity: 0; transform: scale(.6) } 20% { opacity: 1; transform: scale(1.1) } 100% { opacity: 1; transform: scale(1) } }
+    /* reduced: те же карточки по очереди, без появления, затухания и уезда */
+    .intro-reduced .intro-line, .intro-reduced .intro-title { transition: none; animation: none; }
+    .intro-reduced .intro-line.on { opacity: 1; }
+    .intro-reduced .intro-line.out { opacity: 0; }
+    .intro-reduced .intro-moo, .intro-reduced .intro-hint { animation: none; }
+    .intro-reduced .intro-moo { opacity: 1; }
+    @media (prefers-reduced-motion: reduce) {
+      .intro-line, .intro-title { transition: none; animation: none; }
+      .intro-line.on { opacity: 1; }
+      .intro-line.out { opacity: 0; }
+      .intro-moo, .intro-hint { animation: none; }
+      .intro-leave { transition: none; }
+    }
+    /* intro-css:end */
   </style>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-180.png">
@@ -82,6 +153,6 @@
       <div class="boot-bubble" aria-hidden="true"><i></i><i></i><i></i></div>
     </div>
   </div>
-  <script type="module" src="/src/main.tsx"></script>
+  <script type="module" src="/src/intro/shell.ts"></script>
 </body>
 </html>
