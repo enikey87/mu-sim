@@ -20,6 +20,10 @@ const heat = (game: Game, h: number) => { game.S.mem[HEAT] = h }
 const fresh = (game: Game) => { game.S.choices = null; return game.choices }
 const offered = (game: Game) => { for (let i = 0; i < 20; i++) if (fresh(game).some((c) => c.act === 'moo')) return true; return false }
 const all = (pool: readonly Entry<T.Said>[]) => pool.map(valueOf).map(([, t]) => t)
+/** Пары снятия блока (#1422): сис-строка и реплика Алика выбираются вместе. */
+const LIFT_PAIRS = T.BLOCK_LIFTED.map(valueOf)
+const LIFT_SYS = LIFT_PAIRS.map(([sys]) => sys)
+const LIFT_REPLY = LIFT_PAIRS.map(([, line]) => line)
 
 describe('лестница грубости: ступени', () => {
   it('угроза насилием ускоряет ссору на две ступени и не запускает суд', async () => {
@@ -184,12 +188,12 @@ describe('лестница грубости: ступени', () => {
     const n = game.S.msgs.length
     await game.send('Алик, привет.')
     const t = texts(game, n)
-    expect(t, 'разблокировка молчит').toContain(T.BLOCK_LIFTED_SYS)
-    expect(t, 'реплики разблокировки нет').toContain(T.BLOCK_LIFTED_LINE)
+    expect(t.some((x) => LIFT_SYS.includes(x)), 'разблокировка молчит').toBe(true)
+    expect(t.some((x) => LIFT_REPLY.includes(x)), 'реплики разблокировки нет').toBe(true)
     expect(game.S.mem[blockLifted], 'метка не потреблена первым ходом').toBeUndefined()
     const n2 = game.S.msgs.length
     await game.send('Ещё раз привет.')
-    expect(texts(game, n2), 'нарратив повторяется').not.toContain(T.BLOCK_LIFTED_SYS)
+    expect(texts(game, n2).some((x) => LIFT_SYS.includes(x)), 'нарратив повторяется').toBe(false)
     // посредник снимает блок раньше срока — тихого снятия нет, и метки тоже
     const { game: g2 } = makeGame()
     heat(g2, 3)
@@ -201,6 +205,35 @@ describe('лестница грубости: ступени', () => {
     expect(g2.S.mem.blocked, 'посредник не снял блок — проверка пустеет').toBe(false)
     g2.nextDay(4)
     expect(g2.S.mem[blockLifted], 'посредник оставил метку тихого снятия').toBeUndefined()
+  })
+  it('снятие блока играет разные пары и не повторяет строку в окне 20 ходов (#1422)', async () => {
+    const { game } = makeGame()
+    const played: string[] = []
+    for (let i = 0; i < 6; i++) {
+      game.S.mem[blockLifted] = true
+      const n = game.S.msgs.length
+      await game.send(`Привет, это ${i + 1}-й раз.`)
+      const t = texts(game, n)
+      const sys = t.find((x) => LIFT_SYS.includes(x))
+      const line = t.find((x) => LIFT_REPLY.includes(x))
+      expect(sys, 'разблокировка молчит').toBeDefined()
+      expect(line, 'реплики разблокировки нет').toBeDefined()
+      played.push(`${sys}\n${line}`)
+    }
+    expect(new Set(played).size, 'подряд 6 снятий играют одну-две пары').toBeGreaterThanOrEqual(4)
+  })
+  it('пул исчерпан окном — снятие играет самую давнюю пару, а не молчит (#1422)', async () => {
+    const { game } = makeGame()
+    const played: string[] = []
+    for (let i = 0; i < LIFT_PAIRS.length + 1; i++) {
+      game.S.mem[blockLifted] = true
+      const n = game.S.msgs.length
+      await game.send(`Привет, раз ${i + 1}.`)
+      const t = texts(game, n)
+      played.push(`${t.find((x) => LIFT_SYS.includes(x))}\n${t.find((x) => LIFT_REPLY.includes(x))}`)
+    }
+    expect(new Set(played.slice(0, -1)).size, 'пары повторились раньше окна').toBe(LIFT_PAIRS.length)
+    expect(played.at(-1), 'окно отпустило не самую давнюю пару').toBe(played[0])
   })
   it('в блоке извинение не доставлено — только через посредника; до Бориса это Карине, посредник разблокирует', async () => {
     const { game } = makeGame()
