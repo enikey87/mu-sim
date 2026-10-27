@@ -1,0 +1,8 @@
+node_modules/
+coverage/
+.wrangler/
+# Временная конфигурация установщика: содержит account-specific database ID
+wrangler.generated.json
+# Локальные секреты wrangler dev
+.dev.vars
+*.local
