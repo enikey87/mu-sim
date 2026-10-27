@@ -8,7 +8,7 @@ import type { Facts } from '../engine/rules'
 import { during } from '../engine/rules'
 import { START_DAY, ARC_MARINATION_DAYS } from '../engine/state'
 import { HEAT, borisAskAt, legendDay, legendId, muenAt, nuneKeyPassed, payday, sorryAt } from '../content/memkeys'
-import { ENDING_MIN_DAY } from '../content/finales'
+import { ENDING_MIN_DAY, CHRONIC_RUDE_AFTER_VENDETTA } from '../content/finales'
 
 export type DirectCase = { event: string; facts?: Facts; target?: string; setup?: (g: Game) => void }
 
@@ -107,6 +107,13 @@ export const DIRECT: Record<string, DirectCase> = {
   Finale_rubik_bribe: { event: 'ArcFinale', facts: { arc: 'rubik' }, setup: (g) => { g.S.ach.redo = 1 } },
   Finale_samvel_tamada: { event: 'ArcFinale', facts: { arc: 'samvel' }, setup: (g) => { g.S.ach.toast = 1 } },
   Ending_alik: { event: 'CheckEnding', setup: (g) => { g.S.day = ENDING_MIN_DAY; g.S.mem['finale.garik'] = 'cutter' } },
+  // #1424: режим холодной войны даёт хронику постоянное извинение как выход (issue: ритуал примирения остаётся
+  // выходом) — бот-хроник этим пользуется, и в выборках «до концовки» хроника #1425 до порога не доходит.
+  // Для игрока, который продолжает кричать и не извиняется, путь прежний: счётчик растёт в game.ts.
+  Ending_bloodfeud: {
+    event: 'CheckEnding',
+    setup: (g) => { g.S.mem.vendetta = true; g.S.mem['count.rudeAfterVendetta'] = CHRONIC_RUDE_AFTER_VENDETTA },
+  },
   Ending_heir: { event: 'CheckEnding', setup: (g) => { g.S.day = ENDING_MIN_DAY; g.S.mem['finale.alik_death'] = 'will' } },
   Says_via_boris: { event: 'PlayerSays', facts: { intent: 'via', arg: 'boris' }, setup: (g) => { g.S.mem.blocked = true } },
   // с колкостями (#683) PromiseDue в открытом экране выплаты ловят сами выборки — случай снят по порогу гейта
