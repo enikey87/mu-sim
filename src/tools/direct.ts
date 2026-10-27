@@ -7,7 +7,7 @@ import type { Game } from '../engine/game'
 import type { Facts } from '../engine/rules'
 import { during } from '../engine/rules'
 import { START_DAY, ARC_MARINATION_DAYS } from '../engine/state'
-import { HEAT, borisAskAt, legendDay, legendId, nuneKeyPassed, payday, sorryAt } from '../content/memkeys'
+import { HEAT, borisAskAt, legendDay, legendId, muenAt, nuneKeyPassed, payday, sorryAt } from '../content/memkeys'
 import { ENDING_MIN_DAY } from '../content/finales'
 
 export type DirectCase = { event: string; facts?: Facts; target?: string; setup?: (g: Game) => void }
@@ -51,6 +51,10 @@ export const DIRECT: Record<string, DirectCase> = {
   // #426: sys-claim Гранта («всё заплатил») противоречит «заказчик мне не платит» — бот ловит это сам, 34 партии
   Turn_BorisSick: { event: 'AlikTurn', setup: (g) => { g.S.arcs.boris = { i: 2, last: 0 }; g.S.actors.boris = { sick: true } } },
   Opt_Cow: { event: 'BuildChoices', setup: (g) => { g.S.mem.mooAt = g.S.stats.sent } },
+  // #1410: окно признания курса mu-en — порог (два мычания и два вопроса про корову) бот до экрана концовки
+  // не проходит; штамп ставим тот же, что ставит muenTurn
+  Opt_Muen: { event: 'BuildChoices', setup: (g) => { g.S.mem[muenAt] = g.S.stats.sent } },
+  Says_muen: { event: 'PlayerSays', facts: { intent: 'muen', arg: '0' } },
   // гейт на чужих семействах: в семье +4000 бот не доходит до предложения «через Бориса» (4/0/4) — прямой случай держит гейт
   Opt_Via_boris: { event: 'BuildChoices', setup: (g) => { blocked(g); g.S.arcs.boris = { i: 4, last: 0 } } },
   Away_Offline: { event: 'AlikAway', setup: (g) => { g.S.offlineDays = 2 } },

@@ -29,7 +29,8 @@ describe('эскалация мычания: карточка курса mu-en (
     await sendCow(game)
     const cards = muenCards(game)
     expect(cards, 'второй вопрос — карточка').toHaveLength(1)
-    expect(game.mem()[muenAt], 'факт показа поставлен').toBe(true)
+    // штамп — ход признания (#1410): по нему открывается окно отклика, и он же держит однократность
+    expect(Number(game.mem()[muenAt]), 'штамп показа несёт ход события').toBe(game.S.stats.sent)
     const said = game.S.msgs.filter((m) => m.kind === 'text').map((m) => m.text).join(' ')
     expect(said, 'признание опирается на методику Бынича').toContain('Бынича')
     await sendCow(game)
