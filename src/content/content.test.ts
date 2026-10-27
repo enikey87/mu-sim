@@ -323,7 +323,7 @@ describe('dictionaries', () => {
     }
   })
   it('life pools are non-empty; notifications are well-formed', () => {
-    for (const k of ['IDLE', 'STICKERS', 'FWD', 'DELETED', 'EDIT_WHEN', 'IDLE_Q', 'IDLE_A', 'VOICE', 'NOTIF', 'SPEND'] as const) {
+    for (const k of ['IDLE', 'STICKERS', 'FWD', 'DELETED', 'EDIT_WHEN', 'IDLE_Q', 'IDLE_A', 'NOTIF', 'SPEND'] as const) {
       expect((L[k] as unknown[]).length, k).toBeGreaterThan(0)
     }
     for (const n of L.NOTIF) {

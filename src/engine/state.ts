@@ -6,6 +6,7 @@ import { SAVE_KEY } from './keys'
 import type { PromiseCondition, Rel, WhenKind } from '../content/excuses'
 import type { Vars } from '../content/scenes'
 import { freshLedger, migrateLedger, type LedgerState } from '../content/ledger'
+import type { MooPhrase } from './moo'
 
 /** Ключи хранения — в `engine/keys.ts`: их читает и вход страницы, которому состояние игры не нужно. */
 export { ENDINGS_SEEN_KEY, LEND50_SEEN_KEY, SAVE_KEY } from './keys'
@@ -31,7 +32,7 @@ export type Msg =
   | (MsgBase & { kind: 'sys'; text: string; unread?: boolean })
   | (MsgBase & { kind: 'text'; from: 'me' | 'alik'; text: string; who?: string; legend?: boolean; deleted?: boolean; edited?: boolean; react?: string; topical?: boolean; topicText?: string })
   | (MsgBase & { kind: 'transfer'; from: 'alik'; text: string; amount?: number })
-  | (MsgBase & { kind: 'voice'; from: 'alik'; len: number; feast?: boolean })
+  | (MsgBase & { kind: 'voice'; from: 'alik'; /** Старое сохранение: выдуманная длительность, в показе не участвует (#1420). */ len?: number; feast?: boolean; /** Закреплённый звук фразы; у старых сообщений выводится из id. */ moo?: MooPhrase })
   | (MsgBase & { kind: 'photo'; from: 'alik'; text: string })
   | (MsgBase & { kind: 'sticker'; from: 'alik'; e: string; c: string })
   | (MsgBase & { kind: 'fwd'; from: 'alik'; f: string; text: string })
