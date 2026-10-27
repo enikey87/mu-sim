@@ -1120,6 +1120,9 @@ describe('App', () => {
     expect(document.querySelector('.phone-surface')).toHaveAttribute('inert')
     expect(dead.contains(document.activeElement)).toBe(true)
     await act(async () => { fireEvent.click(screen.getByText('Поставить на зарядку')) })
+    // зарядка — цепочка из 12 шагов по часам игры: act preact ждёт только один кадр,
+    // поэтому конец цепочки (микрозадачи) догоняем макрозадачей
+    await act(async () => { await flush() })
     expect(document.querySelector('#deadScreen')).toHaveClass('hidden')
     expect(document.querySelector('.phone-surface')).not.toHaveAttribute('inert')
   })
@@ -1787,7 +1790,9 @@ describe('режим рецензирования (#872)', () => {
   async function note(msg: HTMLElement, text: string, category = 'Несостыковка') {
     await act(async () => { fireEvent.contextMenu(msg) })
     await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /Заметка/ })) })
-    await act(async () => { fireEvent.change(screen.getByLabelText('Текст заметки'), { target: { value: text } }) })
+    // текст — input, а не change: браузер шлёт input по букве (change — только на blur), preact
+    // переводит onChange textarea ровно в input; голый change без input он не видит
+    await act(async () => { fireEvent.input(screen.getByLabelText('Текст заметки'), { target: { value: text } }) })
     await act(async () => { fireEvent.click(screen.getByRole('radio', { name: new RegExp(category) })) })
     await act(async () => { fireEvent.click(screen.getByText('Сохранить')) })
   }
@@ -1816,7 +1821,7 @@ describe('режим рецензирования (#872)', () => {
     renderApp(game)
     await act(async () => { fireEvent.contextMenu(alikBubble()) })
     await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /Заметка/ })) })
-    await act(async () => { fireEvent.change(screen.getByLabelText('Текст заметки'), { target: { value: 'текст и категория — всё' } }) })
+    await act(async () => { fireEvent.input(screen.getByLabelText('Текст заметки'), { target: { value: 'текст и категория — всё' } }) })
     // ни группы «Важность», ни её radio — сохранение работает сразу после текста и категории
     expect(screen.queryByRole('radiogroup', { name: 'Важность' })).toBeNull()
     expect(screen.queryAllByRole('radio', { name: /^(high|medium|low)$/ })).toHaveLength(0)
@@ -1853,6 +1858,8 @@ describe('режим рецензирования (#872)', () => {
     await note(alikBubble(), 'первая')
     // ход через варианты: только такой ход знает, из чего игрок выбирал
     await act(async () => { fireEvent.click(document.querySelector('.choices button:not(.rude)') as HTMLButtonElement) })
+    // список вариантов записывается после завершения хода (then у send) — микрозадачи, не кадр
+    await act(async () => { await flush() })
     const me = [...document.querySelectorAll('.msg.me')].at(-1) as HTMLElement
     expect(me, 'у игрока есть своя реплика — иначе вариантов в экспорте не проверить').toBeTruthy()
     await note(me, 'вторая', 'Идея')
@@ -1953,7 +1960,7 @@ describe('рецензирование вариантов ответа (#878)', 
     await act(async () => { fireEvent.contextMenu(btn) })
     await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /Заметка/ })) })
     expect(screen.getByRole('radio', { name: /Плохой вариант/ }), 'категория по умолчанию — плохой_вариант').toHaveAttribute('aria-checked', 'true')
-    await act(async () => { fireEvent.change(screen.getByLabelText('Текст заметки'), { target: { value: 'вариант не в тему' } }) })
+    await act(async () => { fireEvent.input(screen.getByLabelText('Текст заметки'), { target: { value: 'вариант не в тему' } }) })
     await act(async () => { fireEvent.click(screen.getByText('Сохранить')) })
     const badge = btn.querySelector('.review-badge')
     expect(badge, 'бейдж на самой кнопке варианта').toBeInTheDocument()
@@ -1995,7 +2002,7 @@ describe('рецензирование вариантов ответа (#878)', 
     const optionText = btn.textContent!.replace(/\s*\d+$/, '').trim()
     await act(async () => { fireEvent.contextMenu(btn) })
     await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /Заметка/ })) })
-    await act(async () => { fireEvent.change(screen.getByLabelText('Текст заметки'), { target: { value: 'этот вариант лишний' } }) })
+    await act(async () => { fireEvent.input(screen.getByLabelText('Текст заметки'), { target: { value: 'этот вариант лишний' } }) })
     await act(async () => { fireEvent.click(screen.getByText('Сохранить')) })
     // выбираем другой вариант — заметка о невыбранном
     const other = choices().find((b) => !b.textContent?.startsWith(optionText))!

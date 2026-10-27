@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react'
 
 const FOCUSABLE = 'a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])'
 
@@ -17,15 +17,26 @@ export function useModal(opts: {
   const returnFocusRef = useRef(returnFocus)
   onEscapeRef.current = onEscape
   returnFocusRef.current = returnFocus
+  /** Кто держал фокус до открытия: его же и возвращаем на закрытии. */
+  const prevFocus = useRef<HTMLElement | null>(null)
 
+  // Фокус — на коммите, а не после кадра: preact откладывает пассивные эффекты до
+  // requestAnimationFrame, и открытый диалог успевал показаться с фокусом на body.
+  useLayoutEffect(() => {
+    if (!active) return
+    const dialog = dialogRef.current
+    if (!dialog) return
+    prevFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const list = focusables(dialog)
+    ;(list[0] ?? dialog).focus()
+  }, [active, dialogRef])
+
+  // Ловушка клавиш и возврат фокуса — пассивным эффектом: на закрытии подложка обязана
+  // уже потерять inert, иначе focus() по её элементу — no-op.
   useEffect(() => {
     if (!active) return
     const dialog = dialogRef.current
     if (!dialog) return
-    const prev = (document.activeElement instanceof HTMLElement) ? document.activeElement : null
-    const list = focusables(dialog)
-    ;(list[0] ?? dialog).focus()
-
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && onEscapeRef.current) {
         e.preventDefault()
@@ -47,7 +58,7 @@ export function useModal(opts: {
     document.addEventListener('keydown', onKey, true)
     return () => {
       document.removeEventListener('keydown', onKey, true)
-      const back = returnFocusRef.current?.() ?? prev
+      const back = returnFocusRef.current?.() ?? prevFocus.current
       if (back?.isConnected) back.focus()
     }
   }, [active, dialogRef])
