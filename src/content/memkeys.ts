@@ -156,6 +156,9 @@ export const count = {
   violence: 'count.violence', intimidation: 'count.intimidation', sorry: 'count.sorry',
   /** Сколько раз за партию сработало тёплое «спасибо» (Tone_Thanks*) — третье даёт once-реплику (#354). */
   thanks: 'count.thanks',
+  /** Номер текущего блока: Rude_Block растит счёт, вкус блока (чужие каналы → мама → канцелярия → тишина)
+   *  читает его в ответе того же правила (#1423). */
+  block: 'count.block',
 } as const
 
 export const endgame = {
