@@ -9,7 +9,7 @@ import { saidJoin, saidMap } from './fact'
 import { needs, WORLD } from './world'
 import { QUESTS, COURT_SCENE } from './quests'
 import { PAYDAY_SCENE } from './payday'
-import { HEAT, bathAsked, bathAskedAt, blocked, cardSent, fraudLoan, grantPaid, intro, karineKnowsDebt, karineThinksTax, polite, ritualCount, ritualCut, saidHash } from './memkeys'
+import { HEAT, bathAsked, bathAskedAt, blocked, cardSent, coldWar, fraudLoan, grantPaid, intro, karineKnowsDebt, karineThinksTax, polite, ritualCount, ritualCut, saidHash } from './memkeys'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- форма переменных задаётся сценой
 export type Vars = Record<string, any>
@@ -714,7 +714,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
           ],
         },
         hash: {
-          fx: { days: 1, mood: 3, ach: 'blood_brother', set: { [HEAT]: 0, [ritualCut]: true } },
+          fx: { days: 1, mood: 3, ach: 'blood_brother', set: { [HEAT]: 0, [ritualCut]: true, [coldWar]: false } },
           sys: 'Хаш в 7 утра. Три тоста. Одна слеза — не твоя.',
           a: [
             gate(lte(ritualCount, 1))('Теперь мы кровные братья. Ну как кровные: я порезался о твою плитку. Брату деньги не отдают, брату отдают себя.'),
@@ -726,7 +726,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
         text: {
           // факт «ванную уже называли» ставит сама реплика: иначе первое «условие то же» ссылается на то,
           // чего в партии не звучало (#1365)
-          fx: { mood: 1, set: { [HEAT]: 1 } },
+          fx: { mood: 1, set: { [HEAT]: 1, [coldWar]: false } },
           a: [needs('karineHome', 'karine')('Текстом — только через Карине.'), gate(WORLD.karineHome, missing(intro('karine')))('Текстом — только через жену. Она передаст.'), needs('karineGone')('Текстом — только через маму. Она передаст. С комментариями.')],
           who2: 'karine', a2: [
             gate(missing(bathAsked), WORLD.karineHome)({ t: 'Я одобрила мир. Условие: переложите нам ванную. Бесплатно. Вы же теперь почти брат.', remember: [set(bathAsked, true)], stamp: bathAskedAt }),
@@ -739,7 +739,7 @@ export function makeScenes(X: ExcuseApi): Record<string, Scene> {
           ],
         },
         moo: {
-          fx: { mood: 2, ach: 'blood_brother', set: { [HEAT]: 0 } },
+          fx: { mood: 2, ach: 'blood_brother', set: { [HEAT]: 0, [coldWar]: false } },
           a: ['Мууу с молитвой… Брат, это самое искреннее извинение в моей жизни. Корова тоже прослезилась. Мир.'],
         },
       },
