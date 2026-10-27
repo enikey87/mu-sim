@@ -30,7 +30,7 @@ describe('живая рецензия №1: точечные правки (#891)
       'Твой вопрос про деньги рассматривает ООН',
       'Мы не злимся.',
       'Может, спросить Гарика? Он же код знает',
-      'с него и спросишь, я подскажу, где он',
+      'с него и спросишь, а я подскажу, где его искать',
     ]) expect(allSource, line).toContain(line)
   })
   it('Тарон рисуется на старых эмодзи-шрифтах: ☕, а не чайник из Unicode 13.0 (#891)', () => {
@@ -38,8 +38,9 @@ describe('живая рецензия №1: точечные правки (#891)
     expect(allSource).not.toContain('🫖')
   })
   it('срок легенды бетона указывает на Гранта: «я свободен» и обещание вернуть самому не спорят (#891)', () => {
-    expect(LEGENDS.beton_law.until.t).toContain('с него и спросишь')
-    expect(LEGENDS.beton_law.until.t).not.toContain('что должен тебе')
+    expect(LEGENDS.beton_law.until.t).toBe('как Грант признает долг')
+    expect(LEGENDS.beton_law.promise).toContain('с него и спросишь')
+    expect(LEGENDS.beton_law.promise).not.toContain('что должен тебе')
   })
   it('в легенде кода Гарика спрашивают, а не достают (#891)', () => {
     const talk = (LEGENDS.garik.talk ?? []).map(valueOf).flat().join(' ')
