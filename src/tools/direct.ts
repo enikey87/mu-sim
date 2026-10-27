@@ -8,7 +8,7 @@ import type { Facts } from '../engine/rules'
 import { during } from '../engine/rules'
 import { START_DAY, ARC_MARINATION_DAYS } from '../engine/state'
 import { HEAT, borisAskAt, legendDay, legendId, muenAt, nuneKeyPassed, payday, sorryAt } from '../content/memkeys'
-import { ENDING_MIN_DAY } from '../content/finales'
+import { ENDING_MIN_DAY, CHRONIC_RUDE_AFTER_VENDETTA } from '../content/finales'
 
 export type DirectCase = { event: string; facts?: Facts; target?: string; setup?: (g: Game) => void }
 
@@ -22,6 +22,8 @@ const paydayOpen = (g: Game) => {
 const phone = (g: Game) => { g.rules.applyOps([during('phone.karine', 1)], {}) }
 const dead = (g: Game) => { g.S.mem.alik_dead = true }
 const blocked = (g: Game) => { g.S.mem.blocked = true }
+/** Режим холодной войны после вендетты (#1424): бот в выборках не доходит до вендетты, факт ставим тот же, что она. */
+const coldWarMode = (g: Game) => { g.S.mem.coldWar = true }
 const offended = (g: Game) => { g.S.mem[HEAT] = 1; g.S.ctx = { offended: true } }
 /** Три сюжетных сериала закончены — ворота третьего акта (тот же setup, что `rich` в payday.test.ts). */
 const thirdAct = (g: Game) => {
@@ -58,6 +60,10 @@ export const DIRECT: Record<string, DirectCase> = {
   // гейт на чужих семействах: в семье +4000 бот не доходит до предложения «через Бориса» (4/0/4) — прямой случай держит гейт
   Opt_Via_boris: { event: 'BuildChoices', setup: (g) => { blocked(g); g.S.arcs.boris = { i: 4, last: 0 } } },
   Away_Offline: { event: 'AlikAway', setup: (g) => { g.S.offlineDays = 2 } },
+  // #1424: до вендетты бот в выборках не доходит — требование и пачка «пока тебя не было» в режиме
+  // холодной войны держатся прямыми случаями (факт ставит сама Вендетта)
+  ColdWar_Request: { event: 'PlayerMessage', facts: { tone: 'neutral', category: 'request' }, setup: coldWarMode },
+  ColdWar_Away: { event: 'AlikAway', setup: coldWarMode },
   Turn_WhileDead: { event: 'AlikTurn', setup: (g) => { g.S.mem.alik_dead = true } },
   // гарантия первой серии (#636): к 12-му сообщению шанс Turn_ArcFirst мог промахнуться всю посадку
   Turn_ArcGuarantee: { event: 'AlikTurn', setup: (g) => { g.S.stats.sent = 12; g.S.day = START_DAY + ARC_MARINATION_DAYS } },
@@ -101,6 +107,13 @@ export const DIRECT: Record<string, DirectCase> = {
   Finale_rubik_bribe: { event: 'ArcFinale', facts: { arc: 'rubik' }, setup: (g) => { g.S.ach.redo = 1 } },
   Finale_samvel_tamada: { event: 'ArcFinale', facts: { arc: 'samvel' }, setup: (g) => { g.S.ach.toast = 1 } },
   Ending_alik: { event: 'CheckEnding', setup: (g) => { g.S.day = ENDING_MIN_DAY; g.S.mem['finale.garik'] = 'cutter' } },
+  // #1424: режим холодной войны даёт хронику постоянное извинение как выход (issue: ритуал примирения остаётся
+  // выходом) — бот-хроник этим пользуется, и в выборках «до концовки» хроника #1425 до порога не доходит.
+  // Для игрока, который продолжает кричать и не извиняется, путь прежний: счётчик растёт в game.ts.
+  Ending_bloodfeud: {
+    event: 'CheckEnding',
+    setup: (g) => { g.S.mem.vendetta = true; g.S.mem['count.rudeAfterVendetta'] = CHRONIC_RUDE_AFTER_VENDETTA },
+  },
   Ending_heir: { event: 'CheckEnding', setup: (g) => { g.S.day = ENDING_MIN_DAY; g.S.mem['finale.alik_death'] = 'will' } },
   Says_via_boris: { event: 'PlayerSays', facts: { intent: 'via', arg: 'boris' }, setup: (g) => { g.S.mem.blocked = true } },
   // с колкостями (#683) PromiseDue в открытом экране выплаты ловят сами выборки — случай снят по порогу гейта
