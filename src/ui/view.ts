@@ -19,7 +19,7 @@ type BatteryView = Readonly<Pick<Game['battery'], 'level' | 'dead' | 'charging'>
  *  обход через каст получает undefined, а не память. */
 export type GameUi = Readonly<
   Pick<Game, 'subscribe' | 'getVersion' | 'getMsgsEpoch' | 'getMsgsDirtyFrom' | 'ackMsgsDirty' | 'choices' | 'clockText' | 'gameDate'
-    | 'send' | 'answerJob' | 'answerCard' | 'canMirror' | 'playVoice' | 'castOf' | 'flash' | 'closeEnding' | 'dismissNotif' | 'toggleMute' | 'gesture' | 'onVisibility' | 'reset' | 'introDone' | 'lend50Sponsor'>
+    | 'send' | 'answerJob' | 'answerCard' | 'canMirror' | 'playVoice' | 'castOf' | 'flash' | 'closeEnding' | 'dismissNotif' | 'toggleMute' | 'gesture' | 'onVisibility' | 'reset' | 'introDone' | 'lend50Sponsor' | 'endingsSeen'>
   & { ui: UiView; battery: BatteryView; mooSound: () => void; vibrate: (p: number | number[]) => void }
 >
 
@@ -47,7 +47,7 @@ export function uiOf(g: Game): GameUi {
     send: (o) => sendWithReview(g, o), answerJob: (id, answer) => g.answerJob(id, answer), answerCard: (id, pick) => g.answerCard(id, pick), canMirror: () => g.canMirror(), playVoice: (m) => g.playVoice(m), castOf: (who) => g.castOf(who),
     flash: (t, ms) => g.flash(t, ms), closeEnding: () => g.closeEnding(), dismissNotif: () => g.dismissNotif(),
     toggleMute: () => g.toggleMute(), gesture: () => g.gesture(), onVisibility: (h) => g.onVisibility(h), reset: () => g.reset(),
-    introDone: () => g.introDone(), lend50Sponsor: () => g.lend50Sponsor(),
+    introDone: () => g.introDone(), lend50Sponsor: () => g.lend50Sponsor(), endingsSeen: () => g.endingsSeen(),
     mooSound: () => { g.audio.moo() },
     vibrate: (p) => { g.audio.vibrate(p) },
   }
@@ -131,6 +131,9 @@ export const viewOf = (u: GameUi): View => {
   const S = g.S
   const ending = S.ending ? ENDINGS.find((x) => x.id === S.ending) : undefined
   const chain = S.mem[payday.chain]
+  // коллекция концовок — партия плюс отметка устройства (#1437): после «Начать заново» открытые остаются открытыми
+  const onDevice = u.endingsSeen()
+  const endings: EndingRow[] = ENDINGS.map((e) => ({ id: e.id, title: e.title, icon: e.icon, got: !!S.endings[e.id] || onDevice.has(e.id) }))
   return {
     day: S.day,
     debt: S.debt,
@@ -146,7 +149,7 @@ export const viewOf = (u: GameUi): View => {
           }
         : { daysLeft: null, sum: null },
     endingId: ending?.id ?? null,
-    endingCount: Object.keys(S.endings).length,
+    endingCount: endings.filter((e) => e.got).length,
     endingTotal: ENDINGS.length,
     ending: ending ? { id: ending.id, title: ending.title, text: ending.text, icon: ending.icon } : null,
     grandExcuse: ending?.id.startsWith('payday_') && typeof chain === 'string' ? chain : null,
@@ -160,7 +163,7 @@ export const viewOf = (u: GameUi): View => {
       const finale = g.finaleTitle(id)
       return { id, title: a.title, state: finale ? `финал «${finale}»` : `серия ${i}/${a.eps.length}`, done: i >= a.eps.length, locked: i === 0 }
     }),
-    endings: ENDINGS.map((e) => ({ id: e.id, title: e.title, icon: e.icon, got: !!S.endings[e.id] })),
+    endings,
     items: S.items,
     ach: Object.entries(ACH).map(([k, [title, desc]]) => ({ id: k, title, desc: typeof desc === 'function' ? desc(S) : desc, got: !!S.ach[k] })),
     achGot: Object.keys(S.ach).length,
