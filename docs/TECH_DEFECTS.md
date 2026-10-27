@@ -37,7 +37,7 @@
 
 ## 🟡 P3 — Residual O(N) reconcile у родителя MessageList
 
-Creation/sync O(Δ) после #28. React-родитель всё ещё видит N children при append. Виртуализация — отдельно, если снова упрёмся в frame time.
+Creation/sync O(Δ) после #28. Родительский компонент всё ещё видит N children при append. Виртуализация — отдельно, если снова упрёмся в frame time.
 
 ---
 

@@ -213,6 +213,6 @@
 
 ## Тех
 
-- Vite + React + TypeScript, без бэкенда. Прогресс хранится в localStorage (последние 150 сообщений).
+- Vite + Preact (`preact/compat` под именами React, #1447) + TypeScript, без бэкенда. Прогресс хранится в localStorage (последние 150 сообщений).
 - Тесты: Vitest (движок, контент, сценарии правил, симуляции, интерфейс) и Playwright e2e против прод-сборки.
 - Публикация: GitHub Actions → GitHub Pages.
