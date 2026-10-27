@@ -11,7 +11,7 @@ test.beforeEach(async ({ page }) => {
 })
 
 test('под тестом прод-сборка, а не dev-сервер', async ({ page }) => {
-  // сборка отдаёт ./assets/index-<хеш>.js, dev-сервер — /src/main.tsx
+  // сборка отдаёт ./assets/index-<хеш>.js, dev-сервер — /src/intro/shell.ts
   const srcs = await page.evaluate(() => [...document.scripts].map((s) => s.getAttribute('src') ?? ''))
   expect(srcs.some((s) => /assets\//.test(s))).toBe(true)
   expect(srcs.some((s) => /\/src\//.test(s))).toBe(false)
