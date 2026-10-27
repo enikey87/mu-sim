@@ -2,7 +2,7 @@
 // что сделать Алику — принимает система правил (engine/rules/, content/rules/*).
 import { make, D, TRANSFER_FRESH_TURNS, PHOTO_FRESH_TURNS, EVENT_FRESH_TURNS, low, cap, type ExcuseApi, type Promise3, type PromiseCondition, type Rel, type When, type WhenKind } from '../content/excuses'
 import { makeScenes, invKey, type Scene, type Line } from '../content/scenes'
-import { BLOCK_LIFTED_LINE, BLOCK_LIFTED_SYS, COLD_WAR, COLD_WAR_TURNS, COLD_WAR_WINDOW, TRIBUNAL } from '../content/rude'
+import { BLOCK_LIFTED, COLD_WAR, COLD_WAR_TURNS, COLD_WAR_WINDOW, TRIBUNAL } from '../content/rude'
 import { MIRROR, MIRROR_AGAIN, MIRROR_OPEN, MIRROR_REPLY, type Mirror } from '../content/mirror'
 import { PAYDAY_HOOKS } from '../content/rules/payday'
 import { QUEST_WHEN } from '../content/rules/world'
@@ -821,6 +821,29 @@ export class Game {
   addrLine = (key: string, arr: readonly Entry<string>[]): string => this.uniq(() => `${this.X.g('ADDR')}, ${this.draw(key, arr)}`)
   /** Как addrLine, но сохраняет явную семантику строк пула (#426). */
   addrSaidLine = (key: string, arr: readonly Entry<Said>[]): Said => this.uniq(() => saidJoin(`${this.X.g('ADDR')}, `, this.draw(key, arr)))
+  /**
+   * Пара снятия блока (#1422): сис-строка и реплика Алика называют одну причину, поэтому выбираются
+   * вместе, а не двумя независимыми пулами. Окно повтора — как у реплик игрока: ни одна строка пары
+   * не выходит дословно раньше PLAYER_REPEAT_TURNS ходов, иначе 18 снятий за партию играют одну пару.
+   */
+  private blockLift(): readonly [string, string] {
+    const key = 'BLOCK_LIFTED'
+    const facts = this.lineFacts()
+    const open = BLOCK_LIFTED.filter((e) => isOpen(e, facts)).map(valueOf)
+    const recent = new Set([
+      ...this.recentLines(key, open.map(([sys]) => sys), PLAYER_REPEAT_TURNS),
+      ...this.recentLines(key, open.map(([, line]) => line), PLAYER_REPEAT_TURNS),
+    ])
+    const fresh = this.decks.pick(key, open, facts, {
+      eligible: (e) => { const [sys, line] = valueOf(e); return !recent.has(sys) && !recent.has(line) },
+    })
+    // всё в окне — самая давняя пара: разблокировка молчать не может
+    const at = (t: string) => this.S.rules.said[lineId(key, t)]?.turn ?? -1e9
+    const pair = fresh ?? open.reduce((a, b) => (Math.max(at(a[0]), at(a[1])) <= Math.max(at(b[0]), at(b[1])) ? a : b))
+    this.noteLine(key, pair[0])
+    this.noteLine(key, pair[1])
+    return pair
+  }
 
   /** Подставить состояние в текст: {debt} и {money} — деньги, {night} — который час по часам переписки. */
   fillMoney = (t: string): string =>
@@ -2220,8 +2243,9 @@ export class Game {
       delete S.mem[memkeys.blockLifted]
       await this.sleep(500)
       if (this.disposed) { this.inPlayerTurn = false; return }
-      this.sys(BLOCK_LIFTED_SYS)
-      await this.say([BLOCK_LIFTED_LINE])
+      const [sysLine, alikLine] = this.blockLift()
+      this.sys(sysLine)
+      await this.say([alikLine])
     }
 
     try {
