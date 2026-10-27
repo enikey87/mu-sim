@@ -20,8 +20,8 @@ npx vite build --mode telegram --outDir dist-telegram
 
 | | web | yandex | vk | telegram |
 |---|---|---|---|---|
-| Старт | ничего | `YaGames.init()` | `VKWebAppInit` | `WebApp.ready()` + `expand()` |
-| Полный экран | системный | — | — | `requestFullscreen()` при поддержке; вертикальные свайпы закрыты (Bot API 7.7) |
+| Старт | ничего | `YaGames.init()` | `VKWebAppInit` | `WebApp.ready()`; fullscreen на телефонах |
+| Полный экран | системный | — | — | `requestFullscreen()` на телефонах при поддержке; вертикальные свайпы закрыты (Bot API 7.7) |
 | После первого кадра | ничего | `LoadingAPI.ready()` | ничего | ничего |
 | Игрок может ходить / оверлей или вкладка скрыта | ничего | `GameplayAPI.start()` / `stop()` | ничего | ничего |
 | Тема | системная (`prefers-color-scheme`) | системная | системная | `WebApp.colorScheme` (`data-theme` на `:root`) |
@@ -82,12 +82,21 @@ npx vite build --mode telegram --outDir dist-telegram
 Сборка — тот же веб-клиент в WebView Telegram. Скрипт `https://telegram.org/js/telegram-web-app.js` грузит
 сам адаптер (`src/platform/telegram.ts`), и только в telegram-сборке: веб и витрины его не запрашивают.
 
-- `WebApp.ready()` и `expand()` — на старте; `disableVerticalSwipes()` (Bot API 7.7) не даёт вертикальному
-  свайпу закрыть игру посреди хода; `requestFullscreen()` (Bot API 8.0) — при поддержке и если игра ещё
-  не на весь экран. У старого клиента метода нет — вызов пропускается, старт не падает.
+- `WebApp.ready()` — на старте. На Android/iOS (`WebApp.platform`: `android`, `android_x`, `ios`)
+  игра вызывает `expand()`, затем `requestFullscreen()` (Bot API 8.0), если ещё не на весь экран.
+  Web/Desktop остаются в окне; если клиент уже включил fullscreen, игра запрашивает `exitFullscreen()`.
+  Неизвестная платформа не разворачивается. Отсутствующий метод или отказ клиента не ломают старт.
+- Ссылка из README использует `mode=compact`: Telegram выбирает компактное окно при открытии,
+  а мобильный адаптер затем разворачивает игру. Точные размеры окна определяет клиент Telegram;
+  настройка относится к запуску по этой ссылке, а не меняет кнопки бота в BotFather.
+  Режимы открытия и методы описаны в [документации Telegram](https://core.telegram.org/bots/webapps).
+- `disableVerticalSwipes()` (Bot API 7.7) не даёт вертикальному свайпу закрыть игру посреди хода.
 - Тема: `colorScheme` клиента ставит `data-theme` на `:root` (палитры — в `styles.css`), `themeChanged`
   переносит её на ходу. Клиент без `colorScheme` определяется по яркости `themeParams.bg_color`.
   Системная тема WebView не важна: телефон у игрока может быть светлым, а Telegram — тёмным.
+- Safe area: адаптер ставит `data-platform="telegram"`; стили резервируют системные отступы и место
+  под кнопки клиента для телефона и оверлеев. CSS-переменные SDK обновляются при изменении окна;
+  системные значения `env()` и SDK учитываются через максимум, отступы интерфейса Telegram добавляются.
 - `externalPay: false`: внешняя платёжная ссылка (DonationAlerts) в Telegram запрещена, цифровые товары
   продаются только за Stars. Карточка «займи 50» на Telegram — Stars-покупка (см. ниже, #1235).
 - `gameplayStart`/`gameplayStop` — пустые: игрового API площадки у Mini App нет.
