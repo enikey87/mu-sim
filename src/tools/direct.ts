@@ -7,8 +7,8 @@ import type { Game } from '../engine/game'
 import type { Facts } from '../engine/rules'
 import { during } from '../engine/rules'
 import { START_DAY, ARC_MARINATION_DAYS } from '../engine/state'
-import { HEAT, borisAskAt, legendDay, legendId, muenAt, nuneKeyPassed, payday, sorryAt } from '../content/memkeys'
-import { ENDING_MIN_DAY } from '../content/finales'
+import { HEAT, borisAskAt, count, legendDay, legendId, muenAt, nuneKeyPassed, payday, sorryAt, vendetta } from '../content/memkeys'
+import { CHRONIC_RUDE_AFTER_VENDETTA, ENDING_MIN_DAY } from '../content/finales'
 
 export type DirectCase = { event: string; facts?: Facts; target?: string; setup?: (g: Game) => void }
 
@@ -102,6 +102,12 @@ export const DIRECT: Record<string, DirectCase> = {
   Finale_samvel_tamada: { event: 'ArcFinale', facts: { arc: 'samvel' }, setup: (g) => { g.S.ach.toast = 1 } },
   Ending_alik: { event: 'CheckEnding', setup: (g) => { g.S.day = ENDING_MIN_DAY; g.S.mem['finale.garik'] = 'cutter' } },
   Ending_heir: { event: 'CheckEnding', setup: (g) => { g.S.day = ENDING_MIN_DAY; g.S.mem['finale.alik_death'] = 'will' } },
+  // #1423 (вкус блока по счёту сдвинул розыгрыш): хроника после Вендетты до экрана концовки больше не доходит —
+  // 72 партии «до концовки» не дают 15 криков после схода. Условия те же, что ставит сход (#1425) и считает игра.
+  Ending_bloodfeud: {
+    event: 'CheckEnding',
+    setup: (g) => { g.S.mem[vendetta] = true; g.S.mem[count.rudeAfterVendetta] = CHRONIC_RUDE_AFTER_VENDETTA },
+  },
   Says_via_boris: { event: 'PlayerSays', facts: { intent: 'via', arg: 'boris' }, setup: (g) => { g.S.mem.blocked = true } },
   // с колкостями (#683) PromiseDue в открытом экране выплаты ловят сами выборки — случай снят по порогу гейта
   // стенд мёртвого телефона больше не доходит и в выборках (#133): оставшиеся редкие окна держатся случаями ниже
