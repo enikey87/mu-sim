@@ -220,8 +220,9 @@ export const rudeRules: R[] = [
   },
   // ветка: кричал всю игру и вдруг вежлив — Алику не хватает крика
   {
-    // ссора остыла (давно не кричал), но за игру накричал много
-    name: 'Tone_MissRude', event: 'PlayerMessage', when: [ne('tone', 'rude'), ne('tone', 'threat'), gte(count.rude, 15), lte(HEAT, 0), gte('sinceRude', 8), missing(coldWar)], odds: 0.35, cooldown: { turns: 8 },
+    // ссора остыла (давно не кричал), но за игру накричал много. Официальное обращение в суд (#1435) — не
+    // «вдруг вежлив»: оно ведёт своё дело, и отклик «не хватает крика» его не съедает
+    name: 'Tone_MissRude', event: 'PlayerMessage', when: [ne('tone', 'rude'), ne('tone', 'threat'), ne('category', 'threat'), gte(count.rude, 15), lte(HEAT, 0), gte('sinceRude', 8), missing(coldWar)], odds: 0.35, cooldown: { turns: 8 },
     respond: async ({ game }) => { const t = game.line('MISS_RUDE', T.MISS_RUDE); if (!t) return game.turnRoll(); await game.say([t]); game.unlock('habit'); await game.turnRoll() },
   },
 

@@ -1,6 +1,7 @@
 // Линия суда: каждая угроза — следующая ступень, заседание — сцена с выбором, потом апелляция и Страсбург.
 import { describe, it, expect } from 'vitest'
 import { makeGame } from '../../test/helpers'
+import { classifyUserInput } from '../../engine/input'
 import { COURT, COURT_AFTER, COURT_LAWYER_AGAIN, COURT_VERDICT_AFTER_LETTER } from '../quests'
 import { ARCS } from '../arcs'
 import { isOpen, valueOf } from '../../engine/rules'
@@ -163,6 +164,49 @@ describe('линия суда', () => {
     try {
       expect((await threat(game)).r).toBe('Court_Step')
     } finally { lettered.when = when }
+  })
+})
+
+describe('вежливый путь в суд (#1435)', () => {
+  /** Официальные обращения без крика: классификатор держит их вежливым тоном, а дело двигает каждое второе. */
+  const FORMAL = [
+    'Будьте добры, официально уведомляю: мой юрист готовит документы.',
+    'Направляю досудебную претензию в суд, пожалуйста.',
+  ]
+  const send = async (game: Game, text: string): Promise<void> => { game.S.offlineDays = 0; await game.send(text) }
+  const say = async (game: Game): Promise<void> => send(game, FORMAL[game.S.stats.sent % FORMAL.length])
+
+  it('официальное обращение — вежливый тон при смысле «угроза судом»', () => {
+    for (const text of FORMAL) expect(classifyUserInput(text), text).toMatchObject({ category: 'threat', tone: 'polite' })
+    // отклик на отправку — тот же, что у устной угрозы: по смыслу это угроза, меняется только регистр
+    expect(makeGame().game.feelFor({ text: FORMAL[0], tone: 'polite', category: 'threat' })).toBe('shake')
+  })
+
+  it('ступень за два обращения: первое канцелярия регистрирует, второе двигает дело', async () => {
+    const { game } = makeGame()
+    await send(game, FORMAL[0])
+    expect(game.S.mem.court, 'первое обращение сдвинуло дело — медленный путь не медленный').toBeUndefined()
+    expect(game.S.mem['court.polite'], 'первое обращение не занесено в журнал').toBe(true)
+    await send(game, FORMAL[0])
+    expect(game.S.mem.court).toBe(1)
+    expect(game.S.mem['court.polite'], 'второе обращение не закрыло журнал').toBe(false)
+    expect(game.S.mem['count.threat'], 'официальное обращение не считается угрозой судом').toBe(2)
+    expect(game.S.ach.threat, 'ачивка «Правосудие» не выдана за официальное обращение').toBeDefined()
+  })
+
+  it('вежливая партия доходит до заседания и до «Настоящих денег», не рвя серию вежливости', async () => {
+    const { game } = makeGame()
+    // партия: официальные обращения, пока не откроется заседание (сцена court — это ступень 3, court = 4)
+    for (let i = 0; i < 24 && game.S.scene?.id !== 'court'; i++) await say(game)
+    expect(game.S.scene?.id, 'вежливые обращения не довели дело до заседания').toBe('court')
+    expect(game.S.mem.court).toBe(4)
+    expect(game.S.ach.court, 'заседание ещё не пройдено — проверка раньше времени').toBeUndefined()
+    await game.send(game.choices.find((c) => c.go === 'screens')!)
+    expect(game.S.ach.court, 'вердикт заседания не получен').toBeDefined()
+    expect(game.S.politeStreak, 'официальное обращение рвёт серию вежливости').toBeGreaterThanOrEqual(8)
+    for (let i = 0; i < 4 && !game.S.ach.saint; i++) await send(game, 'Спасибо, Алик, жду решения.')
+    expect(game.S.ach.saint, 'серия вежливости не дожила до «Святого»').toBeDefined()
+    expect((await game.fire('PaydayOutcome'))?.name, 'вежливая партия не дошла до «Настоящих денег»').toBe('Payday_real')
   })
 })
 

@@ -25,6 +25,9 @@ export const vendetta = 'vendetta'
 export const coldWar = 'coldWar'
 export const court = 'court'
 export const courtVerdict = 'court.verdict'
+/** Официальное вежливое обращение уже прозвучало, но дело ещё не сдвинулось: вежливый путь двигает ступень
+ *  каждым вторым упоминанием (#1435) — флаг и есть это «первое из двух». */
+export const courtPolite = 'court.polite'
 /** Инстанции, которым ступень суда уже объяснила перевод («полиция сказала — это в суд») — список через запятую. */
 export const courtReferral = 'court.referral'
 /** Судья Ашот вернул госпошлину с извинениями: их ставит утренний источник Дня выплаты — до него об извинениях не вспоминают (#988). */
@@ -395,7 +398,7 @@ export type ActorKey = (typeof ACTOR_KEY_LIST)[number]
 export const ACTOR_KEYS: ReadonlySet<string> = new Set(ACTOR_KEY_LIST)
 
 export const MEM_KEYS: ReadonlySet<string> = new Set([
-  HEAT, muenAt, muenAsked, muenAnswered, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, evicted, vendetta, coldWar, court, courtVerdict,
+  HEAT, muenAt, muenAsked, muenAnswered, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, evicted, vendetta, coldWar, court, courtVerdict, courtPolite,
   ritualCount, ritualCut, caughtCount, caughtAt, garikDenied, garikCode, cryptoHodl, bathAsked, bathAskedAt, bathAnswered, mamaCalls, phoneKarine, karineKnowsDebt, karineThinksTax, alikShaved, moustacheKept, moustacheAskAt, alikDay, mooAt, sorryAt, courtReferral, judgeApology, saidStrasburg,
   rudeAt, thanksAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway, nivaPlayer, carGone,
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, borisForeman, taxFrozen, taxThawed,
