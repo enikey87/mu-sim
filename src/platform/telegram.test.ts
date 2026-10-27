@@ -10,10 +10,24 @@ const tg = (app: Record<string, unknown>) => {
 afterEach(() => {
   delete (window as unknown as { Telegram?: unknown }).Telegram
   delete document.documentElement.dataset.theme
+  delete document.documentElement.dataset.platform
   vi.useRealTimers()
 })
 
 describe('адаптер Telegram Mini App (#1234)', () => {
+  it('помечает Telegram для безопасного layout даже без доступного SDK', async () => {
+    expect(document.documentElement.dataset.platform).toBeUndefined()
+    let platformDuringLoad: string | undefined
+    const load = vi.fn(async () => {
+      platformDuringLoad = document.documentElement.dataset.platform
+      throw new Error('SDK unavailable')
+    })
+    await telegramPlatform({ load }).init()
+    expect(load).toHaveBeenCalledOnce()
+    expect(platformDuringLoad).toBe('telegram')
+    expect(document.documentElement.dataset.platform).toBe('telegram')
+  })
+
   it('init грузит официальный скрипт и просит ready/expand/свайпы/фуллскрин', async () => {
     const ready = vi.fn()
     const expand = vi.fn()

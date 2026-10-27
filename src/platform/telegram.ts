@@ -102,6 +102,7 @@ export function telegramPlatform(deps: TelegramDeps = {}): Platform {
     // цифровые товары в Telegram продаются только за Stars: внешней ссылки на DonationAlerts здесь нет
     externalPay: false,
     async init() {
+      document.documentElement.dataset.platform = 'telegram'
       let app = tg()
       if (!app) {
         let timer: ReturnType<typeof setTimeout> | undefined
