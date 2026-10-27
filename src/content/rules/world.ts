@@ -58,10 +58,13 @@ export const QUEST_WHEN: Record<string, R['when']> = {
   q_crypto: [gte('day', 200), missing('legend')],
   q_witness: [gte('day', 210)],
   q_tamada: [missing(mourning)], // вести застолье, пока в семье прощаются, — нельзя
+  // письмо из Глендейла (#1439): середина партии, до эндгейма и не в трауре — гэг весёлый
+  q_inherit: [gte('day', 200), missing(endgame.active), missing(alikDead), missing(mourning)],
 }
 export const questRules: R[] = [
   quest('q_hash'), quest('q_niva', QUEST_WHEN.q_niva), quest('q_tamada', QUEST_WHEN.q_tamada), quest('q_lottery'), quest('q_parking'),
   quest('q_mama'), quest('q_crypto', QUEST_WHEN.q_crypto), quest('q_photo'), quest('q_witness', QUEST_WHEN.q_witness), quest('q_goat'),
+  quest('q_inherit', QUEST_WHEN.q_inherit),
 ]
 
 // ---- обещание наступило (PromiseDue — отложенное событие на день срока) ----
