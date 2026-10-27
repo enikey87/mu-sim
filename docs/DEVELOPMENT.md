@@ -71,6 +71,29 @@ CI — [.github/workflows/pages.yml](../.github/workflows/pages.yml). Тесты
 Платформенные адаптеры и их сборки — [platforms.md](platforms.md).
 Сборка Android через Capacitor — [android.md](android.md).
 
+## Service worker: офлайн и повторный визит
+
+Сборка кладёт в корень сайта `sw.js` — воркер с app-shell кэшем (#1446). Что он делает:
+
+| Что | Стратегия |
+|---|---|
+| `/assets/*` (хешированные файлы), иконки | cache-first: повторный визит не ходит в сеть |
+| `index.html` (навигация), `manifest.webmanifest` | network-first: новый деплой подхватывается следующим визитом, офлайн — кэш |
+| Аналитика (`mc.yandex.ru`, `cloud.umami.is`, `eu.i.posthog.com`) и всё чужое | мимо воркера: ни кэша, ни офлайн-подмены |
+
+Установка кэширует шелл и все файлы из `manifest.json` сборки (`build.manifest` в `vite.config.ts`):
+без списка сборки динамический чанк приложения офлайн не находится. Новый воркер активируется сразу
+(`skipWaiting` + `clients.claim`), старые кэши `alik-*` удаляются на activate.
+
+`sw.js` раздаётся с GitHub Pages как обычный файл, поэтому **браузер проверяет обновление самого воркера
+не чаще раза в 10 минут** (так Pages кэширует отдачу): новый деплой подхватывается визитом после этого
+окна, а не мгновенно. Это норма, менять нечего — версия кэшей (`VERSION` в `src/sw/worker.ts`) поднимается
+вручную, когда меняется смысл хранения.
+
+В браузерных тестах воркер по умолчанию заблокирован (`serviceWorkers: 'block'` в `playwright.config.ts`):
+сценарии не должны зависеть от кэша. Сам воркер проверяет `tests/e2e/sw.spec.ts` — у него свой
+статический сервер над `dist/`, поэтому «новый деплой» изображается подменой `index.html` посреди теста.
+
 ## Где искать код и решения
 
 | Путь | Содержание |
@@ -81,6 +104,7 @@ CI — [.github/workflows/pages.yml](../.github/workflows/pages.yml). Тесты
 | [src/tools](../src/tools/) | Бот для партий, расшифровки и проверка покрытия правил. |
 | [src/platform](../src/platform/) | Адаптеры веба, Telegram, VK и Яндекс Игр. |
 | [src/analytics](../src/analytics/) | Приёмники событий аналитики. |
+| [src/sw](../src/sw/) | Service worker: app-shell кэш, офлайн и повторный визит (#1446). |
 
 [DESIGN.md](../DESIGN.md) описывает механики игры; [docs/design](design/README.md) — отдельные решения.
 Аудиты: [архитектура](ARCHITECTURE_AUDIT.md), [движок правил](RULES_ENGINE_AUDIT.md),

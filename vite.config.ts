@@ -6,6 +6,19 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   base: './',
   plugins: [react()],
+  build: {
+    // Список всех файлов сборки в корне dist: по нему воркер (#1446) предкэширует и динамические
+    // чанки приложения — их нет в index.html, а офлайн после первого визита нужен весь пакет.
+    manifest: 'manifest.json',
+    rollupOptions: {
+      // Service worker (#1446) — отдельный вход сборки: браузер ищет его по постоянному адресу
+      // (sw.js в корне области), поэтому у этого файла нет хеша в имени, в отличие от остальных.
+      input: { index: 'index.html', sw: 'src/sw/worker.ts' },
+      output: {
+        entryFileNames: (chunk) => (chunk.name === 'sw' ? 'sw.js' : 'assets/[name]-[hash].js'),
+      },
+    },
+  },
   test: {
     // jsdom нужен только файлам, которые реально трогают DOM: они помечены
     // `// @vitest-environment jsdom` (см. analytics/*, platform, ui). Остальным хватает node —

@@ -10,6 +10,7 @@ import { introLinesOf, introTextOf } from './cards'
 import { mountIntro } from './mount'
 import { shellIntroWanted } from './wanted'
 import { analyticsGate } from '../analytics/gate'
+import { armServiceWorker } from '../sw/register'
 import type { AppHandle } from '../main'
 
 const q = new URLSearchParams(location.search)
@@ -27,6 +28,11 @@ const clockMinutes = (): number =>
   (q.has('hour') ? Number(q.get('hour')) : new Date().getHours()) * 60 + new Date().getMinutes()
 
 const app = () => import('../main')
+
+// Воркер (#1446): повторный визит и офлайн играются из app-shell кэша. Регистрация ждёт load
+// и не мешает первому кадру; без API витрины или при отказе игра идёт как раньше (src/sw/register.ts).
+// В dev воркера нет — sw.js появляется только сборкой, поэтому dev-сервер о нём не просит.
+if (import.meta.env.PROD) armServiceWorker()
 
 if (!shellIntroWanted({ noIntro: q.has('nointro'), web: webBuild, save: hasSave() })) {
   // Титров нет: игра сама решит про своё интро по отметке в сохранении, шелл отдаёт ей место
