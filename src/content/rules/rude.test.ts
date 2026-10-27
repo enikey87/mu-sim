@@ -581,3 +581,93 @@ describe('холодная война после вендетты', () => {
     expect((await fire(game, 'polite')).r).not.toBe('Tone_MissRude')
   })
 })
+
+// Строки COLD_WAR живут в двух колодах: инициатива («Ну и молчи») и ответ на грубость (COLD_WAR_ALL).
+// Окно повтора у такой строки одно — по тексту, а не по ключу колоды (#1441): показ одним путём
+// держит её для другого. Иначе sequential-колода 5 строк и random-колода 15 строк не видят друг друга,
+// и «Ну и молчи» выходит трижды за 17 ходов (rude, сид 3029).
+describe('холодная война: общее окно повтора у двух колод (#1441)', () => {
+  const coldWarTexts = T.COLD_WAR.map(valueOf)
+  const saidCold = (game: Game, from: number) => texts(game, from).filter((t) => coldWarTexts.includes(t))
+
+  /** Вендетта включает режим: 15-й крик без извинений. */
+  const vendetta = async (game: Game): Promise<void> => {
+    game.S.mem[HEAT] = 1
+    game.S.mem['count.rude'] = 14
+    expect((await fire(game, 'rude')).r).toBe('Rude_Vendetta')
+    expect(game.S.mem[coldWar], 'вендетта не поставила режим').toBe(true)
+  }
+
+  /** Инициатива Алика из COLD_WAR: обиженный игрок молчит (правило с перерывом и шансом). */
+  const initiative = async (game: Game): Promise<string> => {
+    for (let i = 0; i < 20; i++) {
+      game.S.ctx = { offended: true }
+      const from = game.S.msgs.length
+      if ((await game.fire('AlikIdle'))?.name === 'Idle_ColdWar') {
+        const said = saidCold(game, from)
+        if (said.length) return said[0]!
+      }
+    }
+    throw new Error('инициатива холодной войны не прозвучала')
+  }
+
+  it('строка, показанная инициативой, не возвращается ответом в окне 20 ходов', async () => {
+    const { game } = makeGame()
+    game.S.mem['intro.karine'] = true // строка про Карине открыта: инициатива идёт по всему пулу
+    heat(game, 1)
+    const first = await initiative(game)
+    expect(first, 'инициатива пошла не с первой строки пула').toBe(coldWarTexts[0])
+    game.S.ctx = null
+    game.S.mem[coldWar] = true // режим: ответы на грубость идут холодным пулом
+    for (let turn = 1; turn <= 19; turn++) {
+      game.S.stats.sent += 1
+      const from = game.S.msgs.length
+      expect((await fire(game, 'rude')).r).toBe('ColdWar_Rude')
+      expect(saidCold(game, from), `ход ${turn}`).not.toContain(first)
+    }
+  })
+
+  it('строка, показанная ответом, не возвращается инициативой в окне 20 ходов', async () => {
+    const { game } = makeGame()
+    await vendetta(game)
+    const first = coldWarTexts[0]
+    let shown = false
+    // колода ответа — 15 строк: пока не прозвучит каждая, повторов нет, значит первая холодная выйдет за круг
+    for (let turn = 1; turn <= T.COLD_WAR_ALL.length && !shown; turn++) {
+      game.S.stats.sent += 1
+      const from = game.S.msgs.length
+      expect((await fire(game, 'rude')).r).toBe('ColdWar_Rude')
+      shown = saidCold(game, from).includes(first)
+    }
+    expect(shown, 'первая строка пула не вышла за круг ответов').toBe(true)
+    game.clearFact(coldWar) // иначе AlikIdle отвечает инициативами режима (ColdWar_Idle), а не COLD_WAR
+    heat(game, 1)
+    game.S.mem['intro.karine'] = true
+    expect(await initiative(game), 'инициатива повторила строку внутри окна').not.toBe(first)
+  })
+
+  it('rude-партия (сид 3029): ни одна строка COLD_WAR не выходит дважды в окне 20 ходов', async () => {
+    const { game } = makeGame({ seed: 3029 })
+    const profile = [
+      'АЛИК!!! ВЕРНИ ДЕНЬГИ!!!', 'Ты мошенник!!!', 'Где мои 240 000?!', 'Хватит врать!!!',
+      'Я устал от твоих отмазок!!', 'Ты не подрядчик, ты вор!!!', 'АЛИК ВОЗДУХОНЕСЯН!!! ГДЕ ДЕНЬГИ?!',
+      'Мне плевать на твою родню!!! ПЛАТИ!', 'Сколько можно ждать?!', 'Ты меня за дурака держишь?!',
+      'Я всё расскажу всем!!!', 'ХВАТИТ!!!', 'Плита кривая, деньги где?!', 'Ты кричал, что заплатишь — я записал!!!',
+      'Никаких больше «завтра»!!!', 'Верни хотя бы тысячу!!!',
+    ]
+    const turns: Array<{ text: string; turn: number }> = []
+    for (let turn = 1; turn <= 60; turn++) {
+      const from = game.S.msgs.length
+      await game.send({ text: profile[(turn - 1) % profile.length]!, tone: 'rude' })
+      for (const t of saidCold(game, from)) turns.push({ text: t, turn })
+    }
+    expect(turns.length, 'партия не дошла до холодных строк').toBeGreaterThan(0)
+    for (const text of coldWarTexts) {
+      const at = turns.filter((s) => s.text === text).map((s) => s.turn)
+      for (const start of at) {
+        const inWindow = at.filter((t) => t >= start && t - start <= 20).length
+        expect(inWindow, `«${text.slice(0, 40)}»: ходы ${at.join(', ')}`).toBeLessThan(3)
+      }
+    }
+  })
+})

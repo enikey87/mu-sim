@@ -30,10 +30,19 @@ export async function sayFresh(game: ContentApi, key: string, pool: readonly Ent
   await game.say([who === 'alik' ? said : { w: who, t, claims: saidClaims(said) }])
   return picked
 }
+/** Строки холодной войны в окне повтора: их не берёт ни инициатива, ни ответ из общего пула (#1441). */
+const coldWarBlocked = (game: ContentApi): Set<string> => game.recentLines(T.COLD_WAR_WINDOW, T.COLD_WAR, T.COLD_WAR_TURNS)
+/** Строки COLD_WAR: их показ держит общее окно двух колод (канцелярит ответов окно не занимает, #1441). */
+const COLD_WAR_LINES = new Set(T.COLD_WAR.map(valueOf))
+const coldWarNote = (game: ContentApi, text: string): void => { if (COLD_WAR_LINES.has(text)) game.noteLine(T.COLD_WAR_WINDOW, text) }
 /** Реплика холодной войны: сухой пул без соседних повторов; когда пул кончился, колода тасуется заново —
- *  тёплая строка из обычных пулов вместо холодной не берётся никогда (режим не сдаётся). */
+ *  тёплая строка из обычных пулов вместо холодной не берётся никогда (режим не сдаётся).
+ *  Строки COLD_WAR инициатива и ответ делят одним окном (#1441): показанная одним путём не выходит другим. */
 async function coldWarLine(game: ContentApi, key: string, pool: readonly Entry<string>[]): Promise<void> {
-  await game.say([game.decks.pick(key, pool, game.lineFacts()) ?? valueOf(pool[0])])
+  const blocked = coldWarBlocked(game)
+  const text = game.decks.pick(key, pool, game.lineFacts(), { eligible: (e) => !blocked.has(valueOf(e)) }) ?? valueOf(pool[0])
+  coldWarNote(game, text)
+  await game.say([text])
 }
 /** Остудить ссору на n, не ниже нуля. */
 export const cooldown = (game: ContentApi, n: number) => game.coolConflict(n)
@@ -244,8 +253,10 @@ export const rudeRules: R[] = [
     // Алик ещё обижен (после извинения «Ну и молчи» — невпопад); пропавший («был давно») молчит — см. Idle/Away_Offline
     name: 'Idle_ColdWar', event: 'AlikIdle', when: [gte(HEAT, 1), is('ctx.offended'), ne('offline', true)], odds: 0.7, cooldown: { turns: 2 }, priority: 'chatter',
     respond: async ({ game }) => {
-      const t = game.decks.pick('COLD_WAR', T.COLD_WAR, game.lineFacts(), { mode: 'sequential', noRepeat: true })
+      const blocked = coldWarBlocked(game)
+      const t = game.decks.pick('COLD_WAR', T.COLD_WAR, game.lineFacts(), { mode: 'sequential', noRepeat: true, eligible: (e) => !blocked.has(valueOf(e)) })
       if (!t) return false
+      coldWarNote(game, t)
       await game.say([t])
     },
   },
