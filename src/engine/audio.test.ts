@@ -9,66 +9,30 @@ const phraseOf = (kind: MooKind): MooPhrase => {
   return makeMooPhrase(kind, () => rng.random())
 }
 
-describe('browserAudio.dispose', () => {
+// #1420: браузерной речи в звуке игры больше нет — ни на голосовых, ни на застолье, ни в отложенных частях.
+describe('браузерная речь снята со всех путей (#1420)', () => {
   afterEach(() => {
-    vi.useRealTimers()
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
   })
 
-  it('отменяет delayed moo и вызывает speechSynthesis.cancel', async () => {
-    vi.useFakeTimers()
-    const cancel = vi.fn()
-    const speak = vi.fn()
-    vi.stubGlobal('speechSynthesis', { speak, cancel })
-    vi.stubGlobal('AudioContext', class {
-      currentTime = 0
-      resume() { return Promise.resolve() }
-      createOscillator() {
-        return {
-          frequency: { value: 0, setValueAtTime() {}, linearRampToValueAtTime() {} },
-          type: 'sine',
-          connect() { return this },
-          start() {},
-          stop() {},
+  it('исходники звука не упоминают синтез речи', async () => {
+    const fs = await import('node:fs/promises')
+    const path = await import('node:path')
+    const dirs = ['src']
+    const hits: string[] = []
+    const walk = async (dir: string): Promise<void> => {
+      for (const e of await fs.readdir(dir, { withFileTypes: true })) {
+        const p = path.join(dir, e.name)
+        if (e.isDirectory()) await walk(p)
+        else if (/\.(ts|tsx)$/.test(e.name) && !e.name.endsWith('.test.ts') && !e.name.endsWith('.test.tsx')) {
+          const src = await fs.readFile(p, 'utf8')
+          if (/speechSynthesis|SpeechSynthesisUtterance/.test(src)) hits.push(p)
         }
       }
-      createGain() {
-        return {
-          gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} },
-          connect() { return this },
-        }
-      }
-      createBiquadFilter() {
-        return {
-          type: 'bandpass',
-          frequency: { value: 0 },
-          Q: { value: 0 },
-          connect() { return this },
-        }
-      }
-      get destination() { return {} }
-    })
-    vi.stubGlobal('SpeechSynthesisUtterance', class {
-      lang = ''
-      pitch = 1
-      rate = 1
-      volume = 1
-      constructor(public text: string) {}
-    })
-    vi.spyOn(Math, 'random').mockReturnValue(0) // < 0.3 → delayed moo
-
-    const audio = browserAudio()
-    audio.unlock()
-    audio.alikVoice(() => 'тест')
-    expect(speak).toHaveBeenCalled()
-    expect(vi.getTimerCount()).toBe(1)
-
-    audio.dispose()
-    expect(vi.getTimerCount()).toBe(0)
-    expect(cancel).toHaveBeenCalled()
-    await vi.advanceTimersByTimeAsync(5000)
-    expect(vi.getTimerCount()).toBe(0)
+    }
+    for (const d of dirs) await walk(d)
+    expect(hits).toEqual([])
   })
 })
 
@@ -167,12 +131,13 @@ describe('browserAudio.moo', () => {
     expect(heard.osc).toEqual([])
   })
 
-  it('голосовые по-прежнему говорят: убрали синтез только у «Мууу»', () => {
-    const { speak } = stubAudio()
+  it('голосовое звучит синтезом «му», а не речью браузера', () => {
+    const { heard, speak } = stubAudio()
     const audio = browserAudio()
     audio.unlock()
-    audio.alikVoice(() => 'тест')
-    expect(speak).toHaveBeenCalled()
+    audio.voice.play(phraseOf('alik'))
+    expect(heard.osc.length).toBeGreaterThan(0) // слоги «му» — Web Audio
+    expect(speak).not.toHaveBeenCalled()
   })
 })
 
@@ -281,17 +246,17 @@ describe('«Мууу»: выходной уровень (#282)', () => {
     expect(Math.max(...heard.gains)).toBe(MOO_VOL)
   })
 
-  // APK (docs/android.md): WebView без системного TTS — синтетической речи нет, но партия идёт дальше
-  it('нет синтеза речи (WebView без TTS) — голос молчит, остальной звук работает', () => {
+  // APK (docs/android.md): WebView без системного TTS — речи в звуке нет вовсе, партия идёт дальше
+  it('WebView без синтеза речи: «Мууу» и голосовое играют, речи не требуется', () => {
     const { heard } = stubAudio()
     vi.stubGlobal('speechSynthesis', undefined) // ни движка, ни интерфейса: как в WebView без TTS
     vi.stubGlobal('SpeechSynthesisUtterance', undefined)
     const audio = browserAudio()
     audio.unlock()
-    expect(() => audio.alikVoice(() => 'Брат, где деньги?')).not.toThrow()
-    expect(() => audio.feast((a) => a[0] ?? 'тост')).not.toThrow()
     audio.moo()
-    expect(Math.max(...heard.gains)).toBe(MOO_VOL) // «Мууу» и SMS-писк — Web Audio, речи не требуют
+    expect(Math.max(...heard.gains)).toBe(MOO_VOL) // «Мууу» и SMS-писк — Web Audio
+    expect(() => audio.voice.play(phraseOf('feast'))).not.toThrow()
+    expect(heard.osc.length).toBeGreaterThan(1)
   })
 })
 

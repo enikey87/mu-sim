@@ -1,7 +1,4 @@
 // Звук и вибрация. Браузер блокирует их до первого касания — поэтому unlock() вызывается по жесту.
-import { FEAST } from '../content/misc'
-import { VOICE } from '../content/life'
-import type { WallTimer } from './clock'
 import { mooPhraseDuration, synthMooSource, type MooSource } from './moo'
 
 export interface Audio {
@@ -9,18 +6,15 @@ export interface Audio {
   setMuted(m: boolean): void
   beep(): void
   moo(): void
-  speak(text: string, opts?: { pitch?: number; rate?: number; volume?: number }): void
-  feast(pick: (arr: readonly string[]) => string): void
-  alikVoice(pick: (arr: readonly string[]) => string): void
   /** Голосовое «му»: звук задан описанием сообщения, а не выбирается при нажатии (#1419). */
   voice: MooSource
   vibrate(pattern: number | number[]): void
-  /** Остановить речь и отложенные колбэки (после dispose игры). */
+  /** Остановить звук и отложенные колбэки (после dispose игры). */
   dispose(): void
 }
 
 export const silentAudio: Audio = {
-  unlock() {}, setMuted() {}, beep() {}, moo() {}, speak() {}, feast() {}, alikVoice() {},
+  unlock() {}, setMuted() {}, beep() {}, moo() {},
   voice: { duration: mooPhraseDuration, play() {}, stop() {} },
   vibrate() {}, dispose() {},
 }
@@ -58,7 +52,6 @@ export function browserAudio(voiceSource?: MooSource): Audio {
   let gestured = everGestured
   let muted = false
   let disposed = false
-  const pending = new Set<WallTimer>()
   const ctx = (): AudioContext => {
     if (!gestured) throw new Error('no gesture')
     return (ac ??= new AudioContext())
@@ -79,13 +72,6 @@ export function browserAudio(voiceSource?: MooSource): Audio {
     if (muted || disposed) return
     try { fn() } catch { /* до первого касания или без Web Audio */ }
   }
-  const trackTimeout = (fn: () => void, ms: number): void => {
-    const id = globalThis.setTimeout(() => {
-      pending.delete(id)
-      if (!disposed) fn()
-    }, ms) as unknown as WallTimer
-    pending.add(id)
-  }
 
   function tone(freq: number, dur: number, vol: number, type: OscillatorType = 'sine', at = 0) {
     const c = ctx(), t = c.currentTime + at
@@ -105,37 +91,17 @@ export function browserAudio(voiceSource?: MooSource): Audio {
     },
     setMuted(m) {
       muted = m
-      if (m) {
-        voice.stop()
-        try { speechSynthesis.cancel() } catch { /* ignore */ }
-      }
+      if (m) voice.stop()
     },
     dispose() {
       disposed = true
       muted = true
       voice.stop()
-      for (const id of pending) globalThis.clearTimeout(id)
-      pending.clear()
-      try { speechSynthesis.cancel() } catch { /* ignore */ }
     },
     beep: () => safe(() => { tone(1320, 0.1, 0.15); tone(1320, 0.1, 0.15, 'sine', 0.12) }),
-    // синтеза речи поверх нет: голос браузера звучит по-разному на устройствах, а ориентир — без него (#161)
+    // синтеза речи в игре нет: голос браузера звучит по-разному на устройствах, а ориентир — без него (#161/#1420)
     moo: () => safe(() => { const c = ctx(); mooVoice(c, c.currentTime, MOO_VOL, Math.random) }),
-    speak(text, { pitch = 1, rate = 1, volume = 0.5 } = {}) {
-      if (muted || disposed || !gestured) return
-      try {
-        const u = new SpeechSynthesisUtterance(text)
-        u.lang = 'ru-RU'; u.pitch = pitch; u.rate = rate; u.volume = volume
-        speechSynthesis.speak(u)
-      } catch { /* нет синтеза речи */ }
-    },
-    feast: (pick) => api.speak(pick(FEAST), { rate: 1.2 }),
     voice,
-    alikVoice(pick) {
-      if (disposed) return
-      api.speak(pick(VOICE), { pitch: 0.55, rate: 0.8, volume: 0.6 })
-      if (Math.random() < 0.3) trackTimeout(() => api.moo(), 2500)
-    },
     vibrate(p) {
       if (muted || disposed || !gestured) return
       try { navigator.vibrate?.(p) } catch { /* ignore */ }

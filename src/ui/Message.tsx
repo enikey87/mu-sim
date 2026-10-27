@@ -6,6 +6,7 @@ import { PhotoSvg } from './PhotoSvg'
 import { copyText } from './Overlays'
 import { ReviewBadge, useReview } from './Review'
 import { annotatable } from './review'
+import { mooClock } from '../engine/moo'
 import { platform } from '../platform'
 
 /** Счётчик рендеров Message — только в test. */
@@ -294,7 +295,7 @@ function body(m: Msg, game: ReturnType<typeof useGameApi>) {
             }
           }}
         >
-          <div className="play">▶</div><div className="wave">▂▃▅▂▇▃▂▅▆▃▂▅▃▇▂</div><div>0:{m.len}</div>
+          <div className="play">▶</div><div className="wave">▂▃▅▂▇▃▂▅▆▃▂▅▃▇▂</div><div>{mooClock(m)}</div>
         </div>
       )
     case 'photo':

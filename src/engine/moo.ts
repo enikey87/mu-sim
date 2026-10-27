@@ -2,6 +2,7 @@
 // Повтор, сохранение и загрузка проигрывают то же описание: ритм, высота и длительность
 // не переизобретаются и не тратят RNG партии (#1419).
 import type { MooContext } from './audio'
+import { seededRng } from './rng'
 
 export type MooKind = 'alik' | 'feast'
 
@@ -91,6 +92,25 @@ export function makeMooPhrase(kind: MooKind, rnd: () => number): MooPhrase {
 export function mooPhraseDuration(p: MooPhrase): number {
   const last = p.syllables[p.syllables.length - 1]
   return last ? last.at + last.dur + p.tail : 0
+}
+
+/**
+ * Вариант, закреплённый за сообщением: тот же id — та же фраза. Это путь старых сохранений,
+ * где описания ещё нет, и он не трогает RNG партии: реплика не перевыбирается при каждом нажатии (#1420).
+ */
+export function pinnedMooPhrase(id: number, feast?: boolean): MooPhrase {
+  const rng = seededRng(id + 1)
+  return makeMooPhrase(feast ? 'feast' : 'alik', () => rng.random())
+}
+
+/** Звук голосового сообщения: сохранённое при создании описание или выведенное из id. */
+export function mooOf(m: { id: number; feast?: boolean; moo?: MooPhrase }): MooPhrase {
+  return m.moo ?? pinnedMooPhrase(m.id, m.feast)
+}
+
+/** Длительность на карточке и в выгрузке — длительность самой фразы, а не выдуманные секунды старого `len`. */
+export function mooClock(m: { id: number; feast?: boolean; moo?: MooPhrase }): string {
+  return `0:${String(Math.max(1, Math.round(mooPhraseDuration(mooOf(m))))).padStart(2, '0')}`
 }
 
 /**

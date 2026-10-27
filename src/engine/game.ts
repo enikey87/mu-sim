@@ -48,6 +48,7 @@ import {
 import { MENTION_RE, WORLD } from '../content/world'
 import { type Clock, type GameTimer, type WallTimer, realClock, isManualClock, wallClock } from './clock'
 import { type Audio, silentAudio } from './audio'
+import { makeMooPhrase, mooOf, pinnedMooPhrase } from './moo'
 import { typo } from './typo'
 import { UiState, type Moo, type Notif, type SendFeel } from './ui-state'
 import { classifyUserInput, legalClaim, type ClassifiedInput } from './input'
@@ -1401,6 +1402,8 @@ export class Game {
     if (this.disposed) throw new GameDisposed()
     const msg = { ...m, id: this.S.nextId++ } as Msg
     if ((msg.kind === 'text' || msg.kind === 'sys') && msg.text.includes('{')) msg.text = this.fillMoney(msg.text)
+    // звук голосового закрепляется здесь же, при создании: ни один путь не выберет его заново при нажатии (#1420)
+    if (msg.kind === 'voice' && !msg.moo) msg.moo = pinnedMooPhrase(msg.id, msg.feast)
     // день показа — на карточке: ответ с числами верен для своего дня, не дня показа (#553)
     if (msg.kind === 'card' && msg.day === undefined) msg.day = this.S.day
     this.quietHeader()
@@ -1577,12 +1580,13 @@ export class Game {
     this.audio.moo()
     this.emit()
   }
+  /**
+   * Прослушивание голосового — воспроизведение закреплённого звука: ни RNG, ни статистики «му»,
+   * ни всплывающего «Мууу», ни вариантов ответа. Фраза и её длительность — данные сообщения (#1420).
+   */
   playVoice(m: Msg): void {
     if (m.kind !== 'voice') return
-    const pick = (a: readonly string[]) => this.draw('VOICE_PICK', a)
-    if (m.feast) this.audio.feast(pick)
-    else if (this.chance(0.5)) this.audio.alikVoice(pick)
-    else this.moo()
+    this.audio.voice.play(mooOf(m))
   }
   toggleMute(): void {
     this.S.muted = !this.S.muted
@@ -2574,7 +2578,7 @@ export class Game {
 
   async voice(): Promise<void> {
     await this.typingFor(3000, 'записывает голосовое…')
-    this.alikMsg({ kind: 'voice', from: 'alik', len: 10 + this.rnd(50), feast: this.period() === 'friday' || this.chance(0.25) })
+    this.alikMsg({ kind: 'voice', from: 'alik', feast: this.period() === 'friday' || this.chance(0.25) })
     this.S.ctx = { type: 'voice' }
   }
 
@@ -2713,7 +2717,7 @@ export class Game {
     })
     this.commitRemember(picked)
     await this.say([line])
-    if (p === 'friday' && this.chance(0.5)) this.audio.feast((a) => this.draw('FEAST', a))
+    if (p === 'friday' && this.chance(0.5)) this.audio.voice.play(makeMooPhrase('feast', () => this.rng.random()))
   }
 
   // ---------- бухгалтерия лжи ----------
@@ -3503,7 +3507,7 @@ export class Game {
         return
       }
       case 'deleted': deliver({ kind: 'text', from: 'alik', text: '', deleted: true }); return
-      case 'voice': deliver({ kind: 'voice', from: 'alik', len: 10 + this.rnd(50) }); return
+      case 'voice': deliver({ kind: 'voice', from: 'alik' }); return
       // вопрос «ты обиделся?» после тишины (#1292): строка своего пула, ход вопроса — штамп события
       case 'offended': {
         const line = this.addrSaidLine('IDLE_ASK', L.IDLE_ASK)

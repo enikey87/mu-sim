@@ -104,13 +104,16 @@ describe('одиночные реплики про Бориса: место ба
       await game.playArc('boris') // серия болезни ставит состояние на доске барана
       expect(game.S.actors.boris.sick, 'состояние болезни не поставлено — проверка пустеет').toBe(true)
       const seen = new Set<string>()
-      for (let i = 0; i < 250 && seen.size < 2; i++) {
+      // Пулы болезни: по четыре реплики на владельца (три ухода + ветеринар). Собираем весь пул:
+      // выбор двух «первых попавшихся» зависел от порядка розыгрыша, а не от места барана (#1420).
+      for (let i = 0; i < 250 && seen.size < 4; i++) {
         game.S.stats.sent += 4 // перерыв правила — в ходах
         game.S.scene = null // сцена подняла бы порог приоритета и заглушила ходы
         const from = game.S.msgs.length
         if ((await game.fire('AlikTurn'))?.name === 'Turn_BorisSick') for (const t of alikTexts(game.S.msgs.slice(from))) seen.add(t)
       }
       const where = owner ? 'баран у игрока' : 'баран у Алика'
+      expect(seen.size, `${where}: собраны не все реплики пула болезни`).toBe(4)
       expect([...seen], `${where}: ход болезни ни разу не прозвучал`).toContain('Ветеринар сказал: Борису нужен покой и твоё терпение.')
       // не пустая проверка: уход за бараном (своя формулировка) обязан прозвучать — иначе запрет ниже ничего не проверяет
       const own = owner ? SICK_PLAYER : SICK_HOME

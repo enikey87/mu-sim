@@ -2,7 +2,8 @@ import { STARTS } from '../content/quests'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { makeGame, memStorage, alikTexts, flush, setMoney, cards } from '../test/helpers'
 import { ENDGAME_FORMALITIES, ENDGAME_JUBILEES } from '../content/endgame'
-import { silentAudio } from './audio'
+import { silentAudio, type Audio } from './audio'
+import { mooClock, mooOf, mooPhraseDuration, type MooPhrase } from './moo'
 import { manualClock, realClock } from './clock'
 import { Game } from './game'
 import { seededRng } from './rng'
@@ -19,6 +20,11 @@ import { MENTION_RE } from '../content/world'
 import { P_FRIDAY, P_MONEY, P_DESPERATE } from '../content/topics'
 import { BLOOD_PAY, FLOOR } from '../content/misc'
 import { PERIOD, periodText } from '../content/life'
+
+/** Аудио-шпион: запоминает, какие описания фраз просили проиграть (#1420). */
+function recordingAudio(played: MooPhrase[]): Audio {
+  return { ...silentAudio, voice: { duration: mooPhraseDuration, play: (p) => { played.push(p) }, stop: () => {} } }
+}
 
 describe('Game: начало и ход', () => {
   it('новая игра: одна из завязок, 184-й день, 3–4 варианта реплик', () => {
@@ -875,11 +881,95 @@ describe('Game: мелочи', () => {
     game.toggleMute()
     expect(game.S.muted).toBe(true)
   })
-  it('голосовое: застолье, голос Алика или корова', () => {
-    const { game } = makeGame()
-    const v = game.push({ kind: 'voice', from: 'alik', len: 12 })
-    for (let i = 0; i < 10; i++) game.playVoice(v)
-    expect(game.S.stats.moo).toBeGreaterThan(0)
+  // #1420: голосовое — сохранённое сообщение, прослушивание только играет его звук
+  it('голосовое: прослушивание играет закреплённую фразу и не трогает мир', () => {
+    const played: MooPhrase[] = []
+    const { game } = makeGame({ seed: 7, audio: recordingAudio(played) })
+    game.S.stats.moo = 9 // порог ачивки рядом: побочный moo() проявился бы сразу
+    const v = game.push({ kind: 'voice', from: 'alik' })
+    const mem = JSON.stringify(game.S.mem)
+    const day = game.S.day
+    const msgs = game.S.msgs.length
+
+    game.playVoice(v)
+    game.playVoice(v)
+
+    expect(played).toHaveLength(2)
+    expect(played[0]).toEqual(played[1]) // повтор — та же фраза, а не новый выбор
+    expect(played[0]).toEqual(mooOf(v))
+    expect(game.S.stats.moo).toBe(9) // игровой moo() не вызывается
+    expect(game.ui.moos).toEqual([]) // и всплывающего «Мууу» нет
+    expect(game.S.ach.moo10).toBeUndefined() // ачивка «му» не выдана
+    expect(JSON.stringify(game.S.mem)).toBe(mem)
+    expect(game.S.day).toBe(day)
+    expect(game.S.msgs).toHaveLength(msgs)
+  })
+  it('прослушивание не расходует RNG партии: следующая случайность та же', () => {
+    const a = makeGame({ seed: 11 }).game
+    const b = makeGame({ seed: 11 }).game
+    const va = a.push({ kind: 'voice', from: 'alik' })
+    b.push({ kind: 'voice', from: 'alik' })
+    for (let i = 0; i < 5; i++) a.playVoice(va)
+    expect(Array.from({ length: 8 }, () => a.rnd(1000))).toEqual(Array.from({ length: 8 }, () => b.rnd(1000)))
+  })
+  it('сохранение и загрузка играют то же описание и ту же длительность', () => {
+    const played: MooPhrase[] = []
+    const storage = memStorage()
+    const { game } = makeGame({ seed: 3, audio: recordingAudio(played), storage })
+    const v = game.push({ kind: 'voice', from: 'alik' })
+    game.playVoice(v)
+    game.save()
+
+    const loaded = makeGame({ seed: 3, audio: recordingAudio(played), storage: memStorage(storage.data) }).game
+    const same = loaded.S.msgs.find((m) => m.id === v.id)
+    expect(same?.kind).toBe('voice')
+    loaded.playVoice(same!)
+
+    expect(played).toHaveLength(2)
+    expect(played[1]).toEqual(played[0])
+    expect(mooClock(same!)).toBe(mooClock(v))
+  })
+  it('старое сохранение без описания: вариант стабилен, выдуманный len не показывается', () => {
+    const played: MooPhrase[] = []
+    const storage = memStorage()
+    const { game } = makeGame({ seed: 4, audio: recordingAudio(played), storage })
+    const v = game.push({ kind: 'voice', from: 'alik' })
+    game.save()
+    // голосовое старого формата: только выдуманная длительность, без описания звука
+    const raw = JSON.parse(storage.data[SAVE_KEY])
+    const saved = raw.msgs.find((m: Msg) => m.id === v.id)
+    delete saved.moo
+    saved.len = 47
+    storage.data[SAVE_KEY] = JSON.stringify(raw)
+
+    const loaded = makeGame({ seed: 4, audio: recordingAudio(played), storage: memStorage(storage.data) }).game
+    const legacy = loaded.S.msgs.find((m) => m.id === v.id)!
+    expect(legacy.kind).toBe('voice')
+    loaded.playVoice(legacy)
+    loaded.playVoice(legacy)
+
+    expect(played).toHaveLength(2)
+    expect(played[0]).toEqual(played[1]) // не перевыбирается при каждом нажатии
+    expect(played[0]).toEqual(mooOf(legacy))
+    expect(mooClock(legacy)).not.toBe('0:47') // старый len не выдаёт себя за длительность
+    expect(mooClock(legacy)).toBe(mooClock(v)) // то же сообщение — тот же звук и в новой игре
+    expect(loaded.S.stats.moo).toBe(0)
+  })
+  it('голосовое из пачки и пятничный отклик идут тем же источником', async () => {
+    const played: MooPhrase[] = []
+    const { game } = makeGame({ seed: 9, audio: recordingAudio(played) })
+    game.awayMsg('voice')
+    const away = game.S.msgs[game.S.msgs.length - 1]
+    expect(away.kind).toBe('voice')
+    if (away.kind !== 'voice') return
+    expect(away.moo).toBeDefined() // вариант закреплён при создании
+    game.playVoice(away)
+    expect(played[0]).toEqual(away.moo)
+
+    vi.spyOn(game, 'chance').mockReturnValue(true)
+    await game.periodLine('friday')
+    expect(played[1].kind).toBe('feast') // самостоятельный пятничный отклик — новый синтез, не речь
+    expect(game.S.stats.moo).toBe(0) // и это не игровой moo()
   })
   it('подписка React получает изменения', () => {
     const { game } = makeGame()
@@ -1011,7 +1101,7 @@ describe('Game: dispose отменяет async', () => {
     expect(game.S.msgs.length).toBe(before)
   })
 
-  it('audio.dispose отменяет отложенный callback после playVoice', async () => {
+  it('audio.dispose отменяет отложенные части фразы после playVoice', async () => {
     vi.useFakeTimers()
     let moos = 0
     const pending = new Set<ReturnType<typeof setTimeout>>()
@@ -1022,13 +1112,17 @@ describe('Game: dispose отменяет async', () => {
         pending.clear()
       },
       moo: () => { moos++ },
-      alikVoice(_pick?: (a: readonly string[]) => string) {
-        const id = setTimeout(() => { pending.delete(id); audio.moo() }, 2500)
-        pending.add(id)
+      voice: {
+        duration: mooPhraseDuration,
+        // источник сам планирует части фразы: их и должна снять остановка
+        play: () => { const id = setTimeout(() => { pending.delete(id); audio.moo() }, 2500); pending.add(id) },
+        stop: () => {},
       },
     }
-    const game = new Game({ storage: memStorage(), clock: manualClock(), rng: seededRng(1), noTimers: true, hour: 14, audio })
-    audio.alikVoice()
+    const { game } = makeGame({ seed: 1, audio })
+    const v = game.push({ kind: 'voice', from: 'alik' })
+    game.playVoice(v)
+    expect(pending.size).toBe(1)
     game.dispose()
     await vi.advanceTimersByTimeAsync(3000)
     expect(moos).toBe(0)
