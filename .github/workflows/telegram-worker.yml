@@ -1,0 +1,182 @@
+# Telegram Stars Worker: CI подпроекта services/telegram-worker и ручные операции
+# установки. Один запуск workflow_dispatch в режиме deploy выполняет всю установку:
+# D1, миграции, каталог, Worker, секреты, webhook, инвойс (см. README подпроекта).
+#
+# Секреты живут только в GitHub environment telegram-production и доступны только
+# job'ам deploy/status/refund. PR-тесты секретов не получают; pull_request_target
+# здесь не используется.
+name: Telegram Stars Worker
+
+on:
+  pull_request:
+    paths:
+      - 'services/telegram-worker/**'
+      - '.github/workflows/telegram-worker.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/telegram-worker/**'
+      - '.github/workflows/telegram-worker.yml'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Режим работы'
+        type: choice
+        options: [deploy, status, refund]
+        default: deploy
+      stars_amount:
+        description: 'Цена Stars для deploy (целое; 25 — стартовое значение, не рубли)'
+        type: string
+        default: '25'
+      charge_id:
+        description: 'Для refund: telegram_payment_charge_id из журнала'
+        type: string
+        default: ''
+      refund_confirm:
+        description: 'Для refund: повторите charge_id как подтверждение возврата'
+        type: string
+        default: ''
+      replace_webhook_confirmed:
+        description: 'Разрешить замену уже установленного чужого webhook'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: services/telegram-worker
+
+jobs:
+  # Проверки подпроекта на настоящем workerd и настоящей локальной D1.
+  test:
+    name: Проверки подпроекта
+    runs-on: ubuntu-latest
+    concurrency:
+      group: telegram-worker-test-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: services/telegram-worker/package-lock.json
+      - run: npm ci --prefer-offline --no-audit
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+  deploy:
+    name: deploy
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'deploy' && github.ref == 'refs/heads/main'
+    needs: [test]
+    runs-on: ubuntu-latest
+    environment:
+      name: telegram-production
+      url: ${{ steps.deploy.outputs.worker_url }}
+    concurrency:
+      group: telegram-worker-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: services/telegram-worker/package-lock.json
+      - name: Проверить сумму Stars
+        env:
+          STARS_AMOUNT: ${{ inputs.stars_amount }}
+        run: |
+          set -euo pipefail
+          case "$STARS_AMOUNT" in
+            ''|*[!0-9]*)
+              echo "::error::stars_amount должен быть целым числом Stars"
+              exit 1
+              ;;
+          esac
+          amount=$((10#$STARS_AMOUNT))
+          if [ "$amount" -lt 1 ] || [ "$amount" -gt 100000 ]; then
+            echo "::error::stars_amount должен быть в диапазоне 1..100000"
+            exit 1
+          fi
+          echo "цена: $amount Stars"
+      - run: npm ci --prefer-offline --no-audit
+      - name: deploy
+        id: deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          STARS_AMOUNT: ${{ inputs.stars_amount }}
+          CONFIRM_REPLACE_WEBHOOK: ${{ inputs.replace_webhook_confirmed }}
+        run: npm run deploy
+
+  status:
+    name: status
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'status' && github.ref == 'refs/heads/main'
+    needs: [test]
+    runs-on: ubuntu-latest
+    environment:
+      name: telegram-production
+    concurrency:
+      group: telegram-worker-status
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: services/telegram-worker/package-lock.json
+      - run: npm ci --prefer-offline --no-audit
+      - name: status
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: npm run status
+
+  refund:
+    name: refund
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'refund' && github.ref == 'refs/heads/main'
+    needs: [test]
+    runs-on: ubuntu-latest
+    environment:
+      name: telegram-production
+    concurrency:
+      group: telegram-worker-refund
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: services/telegram-worker/package-lock.json
+      - name: Проверить подтверждение возврата
+        env:
+          CHARGE_ID: ${{ inputs.charge_id }}
+          REFUND_CONFIRM: ${{ inputs.refund_confirm }}
+        run: |
+          set -euo pipefail
+          if [ -z "$CHARGE_ID" ]; then
+            echo "::error::charge_id обязателен для refund"
+            exit 1
+          fi
+          if [ "$CHARGE_ID" != "$REFUND_CONFIRM" ]; then
+            echo "::error::refund_confirm должен совпадать с charge_id: возврат не запущен"
+            exit 1
+          fi
+      - run: npm ci --prefer-offline --no-audit
+      - name: refund
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHARGE_ID: ${{ inputs.charge_id }}
+          REFUND_CONFIRM: ${{ inputs.refund_confirm }}
+        run: npm run refund

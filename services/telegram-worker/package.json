@@ -1,0 +1,37 @@
+{
+  "name": "@mu-sim/telegram-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Платёжный сервис Telegram Stars для игры «Алик, Где Деньги?»: Cloudflare Worker + D1",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "build": "wrangler deploy --dry-run --config wrangler.json",
+    "dev": "wrangler dev --local --config wrangler.json",
+    "db:migrate:local": "wrangler d1 migrations apply alik-stars --local --config wrangler.json",
+    "deploy": "node scripts/deploy.ts",
+    "status": "node scripts/status.ts",
+    "refund": "node scripts/refund.ts"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.4.8",
+    "@cloudflare/workers-types": "5.20261027.1",
+    "@eslint/js": "9.39.5",
+    "@types/node": "26.6.1",
+    "eslint": "9.39.5",
+    "globals": "16.4.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.70.0",
+    "vitest": "5.0.5",
+    "wrangler": "4.153.0"
+  },
+  "allowScripts": {
+    "workerd@1.20261023.1": true,
+    "esbuild@0.28.2": true
+  }
+}
