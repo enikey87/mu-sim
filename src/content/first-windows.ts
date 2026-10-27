@@ -3,7 +3,7 @@
 // участник, умеющий писать сам (SPEAKS), обязан быть здесь или в исключениях с причиной — новый
 // участник красит сюит на месте, а не в плейтесте через раунд. Офферы и потребление окна ответом —
 // как были (#951), тексты пулов не менялись.
-import { arsenTrackAt, avitoReviewAt, bathAskedAt, borisAskAt, borisSaleAt, collectorsAskAt, collectorsEpAt, countersuitAt, courtVerdictAt, crewPaidAt, grantBathAt, grantHouseAt, grantTileAt, internAt, kettleAt, lawyerAt, mamaMarketAt, mamaVoiceAt, mooAt, muenAt, moustachePhotoAt, nivaBackAt, offendedAskAt, photoAt, ramPhotoAt, rubikAskAt, rubikHoleAt, samvelDivorceAt, saleAt, seryogaAskAt, tamadaDoneAt, tileAdAt, tileCourtAt, tileLawyerAt, tileMonumentAt, tileSlipAt, transferAt, vacancyAt } from './memkeys'
+import { arsenTrackAt, avitoReviewAt, bathAskedAt, borisAskAt, borisSaleAt, collectorsAskAt, collectorsEpAt, countersuitAt, courtVerdictAt, crewPaidAt, grantBathAt, grantHouseAt, grantTileAt, inhDoneAt, internAt, kettleAt, lawyerAt, mamaMarketAt, mamaVoiceAt, mooAt, muenAt, moustachePhotoAt, nivaBackAt, offendedAskAt, photoAt, ramPhotoAt, rubikAskAt, rubikHoleAt, samvelDivorceAt, saleAt, seryogaAskAt, tamadaDoneAt, tileAdAt, tileCourtAt, tileLawyerAt, tileMonumentAt, tileSlipAt, transferAt, vacancyAt } from './memkeys'
 import type { Criterion } from '../engine/rules'
 
 /**
@@ -101,6 +101,11 @@ export const EVENT_SOURCES: readonly EventSource[] = [
   { source: 'кража плиточной рекламы (q_photo, узел send: подпись «Сам клал»)', at: tileAdAt, offer: 'TileAd', pool: 'P_TILE_AD' },
   { source: 'вопрос о баране по памяти партии (Turn_Memory, строка «Всё ещё у тебя?») — реплика штампует ход', at: borisAskAt, offer: 'BorisMemory', pool: 'P_BORIS_MEMORY' },
   { source: 'финал квеста-тамады (q_tamada, узел yes: застолье, сервиз тёти Гоар и знакомство)', at: tamadaDoneAt, offer: 'TamadaDone', pool: 'P_TAMADA_DONE' },
+  // развязка «Наследства дяди Тиграна» (#1439): последняя строка каждой ветки квеста `q_inherit` —
+  // сгоревшие нотариальные 54 000 ₽ (горелая) или обида Алика (отказная). Штамп ставит сама строка,
+  // пул ответа у ветки свой: горелая пара говорит о нотариусах, отказная — об обиде
+  { source: 'развязка «Наследства дяди Тиграна», горелая ветка (q_inherit, узел believe, штамп строки)', at: inhDoneAt, offer: 'InhBurned', pool: 'P_INH_BURNED' },
+  { source: 'развязка «Наследства дяди Тиграна», отказная ветка (q_inherit, узел refuse, штамп строки)', at: inhDoneAt, offer: 'InhRefused', pool: 'P_INH_REFUSED' },
   { source: 'голосовое-плач мамы (Rude_Calls, строка MAMA_VOICE_CRY)', at: mamaVoiceAt, offer: 'MamaVoice', pool: 'P_MAMA_VOICE' },
   { source: 'развод дяди Самвела на свадьбе (серия samvel, stamp)', at: samvelDivorceAt, offer: 'SamvelDivorce', pool: 'P_SAMVEL_DIVORCE' },
   { source: 'вердикт суда (сцена court, узлы debt/screens/moo, stamp)', at: courtVerdictAt, offer: 'CourtVerdict', pool: 'P_COURT_VERDICT' },
