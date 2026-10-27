@@ -203,6 +203,7 @@ body {
 }
 .lend50-btn:disabled { opacity: .6; cursor: default; }
 .lend50-url { font-size: 11px; opacity: .75; word-break: break-all; }
+.muen-bull { width: 64px; height: auto; }
 .lend50-joined { font-size: 11px; opacity: .75; }
 .voice { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
 .voice .play {

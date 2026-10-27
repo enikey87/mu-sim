@@ -1,4 +1,5 @@
 import { memo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import bull from './bull.svg'
 import type { Msg } from '../engine/state'
 import { useGame, useGameApi } from './useGame'
 import { PhotoSvg } from './PhotoSvg'
@@ -158,7 +159,7 @@ function Lend50Card({ m, link }: { m: Extract<Msg, { kind: 'lend50' }>; link: st
 function MuenCard({ m }: { m: Extract<Msg, { kind: 'muen' }> }) {
   return (
     <div className="lend50 transfer" data-testid="muen-card">
-      <div className="sum">🎓</div>
+      <img className="muen-bull" src={bull} alt="Бынич — бык с добрыми глазами" />
       <div>{m.text}</div>
       <a className="lend50-btn" href={m.link} target="_blank" rel="noopener">Научиться</a>
       <div className="lend50-url">{m.link}</div>
