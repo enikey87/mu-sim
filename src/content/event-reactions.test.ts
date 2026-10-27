@@ -13,7 +13,7 @@ import { turnRules } from './rules/turn'
 import { FINALES } from './finales'
 import { COURT_LAWYER_AGAIN } from './quests'
 import { RUDE_CALLS_VOICE, MAMA_VOICE_CRY } from './rude'
-import { count, collectorsRecruited, court, crewPaid, crewPaidAt, HEAT, internAt, lawyerAt, debutWho, debutAt, arsenTrack, arsenTrackAt, saidStrasburg, saidGrantEnvelope, grantTileAt, grantHouseAt, mamaMarketAt, tileAdAt, tamadaDoneAt, borisAskAt, mamaVoiceAt, mamaCalls, samvelDivorceAt, tileSlipAt, tileCourtAt, tileLawyerAt, tileMonumentAt, legendOf, nivaAway, nivaBack, nivaBackAt, saleAt, saleWhat, alikDead, paydayScene, seryogaAskAt, grantBathAt, offendedAskAt, intro, kettleAt } from './memkeys'
+import { count, collectorsRecruited, court, crewPaid, crewPaidAt, HEAT, internAt, lawyerAt, debutWho, debutAt, arsenTrack, arsenTrackAt, saidStrasburg, saidGrantEnvelope, grantTileAt, grantHouseAt, mamaMarketAt, tileAdAt, tamadaDoneAt, borisAskAt, mamaVoiceAt, mamaCalls, samvelDivorceAt, tileSlipAt, tileCourtAt, tileLawyerAt, tileMonumentAt, legendOf, nivaAway, nivaBack, nivaBackAt, saleAt, saleWhat, alikDead, paydayScene, seryogaAskAt, grantBathAt, offendedAskAt, intro, kettleAt, carGone } from './memkeys'
 import { valueOf, type Line } from './fact'
 import type { Choice } from '../engine/state'
 
@@ -1399,6 +1399,56 @@ describe('окно возврата «Нивы» (#1306)', () => {
     // машина ушла снова (следующая серия) — строка возвращается: гейт держит состояние, а не запрет навсегда
     game.S.mem[nivaAway] = true
     expect(game.open(TOPICS.niva.r), '«найду» не вернулось с новой пропажей').toContain(NIVA_LINE)
+  })
+
+  // Окно длиннее хода события: в нём же продаётся зимняя резина со дна, и машина уходит с ней
+  // (`car.gone` → `has.car` гаснет, #530). «Машина дома…» — утверждение о машине, поэтому в блоке
+  // хода продажи оно не встаёт рядом с «Резину продал. Машины нет…» (#1404).
+  const CAR_HOME = 'Машина дома'
+  const saysCarHome = (texts: Iterable<string>) => [...texts].some((t) => t.toLowerCase().includes(CAR_HOME.toLowerCase()))
+  /** Продажа резины путём игрока: дно → карточка банка предлагает резину (остальное продано). */
+  const sellTires = (game: Game) => {
+    for (const id of ['microwave', 'guitar', 'tile'] as const) game.S.mem[sold(id)] = true
+    setMoney(game, 100)
+    game.chargeBill('rent') // отказ платежа → карточка с предложением продать
+    const card = cards(game, 'Банк').filter((c) => c.offer && !c.answered).at(-1)!
+    expect(card.offer?.sell, 'карточка предлагает не резину — проверка пустеет').toBe('Продать зимнюю резину')
+    game.answerCard(card.id, 'sell')
+  }
+  /** Блок на каждом ходу окна (ход события и три после): какие строки пула игроку предлагали. */
+  const windowTexts = (game: Game, at: number): Set<string> => {
+    const texts = new Set<string>()
+    for (let turn = 0; turn <= 3; turn++) {
+      game.S.stats.sent = at + turn
+      game.S.choices = null
+      const b = game.buildChoices().find((c) => c.act === 'nivaBack')
+      if (b) texts.add(b.text)
+    }
+    return texts
+  }
+
+  it('после продажи резины машина уходит — «Машина дома…» в окне не предлагается', async () => {
+    const { game } = makeGame()
+    await game.playEpisode(ARCS.niva.eps[5], 'niva')
+    const at = Number(game.S.mem[nivaBackAt])
+    expect(saysCarHome(game.open(P_NIVA_BACK)), 'до продажи строки нет — проверка пустеет').toBe(true)
+    sellTires(game)
+    expect(game.S.mem[carGone], 'продажа не увела машину — проверка пустеет').toBe(true)
+    // соседняя строка того же блока — продажа резины — на месте: противоречие было живым
+    game.S.choices = null
+    expect(game.buildChoices().find((c) => c.act === 'soldQ')?.text, 'соседней строки о продаже нет — сценарий не воспроизведён').toContain('Машины нет')
+    const texts = windowTexts(game, at)
+    expect(saysCarHome(texts), `строка о машине дома после продажи: ${[...texts].join(' | ')}`).toBe(false)
+    expect(texts.size, 'окно молчит целиком — проверка пустеет').toBe(2)
+  })
+
+  it('контроль без продажи: тот же пул в окне сохраняет «Машина дома…»', async () => {
+    const { game } = makeGame()
+    await game.playEpisode(ARCS.niva.eps[5], 'niva')
+    const at = Number(game.S.mem[nivaBackAt])
+    const texts = windowTexts(game, at)
+    expect(texts.size, 'окно показало не весь пул').toBe(3)
+    expect(saysCarHome(texts), `в контроле строки нет: ${[...texts].join(' | ')}`).toBe(true)
   })
 })
 
