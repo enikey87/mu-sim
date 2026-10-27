@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { browserAudio, mooVoice, MOO_VOL, type MooContext } from './audio'
+import { makeMooPhrase, mooPhraseDuration, type MooKind, type MooPhrase, type MooSource } from './moo'
+import { seededRng } from './rng'
 import { renderOffline, level } from '../test/offline-audio'
+
+const phraseOf = (kind: MooKind): MooPhrase => {
+  const rng = seededRng(1)
+  return makeMooPhrase(kind, () => rng.random())
+}
 
 describe('browserAudio.dispose', () => {
   afterEach(() => {
@@ -285,5 +292,145 @@ describe('«Мууу»: выходной уровень (#282)', () => {
     expect(() => audio.feast((a) => a[0] ?? 'тост')).not.toThrow()
     audio.moo()
     expect(Math.max(...heard.gains)).toBe(MOO_VOL) // «Мууу» и SMS-писк — Web Audio, речи не требуют
+  })
+})
+
+/** Контекст голосовых: журнал осцилляторов и их start/stop — по нему видно, что звук остановлен. */
+function voiceStub() {
+  const oscs: { type: string; start: number[]; stop: (number | undefined)[] }[] = []
+  vi.stubGlobal('AudioContext', class {
+    currentTime = 10
+    resume() { return Promise.resolve() }
+    createOscillator() {
+      const rec = { type: 'sine', start: [] as number[], stop: [] as (number | undefined)[] }
+      oscs.push(rec)
+      return {
+        get type() { return rec.type },
+        set type(t: string) { rec.type = t },
+        frequency: {
+          value: 0,
+          setValueAtTime() {},
+          linearRampToValueAtTime() {},
+        },
+        connect<T>(target: T): T { return target },
+        start(t: number) { rec.start.push(t) },
+        stop(t?: number) { rec.stop.push(t) },
+      }
+    }
+    createGain() {
+      return {
+        gain: { value: 1, setValueAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {} },
+        connect<T>(target: T): T { return target },
+      }
+    }
+    createBiquadFilter() {
+      return {
+        type: 'lowpass',
+        frequency: { value: 0, setValueAtTime() {}, linearRampToValueAtTime() {} },
+        Q: { value: 0 },
+        connect<T>(target: T): T { return target },
+      }
+    }
+    get destination() { return {} }
+  })
+  const speak = vi.fn()
+  vi.stubGlobal('speechSynthesis', { speak, cancel: vi.fn() })
+  vi.stubGlobal('SpeechSynthesisUtterance', class {
+    lang = ''; pitch = 1; rate = 1; volume = 1
+    constructor(public text: string) {}
+  })
+  return { oscs, speak }
+}
+
+const stoppedNow = (o: { stop: (number | undefined)[] }) => o.stop.length > 0 && o.stop[o.stop.length - 1] === undefined
+
+describe('browserAudio.voice: голосовые «му» (#1419)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('до касания звука нет', async () => {
+    const { oscs, speak } = voiceStub()
+    vi.resetModules() // жест — свойство страницы: свежий модуль и есть страница без касания
+    const fresh = await import('./audio')
+    fresh.browserAudio().voice.play(phraseOf('alik'))
+    expect(oscs).toEqual([])
+    expect(speak).not.toHaveBeenCalled()
+  })
+
+  it('mute останавливает начатые и запланированные слоги, включение их не воскрешает', () => {
+    const { oscs, speak } = voiceStub()
+    const audio = browserAudio()
+    audio.unlock()
+    const p = phraseOf('feast')
+    audio.voice.play(p)
+    expect(oscs.length).toBeGreaterThan(3) // несколько слогов и их вибрато запланированы сразу
+    const afterPlay = oscs.length
+
+    audio.setMuted(true)
+    expect(oscs.every(stoppedNow)).toBe(true) // и звучащий слог, и будущие
+    expect(speak).not.toHaveBeenCalled() // браузерная речь на этом пути не включалась
+
+    audio.setMuted(false)
+    expect(oscs.length).toBe(afterPlay) // старую фразу никто не перезапустил
+    audio.voice.play(p)
+    expect(oscs.length).toBeGreaterThan(afterPlay)
+  })
+
+  it('новая фраза останавливает прежнюю, dispose останавливает текущую', () => {
+    const { oscs } = voiceStub()
+    const audio = browserAudio()
+    audio.unlock()
+    audio.voice.play(phraseOf('alik'))
+    const first = oscs.length
+    audio.voice.play(phraseOf('feast'))
+    expect(oscs.slice(0, first).every(stoppedNow)).toBe(true)
+    audio.dispose()
+    expect(oscs.every(stoppedNow)).toBe(true)
+    const afterDispose = oscs.length
+    audio.voice.play(phraseOf('alik'))
+    expect(oscs.length).toBe(afterDispose)
+  })
+
+  it('без Web Audio игра не падает и не возвращает браузерную речь', () => {
+    const { oscs, speak } = voiceStub()
+    vi.stubGlobal('AudioContext', undefined)
+    const audio = browserAudio()
+    audio.unlock()
+    expect(() => audio.voice.play(phraseOf('alik'))).not.toThrow()
+    expect(oscs).toEqual([])
+    expect(speak).not.toHaveBeenCalled()
+  })
+
+  it('источник звука подменяется на том же контракте, жест гейтит и его', async () => {
+    const played: MooPhrase[] = []
+    let stops = 0
+    const fake: MooSource = { duration: () => 7, play: (p) => { played.push(p) }, stop: () => { stops++ } }
+    vi.resetModules() // свежая страница без касания: гейт жеста принадлежит модулю
+    const fresh = await import('./audio')
+    const audio = fresh.browserAudio(fake)
+    const p = phraseOf('alik')
+    audio.voice.play(p)
+    expect(played).toEqual([])
+    audio.unlock()
+    audio.voice.play(p)
+    expect(played).toEqual([p])
+    expect(audio.voice.duration(p)).toBe(7)
+    audio.setMuted(true)
+    expect(stops).toBe(1)
+    audio.setMuted(false)
+    expect(played).toHaveLength(1)
+    audio.voice.play(p)
+    expect(played).toHaveLength(2)
+    audio.dispose()
+    expect(stops).toBe(2)
+  })
+
+  it('длительность карточки — длительность описания', () => {
+    voiceStub()
+    const audio = browserAudio()
+    const p = phraseOf('alik')
+    expect(audio.voice.duration(p)).toBeCloseTo(mooPhraseDuration(p), 10)
   })
 })

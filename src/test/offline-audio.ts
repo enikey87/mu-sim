@@ -1,16 +1,25 @@
 // Офлайн-рендер графа Web Audio для тестов: node не умеет Web Audio, а громкость надо мерить по сигналу,
-// а не по уставкам (#282). Только то, что строит «Мууу»: пила, биквад по формулам спеки, усиление, автоматизация.
+// а не по уставкам (#282). Только то, что строит «Мууу» и голосовые «му»: осцилляторы с модуляцией,
+// биквад по формулам спеки, усиление, автоматизация (#1419).
 import type { MooContext } from '../engine/audio'
 
 type Ev = { kind: 'set' | 'lin' | 'exp'; t: number; v: number }
 
 class Param {
   private evs: Ev[] = []
+  private mods: Node[] = []
   constructor(public value: number) {}
   setValueAtTime(v: number, t: number) { this.evs.push({ kind: 'set', t, v }); return this }
   linearRampToValueAtTime(v: number, t: number) { this.evs.push({ kind: 'lin', t, v }); return this }
   exponentialRampToValueAtTime(v: number, t: number) { this.evs.push({ kind: 'exp', t, v }); return this }
-  at(time: number): number {
+  /** Модуляция параметра сигналом: вибрато — LFO → frequency осциллятора (#1419). */
+  hook(n: Node) { this.mods.push(n) }
+  at(i: number, time: number): number {
+    let v = this.valueAt(time)
+    for (const n of this.mods) v += n.out(i, time)
+    return v
+  }
+  private valueAt(time: number): number {
     let prev: { t: number; v: number } | null = null
     for (const e of this.evs) {
       if (e.t <= time) { prev = e; continue }
@@ -27,7 +36,13 @@ abstract class Node {
   inputs: Node[] = []
   private memo = -1
   private last = 0
-  connect<T extends Node>(n: T): T { n.inputs.push(this); return n }
+  connect(n: Node): Node
+  connect(p: Param): Param
+  connect(target: Node | Param): Node | Param {
+    if (target instanceof Param) { target.hook(this); return target }
+    target.inputs.push(this)
+    return target
+  }
   input(i: number, time: number): number { let s = 0; for (const n of this.inputs) s += n.out(i, time); return s }
   out(i: number, time: number): number {
     if (this.memo !== i) { this.last = this.process(i, time); this.memo = i }
@@ -45,9 +60,9 @@ class Osc extends Node {
   constructor(private rate: number) { super() }
   start(t: number) { this.from = t }
   stop(t: number) { this.to = t }
-  process(_: number, time: number): number {
+  process(i: number, time: number): number {
     if (time < this.from || time >= this.to) return 0
-    const dt = this.frequency.at(time) / this.rate
+    const dt = this.frequency.at(i, time) / this.rate
     const p = this.phase
     this.phase = (p + dt) % 1
     if (this.type !== 'sawtooth') return Math.sin(2 * Math.PI * p)
@@ -65,9 +80,9 @@ class Biquad extends Node {
   private x1 = 0; private x2 = 0; private y1 = 0; private y2 = 0
   constructor(private rate: number) { super() }
   process(i: number, time: number): number {
-    const w = 2 * Math.PI * this.frequency.at(time) / this.rate
+    const w = 2 * Math.PI * this.frequency.at(i, time) / this.rate
     const cos = Math.cos(w), sin = Math.sin(w)
-    const q = this.Q.at(time)
+    const q = this.Q.at(i, time)
     let b0: number, b1: number, b2: number, alpha: number
     if (this.type === 'lowpass') {
       alpha = sin / (2 * Math.pow(10, q / 20)) // у lowpass Q в децибелах (спека Web Audio)
@@ -87,7 +102,7 @@ class Biquad extends Node {
 
 class Gain extends Node {
   gain = new Param(1)
-  process(i: number, time: number): number { return this.input(i, time) * this.gain.at(time) }
+  process(i: number, time: number): number { return this.input(i, time) * this.gain.at(i, time) }
 }
 
 class Sum extends Node {

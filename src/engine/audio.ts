@@ -2,6 +2,7 @@
 import { FEAST } from '../content/misc'
 import { VOICE } from '../content/life'
 import type { WallTimer } from './clock'
+import { mooPhraseDuration, synthMooSource, type MooSource } from './moo'
 
 export interface Audio {
   unlock(): void
@@ -11,13 +12,17 @@ export interface Audio {
   speak(text: string, opts?: { pitch?: number; rate?: number; volume?: number }): void
   feast(pick: (arr: readonly string[]) => string): void
   alikVoice(pick: (arr: readonly string[]) => string): void
+  /** Голосовое «му»: звук задан описанием сообщения, а не выбирается при нажатии (#1419). */
+  voice: MooSource
   vibrate(pattern: number | number[]): void
   /** Остановить речь и отложенные колбэки (после dispose игры). */
   dispose(): void
 }
 
 export const silentAudio: Audio = {
-  unlock() {}, setMuted() {}, beep() {}, moo() {}, speak() {}, feast() {}, alikVoice() {}, vibrate() {}, dispose() {},
+  unlock() {}, setMuted() {}, beep() {}, moo() {}, speak() {}, feast() {}, alikVoice() {},
+  voice: { duration: mooPhraseDuration, play() {}, stop() {} },
+  vibrate() {}, dispose() {},
 }
 
 let everGestured = false
@@ -47,7 +52,7 @@ export function mooVoice(c: MooContext, t: number, vol: number, rnd: () => numbe
 /** Усиление «Мууу»: выходной уровень не выше прежнего звука (офлайн-рендер, audio.test.ts, #282). */
 export const MOO_VOL = 0.09
 
-export function browserAudio(): Audio {
+export function browserAudio(voiceSource?: MooSource): Audio {
   let ac: AudioContext | null = null
   // жест — свойство страницы, а не экземпляра: звук не должен молчать в интро после «Начать заново»
   let gestured = everGestured
@@ -57,6 +62,18 @@ export function browserAudio(): Audio {
   const ctx = (): AudioContext => {
     if (!gestured) throw new Error('no gesture')
     return (ac ??= new AudioContext())
+  }
+  const source = voiceSource ?? synthMooSource(ctx, () => ctx().currentTime)
+  // источник не знает про жест и mute игры: их держит аудиосистема, а не звук (#1419)
+  const voice: MooSource = {
+    duration: (p) => source.duration(p),
+    play(p) {
+      if (muted || disposed || !gestured) return
+      try { source.play(p) } catch { /* нет Web Audio */ }
+    },
+    stop() {
+      try { source.stop() } catch { /* звука ещё не было */ }
+    },
   }
   const safe = (fn: () => void) => {
     if (muted || disposed) return
@@ -88,11 +105,15 @@ export function browserAudio(): Audio {
     },
     setMuted(m) {
       muted = m
-      if (m) try { speechSynthesis.cancel() } catch { /* ignore */ }
+      if (m) {
+        voice.stop()
+        try { speechSynthesis.cancel() } catch { /* ignore */ }
+      }
     },
     dispose() {
       disposed = true
       muted = true
+      voice.stop()
       for (const id of pending) globalThis.clearTimeout(id)
       pending.clear()
       try { speechSynthesis.cancel() } catch { /* ignore */ }
@@ -109,6 +130,7 @@ export function browserAudio(): Audio {
       } catch { /* нет синтеза речи */ }
     },
     feast: (pick) => api.speak(pick(FEAST), { rate: 1.2 }),
+    voice,
     alikVoice(pick) {
       if (disposed) return
       api.speak(pick(VOICE), { pitch: 0.55, rate: 0.8, volume: 0.6 })
