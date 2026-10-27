@@ -1,18 +1,20 @@
 // Состояние игры (сохраняется целиком) и сообщения чата.
 import type { Bags } from './deck'
 import { type Facts, type RuleState, freshRuleState } from './rules'
+import { START_DAY } from './time'
+import { SAVE_KEY } from './keys'
 import type { PromiseCondition, Rel, WhenKind } from '../content/excuses'
 import type { Vars } from '../content/scenes'
 import { freshLedger, migrateLedger, type LedgerState } from '../content/ledger'
 
-export const SAVE_KEY = 'alik-save-v4'
-/** Отметка устройства, а не партии: просьба «займи 50» уже звучала — вторая партия говорит другим текстом. */
-export const LEND50_SEEN_KEY = 'alik-lend50-seen'
+/** Ключи хранения — в `engine/keys.ts`: их читает и вход страницы, которому состояние игры не нужно. */
+export { LEND50_SEEN_KEY, SAVE_KEY } from './keys'
 export const DEBT0 = 240000
 /** Старт с запасом: дно должно наступить по пути к Дню выплаты, а не в первые ходы (#184). */
 export const START_MONEY = 28000
 export const MAX_PATIENCE = 5
-export const START_DAY = 184
+/** День 0 партии — календарный факт (`engine/time.ts`): им называют число дней титры шелла (#1444). */
+export { START_DAY } from './time'
 /** Дней «маринования» до первой арки (#1004): первые дни — только шаблонные отмазки Алика,
  *  без сериалов, легенд и родни; задержка считается в `availableArcs` и `facts` — в одном месте. */
 export const ARC_MARINATION_DAYS = 6

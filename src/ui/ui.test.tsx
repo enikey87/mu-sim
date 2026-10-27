@@ -13,7 +13,7 @@ import { ENDING_MIN_DAY } from '../content/finales'
 import { fmtDate } from '../engine/time'
 import type { Game } from '../engine/game'
 import { introOf, uiOf } from './view'
-import { introDateLine, introVowLine, LINE_MS, FADE_MS } from './Intro'
+import { introDateLine, introVowLine, LINE_MS, FADE_MS } from '../intro/cards'
 import { enable, GAME_HOST } from '../analytics/metrics'
 import { EPILOGUE_BANNER, LEND50_LINK, LEND50_RENAME, LEND50_SYS, LEND50_TG_SYS, LEND50_VK_SYS, LEND50_YA_SYS } from '../content/endgame'
 import { adoptPlatform, webPlatform } from '../platform'
@@ -1358,11 +1358,16 @@ describe('интро новой партии', () => {
 
   it('NC: без фазы out строка обрывается — сторож затухания красный (#500)', async () => {
     const { readFileSync } = await import('node:fs')
-    const css = readFileSync('src/styles.css', 'utf8')
-    expect(css).toMatch(/@keyframes intro-line-out/)
-    expect(css).toMatch(/\.intro-line\.out/)
-    const src = readFileSync('src/ui/Intro.tsx', 'utf8')
-    expect(src).toMatch(/setLinePhase\('out'\)/)
+    // правила интро живут в двух файлах: styles.css приложения и инлайн-копия в index.html для титров шелла
+    // (#1444) — затухание обязано быть в обоих, иначе строка пропадает рывком на одном из входов
+    for (const file of ['src/styles.css', 'index.html']) {
+      const css = readFileSync(file, 'utf8')
+      expect(css, file).toMatch(/@keyframes intro-line-out/)
+      expect(css, file).toMatch(/\.intro-line\.out/)
+    }
+    // фазу out ставит общий модуль титров: им играет и React новой партии, и шелл холодной загрузки
+    const src = readFileSync('src/intro/mount.ts', 'utf8')
+    expect(src).toMatch(/phase = 'out'/)
     expect(src).toMatch(/LINE_MS \* i - FADE_MS/)
   })
 

@@ -97,9 +97,19 @@ test('Telegram: интро, концовка и разряженный теле�
   await page.setViewportSize({ width: 390, height: 844 })
   await page.addInitScript(() => localStorage.clear())
   await page.goto('/?fast')
-  const intro = page.getByRole('button', { name: 'Интро: коснитесь, чтобы пропустить' })
-  await expect(intro).toBeVisible()
+  // Первый запуск в вебе играет шелл (#1444): его титры стоят в своей рамке вне .phone, а safe area витрины
+  // касается интро внутри приложения — поэтому кадр берём с перезапуска, где интро рисует React
+  const shell = page.getByRole('button', { name: 'Интро: коснитесь, чтобы пропустить' })
+  await expect(shell).toBeVisible()
   await expect(page.getByText('Коснитесь, чтобы начать', { exact: true })).toBeVisible()
+  await shell.click()
+  await shell.click()
+  await expect(shell).toBeHidden()
+  page.once('dialog', (d) => d.accept())
+  await page.getByTitle('Обещания и ачивки').click()
+  await page.getByRole('button', { name: 'Начать заново' }).click()
+  const intro = page.locator('.intro')
+  await expect(intro).toBeVisible()
   await insets(page, [24, 0, 34, 0], [56, 0, 0, 0])
   await page.evaluate(() => { document.documentElement.dataset.platform = 'telegram' })
 
@@ -110,7 +120,6 @@ test('Telegram: интро, концовка и разряженный теле�
     expect(box!.y + box!.height).toBe(810)
   }
   await checkBounds('.intro')
-  await intro.click()
   await intro.click()
   await expect(intro).toBeHidden()
 
