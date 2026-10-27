@@ -2174,7 +2174,11 @@ export class Game {
     if (!o.scene) this.triggerFeel(o)
     if (o.act !== 'topic') S.mem[memkeys.topicRun] = 0 // серия вопросов по одной теме прервалась
     if (o.act === 'sorry') S.mem[memkeys.sorryAt] = [...String(S.mem[memkeys.sorryAt] ?? '').split(',').filter(Boolean), S.stats.sent].slice(-4).join(',') // для «качелей»
-    if (tone === 'rude') S.mem[memkeys.rudeAt] = S.stats.sent
+    if (tone === 'rude') {
+      S.mem[memkeys.rudeAt] = S.stats.sent
+      // вендетта уже объявлена, а игрок продолжает кричать: счётчик хронической грубости (#1425)
+      if (S.mem[memkeys.vendetta]) S.mem[memkeys.count.rudeAfterVendetta] = Number(S.mem[memkeys.count.rudeAfterVendetta] ?? 0) + 1
+    }
     S.choices = null
     this.battery.drain(1)
     this.save()
