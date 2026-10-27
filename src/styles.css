@@ -510,6 +510,9 @@ body {
   border-radius: 12px; padding: 10px 14px; font: inherit; cursor: pointer;
 }
 
+/* intro-css:start — блок дословно повторён в index.html: те же правила рисуют титры шелла холодной
+   загрузки (#1444) до прихода этого файла. Менять в двух местах сразу: расхождение ловит
+   src/tools/intro-shell.test.ts. */
 /* Интро v2: приглушённый экран блокировки, пять строк-титров по одной, титул, уезд в чат */
 .intro {
   position: absolute; inset: 0; z-index: 70; overflow: hidden;
@@ -561,6 +564,7 @@ body {
   .intro-moo, .intro-hint { animation: none; }
   .intro-leave { transition: none; }
 }
+/* intro-css:end */
 
 /* Режим живого рецензирования (#872): бейдж заметки, мини-меню, модалка и кнопки досье */
 .msg { position: relative; }

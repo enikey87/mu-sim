@@ -2,24 +2,9 @@
 // Вызов из игры один — track(имя, параметры); приёмников три — Метрика, PostHog и Umami, каждый своим тегом
 // и своим пустым ключом. В тестах клиенты подставные, живой сети прогон не трогает.
 import type { EndingId, PaydayId } from '../content/finales'
+import { analyticsGate, COUNTER_ID, POSTHOG_KEY, UMAMI_KEY, type Gate } from './gate'
 
-/**
- * Сборочная переменная: значение из окружения сборки, вокруг — пробелы прочь.
- * Не задана или пуста — пустая строка, и это исправное состояние: приёмник молчит.
- */
-const buildVar = (value: string | undefined): string => String(value ?? '').trim()
-
-/** Номер счётчика Метрики: `VITE_METRIKA_COUNTER`. Пусто — приёмник молчит (docs/design/analytics.md). */
-export const COUNTER_ID = buildVar(import.meta.env.VITE_METRIKA_COUNTER)
-
-/** Ключ проекта PostHog (EU): `VITE_POSTHOG_KEY`. Пусто — приёмник молчит. */
-export const POSTHOG_KEY = buildVar(import.meta.env.VITE_POSTHOG_KEY)
-
-/** Ключ сайта Umami: `VITE_UMAMI_WEBSITE_ID`. Пусто — приёмник молчит. */
-export const UMAMI_KEY = buildVar(import.meta.env.VITE_UMAMI_WEBSITE_ID)
-
-/** Хост, на котором приёмники включаются: localhost, превью и e2e молчат. */
-export const GAME_HOST = 'enikey87.github.io'
+export { COUNTER_ID, GAME_HOST, POSTHOG_KEY, UMAMI_KEY } from './gate'
 
 /** Имена целей закрыты типом: произвольной строки в `track` не передать. */
 export type Goal = 'boot' | 'milestone' | 'ending' | 'copied' | 'endgame' | 'left'
@@ -255,12 +240,11 @@ export const isOn = (): boolean => receivers.some((r) => r.on)
  * `id` — номер Метрики, `posthogKey` — ключ PostHog, `umamiKey` — ключ Umami: подстановки
  * для теста с приёмником; игра передаёт константы `COUNTER_ID`, `POSTHOG_KEY` и `UMAMI_KEY`.
  */
-export function enable(opts: { host: string; search: string; id?: string; posthogKey?: string; umamiKey?: string }): boolean {
-  const url = new URLSearchParams(opts.search)
-  const allowed = opts.host === GAME_HOST && !url.has('debug') && !url.has('fast') && !url.has('noidle')
-  const ya = allowed && (opts.id ?? COUNTER_ID) ? Number(opts.id ?? COUNTER_ID) : 0
-  const ph = allowed ? (opts.posthogKey ?? POSTHOG_KEY) : ''
-  const um = allowed ? (opts.umamiKey ?? UMAMI_KEY) : ''
+export function enable(opts: Gate): boolean {
+  const on = analyticsGate(opts)
+  const ya = on ? Number(opts.id ?? COUNTER_ID) : 0
+  const ph = on ? (opts.posthogKey ?? POSTHOG_KEY) : ''
+  const um = on ? (opts.umamiKey ?? UMAMI_KEY) : ''
   receivers = [ya ? metrika(ya) : silent, ph ? posthog(ph) : silent, um ? umami(um) : silent]
   pageviewSent = false
   shownAt = null

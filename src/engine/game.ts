@@ -122,6 +122,8 @@ export interface GameOptions {
   /** Витрина, где карточка «займи 50» — настоящая покупка: Яндекс Игры (инап, #1241) или Telegram Stars (#1235).
    *  Текст карточки у площадок разный, поэтому здесь имя витрины, а не `boolean`. */
   pay50?: 'yandex' | 'telegram'
+  /** Номер завязки в STARTS: её выбрали титры шелла, и пролог обязан сказать то же обещание (#1444). */
+  start?: number
 }
 
 
@@ -177,6 +179,7 @@ export class Game {
 
   private storage: Storage | null
   private hour: number | null
+  private start: number | null
   private listeners = new Set<() => void>()
   private version = 0
   private idleT: GameTimer | null = null
@@ -217,6 +220,7 @@ export class Game {
     this.clock = opts.clock ?? realClock()
     this.rawAudio = opts.audio ?? silentAudio
     this.hour = opts.hour ?? null
+    this.start = opts.start ?? null
     this.noTimers = !!opts.noTimers
     this.noIdle = !!opts.noIdle
     this.typos = opts.typos ?? true
@@ -3596,7 +3600,7 @@ export class Game {
   // ---------- начало ----------
   /** Начало партии: одна из завязок (что Алик обещал в день сдачи и что было потом). */
   private seed(): void {
-    const st = STARTS[this.rnd(STARTS.length)]
+    const st = STARTS[this.start ?? this.rnd(STARTS.length)]
     this.push({ kind: 'sep', text: fmtDate(0) })
     this.push({ kind: 'text', from: 'alik', time: '18:02', text: st.intro })
     this.push({ kind: 'text', from: 'me', time: '18:05', text: st.reply })
