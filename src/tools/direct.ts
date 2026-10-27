@@ -7,7 +7,7 @@ import type { Game } from '../engine/game'
 import type { Facts } from '../engine/rules'
 import { during } from '../engine/rules'
 import { START_DAY, ARC_MARINATION_DAYS } from '../engine/state'
-import { HEAT, borisAskAt, legendDay, legendId, muenAt, nuneKeyPassed, payday, sorryAt } from '../content/memkeys'
+import { HEAT, arsenTrackAt, borisAskAt, legendDay, legendId, muenAt, nuneKeyPassed, payday, sorryAt } from '../content/memkeys'
 import { ENDING_MIN_DAY, CHRONIC_RUDE_AFTER_VENDETTA } from '../content/finales'
 
 export type DirectCase = { event: string; facts?: Facts; target?: string; setup?: (g: Game) => void }
@@ -303,6 +303,8 @@ export const DIRECT: Record<string, DirectCase> = {
   // #1423 (вкус блока по счёту сдвинул розыгрыш) — окно трека «Плиточник» бот до экрана концовки больше не проходит,
   // и ответ на него ни разу не сыграл: правило цело, держим прямым случаем, как соседний Says_debutArsen
   Says_arsenTrack: { event: 'PlayerSays', facts: { intent: 'arsenTrack' } },
+  // #1423: то же окно трека «Плиточник» в кнопках — штамп ставим тот, что ставит сама строка трека (stamp arsenTrackAt)
+  Opt_ArsenTrack: { event: 'BuildChoices', setup: (g) => { g.S.mem[arsenTrackAt] = g.S.stats.sent } },
   // #1179 (1b05ae5): дебют Гранта хором — шанс 0.3, окно живёт, только если первая фраза была про конверт; случай завели
   // вместе с правилом, тогда бот до него не доходил. #1321: окна дебютов Арсена (#1313) и коллекторов (#1316) сдвинули
   // блок — правило доходит само: 32 партии в CI-выборках при пороге 7, семьи +2000/+4000/+6000 = 31/32/27, нулей нет (#1100)
