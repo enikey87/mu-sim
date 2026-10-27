@@ -206,7 +206,7 @@ export const FINALES: Record<string, Finale[]> = {
 /** id концовок вне Дня выплаты — перечислены, чтобы `id` был закрытым типом (#611: цель `ending` не примет произвольную строку). */
 export const PLAIN_ENDING_IDS = ['family', 'heir', 'ram', 'alik', 'honest', 'vendetta', 'bloodfeud', 'multiverse'] as const
 /** Исходы Дня выплаты: хвост id `payday_*` (docs/design/analytics.md, цель `endgame`). */
-export const PAYDAY_OUTCOMES = ['real', 'coins', 'lavash', 'niva', 'strasbourg', 'notyou', 'default'] as const
+export const PAYDAY_OUTCOMES = ['real', 'detective', 'coins', 'lavash', 'niva', 'strasbourg', 'notyou', 'default'] as const
 export type PaydayId = (typeof PAYDAY_OUTCOMES)[number]
 export type EndingId = (typeof PLAIN_ENDING_IDS)[number] | `payday_${PaydayId}`
 
@@ -294,6 +294,7 @@ export const ENDINGS: Ending[] = [
   // исходы Дня выплаты (третий акт): экран итогов после выплаты
   ...([
     ['real', 'Настоящие деньги', '💸', 'Алик перевёл весь долг. Настоящими. Самый редкий исход: ты был вежлив и дошёл до суда. Он сам не верит.'],
+    ['detective', 'Следователь', '🔎', 'Ты трижды поймал его на слове ещё до Дня выплаты. Родня видела записи и не решилась резать, комиссия банка не взяла своего — долг пришёл полным переводом. Слово сдалось первым.'],
     ['coins', 'Мешок мелочи', '💰', 'Ты поймал его в День выплаты — и он сдержал слово: весь долг монетами по 10 рублей. Считать — при Карине.'],
     ['lavash', 'Лавашами', '🥖', 'Долг закрыт в «Лаваш-коинах»: 240 000 лавашей у твоей двери. Курс стабильный. Лаваши — нет, они черствеют.'],
     ['niva', '«Нивой»', '🚙', 'Выплата — «Нивой», которая сама тебя выбрала. Документы — у козы тёти Гоар.'],
