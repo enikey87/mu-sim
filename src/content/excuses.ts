@@ -65,6 +65,8 @@ D.ADDR = [
   'Братишка', 'Сынок-джан', 'Уважаемый', 'Мастер', 'Друг мой', 'Ара, джан',
   'Слушай, брат', 'Золотые руки', 'Брат, родной', 'Джан-джан',
 ];
+/** Обращения холодной войны (#1424): тёплые недоступны, но префикс нужен — тот же слот `ADDR`. */
+D.ADDR_COLD = ['Уважаемый', 'К сведению', 'По существу', 'Официально'];
 
 // 'именительный|родительный'
 D.REL = [
@@ -782,8 +784,9 @@ D.P_SORRY = ['Алик, простите, погорячился.', 'Извин�
 D.P_PING = ['Алик, я вижу, что вы прочитали.', 'Алик, две галочки!', 'Прочитано, но не отвечено.', 'Алик, я вижу вас онлайн.'];
 D.P_PREV = ['Алик, вы обещали «{t}» ещё {date}.', 'А помните «{t}»? Это было {date}.', 'Алик, по журналу у вас просрочено «{t}», обещано {date}.'];
 
-export function make(draw: DrawFn, getTier: () => number = () => 0, rng: Rng = mathRng) {
-  const g = <T = string>(k: string): T => draw(k, D[k]);
+/** `cold` — режим холодной войны (#1424): то же место обращения, но без «брат/джан» — тёплые пулы недоступны. */
+export function make(draw: DrawFn, getTier: () => number = () => 0, rng: Rng = mathRng, cold: () => boolean = () => false) {
+  const g = <T = string>(k: string): T => (k === 'ADDR' && cold() ? draw('ADDR_COLD', D.ADDR_COLD) : draw(k, D[k])) as T;
   let sorryMark: FactOp[] | undefined
   const spoken = (x: unknown): string => {
     if (typeof x === 'string') return x

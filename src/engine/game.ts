@@ -243,7 +243,7 @@ export class Game {
       const x = this.decks.pick(k, a, this.lineFacts(), { eligible })
       if (x === null) throw new Error(`Колода ${k}: ни одного элемента, уместного сейчас`)
       return x
-    }, () => this.S.tier, this.rng)
+    }, () => this.S.tier, this.rng, () => !!this.S.mem[memkeys.coldWar])
     this.scenes = makeScenes(this.X)
     this.S.rules.said ??= {} // старые сохранения
     this.lines = new Lines(this.S.rules.said, this.rng, () => ({ turn: this.S.stats.sent, day: this.S.day }))

@@ -8,7 +8,7 @@ import type { GameEvent, Offer } from './events'
 import { WORLD, speaks } from '../world'
 import * as T from '../rude'
 import { RUDE_AGAIN } from '../misc'
-import { HEAT, blocked, blockedHint, count, countersuitAt, mamaCalls, mamaVoiceAt, phoneKarine, polite, ritualCount, statusHidden, vendetta } from '../memkeys'
+import { HEAT, alikDead, blocked, blockedHint, coldWar, count, countersuitAt, mamaCalls, mamaVoiceAt, phoneKarine, polite, ritualCount, statusHidden, vendetta } from '../memkeys'
 
 type R = Rule<ContentApi, GameEvent, Offer>
 const rude = eq('tone', 'rude')
@@ -29,6 +29,12 @@ export async function sayFresh(game: ContentApi, key: string, pool: readonly Ent
   const [who, said] = picked
   await game.say([who === 'alik' ? said : { w: who, t, claims: saidClaims(said) }])
   return picked
+}
+/** Реплика холодной войны: сухой пул по порядку, без повторов; пул исчерпан — короткий отказ,
+ *  а не тёплая строка из обычных пулов (режим не должен молча сдаваться). */
+async function coldWarLine(game: ContentApi, key: string, pool: readonly Entry<string>[]): Promise<void> {
+  const t = game.decks.pick(key, pool, game.lineFacts(), { mode: 'sequential', noRepeat: true })
+  await game.say([t ?? game.draw('CW_FB', T.COLD_WAR_FALLBACK)])
 }
 /** Остудить ссору на n, не ниже нуля. */
 export const cooldown = (game: ContentApi, n: number) => game.coolConflict(n)
@@ -138,12 +144,38 @@ export const rudeRules: R[] = [
   // Порог читается до remember текущего крика, поэтому 14 здесь — это 15-й крик, число из шпаргалки (#742)
   {
     name: 'Rude_Vendetta', event: 'PlayerMessage', when: [rude, gte(count.rude, 14), lte(count.sorry, 0)], bonus: 8, once: true, priority: 'cinematic',
-    remember: [add(count.rude), set(vendetta, true)],
+    remember: [add(count.rude), set(vendetta, true), set(coldWar, true)],
     respond: async ({ game }) => {
       await game.sticker({ e: '🗡️', c: 'Вендетта' })
       for (const [w, said] of T.VENDETTA) await game.say([w === 'alik' ? said : { w, t: saidText(said), claims: saidClaims(said) }])
       game.unlock('vendetta')
     },
+  },
+
+  // после вендетты — режим холодной войны: место тёплых пулов занимает сухой канцелярит (`coldWar`).
+  // Грубость, требования и собственные инициативы Алика говорят из холодных пулов; снимает режим
+  // принятое извинение (ритуал примирения, посредник, обычное sorry).
+  {
+    name: 'ColdWar_Rude', event: 'PlayerMessage', when: [is(coldWar), eq('tone', 'rude'), missing(blocked)], specificity: 30,
+    remember: cools, trigger: cool,
+    respond: async ({ game }) => {
+      game.mood(-2)
+      await coldWarLine(game, 'CW_REPLY', T.COLD_WAR_ALL)
+      game.setCtx({ offended: true })
+    },
+  },
+  {
+    name: 'ColdWar_Request', event: 'PlayerMessage', when: [is(coldWar), eq('category', 'request'), missing(blocked)], specificity: 30,
+    respond: async ({ game }) => { await coldWarLine(game, 'CW_REPLY', T.COLD_WAR_ALL) },
+  },
+  // Алик пишет сам только формально: расписания и напоминания о документах, без «ты поел?»
+  {
+    name: 'ColdWar_Idle', event: 'AlikIdle', when: [is(coldWar), missing(blocked), missing(phoneKarine), missing(alikDead), ne('offline', true)], specificity: 30,
+    respond: async ({ game }) => { await coldWarLine(game, 'CW_IDLE', T.COLD_WAR_INITIATIVE) },
+  },
+  {
+    name: 'ColdWar_Away', event: 'AlikAway', when: [is(coldWar), missing(blocked), missing(phoneKarine), missing(alikDead), ne('offline', true)], specificity: 30,
+    respond: async ({ game }) => { await coldWarLine(game, 'CW_AWAY', T.COLD_WAR_INITIATIVE) },
   },
 
   // остывание ссоры: −1 через 20 дней после крика, не ниже нуля
@@ -152,7 +184,8 @@ export const rudeRules: R[] = [
   // ветка: угроза судом, пока ссора горячая — встречный иск, суд мирит
   {
     name: 'Tone_Threat_Hot', event: 'PlayerMessage', when: [eq('tone', 'threat'), gte(HEAT, 2)], bonus: 2, once: true,
-    remember: [add(count.threat), set(HEAT, 0)],
+    // суд мирит — значит, и холодная война кончена: «Мир, брат» не бывает половиной мира (#1424)
+    remember: [add(count.threat), set(HEAT, 0), set(coldWar, false)],
     respond: async ({ game, facts }) => {
       for (const [w, said] of T.COUNTERSUIT) await game.say([w === 'alik' ? said : { w, t: saidText(said), claims: saidClaims(said) }])
       game.unlock('countersuit')
@@ -168,7 +201,7 @@ export const rudeRules: R[] = [
   // ветка: кричал всю игру и вдруг вежлив — Алику не хватает крика
   {
     // ссора остыла (давно не кричал), но за игру накричал много
-    name: 'Tone_MissRude', event: 'PlayerMessage', when: [ne('tone', 'rude'), ne('tone', 'threat'), gte(count.rude, 15), lte(HEAT, 0), gte('sinceRude', 8)], odds: 0.35, cooldown: { turns: 8 },
+    name: 'Tone_MissRude', event: 'PlayerMessage', when: [ne('tone', 'rude'), ne('tone', 'threat'), gte(count.rude, 15), lte(HEAT, 0), gte('sinceRude', 8), missing(coldWar)], odds: 0.35, cooldown: { turns: 8 },
     respond: async ({ game }) => { const t = game.line('MISS_RUDE', T.MISS_RUDE); if (!t) return game.turnRoll(); await game.say([t]); game.unlock('habit'); await game.turnRoll() },
   },
 
@@ -209,6 +242,8 @@ export const rudeSaysRules: R[] = [
   // «Мууу» игрока: пока ссора горячая — корова мирит, иначе Алик не понимает
   {
     name: 'Says_moo_peace', event: 'PlayerSays', when: [eq('intent', 'moo'), gte(HEAT, 1)],
+    // «Мир, брат» — мир целиком: холодная война на этом кончается (#1424), иначе режим спорит со своей же репликой
+    remember: [set(coldWar, false)],
     respond: async ({ game }) => {
       cooldown(game, 2); game.mood(1)
       const p = game.linePicked('COW_PEACE', T.COW_PEACE)
@@ -236,7 +271,7 @@ export const rudeSaysRules: R[] = [
   },
   // извинение через посредника, которого игрок выбрал (arg)
   ...([['boris', T.VIA_BORIS], ['karine', T.VIA_KARINE], ['mama', T.VIA_MAMA]] as const).map(([who, lines]): R => ({
-    name: 'Says_via_' + who, event: 'PlayerSays', when: [eq('intent', 'via'), eq('arg', who)], remember: [set(blocked, false), add(count.sorry)],
+    name: 'Says_via_' + who, event: 'PlayerSays', when: [eq('intent', 'via'), eq('arg', who)], remember: [set(blocked, false), add(count.sorry), set(coldWar, false)],
     respond: async ({ game }) => { cooldown(game, 1); for (const [w, said] of lines) await game.say([w === 'alik' ? said : { w, t: saidText(said), claims: saidClaims(said) }]); game.sys('Алик Воздухонесян разблокировал вас'); game.setCtx(null) },
   })),
   {
