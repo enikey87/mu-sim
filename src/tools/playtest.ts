@@ -209,7 +209,7 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
     const mem = worldFacts(game)
     const range = game.S.msgs.slice(msgAt)
     const said = range.flatMap((m, i) => {
-      if (m.kind === 'sep' || m.kind === 'sys' || m.kind === 'card' || m.kind === 'lend50' || awayIdx.has(msgAt + i)) return []
+      if (m.kind === 'sep' || m.kind === 'sys' || m.kind === 'card' || m.kind === 'lend50' || m.kind === 'muen' || awayIdx.has(msgAt + i)) return []
       return [{ w: m.from === 'me' ? 'me' : (('who' in m && m.who) || 'alik'), k: m.kind as string, r: ruleOf.get(m.id) ?? null }]
     })
     world.push({
@@ -330,6 +330,7 @@ function line(m: Msg): string {
       return `(карточка в ленте: ${m.icon} ${m.app} — ${[m.text, ...(m.lines ?? [])].join(' · ')}${btns}${m.result ? ` → ${m.result}` : ''})`
     }
     case 'lend50': return `${t}(карточка просьбы: 50 ₽ — ${m.text} → ${m.stars ? 'Купить за звёзды' : m.buy ? 'Купить «Чашку хаша»' : m.join ? 'Вступить в сообщество игры' : `Перевести: ${m.link ?? '—'}`})`
+    case 'muen': return `(карточка курса: ${m.text} → ${m.link})`
   }
 }
 

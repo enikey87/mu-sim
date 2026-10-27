@@ -36,6 +36,7 @@ export type Msg =
   | (MsgBase & { kind: 'doc'; from: 'alik'; title: string; rows: Array<[string, number]>; total: number })
   | (MsgBase & { kind: 'job'; from: 'alik'; text: string; answered?: boolean })
   | (MsgBase & { kind: 'lend50'; text: string; link?: string; join?: boolean; buy?: boolean; stars?: boolean })
+  | (MsgBase & { kind: 'muen'; text: string; link: string })
   | (MsgBase & { kind: 'card' } & Card)
 
 /** Что за событие телефона: по нему оракул отличает законный повтор (сводка, отказ, уровень) от настоящего (#304). */
