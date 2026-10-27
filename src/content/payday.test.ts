@@ -145,6 +145,66 @@ describe('День выплаты', () => {
     expect((await game.fire('StoryBeat'))?.name).not.toBe('Beat_Payday')
     expect(game.S.scene).toBeNull()
   })
+  // #1434: три мидгейм-поимки — свой исход Дня выплаты; срезы родни не проходят, «по рублю» отменяется
+  it('Следователь: три поимки — доли не срезают, долг приходит целиком (#1434)', async () => {
+    const { game } = makeGame()
+    rich(game)
+    game.S.mem.caught = 3
+    await game.enterNode('payday', 'announce')
+    await choose(game, 'witness')
+    const debt = game.debt
+    const n = game.S.msgs.length
+    await choose(game, 'share')
+    const out = texts(game, n).join('\n')
+    // доли не прошли вовсе: перевод называет весь долг, а не остаток
+    expect(out).not.toMatch(/К выплате: 50 ₽/)
+    expect(out, 'перевод не назвал весь долг').toContain(`перевёл вам ${debt.toLocaleString('ru-RU')} ₽`)
+    expect(out, 'исходная строка комиссии банка').not.toMatch(/комиссия банка за крупный перевод/)
+    expect(out).toMatch(/Доли я отменил сам/)
+    expect(out, 'родня не отступила').toMatch(/не надо мне ничего/)
+    expect(out).toMatch(/Комиссию банк брать не будет/)
+    // выплата честная: весь долг переводом, сцена закрыта, экран — свой
+    expect(game.S.mem.payday).toBe('detective')
+    expect(game.S.debt).toBe(0)
+    expect(game.S.money).toBeGreaterThanOrEqual(debt)
+    expect(game.S.scene).toBeNull()
+    await game.fire('CheckEnding')
+    expect(game.S.ending).toBe('payday_detective')
+  })
+  it('Следователь: «по рублю» отменяется — отказ делиться не удваивает срезы (#1434)', async () => {
+    const { game } = makeGame()
+    rich(game)
+    game.S.mem.caught = 3
+    await game.enterNode('payday', 'announce')
+    await choose(game, 'bag')
+    const debt = game.debt
+    const n = game.S.msgs.length
+    await choose(game, 'refuse')
+    const out = texts(game, n).join('\n')
+    expect(game.S.mem['payday.refused']).toBe(true)
+    expect(out, 'угроза удержания осталась без ответа').toMatch(/по рублю/)
+    expect(out, '«по рублю» всё-таки срезало').toContain(`перевёл вам ${debt.toLocaleString('ru-RU')} ₽`)
+    expect(out).not.toMatch(/К выплате: 50 ₽/)
+    expect(game.S.mem.payday).toBe('detective')
+    expect(game.S.debt).toBe(0)
+  })
+  it('Следователь: с двумя поимками исход недоступен, с тремя — выигрывает у «Нивы» (#1434)', async () => {
+    const pick = async (caught: number) => {
+      const { game } = makeGame()
+      game.S.mem.caught = caught
+      game.S.mem['finale.niva'] = 'chose' // у «Нивы» 2 — следователь (3) обязан её обойти
+      return (await game.fire('PaydayOutcome'))?.name
+    }
+    expect(await pick(2)).toBe('Payday_niva')
+    expect(await pick(3)).toBe('Payday_detective')
+  })
+  it('Следователь не вытесняет поимку в самой сцене: она остаётся за coins (#1434)', async () => {
+    const { game } = makeGame()
+    game.S.mem.caught = 3
+    game.S.mem['payday.caught'] = true
+    expect((await game.fire('PaydayOutcome'))?.name).toBe('Payday_coins')
+  })
+
   it('переводы 50 ₽ вычитаются один раз: суд и выплата считают от одного долга (#832)', async () => {
     const { game } = makeGame()
     const base = game.debt
@@ -414,7 +474,7 @@ describe('День выплаты', () => {
     }
     // chose нет — «Не тебе», как прежде
     expect(await pick(1, (g) => { g.S.mem['finale.razmik'] = 'default' })).toBe('Payday_notyou')
-    const hierarchy = '`real` (4) > `lavash` (3) > `coins` (2) = `niva` (2) > `strasbourg`/`notyou` (1) > `default` (0)'
+    const hierarchy = '`real` (4) > `lavash` (3) = `detective` (3) > `coins` (2) = `niva` (2) > `strasbourg`/`notyou` (1) > `default` (0)'
     expect(readFileSync('ENDINGS.md', 'utf8')).toContain(hierarchy)
     expect(readFileSync('docs/design/endings-single-condition.md', 'utf8')).toContain(hierarchy)
   })

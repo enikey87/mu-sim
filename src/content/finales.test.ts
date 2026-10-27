@@ -456,7 +456,16 @@ describe('концовки игры', () => {
       payday_niva: [async (g) => { g.S.mem['asked.niva'] = 4; toLast(g, 'niva'); await g.playArc('niva') }, payday(false)],
       payday_strasbourg: [async (g) => { g.S.mem.court = 5; await threat(g); expect(g.S.ach.strasbourg).toBeDefined() }, payday(false)],
       payday_notyou: [async (g) => { toLast(g, 'razmik'); await g.playArc('razmik'); g.S.mem['count.rude'] = 8 }, payday(false)],
-      payday_real: [async (g) => { Object.assign(g.S.ach, { saint: 190, court: 200, q_hash: 1, q_mama: 1, q_goat: 1, q_parking: 1, q_photo: 1 }); g.S.mem.caught = 3 }, payday(false)],
+      payday_real: [
+        async (g) => { Object.assign(g.S.ach, { saint: 190, court: 200, q_hash: 1, q_mama: 1, q_goat: 1, q_parking: 1, q_photo: 1 }); g.S.mem.caught = 3 },
+        // три поимки сокращают сцену дележа (#1434) — «Настоящие деньги» всё равно специфичнее «Следователя»
+        async (g) => { await g.enterNode('payday', 'announce'); await choose(g, 'bag'); await choose(g, 'share') },
+      ],
+      // «Следователь» (#1434): три мидгейм-поимки — дележ уже не режет, поэтому и выбора «поймать/принять» нет
+      payday_detective: [
+        async (g) => { g.S.mem.caught = 3 },
+        async (g) => { await g.enterNode('payday', 'announce'); await choose(g, 'bag'); await choose(g, 'share') },
+      ],
     }
     expect(Object.keys(SCENARIO).sort()).toEqual(ENDINGS.map((e) => e.id).sort())
     /** Нижняя граница, которую ставит условие концовки: gte(key, n) → n. */

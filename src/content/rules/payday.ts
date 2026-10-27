@@ -2,8 +2,8 @@
 import type { ContentApi } from '../../engine/game'
 import { type Rule, eq, gte, is, exists, missing, set, during, lt } from '../fact'
 import type { GameEvent, Offer } from './events'
-import { SOURCES, SOURCES_TOPUP, ROLL, CLAIMS, GRAND, GRAND_FALLBACK, SLOTS, CONTRADICTIONS, MORNING_CONTRA, OUTCOME, LEAD, type Source, type Call, type Claim, type Lead } from '../payday'
-import { alikDead, cryptoHodl, payday as pd, paydayScene, taxFrozen, taxThawed } from '../memkeys'
+import { SOURCES, SOURCES_TOPUP, ROLL, CLAIMS, DETECTIVE_CLAIMS, DETECTIVE_CHAIN, DETECTIVE_CATCHES, detectiveDue, GRAND, GRAND_FALLBACK, SLOTS, CONTRADICTIONS, MORNING_CONTRA, OUTCOME, LEAD, type Source, type Call, type Claim, type Lead } from '../payday'
+import { alikDead, caughtCount, cryptoHodl, payday as pd, paydayScene, taxFrozen, taxThawed } from '../memkeys'
 import { samvelLine } from '../world'
 
 type R = Rule<ContentApi, GameEvent, Offer>
@@ -72,6 +72,16 @@ export const PAYDAY_HOOKS: Record<string, (game: ContentApi) => Promise<void>> =
   // дележ: каждый требует долю, счётчик тает до 50 ₽
   claims: async (game) => {
     let sum = Number(game.mem()[pd.sum] ?? game.debt)
+    // Следователь (#1434): три мидгейм-поимки — родня видела записи, доли не проходят и «по рублю» не работает.
+    // Срезы — шаг общей сцены, поэтому ветка стоит здесь, а не в правиле исхода: отмазка после такого дележа
+    // не нужна, потому что оставшаяся сумма не «остаток», а весь долг.
+    if (detectiveDue(game.mem())) {
+      for (const l of game.open(DETECTIVE_CLAIMS)) await game.say([typeof l === 'string' ? l : l.w ? { w: l.w, t: l.t } : l.t])
+      // отмазки не будет, но её место в памяти — метка «выплата началась», её читают амнистия, отклик памяти и лаваш
+      game.applyFacts([set(pd.chain, DETECTIVE_CHAIN)])
+      await PAYDAY_HOOKS.outcome(game)
+      return
+    }
     const took = new Set<string>()
     for (let i = 0; i < 5 && sum > 50; i++) {
       const p = game.linePicked('PD_CLAIM', CLAIMS, { filter: (l) => !took.has((l as Claim).who) })
@@ -137,7 +147,7 @@ const outcome = (id: string, when: R['when'], extra: Partial<R> = {}): R => ({
     // строка исхода — реплика или пара [кто, текст]; объект с `claims` идёт как есть (утверждение о курсе, #815)
     for (const l of game.open(o.lines)) await game.say([typeof l === 'string' ? l : Array.isArray(l) ? { w: l[0], t: l[1] } : { t: l.t, claims: l.claims ?? [] }])
     // долг меняем до печати выплаты: после paydayScene adjustDebt уже не пустит
-    if (id === 'real' || id === 'coins') { game.adjustMoney(game.debt, 'День выплаты'); game.adjustDebt(-game.debt) }
+    if (id === 'real' || id === 'coins' || id === 'detective') { game.adjustMoney(game.debt, 'День выплаты'); game.adjustDebt(-game.debt) }
     if (id === 'lavash') { game.adjustDebt(-game.debt); game.giveItem('Лаваш × 240 000') }
     if (id === 'niva') { game.adjustDebt(-Math.min(5000, game.debt)); game.giveItem('«Нива» (выплата)') }
     if (id === 'notyou') game.giveItem('Место на кране (40 м)')
@@ -208,8 +218,12 @@ export const paydayRules: R[] = [
     name: 'Beat_Payday_Deadline', event: 'StoryBeat', when: [gte('day', PAYDAY_HARD_DAY), gte(pd.signs, 2), missing(alikDead), missing(paydayScene), missing(pd.at)], bonus: 11, once: true, priority: 'cinematic',
     respond: ({ game }) => resumePayday(game),
   },
-  // иерархия исходов — бонусами специфичности, а не числом условий: real 4 > lavash 3 > coins 2 = niva 2 > strasbourg/notyou 1 > default 0
+  // иерархия исходов — бонусами специфичности, а не числом условий:
+  // real 4 > lavash 3 = detective 3 > coins 2 = niva 2 > strasbourg/notyou 1 > default 0
   outcome('real', [is('ach.saint'), is('ach.court')], { bonus: 2 }),
+  // три мидгейм-поимки (#1434): выше «Мешка мелочи» и «Нивы», ниже «Настоящих денег»; поимка в самой сцене
+  // остаётся за coins — она требует missing(pd.caught), поэтому момент выплаты detective не вытесняет
+  outcome('detective', [gte(caughtCount, DETECTIVE_CATCHES), missing(pd.caught)], { bonus: 1 }),
   // поимка и «Нива выбрала тебя» — заслуга игрока: важнее исходов «по стилю партии»; между собой жребий допустим
   outcome('coins', [is(pd.caught)], { bonus: 1 }),
   outcome('lavash', [is(cryptoHodl)], { bonus: 2 }),
