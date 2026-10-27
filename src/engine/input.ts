@@ -31,6 +31,8 @@ const spelled = (text: string, word: string): boolean => {
 }
 
 const LEGAL = ['судеб', 'полиц', 'прокур', 'заявлен', 'адвокат', 'юрист', 'коллектор', 'жалоб', 'участков', 'пристав', 'мент']
+/** Канцелярия рядом с инстанцией — официальная форма обращения, а не крик (#1435). */
+const FORMAL = ['официальн', 'претензи', 'досудебн', 'юридическ', 'документ', 'уведомл', 'заказн', 'регламент']
 /** Глаголы рядом с «иск», без них «на иске» — не угроза. */
 const ISK_ACT = new Set(['подам', 'подадим', 'подать', 'подашь', 'направлю', 'направим', 'отправлю', 'напишу', 'грожу'])
 const VIOLENCE = ['убью', 'убить', 'приконч', 'зареж', 'застрел', 'задуш', 'побью', 'изобью', 'сломаю', 'разобью', 'сожгу', 'покалеч', 'закопаю', 'уничтож']
@@ -156,7 +158,11 @@ export function classifyUserInput(text: string, mentions: ReadonlyArray<readonly
 
   const courteous = hasStem(tokens, COURTESY) || apology || gratitude || greeting
   const negative = ['violent-threat', 'intimidation', 'insult', 'accusation', 'anger', 'rude'].includes(category)
-  const tone: Tone = category === 'threat' ? 'threat'
+  // Официальное упоминание суда (#1435): канцелярская форма без крика, ругани и расправы. Такое обращение
+  // двигает линию суда вежливым путём (court.ts) и не рвёт серию вежливости; устная угроза остаётся «threat».
+  const formalCourt = legalThreat && !violentThreat && !intimidation && !insult && !accusation && !anger && !shouting
+    && hasStem(tokens, FORMAL)
+  const tone: Tone = category === 'threat' ? (formalCourt ? 'polite' : 'threat')
     : category === 'cow' ? 'cow'
     : negative || (shouting && !courteous && !benignShout) ? 'rude'
     : courteous ? 'polite'

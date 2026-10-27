@@ -279,6 +279,40 @@ describe('День выплаты', () => {
     expect(await pick(3, () => {})).toBe('Payday_detective')
   })
 
+  // #1435: «Настоящие деньги» — saint И (court ИЛИ detective). Критерии — только конъюнкция, дверь с поимками — своё правило
+  it('Настоящие деньги без заседания: вежливость и три поимки (#1435)', async () => {
+    const { game } = makeGame()
+    game.S.ach.saint = 1
+    game.S.mem.caught = 3
+    const n = game.S.msgs.length
+    await game.fire('PaydayOutcome')
+    expect(game.S.mem.payday, 'исход не «Настоящие деньги»').toBe('real')
+    const out = texts(game, n).join('\n')
+    expect(out, 'исход назвал заседание, которого не было').not.toMatch(/дошёл до суда/)
+    expect(out, 'исход не назвал поимки').toMatch(/трижды поймал меня на слове/)
+  })
+  it('Настоящие деньги через суд по-прежнему называют заседание (#1435)', async () => {
+    const { game } = makeGame()
+    game.S.ach.saint = 1
+    game.S.ach.court = 1
+    const n = game.S.msgs.length
+    expect((await game.fire('PaydayOutcome'))?.name).toBe('Payday_real')
+    const out = texts(game, n).join('\n')
+    expect(out).toMatch(/дошёл до суда/)
+    expect(out, 'вежливому с заседанием назвали поимки').not.toMatch(/трижды поймал меня на слове/)
+  })
+  it('без вежливости поимки дают «Следователя», с двумя поимками «Настоящие деньги» недоступны (#1435)', async () => {
+    const pick = async (saint: boolean, caught: number) => {
+      const { game } = makeGame()
+      if (saint) game.S.ach.saint = 1
+      game.S.mem.caught = caught
+      return (await game.fire('PaydayOutcome'))?.name
+    }
+    expect(await pick(false, 3)).toBe('Payday_detective')
+    // две поимки дают «мешок» мостом #1433, но не «Настоящие деньги»: вторая дверь требует трёх
+    expect(await pick(true, 2)).not.toBe('Payday_real')
+  })
+
   it('переводы 50 ₽ вычитаются один раз: суд и выплата считают от одного долга (#832)', async () => {
     const { game } = makeGame()
     const base = game.debt
