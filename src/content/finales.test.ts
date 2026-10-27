@@ -429,17 +429,19 @@ describe('концовки игры', () => {
     const contra = async (g: Game) => { g.S.mem['finale.nune'] = 'default'; g.S.arcs.nune = { i: ARCS.nune.eps.length, last: 0 } }
     const threat = async (g: Game) => { g.S.offlineDays = 0; await g.send('Я подаю в суд. Серьёзно.') }
     type Step = (g: Game) => Promise<void>
+    // сход объявляется своим путём: двадцать пятый крик за партию без извинений
+    const toVendetta = async (g: Game) => { Object.assign(g.S.mem, { 'count.rude': 25, 'rude.heat': 5 }); await g.send({ text: 'АЛИК!!! ТЫ ВРЁШЬ!!!', tone: 'rude' }); expect(g.S.mem.vendetta).toBe(true) }
     const SCENARIO: Record<string, Step[]> = {
       family: [finale('samvel.groom')],
       heir: [finale('alik_death.will')],
       ram: [finale('boris.toyou')],
       alik: [finale('garik.cutter')],
       honest: [finale('grant.ally')],
-      vendetta: [async (g) => { Object.assign(g.S.mem, { 'count.rude': 25, 'rude.heat': 5 }); await g.send({ text: 'АЛИК!!! ТЫ ВРЁШЬ!!!', tone: 'rude' }); expect(g.S.mem.vendetta).toBe(true) }],
+      vendetta: [toVendetta],
       // ранний финал хроники (#1425): сход объявляется своим путём, порог криков после него добирается
       // настоящим грубым ходом — счётчик ставит движок, а не поле в памяти
       bloodfeud: [
-        async (g) => { Object.assign(g.S.mem, { 'count.rude': 25, 'rude.heat': 5 }); await g.send({ text: 'АЛИК!!! ТЫ ВРЁШЬ!!!', tone: 'rude' }); expect(g.S.mem.vendetta).toBe(true) },
+        toVendetta,
         async (g) => {
           g.S.mem['count.rudeAfterVendetta'] = CHRONIC_RUDE_AFTER_VENDETTA - 1
           await g.send({ text: 'ТЫ МНЕ ДОЛЖЕН, СЛЫШИШЬ?!', tone: 'rude' })
