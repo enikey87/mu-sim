@@ -16,10 +16,12 @@ const invoiceUrl = (): string => String(import.meta.env.VITE_TELEGRAM_INVOICE_UR
  * неизвестна, старый клиент просто не имеет новых вызовов (Bot API 7.7 — свайпы, 8.0 — фуллскрин).
  */
 interface TgWebApp {
+  platform?: string
   ready?(): void
   expand?(): void
   disableVerticalSwipes?(): void
   requestFullscreen?(): void | Promise<unknown>
+  exitFullscreen?(): void | Promise<unknown>
   isFullscreen?: boolean
   /** `light` | `dark` — тема клиента Telegram, а не системная тема WebView. */
   colorScheme?: string
@@ -69,12 +71,16 @@ export function telegramPlatform(deps: TelegramDeps = {}): Platform {
     if (scheme) document.documentElement.dataset.theme = scheme
   }
 
-  const fullscreen = (app: TgWebApp) => {
-    if (app.isFullscreen || !app.requestFullscreen) return
+  const configureViewport = (app: TgWebApp) => {
+    const mobile = app.platform === 'android' || app.platform === 'android_x' || app.platform === 'ios'
+    if (mobile) call(() => app.expand?.())
+    const change = mobile
+      ? (app.isFullscreen ? undefined : app.requestFullscreen)
+      : (app.isFullscreen ? app.exitFullscreen : undefined)
+    if (!change) return
     try {
-      // Bot API 8.0 отвечает промисом: отказ (старый клиент, запрет) не должен всплыть необработанным
-      void Promise.resolve(app.requestFullscreen()).catch(() => {})
-    } catch { /* синхронный отказ клиента — остаёмся в обычном режиме */ }
+      void Promise.resolve(change.call(app)).catch(() => {})
+    } catch { /* отказ клиента не должен ломать старт */ }
   }
 
   /**
@@ -120,9 +126,8 @@ export function telegramPlatform(deps: TelegramDeps = {}): Platform {
       const client = app
       applyTheme(client)
       call(() => client.ready?.())
-      call(() => client.expand?.())
       call(() => client.disableVerticalSwipes?.())
-      fullscreen(client)
+      configureViewport(client)
       // смена темы в клиенте на ходу: палитра игры следует за Telegram, а не за WebView
       call(() => client.onEvent?.('themeChanged', () => applyTheme(client)))
     },
