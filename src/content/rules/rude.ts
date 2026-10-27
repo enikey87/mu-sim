@@ -30,11 +30,10 @@ export async function sayFresh(game: ContentApi, key: string, pool: readonly Ent
   await game.say([who === 'alik' ? said : { w: who, t, claims: saidClaims(said) }])
   return picked
 }
-/** Реплика холодной войны: сухой пул по порядку, без повторов; пул исчерпан — короткий отказ,
- *  а не тёплая строка из обычных пулов (режим не должен молча сдаваться). */
+/** Реплика холодной войны: сухой пул без соседних повторов; когда пул кончился, колода тасуется заново —
+ *  тёплая строка из обычных пулов вместо холодной не берётся никогда (режим не сдаётся). */
 async function coldWarLine(game: ContentApi, key: string, pool: readonly Entry<string>[]): Promise<void> {
-  const t = game.decks.pick(key, pool, game.lineFacts(), { mode: 'sequential', noRepeat: true })
-  await game.say([t ?? game.draw('CW_FB', T.COLD_WAR_FALLBACK)])
+  await game.say([game.decks.pick(key, pool, game.lineFacts()) ?? valueOf(pool[0])])
 }
 /** Остудить ссору на n, не ниже нуля. */
 export const cooldown = (game: ContentApi, n: number) => game.coolConflict(n)

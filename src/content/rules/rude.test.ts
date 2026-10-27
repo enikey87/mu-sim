@@ -492,12 +492,12 @@ describe('холодная война после вендетты', () => {
       const { r, n } = await fire(game, 'rude')
       expect(r, `крик ${i + 1} в режиме`).toBe('ColdWar_Rude')
       const said = texts(game, n).filter(Boolean)
-      expect(said.some((t) => coldPool.has(t) || T.COLD_WAR_FALLBACK.includes(t)), said.join(' | ')).toBe(true)
+      expect(said.some((t) => coldPool.has(t)), said.join(' | ')).toBe(true)
       for (const t of said) expect(t).not.toMatch(WARM)
     }
   })
   it('обычный пул холодной войны не содержит тёплых обращений — иначе режим обещает больше, чем даёт', () => {
-    for (const t of [...coldPool, ...initiatives, ...T.COLD_WAR_FALLBACK]) expect(t).not.toMatch(WARM)
+    for (const t of [...coldPool, ...initiatives]) expect(t).not.toMatch(WARM)
   })
   it('требование (не крик) в режиме — тоже из холодного пула', async () => {
     const { game } = makeGame()
