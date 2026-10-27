@@ -221,6 +221,9 @@ export const paydayRules: R[] = [
   // иерархия исходов — бонусами специфичности, а не числом условий:
   // real 4 > lavash 3 = detective 3 > coins 2 = niva 2 > strasbourg/notyou 1 > default 0
   outcome('real', [is('ach.saint'), is('ach.court')], { bonus: 2 }),
+  // «Настоящие деньги» вежливому следователю (#1435): saint И (court ИЛИ detective). Критерии контента — только
+  // конъюнкция, поэтому «ИЛИ» здесь — второе правило того же исхода с тем же бонусом 2; заседание важнее счётчика
+  outcome('real', [is('ach.saint'), gte(caughtCount, DETECTIVE_CATCHES), missing('ach.court'), missing(pd.caught)], { name: 'Payday_real_detective', bonus: 2 }),
   // три мидгейм-поимки (#1434): выше «Мешка мелочи» и «Нивы», ниже «Настоящих денег»; поимка в самой сцене
   // остаётся за coins — она требует missing(pd.caught), поэтому момент выплаты detective не вытесняет
   outcome('detective', [gte(caughtCount, DETECTIVE_CATCHES), missing(pd.caught)], { bonus: 1 }),

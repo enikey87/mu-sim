@@ -71,6 +71,11 @@ export const DIRECT: Record<string, DirectCase> = {
   Court_Verdict_Lettered: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem.court = 6; g.S.mem.payday = 'strasbourg' } },
   // #553: дрейф сроков платежей увёл оба правила из выборок — прямой случай держит их под гейтом
   Court_After: { event: 'PlayerMessage', facts: { tone: 'threat' }, setup: (g) => { g.S.mem.court = 7 } },
+  // #1435: официальное обращение в суд — бот так не пишет (кнопки идут тоном «threat»), вежливый путь держится
+  // тремя прямыми случаями: журнал, ступень по второму обращению и отклик после всех инстанций
+  Court_Polite_Ack: { event: 'PlayerMessage', facts: { tone: 'polite', category: 'threat' } },
+  Court_Polite_Step: { event: 'PlayerMessage', facts: { tone: 'polite', category: 'threat' }, setup: (g) => { g.S.mem['court.polite'] = true } },
+  Court_Polite_After: { event: 'PlayerMessage', facts: { tone: 'polite', category: 'threat' }, setup: (g) => { g.S.mem.court = 7 } },
   Says_sorry_sorrySwing3: {
     event: 'PlayerSays',
     facts: { intent: 'sorry' },
@@ -184,6 +189,14 @@ export const DIRECT: Record<string, DirectCase> = {
     event: 'PaydayOutcome',
     setup: (g) => {
       Object.assign(g.S.ach, { saint: 1, court: 1 })
+    },
+  },
+  // #1435: вторая дверь «Настоящих денег» — вежливость и три поимки вместо заседания; бот до неё не доходит
+  Payday_real_detective: {
+    event: 'PaydayOutcome',
+    setup: (g) => {
+      g.S.ach.saint = 1
+      g.S.mem.caught = 3
     },
   },
   Quiet_PaydayOpen_AlikAway: { event: 'AlikAway', setup: paydayOpen },
