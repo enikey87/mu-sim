@@ -88,6 +88,9 @@ npx vite build --mode telegram --outDir dist-telegram
 - Тема: `colorScheme` клиента ставит `data-theme` на `:root` (палитры — в `styles.css`), `themeChanged`
   переносит её на ходу. Клиент без `colorScheme` определяется по яркости `themeParams.bg_color`.
   Системная тема WebView не важна: телефон у игрока может быть светлым, а Telegram — тёмным.
+- Safe area: адаптер ставит `data-platform="telegram"`; стили резервируют системные отступы и место
+  под кнопки клиента для телефона и оверлеев. CSS-переменные SDK обновляются при изменении окна;
+  системные значения `env()` и SDK учитываются через максимум, отступы интерфейса Telegram добавляются.
 - `externalPay: false`: внешняя платёжная ссылка (DonationAlerts) в Telegram запрещена, цифровые товары
   продаются только за Stars. Карточка «займи 50» на Telegram — Stars-покупка (см. ниже, #1235).
 - `gameplayStart`/`gameplayStop` — пустые: игрового API площадки у Mini App нет.
