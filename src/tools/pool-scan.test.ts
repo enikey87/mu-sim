@@ -69,22 +69,29 @@ const CONTENT: Array<[string, string]> = ['src/content', 'src/engine'].flatMap((
 /** Трассировка повторённой строки до источника: константа (HARDCODED) или место в пуле. */
 const trace = (text: string): string => {
   // sys-строки приходят с префиксом отчёта — источник ищем по тексту без него
-  const probe = text.replace(/^SYS: /, '').slice(0, 24).replace(/[«»]/g, '')
-  if (probe.trim().length < 12) return 'источник не найден (строка короткая/шаблонная)'
-  for (const [f, body] of CONTENT) {
-    const idx = body.indexOf(probe)
-    if (idx >= 0) {
-      const lines = body.split('\n')
-      const line = body.slice(0, idx).split('\n').length
-      // строка может начинаться внутри многострочного литерала: ищем начало константы вверх
-      for (let k = 0; k < 4; k++) {
-        const cand = (lines[line - 1 - k] ?? '').trim()
-        if (/export const [A-Z_0-9]+ = ['"`]/.test(cand)) return `HARDCODED ${f}:${line - k} — ${cand.slice(0, 56)}`
+  const clean = text.replace(/^SYS: /, '').replace(/[«»]/g, '')
+  // проба от полной строки к короткому префиксу: у разных пулов бывают одинаковые начала
+  // строк («Ваш крик зарегистрирован…» есть и в POLITE_RUDE, и в COLD_WAR_REPLY), и
+  // короткая проба атрибутирует показ чужому пулу (прогон 4029). Короткие пробы —
+  // запас на случай многострочных литералов, где полной строки в файле нет.
+  const probes = [...new Set([clean, clean.slice(0, 40), clean.slice(0, 24)])]
+  for (const probe of probes) {
+    if (probe.trim().length < 12) continue
+    for (const [f, body] of CONTENT) {
+      const idx = body.indexOf(probe)
+      if (idx >= 0) {
+        const lines = body.split('\n')
+        const line = body.slice(0, idx).split('\n').length
+        // строка может начинаться внутри многострочного литерала: ищем начало константы вверх
+        for (let k = 0; k < 4; k++) {
+          const cand = (lines[line - 1 - k] ?? '').trim()
+          if (/export const [A-Z_0-9]+ = ['"`]/.test(cand)) return `HARDCODED ${f}:${line - k} — ${cand.slice(0, 56)}`
+        }
+        const cur = lines[line - 1] ?? ''
+        // строка пула: литерал или needs-обёртка (пул с гейтами) — оба случая пул, не HARDCODED
+        if (/^\s*('|needs\()/.test(cur)) return `POOL ${f}:${line}`
+        return `ДРУГОЕ ${f}:${line}`
       }
-      const cur = lines[line - 1] ?? ''
-      // строка пула: литерал или needs-обёртка (пул с гейтами) — оба случая пул, не HARDCODED
-      if (/^\s*('|needs\()/.test(cur)) return `POOL ${f}:${line}`
-      return `ДРУГОЕ ${f}:${line}`
     }
   }
   return 'источник не найден (шаблон/склейка)'
@@ -141,6 +148,13 @@ describe('сканер исчерпания пула (POOL_SCAN)', () => {
       ].join('\n')
       const out = `/tmp/opencode/pool-scan-${p.name}.md`
       writeFileSync(out, report)
+      // полный транскрипт партии: кандидат из top-10 обязан проверяться по нему (скилл,
+      // урок прогона FLOOR), и исчезновение известной сигнатуры тоже подтверждается
+      // по всем показам, а не по отсутствию в top-10 (прогон 4029, #1422)
+      writeFileSync(
+        `/tmp/opencode/pool-scan-${p.name}-transcript.txt`,
+        events.map((e) => `${e.turn}\t${e.text.replace(/\n/g, ' ')}`).join('\n') + '\n',
+      )
       console.log(`\n=== ${p.name} → ${out} ===\n` + report)
       expect(msgs.length).toBeGreaterThan(0)
     }
