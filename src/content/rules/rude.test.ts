@@ -5,9 +5,11 @@ import type { Game } from '../../engine/game'
 import type { Facts } from '../../engine/rules'
 import type { Msg } from '../../engine/state'
 import * as T from '../rude'
-import { HEAT, blockLifted } from '../memkeys'
+import { HEAT, blockLifted, coldWar } from '../memkeys'
 import { valueOf, spec, during, isOpen, saidText, type Entry } from '../fact'
 import { P_VIA_BORIS, P_VIA_KARINE, P_VIA_MAMA } from './player-choice-pools'
+import { D } from '../excuses'
+import { IDLE } from '../life'
 
 const texts = (game: Game, from: number) => game.S.msgs.slice(from).map((m) => (m.kind === 'text' || m.kind === 'sys' ? m.text : m.kind === 'sticker' ? m.e : ''))
 const whos = (game: Game, from: number) => game.S.msgs.slice(from).filter((m): m is Extract<Msg, { kind: 'text' }> => m.kind === 'text').map((m) => m.who ?? 'alik')
@@ -459,5 +461,123 @@ describe('лестница грубости: ветки', () => {
     }
     expect(missed, rs.join(',')).toBe(true)
     expect(game.S.ach.habit).toBeDefined()
+  })
+})
+
+// Холодная война: режим после вендетты. Факт `coldWar` ставит сама Вендетта, снимает принятое
+// извинение; пока он стоит, грубость, требования и инициативы Алика говорят из холодных пулов,
+// а тёплые обращения («брат», «джан», «сынок») недоступны. Проверяется механизм, а не один текст:
+// тот же крик до вендетты идёт обычной лестницей, после — холодным пулом.
+describe('холодная война после вендетты', () => {
+  // обращения тёплых пулов — то, чего в режиме быть не должно (ADDR из excuses.ts + родня)
+  const WARM = /брат|джан|сынок|дорог|ахпер|родн[оа]|братишк|золот/i
+  const coldPool = new Set(T.COLD_WAR_ALL.map((e) => valueOf(e)))
+  const initiatives = T.COLD_WAR_INITIATIVE.map((e) => valueOf(e))
+  const vendetta = async (game: Game): Promise<void> => {
+    game.S.mem[HEAT] = 1
+    game.S.mem['count.rude'] = 14 // 15-й крик
+    expect((await fire(game, 'rude')).r).toBe('Rude_Vendetta')
+    expect(game.S.mem[coldWar], 'вендетта не поставила режим').toBe(true)
+  }
+
+  it('до вендетты режима нет: тот же крик идёт обычной лестницей', async () => {
+    const { game } = makeGame()
+    expect(game.S.mem[coldWar]).toBeUndefined()
+    expect((await fire(game, 'rude')).r).toBe('Tone_Rude')
+  })
+  it('на грубость — холодный пул, тёплых обращений нет ни в одной реплике', async () => {
+    const { game } = makeGame()
+    await vendetta(game)
+    for (let i = 0; i < 8; i++) {
+      const { r, n } = await fire(game, 'rude')
+      expect(r, `крик ${i + 1} в режиме`).toBe('ColdWar_Rude')
+      const said = texts(game, n).filter(Boolean)
+      expect(said.some((t) => coldPool.has(t)), said.join(' | ')).toBe(true)
+      for (const t of said) expect(t).not.toMatch(WARM)
+    }
+  })
+  it('обычный пул холодной войны не содержит тёплых обращений — иначе режим обещает больше, чем даёт', () => {
+    for (const t of [...coldPool, ...initiatives]) expect(t).not.toMatch(WARM)
+  })
+  it('требование (не крик) в режиме — тоже из холодного пула', async () => {
+    const { game } = makeGame()
+    await vendetta(game)
+    const { r, n } = await fireFacts(game, { tone: 'neutral', category: 'request' })
+    expect(r).toBe('ColdWar_Request')
+    expect(coldPool.has(texts(game, n).at(-1)!)).toBe(true)
+  })
+  it('инициативы Алика в режиме формальные: расписания и документы, не «ты поел?»', async () => {
+    const { game } = makeGame()
+    await vendetta(game)
+    for (let i = 0; i < 3; i++) {
+      game.S.ctx = null
+      const n = game.S.msgs.length
+      expect((await game.fire('AlikIdle'))?.name).toBe('ColdWar_Idle')
+      const said = texts(game, n)
+      expect(initiatives, said.join(' | ')).toEqual(expect.arrayContaining(said.filter((t) => initiatives.includes(t))))
+      for (const t of said) expect(t).not.toMatch(WARM)
+    }
+  })
+  it('пачка «пока тебя не было» в режиме — те же формальные строки', async () => {
+    const { game } = makeGame()
+    await vendetta(game)
+    const n = game.S.msgs.length
+    expect((await game.fire('AlikAway'))?.name).toBe('ColdWar_Away')
+    expect(initiatives).toContain(texts(game, n).at(-1))
+  })
+  it('блок не отменяется режимом: в чёрном списке сообщение по-прежнему не доставлено', async () => {
+    const { game } = makeGame()
+    await vendetta(game)
+    game.S.mem.blocked = true
+    expect((await fire(game, 'rude')).r).toBe('Rude_WhileBlocked')
+  })
+  it('тёплые обращения заменены формальными в том же слоте ADDR: украшение и IDLE', async () => {
+    const { game } = makeGame()
+    const has = (pool: readonly string[], s: string) => pool.some((a) => s.startsWith(a + ',') || s.startsWith(a + '!'))
+    // до вендетты слот тёплый — иначе проверка ниже ничего не доказывает
+    expect(has(D.ADDR, String(game.alikDecor('проверка')))).toBe(true)
+    await vendetta(game)
+    for (let i = 0; i < 6; i++) {
+      const decor = String(game.alikDecor('проверка'))
+      expect(has(D.ADDR_COLD, decor), decor).toBe(true)
+      const said = saidText(game.addrSaidLine('IDLE', IDLE))
+      expect(has(D.ADDR_COLD, said), said).toBe(true)
+    }
+  })
+  it('извинение возвращает обычный режим: следующий крик идёт лестницей, а не холодным пулом', async () => {
+    const { game } = makeGame()
+    await vendetta(game)
+    heat(game, 0) // ссора остыла — извинение принимается текстом, без ритуала
+    expect((await says(game, 'sorry')).r).toMatch(/^Says_sorry/)
+    expect(game.S.mem[coldWar], 'принятое извинение не сняло режим').toBe(false)
+    const after = await fire(game, 'rude')
+    expect(after.r).not.toBe('ColdWar_Rude')
+  })
+  it('ритуал примирения (хаш) тоже снимает режим', async () => {
+    const { game } = makeGame()
+    await vendetta(game)
+    heat(game, 3) // извинение после серии криков — только ритуалом
+    expect((await says(game, 'sorry')).r).toBe('Says_sorry_ritual')
+    await game.send(fresh(game).find((c) => c.go === 'hash')!)
+    expect(game.S.mem[coldWar]).toBe(false)
+  })
+  it('мир кончает режим: встречный иск и «Мууу» — мир целиком, а не половина', async () => {
+    const a = makeGame().game
+    await vendetta(a)
+    heat(a, 2)
+    expect((await fire(a, 'threat')).r).toBe('Tone_Threat_Hot')
+    expect(a.S.mem[coldWar], 'встречный иск оставил режим').toBe(false)
+    const b = makeGame().game
+    await vendetta(b)
+    heat(b, 1)
+    expect((await says(b, 'moo')).r).toBe('Says_moo_peace')
+    expect(b.S.mem[coldWar], '«Мууу»-мир оставил режим').toBe(false)
+  })
+  it('в режиме Алик не скучает по крику: «привыкание» молчит', async () => {
+    const { game } = makeGame()
+    await vendetta(game)
+    heat(game, 0)
+    game.S.mem['count.rude'] = 15
+    expect((await fire(game, 'polite')).r).not.toBe('Tone_MissRude')
   })
 })

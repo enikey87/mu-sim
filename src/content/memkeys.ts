@@ -19,6 +19,10 @@ export const alikDead = 'alik_dead'
 export const mourning = 'mourning'
 export const evicted = 'evicted'
 export const vendetta = 'vendetta'
+/** Режим холодной войны после вендетты: Алик говорит сухо и формально, тёплые пулы недоступны.
+ *  Ставит сама Вендетта, снимает принятое извинение (ритуал примирения, посредник, обычный sorry)
+ *  и объявленный мир — «Мууу» и встречный иск. */
+export const coldWar = 'coldWar'
 export const court = 'court'
 export const courtVerdict = 'court.verdict'
 /** Инстанции, которым ступень суда уже объяснила перевод («полиция сказала — это в суд») — список через запятую. */
@@ -381,7 +385,7 @@ export type ActorKey = (typeof ACTOR_KEY_LIST)[number]
 export const ACTOR_KEYS: ReadonlySet<string> = new Set(ACTOR_KEY_LIST)
 
 export const MEM_KEYS: ReadonlySet<string> = new Set([
-  HEAT, muenAt, muenAsked, muenAnswered, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, evicted, vendetta, court, courtVerdict,
+  HEAT, muenAt, muenAsked, muenAnswered, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, evicted, vendetta, coldWar, court, courtVerdict,
   ritualCount, ritualCut, caughtCount, caughtAt, garikDenied, garikCode, cryptoHodl, bathAsked, bathAskedAt, bathAnswered, mamaCalls, phoneKarine, karineKnowsDebt, karineThinksTax, alikShaved, moustacheKept, moustacheAskAt, alikDay, mooAt, sorryAt, courtReferral, judgeApology, saidStrasburg,
   rudeAt, thanksAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway, nivaPlayer, carGone,
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, borisForeman, taxFrozen, taxThawed,
