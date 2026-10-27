@@ -226,3 +226,29 @@ describe('ключи приёмников — из переменных сбор
     expect(fresh.enable({ host: fresh.GAME_HOST, search: '' })).toBe(false)
   })
 })
+describe('заглушка ym до прихода tag.js: протокол официального сниппета (27.10, Метрика молчала при живом теге)', () => {
+  it('очередь ложится в ym.a — её читает tag.js; в ym.q её нет', () => {
+    enable({ host: GAME_HOST, search: '', id: '4242' })
+    firstGesture()
+    const stub = (globalThis as { ym?: { a?: unknown[][]; q?: unknown[][] } }).ym
+    expect(typeof stub, 'жест обязан поставить заглушку-функцию').toBe('function')
+    expect(stub!.a, 'очередь в ym.a: init и hit').toBeTruthy()
+    expect(stub!.a!.length).toBeGreaterThanOrEqual(2)
+    expect(stub!.a![0]![0]).toBe(4242)
+    expect(stub!.a![0]![1]).toBe('init')
+    expect(stub!.a![1]![1]).toBe('hit')
+    expect(stub!.q, 'ym.q — не протокольное поле: tag.js его не читает').toBeUndefined()
+  })
+
+  it('разыгранная tag.js очередь доносит init и hit до настоящего счётчика', () => {
+    enable({ host: GAME_HOST, search: '', id: '4242' })
+    firstGesture()
+    const stub = (globalThis as { ym?: { a?: unknown[][] } }).ym
+    // tag.js на приходе применяет записи из ym.a и заменяет заглушку настоящим API
+    const delivered: Call[] = []
+    for (const entry of stub!.a ?? []) delivered.push(entry as Call)
+    ;(globalThis as { ym?: unknown }).ym = (...args: unknown[]) => { delivered.push(args as Call) }
+    expect(delivered.some((c) => c[1] === 'init' && c[0] === 4242), 'init дошёл').toBe(true)
+    expect(delivered.some((c) => c[1] === 'hit'), 'hit дошёл').toBe(true)
+  })
+})

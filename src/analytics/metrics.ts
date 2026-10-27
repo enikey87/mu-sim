@@ -68,7 +68,7 @@ const loadScript = (src: string, anonymous = false, attrs?: Record<string, strin
 
 // ---------- Метрика ----------
 
-type Ym = ((id: number, method: string, ...rest: readonly unknown[]) => void) & { q?: unknown[][] }
+type Ym = ((id: number, method: string, ...rest: readonly unknown[]) => void) & { a?: unknown[][] }
 
 type Metrics = {
   ym?: Ym
@@ -93,8 +93,11 @@ const metrika = (id: number): Receiver => ({
   on: true,
   gesture: () => safe(() => {
     const m = global()
-    // очередь вызовов до прихода тега: `ym` к этому моменту ещё не функция Метрики
-    const ym = (m.ym ??= ((...args: unknown[]) => { ym.q ??= []; ym.q.push(args) }) as Ym)
+    // очередь вызовов до прихода тега: `ym` к этому моменту ещё не функция Метрики.
+    // Очередь обязана лежать в `ym.a` — её читает официальный tag.js (сниппет Яндекса
+    // кладёт туда `arguments`). До 27.10 очередь писалась в `ym.q`: tag.js грузился,
+    // своей очереди не видел и счётчик не инициализировал — Метрика молчала при живом теге.
+    const ym = (m.ym ??= ((...args: unknown[]) => { (ym.a ??= []).push(args) }) as Ym)
     ym(id, 'init', INIT_YA)
     ym(id, 'hit', location.href)
     loadScript(TAG_YA)
