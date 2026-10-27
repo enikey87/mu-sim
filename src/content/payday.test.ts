@@ -5,7 +5,8 @@ import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
 import type { Criterion } from '../engine/rules'
 import { spec } from '../engine/rules/lines'
-import { ANNOUNCE, CLAIMS, COINS_BRIDGE_CATCHES, LEAD, MORNING_CONTRA, OUTCOME, ROLL, SOURCES, type Claim, type Lead } from './payday'
+import { ANNOUNCE, CLAIMS, COINS_BRIDGE_CATCHES, DETECTIVE_CHAIN, LEAD, MORNING_CONTRA, OUTCOME, ROLL, SOURCES, type Claim, type Lead } from './payday'
+import { ENDINGS } from './finales'
 import { LEGENDS } from './legends'
 import { CLAIM_LEDGER } from './ledger'
 import { ENDGAME_ARCH } from './endgame'
@@ -203,6 +204,40 @@ describe('День выплаты', () => {
     game.S.mem.caught = 3
     game.S.mem['payday.caught'] = true
     expect((await game.fire('PaydayOutcome'))?.name).toBe('Payday_coins')
+  })
+  // #1456: счётчик поимок только растёт, условие исхода — gte(caughtCount, 3), поэтому ни одна строка
+  // «Следователя» не называет числа: при четвёртой и пятой поимках «трижды» противоречило бы записям
+  it('Следователь: строки исхода не называют число поимок — при 4+ им нечего опровергать (#1456)', async () => {
+    const play = async (caught: number) => {
+      const { game } = makeGame()
+      rich(game)
+      game.S.mem.caught = caught
+      await game.enterNode('payday', 'announce')
+      await choose(game, 'witness')
+      const debt = game.debt
+      const n = game.S.msgs.length
+      await choose(game, 'share')
+      await game.fire('CheckEnding')
+      const dossier = ENDINGS.find((e) => e.id === game.S.ending)
+      expect(dossier, `экран концовки для ${game.S.ending}`).toBeDefined()
+      return { game, debt, out: texts(game, n).join('\n'), chain: String(game.S.mem['payday.chain']), dossier: dossier!.text }
+    }
+    const five = await play(5)
+    expect(five.game.S.mem.payday).toBe('detective')
+    // выплата честная, как и при трёх: число поимок на неё не влияет
+    expect(five.game.S.debt).toBe(0)
+    expect(five.game.S.money).toBeGreaterThanOrEqual(five.debt)
+    // ни в переводе, ни в репликах, ни в отмазке, ни в досье нет числа, которого в партии не было
+    for (const [where, text] of [['перевод и реплики', five.out], ['отмазка', five.chain], ['досье', five.dossier]] as const) {
+      expect(text, `число поимок в тексте: ${where}`).not.toMatch(/трижды|три поимки/i)
+    }
+    // строки на месте: перевод с назначением, обе реплики исхода, отмазка-метка
+    const three = await play(3)
+    expect(three.game.S.mem.payday).toBe('detective')
+    expect(three.out).toContain('Назначение: «Слово. Поимки. Долг»')
+    expect(three.out).toContain('Не раз и не два я врал — и ты записывал.')
+    expect(three.out).toContain('Ты ловил меня на слове — и не раз, брат.')
+    expect(three.chain).toBe(DETECTIVE_CHAIN)
   })
   // #1433: мост поимок — две мидгейм-поимки дают мешок и без поимки в самой сцене
   it('Мост поимок: две мидгейм-поимки — «Мешок мелочи» без поимки в сцене (#1433)', async () => {
