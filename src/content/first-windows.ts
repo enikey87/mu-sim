@@ -3,7 +3,7 @@
 // участник, умеющий писать сам (SPEAKS), обязан быть здесь или в исключениях с причиной — новый
 // участник красит сюит на месте, а не в плейтесте через раунд. Офферы и потребление окна ответом —
 // как были (#951), тексты пулов не менялись.
-import { arsenTrackAt, avitoReviewAt, bathAskedAt, borisAskAt, borisSaleAt, collectorsAskAt, collectorsEpAt, countersuitAt, courtVerdictAt, crewPaidAt, grantBathAt, grantHouseAt, grantTileAt, internAt, kettleAt, lawyerAt, mamaMarketAt, mamaVoiceAt, mooAt, moustachePhotoAt, nivaBackAt, offendedAskAt, photoAt, ramPhotoAt, rubikAskAt, rubikHoleAt, samvelDivorceAt, saleAt, seryogaAskAt, tamadaDoneAt, tileAdAt, tileCourtAt, tileLawyerAt, tileMonumentAt, tileSlipAt, transferAt, vacancyAt } from './memkeys'
+import { arsenTrackAt, avitoReviewAt, bathAskedAt, borisAskAt, borisSaleAt, collectorsAskAt, collectorsEpAt, countersuitAt, courtVerdictAt, crewPaidAt, grantBathAt, grantHouseAt, grantTileAt, internAt, kettleAt, lawyerAt, mamaMarketAt, mamaVoiceAt, mooAt, muenAt, moustachePhotoAt, nivaBackAt, offendedAskAt, photoAt, ramPhotoAt, rubikAskAt, rubikHoleAt, samvelDivorceAt, saleAt, seryogaAskAt, tamadaDoneAt, tileAdAt, tileCourtAt, tileLawyerAt, tileMonumentAt, tileSlipAt, transferAt, vacancyAt } from './memkeys'
 import type { Criterion } from '../engine/rules'
 
 /**
@@ -117,4 +117,7 @@ export const EVENT_SOURCES: readonly EventSource[] = [
   // условие Карине «переложите нам ванную» (#1382): сцена мира ставила только факт `bath.asked`,
   // окна отклика у условия не было — до Дня выплаты игрок ответить не мог. Штамп ставит сама строка о ванной
   { source: 'условие Карине «переложите нам ванную» (сцена ritual, узел text, строка о ванной — stamp)', at: bathAskedAt, offer: 'BathAsk', pool: 'P_BATH_ASK' },
+  // признание «учу английский» + карточка курса mu-en (#1410): развязка лестницы мычания — заметное
+  // событие, у которого не было своего окна отклика (прецеденты #927/#1292). Штамп ставит muenTurn
+  { source: 'признание «это я учу английский» и карточка курса mu-en (muenTurn, stamp)', at: muenAt, offer: 'Muen', pool: 'P_MUEN' },
 ]

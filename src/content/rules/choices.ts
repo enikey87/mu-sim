@@ -16,7 +16,7 @@ import { MONEY_ASK, moneyPlaceOf, moneyAskOwn } from '../money-ask'
 import { P_HOLIDAY, holidayBefore, type Holiday } from '../holidays'
 import { WORLD, SPEAKS } from '../world'
 import { fmtDayMonth, fmtDays } from '../../engine/time'
-import { HEAT, alikDead, alikShaved, intro, moustacheAskAt, blocked, court, mourning, phoneKarine, crewPaid, endgame, collectorsTea, collectorsRecruited, collectorsTurned, paydayScene, bathAsked } from '../memkeys'
+import { HEAT, alikDead, alikShaved, intro, moustacheAskAt, blocked, court, mourning, phoneKarine, crewPaid, endgame, collectorsTea, collectorsRecruited, collectorsTurned, paydayScene, bathAsked, muenAnswered } from '../memkeys'
 import { collectorsEpPool, requirePlayerPool } from '../player-pools'
 import { isEventWindow } from '../first-windows'
 import {
@@ -24,7 +24,7 @@ import {
   STRASBOURG_THREAT,
   P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE,
   P_CREW_CALL, P_LAWYER, P_COLLECTORS_ASK, P_INTERN, P_HOLE, P_COUNTERSUIT,
-  P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_BORIS, P_DEBUT_NIVA, P_NUNE_DEBUT, P_DEBUT_GRANT, P_GRANT_TILE, P_MOUSTACHE_PHOTO, P_MAMA_MARKET, P_TILE_AD, P_TAMADA_DONE, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_COURT_VERDICT, P_TILE_SLIP, P_TILE_COURT, P_TILE_LAWYER, P_TILE_MONUMENT, P_NIVA_BACK, P_SOLD, P_GRANT_HOUSE, P_BORIS_MEMORY, P_SERYOGA, P_GRANT_BATH, P_OFFENDED_ASK, P_BATH_ASK,
+  P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_BORIS, P_DEBUT_NIVA, P_NUNE_DEBUT, P_DEBUT_GRANT, P_GRANT_TILE, P_MOUSTACHE_PHOTO, P_MAMA_MARKET, P_TILE_AD, P_TAMADA_DONE, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_COURT_VERDICT, P_TILE_SLIP, P_TILE_COURT, P_TILE_LAWYER, P_TILE_MONUMENT, P_NIVA_BACK, P_SOLD, P_GRANT_HOUSE, P_BORIS_MEMORY, P_SERYOGA, P_GRANT_BATH, P_OFFENDED_ASK, P_BATH_ASK, P_MUEN,
 } from './player-choice-pools'
 
 type R = Rule<ContentApi, GameEvent, Offer>
@@ -349,6 +349,19 @@ export const choiceRules: R[] = [
     return [offer({
       name: 'BathAsk', when: [is(bathAsked), is('bathAskFresh'), missing(paydayScene)], act: 'bathAsk', tone: 'neutral', bonus: 5,
       text: (g) => windowFromArrNum(g, 'P_BATH_ASK', P_BATH_ASK, (i) => { arg = String(i) }),
+      arg: () => arg,
+    })]
+  })(),
+  // признание «учу английский» + карточка курса mu-en (#1410): развязка лестницы мычания — заметное
+  // событие с окном отклика (ход события и три после). Ответ потребляет окно фактом `muen.answered`,
+  // а не стиранием штампа: `muenAt` держит однократность карточки. Номер выбранной строки уезжает с arg —
+  // ответ идёт по выбранному вопросу, как у ванной и стажёра (#1017). bonus 5: рядом стоят общие
+  // вопросы блока (извинение и мычание — 6) — событийная реакция обязана попасть в слот.
+  ...(() => {
+    let arg = ''
+    return [offer({
+      name: 'Muen', when: [is('muenFresh'), missing(muenAnswered)], act: 'muen', tone: 'neutral', bonus: 5,
+      text: (g) => windowFromArrNum(g, 'P_MUEN', P_MUEN, (i) => { arg = String(i) }),
       arg: () => arg,
     })]
   })(),
