@@ -3,7 +3,7 @@
 // участник, умеющий писать сам (SPEAKS), обязан быть здесь или в исключениях с причиной — новый
 // участник красит сюит на месте, а не в плейтесте через раунд. Офферы и потребление окна ответом —
 // как были (#951), тексты пулов не менялись.
-import { arsenTrackAt, avitoReviewAt, borisAskAt, borisSaleAt, collectorsAskAt, collectorsEpAt, countersuitAt, courtVerdictAt, crewPaidAt, grantBathAt, grantHouseAt, grantTileAt, internAt, kettleAt, lawyerAt, mamaMarketAt, mamaVoiceAt, mooAt, moustachePhotoAt, nivaBackAt, offendedAskAt, photoAt, ramPhotoAt, rubikAskAt, rubikHoleAt, samvelDivorceAt, saleAt, seryogaAskAt, tamadaDoneAt, tileAdAt, tileCourtAt, tileLawyerAt, tileMonumentAt, tileSlipAt, transferAt, vacancyAt } from './memkeys'
+import { arsenTrackAt, avitoReviewAt, bathAskedAt, borisAskAt, borisSaleAt, collectorsAskAt, collectorsEpAt, countersuitAt, courtVerdictAt, crewPaidAt, grantBathAt, grantHouseAt, grantTileAt, internAt, kettleAt, lawyerAt, mamaMarketAt, mamaVoiceAt, mooAt, moustachePhotoAt, nivaBackAt, offendedAskAt, photoAt, ramPhotoAt, rubikAskAt, rubikHoleAt, samvelDivorceAt, saleAt, seryogaAskAt, tamadaDoneAt, tileAdAt, tileCourtAt, tileLawyerAt, tileMonumentAt, tileSlipAt, transferAt, vacancyAt } from './memkeys'
 import type { Criterion } from '../engine/rules'
 
 /**
@@ -114,4 +114,7 @@ export const EVENT_SOURCES: readonly EventSource[] = [
   { source: 'карточка друга Серёги «Ну что, заплатил твой Алик?» (уведомление телефона, stamp)', at: seryogaAskAt, offer: 'Seryoga', pool: 'P_SERYOGA' },
   { source: 'строка Гранта «Алик, завтра в бане как договорились. Ой. Не тот чат.» (серия, stamp)', at: grantBathAt, offer: 'GrantBath', pool: 'P_GRANT_BATH' },
   { source: 'вопрос Алика «ты обиделся?» после тишины (Idle_Offended / Away_Offended, stamp)', at: offendedAskAt, offer: 'OffendedAsk', pool: 'P_OFFENDED_ASK' },
+  // условие Карине «переложите нам ванную» (#1382): сцена мира ставила только факт `bath.asked`,
+  // окна отклика у условия не было — до Дня выплаты игрок ответить не мог. Штамп ставит сама строка о ванной
+  { source: 'условие Карине «переложите нам ванную» (сцена ritual, узел text, строка о ванной — stamp)', at: bathAskedAt, offer: 'BathAsk', pool: 'P_BATH_ASK' },
 ]

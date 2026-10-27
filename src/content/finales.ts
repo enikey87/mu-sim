@@ -5,7 +5,7 @@
 import { type Criterion, type Entry, is, gte, lte, eq, set, gate, missing } from './fact'
 import type { Episode } from './arcs'
 import { needs, meet } from './world'
-import { HEAT, caughtCount, count, court, garikConcrete, grantPaid, houseOnGarik, internAt, internDeclined, intro, karineKnowsDebt, nivaAway, nivaPlayer, paydayScene, rubikFined, tileCornerRemoved, vendetta, wedding, endgame } from './memkeys'
+import { HEAT, caughtCount, count, court, garikConcrete, grantPaid, houseOnGarik, internAccepted, internAt, internDeclined, intro, karineKnowsDebt, nivaAway, nivaPlayer, paydayScene, rubikFined, tileCornerRemoved, vendetta, wedding, endgame } from './memkeys'
 import { PAYDAY_HARD_DAY } from './rules/payday'
 
 export interface Finale extends Episode {
@@ -169,7 +169,15 @@ export const FINALES: Record<string, Finale[]> = {
       m: [{ w: 'collectors', t: 'Мы прослушали ваш разговор с Аликом. Профессионально. Приходите к нам. Стажировка — три чая.', stamp: internAt }],
       fx: { ach: 'arc_collectors' },
       sys: 'Вам предложена должность: стажёр-коллектор «Деньги-Ара». Оплата: процент.',
-      done: ['Стажировка идёт. Чай наливают, долги слушают. Тебя хвалят.', 'С меня уже взыскивают по-настоящему. Быстро ты научился.'],
+      // ответ «как там» читает выбор игрока, а не факт финала (#1381): «идёт» звучит только после
+      // согласия (`internAccepted`), отказ — по своему факту, а оффер без ответа — предложение на
+      // столе, а не идущая работа (на этот пул приходит и посторонний вопрос про коллекторов)
+      done: [
+        gate(is(internAccepted))('Стажировка идёт. Чай наливают, долги слушают. Тебя хвалят.'),
+        gate(is(internAccepted))('С меня уже взыскивают по-настоящему. Быстро ты научился.'),
+        gate(is(internDeclined))('Стажировки не будет. Чай без тебя допили, долг твой — с тобой.'),
+        gate(missing(internAccepted), missing(internDeclined))('Стажировка лежит на столе. Чай — после согласия, брат: раньше не нальют.'),
+      ],
     },
   ],
   razmik: [

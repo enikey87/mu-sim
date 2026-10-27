@@ -16,7 +16,7 @@ import { MONEY_ASK, moneyPlaceOf, moneyAskOwn } from '../money-ask'
 import { P_HOLIDAY, holidayBefore, type Holiday } from '../holidays'
 import { WORLD, SPEAKS } from '../world'
 import { fmtDayMonth, fmtDays } from '../../engine/time'
-import { HEAT, alikDead, alikShaved, intro, moustacheAskAt, blocked, court, mourning, phoneKarine, crewPaid, endgame, collectorsTea, collectorsRecruited, collectorsTurned } from '../memkeys'
+import { HEAT, alikDead, alikShaved, intro, moustacheAskAt, blocked, court, mourning, phoneKarine, crewPaid, endgame, collectorsTea, collectorsRecruited, collectorsTurned, paydayScene, bathAsked } from '../memkeys'
 import { collectorsEpPool, requirePlayerPool } from '../player-pools'
 import { isEventWindow } from '../first-windows'
 import {
@@ -24,7 +24,7 @@ import {
   STRASBOURG_THREAT,
   P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE,
   P_CREW_CALL, P_LAWYER, P_COLLECTORS_ASK, P_INTERN, P_HOLE, P_COUNTERSUIT,
-  P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_BORIS, P_DEBUT_NIVA, P_NUNE_DEBUT, P_DEBUT_GRANT, P_GRANT_TILE, P_MOUSTACHE_PHOTO, P_MAMA_MARKET, P_TILE_AD, P_TAMADA_DONE, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_COURT_VERDICT, P_TILE_SLIP, P_TILE_COURT, P_TILE_LAWYER, P_TILE_MONUMENT, P_NIVA_BACK, P_SOLD, P_GRANT_HOUSE, P_BORIS_MEMORY, P_SERYOGA, P_GRANT_BATH, P_OFFENDED_ASK,
+  P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_BORIS, P_DEBUT_NIVA, P_NUNE_DEBUT, P_DEBUT_GRANT, P_GRANT_TILE, P_MOUSTACHE_PHOTO, P_MAMA_MARKET, P_TILE_AD, P_TAMADA_DONE, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_COURT_VERDICT, P_TILE_SLIP, P_TILE_COURT, P_TILE_LAWYER, P_TILE_MONUMENT, P_NIVA_BACK, P_SOLD, P_GRANT_HOUSE, P_BORIS_MEMORY, P_SERYOGA, P_GRANT_BATH, P_OFFENDED_ASK, P_BATH_ASK,
 } from './player-choice-pools'
 
 type R = Rule<ContentApi, GameEvent, Offer>
@@ -338,6 +338,20 @@ export const choiceRules: R[] = [
   offer({ name: 'Seryoga', when: [is('seryogaFresh')], act: 'seryoga', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_SERYOGA', P_SERYOGA) }),
   offer({ name: 'GrantBath', when: [is('grantBathFresh')], act: 'grantBath', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_GRANT_BATH', P_GRANT_BATH) }),
   offer({ name: 'OffendedAsk', when: [is('offendedAskFresh')], act: 'offendedAsk', tone: 'polite', bonus: 5, text: (g) => windowFromArr(g, 'P_OFFENDED_ASK', P_OFFENDED_ASK) }),
+  // условие Карине «переложите нам ванную» (#1382): сцена мира ставила факт `bath.asked`, но окна отклика
+  // не было — до Дня выплаты игрок не мог ответить на условие. Окно своё (ход строки и три после) и
+  // кончается Днём выплаты: после него условие либо уже учтено в дележе, либо превращено в претензию.
+  // bonus 5: рядом стоят общие вопросы блока (извинение и мычание — 6) — отклик на условие обязан попасть в слот.
+  // Номер выбранной строки уезжает с arg: у ответа свой смысл для Дня выплаты — «в счёт долга» это
+  // согласие на вычет, остальные два им не являются (#862)
+  ...(() => {
+    let arg = ''
+    return [offer({
+      name: 'BathAsk', when: [is(bathAsked), is('bathAskFresh'), missing(paydayScene)], act: 'bathAsk', tone: 'neutral', bonus: 5,
+      text: (g) => windowFromArrNum(g, 'P_BATH_ASK', P_BATH_ASK, (i) => { arg = String(i) }),
+      arg: () => arg,
+    })]
+  })(),
   // встречный иск — заметное событие с окном отклика (#964): ход и три после
   offer({ name: 'Countersuit', when: [is('countersuitFresh')], act: 'countersuitAsk', tone: 'neutral', bonus: 3, text: (g) => windowFromArr(g, 'P_COUNTERSUIT', P_COUNTERSUIT) }),
 

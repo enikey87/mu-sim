@@ -14,7 +14,7 @@ import * as W from './world'
 import {
   RAM_PHOTO, BORIS_SALE, VACANCY, AVITO_REVIEW, RUBIK_ASK, KETTLE,
   CREW_CALL_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, GRANT_TILE_B, DEBUT_NIVA_B, DEBUT_BORIS_B, MOUSTACHE_PHOTO_B, MAMA_MARKET_B, TILE_AD_B, TAMADA_DONE_B, BORIS_MEMORY_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, GRANT_HOUSE_B, COURT_VERDICT_B, TILE_SLIP_B, TILE_COURT_B, TILE_LAWYER_B, TILE_MONUMENT_B, NIVA_BACK_B, NUNE_DEBUT_B, DEBUT_GRANT_B, SOLD_B,
-  LAWYER_B, COLLECTORS_ASK_B, COLLECTORS_EP_B, INTERN_B, HOLE_B, COUNTERSUIT_B, VACANCY_START_B, VACANCY_SOON_B, SERYOGA_B, GRANT_BATH_B, OFFENDED_ASK_B,
+  LAWYER_B, COLLECTORS_ASK_B, COLLECTORS_EP_B, INTERN_B, HOLE_B, COUNTERSUIT_B, VACANCY_START_B, VACANCY_SOON_B, SERYOGA_B, GRANT_BATH_B, OFFENDED_ASK_B, BATH_ASK_B,
 } from './world'
 
 /** Метки линтера: имена персонажей и объекты классов #970/#974/#982. Список узкий и осознанный —
@@ -85,6 +85,9 @@ const WINDOWS: Window[] = [
   { pool: 'GRANT_BATH_B', lines: GRANT_BATH_B, marks: { Грант: 'intro.grant' } },
   { pool: 'P_OFFENDED_ASK', lines: PP.P_OFFENDED_ASK, marks: {} },
   { pool: 'OFFENDED_ASK_B', lines: OFFENDED_ASK_B, marks: {} },
+  // условие Карине про ванную (#1382): ванную и «в счёт долга» называет сама сцена ритуала — меток нет
+  { pool: 'P_BATH_ASK', lines: PP.P_BATH_ASK, marks: {} },
+  { pool: 'BATH_ASK_B', lines: BATH_ASK_B, marks: {} },
   { pool: 'P_AVITO_REVIEW', lines: PP.P_AVITO_REVIEW, marks: {} },
   { pool: 'AVITO_REVIEW', lines: AVITO_REVIEW, marks: {} },
   { pool: 'P_RUBIK_ASK', lines: PP.P_RUBIK_ASK, marks: { Рубик: null } },
