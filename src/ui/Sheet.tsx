@@ -5,7 +5,7 @@ import { useModal } from './useModal'
 import { viewOf, type EndingRow, type PromiseRow } from './view'
 import { TrackNote } from './TrackNote'
 import { useReview } from './Review'
-import { shareEnding } from './share'
+import { shareEnding, PRIVACY_URL } from './share'
 
 /** Значок записи журнала: свой у каждого состояния (docs/design/promise-amnesty.md). */
 const due = (p: PromiseRow) => (p.due === null ? '' : ` ${fmtDate(p.due)}`)
@@ -115,6 +115,11 @@ export function Sheet({ onClose, onReset }: { onClose: () => void; onReset: () =
           ))}
         </div>
         <TrackNote />
+        {/* Страница «О игре и приватности» (#1484): тихая строка под счётчиком, в новой вкладке —
+            WebView площадок уводит ссылку из игры, а не затирает партию. */}
+        <p className="privacy-link">
+          <a href={PRIVACY_URL} target="_blank" rel="noopener noreferrer">О игре и приватности</a>
+        </p>
         {review && (
           <>
             <h3>Рецензирование</h3>
