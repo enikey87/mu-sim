@@ -20,10 +20,10 @@ import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, PROMISE_PENCIL,
 import { CREW_PAID } from '../crew'
 import { HOLIDAY_MONEY, type Holiday } from '../holidays'
 import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_THIRD, LIE_NOCRED } from '../lies'
-import { HEAT, alikShaved, arsenTrackAt, avitoReviewAt, bathAnswered, bathAskedAt, borisAskAt, borisSaleAt, coldWar, collectorsAskAt, collectorsEpAt, countersuitAt, courtVerdictAt, tileCourtAt, tileLawyerAt, tileMonumentAt, tileSlipAt, nivaBackAt, saleAt, crewPaidAt, debutAt, grantBathAt, grantTileAt, inhDoneAt, internAccepted, internAt, internDeclined, kettleAt, lawyerAt, moustacheAskAt, offendedAskAt, ramPhotoAt, rubikAskAt, rubikHoleAt, moustachePhotoAt, photoAt, tileAdAt, tamadaDoneAt, mamaMarketAt, mamaVoiceAt, samvelDivorceAt, grantHouseAt, seryogaAskAt, transferAt, vacancyAt, muenAnswered, inhRefused, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, saidKonak, stateAt, topic, topicLast, topicMute, topicRun, whenYears } from '../memkeys'
+import { HEAT, alikShaved, arsenTrackAt, avitoReviewAt, bathAnswered, bathAskedAt, borisAskAt, borisSaleAt, coldWar, collectorsAskAt, collectorsEpAt, countersuitAt, courtVerdictAt, tileCourtAt, tileLawyerAt, tileMonumentAt, tileSlipAt, nivaBackAt, saleAt, crewPaidAt, debutAt, grantBathAt, grantTileAt, inhDoneAt, internAccepted, internAt, internDeclined, kettleAt, lawyerAt, moustacheAskAt, offendedAskAt, ramPhotoAt, rubikAskAt, rubikHoleAt, moustachePhotoAt, photoAt, tileAdAt, tamadaDoneAt, mamaMarketAt, mamaVoiceAt, samvelDivorceAt, grantHouseAt, seryogaAskAt, transferAt, vacancyAt, muenAnswered, hhJobAt, seryogaLoanAt, dachaAskAt, evictAt, collectorsEchoAt, threatGovAt, fraudCardAt, inhRefused, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, saidKonak, stateAt, topic, topicLast, topicMute, topicRun, whenYears } from '../memkeys'
 import type { ArcId, TopicId } from '../ids'
 import { BATH_ANSWER } from './player-choice-pools'
-import { PROMISE_SHAVE_ASK, BORIS_MEMORY_B, MOUSTACHE_PHOTO_B, MAMA_MARKET_B, TILE_AD_B, TAMADA_DONE_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, GRANT_HOUSE_B, COURT_VERDICT_B, TILE_SLIP_B, TILE_COURT_B, TILE_LAWYER_B, TILE_MONUMENT_B, NIVA_BACK_B, SOLD_B, RAM_PHOTO, BORIS_SALE, VACANCY, VACANCY_START_B, VACANCY_SOON_B, SERYOGA_B, GRANT_BATH_B, OFFENDED_ASK_B, BATH_ASK_B, MUEN_ASK_B, INH_BURNED_B, INH_REFUSED_B, AVITO_REVIEW, RUBIK_ASK, KETTLE, CREW_CALL_B, LAWYER_B, COLLECTORS_ASK_B, COLLECTORS_EP_B, INTERN_B, HOLE_B, COUNTERSUIT_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, DEBUT_BORIS_B, DEBUT_NIVA_B, NUNE_DEBUT_B, DEBUT_GRANT_B, GRANT_TILE_B } from '../world'
+import { PROMISE_SHAVE_ASK, BORIS_MEMORY_B, MOUSTACHE_PHOTO_B, MAMA_MARKET_B, TILE_AD_B, TAMADA_DONE_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, GRANT_HOUSE_B, COURT_VERDICT_B, TILE_SLIP_B, TILE_COURT_B, TILE_LAWYER_B, TILE_MONUMENT_B, NIVA_BACK_B, SOLD_B, RAM_PHOTO, BORIS_SALE, VACANCY, VACANCY_START_B, VACANCY_SOON_B, SERYOGA_B, GRANT_BATH_B, OFFENDED_ASK_B, BATH_ASK_B, MUEN_ASK_B, INH_BURNED_B, INH_REFUSED_B, AVITO_REVIEW, RUBIK_ASK, KETTLE, CREW_CALL_B, LAWYER_B, COLLECTORS_ASK_B, COLLECTORS_EP_B, INTERN_B, HOLE_B, COUNTERSUIT_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, DEBUT_BORIS_B, DEBUT_NIVA_B, NUNE_DEBUT_B, DEBUT_GRANT_B, GRANT_TILE_B, HH_JOB_B, SERYOGA_LOAN_B, DACHA_ASK_B, EVICT_B, COLLECTORS_ECHO_B, THREAT_GOV_B, FRAUD_CARD_B } from '../world'
 
 type R = Rule<ContentApi, GameEvent, Offer>
 const says = (intent: string, rest: Partial<R> & Pick<R, 'respond'>, extra: R['when'] = []): R => ({
@@ -51,6 +51,15 @@ async function sorry(game: ContentApi, line: string): Promise<void> {
 
 const simple = (intent: string, line: (g: ContentApi) => Said, after?: (g: ContentApi) => void | Promise<void>): R =>
   says(intent, { respond: async ({ game }) => { await game.say([line(game)]); game.setCtx(null); await after?.(game) } })
+
+/** Ответ Арсена на вопрос пула дебюта/трека — строка DEBUT_ARSEN_B того же номера, что выбранный
+ *  вопрос (#1500, #1017): номер уезжает с arg оффера. Прямой fire без номера — колода, как раньше;
+ *  закрытая строка пары — тоже колода, чтобы окно не молчало. */
+function debutArsenAnswer(game: ContentApi, arg: unknown): { w: string; t: string } {
+  const i = Number(arg)
+  const line = Number.isInteger(i) ? DEBUT_ARSEN_B[i] : undefined
+  return line && isOpen(line, game.lineFacts()) ? valueOf(line) : game.draw('DEBUT_ARSEN_B', DEBUT_ARSEN_B)
+}
 
 export const replyRules: R[] = [
   // Алик «пропал» после грубости — на любой вопрос, кроме извинения, отвечает, когда вернётся
@@ -392,6 +401,57 @@ export const replyRules: R[] = [
       game.setCtx(null)
     },
   }),
+  // свип карточек ленты (#1487): семь карточек, обращённых к игроку, получили окно — ответ
+  // идёт по пулу события и потребляет штамп, как у #927/#1292
+  says('hhJob', {
+    respond: async ({ game }) => {
+      await game.say([game.draw('HH_JOB_B', HH_JOB_B)])
+      game.clearFact(hhJobAt)
+      game.setCtx(null)
+    },
+  }),
+  says('seryogaLoan', {
+    respond: async ({ game }) => {
+      await game.say([game.draw('SERYOGA_LOAN_B', SERYOGA_LOAN_B)])
+      game.clearFact(seryogaLoanAt)
+      game.setCtx(null)
+    },
+  }),
+  says('dachaAsk', {
+    respond: async ({ game }) => {
+      await game.say([game.draw('DACHA_ASK_B', DACHA_ASK_B)])
+      game.clearFact(dachaAskAt)
+      game.setCtx(null)
+    },
+  }),
+  says('evictAsk', {
+    respond: async ({ game }) => {
+      await game.say([game.draw('EVICT_B', EVICT_B)])
+      game.clearFact(evictAt)
+      game.setCtx(null)
+    },
+  }),
+  says('collectorsEcho', {
+    respond: async ({ game }) => {
+      await game.say([game.draw('COLLECTORS_ECHO_B', COLLECTORS_ECHO_B)])
+      game.clearFact(collectorsEchoAt)
+      game.setCtx(null)
+    },
+  }),
+  says('threatGov', {
+    respond: async ({ game }) => {
+      await game.say([game.draw('THREAT_GOV_B', THREAT_GOV_B)])
+      game.clearFact(threatGovAt)
+      game.setCtx(null)
+    },
+  }),
+  says('fraudCard', {
+    respond: async ({ game }) => {
+      await game.say([game.draw('FRAUD_CARD_B', FRAUD_CARD_B)])
+      game.clearFact(fraudCardAt)
+      game.setCtx(null)
+    },
+  }),
   // строка Гранта «Ой. Не тот чат.» (#1292): отвечает сам Грант, окно события потребляет ответ
   says('grantBath', {
     respond: async ({ game }) => {
@@ -516,8 +576,8 @@ export const replyRules: R[] = [
   }),
   // дебюты участников (#973): ответ потребляет окно — повторные сообщения нового окна не откроют
   says('debutArsen', {
-    respond: async ({ game }) => {
-      await game.say([game.draw('DEBUT_ARSEN_B', DEBUT_ARSEN_B)])
+    respond: async ({ game, facts }) => {
+      await game.say([debutArsenAnswer(game, facts.arg)])
       game.clearFact(debutAt)
       game.setCtx(null)
     },
@@ -525,8 +585,8 @@ export const replyRules: R[] = [
   // трек «Плиточник» (#1351): у строки трека своё окно, ответ — та же пара DEBUT_ARSEN_B.
   // Окно дебюта не трогаем: у него свой ответ (`debutArsen`), и чужой ответ его не гасит
   says('arsenTrack', {
-    respond: async ({ game }) => {
-      await game.say([game.draw('DEBUT_ARSEN_B', DEBUT_ARSEN_B)])
+    respond: async ({ game, facts }) => {
+      await game.say([debutArsenAnswer(game, facts.arg)])
       game.clearFact(arsenTrackAt)
       game.setCtx(null)
     },

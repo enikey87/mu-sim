@@ -377,6 +377,16 @@ export const nivaBackAt = 'niva.backAt'
  *  отклик живёт ход продажи и три после; сам факт `sold.<id>` хранит, что вещь ушла. */
 export const saleAt = 'sale.at'
 export const saleWhat = 'sale.what'
+/** Свип карточек без окна отклика (#1487): каждая карточка, которая обращена к игроку или объявляет
+ *  событие партии, штампует свой ход — по нему `<событие>Fresh` открывает оффер, ответ игрока
+ *  потребляет штамп. Фон ленты штампов не получает и записан в реестре `reply-windows.ts`. */
+export const hhJobAt = 'hh.jobAt'
+export const seryogaLoanAt = 'seryoga.loanAt'
+export const dachaAskAt = 'dacha.askAt'
+export const evictAt = 'evict.at'
+export const collectorsEchoAt = 'collectors.echoAt'
+export const threatGovAt = 'threat.gov.at'
+export const fraudCardAt = 'bank.fraudCard.at'
 /** Чёрный список истёк своим сроком молча (#1050): движок ставит метку при тихом снятии блока
  *  (`nextDay`), первый доставленный ход её потребляет и нарративит разблокировку; путь через
  *  посредника снимает блок раньше (`blocked = false`) — метки не появляется. */
@@ -394,6 +404,7 @@ export const EVENT_KEY_LIST = [
   'debutWho', 'debutFresh', 'arsenTrackFresh', 'bathAskFresh', 'transferFresh', 'transferAmount',
   'ramPhotoFresh', 'borisSaleFresh', 'vacancyFresh', 'avitoReviewFresh', 'rubikAskFresh', 'kettleFresh',
   'lawyerFresh', 'collectorsAskFresh', 'collectorsEpFresh', 'internFresh', 'rubikHoleFresh', 'rubikProposalFresh', 'countersuitFresh', 'grantTileFresh', 'moustachePhotoFresh', 'mamaMarketFresh', 'mamaVoiceFresh', 'photoFresh', 'tileAdFresh', 'inhDoneFresh', 'tamadaDoneFresh', 'samvelDivorceFresh', 'courtVerdictFresh', 'tileSlipFresh', 'tileCourtFresh', 'tileLawyerFresh', 'tileMonumentFresh', 'nivaBackFresh', 'saleFresh', 'saleItem', 'grantHouseFresh', 'borisAskFresh', 'seryogaFresh', 'grantBathFresh', 'offendedAskFresh', 'muenFresh',
+  'hhJobFresh', 'seryogaLoanFresh', 'dachaAskFresh', 'evictFresh', 'collectorsEchoFresh', 'threatGovFresh', 'fraudCardFresh',
   'period', 'night', 'offline', 'scene', 'sinceAlik', 'lateCount', 'arcAvailable',
   'arcsStarted', 'arcsDone', 'arcsMature', 'quests', 'callbackReady', 'lieOpen', 'lieKind', 'lieAlikOld', 'deathCanAdvance', 'collectorsCanAdvance',
   'intent', 'tone', 'arg', 'category', 'arc', 'argArcDone', 'greet', 'promise', 'somedayCount', 'promiseRecordDays', 'promiseRecordNew', 'promiseRecordSeen', 'promiseRecordVoice', 'promiseRecordDue', momDachaDays,
@@ -415,5 +426,6 @@ export const MEM_KEYS: ReadonlySet<string> = new Set([
   creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, collectorsTurned, collectorsTea, collectorsEpAt, criticalAt, creditOfferSum, momDachaAt, crewPaid, crewPaidAt, crewAllPaid, rubikBath, whenYears, ...Object.values(moneyAskAt), transferAt, transferAmount, moneyAt, moustachePhotoAt, moustacheStakeSaid, mamaMarketAt, mamaVoiceAt, samvelDivorceAt, courtVerdictAt, tileSlipAt, tileCourtAt, tileLawyerAt, tileMonumentAt, nivaBackAt, saleAt, saleWhat, fraudLoan, blockLifted, internDeclined, internAccepted, grantHouseAt, photoAt, tileAdAt, inhDoneAt, inhBurned, inhRefused, tamadaDoneAt, borisAskAt, debutWho, debutAt, arsenTrack, arsenTrackAt,
   ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt, rubikProposalAt, countersuitAt, grantTileAt,
   seryogaAskAt, grantBathAt, offendedAskAt,
+  hhJobAt, seryogaLoanAt, dachaAskAt, evictAt, collectorsEchoAt, threatGovAt, fraudCardAt,
   ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lend50),
 ])

@@ -3,7 +3,7 @@
 // участник, умеющий писать сам (SPEAKS), обязан быть здесь или в исключениях с причиной — новый
 // участник красит сюит на месте, а не в плейтесте через раунд. Офферы и потребление окна ответом —
 // как были (#951), тексты пулов не менялись.
-import { arsenTrackAt, avitoReviewAt, bathAskedAt, borisAskAt, borisSaleAt, collectorsAskAt, collectorsEpAt, countersuitAt, courtVerdictAt, crewPaidAt, grantBathAt, grantHouseAt, grantTileAt, inhDoneAt, internAt, kettleAt, lawyerAt, mamaMarketAt, mamaVoiceAt, mooAt, muenAt, moustachePhotoAt, nivaBackAt, offendedAskAt, photoAt, ramPhotoAt, rubikAskAt, rubikHoleAt, rubikProposalAt, samvelDivorceAt, saleAt, seryogaAskAt, tamadaDoneAt, tileAdAt, tileCourtAt, tileLawyerAt, tileMonumentAt, tileSlipAt, transferAt, vacancyAt } from './memkeys'
+import { arsenTrackAt, avitoReviewAt, bathAskedAt, borisAskAt, borisSaleAt, collectorsAskAt, collectorsEpAt, countersuitAt, courtVerdictAt, crewPaidAt, grantBathAt, grantHouseAt, grantTileAt, inhDoneAt, internAt, kettleAt, lawyerAt, mamaMarketAt, mamaVoiceAt, mooAt, muenAt, moustachePhotoAt, nivaBackAt, offendedAskAt, photoAt, ramPhotoAt, rubikAskAt, rubikHoleAt, rubikProposalAt, samvelDivorceAt, saleAt, seryogaAskAt, tamadaDoneAt, tileAdAt, tileCourtAt, tileLawyerAt, tileMonumentAt, tileSlipAt, transferAt, vacancyAt, hhJobAt, seryogaLoanAt, dachaAskAt, evictAt, collectorsEchoAt, threatGovAt, fraudCardAt } from './memkeys'
 import type { Criterion } from '../engine/rules'
 
 /**
@@ -128,4 +128,13 @@ export const EVENT_SOURCES: readonly EventSource[] = [
   // предложение Карине в 7-й серии Рубика (#1471): просьба «Скажи, что подождёшь» — прямая просьба к
   // игроку, пары #920 получили своё окно отклика: общий Talk_arc не выигрывал слот у муэна и звонка
   { source: 'предложение Карине в 7-й серии Рубика, строка «Скажи, что подождёшь» (stamp строки)', at: rubikProposalAt, offer: 'RubikProposal', pool: 'P_RUBIK_PROPOSAL' },
+  // свип «показал — ответить нельзя» (#1487): карточки ленты, которые обращаются к игроку или
+  // объявляют событие партии, а ответить на них было нечем. Окно то же, что у #927/#1292
+  { source: 'вакансия hh.ru «150 000 ₽, оплата каждую пятницу. Откликнуться?» (карточка, stamp)', at: hhJobAt, offer: 'HhJob', pool: 'P_HH_JOB' },
+  { source: 'Серёга «Братан, займи до зарплаты» (карточка, stamp)', at: seryogaLoanAt, offer: 'SeryogaLoan', pool: 'P_SERYOGA_LOAN' },
+  { source: 'мама «продала дачу… Помогло?» (карточка, stamp)', at: dachaAskAt, offer: 'DachaAsk', pool: 'P_DACHA_ASK' },
+  { source: 'хозяин квартиры «Выселяю» (карточка, stamp; она же ставит `evicted`)', at: evictAt, offer: 'Evict', pool: 'P_EVICT' },
+  { source: 'коллекторы «Он нам тоже должен. Давайте дружить» (карточка-эхо арки, stamp)', at: collectorsEchoAt, offer: 'CollectorsEcho', pool: 'P_COLLECTORS_ECHO' },
+  { source: 'Госуслуги «Ваша угроза зарегистрирована» (карточка, stamp)', at: threatGovAt, offer: 'ThreatGov', pool: 'P_THREAT_GOV' },
+  { source: 'банк «Кредит на ваше имя: остаток 300 000» (карточка, stamp)', at: fraudCardAt, offer: 'FraudCard', pool: 'P_FRAUD_CARD' },
 ]

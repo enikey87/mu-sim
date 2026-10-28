@@ -6,24 +6,40 @@ import type { PlatformId } from '../platform/types'
 import { analyticsGate, COUNTER_ID, POSTHOG_KEY, UMAMI_KEY, type Gate } from './gate'
 
 export { COUNTER_ID, GAME_HOST, POSTHOG_KEY, UMAMI_KEY } from './gate'
+export type { PlatformId } from '../platform/types'
 
 /** Имена целей закрыты типом: произвольной строки в `track` не передать. */
-export type Goal = 'boot' | 'milestone' | 'ending' | 'copied' | 'endgame' | 'left' | 'crash'
+export type Goal =
+  | 'boot' | 'milestone' | 'ending' | 'copied' | 'endgame' | 'left' | 'crash'
+  | 'progress' | 'beat' | 'collection' | 'lend50_shown' | 'lend50_clicked' | 'lend50_paid'
 
 export type Phase = 'intro' | 'chat' | 'payday' | 'endgame'
 
 /** Крах интерфейса (граница рисования) или глобальная ошибка страницы (#1482). */
 export type CrashKind = 'ui' | 'global'
 
+/** Дни партии, на которых срабатывает цель `progress` (#1483): порог называется один раз, при первом достижении. */
+export const PROGRESS_DAYS = [10, 50, 100, 200, 300] as const
+export type ProgressDay = (typeof PROGRESS_DAYS)[number]
+
+/** Вехи партии (#1483): каждая звучит в приёмнике один раз за партию. */
+export type Beat = 'intro' | 'caught' | 'block' | 'payday' | 'transfer'
+
 /** Параметр цели — тоже закрытый тип. Текст сообщения, долг и сид сюда не попадают. */
 export type GoalParams = {
   boot: { save: 'yes' | 'no'; since: number }
   milestone: { n: number; day: number }
+  progress: { n: ProgressDay; day: number }
+  beat: { name: Beat; day: number }
   ending: { id: EndingId }
+  collection: { n: number; id: EndingId }
   copied: { id: EndingId }
   endgame: { outcome: PaydayId }
   left: { phase: Phase; day: number; turns: number; sec: number; total: number }
   crash: { kind: CrashKind; name: string; stack: string; day: number; platform: PlatformId }
+  lend50_shown: { platform: PlatformId }
+  lend50_clicked: { platform: PlatformId }
+  lend50_paid: { platform: PlatformId }
 }
 
 type Params = { [G in Goal]: GoalParams[G] }[Goal]

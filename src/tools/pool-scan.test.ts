@@ -11,7 +11,11 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { makeGame } from '../test/helpers'
+import type { Game } from '../engine/game'
 import { RUDE_SHOUTS } from './shouts'
+import { NOTIF } from '../content/life'
+import { DEBUT_SLOT, EVENT_SOURCES, FIRST_WINDOWS } from '../content/first-windows'
+import { unclassifiedCards } from '../content/reply-windows'
 
 type Profile = { name: string; tone: 'rude' | 'polite' | 'neutral'; texts: string[]; note: string }
 
@@ -97,6 +101,41 @@ const trace = (text: string): string => {
   return 'источник не найден (шаблон/склейка)'
 }
 
+/** Штампы, у которых есть окно отклика: источники-события, дебюты и окна первого сообщения (#1487). */
+const WINDOW_STAMPS: ReadonlySet<string> = new Set([
+  ...EVENT_SOURCES.map((e) => e.at),
+  ...FIRST_WINDOWS.flatMap((w) => (w.at && w.at !== DEBUT_SLOT ? [w.at] : [])),
+])
+
+/** Карточка ленты по тексту из партии: шаблоны с подстановкой ({spend}, {money}) сравниваем по префиксу. */
+const notifOf = (text: string): (typeof NOTIF)[number] | undefined =>
+  NOTIF.find((n) => n.t === text)
+  ?? NOTIF.find((n) => n.t.includes('{') && text.startsWith(n.t.slice(0, n.t.indexOf('{'))))
+
+/** Окна событий, которые сканер видел в партии: карточка → её оффер; null — окна нет. */
+const windowOffer = (card: (typeof NOTIF)[number] | undefined): string | null => {
+  if (!card?.stamp) return null
+  return EVENT_SOURCES.find((e) => e.at === card.stamp)?.offer ?? null
+}
+
+/** Правило оффера живо в блоке: eligibility без сборки вариантов — сборка тратит строки окна (#826). */
+const offerLive = (game: Game, offer: string): boolean =>
+  game.rules.collect({ event: 'BuildChoices' }, game.facts()).some((r) => r.name === `Opt_${offer}`)
+
+// Свип «показал — ответить нельзя» (#1487): класс рождался находкой за находкой (#1192/#1292/#1382/#1410).
+// Статический реестр (reply-windows.ts) отвечает за полноту классификации, здесь — вторая половина
+// сигнатуры: в живой партии нет карточек без окна и у каждого окна отклик реально доходит до блока.
+describe('сигнатура класса «показал — ответить нельзя» (#1487)', () => {
+  it('каждая карточка ленты: окно или запись в реестре; новая карточка без классификации — находка', () => {
+    expect(unclassifiedCards(NOTIF, WINDOW_STAMPS), 'карточки без окна и без классификации').toEqual([])
+    expect(unclassifiedCards(NOTIF, WINDOW_STAMPS).length, 'проверка пустеет на пустом реестре').toBe(0)
+    // отрицательный контроль: синтетическая карточка без штампа и без записи обязана попасть в находки
+    const mutant = [...NOTIF, { ...NOTIF[0], t: 'Синтетическая карточка без окна и без записи в реестре', stamp: undefined }]
+    expect(unclassifiedCards(mutant, WINDOW_STAMPS), 'мутант не пойман — сигнатура слепа').toHaveLength(1)
+    expect(unclassifiedCards([{ t: 'Синтетическая карточка со штампом без окна', stamp: 'synthetic.at' }], WINDOW_STAMPS), 'штамп без окна не пойман').toHaveLength(1)
+  })
+})
+
 describe('сканер исчерпания пула (POOL_SCAN)', () => {
   it.skipIf(!process.env.POOL_SCAN)('профили: ' + (process.env.POOL_PROFILES ?? 'rude'), async () => {
     const names = (process.env.POOL_PROFILES ?? 'rude').split(',')
@@ -116,14 +155,29 @@ describe('сканер исчерпания пула (POOL_SCAN)', () => {
         }
       }
       collect(0)
+      // сигнатура «показал — ответить нельзя» (#1487): карточка ленты в живой партии и её окно
+      const cardsSeen: Array<{ turn: number; text: string; event?: string; offer: string | null; live: boolean }> = []
       for (let i = 0; i < turns; i++) {
         const seen = game.S.msgs.length
         await game.send({ text: p.texts[i % p.texts.length], tone: p.tone })
         for (const m of game.S.msgs.slice(seen)) {
           if (m.kind === 'sys') events.push({ text: `SYS: ${m.text}`, turn: i + 1 })
           else if (m.kind === 'text' && m.from !== 'me') events.push({ text: String((m as { text: string }).text), turn: i + 1 })
+          else if (m.kind === 'card') cardsSeen.push({ turn: i + 1, text: m.text, event: m.event, offer: windowOffer(notifOf(m.text)), live: false })
         }
+        // окно живёт ход карточки и три после: отклик обязан попасть в блок хотя бы раз
+        for (const c of cardsSeen) if (c.offer && !c.live && i + 1 >= c.turn && i + 1 <= c.turn + 3) c.live = offerLive(game, c.offer)
       }
+      const unclassified = cardsSeen.flatMap((c) => {
+        // карточка движка (банк, МФО, мама...) классифицирована реестром событий телефона;
+        // `life` — карточка ленты, её сверяем по тексту с NOTIF и SILENT_CARDS
+        if (c.event && c.event !== 'life') return []
+        const entry: { t: string; stamp?: string } = notifOf(c.text) ?? { t: c.text }
+        return unclassifiedCards([entry], WINDOW_STAMPS).map((x) => `ход ${c.turn}: ${x}`)
+      })
+      const deadWindows = cardsSeen.filter((c) => c.offer && !c.live).map((c) => `ход ${c.turn}: ${c.offer} не дошёл до блока`)
+      expect(unclassified, 'карточки без окна и без классификации в партии').toEqual([])
+      expect(deadWindows, 'окно карточки не дало отклика в блоке').toEqual([])
       const msgs = events.map((e) => e.text)
       const counts = new Map<string, number>()
       for (const t of msgs) counts.set(t, (counts.get(t) ?? 0) + 1)
@@ -145,6 +199,8 @@ describe('сканер исчерпания пула (POOL_SCAN)', () => {
         `Профиль: ${p.note}. Реплик+системных: ${msgs.length}, уникальных: ${counts.size}.`,
         '',
         ...top.map(([t, n]) => `- ${n}× (макс ${maxInWindow(t)} в окне 20) ${trace(t)}\n    «${t.slice(0, 100)}»`),
+        '',
+        `# свип окон отклика (#1487): карточек в партии ${cardsSeen.length}, без окна/классификации ${unclassified.length}, окна без отклика ${deadWindows.length}`,
       ].join('\n')
       const out = `/tmp/opencode/pool-scan-${p.name}.md`
       writeFileSync(out, report)

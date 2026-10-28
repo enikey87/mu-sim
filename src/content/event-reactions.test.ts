@@ -4,16 +4,16 @@ import { makeGame, setMoney, cards, respondCtx } from '../test/helpers'
 import type { Game } from '../engine/game'
 import { NOTIF, IDLE } from './life'
 import { D } from './excuses'
-import { sold } from './credit'
-import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_NIVA, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE, P_DEBUT_GRANT, P_MAMA_MARKET, P_TILE_AD, P_TAMADA_DONE, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_GRANT_HOUSE, P_TILE_SLIP, P_TILE_COURT, P_TILE_LAWYER, P_TILE_MONUMENT, P_NIVA_BACK, P_SOLD, P_BORIS_MEMORY, P_SERYOGA, P_GRANT_BATH, P_OFFENDED_ASK } from './rules/player-choice-pools'
-import { BORIS_MEMORY_B, BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, DEBUT_GRANT_B, GRANT_HOUSE_B, INTERN_B, HOLE_B, AVITO_REVIEW, MAMA_MARKET_B, TILE_AD_B, TAMADA_DONE_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, TILE_SLIP_B, TILE_COURT_B, TILE_LAWYER_B, TILE_MONUMENT_B, NIVA_BACK_B, SOLD_B, VACANCY, VACANCY_START_B, VACANCY_SOON_B, SERYOGA_B, GRANT_BATH_B, OFFENDED_ASK_B, DEBUT_ARSEN_B } from './world'
+import { momHelp, momDachaAt, sold } from './credit'
+import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_NIVA, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE, P_DEBUT_GRANT, P_MAMA_MARKET, P_TILE_AD, P_TAMADA_DONE, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_GRANT_HOUSE, P_TILE_SLIP, P_TILE_COURT, P_TILE_LAWYER, P_TILE_MONUMENT, P_NIVA_BACK, P_SOLD, P_BORIS_MEMORY, P_SERYOGA, P_GRANT_BATH, P_OFFENDED_ASK, P_HH_JOB, P_SERYOGA_LOAN, P_DACHA_ASK, P_EVICT, P_COLLECTORS_ECHO, P_THREAT_GOV, P_FRAUD_CARD } from './rules/player-choice-pools'
+import { BORIS_MEMORY_B, BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, DEBUT_GRANT_B, GRANT_HOUSE_B, INTERN_B, HOLE_B, AVITO_REVIEW, MAMA_MARKET_B, TILE_AD_B, TAMADA_DONE_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, TILE_SLIP_B, TILE_COURT_B, TILE_LAWYER_B, TILE_MONUMENT_B, NIVA_BACK_B, SOLD_B, VACANCY, VACANCY_START_B, VACANCY_SOON_B, SERYOGA_B, GRANT_BATH_B, OFFENDED_ASK_B, DEBUT_ARSEN_B, HH_JOB_B, SERYOGA_LOAN_B, DACHA_ASK_B, EVICT_B, COLLECTORS_ECHO_B, THREAT_GOV_B, FRAUD_CARD_B } from './world'
 import { TOPICS } from './topics'
 import { ARCS } from './arcs'
 import { turnRules } from './rules/turn'
 import { FINALES } from './finales'
 import { COURT_LAWYER_AGAIN } from './quests'
 import { RUDE_CALLS_VOICE, MAMA_VOICE_CRY } from './rude'
-import { count, collectorsRecruited, court, crewPaid, crewPaidAt, HEAT, internAt, lawyerAt, debutWho, debutAt, arsenTrack, arsenTrackAt, saidStrasburg, saidGrantEnvelope, grantTileAt, grantHouseAt, mamaMarketAt, tileAdAt, tamadaDoneAt, borisAskAt, mamaVoiceAt, mamaCalls, samvelDivorceAt, tileSlipAt, tileCourtAt, tileLawyerAt, tileMonumentAt, legendOf, nivaAway, nivaBack, nivaBackAt, saleAt, saleWhat, alikDead, paydayScene, seryogaAskAt, grantBathAt, offendedAskAt, intro, kettleAt, carGone } from './memkeys'
+import { count, collectorsRecruited, court, crewPaid, crewPaidAt, HEAT, internAt, lawyerAt, debutWho, debutAt, arsenTrack, arsenTrackAt, saidStrasburg, saidGrantEnvelope, grantTileAt, grantHouseAt, mamaMarketAt, tileAdAt, tamadaDoneAt, borisAskAt, mamaVoiceAt, mamaCalls, samvelDivorceAt, tileSlipAt, tileCourtAt, tileLawyerAt, tileMonumentAt, legendOf, nivaAway, nivaBack, nivaBackAt, saleAt, saleWhat, alikDead, paydayScene, seryogaAskAt, grantBathAt, offendedAskAt, intro, kettleAt, carGone, dachaAskAt, evictAt, collectorsEchoAt, threatGovAt, fraudCardAt, hhJobAt, seryogaLoanAt, vacancyAt, evicted, fraudLoan } from './memkeys'
 import { valueOf, type Line } from './fact'
 import type { Choice } from '../engine/state'
 
@@ -843,6 +843,55 @@ describe('трек «Плиточник» открывает своё окно �
     const btns = frame(game).filter((c) => c.act === 'debutArsen' || c.act === 'arsenTrack')
     expect(btns.length, 'одна и та же кнопка встала дважды').toBe(1)
     expect(TRACK, 'на ходу с треком кнопка не про трек').toContain(btns[0].text)
+  })
+
+  // ответ окна — пара к выбранному вопросу, а не общий draw DEBUT_ARSEN_B (#1500, #1017)
+  /** Выбранный вопрос и его номер в пуле дебюта: пара в DEBUT_ARSEN_B — строка с тем же номером. */
+  const question = (game: Game, act: string, seed: number): { c: Choice; j: number } => {
+    const c = frame(game).find((x) => x.act === act)
+    expect(c, `seed ${seed}: окна ${act} нет — проверка пустеет`).toBeTruthy()
+    const j = P_DEBUT_ARSEN.findIndex((e) => valueOf(e) === c!.text)
+    expect(j, `seed ${seed}: вопрос не из пула дебюта: «${c!.text}»`).toBeGreaterThan(0)
+    return { c: c!, j }
+  }
+  const pairText = (j: number): string => (valueOf(DEBUT_ARSEN_B[j]) as { t: string }).t
+  const arsenAnswer = async (game: Game, c: Choice): Promise<string> => {
+    const from = game.S.msgs.length
+    await game.send(c)
+    return game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' && m.who === 'arsen' ? [m.text] : [])).join(' ')
+  }
+
+  it('ответ окна трека — пара к выбранному вопросу, каждый из трёх (#1500)', async () => {
+    // NC: возврат к общему draw — тест красный: вопрос может вытянуть чужой ответ (проверено)
+    const seen = new Set<number>()
+    for (let seed = 1; seed <= 40; seed++) {
+      const { game } = makeGame({ seed })
+      closedDebut(game)
+      game.S.mem[intro('arsen')] = true
+      game.S.mem[arsenTrack] = true
+      game.S.mem[arsenTrackAt] = game.S.stats.sent
+      const { c, j } = question(game, 'arsenTrack', seed)
+      expect(await arsenAnswer(game, c), `seed ${seed}: выбран «${c.text}» — ответ не по строке`).toContain(pairText(j))
+      seen.add(j)
+    }
+    expect([...seen].sort(), 'не все три трек-вопроса получили свой ответ').toEqual([1, 2, 3])
+  })
+
+  it('ответ окна дебюта с треком — тоже пара к выбранному вопросу (#1500)', async () => {
+    // окно дебюта живо, трек уже прозвучал: трек-вопросы предлагает `debutArsen`, пара та же
+    const seen = new Set<number>()
+    for (let seed = 1; seed <= 40; seed++) {
+      const { game } = makeGame({ seed })
+      game.S.mem['wrote.arsen'] = true
+      game.S.mem[intro('arsen')] = true
+      game.S.mem[debutWho] = 'arsen'
+      game.S.mem[debutAt] = game.S.stats.sent
+      game.S.mem[arsenTrack] = true
+      const { c, j } = question(game, 'debutArsen', seed)
+      expect(await arsenAnswer(game, c), `seed ${seed}: выбран «${c.text}» — ответ не по строке`).toContain(pairText(j))
+      seen.add(j)
+    }
+    expect([...seen].sort(), 'не все три трек-вопроса получили свой ответ').toEqual([1, 2, 3])
   })
 })
 
@@ -1737,5 +1786,95 @@ describe('окна отклика глубоких раундов (#1292)', () =
     expect(said.length, `на вопрос ответили нитью о сроке: ${said.join(' | ')}`).toBe(1)
     const generic = VACANCY.map(text)
     expect(generic.some((p) => said[0].includes(p)), `ответ не из общего пула: ${said[0]}`).toBe(true)
+  })
+})
+
+describe('свип карточек ленты (#1487): окно отклика у обращённых к игроку карточек', () => {
+  const HH_CARD = 'Вакансия: плиточник, 150 000 ₽, оплата каждую пятницу. Откликнуться?'
+  const SER_LOAN_CARD = 'Братан, займи до зарплаты. А, у тебя ж тоже нет.'
+  const DACHA_CARD = 'Сынок, помнишь, я продала дачу? Помидоры всё равно не росли — но я рада, что помогла тебе продержаться. Помогло?'
+  const EVICT_CARD = 'Выселяю. Можешь пожить у Алика, он же тебе как отец.'
+  const ECHO_CARD = 'Мы знаем, где живёт ваш Алик. Он нам тоже должен. Давайте дружить.'
+  const GOV_CARD = 'Ваша угроза зарегистрирована как заявление «Алик не платит». Срок рассмотрения — 1473 дня.'
+  const FRAUD_CARD = 'Кредит на ваше имя: остаток 300 000 ₽. Напоминаем: плательщик — вы.'
+
+  /** Гейты карточек: без них randomNotif карточку не выдаст и проверка опустеет. */
+  const cases: Array<{ name: string; card: string; act: string; stamp: string; pool: readonly unknown[]; answers: readonly unknown[]; prep: (g: Game) => void }> = [
+    { name: 'hh.ru 150 000', card: HH_CARD, act: 'hhJob', stamp: hhJobAt, pool: P_HH_JOB, answers: HH_JOB_B, prep: () => {} },
+    { name: 'Серёга «займи»', card: SER_LOAN_CARD, act: 'seryogaLoan', stamp: seryogaLoanAt, pool: P_SERYOGA_LOAN, answers: SERYOGA_LOAN_B, prep: () => {} },
+    { name: 'дача мамы', card: DACHA_CARD, act: 'dachaAsk', stamp: dachaAskAt, pool: P_DACHA_ASK, answers: DACHA_ASK_B, prep: (g) => { g.S.mem[momHelp('dacha')] = true; g.S.mem[momDachaAt] = g.S.day - 30 } },
+    { name: 'выселение', card: EVICT_CARD, act: 'evictAsk', stamp: evictAt, pool: P_EVICT, answers: EVICT_B, prep: (g) => { g.S.mem['bills.rent.streak'] = 3 } },
+    { name: 'коллекторы-друзья', card: ECHO_CARD, act: 'collectorsEcho', stamp: collectorsEchoAt, pool: P_COLLECTORS_ECHO, answers: COLLECTORS_ECHO_B, prep: (g) => { g.S.arcs.collectors = { i: 2, last: 0 } } },
+    { name: 'регистрация угрозы', card: GOV_CARD, act: 'threatGov', stamp: threatGovAt, pool: P_THREAT_GOV, answers: THREAT_GOV_B, prep: (g) => { g.S.mem[count.threat] = 1 } },
+    { name: 'кредит на имя игрока', card: FRAUD_CARD, act: 'fraudCard', stamp: fraudCardAt, pool: P_FRAUD_CARD, answers: FRAUD_CARD_B, prep: (g) => { g.S.mem[fraudLoan] = true } },
+  ]
+  const has = (game: Game, act: string) => { game.S.choices = null; return game.buildChoices().find((c) => c.act === act) }
+  const texts = (pool: readonly unknown[]): string[] => pool.map((e) => String(valueOf(e as never)))
+
+  it.each(cases)('$name: штамп на ходу карточки, отклик в окне (ход и три после), ответ потребляет', async ({ card, act, stamp, pool, answers, prep }) => {
+    const { game } = makeGame()
+    prep(game)
+    expect(has(game, act), `${act}: отклик есть без карточки`).toBeUndefined()
+    showCard(game, card)
+    const at = Number(game.S.mem[stamp])
+    expect(at, 'карточка не штампанула ход — окно не откроется').toBe(game.S.stats.sent)
+    const btn = has(game, act)
+    expect(btn, 'на ходу карточки отклика нет').toBeDefined()
+    expect(texts(pool), `кнопка вне пула: «${btn!.text}»`).toContain(btn!.text)
+    game.S.stats.sent = at + 3
+    expect(has(game, act), 'третий ход после карточки — уже вне окна').toBeDefined()
+    game.S.stats.sent = at + 4
+    expect(has(game, act), 'окно живёт дольше трёх ходов').toBeUndefined()
+    // ответ — из пула события, штамп потреблён, кнопка ушла
+    game.S.stats.sent = at
+    const from = game.S.msgs.length
+    await game.fire('PlayerSays', { intent: act })
+    const said = game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : []))
+    expect(said.some((t) => texts(answers).includes(t)), `ответ не из пула: ${said.join(' | ')}`).toBe(true)
+    expect(game.S.mem[stamp], 'ответ не потребил окно').toBeUndefined()
+    expect(has(game, act), 'после ответа кнопка жива').toBeUndefined()
+  })
+
+  it('вакансия hh.ru без работодателя: окно не называет Алика-работодателем до раскрытия — НК синтетикой', () => {
+    // карточка #1487 работодателя не называет; «на его же вакансию» было утверждением партии,
+    // которой не было — раскрытие приходит ответом `HH_JOB_B` или поздней карточкой «Работодатель:
+    // Алик В.» (`vacancyAt`), а не вариантом игрока. Прежняя строка срабатывала во всех трёх
+    // партиях r177 (#1508).
+    const { game } = makeGame()
+    expect(game.S.mem[vacancyAt], 'карточка-раскрытие уже в партии — проверка пустеет').toBeUndefined()
+    showCard(game, HH_CARD)
+    const at = Number(game.S.mem[hhJobAt])
+    expect(at, 'карточка не открыла окно — проверка пустеет').toBe(game.S.stats.sent)
+    const offered: string[] = []
+    for (let turn = 0; turn <= 3; turn++) {
+      game.S.stats.sent = at + turn
+      game.S.choices = null
+      const c = game.buildChoices().find((x) => x.act === 'hhJob')
+      if (c) offered.push(c.text)
+    }
+    // окно показывает пул целиком — иначе проверка ниже прошла бы на одной строке
+    expect([...offered].sort(), `окно показало не весь пул: ${offered.join(' → ')}`).toEqual([...texts(P_HH_JOB)].sort())
+    const phantom = offered.filter((t) => /его же ваканси|ваканси[а-я]* Алик/i.test(t))
+    expect(phantom, `вариант утверждает Алика-работодателя до введения: ${phantom.join(' | ')}`).toEqual([])
+    // шутку раскрывает ответ, а не вариант: пул ответов не тронут
+    expect(texts(HH_JOB_B).some((t) => t.includes('Вакансия внутренняя')), 'ответ больше не раскрывает шутку').toBe(true)
+  })
+
+  it('окно мамы на дачу кончается вместе с вопросом: без факта «помогло» карточки нет', () => {
+    const { game } = makeGame()
+    showCard(game, DACHA_CARD)
+    expect(game.S.mem[dachaAskAt], 'карточка прозвучала без проданной дачи').toBeUndefined()
+  })
+
+  it('выселение открывает окно один раз: повторная карточка выселения невозможна (факт `evicted`)', () => {
+    const { game } = makeGame()
+    game.S.mem['bills.rent.streak'] = 3
+    const sent = game.S.stats.sent
+    showCard(game, EVICT_CARD)
+    expect(game.S.mem[evicted], 'карточка не поставила факт выселения').toBe(true)
+    expect(game.S.mem[evictAt], 'первое выселение не штампануло ход').toBe(sent)
+    delete game.S.mem[evictAt]
+    showCard(game, EVICT_CARD)
+    expect(game.S.mem[evictAt], 'выселение прозвучало второй раз').toBeUndefined()
   })
 })

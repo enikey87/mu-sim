@@ -8,6 +8,7 @@ import { ReviewBadge, useReview } from './Review'
 import { annotatable } from './review'
 import { mooClock } from '../engine/moo'
 import { platform } from '../platform'
+import { track } from '../analytics/metrics'
 
 /** Счётчик рендеров Message — только в test. */
 export const messageRenderStats = { count: 0 }
@@ -149,7 +150,8 @@ function Lend50Card({ m, link }: { m: Extract<Msg, { kind: 'lend50' }>; link: st
     <div className="lend50 transfer" data-testid="lend50-card">
       <div className="sum">50 ₽</div>
       <div>{m.text}</div>
-      <a className="lend50-btn" href={link} target="_blank" rel="noopener">Перевести</a>
+      <a className="lend50-btn" href={link} target="_blank" rel="noopener"
+        onClick={() => track('lend50_clicked', { platform: platform().id })}>Перевести</a>
       <div className="lend50-url">{link}</div>
     </div>
   )
@@ -175,8 +177,11 @@ function Lend50JoinCard({ m }: { m: Extract<Msg, { kind: 'lend50' }> }) {
   const [joined, setJoined] = useState(false)
   const busy = game.ui.busy || game.battery.dead
   const join = async () => {
-    if (!(await platform().joinGroup?.())) return
+    const p = platform()
+    track('lend50_clicked', { platform: p.id })
+    if (!(await p.joinGroup?.())) return
     setJoined(true)
+    track('lend50_paid', { platform: p.id })
     game.lend50Sponsor()
   }
   return (
@@ -200,8 +205,11 @@ function Lend50BuyCard({ m }: { m: Extract<Msg, { kind: 'lend50' }> }) {
   const busy = game.ui.busy || game.battery.dead
   if (!price) return null
   const buy = async () => {
-    if (await platform().pay50?.() !== 'paid') return
+    const p = platform()
+    track('lend50_clicked', { platform: p.id })
+    if (await p.pay50?.() !== 'paid') return
     setPaid(true)
+    track('lend50_paid', { platform: p.id })
     game.lend50Sponsor()
   }
   return (
@@ -223,8 +231,11 @@ function Lend50StarsCard({ m }: { m: Extract<Msg, { kind: 'lend50' }> }) {
   const [paid, setPaid] = useState(false)
   const busy = game.ui.busy || game.battery.dead
   const buy = async () => {
-    if (await platform().pay50?.() !== 'paid') return
+    const p = platform()
+    track('lend50_clicked', { platform: p.id })
+    if (await p.pay50?.() !== 'paid') return
     setPaid(true)
+    track('lend50_paid', { platform: p.id })
     game.lend50Sponsor()
   }
   return (

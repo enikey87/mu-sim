@@ -25,6 +25,7 @@ import {
   P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE,
   P_CREW_CALL, P_LAWYER, P_COLLECTORS_ASK, P_INTERN, P_HOLE, P_COUNTERSUIT,
   P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_BORIS, P_DEBUT_NIVA, P_NUNE_DEBUT, P_DEBUT_GRANT, P_GRANT_TILE, P_MOUSTACHE_PHOTO, P_MAMA_MARKET, P_TILE_AD, P_TAMADA_DONE, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_COURT_VERDICT, P_TILE_SLIP, P_TILE_COURT, P_TILE_LAWYER, P_TILE_MONUMENT, P_NIVA_BACK, P_SOLD, P_GRANT_HOUSE, P_BORIS_MEMORY, P_SERYOGA, P_GRANT_BATH, P_OFFENDED_ASK, P_BATH_ASK, P_MUEN, P_INH_BURNED, P_INH_REFUSED,
+  P_HH_JOB, P_SERYOGA_LOAN, P_DACHA_ASK, P_EVICT, P_COLLECTORS_ECHO, P_THREAT_GOV, P_FRAUD_CARD,
 } from './player-choice-pools'
 
 type R = Rule<ContentApi, GameEvent, Offer>
@@ -116,15 +117,22 @@ const windowFromD = (game: ContentApi, key: string, window: number, map: Record<
   const raw = game.windowLine(key, D[key], window)
   return raw === null ? '' : game.X.fill(raw, map)
 }
-/** Линия игрока из плоского пула вместе с её номером: ответ окна подбирается по выбранной строке,
+/** Линия игрока из пула вместе с её номером: ответ окна подбирается по выбранной строке,
  *  а не колодой (#1017). Номер уезжает с arg, как у угрозы «до Страсбурга» (#982). Окно события —
  *  `windowFromArrNum`: строка предлагается один раз за окно, номер берётся у выбранной строки,
- *  поэтому порядок пула не меняется (у `P_INTERN` индекс 1 — отказ, #1041). */
-const windowFromArrNum = (game: ContentApi, key: string, arr: readonly string[], set: (i: number) => void): string => {
-  requirePlayerPool(key, arr)
-  const line = game.windowLine(key, arr, EVENT_FRESH_TURNS)
-  if (line === null) return ''
-  set(arr.indexOf(line))
+ *  поэтому порядок пула не меняется (у `P_INTERN` индекс 1 — отказ, #1041). Пул может быть под
+ *  воротами (#1500): номер ищется по тексту строки, а не по индексу в массиве строк. */
+const windowFromArrNum = (game: ContentApi, key: string, arr: readonly Entry<unknown>[], set: (i: number) => void): string => {
+  const line = windowFromArr(game, key, arr)
+  if (!line) return ''
+  set(arr.findIndex((e) => valueOf(e) === line))
+  return line
+}
+/** То же для пула на окне повтора (#824): дебют Арсена — свой ответ на выбранную строку (#1500). */
+const freshFromArrNum = (game: ContentApi, key: string, arr: readonly Entry<unknown>[], set: (i: number) => void): string => {
+  const line = freshFromArr(game, key, arr)
+  if (!line) return ''
+  set(arr.findIndex((e) => valueOf(e) === line))
   return line
 }
 
@@ -272,13 +280,29 @@ export const choiceRules: R[] = [
   })(),
   // дебюты участников (#973): первое сообщение персонажа — ход и три после, пул — только у тех, у кого 2+ строки.
   // bonus 5: на rude-пути окно конкурирует с извинением (6) и мычанием (6) — дебют должен попадать в блок.
-  // Пул Арсена под воротами (#982): пустой пул даёт пустой текст — freshFromArr, не draw
-  offer({ name: 'DebutArsen', when: [is('debutFresh'), eq('debutWho', 'arsen')], act: 'debutArsen', tone: 'neutral', bonus: 5, text: (g) => freshFromArr(g, 'P_DEBUT_ARSEN', P_DEBUT_ARSEN) }),
+  // Пул Арсена под воротами (#982): пустой пул даёт пустой текст — freshFromArr, не draw.
+  // Номер выбранного вопроса уезжает с arg — ответ DEBUT_ARSEN_B берётся парой (#1500, #1017)
+  ...(() => {
+    let arg = ''
+    return [offer({
+      name: 'DebutArsen', when: [is('debutFresh'), eq('debutWho', 'arsen')], act: 'debutArsen', tone: 'neutral', bonus: 5,
+      text: (g) => freshFromArrNum(g, 'P_DEBUT_ARSEN', P_DEBUT_ARSEN, (i) => { arg = String(i) }),
+      arg: () => arg,
+    })]
+  })(),
   // трек «Плиточник» (#1351): событие rude-цепочки, приходит независимо от дебюта и почти всегда позже
   // его окна (три отправки) — своих трек-вопросов без него не было. Окно у события своё, пул тот же:
   // с фактом трека в нём только трек-вопросы, ответы DEBUT_ARSEN_B остаются парой (#973). Слот дебюта
-  // общий: на ходу, где живы оба окна, одна и та же кнопка не встаёт дважды — берёт более специфичный оффер
-  offer({ name: 'ArsenTrack', slot: 'DebutArsen', when: [is('arsenTrackFresh')], act: 'arsenTrack', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_DEBUT_ARSEN', P_DEBUT_ARSEN) }),
+  // общий: на ходу, где живы оба окна, одна и та же кнопка не встаёт дважды — берёт более специфичный оффер.
+  // Ответ — пара к выбранному вопросу, а не общий draw из DEBUT_ARSEN_B (#1500)
+  ...(() => {
+    let arg = ''
+    return [offer({
+      name: 'ArsenTrack', slot: 'DebutArsen', when: [is('arsenTrackFresh')], act: 'arsenTrack', tone: 'neutral', bonus: 5,
+      text: (g) => windowFromArrNum(g, 'P_DEBUT_ARSEN', P_DEBUT_ARSEN, (i) => { arg = String(i) }),
+      arg: () => arg,
+    })]
+  })(),
   offer({ name: 'DebutSamvel', when: [is('debutFresh'), eq('debutWho', 'samvel')], act: 'debutSamvel', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_DEBUT_SAMVEL', P_DEBUT_SAMVEL) }),
   offer({ name: 'DebutBoris', when: [is('debutFresh'), eq('debutWho', 'boris')], act: 'debutBoris', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_DEBUT_BORIS', P_DEBUT_BORIS) }),
   offer({ name: 'DebutNiva', when: [is('debutFresh'), eq('debutWho', 'niva')], act: 'debutNiva', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_DEBUT_NIVA', P_DEBUT_NIVA) }),
@@ -338,6 +362,17 @@ export const choiceRules: R[] = [
   offer({ name: 'Seryoga', when: [is('seryogaFresh')], act: 'seryoga', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_SERYOGA', P_SERYOGA) }),
   offer({ name: 'GrantBath', when: [is('grantBathFresh')], act: 'grantBath', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_GRANT_BATH', P_GRANT_BATH) }),
   offer({ name: 'OffendedAsk', when: [is('offendedAskFresh')], act: 'offendedAsk', tone: 'polite', bonus: 5, text: (g) => windowFromArr(g, 'P_OFFENDED_ASK', P_OFFENDED_ASK) }),
+  // свип карточек ленты (#1487): семь карточек, обращённых к игроку или объявивших событие партии,
+  // остались без варианта ответа — вопрос «Откликнуться?», просьба Серёги, «Помогло?», выселение,
+  // коллекторы-друзья, регистрация угрозы и остаток кредита на имя игрока. Окно как у #927/#1292:
+  // ход карточки и три после, bonus 5 — рядом стоят общие вопросы блока (извинение и мычание — 6)
+  offer({ name: 'HhJob', when: [is('hhJobFresh')], act: 'hhJob', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_HH_JOB', P_HH_JOB) }),
+  offer({ name: 'SeryogaLoan', when: [is('seryogaLoanFresh')], act: 'seryogaLoan', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_SERYOGA_LOAN', P_SERYOGA_LOAN) }),
+  offer({ name: 'DachaAsk', when: [is('dachaAskFresh')], act: 'dachaAsk', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_DACHA_ASK', P_DACHA_ASK) }),
+  offer({ name: 'Evict', when: [is('evictFresh')], act: 'evictAsk', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_EVICT', P_EVICT) }),
+  offer({ name: 'CollectorsEcho', when: [is('collectorsEchoFresh')], act: 'collectorsEcho', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_COLLECTORS_ECHO', P_COLLECTORS_ECHO) }),
+  offer({ name: 'ThreatGov', when: [is('threatGovFresh')], act: 'threatGov', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_THREAT_GOV', P_THREAT_GOV) }),
+  offer({ name: 'FraudCard', when: [is('fraudCardFresh')], act: 'fraudCard', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_FRAUD_CARD', P_FRAUD_CARD) }),
   // условие Карине «переложите нам ванную» (#1382): сцена мира ставила факт `bath.asked`, но окна отклика
   // не было — до Дня выплаты игрок не мог ответить на условие. Окно своё (ход строки и три после) и
   // кончается Днём выплаты: после него условие либо уже учтено в дележе, либо превращено в претензию.
