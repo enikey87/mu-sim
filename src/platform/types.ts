@@ -1,4 +1,5 @@
 import type { Storage } from '../engine/state'
+import type { TransferChannel } from './transfer'
 
 export type PlatformId = 'web' | 'yandex' | 'vk' | 'telegram'
 
@@ -42,4 +43,9 @@ export interface Platform {
    * После `init()`: облачная копия уже прочитана, запись уходит в облако в фоне.
    */
   storage?(): Storage | null
+  /**
+   * Перенос партии между устройствами (Telegram Mini App, #1488). Нет метода или `null` —
+   * площадка такого не умеет или воркер не настроен: игра живёт на локальной копии.
+   */
+  transfer?(): TransferChannel | null
 }

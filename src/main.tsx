@@ -1,7 +1,7 @@
 // Вход приложения: игра создаётся вне React, интерфейс — React поверх неё.
 // Модуль не запускается сам: его грузит вход страницы (src/intro/shell.ts) — динамическим import()
 // параллельно титрам интро (#1444), поэтому до вызова startApp здесь ничего не происходит.
-import { StrictMode, useState } from 'react'
+import { StrictMode, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Game } from './engine/game'
 import { realClock } from './engine/clock'
@@ -10,6 +10,7 @@ import { SAVE_KEY } from './engine/state'
 import { App } from './ui/App'
 import { enable, firstGesture, boot, shown, watchCrashes } from './analytics/metrics'
 import { bootPlatform, platform, safeStorage } from './platform'
+import { Restore } from './ui/Restore'
 import './styles.css'
 
 // Параметры адреса: ?fast — паузы в ~30 раз короче, ?hour=3 — подменить час, ?away=90 — «не было 90 минут»,
@@ -42,6 +43,10 @@ export function startApp(opts: StartOptions = {}): Promise<AppHandle> {
     // Хранилище прогресса: у витрины своё (облако площадки, #1240), у веба и VK — localStorage.
     const storage = safeStorage(platform().storage?.())
     const hadSave = storage?.getItem(SAVE_KEY) != null
+    // Перенос партии (#1488): канал есть только у Telegram-сборки с адресом воркера.
+    // Токен из `?startapp=` показываем лишь на пустом устройстве — иначе нечем затирать живую партию.
+    const transfer = platform().transfer?.() ?? null
+    const restoreToken = hadSave ? null : transfer?.token() ?? null
     const newGame = (start?: number) => {
       const p = platform()
       const game = new Game({
@@ -99,6 +104,22 @@ export function startApp(opts: StartOptions = {}): Promise<AppHandle> {
 
     function Root() {
       const [{ game, n }, setState] = useState({ game: first, n: 0 })
+      const [pendingRestore, setPendingRestore] = useState(restoreToken)
+      // Заход и уход — на сервер: копия партии для переноса и отметка «игрок вернулся» для напоминаний.
+      // Локальная партия остаётся источником правды: не доехало — игра идёт дальше.
+      useEffect(() => {
+        if (!transfer) return
+        const push = () => transfer.push(storage?.getItem(SAVE_KEY) ?? null, game.S.ending != null)
+        push()
+        const onHide = () => push()
+        const onVisibility = () => { if (document.hidden) push() }
+        document.addEventListener('pagehide', onHide)
+        document.addEventListener('visibilitychange', onVisibility)
+        return () => {
+          document.removeEventListener('pagehide', onHide)
+          document.removeEventListener('visibilitychange', onVisibility)
+        }
+      }, [game])
       const onReset = () => {
         game.dispose()
         live = newGame()
@@ -108,6 +129,24 @@ export function startApp(opts: StartOptions = {}): Promise<AppHandle> {
       // после «Начать заново» касание уже было — анимация идёт сразу.
       // Титры первой партии играет шелл: интерфейсу остаётся перезапуск «Начать заново»
       const intro = !q.has('nointro') && !(shellIntro && n === 0)
+      if (pendingRestore && transfer) {
+        return (
+          <Restore
+            channel={transfer}
+            token={pendingRestore}
+            onSkip={() => setPendingRestore(null)}
+            onRestore={(save) => {
+              // сохранение кладётся туда, откуда его читает конструктор партии: игра стартует уже восстановленной
+              storage?.setItem(SAVE_KEY, save)
+              game.dispose()
+              setPendingRestore(null)
+              // live — ссылка для маячка падений (#1482): она всегда указывает на партию на экране
+              live = newGame()
+              setState({ game: live, n: n + 1 })
+            }}
+          />
+        )
+      }
       return <App key={n} game={game} onReset={onReset} debug={q.has('debug')} intro={intro} introGate={n === 0 && !hadSave} />
     }
 

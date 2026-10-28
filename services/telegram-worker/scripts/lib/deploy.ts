@@ -132,7 +132,7 @@ export async function deploy(ctx: InstallerContext): Promise<DeployResult> {
     telegram(ctx, botToken, 'setWebhook', {
       url: webhookUrl,
       secret_token: webhookSecret,
-      allowed_updates: ['pre_checkout_query', 'message'],
+      allowed_updates: ['pre_checkout_query', 'message', 'callback_query'],
     }),
   )
   const verified = (await step('getWebhookInfo', () => telegram(ctx, botToken, 'getWebhookInfo', {}))) as { url?: string } | null
