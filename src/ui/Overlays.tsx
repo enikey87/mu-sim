@@ -1,8 +1,9 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { useGame } from './useGame'
 import { useModal } from './useModal'
 import { viewOf } from './view'
 import { track } from '../analytics/metrics'
+import { saveEndingCard, shareAvailable, shareEnding, type ShareCard } from './share'
 
 export function Toast() {
   const game = useGame()
@@ -92,6 +93,8 @@ export function EndingScreen({ onReset }: { onReset: () => void }) {
   const e = v.ending
   const active = !!e
   const dialogRef = useRef<HTMLDivElement>(null)
+  const [busy, setBusy] = useState(false)
+  const canShare = shareAvailable()
   useModal({
     active,
     dialogRef,
@@ -99,6 +102,16 @@ export function EndingScreen({ onReset }: { onReset: () => void }) {
   })
   if (!e) return null
   const endingId = v.ending?.id ?? null
+  const card: ShareCard = { id: e.id, icon: e.icon, title: e.title, days: v.day, path: v.sharePath }
+  const run = async (mode: 'share' | 'save') => {
+    if (busy) return
+    setBusy(true)
+    try {
+      const r = mode === 'save' ? ((await saveEndingCard(card)) ? 'saved' : 'failed') : await shareEnding(card)
+      if (r === 'saved') game.flash('Картинка сохранена')
+      else if (r === 'failed') game.flash('Не вышло поделиться')
+    } finally { setBusy(false) }
+  }
   return (
     <div
       className="ending"
@@ -141,6 +154,10 @@ export function EndingScreen({ onReset }: { onReset: () => void }) {
         </ul>
         <div className="ending-btns">
           <button id="endingContinue" onClick={() => game.closeEnding()}>Эпилог</button>
+          {canShare && (
+            <button className="secondary" id="endingShare" disabled={busy} onClick={() => void run('share')}>Поделиться</button>
+          )}
+          <button className="secondary" id="endingSaveCard" disabled={busy} onClick={() => void run('save')}>Сохранить картинку</button>
           <button className="secondary" id="endingReset" onClick={onReset}>Начать заново</button>
         </div>
       </div>
