@@ -367,20 +367,23 @@ describe('окно дебюта коллекторов молчит на исч�
     game.S.mem[intro('collectors')] = true
     game.S.mem[loanTaken('micro')] = true
     game.S.arcs.collectors = { i: 1, last: 0 }
+    // выбор держится до конца хода (#1524): следующая строка пула — со следующего хода,
+    // поэтому три открытые строки показываются тремя ходами, а не тремя пересборками блока
     const shown: string[] = []
-    for (let i = 0; i < 10; i++) {
+    for (let turn = 0; turn < 3; turn++) {
+      game.S.stats.sent = turn
       const t = debut(game)
       if (!t) break
       shown.push(t)
     }
     expect(shown.length, 'открытые формулировки пула показаны все').toBe(3)
     expect(new Set(shown).size, 'формулировки свежие, без повторов').toBe(shown.length)
-    expect(debut(game), 'в том же ходе пул не повторяется дословно').toBeFalsy()
+    // строки показаны ходами 0–2: до 20-го хода каждая ещё в окне повтора (старейшая — ровно на границе)
+    game.S.stats.sent = 19
+    expect(debut(game), 'внутри окна повтора пул не повторяется').toBeFalsy()
     expect(game.buildChoices().map((c) => c.text).filter((t) => openPool(game).includes(t)),
       'в блоке нет ни одной строки пула дословно').toEqual([])
-    game.S.stats.sent += 10
-    expect(debut(game), 'и до окна тоже').toBeFalsy()
-    game.S.stats.sent += 10
+    game.S.stats.sent = 20
     const again = debut(game)
     expect(again && shown.includes(again), 'за окном вопрос возвращается строкой пула').toBe(true)
   })
@@ -406,6 +409,30 @@ describe('дебют коллекторов попадает в блок в ед
     const debut = frame(game).find((c) => c.act === 'arc' && c.arg === 'collectors')
     expect(debut, 'в кадре дебюта варианта о коллекторах нет').toBeTruthy()
     expect(game.open(P_COLLECTORS_DEBUT), 'вариант не из пула дебюта').toContain(debut!.text)
+  })
+})
+
+describe('пересборки блока не сжигают пул дебюта коллекторов (#1524)', () => {
+  const frame = (g: Game) => { g.S.choices = null; return g.buildChoices() }
+  const debut = (g: Game) => frame(g).filter((c) => c.act === 'arc' && c.arg === 'collectors')
+
+  it('все четыре сборки одного хода предлагают вариант пула — выбор держится до конца хода', () => {
+    // партия 503117: за ход дебюта блок собирался 4 раза, голый `freshPlayer` тратил на каждую
+    // сборку следующую строку — четвёртая (отрисованная) получала null, и окно молчало всю партию
+    const { game } = makeGame()
+    game.S.mem[intro('collectors')] = true
+    game.S.mem[loanTaken('micro')] = true
+    game.S.arcs.collectors = { i: 1, last: 0 }
+    const open = game.open(P_COLLECTORS_DEBUT)
+    expect(open.length, 'открытых строк пула нет — проверка пустеет').toBe(3)
+    const picks: string[] = []
+    for (let build = 1; build <= 4; build++) {
+      const found = debut(game)
+      expect(found.length, `сборка ${build}: варианта о коллекторах нет в блоке`).toBe(1)
+      expect(open, `сборка ${build}: вариант не из пула дебюта`).toContain(found[0].text)
+      picks.push(found[0].text)
+    }
+    expect(new Set(picks).size, 'пересборки меняют строку под пальцем').toBe(1)
   })
 })
 
