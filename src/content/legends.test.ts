@@ -317,20 +317,29 @@ describe('торг за код: Гарик торгуется после при�
   const ask = (q: string) => LEGENDS.garik.talk!.find((e) => valueOf(e)[0] === q)!
   const tradeLines = LEGENDS.garik.lines.filter((l) => spec(l).when?.some((c) => c.key === 'arc.garik'))
 
-  it('до признания торга нет, после — раунд торгов открыт', async () => {
-    expect(tradeLines.length, 'раундов торгов нет — проверка пустеет').toBeGreaterThan(0)
+  it('до признания торга нет; после — торг открыт, но только после вводной кода (#908, #1518)', async () => {
+    expect(tradeLines.length, 'торгов в пуле три').toBe(3)
     const before = await played(5)
     expect(before.confessed, 'признания ещё не было').toBe(false)
     expect(before.game.open([ask('И что Гарик хочет за код?')]), 'до признания торга нет').toEqual([])
     expect(before.game.open(tradeLines), 'строк торгов до признания нет').toEqual([])
     const after = await played(6)
     expect(after.confessed, 'шестая серия — признание').toBe(true)
-    expect(after.game.open([ask('И что Гарик хочет за код?')]), 'раунд открыт после признания').toHaveLength(1)
-    expect(after.game.open(tradeLines), 'строки торгов открыты').toHaveLength(tradeLines.length)
+    // признание открыло торг, но «код» ещё не введён: строки и вопросы о нём молчат (#1518)
+    expect(after.game.holds(is(garikCode)), 'вводная кода в партии не звучала').toBe(false)
+    expect(after.game.linePicked('LEG_garik_trade', tradeLines), 'торг до вводной не разыгрывается').toBeNull()
+    expect(after.game.open([ask('И что Гарик хочет за код?')]), 'вопроса о торге до вводной нет').toEqual([])
+    expect(after.game.open([ask('Он вообще код назовёт?')]), 'вопроса «назовёт ли код» до вводной нет').toEqual([])
+    expect(after.game.open(tradeLines), 'строк торгов до вводной нет').toEqual([])
+    after.game.linePicked('LEG_garik', LEGENDS.garik.lines) // единственная доступная строка — вводящая
+    expect(after.game.holds(is(garikCode)), 'вводная не поставила факт о коде').toBe(true)
+    expect(after.game.open([ask('И что Гарик хочет за код?')]), 'раунд открыт после вводной').toHaveLength(1)
+    expect(after.game.open(tradeLines), 'строки торгов открыты после вводной').toHaveLength(tradeLines.length)
   })
 
   it('в раунде: вопрос игрока → условие Гарика → ответ Алика-посредника', async () => {
     const { game } = await played(6)
+    game.linePicked('LEG_garik', LEGENDS.garik.lines) // вводная кода: без неё торг не открыт (#1518)
     const round = game.open([ask('И что Гарик хочет за код?')])[0]
     expect(round?.[0], 'вопрос задаёт игрок').toBe('И что Гарик хочет за код?')
     expect(round?.[1], 'Алик называет условие Гарика').toMatch(/хаш/)
