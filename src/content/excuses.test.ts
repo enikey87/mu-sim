@@ -4,12 +4,30 @@
 // в CAST без записи в NAME_RE краснит тест, а не молчит в партии.
 import { describe, expect, it } from 'vitest'
 import { CAST } from './arcs'
-import { D, low } from './excuses'
+import { D, low, make, type DrawFn } from './excuses'
 import { valueOf, type Entry } from './fact'
 import { PLAYER_ADDRESSEES } from './misc'
 import { allPlayerPools, PLAYER_CHOICE_POOLS, PLAYER_PAIR_POOLS } from './player-pools'
 import { forEachSceneOpt } from './scene-walk'
 import { makeGame } from '../test/helpers'
+
+it('холодное обращение подходит благодарности при входе в режим и выходе из него', () => {
+  expect(D.ADDR_COLD.length).toBeGreaterThan(0)
+  for (let i = 0; i < D.ADDR_COLD.length; i++) {
+    let cold = false
+    const draw: DrawFn = (key, pool) => valueOf(pool[key === 'ADDR_COLD' ? i : 0])
+    const x = make(draw, undefined, undefined, () => cold)
+    const relative = x.rel()
+    const warm = x.congrats(relative)
+    cold = true
+    const thanks = x.congrats(relative)
+    expect(thanks).toMatch(/^Спасибо, [^!]+! /)
+    expect(thanks).not.toMatch(/^Спасибо, (?:к сведению|по существу|официально)!/)
+    expect(thanks).not.toBe(warm)
+    cold = false
+    expect(x.congrats(relative)).toBe(warm)
+  }
+})
 
 /** Имя говорящего — последнее слово с заглавной в отображаемом имени: «Заказчик Грант» → «Грант».
  *  Роль-титул (Заказчик, Прораб, Мама, Коллекторы…) именем не считается: «…, Мама рядом стоит…»,

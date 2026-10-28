@@ -4,25 +4,40 @@ import {
   GAME_URL_DEFAULT,
   maxBodyBytesFrom,
   nonEmpty,
+  originsFrom,
   precheckoutBudgetMsFrom,
+  saveMaxBytesFrom,
   SUPPORT_URL_DEFAULT,
   timeoutMsFrom,
+  botUsernameFrom,
 } from './config.ts'
 import type { RuntimeConfig, WorkerEnv } from './env.ts'
 import { loadActiveCatalog } from './db.ts'
+import { corsPreflight, handleHello, handleRestore, MINI_HELLO_PATH, MINI_RESTORE_PATH } from './mini.ts'
+import { sendReminders } from './reminders.ts'
 import { handleUpdate, type UpdateOutcome } from './webhook.ts'
 import { secretMatches } from './webhook-secret.ts'
 
 const WEBHOOK_PATH = '/telegram/webhook'
 const HEALTH_PATH = '/health'
+const MINI_PATHS = new Set([MINI_HELLO_PATH, MINI_RESTORE_PATH])
 
 export default {
   async fetch(request: Request, env: WorkerEnv): Promise<Response> {
     const url = new URL(request.url)
+    const config = runtimeConfig(env)
 
+    if (MINI_PATHS.has(url.pathname)) {
+      if (request.method === 'OPTIONS') return corsPreflight(request, config)
+      if (request.method !== 'POST') return methodNotAllowed('POST')
+      const now = new Date().toISOString()
+      return url.pathname === MINI_HELLO_PATH
+        ? handleHello(request, env, config, now)
+        : handleRestore(request, env, config, now)
+    }
     if (url.pathname === WEBHOOK_PATH) {
       if (request.method !== 'POST') return methodNotAllowed('POST')
-      return handleWebhook(request, env)
+      return handleWebhook(request, env, config)
     }
     if (url.pathname === HEALTH_PATH) {
       if (request.method !== 'GET' && request.method !== 'HEAD') return methodNotAllowed('GET, HEAD')
@@ -30,24 +45,34 @@ export default {
     }
     return json({ error: 'not-found' }, 404)
   },
+
+  /**
+   * Раз в сутки: «Алик скучает» молчунам. Ограничители (опт-аут, лимит подряд,
+   * пауза между напоминаниями, конченная партия) — в SQL и схеме, см. src/reminders.ts.
+   */
+  async scheduled(_controller: ScheduledController, env: WorkerEnv): Promise<void> {
+    await sendReminders(env, runtimeConfig(env), new Date().toISOString())
+  },
 } satisfies ExportedHandler<WorkerEnv>
 
 function runtimeConfig(env: WorkerEnv): RuntimeConfig {
+  const gameUrl = nonEmpty(env.GAME_URL) || GAME_URL_DEFAULT
   return {
     botToken: nonEmpty(env.BOT_TOKEN),
     webhookSecret: nonEmpty(env.WEBHOOK_SECRET),
-    gameUrl: nonEmpty(env.GAME_URL) || GAME_URL_DEFAULT,
+    botUsername: botUsernameFrom(gameUrl, env.BOT_USERNAME),
+    gameUrl,
     supportUrl: nonEmpty(env.SUPPORT_URL) || SUPPORT_URL_DEFAULT,
+    clientOrigins: originsFrom(env.CLIENT_ORIGINS),
     apiBase: apiBaseFrom(env.TELEGRAM_API_BASE),
     timeoutMs: timeoutMsFrom(env.TELEGRAM_TIMEOUT_MS),
     precheckoutBudgetMs: precheckoutBudgetMsFrom(env.PRECHECKOUT_BUDGET_MS),
     maxBodyBytes: maxBodyBytesFrom(env.MAX_BODY_BYTES),
+    saveMaxBytes: saveMaxBytesFrom(env.SAVE_MAX_BYTES),
   }
 }
 
-async function handleWebhook(request: Request, env: WorkerEnv): Promise<Response> {
-  const config = runtimeConfig(env)
-
+async function handleWebhook(request: Request, env: WorkerEnv, config: RuntimeConfig): Promise<Response> {
   // Заголовок проверяется до разбора тела и любых вызовов API/БД.
   // Пустой WEBHOOK_SECRET — всегда отказ, а не «пускать всех».
   const provided = request.headers.get('x-telegram-bot-api-secret-token')
@@ -99,6 +124,7 @@ async function health(env: WorkerEnv, headOnly: boolean): Promise<Response> {
       const catalog = await loadActiveCatalog(env.DB)
       if (!catalog || catalog.currency !== CURRENCY || catalog.amount <= 0) failed.push('catalog')
       await env.DB.prepare('SELECT 1 AS ok FROM payments LIMIT 1').first()
+      await env.DB.prepare('SELECT 1 AS ok FROM players LIMIT 1').first()
     }
   } catch {
     failed.push('d1')

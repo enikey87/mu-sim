@@ -400,16 +400,33 @@ body {
 .ending-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 6px; }
 .ending-btns button { border: 0; border-radius: 12px; padding: 10px 16px; background: var(--accent); color: #fff; font: inherit; cursor: pointer; }
 .ending-btns button.secondary { background: transparent; color: inherit; border: 1px solid rgba(127,127,127,.4); }
+/* Перенос партии на пустом устройстве (#1488): тот же полноэкранный слой, что у концовки */
+.restore {
+  position: absolute; inset: 0; z-index: 46; background: color-mix(in srgb, var(--bg) 70%, transparent);
+  backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.restore-in {
+  background: var(--panel); border-radius: 18px; padding: 22px 20px; max-width: 340px; width: 100%;
+  display: flex; flex-direction: column; gap: 8px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,.25);
+  max-height: 100%; overflow-y: auto;
+}
+.restore-icon { font-size: 56px; line-height: 1; }
+.restore-in small { opacity: .6; text-transform: uppercase; letter-spacing: .06em; font-size: 11px; }
+.restore-in h2 { margin: 0; font-size: 22px; }
+.restore-in p { margin: 0; font-size: 14.5px; line-height: 1.45; }
+.restore-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 6px; }
+.restore-btns button { border: 0; border-radius: 12px; padding: 10px 16px; background: var(--accent); color: #fff; font: inherit; cursor: pointer; }
+.restore-btns button.secondary { background: transparent; color: inherit; border: 1px solid rgba(127,127,127,.4); }
 /* abspos не видит padding .phone — inset один раз через те же --safe-* */
 @media (max-width: 500px), (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
-  .sheet, .dead, .ending {
+  .sheet, .dead, .ending, .restore {
     top: var(--safe-top);
     right: var(--safe-right);
     bottom: var(--safe-bottom);
     left: var(--safe-left);
   }
 }
-:root[data-platform="telegram"] :is(.sheet, .dead, .ending, .intro) {
+:root[data-platform="telegram"] :is(.sheet, .dead, .ending, .restore, .intro) {
   inset: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
 }
 /* отклик на тип ввода (категория на экране не показывается) */
@@ -515,6 +532,9 @@ body {
   border: 1px solid rgba(127,127,127,.4); background: transparent; color: inherit;
   border-radius: 12px; padding: 10px 14px; font: inherit; cursor: pointer;
 }
+/* второй крах подряд: перемонтирование не помогло — запасная кнопка как рекомендованная (#1482) */
+.crash button.recommended { border-color: rgba(217,68,60,.55); background: rgba(217,68,60,.12); font-weight: 600; }
+.crash-hint { margin: 0; font-size: 13px; color: var(--muted); }
 
 /* intro-css:start — блок дословно повторён в index.html: те же правила рисуют титры шелла холодной
    загрузки (#1444) до прихода этого файла. Менять в двух местах сразу: расхождение ловит

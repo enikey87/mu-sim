@@ -42,7 +42,8 @@ describe('установка: чистая и повторная', () => {
     expect(setWebhook?.payload).toEqual({
       url: WEBHOOK_URL,
       secret_token: await deriveWebhookSecret(BOT_TOKEN),
-      allowed_updates: ['pre_checkout_query', 'message'],
+      // callback_query — кнопка «Не напоминать» в напоминании «Алик скучает» (#1488)
+      allowed_updates: ['pre_checkout_query', 'message', 'callback_query'],
     })
     expect(setWebhook?.payload).not.toHaveProperty('drop_pending_updates')
 

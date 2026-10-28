@@ -12,6 +12,7 @@ import { uiOf, viewOf, introOf, reviewOffersOf, reviewSessionOf, reviewTranscrip
 import { ReviewMenu, ReviewModal, ReviewProvider, type ReviewApi, type ReviewDraft } from './Review'
 import { clearNotes, isOptionNote, loadNotes, nextNoteId, reviewChoiceOf, reviewDump, reviewFileName, reviewRequested, reviewTargetOf, saveNotes, TARGET_TEXT_MAX, type ReviewNote, type ReviewTarget } from './review'
 import { platform } from '../platform'
+import { crash } from '../analytics/metrics'
 
 /** Корень: единственный компонент с Game в руках — отдаёт дереву фасад, а живую игру только DebugPanel. */
 export function App({ game, onReset, debug = false, intro = false, introGate = false }: { game: Game; onReset: () => void; debug?: boolean; intro?: boolean; introGate?: boolean }) {
@@ -87,7 +88,7 @@ export function App({ game, onReset, debug = false, intro = false, introGate = f
   }
 
   return (
-    <Crash onReset={hardReset}>
+    <Crash game={game} onReset={hardReset}>
       <GameContext.Provider value={ui}>
         <ReviewProvider value={review}>
           {debug ? (
@@ -113,17 +114,34 @@ export function App({ game, onReset, debug = false, intro = false, introGate = f
   )
 }
 
-/** Падение отрисовки: без границы — белый экран без единой кнопки. */
-class Crash extends Component<{ onReset: () => void; children: ReactNode }, { failed: boolean }> {
-  state = { failed: false }
+/** Падение отрисовки: без границы — белый экран без единой кнопки. Партия живёт вне React,
+ *  поэтому первая кнопка перемонтирует интерфейс, а не стирает сохранение (#1482). */
+class Crash extends Component<{ game: Game; onReset: () => void; children: ReactNode }, { failed: boolean; crashes: number }> {
+  state = { failed: false, crashes: 0 }
   static getDerivedStateFromError() { return { failed: true } }
-  componentDidCatch(error: unknown) { console.error('[alik] интерфейс упал', error) }
+  componentDidCatch(error: unknown) {
+    console.error('[alik] интерфейс упал', error)
+    this.setState((s) => ({ crashes: s.crashes + 1 }))
+    // до маячка форсируем сохранение: потерять последние ходы хуже упавшего экрана.
+    // Сломанное состояние может бросить и здесь — тогда партия остаётся только в памяти.
+    let day = 0
+    try {
+      this.props.game.save()
+      day = this.props.game.S.day
+    } catch { /* сохранение не сложилось */ }
+    crash('ui', error, { day, platform: platform().id })
+  }
+  private retry = () => this.setState({ failed: false })
   render() {
     if (!this.state.failed) return this.props.children
+    // второй подряд: перемонтирование не помогло — подсвечиваем запасную кнопку, но цикл не заводим
+    const twice = this.state.crashes >= 2
     return (
       <div className="crash">
-        <p>Что-то сломалось. Начать заново?</p>
-        <button onClick={this.props.onReset}>Стереть сохранение и начать заново</button>
+        <p>Что-то сломалось. Партия цела — перезагрузите интерфейс.</p>
+        <button autoFocus onClick={this.retry}>Перезагрузить интерфейс</button>
+        <button className={twice ? 'recommended' : undefined} onClick={this.props.onReset}>Стереть сохранение и начать заново</button>
+        {twice && <p className="crash-hint">Если и после перезагрузки не открывается, остаётся стереть сохранение.</p>}
       </div>
     )
   }
