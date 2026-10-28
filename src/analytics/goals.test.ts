@@ -4,6 +4,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { enable, boot, shown, left, track, GAME_HOST } from './metrics'
 import { makeGame } from '../test/helpers'
 import { PAYDAY_OUTCOMES, ENDING_MIN_DAY } from '../content/finales'
+import { START_DAY } from '../engine/state'
 
 type Call = [number, string, ...unknown[]]
 
@@ -189,5 +190,120 @@ describe('фоновая вкладка при загрузке (#612)', () => {
     } finally {
       hidden.mockRestore()
     }
+  })
+})
+
+describe('progress: день партии впервые прошёл порог (#1483)', () => {
+  const progress = () => goals().filter(([n]) => n === 'progress')
+
+  it('десятый день партии — одно событие, следующие ходы и дни его не повторяют', async () => {
+    const { game } = makeGame({ seed: 2 })
+    game.S.day = START_DAY + 9
+    game.nextDay(1)
+    expect(progress()).toEqual([['progress', { n: 10, day: START_DAY + 10 }]])
+    game.nextDay(1)
+    expect(progress()).toHaveLength(1)
+    // ходы после десятого дня двигают календарь, но порог уже назван
+    for (let i = 0; i < 3; i++) await game.send({ text: 'Алик, как там деньги?', tone: 'neutral' })
+    expect(progress()).toHaveLength(1)
+  })
+
+  it('прыжок через дни присылает каждый пройденный порог один раз, день — календарный', () => {
+    const { game } = makeGame({ seed: 3 })
+    game.S.day = START_DAY + 45
+    game.nextDay(60) // 105-й день партии — разом 50 и 100
+    expect(progress()).toEqual([
+      ['progress', { n: 50, day: START_DAY + 105 }],
+      ['progress', { n: 100, day: START_DAY + 105 }],
+    ])
+  })
+
+  it('порог, пройденный до загрузки, не досылается', () => {
+    const first = makeGame({ seed: 4 })
+    first.game.S.day = START_DAY + 60
+    first.game.save()
+    expect(progress()).toEqual([])
+    makeGame({ storage: first.storage, seed: 4 })
+    expect(progress()).toEqual([])
+  })
+})
+
+describe('beat: вехи партии по одному разу (#1483)', () => {
+  const beats = () => goals().filter(([n]) => n === 'beat').map(([, p]) => p.name)
+
+  it('интро, первая поимка, первый блок и начало Дня выплаты — по одной вехе', async () => {
+    const { game } = makeGame({ seed: 2 })
+    game.introDone()
+    game.introDone()
+    // первая поимка: счётчик вырос в remember правила до caught(), вторая — уже не веха
+    game.S.mem.caught = 1
+    await game.caught('Брат, попался')
+    game.S.mem.caught = 2
+    await game.caught('И тут попался')
+    // блок ставит правило посреди хода: веха читается после реакции, до смены календаря
+    game.S.mem.blocked = true
+    await game.send({ text: 'Алик, привет', tone: 'polite' })
+    game.S.mem.blocked = false
+    game.S.mem.blocked = true
+    await game.send({ text: 'Алик, ты тут?', tone: 'polite' })
+    // продолжение той же сцены выплаты после перезагрузки новой вехой не считается
+    await game.enterNode('payday', 'announce')
+    game.S.scene = null
+    await game.enterNode('payday', 'announce')
+
+    expect(beats()).toEqual(['intro', 'caught', 'block', 'payday'])
+  })
+
+  it('старый блок из сохранения вехой не считается', async () => {
+    const first = makeGame({ seed: 5 })
+    first.game.S.mem.blocked = true
+    first.game.save()
+    makeGame({ storage: first.storage, seed: 5 })
+    const { game } = makeGame({ storage: first.storage, seed: 5 })
+    await game.send({ text: 'Алик, привет', tone: 'polite' })
+    expect(beats()).toEqual([])
+  })
+
+  it('перевод 50 ₽ — ответ «Перевёл», один раз; покупка площадки считается воронкой', async () => {
+    const { game } = makeGame({ seed: 2 })
+    game.S.mem['endgame.active'] = true
+    game.lend50Sponsor() // спонсорская покупка до ответа — веха перевода не она
+    expect(beats()).toEqual([])
+    await game.endgameLend50('yes')
+    await game.endgameLend50('no')
+    game.lend50Sponsor()
+    expect(goals().filter(([n]) => n === 'beat')).toEqual([['beat', { name: 'transfer', day: START_DAY }]])
+  })
+})
+
+describe('collection: коллекция концовок (#1483, #1453)', () => {
+  const collections = () => goals().filter(([n]) => n === 'collection')
+
+  it('новая концовка шлёт размер коллекции, повторная — нет', async () => {
+    const { game } = makeGame()
+    await game.reachEnding('family')
+    expect(goals().find(([n]) => n === 'ending')).toEqual(['ending', { id: 'family' }])
+    expect(collections()).toEqual([['collection', { n: 1, id: 'family' }]])
+    await game.reachEnding('family')
+    expect(collections()).toHaveLength(1)
+  })
+
+  it('вторая концовка называет коллекцию из двух', async () => {
+    const { game } = makeGame()
+    await game.reachEnding('family')
+    await game.reachEnding('payday_coins')
+    expect(collections().at(-1)).toEqual(['collection', { n: 2, id: 'payday_coins' }])
+  })
+})
+
+describe('одна партия до первой вехи: события по порядку (#1483)', () => {
+  it('интро и первый ход: beat intro, milestone 1 — без лишних целей', async () => {
+    const { game } = makeGame({ seed: 2 })
+    const day = game.S.day
+    game.introDone()
+    await game.send({ text: 'Брат, верни деньги', tone: 'polite' })
+    expect(goals().map(([n]) => n)).toEqual(['beat', 'milestone'])
+    expect(goals()[0]).toEqual(['beat', { name: 'intro', day }])
+    expect(goals()[1]?.[1].n).toBe(1)
   })
 })
