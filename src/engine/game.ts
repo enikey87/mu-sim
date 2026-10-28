@@ -52,7 +52,7 @@ import { makeMooPhrase, mooOf, pinnedMooPhrase } from './moo'
 import { typo } from './typo'
 import { UiState, type Moo, type Notif, type SendFeel } from './ui-state'
 import { classifyUserInput, legalClaim, type ClassifiedInput } from './input'
-import { track, left, shown, type Phase } from '../analytics/metrics'
+import { track, left, shown, PROGRESS_DAYS, type Beat, type Phase, type PlatformId } from '../analytics/metrics'
 import { holidayOf, holidayGreetKey, holidayDays, HOLIDAY_EXCUSES } from '../content/holidays'
 import { dueIn, dateOf, fmtDate, fmtDayMonth, fmtShortDate, fmtTime, weekOf, nightHour, periodOf, tierOf, TIERS, type Due, type Period } from './time'
 import { type GameState, type BankWeek, type Msg, type NewMsg, type Card, type PhoneEvent, type Choice, type Ctx, type Tone, type Storage, type InputCategory, freshState, loadState, saveState, SAVE_KEY, LEND50_SEEN_KEY, ENDINGS_SEEN_KEY, endingsOnDevice, withEndingOnDevice, MAX_PATIENCE, ARC_MARINATION_DAYS, START_DAY, isLate, countOf, setCount, type PromiseRec } from './state'
@@ -118,6 +118,8 @@ export interface GameOptions {
   strictTurns?: boolean
   /** Карточка с внешней ссылкой «займи 50». На витрине платформы — false. */
   externalPay?: boolean
+  /** Витрина партии: её имя уходит в цели воронки «займи 50» (#1483). */
+  platformId?: PlatformId
   /** На витрине карточка «займи 50» ведёт в сообщество игры (VK), а не к внешней ссылке (#1239). */
   joinGroup?: boolean
   /** Витрина, где карточка «займи 50» — настоящая покупка: Яндекс Игры (инап, #1241) или Telegram Stars (#1235).
@@ -206,6 +208,8 @@ export class Game {
   private externalPay: boolean
   private joinGroup: boolean
   private pay50: 'yandex' | 'telegram' | null
+  /** Витрина партии — параметр цели `lend50_shown` (#1483). */
+  private platformId: PlatformId
   private hiddenAt = 0
   /** Ход игрока: nextDay уже был (offline / fx.days) — обычный +1…3 в конце не дублируем. */
   private inPlayerTurn = false
@@ -214,6 +218,10 @@ export class Game {
   private bankSmsDay: { day: number; keys: Set<string> } | null = null
   /** Пороги цели `milestone`, уже пройденные или отправленные; «Начать заново» создаёт новую игру — список с нуля (#612). */
   private milestones = new Set<number>()
+  /** Вехи партии, уже отправленные; «Начать заново» создаёт новую игру — набор с нуля (#1483). */
+  private beats = new Set<Beat>()
+  /** Был ли блок в начале хода: веха `block` — только переход «не было → было» (#1483). */
+  private blockWas = false
 
   constructor(opts: GameOptions = {}) {
     this.storage = opts.storage === undefined ? (typeof localStorage !== 'undefined' ? localStorage : null) : opts.storage
@@ -229,7 +237,10 @@ export class Game {
     this.externalPay = opts.externalPay !== false
     this.joinGroup = !!opts.joinGroup
     this.pay50 = opts.pay50 ?? null
+    this.platformId = opts.platformId ?? 'web'
     this.S = loadState(this.storage) ?? freshState()
+    // блок из старого сохранения вехой не считается: маячок зовётся на живом переходе, а не при загрузке (#1483)
+    this.blockWas = this.S.mem[memkeys.blocked] === true
     if (this.S.mem[momHelp('dacha')] && this.S.mem[momDachaAt] == null) this.S.mem[momDachaAt] = this.S.day
     // колбеки батареи — в узком хосте, а не в публичном интерфейсе Game: game.dead() путался бы со смертью Алика
     this.battery = new Battery(this.S, {
@@ -407,6 +418,7 @@ export class Game {
   introDone(): void {
     if (this.S.introShown) return
     this.S.introShown = true
+    this.beat('intro')
     this.save()
   }
 
@@ -1373,7 +1385,9 @@ export class Game {
     if (this.S.clock >= 23 * 60 + 50) this.nextDay(1)
   }
   nextDay(n: number): void {
+    const was = this.S.day
     this.S.day += n
+    this.noteProgress(was)
     const wasBlocked = this.S.mem[memkeys.blocked] === true
     this.rules.settle()
     // чёрный список истёк своим сроком молча (#1050): метка для нарратива первого доставленного хода.
@@ -2304,6 +2318,8 @@ export class Game {
       }
       if (this.disposed) return
 
+      // блок ставит правило посреди хода: веха читается здесь, до смены календаря (#1483)
+      this.noteBlocked()
       await this.fulfillConditionalPromise()
       // хор ещё в том же дне → смена даты → утром наступившие обещания и сюжет
       await this.flushChorus()
@@ -2798,6 +2814,7 @@ export class Game {
     // знает только движок, поэтому пишется здесь — на самом событии поимки
     this.S.mem[memkeys.caughtAt] = this.S.day
     const n = Number(this.S.mem[memkeys.caughtCount] ?? 0)
+    if (n === 1) this.beat('caught') // счётчик уже вырос в remember правила: первая поимка — это n === 1 (#1483)
     this.unlock('liar')
     if (n >= 3) this.unlock('liar3')
     this.mood(-1)
@@ -2955,6 +2972,11 @@ export class Game {
     return endingsOnDevice(this.storage?.getItem(ENDINGS_SEEN_KEY) ?? null)
   }
 
+  /** Коллекция концовок так, как её считает досье: партия плюс отметка устройства (#1437, #1483). */
+  private endingCollection(): Set<string> {
+    return new Set([...Object.keys(this.S.endings), ...this.endingsSeen()])
+  }
+
   /** Отметка устройства после концовки: в облако не едет, поэтому коллекция не переезжает на другое устройство. */
   private markEndingOnDevice(id: string): void {
     const storage = this.storage
@@ -2968,11 +2990,14 @@ export class Game {
     const e = ENDINGS.find((x) => x.id === id)!
     await this.sleep(800)
     await this.say(this.open(e.m))
+    const collected = !this.endingCollection().has(id)
     this.S.endings[id] = this.S.day
     this.markEndingOnDevice(id)
     this.S.ending = id
     this.unlock('end_' + id)
     track('ending', { id: e.id })
+    // коллекция выросла: `n` — её размер так, как его видит досье, а не номер этой концовки (#1453)
+    if (collected) track('collection', { n: this.endingCollection().size, id: e.id })
     this.emit()
   }
   async closeEnding(): Promise<void> {
@@ -3086,6 +3111,8 @@ export class Game {
     else if (this.joinGroup) this.push({ kind: 'lend50', text: LEND50_VK_SYS, join: true })
     else if (this.pay50 === 'yandex') this.push({ kind: 'lend50', text: LEND50_YA_SYS, buy: true })
     else if (this.pay50 === 'telegram') this.push({ kind: 'lend50', text: LEND50_TG_SYS, stars: true })
+    // воронка «займи 50»: карточка добавлена в ленту — одна цель на партию (#1483)
+    if (this.externalPay || this.joinGroup || this.pay50) track('lend50_shown', { platform: this.platformId })
     this.storage?.setItem(LEND50_SEEN_KEY, '1') // отметка устройства, а не партии: она только выбирает текст
     S.mem[memkeys.lend50.asked] = true
     S.choices = null // buildChoices отдаст LEND50_CHOICES
@@ -3154,6 +3181,7 @@ export class Game {
       if (answer === 'yes') {
         await this.say([LEND50_YES])
         if (!S.mem[memkeys.lend50.sponsor]) this.sponsorRename()
+        this.beat('transfer') // «Перевёл» — перевод получен в партии; настоящая покупка считается воронкой (#1483)
         if (this.canSpeak('nune')) await this.say([{ w: 'nune', t: LEND50_NUNE }])
       } else if (answer === 'no') await this.say([this.draw('LEND50_NO', LEND50_NO)])
       else await this.say([isOpen(LEND50_SERIOUS, this.lineFacts()) ? valueOf(LEND50_SERIOUS) : LEND50_SERIOUS_ELSE])
@@ -3272,6 +3300,8 @@ export class Game {
     if (nid === null) { this.clearScene(true); await this.say([this.uniq(this.X.short)]); return }
     if (nid.includes(':')) [sid, nid] = nid.split(':')
     const sc = this.scenes[sid]
+    // веха `payday`: сцена Дня выплаты началась впервые; продолжение после перезагрузки — та же сцена (#1483)
+    if (sid === 'payday' && !this.S.ach.payday) this.beat('payday')
     // новая сцена — старый контекст («что вы удалили?», «при чём тут тётя?») больше не к месту
     if (!S.scene || S.scene.id !== sid) {
       S.scene = { id: sid, node: nid, vars: sc.init ? sc.init(this.rng, (arr) => this.open(arr), S.day) : {} }
@@ -3618,6 +3648,30 @@ export class Game {
       if (n === t && !this.milestones.has(t)) { this.milestones.add(t); track('milestone', { n: t, day: this.S.day }) }
       else if (n > t) this.milestones.add(t)
     }
+  }
+  /**
+   * Цель `progress`: день **партии** впервые пересёк порог 10, 50, 100, 200 или 300 (#1483).
+   * Дни партии считаются от старта (`START_DAY` — 184-й день календаря), потому что первые три
+   * порога иначе не наступают никогда. `day` в цели — абсолютный день календаря: им же меряют
+   * `milestone` и `left`. Сравнение «было → стало» живёт только в живом ходе календаря: порог,
+   * пройденный до загрузки, молчит — как и пороги `milestone`.
+   */
+  private noteProgress(was: number): void {
+    const wasParty = was - START_DAY
+    const party = this.S.day - START_DAY
+    for (const n of PROGRESS_DAYS) if (wasParty < n && party >= n) track('progress', { n, day: this.S.day })
+  }
+  /** Веха партии (#1483): одна цель на веху, повтор не шлётся — набор, как у порогов `milestone`. */
+  private beat(name: Beat): void {
+    if (this.beats.has(name)) return
+    this.beats.add(name)
+    track('beat', { name, day: this.S.day })
+  }
+  /** Первый блок: факт `blocked` ставит правило грубости посреди хода, поэтому здесь — только смена значения (#1483). */
+  private noteBlocked(): void {
+    const now = this.S.mem[memkeys.blocked] === true
+    if (now && !this.blockWas) this.beat('block')
+    this.blockWas = now
   }
   /** Фаза партии для цели `left`: экран, на котором игрок ушёл (docs/design/analytics.md). */
   private phase(): Phase {
