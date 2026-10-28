@@ -5,7 +5,7 @@
 import { type Facts, type Line, type LineSpec, type Entry, is, eq, ne, exists, gte, lte, gate, missing, set } from './fact'
 import type { Scene, SceneNode } from './scenes'
 import { needs, samvelLine, WORLD } from './world'
-import { bathAsked, bathAnswered, caughtCount, court, cryptoHodl, garikConcrete, intro, judgeApology, karineKnowsDebt, met, payday, rubikFined, taxFrozen, taxThawed } from './memkeys'
+import { actSigned, bathAsked, bathAnswered, caughtCount, court, cryptoHodl, garikConcrete, intro, judgeApology, karineKnowsDebt, met, payday, rubikFined, taxFrozen, taxThawed } from './memkeys'
 import { BATH_ANSWER } from './rules/player-choice-pools'
 
 export const ANNOUNCE = [
@@ -48,7 +48,10 @@ export const SOURCES: Source[] = [
   { t: 'Гарик принёс 25 000. Аренда за хранение твоих денег плюс доля экскурсий. И говорит: «Я единственный честный человек в этой семье».', when: [exists('finale.garik')], prio: 1, amount: 25000 },
   { t: 'Самвел раздал свадебные конверты. Сорок свадеб — сорок конвертов. 60 000.', when: [WORLD.samvel, exists('finale.samvel')], prio: 1, amount: 60000 },
   { t: 'Размик сбросился. Сказал: «Брату плиточнику — нужнее». 45 000.', when: [exists('finale.razmik')], prio: 1, amount: 45000 },
-  { t: 'Инспектор Рубик подписал акт! Грант оплатил объект. 55 000 — твои.', when: [WORLD.grant, exists('finale.rubik')], prio: 1, amount: 55000 },
+  // финал сериала уже объявил подпись акта и оплату (#1470): тот же доход, но не вторая новость о подписи
+  { t: 'Помнишь, Рубик подписал акт? Деньги по нему наконец дошли. 55 000 — твои.', when: [WORLD.grant, exists('finale.rubik'), is(actSigned)], prio: 1, amount: 55000 },
+  // без объявленной подписи (сериал закончился раньше знакомства с Грантом) новость остаётся новостью
+  { t: 'Инспектор Рубик подписал акт! Грант оплатил объект. 55 000 — твои.', when: [WORLD.grant, exists('finale.rubik'), missing(actSigned)], prio: 1, amount: 55000 },
   { t: 'Из суда по плитке вернули залог. 35 000.', when: [exists('finale.tile')], prio: 1, amount: 35000 },
   { t: 'Я с того света принёс. 20 000. Там, оказывается, тоже бывают выплаты.', when: [exists('finale.alik_death')], prio: 1, amount: 20000 },
   // квесты и суд
