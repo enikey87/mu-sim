@@ -4,16 +4,16 @@ import { makeGame, setMoney, cards, respondCtx } from '../test/helpers'
 import type { Game } from '../engine/game'
 import { NOTIF, IDLE } from './life'
 import { D } from './excuses'
-import { sold } from './credit'
-import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_NIVA, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE, P_DEBUT_GRANT, P_MAMA_MARKET, P_TILE_AD, P_TAMADA_DONE, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_GRANT_HOUSE, P_TILE_SLIP, P_TILE_COURT, P_TILE_LAWYER, P_TILE_MONUMENT, P_NIVA_BACK, P_SOLD, P_BORIS_MEMORY, P_SERYOGA, P_GRANT_BATH, P_OFFENDED_ASK } from './rules/player-choice-pools'
-import { BORIS_MEMORY_B, BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, DEBUT_GRANT_B, GRANT_HOUSE_B, INTERN_B, HOLE_B, AVITO_REVIEW, MAMA_MARKET_B, TILE_AD_B, TAMADA_DONE_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, TILE_SLIP_B, TILE_COURT_B, TILE_LAWYER_B, TILE_MONUMENT_B, NIVA_BACK_B, SOLD_B, VACANCY, VACANCY_START_B, VACANCY_SOON_B, SERYOGA_B, GRANT_BATH_B, OFFENDED_ASK_B, DEBUT_ARSEN_B } from './world'
+import { momHelp, momDachaAt, sold } from './credit'
+import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_NIVA, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE, P_DEBUT_GRANT, P_MAMA_MARKET, P_TILE_AD, P_TAMADA_DONE, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_GRANT_HOUSE, P_TILE_SLIP, P_TILE_COURT, P_TILE_LAWYER, P_TILE_MONUMENT, P_NIVA_BACK, P_SOLD, P_BORIS_MEMORY, P_SERYOGA, P_GRANT_BATH, P_OFFENDED_ASK, P_HH_JOB, P_SERYOGA_LOAN, P_DACHA_ASK, P_EVICT, P_COLLECTORS_ECHO, P_THREAT_GOV, P_FRAUD_CARD } from './rules/player-choice-pools'
+import { BORIS_MEMORY_B, BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, DEBUT_GRANT_B, GRANT_HOUSE_B, INTERN_B, HOLE_B, AVITO_REVIEW, MAMA_MARKET_B, TILE_AD_B, TAMADA_DONE_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, TILE_SLIP_B, TILE_COURT_B, TILE_LAWYER_B, TILE_MONUMENT_B, NIVA_BACK_B, SOLD_B, VACANCY, VACANCY_START_B, VACANCY_SOON_B, SERYOGA_B, GRANT_BATH_B, OFFENDED_ASK_B, DEBUT_ARSEN_B, HH_JOB_B, SERYOGA_LOAN_B, DACHA_ASK_B, EVICT_B, COLLECTORS_ECHO_B, THREAT_GOV_B, FRAUD_CARD_B } from './world'
 import { TOPICS } from './topics'
 import { ARCS } from './arcs'
 import { turnRules } from './rules/turn'
 import { FINALES } from './finales'
 import { COURT_LAWYER_AGAIN } from './quests'
 import { RUDE_CALLS_VOICE, MAMA_VOICE_CRY } from './rude'
-import { count, collectorsRecruited, court, crewPaid, crewPaidAt, HEAT, internAt, lawyerAt, debutWho, debutAt, arsenTrack, arsenTrackAt, saidStrasburg, saidGrantEnvelope, grantTileAt, grantHouseAt, mamaMarketAt, tileAdAt, tamadaDoneAt, borisAskAt, mamaVoiceAt, mamaCalls, samvelDivorceAt, tileSlipAt, tileCourtAt, tileLawyerAt, tileMonumentAt, legendOf, nivaAway, nivaBack, nivaBackAt, saleAt, saleWhat, alikDead, paydayScene, seryogaAskAt, grantBathAt, offendedAskAt, intro, kettleAt, carGone } from './memkeys'
+import { count, collectorsRecruited, court, crewPaid, crewPaidAt, HEAT, internAt, lawyerAt, debutWho, debutAt, arsenTrack, arsenTrackAt, saidStrasburg, saidGrantEnvelope, grantTileAt, grantHouseAt, mamaMarketAt, tileAdAt, tamadaDoneAt, borisAskAt, mamaVoiceAt, mamaCalls, samvelDivorceAt, tileSlipAt, tileCourtAt, tileLawyerAt, tileMonumentAt, legendOf, nivaAway, nivaBack, nivaBackAt, saleAt, saleWhat, alikDead, paydayScene, seryogaAskAt, grantBathAt, offendedAskAt, intro, kettleAt, carGone, dachaAskAt, evictAt, collectorsEchoAt, threatGovAt, fraudCardAt, hhJobAt, seryogaLoanAt, evicted, fraudLoan } from './memkeys'
 import { valueOf, type Line } from './fact'
 import type { Choice } from '../engine/state'
 
@@ -1737,5 +1737,70 @@ describe('окна отклика глубоких раундов (#1292)', () =
     expect(said.length, `на вопрос ответили нитью о сроке: ${said.join(' | ')}`).toBe(1)
     const generic = VACANCY.map(text)
     expect(generic.some((p) => said[0].includes(p)), `ответ не из общего пула: ${said[0]}`).toBe(true)
+  })
+})
+
+describe('свип карточек ленты (#1487): окно отклика у обращённых к игроку карточек', () => {
+  const HH_CARD = 'Вакансия: плиточник, 150 000 ₽, оплата каждую пятницу. Откликнуться?'
+  const SER_LOAN_CARD = 'Братан, займи до зарплаты. А, у тебя ж тоже нет.'
+  const DACHA_CARD = 'Сынок, помнишь, я продала дачу? Помидоры всё равно не росли — но я рада, что помогла тебе продержаться. Помогло?'
+  const EVICT_CARD = 'Выселяю. Можешь пожить у Алика, он же тебе как отец.'
+  const ECHO_CARD = 'Мы знаем, где живёт ваш Алик. Он нам тоже должен. Давайте дружить.'
+  const GOV_CARD = 'Ваша угроза зарегистрирована как заявление «Алик не платит». Срок рассмотрения — 1473 дня.'
+  const FRAUD_CARD = 'Кредит на ваше имя: остаток 300 000 ₽. Напоминаем: плательщик — вы.'
+
+  /** Гейты карточек: без них randomNotif карточку не выдаст и проверка опустеет. */
+  const cases: Array<{ name: string; card: string; act: string; stamp: string; pool: readonly unknown[]; answers: readonly unknown[]; prep: (g: Game) => void }> = [
+    { name: 'hh.ru 150 000', card: HH_CARD, act: 'hhJob', stamp: hhJobAt, pool: P_HH_JOB, answers: HH_JOB_B, prep: () => {} },
+    { name: 'Серёга «займи»', card: SER_LOAN_CARD, act: 'seryogaLoan', stamp: seryogaLoanAt, pool: P_SERYOGA_LOAN, answers: SERYOGA_LOAN_B, prep: () => {} },
+    { name: 'дача мамы', card: DACHA_CARD, act: 'dachaAsk', stamp: dachaAskAt, pool: P_DACHA_ASK, answers: DACHA_ASK_B, prep: (g) => { g.S.mem[momHelp('dacha')] = true; g.S.mem[momDachaAt] = g.S.day - 30 } },
+    { name: 'выселение', card: EVICT_CARD, act: 'evictAsk', stamp: evictAt, pool: P_EVICT, answers: EVICT_B, prep: (g) => { g.S.mem['bills.rent.streak'] = 3 } },
+    { name: 'коллекторы-друзья', card: ECHO_CARD, act: 'collectorsEcho', stamp: collectorsEchoAt, pool: P_COLLECTORS_ECHO, answers: COLLECTORS_ECHO_B, prep: (g) => { g.S.arcs.collectors = { i: 2, last: 0 } } },
+    { name: 'регистрация угрозы', card: GOV_CARD, act: 'threatGov', stamp: threatGovAt, pool: P_THREAT_GOV, answers: THREAT_GOV_B, prep: (g) => { g.S.mem[count.threat] = 1 } },
+    { name: 'кредит на имя игрока', card: FRAUD_CARD, act: 'fraudCard', stamp: fraudCardAt, pool: P_FRAUD_CARD, answers: FRAUD_CARD_B, prep: (g) => { g.S.mem[fraudLoan] = true } },
+  ]
+  const has = (game: Game, act: string) => { game.S.choices = null; return game.buildChoices().find((c) => c.act === act) }
+  const texts = (pool: readonly unknown[]): string[] => pool.map((e) => String(valueOf(e as never)))
+
+  it.each(cases)('$name: штамп на ходу карточки, отклик в окне (ход и три после), ответ потребляет', async ({ card, act, stamp, pool, answers, prep }) => {
+    const { game } = makeGame()
+    prep(game)
+    expect(has(game, act), `${act}: отклик есть без карточки`).toBeUndefined()
+    showCard(game, card)
+    const at = Number(game.S.mem[stamp])
+    expect(at, 'карточка не штампанула ход — окно не откроется').toBe(game.S.stats.sent)
+    const btn = has(game, act)
+    expect(btn, 'на ходу карточки отклика нет').toBeDefined()
+    expect(texts(pool), `кнопка вне пула: «${btn!.text}»`).toContain(btn!.text)
+    game.S.stats.sent = at + 3
+    expect(has(game, act), 'третий ход после карточки — уже вне окна').toBeDefined()
+    game.S.stats.sent = at + 4
+    expect(has(game, act), 'окно живёт дольше трёх ходов').toBeUndefined()
+    // ответ — из пула события, штамп потреблён, кнопка ушла
+    game.S.stats.sent = at
+    const from = game.S.msgs.length
+    await game.fire('PlayerSays', { intent: act })
+    const said = game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : []))
+    expect(said.some((t) => texts(answers).includes(t)), `ответ не из пула: ${said.join(' | ')}`).toBe(true)
+    expect(game.S.mem[stamp], 'ответ не потребил окно').toBeUndefined()
+    expect(has(game, act), 'после ответа кнопка жива').toBeUndefined()
+  })
+
+  it('окно мамы на дачу кончается вместе с вопросом: без факта «помогло» карточки нет', () => {
+    const { game } = makeGame()
+    showCard(game, DACHA_CARD)
+    expect(game.S.mem[dachaAskAt], 'карточка прозвучала без проданной дачи').toBeUndefined()
+  })
+
+  it('выселение открывает окно один раз: повторная карточка выселения невозможна (факт `evicted`)', () => {
+    const { game } = makeGame()
+    game.S.mem['bills.rent.streak'] = 3
+    const sent = game.S.stats.sent
+    showCard(game, EVICT_CARD)
+    expect(game.S.mem[evicted], 'карточка не поставила факт выселения').toBe(true)
+    expect(game.S.mem[evictAt], 'первое выселение не штампануло ход').toBe(sent)
+    delete game.S.mem[evictAt]
+    showCard(game, EVICT_CARD)
+    expect(game.S.mem[evictAt], 'выселение прозвучало второй раз').toBeUndefined()
   })
 })

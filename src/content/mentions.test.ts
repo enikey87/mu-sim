@@ -170,6 +170,9 @@ function corpus(): Found[] {
         'world.EXTRAS', 'factkeys.CTX_KEYS', 'factkeys.HAS_KEYS', 'factkeys.FAMILIES',
         // реестр источников окна: `source` — описание для человека («карточка Авито о баране»), а не реплика (#1030)
         'first-windows.EVENT_SOURCES',
+        // реестр свипа «показал — ответить нельзя» (#1487): тексты карточек и причины — повтор
+        // life.NOTIF и узлов сцен, которые линтер уже проверил в источнике
+        'reply-windows.SILENT_CARDS', 'reply-windows.PHONE_CARD_NOTES', 'reply-windows.SCENE_ENDINGS', 'reply-windows.SILENT_STAMPS',
         // реестр пулов кнопок: дублирует legends/talk/topics с пустыми known (#491)
         'player-pools.PLAYER_CHOICE_POOLS', 'player-pools.PLAYER_PAIR_POOLS',
         // правят или сверяют уже сказанное: автозамена, противоречия Дня выплаты (звено звучит, только если было событие)

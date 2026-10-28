@@ -43,8 +43,11 @@ export type Msg =
   | (MsgBase & { kind: 'muen'; text: string; link: string })
   | (MsgBase & { kind: 'card' } & Card)
 
-/** Что за событие телефона: по нему оракул отличает законный повтор (сводка, отказ, уровень) от настоящего (#304). */
-export type PhoneEvent = 'bank.summary' | 'bank.offer' | 'bank.refusal' | 'bank.level' | 'bank.warn' | 'mom' | 'life' | 'battery' | 'unread'
+/** Что за событие телефона: по нему оракул отличает законный повтор (сводка, отказ, уровень) от настоящего (#304).
+ *  Массив, а не только тип: свип «показал — ответить нельзя» (#1487) сверяет реестр карточек движка
+ *  с этим списком, и новое событие без классификации красит сюит. */
+export const PHONE_EVENTS = ['bank.summary', 'bank.offer', 'bank.refusal', 'bank.level', 'bank.warn', 'mom', 'life', 'battery', 'unread'] as const
+export type PhoneEvent = (typeof PHONE_EVENTS)[number]
 
 /** Карточка телефона в ленте (банк, МФО, мама, Авито): не реплика и не требует нажатия; `offer` — кнопки кредита (#287). */
 export interface Card {

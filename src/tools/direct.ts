@@ -7,7 +7,7 @@ import type { Game } from '../engine/game'
 import type { Facts } from '../engine/rules'
 import { during } from '../engine/rules'
 import { START_DAY, ARC_MARINATION_DAYS } from '../engine/state'
-import { HEAT, arsenTrackAt, borisAskAt, legendDay, legendId, muenAt, nuneKeyPassed, payday, rubikProposalAt, sorryAt } from '../content/memkeys'
+import { HEAT, arsenTrackAt, borisAskAt, evictAt, legendDay, legendId, muenAt, nuneKeyPassed, payday, rubikProposalAt, sorryAt } from '../content/memkeys'
 import { ENDING_MIN_DAY, CHRONIC_RUDE_AFTER_VENDETTA } from '../content/finales'
 
 export type DirectCase = { event: string; facts?: Facts; target?: string; setup?: (g: Game) => void }
@@ -59,6 +59,10 @@ export const DIRECT: Record<string, DirectCase> = {
   // #1471: окно предложения Карине живёт три хода после 7-й серии Рубика — бот в выборках до неё не
   // доходит; штамп ставим тот же, что ставит строка серии
   Opt_RubikProposal: { event: 'BuildChoices', setup: (g) => { g.S.mem[rubikProposalAt] = g.S.stats.sent } },
+  // #1487: выселение бот в выборках не получает (три неоплаты коммуналки подряд) — окно и ответ
+  // держатся прямыми случаями; штамп ставит сама карточка, факт `evicted` — её remember
+  Opt_Evict: { event: 'BuildChoices', setup: (g) => { g.S.mem.evicted = true; g.S.mem[evictAt] = g.S.stats.sent } },
+  Says_evictAsk: { event: 'PlayerSays', facts: { intent: 'evictAsk' } },
   Says_muen: { event: 'PlayerSays', facts: { intent: 'muen', arg: '0' } },
   // гейт на чужих семействах: в семье +4000 бот не доходит до предложения «через Бориса» (4/0/4) — прямой случай держит гейт
   Opt_Via_boris: { event: 'BuildChoices', setup: (g) => { blocked(g); g.S.arcs.boris = { i: 4, last: 0 } } },

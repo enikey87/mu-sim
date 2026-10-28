@@ -1886,6 +1886,15 @@ export class Game {
       mamaVoiceFresh: S.stats.sent - Number(S.mem[memkeys.mamaVoiceAt] ?? -99) <= 3,
       // развод дяди Самвела на свадьбе (#1037): событие серии — отклик живёт ход события и три после
       samvelDivorceFresh: S.stats.sent - Number(S.mem[memkeys.samvelDivorceAt] ?? -99) <= 3,
+      // свип карточек ленты (#1487): каждая карточка, обращённая к игроку или объявившая событие
+      // партии, открывает окно на ход показа и три после; фон ленты штампов не ставит
+      hhJobFresh: S.stats.sent - Number(S.mem[memkeys.hhJobAt] ?? -99) <= EVENT_FRESH_TURNS,
+      seryogaLoanFresh: S.stats.sent - Number(S.mem[memkeys.seryogaLoanAt] ?? -99) <= EVENT_FRESH_TURNS,
+      dachaAskFresh: S.stats.sent - Number(S.mem[memkeys.dachaAskAt] ?? -99) <= EVENT_FRESH_TURNS,
+      evictFresh: S.stats.sent - Number(S.mem[memkeys.evictAt] ?? -99) <= EVENT_FRESH_TURNS,
+      collectorsEchoFresh: S.stats.sent - Number(S.mem[memkeys.collectorsEchoAt] ?? -99) <= EVENT_FRESH_TURNS,
+      threatGovFresh: S.stats.sent - Number(S.mem[memkeys.threatGovAt] ?? -99) <= EVENT_FRESH_TURNS,
+      fraudCardFresh: S.stats.sent - Number(S.mem[memkeys.fraudCardAt] ?? -99) <= EVENT_FRESH_TURNS,
       // вердикт суда (#1058): кульминация линии — отклик живёт ход вердикта и три после
       courtVerdictFresh: S.stats.sent - Number(S.mem[memkeys.courtVerdictAt] ?? -99) <= 3,
       // первая серия плиточной арки (#1059): падение заказчика — отклик живёт ход серии и три после
