@@ -844,6 +844,55 @@ describe('трек «Плиточник» открывает своё окно �
     expect(btns.length, 'одна и та же кнопка встала дважды').toBe(1)
     expect(TRACK, 'на ходу с треком кнопка не про трек').toContain(btns[0].text)
   })
+
+  // ответ окна — пара к выбранному вопросу, а не общий draw DEBUT_ARSEN_B (#1500, #1017)
+  /** Выбранный вопрос и его номер в пуле дебюта: пара в DEBUT_ARSEN_B — строка с тем же номером. */
+  const question = (game: Game, act: string, seed: number): { c: Choice; j: number } => {
+    const c = frame(game).find((x) => x.act === act)
+    expect(c, `seed ${seed}: окна ${act} нет — проверка пустеет`).toBeTruthy()
+    const j = P_DEBUT_ARSEN.findIndex((e) => valueOf(e) === c!.text)
+    expect(j, `seed ${seed}: вопрос не из пула дебюта: «${c!.text}»`).toBeGreaterThan(0)
+    return { c: c!, j }
+  }
+  const pairText = (j: number): string => (valueOf(DEBUT_ARSEN_B[j]) as { t: string }).t
+  const arsenAnswer = async (game: Game, c: Choice): Promise<string> => {
+    const from = game.S.msgs.length
+    await game.send(c)
+    return game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' && m.who === 'arsen' ? [m.text] : [])).join(' ')
+  }
+
+  it('ответ окна трека — пара к выбранному вопросу, каждый из трёх (#1500)', async () => {
+    // NC: возврат к общему draw — тест красный: вопрос может вытянуть чужой ответ (проверено)
+    const seen = new Set<number>()
+    for (let seed = 1; seed <= 40; seed++) {
+      const { game } = makeGame({ seed })
+      closedDebut(game)
+      game.S.mem[intro('arsen')] = true
+      game.S.mem[arsenTrack] = true
+      game.S.mem[arsenTrackAt] = game.S.stats.sent
+      const { c, j } = question(game, 'arsenTrack', seed)
+      expect(await arsenAnswer(game, c), `seed ${seed}: выбран «${c.text}» — ответ не по строке`).toContain(pairText(j))
+      seen.add(j)
+    }
+    expect([...seen].sort(), 'не все три трек-вопроса получили свой ответ').toEqual([1, 2, 3])
+  })
+
+  it('ответ окна дебюта с треком — тоже пара к выбранному вопросу (#1500)', async () => {
+    // окно дебюта живо, трек уже прозвучал: трек-вопросы предлагает `debutArsen`, пара та же
+    const seen = new Set<number>()
+    for (let seed = 1; seed <= 40; seed++) {
+      const { game } = makeGame({ seed })
+      game.S.mem['wrote.arsen'] = true
+      game.S.mem[intro('arsen')] = true
+      game.S.mem[debutWho] = 'arsen'
+      game.S.mem[debutAt] = game.S.stats.sent
+      game.S.mem[arsenTrack] = true
+      const { c, j } = question(game, 'debutArsen', seed)
+      expect(await arsenAnswer(game, c), `seed ${seed}: выбран «${c.text}» — ответ не по строке`).toContain(pairText(j))
+      seen.add(j)
+    }
+    expect([...seen].sort(), 'не все три трек-вопроса получили свой ответ').toEqual([1, 2, 3])
+  })
 })
 
 describe('дебют Самвела не предлагает свадьбу, пока её не ввела серия (#1166)', () => {
