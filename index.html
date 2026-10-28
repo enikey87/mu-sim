@@ -50,6 +50,11 @@
     #boot .boot-bubble i { width: 7px; height: 7px; border-radius: 50%; background: #7b8591; animation: boot-blink 1.2s infinite; }
     #boot .boot-bubble i:nth-child(2) { animation-delay: .2s; }
     #boot .boot-bubble i:nth-child(3) { animation-delay: .4s; }
+    #boot-retry{margin:12px 10px 0}
+    #boot-down{display:none;margin:auto;padding:0 22px;text-align:center}
+    #boot.boot-failed>:not(#boot-down){display:none}
+    #boot.boot-failed #boot-down{display:block}
+    #boot-again{margin-top:16px;padding:9px 16px;border:0;border-radius:10px;background:#2f9e5c;color:#fff;font:inherit;font-weight:700}
     @keyframes boot-blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
     @media (prefers-reduced-motion: reduce) { #boot .boot-bubble i { animation: none; opacity: 1; } }
     @media (max-width: 500px) {
@@ -64,6 +69,7 @@
       #boot .boot-head, #boot .boot-bubble { background: #17212b; }
       #boot .boot-status { color: #5fc98a; }
       #boot .boot-bubble i { background: #8a97a4; }
+      #boot-again { background: #5fc98a; color: #0b0e12; }
     }
     /* Рамка титров шелла (#1444): та же, что у .phone из src/styles.css — приложение грузится параллельно
        и появляется ровно в этой коробке. Копия рамки, менять вместе с .phone. */
@@ -135,6 +141,24 @@
     }
     /* intro-css:end */
   </style>
+  <!-- Сторож холодной загрузки (1477): ошибка загрузчика и тайм-аут 12 с — одна перезагрузка за сессию,
+       потом текст. Сигнал __alikBoot ставит первая строка src/intro/shell.ts; без него игра не живёт. -->
+  <script>
+    ;(function(){
+      var K='alik-boot-retry',f=false
+      function fail(){
+        if(f||window.__alikBoot)return
+        f=true
+        var r=false
+        try{r=sessionStorage.getItem(K)==='1';if(!r)sessionStorage.setItem(K,'1')}catch(e){r=true}
+        if(!r){location.reload();return}
+        var b=document.getElementById('boot')
+        if(b)b.className+=' boot-failed'
+      }
+      addEventListener('error',function(e){if(e.target.tagName==='SCRIPT')fail()},true)
+      setTimeout(fail,12000)
+    })()
+  </script>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-180.png">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐄</text></svg>">
@@ -151,8 +175,16 @@
         </div>
       </div>
       <div class="boot-bubble" aria-hidden="true"><i></i><i></i><i></i></div>
+      <p id="boot-retry" hidden></p>
+      <div id="boot-down">
+        <p>Алик не дозвонился. Проверьте сеть и обновите страницу.</p>
+        <button type="button" id="boot-again" hidden>Попробовать снова</button>
+      </div>
+      <noscript><p>Игра живёт на JavaScript — включите его.</p></noscript>
     </div>
   </div>
+  <!-- Сборка снимает с тега навесные атрибуты (onerror) — отказ загрузчика сторожа ловит window error в capture,
+       см. инлайн-скрипт в <head> (1477). -->
   <script type="module" src="/src/intro/shell.ts"></script>
 </body>
 </html>
