@@ -5,7 +5,7 @@
 import { type Facts, type Line, type LineSpec, type Entry, is, eq, ne, exists, gte, lte, gate, missing, set } from './fact'
 import type { Scene, SceneNode } from './scenes'
 import { needs, samvelLine, WORLD } from './world'
-import { actSigned, bathAsked, bathAnswered, caughtCount, court, cryptoHodl, garikConcrete, intro, judgeApology, karineKnowsDebt, met, payday, rubikFined, taxFrozen, taxThawed } from './memkeys'
+import { actSigned, bathAsked, bathAnswered, caughtUnique, court, cryptoHodl, garikConcrete, intro, judgeApology, karineKnowsDebt, met, payday, rubikFined, taxFrozen, taxThawed } from './memkeys'
 import { BATH_ANSWER } from './rules/player-choice-pools'
 
 export const ANNOUNCE = [
@@ -112,12 +112,12 @@ export const CLAIMS: Entry<Claim>[] = [
   gate(is(met('mama')))({ who: 'mama', t: 'А мне на лекарства. Я из-за вас обоих поседела. Ещё раз.', cut: 25000 }),
 ]
 
-/** Порог мидгейм-поимок «Следователя» (#1434): та же планка, что у ачивки liar3 (`game.ts`).
+/** Порог РАЗНЫХ поимок «Следователя» (#1434, #1481): широта расследования, а не настойчивость.
  *  Сцена дележа читает счётчик сама — правило исхода выбирается позже, и сцене незачем гадать,
  *  кто из более частных исходов победит. */
 export const DETECTIVE_CATCHES = 3
-export const detectiveDue = (mem: Readonly<Facts>): boolean => Number(mem[caughtCount] ?? 0) >= DETECTIVE_CATCHES
-/** Мост поимок (#1433): две мидгейм-поимки — уже навык, а не случайность; одна — не повод отдавать мешок. */
+export const detectiveDue = (mem: Readonly<Facts>): boolean => Number(mem[caughtUnique] ?? 0) >= DETECTIVE_CATCHES
+/** Мост поимок (#1433): две РАЗНЫЕ поимки — уже навык, а не случайность; одна — не повод отдавать мешок. */
 export const COINS_BRIDGE_CATCHES = 2
 
 /** Дележ «Следователя» (#1434): родня видела записи и доли не берёт, «по рублю» не работает.
@@ -237,12 +237,12 @@ export const OUTCOME: Record<string, { lines: Array<Entry<string | LineSpec | [s
       // поимка в самой сцене: слово держится на моменте, а не на счётчике
       gate(is(payday.caught))(needs('karineHome')(needs('karine')('Ты меня поймал в День выплаты — я держу слово. Весь долг, до копейки. Монетами. Считать при Карине, так надёжнее.'))),
       gate(is(payday.caught))(needs('karineGone')('Ты меня поймал в День выплаты — я держу слово. Весь долг, до копейки. Монетами. Считай сам, при мне.')),
-      // мост (#1433): сцену не поймал, но поимок в партии две — повод другой, и строка называет именно его
-      gate(gte(caughtCount, COINS_BRIDGE_CATCHES), missing(payday.caught))('Ты ловил меня весь год и поймал дважды. Так что держу слово без напоминаний: весь долг, до копейки, монетами. Мешок у двери. Считай при мне.'),
+      // мост (#1433): сцену не поймал, но разных поимок в партии две — повод другой, и строка называет именно его
+      gate(gte(caughtUnique, COINS_BRIDGE_CATCHES), missing(payday.caught))('Ты ловил меня весь год и поймал дважды. Так что держу слово без напоминаний: весь долг, до копейки, монетами. Мешок у двери. Считай при мне.'),
     ],
     button: [needs('karineHome', 'boris')(needs('karine')('Брат, досчитал? Карине говорит, одной монеты не хватает. Это Борис. Он её съел, извини.')), 'Брат, досчитал? Одной монеты не хватает. Это я её съел. Нервы, извини.'],
   },
-  // «Следователь» (#1434): три мидгейм-поимки — сцена дележа уже не срезала, исход отдаёт долг целиком.
+  // «Следователь» (#1434, #1481): три разных поимки — сцена дележа уже не срезала, исход отдаёт долг целиком.
   // Счётчик поимок только растёт, поэтому ни одна строка исхода не называет числа (#1456): «трижды» при
   // четвёртой поимке противоречило бы записям, которые родня как раз и видела.
   detective: {

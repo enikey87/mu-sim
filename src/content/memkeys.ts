@@ -45,6 +45,10 @@ export const garikCode = 'garik.code'
  *  Имя — по правилу фактов-дней (`mooAt`, `sorryAt`, `thanksAt`): `caught.at` попал бы в легаси-пространство
  *  `caught.<пара утверждений>` и в сторож «новая партия не пишет старые ключи» (`lies.test.ts`). */
 export const caughtAt = 'caughtAt'
+/** Сколько РАЗНЫХ пар утверждений игрок поймал (#1481): повторная поимка той же пары — одна поимка.
+ *  Валюта концовок «Следователь» и «Мешок мелочи»; тотальный `caught` остаётся ачивкам настойчивости.
+ *  Штамп пары — эпизод журнала со статусом `caught` (легаси `caught.<пара>` новая партия не пишет). */
+export const caughtUnique = 'caughtUnique'
 export const cryptoHodl = 'crypto.hodl'
 export const bathAsked = 'bath.asked'
 /** Ход, на котором условие Карине про ванную прозвучало (#1382): сцена мира ставит факт, но своего окна
@@ -403,7 +407,7 @@ export const ACTOR_KEYS: ReadonlySet<string> = new Set(ACTOR_KEY_LIST)
 
 export const MEM_KEYS: ReadonlySet<string> = new Set([
   HEAT, muenAt, muenAsked, muenAnswered, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, evicted, vendetta, coldWar, court, courtVerdict, courtPolite,
-  ritualCount, ritualCut, caughtCount, caughtAt, garikDenied, garikCode, cryptoHodl, bathAsked, bathAskedAt, bathAnswered, mamaCalls, phoneKarine, karineKnowsDebt, karineThinksTax, alikShaved, moustacheKept, moustacheAskAt, alikDay, mooAt, sorryAt, courtReferral, judgeApology, saidStrasburg,
+  ritualCount, ritualCut, caughtCount, caughtUnique, caughtAt, garikDenied, garikCode, cryptoHodl, bathAsked, bathAskedAt, bathAnswered, mamaCalls, phoneKarine, karineKnowsDebt, karineThinksTax, alikShaved, moustacheKept, moustacheAskAt, alikDay, mooAt, sorryAt, courtReferral, judgeApology, saidStrasburg,
   rudeAt, thanksAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway, nivaPlayer, carGone,
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, borisForeman, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, asmikCard, paydayScene, threatClaim, saidTomorrow, saidFriday, saidKonak, saidHash, saidOath, saidNuneNoWrite, saidGrantEnvelope, saidMoneyMoustache, saidRegiment,

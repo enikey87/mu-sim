@@ -609,6 +609,9 @@ describe('App', () => {
     const fixture = [50, 1200, 300]
     for (const amount of fixture) { game.S.mem[nextTransfer] = amount; await game.transfer() }
     const paid = fixture.reduce((a, n) => a + n, 0)
+    // #1481: акт называет РАЗНЫЕ поимки (caughtUnique), а не тотальный счётчик — числа нарочно расходятся
+    game.S.mem['caught'] = 7
+    game.S.mem['caughtUnique'] = 4
     renderApp(game)
     fireEvent.click(screen.getByTitle('Обещания и ачивки'))
     const act = document.getElementById('act')!.textContent!
@@ -619,7 +622,7 @@ describe('App', () => {
     expect(act).toContain(`Возвращено и зачтено: ${paid.toLocaleString('ru-RU')} ₽`)
     // обещания и пойманная ложь — из тех же фактов, что журнал досье
     expect(act).toContain(`Обещаний: ${game.S.promises.length} (`)
-    expect(act).toContain(`Ложи поймано: ${Number(game.S.mem['caught'] ?? 0)}. Переводов получено: ${fixture.length} на ${paid.toLocaleString('ru-RU')} ₽`)
+    expect(act).toContain(`Ложи поймано: ${Number(game.S.mem['caughtUnique'] ?? 0)}. Переводов получено: ${fixture.length} на ${paid.toLocaleString('ru-RU')} ₽`)
     expect(act).toContain(`Дней со сдачи: ${game.S.day}.`)
     expect(act).toContain('Расхождение объяснено Аликом.')
     fireEvent.click(document.getElementById('closeSheet')!)
