@@ -1,10 +1,11 @@
-import { useRef, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { useGame } from './useGame'
 import { fmtDate } from '../engine/time'
 import { useModal } from './useModal'
-import { viewOf, type PromiseRow } from './view'
+import { viewOf, type EndingRow, type PromiseRow } from './view'
 import { TrackNote } from './TrackNote'
 import { useReview } from './Review'
+import { shareEnding } from './share'
 
 /** Значок записи журнала: свой у каждого состояния (docs/design/promise-amnesty.md). */
 const due = (p: PromiseRow) => (p.due === null ? '' : ` ${fmtDate(p.due)}`)
@@ -25,6 +26,7 @@ export function Sheet({ onClose, onReset }: { onClose: () => void; onReset: () =
   const game = useGame()
   const v = viewOf(game)
   const review = useReview()
+  const [note, setNote] = useState<string | null>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
   useModal({
     active: true,
@@ -32,6 +34,12 @@ export function Sheet({ onClose, onReset }: { onClose: () => void; onReset: () =
     onEscape: onClose,
     returnFocus: () => document.getElementById('infoBtn'),
   })
+  // Коллекция знает только день открытия: путь партии к старой концовке не восстановить, постер живёт без него.
+  const share = async (e: EndingRow) => {
+    setNote(null)
+    const r = await shareEnding({ id: e.id, icon: e.icon, title: e.title, days: e.day, path: [] })
+    setNote(r === 'saved' ? 'Картинка сохранена' : r === 'shared' ? 'Поделились' : r === 'failed' ? 'Не вышло поделиться' : null)
+  }
 
   return (
     <div className="sheet" id="sheet" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
@@ -78,9 +86,18 @@ export function Sheet({ onClose, onReset }: { onClose: () => void; onReset: () =
             <div key={e.id} role="listitem" className={e.got ? 'tile' : 'tile locked'}>
               <span className="tile-icon">{e.got ? e.icon : '🔒'}</span>
               <span className="tile-name">{e.got ? <b>{e.title}</b> : '???'}</span>
+              {e.got && (
+                <button
+                  type="button"
+                  className="tile-share"
+                  aria-label={`Поделиться концовкой «${e.title}»`}
+                  onClick={() => void share(e)}
+                >Поделиться</button>
+              )}
             </div>
           ))}
         </div>
+        {note && <p className="share-note" aria-live="polite">{note}</p>}
 
         <h3>Трофеи</h3>
         <ul id="items" className="list">
