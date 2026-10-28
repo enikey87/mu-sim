@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>О игре и приватности — Алик, где деньги?</title>
+  <meta name="description" content="Какие счётчики стоят в игре «Алик, где деньги?», что они видят, где лежит партия, что с покупками и куда писать.">
+  <meta name="theme-color" content="#d9dde3" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0b0e12" media="(prefers-color-scheme: dark)">
+  <!-- Страница статическая: ни скриптов, ни внешних файлов. Палитра и шрифт — из src/styles.css, копия
+       инлайном (сторож: src/tools/privacy-page.test.ts). Обе темы — prefers-color-scheme, как у шелла. -->
+  <style>
+    :root {
+      --page: #d9dde3;
+      --panel: #ffffff;
+      --text: #111418;
+      --muted: #7b8591;
+      --accent: #2f9e5c;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --page: #0b0e12;
+        --panel: #17212b;
+        --text: #e9edf1;
+        --muted: #8a97a4;
+        --accent: #5fc98a;
+      }
+    }
+    html, body { min-height: 100%; margin: 0; }
+    body {
+      display: flex; justify-content: center; align-items: flex-start;
+      background: var(--page); color: var(--text);
+      font: 15px/1.35 -apple-system, "Segoe UI", Roboto, sans-serif;
+      padding: 16px;
+    }
+    main {
+      background: var(--panel); color: var(--text);
+      width: 100%; max-width: 560px;
+      border-radius: 18px; padding: 20px 18px 22px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, .35);
+    }
+    h1 { font-size: 20px; line-height: 1.2; margin: 0 0 10px; }
+    h2 { font-size: 14px; font-weight: 600; margin: 18px 0 6px; color: var(--muted); }
+    p { margin: 0 0 10px; font-size: 14px; }
+    ul { margin: 0 0 10px; padding-left: 18px; font-size: 14px; }
+    li { margin: 0 0 4px; }
+    .lead { font-size: 15px; }
+    .fine { font-size: 12px; color: var(--muted); }
+    a { color: var(--accent); }
+    footer { margin-top: 18px; font-size: 13px; }
+    @media (max-width: 500px) {
+      body { padding: 0; }
+      main { border-radius: 0; box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>О игре и приватности</h1>
+    <p class="lead">«Алик, где деньги?» — браузерная шутка про переписку с подрядчиком, который не платит. Регистрации, аккаунта и пароля в ней нет: игра не знает, кто ты, пока ты сам не напишешь об этом в чате.</p>
+
+    <h2>Какие счётчики</h2>
+    <ul>
+      <li><b>Яндекс Метрика</b> — счётчик на стороне Яндекса, данные в России.</li>
+      <li><b>Umami</b> — счётчик на своём облачном сервере в ЕС.</li>
+      <li><b>PostHog</b> — счётчик на серверах в ЕС.</li>
+    </ul>
+    <p>Все три включаются только на настоящем адресе игры (enikey87.github.io/mu-sim). В локальной сборке, в тестах и в отладочных режимах (<code>?debug</code>, <code>?fast</code>, <code>?noidle</code>) счётчики молчат.</p>
+
+    <h2>Что они видят</h2>
+    <p>Один просмотр страницы за загрузку и события прогресса: начал новую партию или вернулся в сохранённую, сколько дней прошло с первого визита, сколько сообщений отправлено (пороги 1, 10, 25, 50, 100, 200), какая концовка достигнута (её идентификатор), чем кончился День выплаты, сколько секунд вкладка была на экране, и падение интерфейса — имя ошибки и кадры стека, без текста, который мог бы оказаться репликой.</p>
+    <p>Не уходит: текст твоих сообщений, тексты кнопок, сумма долга, сид партии, имена. Вебвизор, карта кликов, запись сессии и нажатий выключены — и в коде игры, и в кабинетах счётчиков.</p>
+    <p class="fine">Чтобы отличить новый визит от повторного, счётчики держат в браузере служебный идентификатор — cookie или запись в памяти браузера. Это номер браузера, а не человек: ни имени, ни телефона, ни почты в нём нет.</p>
+
+    <h2>Где лежит партия</h2>
+    <p>В памяти браузера на твоём устройстве. На Яндекс Играх партия ещё и в облаке площадки («player data»), чтобы она открывалась на другом устройстве того же игрока; между устройствами едет только сама партия, а отметки вроде коллекции концовок остаются на устройстве.</p>
+    <p>«Начать заново» в досье стирает партию с устройства. Коллекция открытых концовок — отметка устройства, её «Начать заново» не стирает. Стереть всё сразу — очистить данные сайта в браузере.</p>
+
+    <h2>Покупки</h2>
+    <p>«Чашка хаша для Алика» — поддержка автора по желанию: в партии она ничего не меняет. На Яндекс Играх это покупка через площадку, в Telegram — звёзды, на сайте — ссылка на DonationAlerts, которая открывается уже на его стороне. Платёж проводит площадка или платёжный сервис: игра не видит и не хранит номер карты, а получает только факт покупки.</p>
+
+    <h2>Кто это сделал и куда писать</h2>
+    <p>Игру сделал и держит enikey87. Вопросы, находки и претензии — в обсуждения репозитория: <a href="https://github.com/enikey87/mu-sim/issues">github.com/enikey87/mu-sim/issues</a>. В Telegram — боту <a href="https://t.me/alik_where_money_bot">@alik_where_money_bot</a>.</p>
+
+    <footer><a href="./">← Вернуться в игру</a></footer>
+  </main>
+</body>
+</html>

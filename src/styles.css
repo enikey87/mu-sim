@@ -595,6 +595,11 @@ body {
 }
 /* intro-css:end */
 
+/* Ссылка на страницу «О игре и приватности» (#1484): тихая строка под счётчиком в досье.
+   Вне intro-css: интро копирует блок в index.html, и лишняя строка там разошлась бы с игрой. */
+.privacy-link { margin: 8px 0 0; font-size: 12px; text-align: center; }
+.privacy-link a { color: var(--accent); }
+
 /* Режим живого рецензирования (#872): бейдж заметки, мини-меню, модалка и кнопки досье */
 .msg { position: relative; }
 .review-badge {
