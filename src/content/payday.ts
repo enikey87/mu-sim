@@ -5,7 +5,7 @@
 import { type Facts, type Line, type LineSpec, type Entry, is, eq, ne, exists, gte, lte, gate, missing, set } from './fact'
 import type { Scene, SceneNode } from './scenes'
 import { needs, samvelLine, WORLD } from './world'
-import { actSigned, bathAsked, bathAnswered, caughtCount, court, cryptoHodl, garikConcrete, judgeApology, karineKnowsDebt, met, payday, rubikFined, taxFrozen, taxThawed } from './memkeys'
+import { actSigned, bathAsked, bathAnswered, caughtCount, court, cryptoHodl, garikConcrete, intro, judgeApology, karineKnowsDebt, met, payday, rubikFined, taxFrozen, taxThawed } from './memkeys'
 import { BATH_ANSWER } from './rules/player-choice-pools'
 
 export const ANNOUNCE = [
@@ -137,6 +137,8 @@ export const DETECTIVE_CLAIMS: Entry<string | DetectiveLine>[] = [
  *  `payday.chain` остаётся меткой «День выплаты начался» — на неё смотрят амнистия, отклик памяти и легенда лаваша.
  *  Число поимок не называет (#1456): счётчик только растёт, и на четвёртой поимке «трижды» стало бы ложью. */
 export const DETECTIVE_CHAIN = 'Отмазку я не расскажу: ты ловил меня на слове снова и снова, и родня видела записи. Впервые мне нечего добавить.'
+/** Покаяние «Следователя» без адресата (#1472): звучит, когда Карине не слышит — не вошла в историю или ушла к Рубику. */
+const DETECTIVE_GENERAL = 'Ты ловил меня на слове — и не раз, брат. Я мог бы сказать, что слово было чужое. Оно было моё. Перевёл всё.'
 
 /** Великая отмазка (у всех звеньев из событий партии один приоритет — цепочки разные от партии к партии): звенья по грамматике «где лежали → кто взял → куда повезли → кто помешал → кто решил → вердикт». */
 export const SLOTS = ['place', 'taker', 'route', 'blocker', 'court', 'verdict'] as const
@@ -245,7 +247,8 @@ export const OUTCOME: Record<string, { lines: Array<Entry<string | LineSpec | [s
   // четвёртой поимке противоречило бы записям, которые родня как раз и видела.
   detective: {
     sys: 'Алик Воздухонесян перевёл вам {sum} ₽. Назначение: «Слово. Поимки. Долг».',
-    lines: [needs('karineHome')(needs('karine')('Не раз и не два я врал — и ты записывал. Я мог бы сказать, что слово было чужое. Оно было моё. Карине, проверь: это правда я перевёл.')), 'Ты ловил меня на слове — и не раз, брат. Я мог бы сказать, что слово было чужое. Оно было моё. Перевёл всё.'],
+    // две версии покаяния взаимоисключающие (#1472): при Карине дома — обращённая к ней, иначе — общая
+    lines: [needs('karineHome')(needs('karine')('Не раз и не два я врал — и ты записывал. Я мог бы сказать, что слово было чужое. Оно было моё. Карине, проверь: это правда я перевёл.')), gate(missing(intro('karine')))(DETECTIVE_GENERAL), needs('karineGone')(needs('karine')(DETECTIVE_GENERAL))],
     button: ['Брат, это был День выплаты. Я, кажется, заплатил. Непривычно. Повторим через год — для тренировки?'],
   },
   lavash: {

@@ -207,6 +207,36 @@ describe('День выплаты', () => {
     game.S.mem['payday.caught'] = true
     expect((await game.fire('PaydayOutcome'))?.name).toBe('Payday_coins')
   })
+  // #1472: у покаяния две версии — обращённая к Карине и общая; при Карине дома звучала одна, а не обе подряд
+  it('Следователь: бит покаяния звучит один раз — при Карине дома обращённый, без неё общий (#1472)', async () => {
+    const play = async (setup: (g: Game) => void) => {
+      const { game } = makeGame()
+      rich(game)
+      game.S.mem.caught = 3
+      setup(game)
+      await game.enterNode('payday', 'announce')
+      await choose(game, 'witness')
+      const n = game.S.msgs.length
+      await choose(game, 'share')
+      expect(game.S.mem.payday).toBe('detective')
+      return texts(game, n).join('\n')
+    }
+    const REPENT = /Я мог бы сказать, что слово было чужое/g
+    const home = await play((g) => { g.S.mem['intro.karine'] = true })
+    expect(home.match(REPENT), 'бит покаяния выдан дважды').toHaveLength(1)
+    expect(home).toMatch(/Карине, проверь/)
+    expect(home, 'при Карине дома прозвучала общая строка').not.toMatch(/Ты ловил меня на слове/)
+
+    const gone = await play((g) => { g.S.mem['intro.karine'] = true; g.S.mem['finale.rubik'] = 'karine' })
+    expect(gone.match(REPENT), 'покаяние без Карине').toHaveLength(1)
+    expect(gone).toMatch(/Ты ловил меня на слове/)
+    expect(gone, 'Карине ушла к Рубику, а строка обращена к ней').not.toMatch(/Карине, проверь/)
+
+    // Карине ещё не входила в историю: обращённая версия ей не адресуется, общая звучит один раз
+    const stranger = await play((g) => { delete g.S.mem['met.karine'] })
+    expect(stranger.match(REPENT), 'покаяние без знакомства с Карине').toHaveLength(1)
+    expect(stranger).toMatch(/Ты ловил меня на слове/)
+  })
   // #1456: счётчик поимок только растёт, условие исхода — gte(caughtCount, 3), поэтому ни одна строка
   // «Следователя» не называет числа: при четвёртой и пятой поимках «трижды» противоречило бы записям
   it('Следователь: строки исхода не называют число поимок — при 4+ им нечего опровергать (#1456)', async () => {
@@ -231,17 +261,17 @@ describe('День выплаты', () => {
     expect(five.game.S.money).toBeGreaterThanOrEqual(five.debt)
     // строки исхода действительно сыграли — иначе запрет на число был бы вакуумным
     expect(five.out).toContain('Назначение: «Слово. Поимки. Долг»')
-    expect(five.out).toContain('Ты ловил меня на слове — и не раз, брат.')
+    expect(five.out).toContain('Не раз и не два я врал — и ты записывал.')
     // ни в переводе, ни в репликах, ни в отмазке, ни в досье нет числа, которого в партии не было
     for (const [where, text] of [['перевод и реплики', five.out], ['отмазка', five.chain], ['досье', five.dossier]] as const) {
       expect(text, `число поимок в тексте: ${where}`).not.toMatch(COUNT_CLAIM)
     }
-    // строки на месте: перевод с назначением, обе реплики исхода, отмазка-метка
+    // строки на месте: перевод с назначением, покаяние (одно — при Карине дома обращённое, #1472), отмазка-метка
     const three = await play(3)
     expect(three.game.S.mem.payday).toBe('detective')
     expect(three.out).toContain('Назначение: «Слово. Поимки. Долг»')
     expect(three.out).toContain('Не раз и не два я врал — и ты записывал.')
-    expect(three.out).toContain('Ты ловил меня на слове — и не раз, брат.')
+    expect(three.out, 'при Карине дома звучит и общая версия покаяния').not.toContain('Ты ловил меня на слове — и не раз, брат.')
     expect(three.chain).toBe(DETECTIVE_CHAIN)
   })
   // #1456: «Настоящие деньги» вежливому следователю (#1435) — та же причина: числа в тексте нет
