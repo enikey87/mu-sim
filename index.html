@@ -38,6 +38,7 @@
     #boot .spr{position:absolute;top:5px;bottom:5px;left:10px;width:58px;border-radius:14px;background:radial-gradient(circle at 35% 30%,#d9dde3,#7b8591);box-shadow:0 1px 3px rgba(0,0,0,.25),inset 0 -2px 4px rgba(0,0,0,.12);animation:hunt 3.2s ease-in-out infinite}
     @keyframes hunt{0%{left:10px}42%{left:71px}58%{left:84px}74%{left:76px}100%{left:10px}}
     /* второе окно: титры кончились, пакет ещё едет */
+    #boot{text-align:center}
     #boot .wt{display:none;align-items:center;gap:8px;padding:10px 14px;border-radius:14px;background:#fff;color:#7b8591;font-size:13px}
     #boot .wt i{width:7px;height:7px;border-radius:50%;background:#7b8591;animation:blink 1.2s infinite}
     #boot .wt i:nth-child(2){animation-delay:.2s}#boot .wt i:nth-child(3){animation-delay:.4s}
@@ -48,7 +49,7 @@
     #boot.waiting .wt{display:flex}
     #boot.failed .fl{display:block}
     /* кнопка повтора (1477) */
-    #boot-again{display:block;margin:12px auto 0;padding:8px 14px;border:0;border-radius:10px;background:#2f9e5c;color:#fff;font:inherit}
+    #boot-again{margin-top:12px;padding:8px 14px;border:0;border-radius:10px;background:#2f9e5c;color:#fff;font:inherit}
     #boot noscript p{max-width:216px;margin:16px 0 0;font-size:13px}
     @media (prefers-reduced-motion:reduce){#boot .spr{animation:none;left:calc(50% - 29px)}#boot .wt i{animation:none;opacity:1}}
     @media (prefers-color-scheme:dark){

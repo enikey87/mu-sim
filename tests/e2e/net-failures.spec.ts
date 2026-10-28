@@ -35,6 +35,8 @@ test('загрузчик не доехал: сторож показывает т
   await expect(page.getByText(FAIL_TEXT)).toBeVisible({ timeout: 15_000 })
   // одна авто-перезагрузка за сессию: отметка в sessionStorage, а не бесконечный цикл
   expect(await page.evaluate(() => sessionStorage.getItem('alik-boot-retry'))).toBe('1')
+  // сторож не предлагает кнопку: перезагрузка уже была, текст велит обновить страницу руками
+  await expect(page.getByRole('button', { name: 'Попробовать снова' })).toBeHidden()
   expect(documents()).toBe(2)
   await page.waitForTimeout(1500)
   expect(documents(), 'сторож ушёл в цикл перезагрузок').toBe(2)
