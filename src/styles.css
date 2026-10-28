@@ -515,6 +515,9 @@ body {
   border: 1px solid rgba(127,127,127,.4); background: transparent; color: inherit;
   border-radius: 12px; padding: 10px 14px; font: inherit; cursor: pointer;
 }
+/* второй крах подряд: перемонтирование не помогло — запасная кнопка как рекомендованная (#1482) */
+.crash button.recommended { border-color: rgba(217,68,60,.55); background: rgba(217,68,60,.12); font-weight: 600; }
+.crash-hint { margin: 0; font-size: 13px; color: var(--muted); }
 
 /* intro-css:start — блок дословно повторён в index.html: те же правила рисуют титры шелла холодной
    загрузки (#1444) до прихода этого файла. Менять в двух местах сразу: расхождение ловит
