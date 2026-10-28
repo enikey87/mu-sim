@@ -7,6 +7,10 @@ export { daysWord }
  *  своих ссылок на приложение в переменных сборки нет, выдумывать их нельзя (см. PR #1485). */
 export const GAME_URL = 'https://enikey87.github.io/mu-sim/'
 
+/** Страница «О игре и приватности» (#1484): тот же адрес, что у игры, следующим файлом — `public/privacy.html`
+ *  сборка кладёт в корень рядом с index.html. */
+export const PRIVACY_URL = `${GAME_URL}privacy.html`
+
 export type ShareCard = {
   id: string
   icon: string

@@ -18,6 +18,7 @@ import { introDateLine, introVowLine, LINE_MS, FADE_MS } from '../intro/cards'
 import { enable, GAME_HOST } from '../analytics/metrics'
 import { EPILOGUE_BANNER, LEND50_LINK, LEND50_RENAME, LEND50_SYS, LEND50_TG_SYS, LEND50_VK_SYS, LEND50_YA_SYS } from '../content/endgame'
 import { adoptPlatform, platform, webPlatform } from '../platform'
+import { PRIVACY_URL } from './share'
 
 function renderApp(game: Game, onReset = vi.fn()) {
   const utils = render(<App game={game} onReset={onReset} />)
@@ -1853,6 +1854,27 @@ describe('строка о счётчике: видна только когда �
     const inSheet = within(dossier).getByText(text!)
     expect(inSheet).toBeInTheDocument()
     expect(within(dossier).getAllByText(text!)).toHaveLength(1)
+  })
+})
+
+describe('ссылка на страницу приватности в досье (#1484)', () => {
+  it('одна тихая строка под счётчиком, ведёт на privacy.html в новой вкладке', () => {
+    const { game } = makeGame()
+    renderApp(game)
+    fireEvent.click(screen.getByTitle('Обещания и ачивки'))
+    const dossier = screen.getByRole('dialog', { name: 'Досье на Алика' })
+    const links = within(dossier).getAllByRole('link')
+    expect(links).toHaveLength(1)
+    expect(links[0].textContent).toBe('О игре и приватности')
+    expect(links[0]).toHaveAttribute('href', PRIVACY_URL)
+    expect(links[0]).toHaveAttribute('target', '_blank')
+    expect(links[0].getAttribute('rel')).toContain('noopener')
+  })
+
+  it('на интро ссылки нет: страница живёт в досье, а не в титрах', () => {
+    const { game } = makeGame()
+    render(<App game={game} onReset={vi.fn()} intro />)
+    expect(document.querySelector('.intro a')).toBeNull()
   })
 })
 
