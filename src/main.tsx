@@ -8,7 +8,7 @@ import { realClock } from './engine/clock'
 import { browserAudio } from './engine/audio'
 import { SAVE_KEY } from './engine/state'
 import { App } from './ui/App'
-import { enable, firstGesture, boot, shown, watchCrashes } from './analytics/metrics'
+import { enable, firstGesture, boot, shown, track, watchCrashes } from './analytics/metrics'
 import { bootPlatform, platform, safeStorage } from './platform'
 import './styles.css'
 
@@ -54,12 +54,16 @@ export function startApp(opts: StartOptions = {}): Promise<AppHandle> {
         storage,
         start,
         externalPay: p.externalPay,
+        platformId: p.id,
         joinGroup: p.joinGroup != null,
         // где карточка «займи 50» — покупка, там имя витрины: текст карточки у Яндекса и Telegram разный
         pay50: p.pay50 != null && (p.id === 'yandex' || p.id === 'telegram') ? p.id : undefined,
       })
       // Незакрытую покупку адаптер закрыл при старте (п. 1.13.1) — спонсорский итог выдаём партии один раз.
-      if (p.takeSponsor?.()) game.lend50Sponsor()
+      if (p.takeSponsor?.()) {
+        track('lend50_paid', { platform: p.id }) // списание подтвердила площадка, а не нажатие (#1483)
+        game.lend50Sponsor()
+      }
       ;(window as unknown as { __alik: Game }).__alik = game // API для scripts/playtest-tech.mjs (и консоли): что он вызывает, проверяет src/tools/window-api.test.ts
       return game
     }
