@@ -63,24 +63,27 @@ test('пакет ещё едет после титр: шелл показыва�
 })
 
 test('пакет не доехал: строка про сеть вместо вечного индикатора', async ({ page }) => {
+  test.slow()
   const entry = await entryScript(page)
   await page.route('**/*.js', (route) => (isEntry(route.request().url(), entry) ? route.continue() : route.abort()))
   await page.goto('/')
-  const intro = page.locator('.intro')
-  await intro.click()
-  await expect(page.locator('.intro-line')).toHaveText('Вы положили плитку на объекте Алика.')
-  await intro.click() // пропуск касанием: титры убираются сразу
-  await expect(intro).toHaveCount(0)
-  await expect(page.locator('#boot .fl')).toBeVisible()
+  await page.locator('.intro').click()
+  // первый отказ не молчит: повтор виден строкой, пока шелл дозванивается (#1477)
+  await expect(page.locator('#boot .wt span')).toHaveText(/дозваниваемся… [23] из 3/, { timeout: 15_000 })
+  // три попытки отказали — строка про сеть вместо вечного индикатора
+  await expect(page.locator('#boot .fl')).toBeVisible({ timeout: 30_000 })
   await expect(page.locator('#boot .fl')).toHaveText('Алик не дозвонился. Проверьте сеть и обновите страницу.')
   await expect(page.locator('#boot .wt')).toBeHidden()
 })
 
 test('?nointro и отказ сети: шелл сразу говорит про сеть, а не показывает индикатор', async ({ page }) => {
+  test.slow()
   const entry = await entryScript(page)
   await page.route('**/*.js', (route) => (isEntry(route.request().url(), entry) ? route.continue() : route.abort()))
   await page.goto('/?nointro')
-  await expect(page.locator('#boot .fl')).toBeVisible()
+  // повтор виден сразу, после трёх попыток — строка про сеть и кнопка (#1477)
+  await expect(page.locator('#boot .wt span')).toHaveText(/дозваниваемся… [23] из 3/, { timeout: 15_000 })
+  await expect(page.locator('#boot .fl')).toBeVisible({ timeout: 30_000 })
   await expect(page.locator('#boot .fl')).toHaveText('Алик не дозвонился. Проверьте сеть и обновите страницу.')
 })
 
