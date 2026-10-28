@@ -295,9 +295,11 @@ describe('День выплаты', () => {
     expect(ENDINGS.find((e) => e.id === game.S.ending)!.text).not.toMatch(COUNT_CLAIM)
   })
   // #1433: мост поимок — две мидгейм-поимки дают мешок и без поимки в самой сцене
-  it('Мост поимок: две мидгейм-поимки — «Мешок мелочи» без поимки в сцене (#1433)', async () => {
+  it.each([2, 5])('Мост поимок: две разные пары при %i поимках — монеты без Карине и поимки в сцене', async (caught) => {
     const { game } = makeGame()
     game.S.mem.caughtUnique = COINS_BRIDGE_CATCHES
+    game.S.mem.caughtCount = caught
+    expect(game.S.mem['intro.karine']).toBeUndefined()
     const debt = game.debt
     const n = game.S.msgs.length
     expect(game.S.mem['payday.caught'], 'поимки в сцене нет').toBeUndefined()
@@ -306,10 +308,14 @@ describe('День выплаты', () => {
     expect(game.S.mem.payday).toBe('coins')
     expect(game.S.debt).toBe(0)
     expect(game.S.money).toBeGreaterThanOrEqual(debt)
-    // строка-мост называет счётчик поимок; строка про поимку в сцене при этом неправдива
-    expect(out).toMatch(/поймал дважды/)
-    expect(out, 'сцена не поймана — строка про День выплаты врёт').not.toMatch(/поймал меня в День выплаты/)
+    expect(out).toMatch(/ловил меня на слове.*до Дня выплаты/)
+    expect(out).not.toMatch(/поймал (?:меня|его) в День выплаты|поймал дважды|весь год/)
     expect(out).toMatch(/мешок монет/)
+    await game.fire('CheckEnding')
+    expect(game.S.ending).toBe('payday_coins')
+    const ending = ENDINGS.find((e) => e.id === game.S.ending)!
+    expect(ending.text).toMatch(/монетами по 10 рублей/)
+    expect(ending.text).not.toMatch(/поймал.*в День выплаты|Карине/)
   })
   it('Мост поимок: одна поимка мешок не открывает — порог 2, не 1 (#1433)', async () => {
     const pick = async (caught: number) => {

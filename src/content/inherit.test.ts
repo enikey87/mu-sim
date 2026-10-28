@@ -11,7 +11,6 @@ import { alikDead, endgame, inhBurned, inhDoneAt, inhRefused, mourning } from '.
 
 const LETTER_START = 'УВАЖАЕМЫЙ Г-Н АЛИК ВОЗДУХОНЕСЯН'
 const BURNED = 'Тиграна не существует'
-const REFUSED = 'ТЫ ПОНЯЛ ЧТО ТЫ СДЕЛАЛ'
 const textOf = (m: { kind: string; text?: string }): string => (m.kind === 'text' ? String(m.text) : '')
 const frame = (game: Game) => { game.S.choices = null; return game.buildChoices() }
 const windowBtn = (game: Game) => frame(game).find((c) => c.act === 'inhDone')
@@ -83,7 +82,7 @@ describe('письмо из Глендейла: обе ветки проигры
     const from = game.S.msgs.length
     await pick(game, 'refuse')
     const said = alikSince(game, from)
-    expect(said, 'обиды Алика нет').toContain(REFUSED)
+    expect(said, 'обиды Алика нет').toMatch(/ТЫ ПОНЯЛ,? ЧТО ТЫ СДЕЛАЛ/)
     expect(game.S.ach.q_inherit, 'достижение «Спаситель наследства» не выдано').toBeDefined()
     expect(game.S.mem[inhRefused], 'обида не зафиксирована фактом').toBe(true)
     expect(game.S.mem[inhBurned], 'отказная ветка записала сгоревшее наследство').toBeUndefined()
