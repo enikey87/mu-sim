@@ -13,7 +13,7 @@ import { turnRules } from './rules/turn'
 import { FINALES } from './finales'
 import { COURT_LAWYER_AGAIN } from './quests'
 import { RUDE_CALLS_VOICE, MAMA_VOICE_CRY } from './rude'
-import { count, collectorsRecruited, court, crewPaid, crewPaidAt, HEAT, internAt, lawyerAt, debutWho, debutAt, arsenTrack, arsenTrackAt, saidStrasburg, saidGrantEnvelope, grantTileAt, grantHouseAt, mamaMarketAt, tileAdAt, tamadaDoneAt, borisAskAt, mamaVoiceAt, mamaCalls, samvelDivorceAt, tileSlipAt, tileCourtAt, tileLawyerAt, tileMonumentAt, legendOf, nivaAway, nivaBack, nivaBackAt, saleAt, saleWhat, alikDead, paydayScene, seryogaAskAt, grantBathAt, offendedAskAt, intro, kettleAt, carGone, dachaAskAt, evictAt, collectorsEchoAt, threatGovAt, fraudCardAt, hhJobAt, seryogaLoanAt, evicted, fraudLoan } from './memkeys'
+import { count, collectorsRecruited, court, crewPaid, crewPaidAt, HEAT, internAt, lawyerAt, debutWho, debutAt, arsenTrack, arsenTrackAt, saidStrasburg, saidGrantEnvelope, grantTileAt, grantHouseAt, mamaMarketAt, tileAdAt, tamadaDoneAt, borisAskAt, mamaVoiceAt, mamaCalls, samvelDivorceAt, tileSlipAt, tileCourtAt, tileLawyerAt, tileMonumentAt, legendOf, nivaAway, nivaBack, nivaBackAt, saleAt, saleWhat, alikDead, paydayScene, seryogaAskAt, grantBathAt, offendedAskAt, intro, kettleAt, carGone, dachaAskAt, evictAt, collectorsEchoAt, threatGovAt, fraudCardAt, hhJobAt, seryogaLoanAt, vacancyAt, evicted, fraudLoan } from './memkeys'
 import { valueOf, type Line } from './fact'
 import type { Choice } from '../engine/state'
 
@@ -1833,6 +1833,31 @@ describe('свип карточек ленты (#1487): окно отклика 
     expect(said.some((t) => texts(answers).includes(t)), `ответ не из пула: ${said.join(' | ')}`).toBe(true)
     expect(game.S.mem[stamp], 'ответ не потребил окно').toBeUndefined()
     expect(has(game, act), 'после ответа кнопка жива').toBeUndefined()
+  })
+
+  it('вакансия hh.ru без работодателя: окно не называет Алика-работодателем до раскрытия — НК синтетикой', () => {
+    // карточка #1487 работодателя не называет; «на его же вакансию» было утверждением партии,
+    // которой не было — раскрытие приходит ответом `HH_JOB_B` или поздней карточкой «Работодатель:
+    // Алик В.» (`vacancyAt`), а не вариантом игрока. Прежняя строка срабатывала во всех трёх
+    // партиях r177 (#1508).
+    const { game } = makeGame()
+    expect(game.S.mem[vacancyAt], 'карточка-раскрытие уже в партии — проверка пустеет').toBeUndefined()
+    showCard(game, HH_CARD)
+    const at = Number(game.S.mem[hhJobAt])
+    expect(at, 'карточка не открыла окно — проверка пустеет').toBe(game.S.stats.sent)
+    const offered: string[] = []
+    for (let turn = 0; turn <= 3; turn++) {
+      game.S.stats.sent = at + turn
+      game.S.choices = null
+      const c = game.buildChoices().find((x) => x.act === 'hhJob')
+      if (c) offered.push(c.text)
+    }
+    // окно показывает пул целиком — иначе проверка ниже прошла бы на одной строке
+    expect([...offered].sort(), `окно показало не весь пул: ${offered.join(' → ')}`).toEqual([...texts(P_HH_JOB)].sort())
+    const phantom = offered.filter((t) => /его же ваканси|ваканси[а-я]* Алик/i.test(t))
+    expect(phantom, `вариант утверждает Алика-работодателя до введения: ${phantom.join(' | ')}`).toEqual([])
+    // шутку раскрывает ответ, а не вариант: пул ответов не тронут
+    expect(texts(HH_JOB_B).some((t) => t.includes('Вакансия внутренняя')), 'ответ больше не раскрывает шутку').toBe(true)
   })
 
   it('окно мамы на дачу кончается вместе с вопросом: без факта «помогло» карточки нет', () => {
