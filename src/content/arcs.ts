@@ -4,7 +4,7 @@ import { type Entry, type FactOp, type Criterion, type FactKey, type Said, set, 
 import { type ClaimKey } from './ids'
 import type { LedgerEvent } from './fact-types'
 import { needs, meet, WORLD, MENTION_RE } from './world'
-import { actSigned, alikDead, betonSet, borisForeman, borisMarried, collectorsAskAt, collectorsEpAt, collectorsRecruited, collectorsTea, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantBathAt, grantHouseAt, grantPaid, grantTileAt, houseOnGarik, internAt, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nivaBackAt, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, rubikHoleAt, saidNuneNoWrite, samvelDivorceAt, sick, taxFrozen, tileCourtAt, tileLawyerAt, tileMonumentAt, tileSlipAt, wedding, wrote } from './memkeys'
+import { actSigned, alikDead, betonSet, borisForeman, borisMarried, collectorsAskAt, collectorsEpAt, collectorsRecruited, collectorsTea, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantBathAt, grantHouseAt, grantPaid, grantTileAt, houseOnGarik, internAt, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nivaBackAt, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, rubikHoleAt, rubikProposalAt, saidNuneNoWrite, samvelDivorceAt, sick, taxFrozen, tileCourtAt, tileLawyerAt, tileMonumentAt, tileSlipAt, wedding, wrote } from './memkeys'
 import { stateQuestion } from './money-ask'
 
 export type ArcMsg = Said | { w: string; t: string; claims?: LedgerEvent[]; remember?: FactOp[]; stamp?: string } | { t: string; claims: LedgerEvent[]; remember?: FactOp[]; stamp?: string }
@@ -270,7 +270,7 @@ export const ARCS: Record<string, Arc> = {
       { m: ['Рубик взял образец твоей плитки на экспертизу. Отколол. Прямо из середины. Экспертиза в Москве, сроков не называют. Пока — дырка. Заказчик в ярости, не платит.', { t: 'Дырку заделаешь? Только не ровно, брат. Ровно — опять заподозрят.', claims: [], stamp: rubikHoleAt }] },
       { remember: [set(rubikBath, true)], m: ['Рубик остался жить на объекте. Не уедет, говорит, пока не найдёт взяткодателя. Спит в ванной, на твоей плитке. Хвалит — прохладная.', 'Говорит, задержится: ищет, кто дал взятку, а заодно привык.'] },
       { remember: meet('karine'), m: ['Жена, Карине, носит Рубику обед. Третью неделю. Рубик поправился на пять кило и прислал ей стихи. Я начинаю нервничать. До этого переживал только за акт.'], then: 'promise', legend: 'inspect_karine' },
-      { m: [{ w: 'karine', t: 'Алик, Рубик сделал мне предложение. Акт подпишет, если соглашусь. Ради плиточника, может, и соглашусь.' }, 'Брат, ты же не хочешь, чтобы из-за твоих денег распалась семья? Скажи, что подождёшь.'], then: 'promise' },
+      { m: [{ w: 'karine', t: 'Алик, Рубик сделал мне предложение. Акт подпишет, если соглашусь. Ради плиточника, может, и соглашусь.', stamp: rubikProposalAt }, 'Брат, ты же не хочешь, чтобы из-за твоих денег распалась семья? Скажи, что подождёшь.'], then: 'promise' },
       {
         // remember — у строк, а не у серии: без Гранта строк про подпись нет, и акта никто не подписывал (#588)
         m: [

@@ -3,7 +3,7 @@
 // участник, умеющий писать сам (SPEAKS), обязан быть здесь или в исключениях с причиной — новый
 // участник красит сюит на месте, а не в плейтесте через раунд. Офферы и потребление окна ответом —
 // как были (#951), тексты пулов не менялись.
-import { arsenTrackAt, avitoReviewAt, bathAskedAt, borisAskAt, borisSaleAt, collectorsAskAt, collectorsEpAt, countersuitAt, courtVerdictAt, crewPaidAt, grantBathAt, grantHouseAt, grantTileAt, inhDoneAt, internAt, kettleAt, lawyerAt, mamaMarketAt, mamaVoiceAt, mooAt, muenAt, moustachePhotoAt, nivaBackAt, offendedAskAt, photoAt, ramPhotoAt, rubikAskAt, rubikHoleAt, samvelDivorceAt, saleAt, seryogaAskAt, tamadaDoneAt, tileAdAt, tileCourtAt, tileLawyerAt, tileMonumentAt, tileSlipAt, transferAt, vacancyAt } from './memkeys'
+import { arsenTrackAt, avitoReviewAt, bathAskedAt, borisAskAt, borisSaleAt, collectorsAskAt, collectorsEpAt, countersuitAt, courtVerdictAt, crewPaidAt, grantBathAt, grantHouseAt, grantTileAt, inhDoneAt, internAt, kettleAt, lawyerAt, mamaMarketAt, mamaVoiceAt, mooAt, muenAt, moustachePhotoAt, nivaBackAt, offendedAskAt, photoAt, ramPhotoAt, rubikAskAt, rubikHoleAt, rubikProposalAt, samvelDivorceAt, saleAt, seryogaAskAt, tamadaDoneAt, tileAdAt, tileCourtAt, tileLawyerAt, tileMonumentAt, tileSlipAt, transferAt, vacancyAt } from './memkeys'
 import type { Criterion } from '../engine/rules'
 
 /**
@@ -125,4 +125,7 @@ export const EVENT_SOURCES: readonly EventSource[] = [
   // признание «учу английский» + карточка курса mu-en (#1410): развязка лестницы мычания — заметное
   // событие, у которого не было своего окна отклика (прецеденты #927/#1292). Штамп ставит muenTurn
   { source: 'признание «это я учу английский» и карточка курса mu-en (muenTurn, stamp)', at: muenAt, offer: 'Muen', pool: 'P_MUEN' },
+  // предложение Карине в 7-й серии Рубика (#1471): просьба «Скажи, что подождёшь» — прямая просьба к
+  // игроку, пары #920 получили своё окно отклика: общий Talk_arc не выигрывал слот у муэна и звонка
+  { source: 'предложение Карине в 7-й серии Рубика, строка «Скажи, что подождёшь» (stamp строки)', at: rubikProposalAt, offer: 'RubikProposal', pool: 'P_RUBIK_PROPOSAL' },
 ]

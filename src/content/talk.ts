@@ -2,8 +2,8 @@
 // Пары «вопрос ↔ ответ» (p[i] ↔ a[i]), каждая один раз за игру. Пары по легендам денег — в legends.ts (talk).
 import { LEGENDS } from './legends'
 import { ARCS } from './arcs'
-import { type Entry, type FactOp, exists, gate, gte, is, set } from './fact'
-import { saidHas, stateGate, type TalkPair } from './said'
+import { type Entry, Gated, type FactOp, exists, gate, gte, is, set, valueOf } from './fact'
+import { saidHas, saidTrigger, stateGate, type TalkPair } from './said'
 import { needs, WORLD } from './world'
 import { garikDenied, grantPaid } from './memkeys'
 
@@ -62,6 +62,10 @@ export const MEMORY_TALK: Entry<TalkPair>[] = [
   needs('garik')(['Вы точно меня ни с кем не путаете?', 'С кем? Таких, кто так долго ждёт, больше нет. Ты у меня один. Ну, ещё Гарик. Но Гарик — это другое.']),
 ]
 
+/** Просьба Алика из 7-й серии Рубика: она открывает окно пар #920 и она же называет его словами.
+ *  Триггер и пул ниже выводятся из одной строки — правка серии краснит `jabs.test.ts`, а не умерщвляет окно. */
+export const PROPOSAL_SAID = 'Скажи, что подождёшь'
+
 /** Колкости (#683): панч уходит игроку — кнопка видна, пока реплика-триггер серии среди последних
  *  реплик Алика (окно), ответ — короткое отражение, не спор. Серию не двигает, звучит раз за партию.
  *  Тексты согласованы с оператором (issue #683); «Грант» в ответе — гейт знакомства.
@@ -85,9 +89,9 @@ export const ARC_TALK: Record<string, Entry<TalkPair>[]> = {
   ],
   rubik: [
     // предложение Карине — окно реплики Алика, не вся арка (#920)
-    needs('karineHome')(needs('karine')(['Карине, решай сама. Акт — сразу.', 'Решай. Я женой не торгую. Я просто акт жду.', saidHas('Скажи, что подождёшь')])),
-    needs('karineHome')(needs('karine')(['Жену на акт менять? Она дороже.', 'Дороже. Поэтому и прошу подождать.', saidHas('Скажи, что подождёшь')])),
-    ['Подожду. Но сначала пусть подпишет акт.', 'Сначала акт, потом деньги. Я слово держу, когда его держит бумага.', saidHas('Скажи, что подождёшь')],
+    needs('karineHome')(needs('karine')(['Карине, решай сама. Акт — сразу.', 'Решай. Я женой не торгую. Я просто акт жду.', saidHas(PROPOSAL_SAID)])),
+    needs('karineHome')(needs('karine')(['Жену на акт менять? Она дороже.', 'Дороже. Поэтому и прошу подождать.', saidHas(PROPOSAL_SAID)])),
+    ['Подожду. Но сначала пусть подпишет акт.', 'Сначала акт, потом деньги. Я слово держу, когда его держит бумага.', saidHas(PROPOSAL_SAID)],
     ['Разогрей.', 'Чужие деньги я не грею, брат. Ещё привыкнут к теплу и попросятся к хозяину.', saidHas('Просто холодные')],
   ],
   razmik: [
@@ -101,6 +105,19 @@ export const ARC_TALK: Record<string, Entry<TalkPair>[]> = {
     ['Я не семья. Я кредитор.', 'Кредитор — тоже семья, брат. Дальняя.', saidHas('в семье деньги не считают')],
   ],
 }
+
+/** Пары окна предложения Карине (#1471) вместе с номерами в `ARC_TALK.rubik`: номер нужен и `talkId`,
+ *  и arg ответа. Отбор — по триггеру, а не по индексу: пара переносится в пуле — окно едет за ней. */
+export const rubikProposalPairs = (): readonly { i: number, e: Entry<TalkPair> }[] =>
+  ARC_TALK.rubik.flatMap((e, i) => (saidTrigger(valueOf(e)[2]) === PROPOSAL_SAID ? [{ i, e }] : []))
+
+/** Пул кнопок окна предложения (#1471) для реестра: вопросы тех же пар с их гейтами — «Карине»
+ *  звучит, только пока она дома (`needs('karineHome')`), и реестр окна обязан это видеть. */
+export const P_RUBIK_PROPOSAL: readonly Entry<string>[] = rubikProposalPairs().map(({ e }) => {
+  const when = e instanceof Gated ? e.when : []
+  const q = valueOf(e)[0]
+  return when.length ? new Gated(when, q) : q
+})
 
 /** Колкость на форму клятвы «Слово Алика крепче банковского!» (#683): окно, пока форма звучала. */
 export const WORD_TALK: Entry<TalkPair>[] = [
