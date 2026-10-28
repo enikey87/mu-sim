@@ -10,7 +10,7 @@ import { D } from './excuses'
 import type { Entry, Said } from './fact'
 import { MEMORY } from './memory'
 import { GRAND } from './payday'
-import { caughtCount, phoneKarine } from './memkeys'
+import { caughtCount, caughtUnique, phoneKarine } from './memkeys'
 import { meet } from './world'
 import { spec, test, resolver, valueOf } from '../engine/rules'
 import { loadState, saveState } from '../engine/state'
@@ -348,6 +348,50 @@ describe('пути публикации claims (#437)', () => {
     game.S.offlineDays = 0
     game.S.choices = null
     expect(game.buildChoices().some((c) => c.act === 'catchLie')).toBe(true)
+  })
+})
+
+describe('уникальные пары — валюта концовок (#1481)', () => {
+  /** Поимка пары «банка против Дубая»: повтор рождает новый эпизод, но не новую пару. */
+  const catchSame = async (game: Game) => { hear(game, ['money_jar']); hear(game, ['money_dubai']); await catchLie(game) }
+
+  it('та же пара трижды — одна уникальная, ачивка liar3 на тотальном счёте, концовки закрыты', async () => {
+    const { game } = makeGame()
+    await catchSame(game)
+    await catchSame(game)
+    await catchSame(game)
+    expect(Number(game.S.mem[caughtCount]), 'тотальный счётчик растёт на каждую поимку').toBe(3)
+    expect(Number(game.S.mem[caughtUnique]), 'три поимки одной пары — одна').toBe(1)
+    expect(game.S.ach.liar3, 'ачивка настойчивости переехала на уникальные').toBeDefined()
+    expect((await game.fire('PaydayOutcome'))?.name, 'одна уникальная пара открыла концовку').toBe('Payday_default')
+  })
+  it('три РАЗНЫЕ пары — три уникальные, «Следователь» открыт', async () => {
+    const { game } = makeGame()
+    await catchSame(game)
+    hear(game, ['money_noah'])
+    await catchLie(game)
+    hear(game, ['money_wife'])
+    await catchLie(game)
+    expect(Number(game.S.mem[caughtUnique]), 'три разные пары').toBe(3)
+    expect((await game.fire('PaydayOutcome'))?.name).toBe('Payday_detective')
+  })
+  it('две разные пары — мост «Мешка мелочи», «Следователю» мало', async () => {
+    const { game } = makeGame()
+    await catchSame(game)
+    hear(game, ['money_noah'])
+    await catchLie(game)
+    expect(Number(game.S.mem[caughtUnique]), 'две разные пары').toBe(2)
+    expect((await game.fire('PaydayOutcome'))?.name).toBe('Payday_coinsByCatch')
+  })
+  it('старое сохранение без caughtUnique: широта восстанавливается из журнала поимок', async () => {
+    const { game, storage } = makeGame()
+    await catchSame(game)
+    hear(game, ['money_noah'])
+    await catchLie(game)
+    delete game.S.mem[caughtUnique]
+    saveState(storage, game.S)
+    const loaded = loadState(storage)!
+    expect(Number(loaded.mem[caughtUnique]), 'уникальные пары из журнала').toBe(2)
   })
 })
 

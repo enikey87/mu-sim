@@ -3,7 +3,7 @@ import type { ContentApi } from '../../engine/game'
 import { type Rule, eq, gte, is, exists, missing, set, during, lt } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { SOURCES, SOURCES_TOPUP, ROLL, CLAIMS, COINS_BRIDGE_CATCHES, DETECTIVE_CLAIMS, DETECTIVE_CHAIN, DETECTIVE_CATCHES, detectiveDue, GRAND, GRAND_FALLBACK, SLOTS, CONTRADICTIONS, MORNING_CONTRA, OUTCOME, LEAD, type Source, type Call, type Claim, type Lead } from '../payday'
-import { alikDead, caughtCount, cryptoHodl, payday as pd, paydayScene, taxFrozen, taxThawed } from '../memkeys'
+import { alikDead, caughtUnique, cryptoHodl, payday as pd, paydayScene, taxFrozen, taxThawed } from '../memkeys'
 import { samvelLine } from '../world'
 
 type R = Rule<ContentApi, GameEvent, Offer>
@@ -72,7 +72,7 @@ export const PAYDAY_HOOKS: Record<string, (game: ContentApi) => Promise<void>> =
   // дележ: каждый требует долю, счётчик тает до 50 ₽
   claims: async (game) => {
     let sum = Number(game.mem()[pd.sum] ?? game.debt)
-    // Следователь (#1434): три мидгейм-поимки — родня видела записи, доли не проходят и «по рублю» не работает.
+    // Следователь (#1434, #1481): три разных поимки — родня видела записи, доли не проходят и «по рублю» не работает.
     // Срезы — шаг общей сцены, поэтому ветка стоит здесь, а не в правиле исхода: отмазка после такого дележа
     // не нужна, потому что оставшаяся сумма не «остаток», а весь долг.
     if (detectiveDue(game.mem())) {
@@ -222,17 +222,18 @@ export const paydayRules: R[] = [
   // real 4 > lavash 3 = detective 3 > coins 2 = niva 2 > strasbourg/notyou 1 > default 0
   outcome('real', [is('ach.saint'), is('ach.court')], { bonus: 2 }),
   // «Настоящие деньги» вежливому следователю (#1435): saint И (court ИЛИ detective). Критерии контента — только
-  // конъюнкция, поэтому «ИЛИ» здесь — второе правило того же исхода с тем же бонусом 2; заседание важнее счётчика
-  outcome('real', [is('ach.saint'), gte(caughtCount, DETECTIVE_CATCHES), missing('ach.court'), missing(pd.caught)], { name: 'Payday_real_detective', bonus: 2 }),
-  // три мидгейм-поимки (#1434): выше «Мешка мелочи» и «Нивы», ниже «Настоящих денег»; поимка в самой сцене
+  // конъюнкция, поэтому «ИЛИ» здесь — второе правило того же исхода с тем же бонусом 2; заседание важнее счётчика.
+  // Счётчик — уникальные пары (#1481): три РАЗНЫХ эпизода лжи, а не три нажатия на одной и той же паре.
+  outcome('real', [is('ach.saint'), gte(caughtUnique, DETECTIVE_CATCHES), missing('ach.court'), missing(pd.caught)], { name: 'Payday_real_detective', bonus: 2 }),
+  // три разных поимки (#1434, #1481): выше «Мешка мелочи» и «Нивы», ниже «Настоящих денег»; поимка в самой сцене
   // остаётся за coins — она требует missing(pd.caught), поэтому момент выплаты detective не вытесняет
-  outcome('detective', [gte(caughtCount, DETECTIVE_CATCHES), missing(pd.caught)], { bonus: 1 }),
+  outcome('detective', [gte(caughtUnique, DETECTIVE_CATCHES), missing(pd.caught)], { bonus: 1 }),
   // поимка и «Нива выбрала тебя» — заслуга игрока: важнее исходов «по стилю партии»; между собой жребий допустим
   outcome('coins', [is(pd.caught)], { bonus: 1 }),
-  // мост поимок (#1433): две мидгейм-поимки отдают мешок и без поимки в самой сцене. Специфичность 1 — самая
+  // мост поимок (#1433): две РАЗНЫЕ поимки отдают мешок и без поимки в самой сцене. Специфичность 1 — самая
   // нижняя из заслуженных: сцена (2), «Нива» (2), «Следователь» (3), «Лаваш» (3), «Настоящие» (4) остаются выше,
   // а со «Страсбургом» и «Не тебе» мост не спорит вовсе — их исключают условия. Выше только default (0).
-  outcome('coins', [gte(caughtCount, COINS_BRIDGE_CATCHES), missing(pd.caught), missing('ach.strasbourg'), missing('finale.razmik')], { name: 'Payday_coinsByCatch', specificity: 1 }),
+  outcome('coins', [gte(caughtUnique, COINS_BRIDGE_CATCHES), missing(pd.caught), missing('ach.strasbourg'), missing('finale.razmik')], { name: 'Payday_coinsByCatch', specificity: 1 }),
   outcome('lavash', [is(cryptoHodl)], { bonus: 2 }),
   outcome('niva', [eq('finale.niva', 'chose')], { bonus: 1 }),
   // исходы «по стилю партии» — одной специфичности: подходит несколько — выбор случайный, а не всегда один
