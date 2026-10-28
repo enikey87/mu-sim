@@ -1838,6 +1838,8 @@ export class Game {
       collectorsEpFresh: S.stats.sent - Number(S.mem[memkeys.collectorsEpAt] ?? -99) <= 3,
       internFresh: S.stats.sent - Number(S.mem[memkeys.internAt] ?? -99) <= 3,
       rubikHoleFresh: S.stats.sent - Number(S.mem[memkeys.rubikHoleAt] ?? -99) <= 3,
+      // предложение Карине в 7-й серии Рубика (#1471): ход события и три после — пары #920
+      rubikProposalFresh: S.stats.sent - Number(S.mem[memkeys.rubikProposalAt] ?? -99) <= EVENT_FRESH_TURNS,
       // перевод 50 ₽ (#1003): реакция на него — ход перевода и ещё TRANSFER_FRESH_TURNS; сумма — для подстановки.
       // Новейшее денежное событие выигрывает (#1376): эпизод со своей суммой после перевода (допработа,
       // вычет хаша, чайник в счёт долга, аванс пирожками) перекрывает «50 рублей?!» — кнопка ссылалась бы

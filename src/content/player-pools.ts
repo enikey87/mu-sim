@@ -7,7 +7,7 @@ import { P_LIE } from './lies'
 import { ARCS, WRONG_Q } from './arcs'
 import { spec } from './fact'
 import { collectorsRecruited, collectorsTea, collectorsTurned } from './memkeys'
-import { CHORUS_TALK, MEMORY_TALK } from './talk'
+import { CHORUS_TALK, MEMORY_TALK, P_RUBIK_PROPOSAL } from './talk'
 import { LEGENDS } from './legends'
 import { GROUP_Q, JOB_YES_P, JOB_NO_P } from './misc'
 import { IDLE_Q, STICKER_Q, FWD_Q, REACT_Q, DEL_Q } from './life'
@@ -115,6 +115,7 @@ put('P_GRANT_BATH', P_GRANT_BATH) // строка Гранта «Ой. Не то
 put('P_OFFENDED_ASK', P_OFFENDED_ASK) // вопрос Алика «ты обиделся?» после тишины (#1292)
 put('P_BATH_ASK', P_BATH_ASK) // условие Карине «переложите нам ванную»: окно отклика на условие мира (#1382)
 put('P_MUEN', P_MUEN) // признание «учу английский» + карточка курса mu-en: окно отклика (#1410)
+put('P_RUBIK_PROPOSAL', P_RUBIK_PROPOSAL) // предложение Карине в серии Рубика: окно отклика на пары #920 (#1471)
 put('P_INH_BURNED', P_INH_BURNED) // развязка «Наследства дяди Тиграна», горелая ветка: окно отклика (#1439)
 put('P_INH_REFUSED', P_INH_REFUSED) // развязка «Наследства дяди Тиграна», отказная ветка: окно отклика (#1439)
 put('P_AVITO_REVIEW', P_AVITO_REVIEW)

@@ -279,6 +279,10 @@ export const collectorsAskAt = 'collectors.askAt'
 export const internAt = 'collectors.internAt'
 /** Вопрос про дырку от образца плитки (#958): ход вопроса. */
 export const rubikHoleAt = 'rubik.holeAt'
+/** Предложение Карине в 7-й серии Рубика (#1471): строка Карине штампует ход события, и пока он свеж,
+ *  окно отклика предлагает пары #920 («Скажи, что подождёшь»). Сам ответ окно не потребляет: пары
+ *  одноразовые (`TALK:arc:rubik:*`), а штамп держит только окно кнопки. */
+export const rubikProposalAt = 'rubik.proposalAt'
 /** Первое сообщение заказчика Гранта («плитка — орудие», #983): ход реплики. */
 export const grantTileAt = 'tile.grantAt'
 /** Смена фото профиля без усов (#1013): заметное событие ставки — окно отклика игрока; сам факт
@@ -385,7 +389,7 @@ export const EVENT_KEY_LIST = [
   'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sinceCrew', 'sorrySwing', 'promiseLive', 'promisePassed', 'promiseStake',
   'debutWho', 'debutFresh', 'arsenTrackFresh', 'bathAskFresh', 'transferFresh', 'transferAmount',
   'ramPhotoFresh', 'borisSaleFresh', 'vacancyFresh', 'avitoReviewFresh', 'rubikAskFresh', 'kettleFresh',
-  'lawyerFresh', 'collectorsAskFresh', 'collectorsEpFresh', 'internFresh', 'rubikHoleFresh', 'countersuitFresh', 'grantTileFresh', 'moustachePhotoFresh', 'mamaMarketFresh', 'mamaVoiceFresh', 'photoFresh', 'tileAdFresh', 'inhDoneFresh', 'tamadaDoneFresh', 'samvelDivorceFresh', 'courtVerdictFresh', 'tileSlipFresh', 'tileCourtFresh', 'tileLawyerFresh', 'tileMonumentFresh', 'nivaBackFresh', 'saleFresh', 'saleItem', 'grantHouseFresh', 'borisAskFresh', 'seryogaFresh', 'grantBathFresh', 'offendedAskFresh', 'muenFresh',
+  'lawyerFresh', 'collectorsAskFresh', 'collectorsEpFresh', 'internFresh', 'rubikHoleFresh', 'rubikProposalFresh', 'countersuitFresh', 'grantTileFresh', 'moustachePhotoFresh', 'mamaMarketFresh', 'mamaVoiceFresh', 'photoFresh', 'tileAdFresh', 'inhDoneFresh', 'tamadaDoneFresh', 'samvelDivorceFresh', 'courtVerdictFresh', 'tileSlipFresh', 'tileCourtFresh', 'tileLawyerFresh', 'tileMonumentFresh', 'nivaBackFresh', 'saleFresh', 'saleItem', 'grantHouseFresh', 'borisAskFresh', 'seryogaFresh', 'grantBathFresh', 'offendedAskFresh', 'muenFresh',
   'period', 'night', 'offline', 'scene', 'sinceAlik', 'lateCount', 'arcAvailable',
   'arcsStarted', 'arcsDone', 'arcsMature', 'quests', 'callbackReady', 'lieOpen', 'lieKind', 'lieAlikOld', 'deathCanAdvance', 'collectorsCanAdvance',
   'intent', 'tone', 'arg', 'category', 'arc', 'argArcDone', 'greet', 'promise', 'somedayCount', 'promiseRecordDays', 'promiseRecordNew', 'promiseRecordSeen', 'promiseRecordVoice', 'promiseRecordDue', momDachaDays,
@@ -405,7 +409,7 @@ export const MEM_KEYS: ReadonlySet<string> = new Set([
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, asmikCard, paydayScene, threatClaim, saidTomorrow, saidFriday, saidKonak, saidHash, saidOath, saidNuneNoWrite, saidGrantEnvelope, saidMoneyMoustache, saidRegiment,
   lightOff, netRation, phoneWarn, holidayGreeted,
   creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, collectorsTurned, collectorsTea, collectorsEpAt, criticalAt, creditOfferSum, momDachaAt, crewPaid, crewPaidAt, crewAllPaid, rubikBath, whenYears, ...Object.values(moneyAskAt), transferAt, transferAmount, moneyAt, moustachePhotoAt, moustacheStakeSaid, mamaMarketAt, mamaVoiceAt, samvelDivorceAt, courtVerdictAt, tileSlipAt, tileCourtAt, tileLawyerAt, tileMonumentAt, nivaBackAt, saleAt, saleWhat, fraudLoan, blockLifted, internDeclined, internAccepted, grantHouseAt, photoAt, tileAdAt, inhDoneAt, inhBurned, inhRefused, tamadaDoneAt, borisAskAt, debutWho, debutAt, arsenTrack, arsenTrackAt,
-  ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt, countersuitAt, grantTileAt,
+  ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt, rubikProposalAt, countersuitAt, grantTileAt,
   seryogaAskAt, grantBathAt, offendedAskAt,
   ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lend50),
 ])

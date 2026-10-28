@@ -5,7 +5,7 @@ import type { Choice, Tone } from '../../engine/state'
 import { type Rule, type Facts, type Criterion, type Entry, type Line, eq, ne, is, exists, missing, gt, gte, lte, isOpen, spec, valueOf, sinceWithin } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { D, cap, WHEN_YEARS, EVENT_FRESH_TURNS, PHOTO_FRESH_TURNS } from '../excuses'
-import { talkPairs, talkId } from '../talk'
+import { talkPairs, talkId, rubikProposalPairs } from '../talk'
 import { ARCS, WRONG_Q } from '../arcs'
 import * as L from '../life'
 import { GROUP_Q } from '../misc'
@@ -530,6 +530,28 @@ export const choiceRules: R[] = [
         const t = g.playerLine(() => (raw = g.draw('P_COURT', P_COURT)))
         arg = raw === STRASBOURG_THREAT ? 'strasbourg' : ''
         return t
+      },
+      arg: () => arg,
+    })]
+  })(),
+  // предложение Карине в 7-й серии Рубика (#1471): просьба «Скажи, что подождёшь» — заметное событие
+  // с прямой просьбой к игроку; пары #920 получают своё окно (ход события и три после) вместо общего
+  // `Talk_arc`. bonus 11: рядом стоят ловля лжи (11), муэн и звонок с объекта (7) — событийная реакция
+  // обязана попасть в слот. Слот общий с `Talk_arc`: одна и та же пара не встаёт в блок дважды.
+  ...(() => {
+    let arg = ''
+    return [offer({
+      name: 'RubikProposal', slot: 'Talk_arc', when: [is('rubikProposalFresh')], act: 'talk', tone: 'neutral', bonus: 11,
+      text: (g) => {
+        const said = g.msgsView().slice(-6).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : [])).join(' ')
+        const facts = g.lineFacts()
+        const hit = rubikProposalPairs().find(({ i, e }) => !g.lines.has(talkId('arc', 'rubik', i)) && isOpen(e, facts)
+          && (valueOf(e)[2]?.(g, said) ?? true) && !g.offeredInWindow(valueOf(e)[0]))
+        if (!hit) return ''
+        arg = `arc|rubik|${hit.i}`
+        const q = valueOf(hit.e)[0]
+        g.rememberShown(q)
+        return q
       },
       arg: () => arg,
     })]
