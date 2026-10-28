@@ -14,6 +14,8 @@ const appCss = readFileSync('src/styles.css', 'utf8')
 const style = html.slice(html.indexOf('<style>') + '<style>'.length, html.indexOf('</style>'))
 /** Разметка шелла: всё, что лежит внутри #root до скрипта приложения. */
 const shell = html.slice(html.indexOf('<div id="root">'), html.indexOf('<script type="module"'))
+/** Инлайн-сторож холодной загрузки (#1477): выполняется до входного скрипта, поэтому живёт в <head>. */
+const guard = /<script>([\s\S]*?)<\/script>/.exec(html)?.[1] ?? ''
 
 /** Переменные темы из блока styles.css: `:root { --page: … }` и `:root[data-theme="dark"] { … }`. */
 function vars(css: string, selector: string): Map<string, string> {
@@ -111,14 +113,35 @@ describe('шелл холодной загрузки в index.html', () => {
     expect(style).not.toContain('@import')
   })
 
-  it('инлайн-часть укладывается в бюджет: шелл 3 кБ, кадр и титры интро 4,5 кБ, страница — 30 кБ gzip', () => {
-    // бюджет по частям: шелл холодной загрузки (#1443) и титры интро (#1444) — разные ответственные блоки
-    // одного инлайна, и растут они по отдельности (кадр #intro-frame + блок intro-css + правила титров)
+  it('сторож бута: ошибка загрузчика, тайм-аут 12 с и guard перезагрузки', () => {
+    // Ошибка загрузки скрипта — window error в capture: атрибут onerror сборка снимает с тега (проверено по dist).
+    // Тайм-аут — зависание и ошибку исполнения.
+    expect(guard).toContain("addEventListener('error'")
+    expect(guard).toContain("tagName==='SCRIPT'")
+    expect(html.indexOf(guard), 'сторож стоит до входного скрипта').toBeLessThan(html.indexOf('<script type="module"'))
+    expect(guard).toContain('setTimeout(fail,12000)')
+    expect(guard).toContain('window.__alikBoot')
+    // сначала одна авто-перезагрузка под отметкой в sessionStorage, только потом текст: цикла перезагрузок нет
+    expect(guard).toContain("'alik-boot-retry'")
+    expect(guard).toContain('sessionStorage.getItem')
+    expect(guard).toContain('sessionStorage.setItem')
+    expect(guard.indexOf('location.reload')).toBeLessThan(guard.indexOf("' failed'"))
+  })
+
+  it('отказ бута: текст в теме игры, кнопка повтора и подсказка без JS', () => {
+    expect(shell).toContain('Алик не дозвонился. Проверьте сеть и обновите страницу.')
+    expect(shell).toContain('<button type="button" id="boot-again" hidden>Попробовать снова</button>')
+    expect(shell).toContain('<noscript><p>Игра живёт на JavaScript — включите его.</p></noscript>')
+  })
+
+  it('инлайн-часть укладывается в бюджет: шелл со сторожем 4 кБ, кадр и титры интро 4,5 кБ, страница — 30 кБ gzip', () => {
+    // бюджет по частям: шелл холодной загрузки (#1443, с #1477 к нему добавился сторож) и титры интро (#1444) —
+    // разные ответственные блоки одного инлайна, и растут они по отдельности
     const atIntro = style.indexOf('/* Рамка титров шелла')
     expect(atIntro, 'в инлайне нет блока кадра и титров интро').toBeGreaterThan(0)
-    const boot = Buffer.byteLength(`<style>${style.slice(0, atIntro)}</style>${shell}`, 'utf8')
+    const boot = Buffer.byteLength(`<style>${style.slice(0, atIntro)}</style><script>${guard}</script>${shell}`, 'utf8')
     const intro = Buffer.byteLength(style.slice(atIntro), 'utf8')
-    expect(boot).toBeLessThanOrEqual(3072)
+    expect(boot).toBeLessThanOrEqual(4096)
     expect(intro).toBeLessThanOrEqual(4608)
     // приёмка #1444: шелл и титры вместе — не больше 30 кБ gzip; страница целиком и есть их носитель
     expect(gzipSync(html, { level: 9 }).length).toBeLessThanOrEqual(30 * 1024)
