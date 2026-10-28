@@ -350,3 +350,40 @@ describe('адаптер витрины (#688)', () => {
     expect(game.S.msgs.length).toBeGreaterThan(0)
   })
 })
+
+describe('шаринг концовки средствами площадки (#1485)', () => {
+  it('VK: ссылка уходит в окно площадки, отказ моста — false', async () => {
+    send.mockClear()
+    send.mockResolvedValueOnce({})
+    await expect(vkPlatform().share?.('текст', 'https://enikey87.github.io/mu-sim/')).resolves.toBe(true)
+    expect(send).toHaveBeenCalledWith('VKWebAppShare', { link: 'https://enikey87.github.io/mu-sim/' })
+
+    send.mockRejectedValueOnce(new Error('no parent'))
+    await expect(vkPlatform().share?.('текст', 'https://enikey87.github.io/mu-sim/')).resolves.toBe(false)
+  })
+
+  it('Telegram: t.me/share/url открывает клиент, без клиента — окно браузера', async () => {
+    const open = vi.fn()
+    ;(window as unknown as { Telegram?: { WebApp?: { openTelegramLink?: (u: string) => void } } }).Telegram = { WebApp: { openTelegramLink: open } }
+    try {
+      await expect(telegramPlatform({ load: async () => {} }).share?.('Я дожал Алика', 'https://enikey87.github.io/mu-sim/')).resolves.toBe(true)
+      expect(open).toHaveBeenCalledWith(
+        'https://t.me/share/url?url=https%3A%2F%2Fenikey87.github.io%2Fmu-sim%2F&text=%D0%AF%20%D0%B4%D0%BE%D0%B6%D0%B0%D0%BB%20%D0%90%D0%BB%D0%B8%D0%BA%D0%B0',
+      )
+    } finally {
+      delete (window as unknown as { Telegram?: unknown }).Telegram
+    }
+
+    const win = vi.fn(() => ({}))
+    vi.stubGlobal('open', win)
+    try {
+      await expect(telegramPlatform({ load: async () => {} }).share?.('текст', 'https://enikey87.github.io/mu-sim/')).resolves.toBe(true)
+      expect(win).toHaveBeenCalledWith(expect.stringContaining('https://t.me/share/url'), '_blank', 'noopener')
+    } finally { vi.unstubAllGlobals() }
+  })
+
+  it('Яндекс и веб: своего механизма нет — интерфейс уходит в браузерный фолбэк', () => {
+    expect(yandexPlatform({ load: async () => {} }).share).toBeUndefined()
+    expect(webPlatform().share).toBeUndefined()
+  })
+})
