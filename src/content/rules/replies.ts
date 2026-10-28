@@ -52,6 +52,15 @@ async function sorry(game: ContentApi, line: string): Promise<void> {
 const simple = (intent: string, line: (g: ContentApi) => Said, after?: (g: ContentApi) => void | Promise<void>): R =>
   says(intent, { respond: async ({ game }) => { await game.say([line(game)]); game.setCtx(null); await after?.(game) } })
 
+/** Ответ Арсена на вопрос пула дебюта/трека — строка DEBUT_ARSEN_B того же номера, что выбранный
+ *  вопрос (#1500, #1017): номер уезжает с arg оффера. Прямой fire без номера — колода, как раньше;
+ *  закрытая строка пары — тоже колода, чтобы окно не молчало. */
+function debutArsenAnswer(game: ContentApi, arg: unknown): { w: string; t: string } {
+  const i = Number(arg)
+  const line = Number.isInteger(i) ? DEBUT_ARSEN_B[i] : undefined
+  return line && isOpen(line, game.lineFacts()) ? valueOf(line) : game.draw('DEBUT_ARSEN_B', DEBUT_ARSEN_B)
+}
+
 export const replyRules: R[] = [
   // Алик «пропал» после грубости — на любой вопрос, кроме извинения, отвечает, когда вернётся
   { name: 'Says_WhileOffline', event: 'PlayerSays', when: [AlikOffline, ne('intent', 'sorry'), ne('intent', 'moo')], bonus: 5, respond: ({ game }) => game.alikTurn('neutral') },
@@ -567,8 +576,8 @@ export const replyRules: R[] = [
   }),
   // дебюты участников (#973): ответ потребляет окно — повторные сообщения нового окна не откроют
   says('debutArsen', {
-    respond: async ({ game }) => {
-      await game.say([game.draw('DEBUT_ARSEN_B', DEBUT_ARSEN_B)])
+    respond: async ({ game, facts }) => {
+      await game.say([debutArsenAnswer(game, facts.arg)])
       game.clearFact(debutAt)
       game.setCtx(null)
     },
@@ -576,8 +585,8 @@ export const replyRules: R[] = [
   // трек «Плиточник» (#1351): у строки трека своё окно, ответ — та же пара DEBUT_ARSEN_B.
   // Окно дебюта не трогаем: у него свой ответ (`debutArsen`), и чужой ответ его не гасит
   says('arsenTrack', {
-    respond: async ({ game }) => {
-      await game.say([game.draw('DEBUT_ARSEN_B', DEBUT_ARSEN_B)])
+    respond: async ({ game, facts }) => {
+      await game.say([debutArsenAnswer(game, facts.arg)])
       game.clearFact(arsenTrackAt)
       game.setCtx(null)
     },

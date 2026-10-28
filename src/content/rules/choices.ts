@@ -117,15 +117,22 @@ const windowFromD = (game: ContentApi, key: string, window: number, map: Record<
   const raw = game.windowLine(key, D[key], window)
   return raw === null ? '' : game.X.fill(raw, map)
 }
-/** Линия игрока из плоского пула вместе с её номером: ответ окна подбирается по выбранной строке,
+/** Линия игрока из пула вместе с её номером: ответ окна подбирается по выбранной строке,
  *  а не колодой (#1017). Номер уезжает с arg, как у угрозы «до Страсбурга» (#982). Окно события —
  *  `windowFromArrNum`: строка предлагается один раз за окно, номер берётся у выбранной строки,
- *  поэтому порядок пула не меняется (у `P_INTERN` индекс 1 — отказ, #1041). */
-const windowFromArrNum = (game: ContentApi, key: string, arr: readonly string[], set: (i: number) => void): string => {
-  requirePlayerPool(key, arr)
-  const line = game.windowLine(key, arr, EVENT_FRESH_TURNS)
-  if (line === null) return ''
-  set(arr.indexOf(line))
+ *  поэтому порядок пула не меняется (у `P_INTERN` индекс 1 — отказ, #1041). Пул может быть под
+ *  воротами (#1500): номер ищется по тексту строки, а не по индексу в массиве строк. */
+const windowFromArrNum = (game: ContentApi, key: string, arr: readonly Entry<unknown>[], set: (i: number) => void): string => {
+  const line = windowFromArr(game, key, arr)
+  if (!line) return ''
+  set(arr.findIndex((e) => valueOf(e) === line))
+  return line
+}
+/** То же для пула на окне повтора (#824): дебют Арсена — свой ответ на выбранную строку (#1500). */
+const freshFromArrNum = (game: ContentApi, key: string, arr: readonly Entry<unknown>[], set: (i: number) => void): string => {
+  const line = freshFromArr(game, key, arr)
+  if (!line) return ''
+  set(arr.findIndex((e) => valueOf(e) === line))
   return line
 }
 
@@ -273,13 +280,29 @@ export const choiceRules: R[] = [
   })(),
   // дебюты участников (#973): первое сообщение персонажа — ход и три после, пул — только у тех, у кого 2+ строки.
   // bonus 5: на rude-пути окно конкурирует с извинением (6) и мычанием (6) — дебют должен попадать в блок.
-  // Пул Арсена под воротами (#982): пустой пул даёт пустой текст — freshFromArr, не draw
-  offer({ name: 'DebutArsen', when: [is('debutFresh'), eq('debutWho', 'arsen')], act: 'debutArsen', tone: 'neutral', bonus: 5, text: (g) => freshFromArr(g, 'P_DEBUT_ARSEN', P_DEBUT_ARSEN) }),
+  // Пул Арсена под воротами (#982): пустой пул даёт пустой текст — freshFromArr, не draw.
+  // Номер выбранного вопроса уезжает с arg — ответ DEBUT_ARSEN_B берётся парой (#1500, #1017)
+  ...(() => {
+    let arg = ''
+    return [offer({
+      name: 'DebutArsen', when: [is('debutFresh'), eq('debutWho', 'arsen')], act: 'debutArsen', tone: 'neutral', bonus: 5,
+      text: (g) => freshFromArrNum(g, 'P_DEBUT_ARSEN', P_DEBUT_ARSEN, (i) => { arg = String(i) }),
+      arg: () => arg,
+    })]
+  })(),
   // трек «Плиточник» (#1351): событие rude-цепочки, приходит независимо от дебюта и почти всегда позже
   // его окна (три отправки) — своих трек-вопросов без него не было. Окно у события своё, пул тот же:
   // с фактом трека в нём только трек-вопросы, ответы DEBUT_ARSEN_B остаются парой (#973). Слот дебюта
-  // общий: на ходу, где живы оба окна, одна и та же кнопка не встаёт дважды — берёт более специфичный оффер
-  offer({ name: 'ArsenTrack', slot: 'DebutArsen', when: [is('arsenTrackFresh')], act: 'arsenTrack', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_DEBUT_ARSEN', P_DEBUT_ARSEN) }),
+  // общий: на ходу, где живы оба окна, одна и та же кнопка не встаёт дважды — берёт более специфичный оффер.
+  // Ответ — пара к выбранному вопросу, а не общий draw из DEBUT_ARSEN_B (#1500)
+  ...(() => {
+    let arg = ''
+    return [offer({
+      name: 'ArsenTrack', slot: 'DebutArsen', when: [is('arsenTrackFresh')], act: 'arsenTrack', tone: 'neutral', bonus: 5,
+      text: (g) => windowFromArrNum(g, 'P_DEBUT_ARSEN', P_DEBUT_ARSEN, (i) => { arg = String(i) }),
+      arg: () => arg,
+    })]
+  })(),
   offer({ name: 'DebutSamvel', when: [is('debutFresh'), eq('debutWho', 'samvel')], act: 'debutSamvel', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_DEBUT_SAMVEL', P_DEBUT_SAMVEL) }),
   offer({ name: 'DebutBoris', when: [is('debutFresh'), eq('debutWho', 'boris')], act: 'debutBoris', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_DEBUT_BORIS', P_DEBUT_BORIS) }),
   offer({ name: 'DebutNiva', when: [is('debutFresh'), eq('debutWho', 'niva')], act: 'debutNiva', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_DEBUT_NIVA', P_DEBUT_NIVA) }),
