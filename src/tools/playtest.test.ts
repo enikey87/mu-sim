@@ -256,8 +256,10 @@ describe('PLAYTEST_PROFILE=agreeable', () => {
     // единственно берёт микрозайм; берём 7.
     // #1292 (окна карточки Серёги, «не тот чат» Гранта, вопроса «ты обиделся?» и ответ-нить вакансии)
     // сдвинул розыгрыш — замер 1–30: баран только у согласника на 2; берём 2.
+    // #1487 (окна семи карточек ленты) сдвинул розыгрыш — замер 1–30: согласие глубже нейтральной
+    // партии ровно на барана только на 20 (на 1, 12, 13, 16 и 18 — на микрозайм, на 19 — на оба).
     const neutral = await playtest(2, 300)
-    const agree = await playtest(2, 300, undefined, undefined, 'agreeable')
+    const agree = await playtest(20, 300, undefined, undefined, 'agreeable')
     const deeper = facts(agree.game).filter((k) => !facts(neutral.game).includes(k))
     expect(deeper).toEqual(['has.boris'])
   }, 60_000)

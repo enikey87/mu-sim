@@ -1,7 +1,7 @@
 import { type Entry, type FactOp, type LineSpec, type Said, gate, gte, lte, eq, ne, is, exists, missing, set } from './fact'
 import { type When } from './excuses'
 import { needs, WORLD } from './world'
-import { avitoReviewAt, asmikCard, bloodGiven, borisSaleAt, count, endgame, evicted, fraudLoan, paydayScene, saidHash, seryogaAskAt, threatClaim, vacancyAt, wedding } from './memkeys'
+import { avitoReviewAt, asmikCard, bloodGiven, borisSaleAt, collectorsEchoAt, count, dachaAskAt, endgame, evictAt, evicted, fraudCardAt, fraudLoan, hhJobAt, paydayScene, saidHash, seryogaAskAt, seryogaLoanAt, threatClaim, threatGovAt, vacancyAt, wedding } from './memkeys'
 import { sold, momHelp, momDachaDays } from './credit'
 import { billStreak } from './bills'
 
@@ -140,7 +140,7 @@ const often = { repeat: true, cooldown: { turns: 40 } }
 export const NOTIF: Notif[] = [
   { icon: '🏦', app: 'Банк', t: 'Списание {spend} ₽. {what}. Баланс: {money} ₽', spend: true, when: [...moneyOpen], repeat: true, cooldown: { turns: 8 } },
   // мошеннический кредит на имя игрока (#1069): объявление сцены живёт дальше — банк напоминает про остаток
-  { icon: '🏦', app: 'Банк', t: 'Кредит на ваше имя: остаток 300 000 ₽. Напоминаем: плательщик — вы.', when: [is(fraudLoan), ...moneyOpen] },
+  { icon: '🏦', app: 'Банк', t: 'Кредит на ваше имя: остаток 300 000 ₽. Напоминаем: плательщик — вы.', when: [is(fraudLoan), ...moneyOpen], stamp: fraudCardAt },
   { icon: '👩', app: 'Мама', t: 'Сынок, ты поел?', ...often }, { icon: '👩', app: 'Мама', t: 'Сынок, Алик заплатил?', ...often },
   { icon: '👩', app: 'Мама', t: 'Сынок, позвони маме.', ...often },
   { icon: '👩', app: 'Мама', t: 'Сынок, с Новым годом. Алик тебя поздравил? А перевёл?', when: [...holidayNewYear] },
@@ -155,23 +155,23 @@ export const NOTIF: Notif[] = [
   // баран передан игроку (барахолка) — объявление Алика о продаже больше не его (#856)
   { icon: '🛒', app: 'Авито', t: 'Новое объявление рядом: «Продаю барана Бориса, торг, умеет писать».', when: [WORLD.baran, gte('arc.boris', 4), missing('has.boris')], stamp: borisSaleAt },
   { icon: '🏛', app: 'Госуслуги', t: 'Штраф 500 ₽: парковка в неположенном месте.', charge: 500, when: [is('has.car'), ...moneyOpen] },
-  { icon: '🏛', app: 'Госуслуги', t: 'Ваша угроза зарегистрирована как заявление «Алик не платит». Срок рассмотрения — 1473 дня.', when: [gte(count.threat, 1)] },
+  { icon: '🏛', app: 'Госуслуги', t: 'Ваша угроза зарегистрирована как заявление «Алик не платит». Срок рассмотрения — 1473 дня.', when: [gte(count.threat, 1)], stamp: threatGovAt },
   { icon: '🌤', app: 'Погода', t: 'Ереван +32°. Идеальная погода, чтобы бетон застыл. Не застынет.', when: [gte('month', 6), lte('month', 8)] },
   { icon: '🌤', app: 'Погода', t: '+3° и дождь. Хорошая погода, чтобы ждать.', when: [gte('month', 10)] },
   { icon: '🏠', app: 'Хозяин квартиры', t: 'Когда за квартиру?', when: [missing(evicted)], ...often },
   { icon: '🏠', app: 'Хозяин квартиры', t: 'Жду до пятницы. Пятница — это не Аликова пятница.', when: [missing(evicted), ne('dow', 5)] },
   { icon: '💼', app: 'hh.ru', t: 'Новая вакансия: плиточник, оплата сразу! Работодатель: Алик В.', stamp: vacancyAt },
-  { icon: '💼', app: 'hh.ru', t: 'Вакансия: плиточник, 150 000 ₽, оплата каждую пятницу. Откликнуться?' },
-  { icon: '🧑', app: 'Серёга', t: 'Ну что, заплатил твой Алик?', stamp: seryogaAskAt, ...often }, { icon: '🧑', app: 'Серёга', t: 'Братан, займи до зарплаты. А, у тебя ж тоже нет.' },
+  { icon: '💼', app: 'hh.ru', t: 'Вакансия: плиточник, 150 000 ₽, оплата каждую пятницу. Откликнуться?', stamp: hhJobAt },
+  { icon: '🧑', app: 'Серёга', t: 'Ну что, заплатил твой Алик?', stamp: seryogaAskAt, ...often }, { icon: '🧑', app: 'Серёга', t: 'Братан, займи до зарплаты. А, у тебя ж тоже нет.', stamp: seryogaLoanAt },
   { icon: '📺', app: 'Новости', t: 'В Ереване бетон отказался застывать. Эксперты разводят руками.' },
   // «сдал объект» — новость финала Бориса, не серии о назначении
   { icon: '📺', app: 'Новости', t: 'Баран-прораб из Абовяна дал первое интервью. На вопрос «как платить людям» ответил «бее».', when: [WORLD.baran, gte('arc.boris', 8)] },
   { icon: '🏦', app: 'Банк', t: 'Кредит одобрен! 94% годовых. Поздравляем!', when: [gte('credit.stage', 1), ...moneyOpen] },
   // эхо второй серии («узнали: Алик должен вам»), пока они не приехали к нему; после выплаты и в эндгейме линии нет (#324/#366)
-  { icon: '📞', app: 'Коллекторы', t: 'Мы знаем, где живёт ваш Алик. Он нам тоже должен. Давайте дружить.', when: [eq('arc.collectors', 2), ...moneyOpen] },
-  { icon: '👩', app: 'Мама', t: 'Сынок, помнишь, я продала дачу? Помидоры всё равно не росли — но я рада, что помогла тебе продержаться. Помогло?', when: [is(momHelp('dacha')), gte(momDachaDays, 30)] },
+  { icon: '📞', app: 'Коллекторы', t: 'Мы знаем, где живёт ваш Алик. Он нам тоже должен. Давайте дружить.', when: [eq('arc.collectors', 2), ...moneyOpen], stamp: collectorsEchoAt },
+  { icon: '👩', app: 'Мама', t: 'Сынок, помнишь, я продала дачу? Помидоры всё равно не росли — но я рада, что помогла тебе продержаться. Помогло?', when: [is(momHelp('dacha')), gte(momDachaDays, 30)], stamp: dachaAskAt },
   // три неоплаты коммуналки подряд — хозяин выселяет; оплата сбрасывает полосу (#301); после выплаты — нет (#323)
-  { icon: '🏠', app: 'Хозяин квартиры', t: 'Выселяю. Можешь пожить у Алика, он же тебе как отец.', when: [missing(evicted), gte(billStreak('rent'), 3), ...moneyOpen], remember: [set(evicted, true)] },
+  { icon: '🏠', app: 'Хозяин квартиры', t: 'Выселяю. Можешь пожить у Алика, он же тебе как отец.', when: [missing(evicted), gte(billStreak('rent'), 3), ...moneyOpen], remember: [set(evicted, true)], stamp: evictAt },
   { icon: '🩸', app: 'Донорский центр', t: 'Спасибо, что пришли сдать кровь! Вы наш герой. Приходите ещё.', when: [is(bloodGiven)] },
   // память о проданном: иначе две несвязанные микроволновки
   { icon: '🍽', app: 'Соседка', t: 'В вашей микроволновке теперь обед грею. Спасибо, что продали.', when: [is(sold('microwave'))] },

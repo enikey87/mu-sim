@@ -15,6 +15,7 @@ import {
   RAM_PHOTO, BORIS_SALE, VACANCY, AVITO_REVIEW, RUBIK_ASK, KETTLE,
   CREW_CALL_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, GRANT_TILE_B, DEBUT_NIVA_B, DEBUT_BORIS_B, MOUSTACHE_PHOTO_B, MAMA_MARKET_B, TILE_AD_B, TAMADA_DONE_B, BORIS_MEMORY_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, GRANT_HOUSE_B, COURT_VERDICT_B, TILE_SLIP_B, TILE_COURT_B, TILE_LAWYER_B, TILE_MONUMENT_B, NIVA_BACK_B, NUNE_DEBUT_B, DEBUT_GRANT_B, SOLD_B,
   LAWYER_B, COLLECTORS_ASK_B, COLLECTORS_EP_B, INTERN_B, HOLE_B, COUNTERSUIT_B, VACANCY_START_B, VACANCY_SOON_B, SERYOGA_B, GRANT_BATH_B, OFFENDED_ASK_B, BATH_ASK_B, MUEN_ASK_B, INH_BURNED_B, INH_REFUSED_B,
+  HH_JOB_B, SERYOGA_LOAN_B, DACHA_ASK_B, EVICT_B, COLLECTORS_ECHO_B, THREAT_GOV_B, FRAUD_CARD_B,
 } from './world'
 
 /** Метки линтера: имена персонажей и объекты классов #970/#974/#982. Список узкий и осознанный —
@@ -161,6 +162,22 @@ const WINDOWS: Window[] = [
   { pool: 'P_MOO', lines: PP.P_MOO, marks: {} },
   // угроза «до Страсбурга» сама вводит план и ставит факт saidStrasburg (#982) — это источник, не ссылка
   { pool: 'P_COURT', lines: PP.P_COURT, marks: { Арсен: null, Страсбург: null } },
+  // свип карточек ленты (#1487): имена и числа (150 000, 300 000, 1473 дня, выселение, дача) называет
+  // сама карточка — своих меток партии пулы не несут
+  { pool: 'P_HH_JOB', lines: PP.P_HH_JOB, marks: {} },
+  { pool: 'HH_JOB_B', lines: HH_JOB_B, marks: {} },
+  { pool: 'P_SERYOGA_LOAN', lines: PP.P_SERYOGA_LOAN, marks: {} },
+  { pool: 'SERYOGA_LOAN_B', lines: SERYOGA_LOAN_B, marks: {} },
+  { pool: 'P_DACHA_ASK', lines: PP.P_DACHA_ASK, marks: {} },
+  { pool: 'DACHA_ASK_B', lines: DACHA_ASK_B, marks: {} },
+  { pool: 'P_EVICT', lines: PP.P_EVICT, marks: {} },
+  { pool: 'EVICT_B', lines: EVICT_B, marks: {} },
+  { pool: 'P_COLLECTORS_ECHO', lines: PP.P_COLLECTORS_ECHO, marks: {} },
+  { pool: 'COLLECTORS_ECHO_B', lines: COLLECTORS_ECHO_B, marks: {} },
+  { pool: 'P_THREAT_GOV', lines: PP.P_THREAT_GOV, marks: {} },
+  { pool: 'THREAT_GOV_B', lines: THREAT_GOV_B, marks: {} },
+  { pool: 'P_FRAUD_CARD', lines: PP.P_FRAUD_CARD, marks: {} },
+  { pool: 'FRAUD_CARD_B', lines: FRAUD_CARD_B, marks: {} },
 ]
 
 /** Метки follow-пулов арок (#1013): что сериал этой арки объявляет сам (null) и на какой факт обязана
