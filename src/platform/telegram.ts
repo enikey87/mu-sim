@@ -1,4 +1,5 @@
 import { loadScript } from './script'
+import { transferChannel, type TransferChannel } from './transfer'
 import type { Platform } from './types'
 
 /** Официальный скрипт Mini App. Грузится только telegram-сборкой: веб и витрины его не знают. */
@@ -10,6 +11,12 @@ const INIT_MS = 8000
  * BotFather/`createInvoiceLink`); пусто — покупки в сборке нет, как пустой `VITE_YANDEX_PRODUCT_ID`.
  */
 const invoiceUrl = (): string => String(import.meta.env.VITE_TELEGRAM_INVOICE_URL ?? '').trim()
+
+/**
+ * Адрес воркера бота с `/mini/*` (#1488): сохранение и перенос партии. Пусто — переноса нет,
+ * как у пустого инвойса: сборка работает, Cloudflare не нужен.
+ */
+const workerUrl = (): string => String(import.meta.env.VITE_TELEGRAM_WORKER_URL ?? '').trim()
 
 /**
  * Клиент Mini App (`window.Telegram.WebApp`). Все методы необязательны: версия клиента у игрока
@@ -33,6 +40,10 @@ interface TgWebApp {
    */
   openInvoice?(url: string, callback?: (status: string) => void): unknown
   onEvent?(event: string, listener: () => void): void
+  /** Подпись захода (Bot API 6.0): воркер проверяет её и не верит телу запроса. */
+  initData?: string
+  /** Разобранный `start_param`: сюда Telegram кладёт токен из `?startapp=…`. */
+  initDataUnsafe?: { start_param?: string }
 }
 
 type Scheme = 'dark' | 'light'
@@ -107,6 +118,17 @@ export function telegramPlatform(deps: TelegramDeps = {}): Platform {
     id: 'telegram',
     // цифровые товары в Telegram продаются только за Stars: внешней ссылки на DonationAlerts здесь нет
     externalPay: false,
+    /**
+     * Перенос партии: нужны и адрес воркера, и подпись захода. Пустой конфиг — `null`,
+     * и интерфейс даже не спрашивает про восстановление.
+     */
+    transfer(): TransferChannel | null {
+      const app = tg()
+      const url = workerUrl()
+      const initData = String(app?.initData ?? '').trim()
+      if (!url || !initData) return null
+      return transferChannel({ url, initData, startParam: app?.initDataUnsafe?.start_param ?? null })
+    },
     async init() {
       document.documentElement.dataset.platform = 'telegram'
       let app = tg()

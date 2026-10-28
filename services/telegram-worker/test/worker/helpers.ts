@@ -200,3 +200,114 @@ export function chargeOf(update: Record<string, unknown>): string {
   const message = update.message as { successful_payment?: { telegram_payment_charge_id?: string } }
   return message.successful_payment?.telegram_payment_charge_id ?? ''
 }
+
+// --- Mini App, игроки и напоминания (#1488) ---
+
+/**
+ * initData, подписанная токеном теста — так же, как её подписывает Telegram.
+ * Понимает `authDate` в секундах: свежесть подписи проверяется на границе `/mini/*`.
+ */
+export async function signedInitData(
+  userId: number,
+  options: { authDate?: number; token?: string; user?: unknown } = {},
+): Promise<string> {
+  const encoder = new TextEncoder()
+  const params = new URLSearchParams()
+  params.set('auth_date', String(options.authDate ?? Math.floor(Date.now() / 1000)))
+  params.set('query_id', 'AAH-test-query')
+  params.set('user', JSON.stringify(options.user ?? { id: userId, first_name: 'Игрок' }))
+
+  const checkString = [...params.entries()]
+    .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+    .map(([key, value]) => `${key}=${value}`)
+    .join('\n')
+
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode('WebAppData'),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  )
+  const secret = await crypto.subtle.sign('HMAC', key, encoder.encode(options.token ?? TEST_TOKEN))
+  const signer = await crypto.subtle.importKey('raw', secret, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+  const digest = await crypto.subtle.sign('HMAC', signer, encoder.encode(checkString))
+  params.set('hash', [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join(''))
+  return params.toString()
+}
+
+export interface MiniCallOptions {
+  origin?: string
+  envOverrides?: Partial<WorkerEnv>
+}
+
+/** Запрос Mini App к воркеру: JSON-тело и, как у браузера, Origin. */
+export function miniCall(path: '/mini/hello' | '/mini/restore', body: unknown, options: MiniCallOptions = {}): Promise<Response> {
+  const headers: Record<string, string> = { 'content-type': 'application/json' }
+  if (options.origin !== undefined) headers.origin = options.origin
+  return callWorker(path, { method: 'POST', headers, body: JSON.stringify(body) }, options.envOverrides)
+}
+
+export interface SeedPlayerOptions {
+  userId: number
+  lastSeen?: string
+  finished?: boolean
+  reminderCount?: number
+  lastReminderAt?: string | null
+  optOut?: boolean
+}
+
+/** Строка игрока в D1 — как её оставил бы заход в игру в прошлом. */
+export async function seedPlayer(options: SeedPlayerOptions, db: D1Database = env.DB): Promise<void> {
+  const seen = options.lastSeen ?? new Date().toISOString()
+  await db
+    .prepare(
+      `INSERT INTO players (telegram_user_id, chat_id, first_seen_at, last_seen_at, finished, reminder_count, last_reminder_at, opt_out)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      options.userId,
+      options.userId,
+      seen,
+      seen,
+      options.finished ? 1 : 0,
+      options.reminderCount ?? 0,
+      options.lastReminderAt ?? null,
+      options.optOut ? 1 : 0,
+    )
+    .run()
+}
+
+export function playerRows(db: D1Database = env.DB): Promise<Array<Record<string, unknown>>> {
+  return db.prepare('SELECT * FROM players ORDER BY telegram_user_id').all<Record<string, unknown>>().then((r) => r.results)
+}
+
+export function saveRows(db: D1Database = env.DB): Promise<Array<Record<string, unknown>>> {
+  return db.prepare('SELECT * FROM saves').all<Record<string, unknown>>().then((r) => r.results)
+}
+
+/** Ручной запуск cron-обработчика — тот же путь, что у Cloudflare Scheduler. */
+export async function runScheduled(envOverrides: Partial<WorkerEnv> = {}): Promise<void> {
+  const handler = worker as unknown as {
+    scheduled(controller: { scheduledTime: number; cron: string; noRetry(): void }, bindings: WorkerEnv): Promise<void>
+  }
+  await handler.scheduled({ scheduledTime: Date.now(), cron: '0 12 * * *', noRetry() {} }, { ...env, ...envOverrides } as WorkerEnv)
+}
+
+/** Текст и клавиатура последнего sendMessage. */
+export function lastSend(calls: TelegramCall[]): { text: string; keyboard: unknown; chatId: unknown } {
+  const call = [...calls].reverse().find((item) => item.method === 'sendMessage')
+  return {
+    text: String(call?.payload.text ?? ''),
+    keyboard: call?.payload.reply_markup,
+    chatId: call?.payload.chat_id,
+  }
+}
+
+/** Одноразовый токен из ссылки, которую бот отдал на /load. */
+export function transferTokenOf(calls: TelegramCall[]): string {
+  const keyboard = lastSend(calls).keyboard as { inline_keyboard?: Array<Array<{ url?: string }>> } | undefined
+  const url = keyboard?.inline_keyboard?.[0]?.[0]?.url ?? ''
+  return new URL(url).searchParams.get('startapp') ?? ''
+}
+
