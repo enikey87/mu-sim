@@ -8,7 +8,7 @@ import { realClock } from './engine/clock'
 import { browserAudio } from './engine/audio'
 import { SAVE_KEY } from './engine/state'
 import { App } from './ui/App'
-import { enable, firstGesture, boot, shown } from './analytics/metrics'
+import { enable, firstGesture, boot, shown, watchCrashes } from './analytics/metrics'
 import { bootPlatform, platform, safeStorage } from './platform'
 import { Restore } from './ui/Restore'
 import './styles.css'
@@ -88,6 +88,14 @@ export function startApp(opts: StartOptions = {}): Promise<AppHandle> {
     }
 
     const first = newGame(opts.start)
+    // Глобальные падения вне React: маячок crash с партией, которая сейчас на экране (#1482).
+    // Ссылка обновляется там же, где партия заменяется, — на «Начать заново».
+    let live = first
+    watchCrashes(() => {
+      let day = 0
+      try { day = live.S.day } catch { /* состояние уже не отвечает */ }
+      return { day, platform: platform().id }
+    })
     // Титры шелла: их конец ставит ту же отметку, что конец интро в приложении, — иначе React сыграет их второй раз.
     // Если приложение смонтировалось после титров, отметка ставится сразу.
     const shellIntro = opts.shellIntro
@@ -114,7 +122,8 @@ export function startApp(opts: StartOptions = {}): Promise<AppHandle> {
       }, [game])
       const onReset = () => {
         game.dispose()
-        setState({ game: newGame(), n: n + 1 }) // новый key — сбросить и состояние интерфейса (открытое досье и т.п.)
+        live = newGame()
+        setState({ game: live, n: n + 1 }) // новый key — сбросить и состояние интерфейса (открытое досье и т.п.)
       }
       // «Коснитесь, чтобы начать» — только когда в этой сессии ещё не было касания (первый запуск без сохранения);
       // после «Начать заново» касание уже было — анимация идёт сразу.
