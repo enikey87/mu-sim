@@ -5,7 +5,7 @@ import { ACH } from '../content/achievements'
 import { ARCS } from '../content/arcs'
 import { ENDINGS, type EndingId } from '../content/finales'
 import { STARTS } from '../content/quests'
-import { alikShaved, caughtCount, payday } from '../content/memkeys'
+import { alikShaved, caughtUnique, payday } from '../content/memkeys'
 import { fmtDate } from '../engine/time'
 import { reviewStamp, reviewTranscript, type ReviewSession } from './review'
 
@@ -94,7 +94,7 @@ const actRows = (S: GameState): ActRow[] => {
     { text: `За работу: ${rub(DEBT0)}. Должен сейчас: ${rub(S.debt)}.` },
     { text: diff > 0 ? `Возвращено и зачтено: ${rub(diff)}.` : diff < 0 ? `Начислено сверх работы: ${rub(-diff)}. Основание: объяснено Аликом.` : 'Возвращено: 0 ₽. Расхождений нет.' },
     { text: `Обещаний: ${S.promises.length} (просрочено — ${late}, сдержано — ${kept}, «когда-нибудь» — ${someday}).` },
-    { text: `Ложи поймано: ${Number(S.mem[caughtCount] ?? 0)}. Переводов получено: ${transfers.length} на ${rub(paid)}.` },
+    { text: `Ложи поймано: ${Number(S.mem[caughtUnique] ?? 0)}. Переводов получено: ${transfers.length} на ${rub(paid)}.` },
     { text: `Дней со сдачи: ${S.day}. Легендарных отмазок: ${legends}. «Муу» за кадром: ${S.stats.moo}.` },
     { text: 'Расхождение объяснено Аликом.' },
   ]

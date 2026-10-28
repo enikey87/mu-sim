@@ -32,7 +32,7 @@ interface Driven {
 /**
  * Скриптованный игрок: вежливый тон до конца партии, ответы на допработы и карточки банка как у живого
  * игрока. `court` — после вежливой серии добирается до заседания официальными обращениями;
- * `catches` — вместо суда ловит Алика на лжи трижды. Дальше Дня выплаты ведёт тот же цикл: сцену играют
+ * `catches` — вместо суда ловит Алика на лжи, пока не поймает три РАЗНЫЕ пары (#1481). Дальше Дня выплаты ведёт тот же цикл: сцену играют
  * её собственные кнопки. Ни одного прямого изменения фактов — только `send`/`answerJob`/`answerCard`.
  */
 async function drive(seed: number, mode: 'court' | 'catches'): Promise<Driven> {
@@ -58,7 +58,9 @@ async function drive(seed: number, mode: 'court' | 'catches'): Promise<Driven> {
       sent.push({ kind: 'text', text: FORMAL_COURT, ...game.classifyInput(FORMAL_COURT) })
       continue
     }
-    const catchOpt = mode === 'catches' && game.S.ach.saint && Number(game.S.mem.caught ?? 0) < 3
+    // Дверь (#1481) — три РАЗНЫЕ поимки, поэтому ловим, пока не наберётся три уникальные пары: повторная
+    // поимка той же пары счётчик не двигает и требует новой пары, а не ещё одного нажатия
+    const catchOpt = mode === 'catches' && game.S.ach.saint && Number(game.S.mem.caughtUnique ?? 0) < 3
       ? game.choices.find((c) => c.act === 'catchLie')
       : undefined
     if (catchOpt) {
@@ -118,8 +120,10 @@ describe('Достижимость «Настоящих денег» живой 
   it('вежливая серия и три поимки: без суда вообще, real через вторую дверь', async () => {
     const d = await drive(1, 'catches')
     const { game } = d
-    expect(d.catchSlots, 'кнопку поимки не предлагали').toBe(3)
-    expect(Number(game.S.mem.caught), 'поимок не три').toBe(3)
+    // поимок могло быть больше трёх: повторная поимка той же пары не приближает дверь (#1481)
+    expect(d.catchSlots, 'кнопку поимки не предлагали').toBeGreaterThanOrEqual(3)
+    expect(Number(game.S.mem.caught), 'поимок меньше трёх').toBeGreaterThanOrEqual(3)
+    expect(Number(game.S.mem.caughtUnique), 'разных поимок не три').toBe(3)
     expect(game.S.ach.liar3, 'третья поимка не зачтена').toBeTruthy()
     // суда в этой партии не было вовсе — значит, дверь именно вторая (saint И поимки)
     expect(game.S.mem.court, 'суд всё-таки двигался').toBeUndefined()
