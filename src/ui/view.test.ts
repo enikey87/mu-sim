@@ -94,7 +94,7 @@ describe('граница UI: фасад и снимок из view.ts, а не в
     expect(viewOf(uiOf(game)).sharePath, 'чистая партия — только долг').toEqual([`Долг Алика: ${rub(game.S.debt)}`])
 
     game.S.mem['count.sorry'] = 2
-    game.S.mem['caught'] = 3
+    game.S.mem['caughtUnique'] = 3
     game.S.mem['court'] = 3
     expect(viewOf(uiOf(game)).sharePath).toEqual([
       'Извинений: 2',
@@ -105,7 +105,7 @@ describe('граница UI: фасад и снимок из view.ts, а не в
 
     // ступень выше — другая строка; поимок и извинений в партии не было — строк о них нет
     delete game.S.mem['count.sorry']
-    delete game.S.mem['caught']
+    delete game.S.mem['caughtUnique']
     game.S.mem['court'] = 5
     expect(viewOf(uiOf(game)).sharePath).toEqual(['Суд: Страсбург', `Долг Алика: ${rub(game.S.debt)}`])
   })

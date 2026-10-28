@@ -5,7 +5,7 @@ import { ACH } from '../content/achievements'
 import { ARCS } from '../content/arcs'
 import { ENDINGS, type EndingId } from '../content/finales'
 import { STARTS } from '../content/quests'
-import { alikShaved, caughtCount, count, court, payday } from '../content/memkeys'
+import { alikShaved, caughtUnique, count, court, payday } from '../content/memkeys'
 import { fmtDate } from '../engine/time'
 import { reviewStamp, reviewTranscript, type ReviewSession } from './review'
 
@@ -86,7 +86,7 @@ const sharePath = (S: GameState): string[] => {
   const out: string[] = []
   const sorry = Number(S.mem[count.sorry] ?? 0)
   if (sorry > 0) out.push(`Извинений: ${sorry}`)
-  const catches = Number(S.mem[caughtCount] ?? 0)
+  const catches = Number(S.mem[caughtUnique] ?? 0)
   if (catches > 0) out.push(`Поимок на лжи: ${catches}`)
   // ступени дела: 1 юрист, 2 претензия, 3 заседание, 4 апелляция, 5 Страсбург, 6 решение
   const stage = Number(S.mem[court] ?? 0)
@@ -114,7 +114,7 @@ const actRows = (S: GameState): ActRow[] => {
     { text: `За работу: ${rub(DEBT0)}. Должен сейчас: ${rub(S.debt)}.` },
     { text: diff > 0 ? `Возвращено и зачтено: ${rub(diff)}.` : diff < 0 ? `Начислено сверх работы: ${rub(-diff)}. Основание: объяснено Аликом.` : 'Возвращено: 0 ₽. Расхождений нет.' },
     { text: `Обещаний: ${S.promises.length} (просрочено — ${late}, сдержано — ${kept}, «когда-нибудь» — ${someday}).` },
-    { text: `Ложи поймано: ${Number(S.mem[caughtCount] ?? 0)}. Переводов получено: ${transfers.length} на ${rub(paid)}.` },
+    { text: `Ложи поймано: ${Number(S.mem[caughtUnique] ?? 0)}. Переводов получено: ${transfers.length} на ${rub(paid)}.` },
     { text: `Дней со сдачи: ${S.day}. Легендарных отмазок: ${legends}. «Муу» за кадром: ${S.stats.moo}.` },
     { text: 'Расхождение объяснено Аликом.' },
   ]

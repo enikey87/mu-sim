@@ -5,7 +5,8 @@ import { START_DAY } from './time'
 import { SAVE_KEY } from './keys'
 import type { PromiseCondition, Rel, WhenKind } from '../content/excuses'
 import type { Vars } from '../content/scenes'
-import { freshLedger, migrateLedger, type LedgerState } from '../content/ledger'
+import { freshLedger, migrateLedger, caughtPairs, type LedgerState } from '../content/ledger'
+import { caughtUnique } from '../content/memkeys'
 import type { MooPhrase } from './moo'
 
 /** Ключи хранения — в `engine/keys.ts`: их читает и вход страницы, которому состояние игры не нужно. */
@@ -255,12 +256,18 @@ export function loadState(storage: Storage | null): GameState | null {
     const s = JSON.parse(raw)
     if (!s || !Array.isArray(s.msgs)) return null
     // старые сохранения без introShown — сразу в чат: иначе интро врёт по обрезанной ленте (#249)
+    const ledger = migrateLedger(s.mem ?? {}, s.ledger)
+    // #1481: старые сохранения знали только тотальный `caught`; широта восстанавливается из журнала —
+    // штамп пары здесь эпизод со статусом `caught`, отдельного ключа на пару партия не пишет
+    const mem = { ...(s.mem ?? {}) }
+    if (mem[caughtUnique] === undefined) mem[caughtUnique] = caughtPairs(ledger)
     return sealCounts({
       ...freshState(), ...s,
       introShown: typeof s.introShown === 'boolean' ? s.introShown : true,
       pendingCards: Array.isArray(s.pendingCards) ? s.pendingCards : [],
       poorSaid: loadPoorSaid(s.poorSaid),
-      ledger: migrateLedger(s.mem ?? {}, s.ledger),
+      ledger,
+      mem,
     })
   } catch {
     return null

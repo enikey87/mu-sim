@@ -145,6 +145,12 @@ export function currentEpisode(l: LedgerState): EpisodeRec | null {
   return openEpisodes(l)[0] ?? null
 }
 
+/** Сколько РАЗНЫХ пар утверждений уже поймано (#1481): штамп пары — эпизод со статусом `caught`,
+ *  повторная поимка той же пары нового штампа не ставит. Легаси `caught.<пара>` миграция закрывает этими же эпизодами. */
+export function caughtPairs(l: LedgerState): number {
+  return new Set(l.episodes.filter((e) => e.status === 'caught').map((e) => pairKey(e.a, e.b))).size
+}
+
 /** Закрыть конкретный эпизод: пойман, объяснён переходом или отозван. */
 export function closeEpisode(l: LedgerState, id: number, how: Exclude<EpisodeStatus, 'open'>): EpisodeRec | null {
   const e = l.episodes.find((x) => x.id === id)

@@ -26,7 +26,7 @@ import {
 import { allRules } from '../content/rules'
 import type { GameEvent, Offer } from '../content/rules/events'
 import { CLAIMS, claimByKey, CALLBACK_OPEN, type Claim } from '../content/lies'
-import { CLAIM_LEDGER, activeClaim, claimKeyOf, closeEpisode, currentEpisode, publishClaim, publishRetraction, publishTransition, type EpisodeRec } from '../content/ledger'
+import { CLAIM_LEDGER, activeClaim, caughtPairs, claimKeyOf, closeEpisode, currentEpisode, publishClaim, publishRetraction, publishTransition, type EpisodeRec } from '../content/ledger'
 import { isWhoId, type ClaimKey } from '../content/ids'
 import { type LedgerEvent, type LineSpec as ContentLineSpec, type Said, saidClaims, saidJoin, saidText } from '../content/fact-types'
 import * as memkeys from '../content/memkeys'
@@ -2781,6 +2781,9 @@ export class Game {
   async caught(line: string): Promise<void> {
     const ep = currentEpisode(this.S.ledger)
     if (ep) closeEpisode(this.S.ledger, ep.id, 'caught')
+    // уникальные пары — валюта концовок (#1481): штамп пары — закрытый эпизод, поэтому повтор
+    // той же пары счёт не двигает; тотальный `caught` остаётся ачивкам настойчивости
+    this.S.mem[memkeys.caughtUnique] = caughtPairs(this.S.ledger)
     // день поимки: архив эндгейма придерживает строку о вранье, пойманном только что (#777) — та же
     // свежесть, что у финала (`finale.at.*`, #771); счётчик `caught` растёт в remember правила, день
     // знает только движок, поэтому пишется здесь — на самом событии поимки
