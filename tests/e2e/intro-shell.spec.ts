@@ -28,6 +28,9 @@ test('титры идут до пакета: первый титр на экра
   await page.goto('/')
   // гейт на экране до пакета: будь титры завязаны на загрузку, он ждал бы её четыре секунды
   await expect(page.getByText('Коснитесь, чтобы начать')).toBeVisible({ timeout: 1500 })
+  // первое окно шелла — уровень, а не фальш-чат; «Алик печатает…» ждёт конца титр
+  await expect(page.locator('#boot .lvl')).toBeVisible()
+  await expect(page.locator('#boot .wt')).toBeHidden()
   // до касания пакет не скачивается вовсе: 322 кБ не платятся за того, кто не начал игру
   expect(requested, 'пакет запрошен до касания').toHaveLength(0)
 
@@ -39,16 +42,49 @@ test('титры идут до пакета: первый титр на экра
   await expect(page.locator('.intro-line'), 'вторая карточка раньше пакета').toHaveText(/Объект сдан/, { timeout: 3000 })
 })
 
-test('пакет не доехал: после титров остаётся «Алик печатает…», а не пустой экран', async ({ page }) => {
+test('пакет ещё едет после титр: шелл показывает «Алик печатает…», а не пустой экран', async ({ page }) => {
+  const entry = await entryScript(page)
+  await page.route('**/*.js', async (route) => {
+    if (isEntry(route.request().url(), entry)) return route.continue()
+    await new Promise((resolve) => setTimeout(resolve, 5000))
+    return route.continue()
+  })
+  await page.goto('/')
+  const intro = page.locator('.intro')
+  await intro.click() // титры пошли — пакет поехал
+  await intro.click() // пропуск касанием: титры убираются сразу
+  await expect(intro).toHaveCount(0)
+  // приложения ещё нет: под уехавшими титрами — метафора чата, уместная на этом ожидании
+  await expect(page.locator('#boot')).toBeVisible()
+  await expect(page.locator('#boot .wt')).toBeVisible()
+  await expect(page.locator('#boot .wt')).toContainText('Алик печатает…')
+  await expect(page.locator('#boot .lvl')).toBeHidden()
+  await expect(page.locator('#boot .fl')).toBeHidden()
+})
+
+test('пакет не доехал: строка про сеть вместо вечного индикатора', async ({ page }) => {
+  test.slow()
   const entry = await entryScript(page)
   await page.route('**/*.js', (route) => (isEntry(route.request().url(), entry) ? route.continue() : route.abort()))
   await page.goto('/')
   await page.locator('.intro').click()
-  await expect(page.locator('.intro-line')).toHaveText('Вы положили плитку на объекте Алика.')
-  await page.locator('.intro').click() // пропуск касанием: титры убираются сразу
-  await expect(page.locator('.intro')).toHaveCount(0)
-  await expect(page.locator('#boot')).toBeVisible()
-  await expect(page.locator('.boot-status')).toHaveText('печатает…')
+  // первый отказ не молчит: повтор виден строкой, пока шелл дозванивается (#1477)
+  await expect(page.locator('#boot .wt span')).toHaveText(/дозваниваемся… [23] из 3/, { timeout: 15_000 })
+  // три попытки отказали — строка про сеть вместо вечного индикатора
+  await expect(page.locator('#boot .fl')).toBeVisible({ timeout: 30_000 })
+  await expect(page.locator('#boot .fl')).toHaveText('Алик не дозвонился. Проверьте сеть и обновите страницу.')
+  await expect(page.locator('#boot .wt')).toBeHidden()
+})
+
+test('?nointro и отказ сети: шелл сразу говорит про сеть, а не показывает индикатор', async ({ page }) => {
+  test.slow()
+  const entry = await entryScript(page)
+  await page.route('**/*.js', (route) => (isEntry(route.request().url(), entry) ? route.continue() : route.abort()))
+  await page.goto('/?nointro')
+  // повтор виден сразу, после трёх попыток — строка про сеть и кнопка (#1477)
+  await expect(page.locator('#boot .wt span')).toHaveText(/дозваниваемся… [23] из 3/, { timeout: 15_000 })
+  await expect(page.locator('#boot .fl')).toBeVisible({ timeout: 30_000 })
+  await expect(page.locator('#boot .fl')).toHaveText('Алик не дозвонился. Проверьте сеть и обновите страницу.')
 })
 
 test('сохранение есть — титров нет: место отдаётся прежней партии', async ({ page }) => {

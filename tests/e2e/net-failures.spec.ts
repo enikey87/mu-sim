@@ -69,7 +69,7 @@ test('пакет не доехал дважды: повтор перезагру
   })
   await page.goto('/?nointro')
   // повтор не молчит: игрок видит, что дозвон продолжается
-  await expect(page.locator('#boot-retry')).toHaveText(/дозваниваемся… [23] из 3/, { timeout: 15_000 })
+  await expect(page.locator('#boot .wt span')).toHaveText(/дозваниваемся… [23] из 3/, { timeout: 15_000 })
   await expect(page.locator('.chat-head .name')).toHaveText('Алик Воздухонесян', { timeout: 30_000 })
   expect(aborted).toBe(2)
   // повтор — новый документ: import() того же адреса сеть не повторила бы (module map помнит отказ)
@@ -84,7 +84,7 @@ test('пакет не доехал трижды: текст и кнопка по
   const again = page.getByRole('button', { name: 'Попробовать снова' })
   await expect(page.getByText(FAIL_TEXT)).toBeVisible({ timeout: 30_000 })
   await expect(again).toBeVisible()
-  await expect(page.locator('#boot')).toHaveClass(/boot-failed/)
+  await expect(page.locator('#boot')).toHaveClass(/failed/)
   // кнопка — перезагрузка: после неё снова честные попытки, а не мёртвая кнопка
   await again.click()
   await expect(page.getByText(FAIL_TEXT)).toBeVisible({ timeout: 30_000 })

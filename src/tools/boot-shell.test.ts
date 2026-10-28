@@ -1,7 +1,8 @@
-// Шелл холодной загрузки (#1443): инлайн-копия рамки телефона, шапки чата и пузыря «печатает…» в index.html.
-// Проверяется то, чего не видно в браузере: бюджет инлайна, отсутствие запросов у шелла и происхождение
-// палитры — цвета шелла берутся из styles.css, а не выдумываются. Что шелл действительно рисует первый кадр
-// и исчезает при монтировании, проверяет tests/e2e/boot-shell.spec.ts: jsdom не считает вёрстку и анимацию.
+// Шелл холодной загрузки (#1443, #1476): инлайн-уровень и пузырёк ожидания в index.html.
+// Проверяется то, чего не видно в браузере: бюджет инлайна, отсутствие запросов у шелла, отсутствие JS
+// у индикатора и происхождение палитры — цвета шелла берутся из styles.css, а не выдумываются.
+// Что шелл действительно рисует первый кадр и исчезает при монтировании,
+// проверяет tests/e2e/boot-shell.spec.ts: jsdom не считает ни вёрстку, ни анимацию.
 import { readFileSync } from 'node:fs'
 import { gzipSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
@@ -38,11 +39,24 @@ const colour = (value: string): string => {
 /** Все цвета, которые знает палитра приложения, — вместе с градиентом аватара и рамкой телефона. */
 const palette = new Set([...appCss.matchAll(/#[0-9a-fA-F]{3,6}\b/g)].map((m) => colour(m[0])))
 
-const inlineDark = style.slice(style.indexOf('@media (prefers-color-scheme: dark)'))
-const inlineLight = style.slice(0, style.indexOf('@media (prefers-color-scheme: dark)'))
-/** Цвета блока — нормализованными: `#fff` и `#ffffff` в палитре одно и то же. */
-const coloursOf = (css: string): Set<string> => new Set([...css.matchAll(/#[0-9a-fA-F]{3,6}\b/g)].map((m) => colour(m[0])))
-const dots = /<div class="boot-bubble"[^>]*>([\s\S]*?)<\/div>/.exec(shell)?.[1] ?? ''
+const inlineDark = style.slice(style.search(/@media\s*\(prefers-color-scheme:\s*dark\)/))
+/** Цвета блока — нормализованными: `#fff` и `#ffffff` в палитре одно и то же; комментарии не считаются. */
+const coloursOf = (css: string): Set<string> =>
+  new Set([...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/#[0-9a-fA-F]{3,6}\b/g)].map((m) => colour(m[0])))
+/** Тело правила по селектору: `sel { … }` → `…`; вложенные скобки (keyframes) считаются. */
+const rule = (css: string, selector: string): string => {
+  const at = css.indexOf(`${selector}{`)
+  expect(at, `в инлайне нет правила ${selector}`).toBeGreaterThanOrEqual(0)
+  const open = css.indexOf('{', at)
+  let depth = 0
+  for (let i = open; i < css.length; i++) {
+    if (css[i] === '{') depth++
+    else if (css[i] === '}' && --depth === 0) return css.slice(open + 1, i)
+  }
+  return ''
+}
+/** Значения `left` из keyframes уровня: перелёты вокруг центра — единственный признак «уровня», не прогресс-бара. */
+const hunt = [...rule(style, '@keyframes hunt').matchAll(/left:(-?\d+)px/g)].map((m) => Number(m[1]))
 
 describe('шелл холодной загрузки в index.html', () => {
   it('лежит внутри #root до скрипта: первый кадр рисуется из одного HTML', () => {
@@ -51,10 +65,45 @@ describe('шелл холодной загрузки в index.html', () => {
     expect(shell.replace('<div id="root">', '').trim().startsWith('<div id="boot"')).toBe(true)
   })
 
-  it('пузырь «печатает…» — три точки, как индикатор набора в чате', () => {
-    expect(dots.match(/<i><\/i>/g)).toHaveLength(3)
-    expect(style).toContain('#boot .boot-bubble i:nth-child(3)')
-    expect(shell).toContain('печатает…')
+  it('первое окно — уровень, а не фальш-чат: ни рамки телефона, ни шапки с аватаром', () => {
+    expect(rule(style, '#boot .lvl')).toContain('border:2px solid')
+    expect(shell).toContain('<div class="lvl" aria-hidden="true"><span class="spr"></span></div>')
+    for (const chat of ['boot-head', 'boot-ava', 'boot-name', 'boot-status', 'boot-bubble']) {
+      expect(shell, chat).not.toContain(chat)
+    }
+  })
+
+  it('уровень — капсула с рисками и пузырьком, перелёты вокруг центра, а не линейный пинг-понг', () => {
+    const lvl = rule(style, '#boot .lvl')
+    expect(lvl).toContain('width:216px')
+    expect(lvl).toContain('height:38px')
+    expect(style).toContain('#boot .lvl::before,#boot .lvl::after')
+    // центр пузырька (58 px в капсуле 216 px) — 79 px; перелёты обязаны пересекать его в обе стороны
+    const centre = (216 - 58) / 2
+    expect(hunt.filter((left) => left < centre).length, '@keyframes hunt').toBeGreaterThan(0)
+    expect(hunt.filter((left) => left > centre).length, '@keyframes hunt').toBeGreaterThan(0)
+    expect(new Set(hunt).size).toBeGreaterThanOrEqual(4)
+  })
+
+  it('индикатор — чистый CSS: у шелла нет ни обработчиков, ни JS', () => {
+    expect(style).toContain('@keyframes hunt')
+    expect(shell).not.toContain('<script')
+    expect(shell).not.toMatch(/\son[a-z]+=/)
+  })
+
+  it('второе окно — «Алик печатает…», скрыто до класса waiting у #boot', () => {
+    expect(shell).toContain('<div class="wt"><i></i><i></i><i></i><span>Алик печатает…</span></div>')
+    expect(rule(style, '#boot .wt')).toContain('display:none')
+    expect(style).toContain('#boot.waiting .wt{display:flex}')
+    // точки набора — те же три, что в чате
+    expect(style).toContain('#boot .wt i:nth-child(2)')
+    expect(style).toContain('#boot .wt i:nth-child(3)')
+  })
+
+  it('отказ сети виден строкой, а не вечным индикатором', () => {
+    expect(shell).toContain('Алик не дозвонился. Проверьте сеть и обновите страницу.')
+    expect(rule(style, '#boot .fl')).toContain('display:none')
+    expect(style).toContain('#boot.failed .fl{display:block}')
   })
 
   it('не тянет ни одного файла: ни src, ни href, ни url()', () => {
@@ -76,7 +125,7 @@ describe('шелл холодной загрузки в index.html', () => {
     expect(guard).toContain("'alik-boot-retry'")
     expect(guard).toContain('sessionStorage.getItem')
     expect(guard).toContain('sessionStorage.setItem')
-    expect(guard.indexOf('location.reload')).toBeLessThan(guard.indexOf('boot-failed'))
+    expect(guard.indexOf('location.reload')).toBeLessThan(guard.indexOf("' failed'"))
   })
 
   it('отказ бута: текст в теме игры, кнопка повтора и подсказка без JS', () => {
@@ -101,32 +150,35 @@ describe('шелл холодной загрузки в index.html', () => {
   it('палитра — копия styles.css, а не свои цвета', () => {
     const used = coloursOf(style)
     expect([...used].filter((c) => !palette.has(c))).toEqual([])
-    // те же роли, что в приложении: страница, телефон, панель, акцент статуса
+    // те же роли, что в приложении: страница, панель пузырька, приглушённый инструмент
     expect(used).toContain(colour(light.get('--page')!))
-    expect(used).toContain(colour(light.get('--bg')!))
     expect(used).toContain(colour(light.get('--panel')!))
-    expect(used).toContain(colour(light.get('--accent')!))
+    expect(used).toContain(colour(light.get('--muted')!))
+    expect(used).toContain(colour(light.get('--text')!))
   })
 
   it('тёмная тема повторяет тёмную палитру styles.css', () => {
     const used = coloursOf(inlineDark)
     expect(used).toContain(colour(dark.get('--page')!))
-    expect(used).toContain(colour(dark.get('--bg')!))
-    expect(used).toContain(colour(dark.get('--panel')!))
-    expect(used).toContain(colour(dark.get('--accent')!))
     expect(used).toContain(colour(dark.get('--muted')!))
+    expect(used).toContain(colour(dark.get('--text')!))
+    expect(used).toContain(colour(dark.get('--panel')!))
+    // светлые роли в тёмный блок не просачиваются: страница тёмная, а не светлая
+    expect(used).not.toContain(colour(light.get('--page')!))
     // тёмная палитра объявлена в styles.css двумя блоками: media и data-theme — шелл копирует media
     expect(darkMedia).toContain(`--panel: ${dark.get('--panel')}`)
   })
 
-  it('reduced-motion выключает анимацию точек', () => {
-    const block = /@media \(prefers-reduced-motion: reduce\) \{([^}]*\})/.exec(style)?.[1] ?? ''
-    expect(block).toContain('#boot .boot-bubble i { animation: none')
+  it('reduced-motion: пузырёк замирает у центра, точки не мигают', () => {
+    const block = style.slice(style.indexOf('@media (prefers-reduced-motion:reduce)'))
+    expect(block).toContain('#boot .spr{animation:none;left:calc(50% - 29px)}')
+    expect(block).toContain('#boot .wt i{animation:none;opacity:1}')
   })
 
   it('узкий экран: рамка снимается, как у .phone, и учитывается safe area', () => {
-    expect(inlineLight).toContain('@media (max-width: 500px)')
-    expect(inlineLight).toContain('width: 100%; height: 100dvh; border: 0; border-radius: 0;')
-    expect(inlineLight).toContain('padding-top: env(safe-area-inset-top, 0px)')
+    const narrow = style.slice(style.indexOf('#intro-frame'))
+    expect(narrow).toContain('@media (max-width: 500px)')
+    expect(narrow).toContain('width: 100%; height: 100dvh; border: 0; border-radius: 0;')
+    expect(narrow).toContain('padding-top: env(safe-area-inset-top, 0px)')
   })
 })
