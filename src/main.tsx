@@ -140,7 +140,9 @@ export function startApp(opts: StartOptions = {}): Promise<AppHandle> {
               storage?.setItem(SAVE_KEY, save)
               game.dispose()
               setPendingRestore(null)
-              setState({ game: newGame(), n: n + 1 })
+              // live — ссылка для маячка падений (#1482): она всегда указывает на партию на экране
+              live = newGame()
+              setState({ game: live, n: n + 1 })
             }}
           />
         )
