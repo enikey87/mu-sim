@@ -61,5 +61,5 @@ test('приложение монтируется уже со своими ст�
   await expect(page.locator('.chat-head .name')).toHaveText('Алик Воздухонесян')
   // тень рамки — правило styles.css: без неё приложение встало бы голым
   await expect(page.locator('.phone').first()).toHaveCSS('box-shadow', /rgba\(0, 0, 0, 0\.35\)/)
-  await expect(page.locator('#boot')).toHaveCount(0)
+  await expect(page.locator('#intro-frame')).toHaveCount(0)
 })

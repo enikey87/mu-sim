@@ -17,7 +17,7 @@ export function Intro({ data, gate, onDone }: { data: IntroView; gate: boolean; 
     const parent = host.current
     if (!parent) return
     const s = first.current
-    return mountIntro(parent, {
+    const intro = mountIntro(parent, {
       lines: introLinesOf(s.data),
       date: s.data.date,
       clock: s.clock,
@@ -27,6 +27,7 @@ export function Intro({ data, gate, onDone }: { data: IntroView; gate: boolean; 
       onGone: s.gone,
       trackNote: s.note,
     })
+    return () => intro.remove()
   }, [])
   return <div ref={host} className="intro-host" />
 }
