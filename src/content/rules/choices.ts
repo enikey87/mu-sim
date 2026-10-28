@@ -25,6 +25,7 @@ import {
   P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE,
   P_CREW_CALL, P_LAWYER, P_COLLECTORS_ASK, P_INTERN, P_HOLE, P_COUNTERSUIT,
   P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_BORIS, P_DEBUT_NIVA, P_NUNE_DEBUT, P_DEBUT_GRANT, P_GRANT_TILE, P_MOUSTACHE_PHOTO, P_MAMA_MARKET, P_TILE_AD, P_TAMADA_DONE, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_COURT_VERDICT, P_TILE_SLIP, P_TILE_COURT, P_TILE_LAWYER, P_TILE_MONUMENT, P_NIVA_BACK, P_SOLD, P_GRANT_HOUSE, P_BORIS_MEMORY, P_SERYOGA, P_GRANT_BATH, P_OFFENDED_ASK, P_BATH_ASK, P_MUEN, P_INH_BURNED, P_INH_REFUSED,
+  P_HH_JOB, P_SERYOGA_LOAN, P_DACHA_ASK, P_EVICT, P_COLLECTORS_ECHO, P_THREAT_GOV, P_FRAUD_CARD,
 } from './player-choice-pools'
 
 type R = Rule<ContentApi, GameEvent, Offer>
@@ -338,6 +339,17 @@ export const choiceRules: R[] = [
   offer({ name: 'Seryoga', when: [is('seryogaFresh')], act: 'seryoga', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_SERYOGA', P_SERYOGA) }),
   offer({ name: 'GrantBath', when: [is('grantBathFresh')], act: 'grantBath', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_GRANT_BATH', P_GRANT_BATH) }),
   offer({ name: 'OffendedAsk', when: [is('offendedAskFresh')], act: 'offendedAsk', tone: 'polite', bonus: 5, text: (g) => windowFromArr(g, 'P_OFFENDED_ASK', P_OFFENDED_ASK) }),
+  // свип карточек ленты (#1487): семь карточек, обращённых к игроку или объявивших событие партии,
+  // остались без варианта ответа — вопрос «Откликнуться?», просьба Серёги, «Помогло?», выселение,
+  // коллекторы-друзья, регистрация угрозы и остаток кредита на имя игрока. Окно как у #927/#1292:
+  // ход карточки и три после, bonus 5 — рядом стоят общие вопросы блока (извинение и мычание — 6)
+  offer({ name: 'HhJob', when: [is('hhJobFresh')], act: 'hhJob', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_HH_JOB', P_HH_JOB) }),
+  offer({ name: 'SeryogaLoan', when: [is('seryogaLoanFresh')], act: 'seryogaLoan', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_SERYOGA_LOAN', P_SERYOGA_LOAN) }),
+  offer({ name: 'DachaAsk', when: [is('dachaAskFresh')], act: 'dachaAsk', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_DACHA_ASK', P_DACHA_ASK) }),
+  offer({ name: 'Evict', when: [is('evictFresh')], act: 'evictAsk', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_EVICT', P_EVICT) }),
+  offer({ name: 'CollectorsEcho', when: [is('collectorsEchoFresh')], act: 'collectorsEcho', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_COLLECTORS_ECHO', P_COLLECTORS_ECHO) }),
+  offer({ name: 'ThreatGov', when: [is('threatGovFresh')], act: 'threatGov', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_THREAT_GOV', P_THREAT_GOV) }),
+  offer({ name: 'FraudCard', when: [is('fraudCardFresh')], act: 'fraudCard', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_FRAUD_CARD', P_FRAUD_CARD) }),
   // условие Карине «переложите нам ванную» (#1382): сцена мира ставила факт `bath.asked`, но окна отклика
   // не было — до Дня выплаты игрок не мог ответить на условие. Окно своё (ход строки и три после) и
   // кончается Днём выплаты: после него условие либо уже учтено в дележе, либо превращено в претензию.
