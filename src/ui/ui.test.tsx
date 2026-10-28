@@ -17,7 +17,7 @@ import { introOf, uiOf } from './view'
 import { introDateLine, introVowLine, LINE_MS, FADE_MS } from '../intro/cards'
 import { enable, GAME_HOST } from '../analytics/metrics'
 import { EPILOGUE_BANNER, LEND50_LINK, LEND50_RENAME, LEND50_SYS, LEND50_TG_SYS, LEND50_VK_SYS, LEND50_YA_SYS } from '../content/endgame'
-import { adoptPlatform, webPlatform } from '../platform'
+import { adoptPlatform, platform, webPlatform } from '../platform'
 
 function renderApp(game: Game, onReset = vi.fn()) {
   const utils = render(<App game={game} onReset={onReset} />)
@@ -694,7 +694,7 @@ describe('App', () => {
     expect(within(endings).queryByText('Честные деньги')).toBeNull()
   })
 
-  it('досье: плитки не кнопки и не ссылки — фокус с «Закрыть» доходит до «Начать заново»', async () => {
+  it('досье: плитки не кнопки и не ссылки — «Поделиться» есть только у открытой концовки, фокус доходит до «Начать заново»', async () => {
     const { game } = makeGame()
     game.S.endings.family = game.S.day
     game.unlock('first')
@@ -703,12 +703,68 @@ describe('App', () => {
     await userEvent.setup().click(info)
     const dialog = screen.getByRole('dialog', { name: 'Досье на Алика' })
     expect(document.querySelectorAll('.tile').length).toBe(document.querySelectorAll('#endings .tile').length + document.querySelectorAll('#achList .tile').length)
-    expect(document.querySelectorAll('.tile button, .tile a')).toHaveLength(0)
+    // плитка целиком — не управляющий элемент: кнопка шаринга живёт внутри и только у открытой концовки
+    for (const tile of document.querySelectorAll('.tile')) {
+      expect(tile.tagName).toBe('DIV')
+      expect(tile.querySelectorAll('a')).toHaveLength(0)
+    }
+    expect(document.querySelectorAll('.tile button')).toHaveLength(1)
+    expect(document.querySelector('.tile.locked button')).toBeNull()
     await userEvent.setup().tab()
     const reset = screen.getByText('Начать заново')
     expect(dialog.contains(document.activeElement)).toBe(true)
     reset.focus()
     expect(document.activeElement).toBe(reset)
+  })
+
+  it('концовка без Web Share API: мёртвой «Поделиться» нет, постер сохраняется кнопкой', () => {
+    const { game } = makeGame()
+    game.S.day = 240
+    game.S.ending = 'family'
+    renderApp(game)
+    const end = screen.getByRole('dialog', { name: /Породнились/ })
+    expect(end.querySelector('#endingShare')).toBeNull()
+    expect(end.querySelector('#endingSaveCard')!.textContent).toBe('Сохранить картинку')
+  })
+
+  it('концовка: «Поделиться» отдаёт число дней и адрес игры', async () => {
+    const share = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'share', { configurable: true, value: share })
+    try {
+      const { game } = makeGame()
+      game.S.day = 240
+      game.S.ending = 'family'
+      renderApp(game)
+      const end = screen.getByRole('dialog', { name: /Породнились/ })
+      await act(async () => { fireEvent.click(end.querySelector('#endingShare')!) })
+      expect(share).toHaveBeenCalledOnce()
+      const data = share.mock.calls[0][0] as ShareData
+      expect(data.text).toContain('240 дней')
+      expect(data.text).toContain('https://enikey87.github.io/mu-sim/')
+      expect(data.url).toBe('https://enikey87.github.io/mu-sim/')
+    } finally { Reflect.deleteProperty(navigator, 'share') }
+  })
+
+  it('досье: делится только открытая концовка — свой день коллекции, у силуэта кнопки нет', async () => {
+    const share = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'share', { configurable: true, value: share })
+    try {
+      const { game } = makeGame()
+      game.S.day = 300
+      game.S.endings.family = 245
+      renderApp(game)
+      fireEvent.click(screen.getByTitle('Обещания и ачивки'))
+      const endings = document.getElementById('endings')!
+      const got = within(endings).getByText('Породнились').closest('.tile')!
+      const locked = within(endings).getAllByText('???')[0].closest('.tile')!
+      expect(locked.querySelector('button')).toBeNull()
+      const btn = got.querySelector('button')!
+      expect(btn.getAttribute('aria-label')).toBe('Поделиться концовкой «Породнились»')
+      await act(async () => { fireEvent.click(btn) })
+      const data = share.mock.calls[0][0] as ShareData
+      expect(data.text).toContain('245 дней')
+      expect(data.text).toContain('https://enikey87.github.io/mu-sim/')
+    } finally { Reflect.deleteProperty(navigator, 'share') }
   })
 
   it('Esc закрывает досье и возвращает фокус на кнопку досье', () => {
@@ -1302,19 +1358,116 @@ describe('лента как лог для скринридера', () => {
 })
 
 describe('экран падения', () => {
-  it('ошибка отрисовки показывает экран падения, кнопка стирает сохранение и зовёт onReset', () => {
-    const { game, storage } = makeGame()
-    game.save()
-    expect(storage.data[SAVE_KEY]).toBeTruthy()
-    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+  afterEach(() => {
+    delete (globalThis as { ym?: unknown }).ym
+    enable({ host: '', search: '', id: '' })
+  })
+
+  /** Ломает отрисовку, не ломая сохранение: шапка читает battery.level через S.battery (#1482). */
+  const breakRender = (game: Game) => {
+    const battery = Object.getOwnPropertyDescriptor(game.S, 'battery')!
     Object.defineProperty(game.S, 'battery', { configurable: true, get() { throw new Error('boom') } })
+    return () => Object.defineProperty(game.S, 'battery', battery)
+  }
+
+  const quietConsole = () => vi.spyOn(console, 'error').mockImplementation(() => {})
+
+  it('ошибка отрисовки: две кнопки, перезагрузка интерфейса перемонтирует дерево и сохраняет партию', () => {
+    const { game, storage } = makeGame({ seed: 2 })
+    game.save()
+    const day = game.S.day
+    const sent = game.S.stats.sent
+    const msgs = game.S.msgs.length
+    const errors = quietConsole()
+    const restore = breakRender(game)
 
     const { onReset } = renderApp(game)
     expect(screen.getByText(/Что-то сломалось/)).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Стереть сохранение и начать заново' }))
+    expect(screen.getAllByRole('button')).toHaveLength(2)
 
+    // первичная кнопка перемонтирует дерево от той же партии — сохранение не трогаем
+    restore()
+    fireEvent.click(screen.getByRole('button', { name: 'Перезагрузить интерфейс' }))
+    expect(onReset).not.toHaveBeenCalled()
+    expect(screen.getByText('Алик Воздухонесян')).toBeInTheDocument()
+    expect(game.S.day).toBe(day)
+    expect(game.S.stats.sent).toBe(sent)
+    expect(game.S.msgs.length).toBe(msgs)
+    expect(storage.data[SAVE_KEY]).toBeTruthy()
+
+    errors.mockRestore()
+  })
+
+  it('запасная кнопка стирает сохранение и зовёт onReset, как до #1482', () => {
+    const { game, storage } = makeGame()
+    game.save()
+    expect(storage.data[SAVE_KEY]).toBeTruthy()
+    const errors = quietConsole()
+    const restore = breakRender(game)
+
+    const { onReset } = renderApp(game)
+    fireEvent.click(screen.getByRole('button', { name: 'Стереть сохранение и начать заново' }))
     expect(onReset).toHaveBeenCalled()
     expect(storage.data[SAVE_KEY]).toBeUndefined()
+
+    restore()
+    errors.mockRestore()
+  })
+
+  it('автосейв до маячка: крах после пустого сохранения оставляет партию с собой', () => {
+    const { game, storage } = makeGame({ seed: 2 })
+    delete storage.data[SAVE_KEY]
+    const day = game.S.day
+    const errors = quietConsole()
+    // падает отрисовка (варианты читает `Choices`), а состояние сериализуется как обычно
+    Object.defineProperty(game, 'choices', { configurable: true, get() { throw new Error('boom') } })
+
+    renderApp(game)
+    expect(screen.getByText(/Что-то сломалось/)).toBeInTheDocument()
+    const saved = JSON.parse(storage.data[SAVE_KEY])
+    expect(saved.day).toBe(day)
+    expect(saved.msgs.length).toBeGreaterThan(0)
+
+    delete (game as unknown as { choices?: unknown }).choices
+    errors.mockRestore()
+  })
+
+  it('маячок уходит в приёмник один раз: вид, имя ошибки, день и платформа — без текста ошибки', () => {
+    const calls: unknown[][] = []
+    ;(globalThis as { ym?: unknown }).ym = (...args: unknown[]) => { calls.push(args) }
+    enable({ host: GAME_HOST, search: '', id: '4242' })
+    const { game } = makeGame({ seed: 2 })
+    const errors = quietConsole()
+    const restore = breakRender(game)
+
+    const view = renderApp(game)
+    const crashes = calls.filter((c) => c[1] === 'reachGoal' && c[2] === 'crash')
+    expect(crashes).toHaveLength(1)
+    expect(crashes[0][3]).toMatchObject({ kind: 'ui', name: 'Error', day: game.S.day, platform: platform().id })
+    expect(JSON.stringify(crashes)).not.toContain('boom')
+
+    // повторная отрисовка экрана падения — не новый крах
+    view.rerender(<App game={game} onReset={view.onReset} />)
+    expect(calls.filter((c) => c[1] === 'reachGoal' && c[2] === 'crash')).toHaveLength(1)
+
+    restore()
+    errors.mockRestore()
+  })
+
+  it('второй крах подряд возвращает экран и подсвечивает запасную кнопку, цикла нет', () => {
+    const { game } = makeGame({ seed: 2 })
+    const errors = quietConsole()
+    const restore = breakRender(game)
+
+    renderApp(game)
+    fireEvent.click(screen.getByRole('button', { name: 'Перезагрузить интерфейс' }))
+    // перемонтирование на сломанном состоянии падает снова — экран вернулся, кнопок по-прежнему две
+    expect(screen.getByText(/Что-то сломалось/)).toBeInTheDocument()
+    expect(screen.getAllByRole('button')).toHaveLength(2)
+    expect(screen.getByRole('button', { name: 'Стереть сохранение и начать заново' })).toHaveClass('recommended')
+    expect(screen.getByText(/остаётся стереть сохранение/)).toBeInTheDocument()
+
+    restore()
     errors.mockRestore()
   })
 })

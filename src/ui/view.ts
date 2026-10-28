@@ -5,7 +5,7 @@ import { ACH } from '../content/achievements'
 import { ARCS } from '../content/arcs'
 import { ENDINGS, type EndingId } from '../content/finales'
 import { STARTS } from '../content/quests'
-import { alikShaved, caughtUnique, payday } from '../content/memkeys'
+import { alikShaved, caughtUnique, count, court, payday } from '../content/memkeys'
 import { fmtDate } from '../engine/time'
 import { reviewStamp, reviewTranscript, type ReviewSession } from './review'
 
@@ -73,11 +73,31 @@ const promiseState = (p: PromiseRec, day: number): PromiseState =>
   p.amnesty !== undefined ? 'amnesty' : p.kept ? 'kept' : p.asked ? 'asked' : isLate(p, day) ? 'late'
     : p.condition ? (p.met === undefined ? 'event' : 'eventMet') : p.due === null ? 'someday' : 'wait'
 export type ArcRow = { id: string; title: string; state: string; done: boolean; locked: boolean }
-export type EndingRow = { id: string; title: string; icon: string; got: boolean }
+/** `day` — день партии, в который концовка открылась в этой партии; null — отметка устройства без дня (#1437). */
+export type EndingRow = { id: string; title: string; icon: string; got: boolean; day: number | null }
 export type AchRow = { id: string; title: string; desc: string; got: boolean }
 export type FinaleRow = { id: string; title: string; finale: string }
 /** Строка «Акта сверки» — сухая фиксация числа; текст фиксированный (не пул), голос системных сообщений. */
 export type ActRow = { text: string }
+
+/** Короткий путь партии для постера «Поделиться»: только несущие факты — извинения, поимки, ступень суда, долг.
+ *  Ничего не додумывает: чего в партии не было, того в строке нет. */
+const sharePath = (S: GameState): string[] => {
+  const out: string[] = []
+  const sorry = Number(S.mem[count.sorry] ?? 0)
+  if (sorry > 0) out.push(`Извинений: ${sorry}`)
+  const catches = Number(S.mem[caughtUnique] ?? 0)
+  if (catches > 0) out.push(`Поимок на лжи: ${catches}`)
+  // ступени дела: 1 юрист, 2 претензия, 3 заседание, 4 апелляция, 5 Страсбург, 6 решение
+  const stage = Number(S.mem[court] ?? 0)
+  if (stage >= 6) out.push('Суд: решение')
+  else if (stage >= 5) out.push('Суд: Страсбург')
+  else if (stage >= 4) out.push('Суд: апелляция')
+  else if (stage >= 3) out.push('Суд: заседание')
+  else if (stage > 0) out.push('Суд: претензия')
+  out.push(`Долг Алика: ${S.debt.toLocaleString('ru-RU')} ₽`)
+  return out
+}
 
 /** «Акт сверки» — сводка партии числами из уже существующих фактов и ленты (#689).
  *  Смешное — в числе и контрасте, не в вариативности: строки фиксированные, без колоды. */
@@ -120,6 +140,8 @@ export type View = {
   act: ActRow[]
   arcs: ArcRow[]
   endings: EndingRow[]
+  /** Короткий путь партии для постера «Поделиться» — факты этой партии. */
+  sharePath: string[]
   items: string[]
   ach: AchRow[]
   achGot: number
@@ -133,7 +155,7 @@ export const viewOf = (u: GameUi): View => {
   const chain = S.mem[payday.chain]
   // коллекция концовок — партия плюс отметка устройства (#1437): после «Начать заново» открытые остаются открытыми
   const onDevice = u.endingsSeen()
-  const endings: EndingRow[] = ENDINGS.map((e) => ({ id: e.id, title: e.title, icon: e.icon, got: !!S.endings[e.id] || onDevice.has(e.id) }))
+  const endings: EndingRow[] = ENDINGS.map((e) => ({ id: e.id, title: e.title, icon: e.icon, got: !!S.endings[e.id] || onDevice.has(e.id), day: S.endings[e.id] ?? null }))
   return {
     day: S.day,
     debt: S.debt,
@@ -164,6 +186,7 @@ export const viewOf = (u: GameUi): View => {
       return { id, title: a.title, state: finale ? `финал «${finale}»` : `серия ${i}/${a.eps.length}`, done: i >= a.eps.length, locked: i === 0 }
     }),
     endings,
+    sharePath: sharePath(S),
     items: S.items,
     ach: Object.entries(ACH).map(([k, [title, desc]]) => ({ id: k, title, desc: typeof desc === 'function' ? desc(S) : desc, got: !!S.ach[k] })),
     achGot: Object.keys(S.ach).length,

@@ -313,6 +313,12 @@ body {
 .tile-icon { display: block; font-size: 22px; line-height: 1.15; }
 .tile-name { display: block; margin-top: 4px; hyphens: auto; }
 .tile-desc { display: block; margin-top: 3px; font-size: 11px; color: var(--muted); hyphens: auto; }
+.tile-share {
+  display: block; width: 100%; margin-top: 5px; padding: 3px 0; border: 0; border-radius: 8px;
+  background: transparent; color: var(--accent); font: inherit; font-size: 11px; cursor: pointer;
+}
+.tile-share:hover { text-decoration: underline; }
+.share-note { margin: 6px 0 0; color: var(--muted); font-size: 12px; text-align: center; }
 .tile.locked { opacity: .5; }
 .list li { padding: 5px 0; border-bottom: 1px solid rgba(127, 127, 127, .15); }
 .list li.locked { opacity: .4; }
@@ -509,6 +515,9 @@ body {
   border: 1px solid rgba(127,127,127,.4); background: transparent; color: inherit;
   border-radius: 12px; padding: 10px 14px; font: inherit; cursor: pointer;
 }
+/* второй крах подряд: перемонтирование не помогло — запасная кнопка как рекомендованная (#1482) */
+.crash button.recommended { border-color: rgba(217,68,60,.55); background: rgba(217,68,60,.12); font-weight: 600; }
+.crash-hint { margin: 0; font-size: 13px; color: var(--muted); }
 
 /* intro-css:start — блок дословно повторён в index.html: те же правила рисуют титры шелла холодной
    загрузки (#1444) до прихода этого файла. Менять в двух местах сразу: расхождение ловит

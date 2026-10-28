@@ -22,6 +22,13 @@ export function vkPlatform(): Platform {
     ready() {},
     gameplayStart() {},
     gameplayStop() {},
+    // Ссылку в общей ленте VK публикует окно площадки: своего текста оно не берёт, только `link`.
+    async share(_text, url) {
+      try {
+        await bridge.send('VKWebAppShare', { link: url })
+        return true
+      } catch { return false }
+    },
   }
   // кнопки вступления нет, пока оператор не завёл сообщество и не дал его id: пустая кнопка хуже отсутствия
   if (Number.isInteger(id) && id > 0) {

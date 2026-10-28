@@ -87,4 +87,34 @@ describe('граница UI: фасад и снимок из view.ts, а не в
     game.S.mem['payday.at'] = game.S.day
     expect(viewOf(uiOf(game)).payday.daysLeft).toBeNull()
   })
+
+  it('путь постера «Поделиться»: только факты, которые партия несёт (#1485)', () => {
+    const { game } = makeGame()
+    const rub = (n: number) => `${n.toLocaleString('ru-RU')} ₽`
+    expect(viewOf(uiOf(game)).sharePath, 'чистая партия — только долг').toEqual([`Долг Алика: ${rub(game.S.debt)}`])
+
+    game.S.mem['count.sorry'] = 2
+    game.S.mem['caughtUnique'] = 3
+    game.S.mem['court'] = 3
+    expect(viewOf(uiOf(game)).sharePath).toEqual([
+      'Извинений: 2',
+      'Поимок на лжи: 3',
+      'Суд: заседание',
+      `Долг Алика: ${rub(game.S.debt)}`,
+    ])
+
+    // ступень выше — другая строка; поимок и извинений в партии не было — строк о них нет
+    delete game.S.mem['count.sorry']
+    delete game.S.mem['caughtUnique']
+    game.S.mem['court'] = 5
+    expect(viewOf(uiOf(game)).sharePath).toEqual(['Суд: Страсбург', `Долг Алика: ${rub(game.S.debt)}`])
+  })
+
+  it('коллекция помнит день открытия: у отметки устройства дня нет (#1437, #1485)', () => {
+    const { game } = makeGame()
+    game.S.endings.family = 240
+    const row = viewOf(uiOf(game)).endings.find((e) => e.id === 'family')!
+    expect(row).toMatchObject({ got: true, day: 240 })
+    expect(viewOf(uiOf(game)).endings.find((e) => e.id === 'ram')!.day).toBeNull()
+  })
 })

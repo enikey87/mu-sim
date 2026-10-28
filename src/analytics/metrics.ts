@@ -2,14 +2,18 @@
 // Вызов из игры один — track(имя, параметры); приёмников три — Метрика, PostHog и Umami, каждый своим тегом
 // и своим пустым ключом. В тестах клиенты подставные, живой сети прогон не трогает.
 import type { EndingId, PaydayId } from '../content/finales'
+import type { PlatformId } from '../platform/types'
 import { analyticsGate, COUNTER_ID, POSTHOG_KEY, UMAMI_KEY, type Gate } from './gate'
 
 export { COUNTER_ID, GAME_HOST, POSTHOG_KEY, UMAMI_KEY } from './gate'
 
 /** Имена целей закрыты типом: произвольной строки в `track` не передать. */
-export type Goal = 'boot' | 'milestone' | 'ending' | 'copied' | 'endgame' | 'left'
+export type Goal = 'boot' | 'milestone' | 'ending' | 'copied' | 'endgame' | 'left' | 'crash'
 
 export type Phase = 'intro' | 'chat' | 'payday' | 'endgame'
+
+/** Крах интерфейса (граница рисования) или глобальная ошибка страницы (#1482). */
+export type CrashKind = 'ui' | 'global'
 
 /** Параметр цели — тоже закрытый тип. Текст сообщения, долг и сид сюда не попадают. */
 export type GoalParams = {
@@ -19,6 +23,7 @@ export type GoalParams = {
   copied: { id: EndingId }
   endgame: { outcome: PaydayId }
   left: { phase: Phase; day: number; turns: number; sec: number; total: number }
+  crash: { kind: CrashKind; name: string; stack: string; day: number; platform: PlatformId }
 }
 
 type Params = { [G in Goal]: GoalParams[G] }[Goal]
@@ -302,4 +307,39 @@ export function firstGesture(): void {
   if (!isOn() || pageviewSent) return
   pageviewSent = true
   for (const r of receivers) if (r.on) r.gesture()
+}
+
+/** Потолок стека в маячке: хватает на кадры, остальное — шум. */
+export const CRASH_STACK_MAX = 2048
+
+/** Имя ошибки: типа для не-Error достаточно, текст ошибки в маячок не идёт. */
+const crashName = (e: unknown): string => e instanceof Error ? e.name : typeof e
+
+/** Кадры стека без первой строки: в ней имя и текст ошибки, а текст может быть репликой игрока. */
+const crashStack = (e: unknown): string => {
+  if (!(e instanceof Error) || typeof e.stack !== 'string') return ''
+  return e.stack.split('\n').slice(1).join('\n').slice(0, CRASH_STACK_MAX)
+}
+
+/**
+ * Маячок краха (#1482): одна цель `crash` во все приёмники — по конвенции `track()`.
+ * Партия в параметрах только числом дня; текста ошибки и переписки в маячке нет.
+ * `day` и `platform` — снимок момента: граница рисования и глобальные обработчики
+ * зовут до того, как состояние могло развалиться.
+ */
+export function crash(kind: CrashKind, error: unknown, depth: { day: number; platform: PlatformId }): void {
+  if (!isOn()) return
+  track('crash', { kind, name: crashName(error), stack: crashStack(error), day: depth.day, platform: depth.platform })
+}
+
+/**
+ * Глобальные падения страницы — вне React: маячок `crash` из `window.onerror` и `unhandledrejection` (#1482).
+ * Подключает вход страницы (`src/main.tsx`) один раз; обработчики живут со страницей.
+ * `depth` читается в момент падения: партия могла смениться «Начать заново».
+ */
+export function watchCrashes(depth: () => { day: number; platform: PlatformId }): void {
+  const report = (error: unknown) => crash('global', error, depth())
+  // у ошибки ресурса (картинка, скрипт) поля `error` нет — это не крах страницы
+  window.addEventListener('error', (e) => { if (e.error) report(e.error) })
+  window.addEventListener('unhandledrejection', (e) => report(e.reason))
 }
