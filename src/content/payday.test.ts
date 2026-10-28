@@ -10,7 +10,7 @@ import { ENDINGS } from './finales'
 import { LEGENDS } from './legends'
 import { CLAIM_LEDGER } from './ledger'
 import { ENDGAME_ARCH } from './endgame'
-import { bathAsked, garikCut, judgeApology, met, nuneDekretOver, taxFrozen, taxThawed } from './memkeys'
+import { actSigned, bathAsked, garikCut, judgeApology, met, nuneDekretOver, taxFrozen, taxThawed } from './memkeys'
 import { ARCS } from './arcs'
 import { is, spec as lineSpec, valueOf, type Entry } from './fact'
 
@@ -430,6 +430,32 @@ describe('День выплаты', () => {
     const t = valueOf(tile[0]!).t
     expect(t, 'строка не начинается с залога').toMatch(/^Из суда по плитке вернули залог\./)
     expect(valueOf(tile[0]!).amount).toBe(35000)
+  })
+
+  // #1470: подпись акта и оплату объявил финал сериала — источник ведёт поступлением денег, а не второй новостью
+  const RUBIK_NEWS = 'Инспектор Рубик подписал акт!'
+  const RUBIK_LINK = 'Помнишь, Рубик подписал акт?'
+  const rubikMorning = async (signed: boolean) => {
+    const { game } = makeGame()
+    game.S.mem['finale.rubik'] = 'default'
+    game.S.mem['intro.grant'] = true
+    if (signed) game.S.mem[actSigned] = true
+    await game.enterNode('payday', 'bag')
+    return { game, morning: texts(game).join('\n') }
+  }
+  it('источник Рубика ссылается на подписанный акт, а не объявляет его заново (#1470)', async () => {
+    const { morning } = await rubikMorning(true)
+    expect(morning, 'источник Рубика не прозвучал — проверка пустеет').toContain('55 000')
+    expect(morning, 'акт объявлен новостью второй раз').not.toContain(RUBIK_NEWS)
+    expect(morning, 'строка не опирается на подписанный акт как на известное').toContain(RUBIK_LINK)
+    const rubik = SOURCES.map((e) => valueOf(e)).filter((s) => s.t.includes('55 000'))
+    expect(rubik.length, 'у источника Рубика одна строка на случай').toBeGreaterThan(0)
+    for (const s of rubik) expect(s.amount, 'сумма источника').toBe(55000)
+  })
+  it('без объявленного акта источник Рубика остаётся новостью (#1470)', async () => {
+    const { morning } = await rubikMorning(false)
+    expect(morning, 'новость о подписи пропала вместе с дублем').toContain(RUBIK_NEWS)
+    expect(morning, 'ссылка на непрозвучавшую подпись').not.toContain(RUBIK_LINK)
   })
 
   // #988: «потом извинился» из RUDE_AGAIN опирается на факт, который ставит утренний источник судьи (возврат госпошлины)

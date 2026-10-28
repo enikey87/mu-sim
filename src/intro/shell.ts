@@ -29,6 +29,22 @@ const clockMinutes = (): number =>
 
 const app = () => import('../main')
 
+/** Шелл (#1476): первое окно — уровень, второе (титры кончились) — «Алик печатает…», отказ сети — строка. */
+const boot = document.getElementById('boot')
+const bootShow = (mode: 'wait' | 'fail'): void => {
+  if (!boot) return
+  // отказ сети важнее ожидания: упавшая загрузка уже не доедет
+  if (mode === 'wait' && boot.classList.contains('failed')) return
+  boot.classList.toggle('waiting', mode === 'wait')
+  boot.classList.toggle('failed', mode === 'fail')
+}
+
+/** Пакет не доехал: вечный индикатор врёт о причине — в шелле строка про сеть. */
+const bootFail = (e: unknown): void => {
+  console.error('[alik] пакет приложения не загрузился', e)
+  bootShow('fail')
+}
+
 // Воркер (#1446): повторный визит и офлайн играются из app-shell кэша. Регистрация ждёт load
 // и не мешает первому кадру; без API витрины или при отказе игра идёт как раньше (src/sw/register.ts).
 // В dev воркера нет — sw.js появляется только сборкой, поэтому dev-сервер о нём не просит.
@@ -36,7 +52,7 @@ if (import.meta.env.PROD) armServiceWorker()
 
 if (!shellIntroWanted({ noIntro: q.has('nointro'), web: webBuild, save: hasSave() })) {
   // Титров нет: игра сама решит про своё интро по отметке в сохранении, шелл отдаёт ей место
-  void app().then((m) => m.startApp())
+  void app().then((m) => m.startApp()).catch(bootFail)
 } else {
   // Завязку выбирает шелл: её же получит партия, поэтому карточка 3 и пролог чата скажут одно обещание.
   // Отметку «показано» ставит конец титров (приложению он приходит сигналом onFinish), как у интро в приложении.
@@ -61,13 +77,12 @@ if (!shellIntroWanted({ noIntro: q.has('nointro'), web: webBuild, save: hasSave(
       app()
         .then((m) => m.startApp({ start, gesture: true, shellIntro: { ended: () => ended } }))
         .then((h) => { handle = h })
-        // Сеть не отдала пакет: на экране остаётся индикатор «Алик печатает…» из шелла — но не молча
-        .catch((e: unknown) => console.error('[alik] пакет приложения не загрузился', e))
+        .catch(bootFail)
     },
     // «Мууу» — звук игры: без смонтированного приложения его не сыграть, титры идут дальше
     onMoo: () => handle?.moo(),
     // Отметку «показано» ставит приложение — концом титров, как у интро в приложении: фаза `left` остаётся «intro»
-    onFinish: () => { ended = true; handle?.introEnded() },
+    onFinish: () => { ended = true; handle?.introEnded(); bootShow('wait') },
     onGone: () => {
       root?.removeAttribute('inert')
       frame.remove()
