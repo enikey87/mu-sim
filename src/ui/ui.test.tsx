@@ -694,7 +694,7 @@ describe('App', () => {
     expect(within(endings).queryByText('Честные деньги')).toBeNull()
   })
 
-  it('досье: плитки не кнопки и не ссылки — фокус с «Закрыть» доходит до «Начать заново»', async () => {
+  it('досье: плитки не кнопки и не ссылки — «Поделиться» есть только у открытой концовки, фокус доходит до «Начать заново»', async () => {
     const { game } = makeGame()
     game.S.endings.family = game.S.day
     game.unlock('first')
@@ -703,12 +703,68 @@ describe('App', () => {
     await userEvent.setup().click(info)
     const dialog = screen.getByRole('dialog', { name: 'Досье на Алика' })
     expect(document.querySelectorAll('.tile').length).toBe(document.querySelectorAll('#endings .tile').length + document.querySelectorAll('#achList .tile').length)
-    expect(document.querySelectorAll('.tile button, .tile a')).toHaveLength(0)
+    // плитка целиком — не управляющий элемент: кнопка шаринга живёт внутри и только у открытой концовки
+    for (const tile of document.querySelectorAll('.tile')) {
+      expect(tile.tagName).toBe('DIV')
+      expect(tile.querySelectorAll('a')).toHaveLength(0)
+    }
+    expect(document.querySelectorAll('.tile button')).toHaveLength(1)
+    expect(document.querySelector('.tile.locked button')).toBeNull()
     await userEvent.setup().tab()
     const reset = screen.getByText('Начать заново')
     expect(dialog.contains(document.activeElement)).toBe(true)
     reset.focus()
     expect(document.activeElement).toBe(reset)
+  })
+
+  it('концовка без Web Share API: мёртвой «Поделиться» нет, постер сохраняется кнопкой', () => {
+    const { game } = makeGame()
+    game.S.day = 240
+    game.S.ending = 'family'
+    renderApp(game)
+    const end = screen.getByRole('dialog', { name: /Породнились/ })
+    expect(end.querySelector('#endingShare')).toBeNull()
+    expect(end.querySelector('#endingSaveCard')!.textContent).toBe('Сохранить картинку')
+  })
+
+  it('концовка: «Поделиться» отдаёт число дней и адрес игры', async () => {
+    const share = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'share', { configurable: true, value: share })
+    try {
+      const { game } = makeGame()
+      game.S.day = 240
+      game.S.ending = 'family'
+      renderApp(game)
+      const end = screen.getByRole('dialog', { name: /Породнились/ })
+      await act(async () => { fireEvent.click(end.querySelector('#endingShare')!) })
+      expect(share).toHaveBeenCalledOnce()
+      const data = share.mock.calls[0][0] as ShareData
+      expect(data.text).toContain('240 дней')
+      expect(data.text).toContain('https://enikey87.github.io/mu-sim/')
+      expect(data.url).toBe('https://enikey87.github.io/mu-sim/')
+    } finally { Reflect.deleteProperty(navigator, 'share') }
+  })
+
+  it('досье: делится только открытая концовка — свой день коллекции, у силуэта кнопки нет', async () => {
+    const share = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'share', { configurable: true, value: share })
+    try {
+      const { game } = makeGame()
+      game.S.day = 300
+      game.S.endings.family = 245
+      renderApp(game)
+      fireEvent.click(screen.getByTitle('Обещания и ачивки'))
+      const endings = document.getElementById('endings')!
+      const got = within(endings).getByText('Породнились').closest('.tile')!
+      const locked = within(endings).getAllByText('???')[0].closest('.tile')!
+      expect(locked.querySelector('button')).toBeNull()
+      const btn = got.querySelector('button')!
+      expect(btn.getAttribute('aria-label')).toBe('Поделиться концовкой «Породнились»')
+      await act(async () => { fireEvent.click(btn) })
+      const data = share.mock.calls[0][0] as ShareData
+      expect(data.text).toContain('245 дней')
+      expect(data.text).toContain('https://enikey87.github.io/mu-sim/')
+    } finally { Reflect.deleteProperty(navigator, 'share') }
   })
 
   it('Esc закрывает досье и возвращает фокус на кнопку досье', () => {

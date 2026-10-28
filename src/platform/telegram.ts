@@ -32,6 +32,8 @@ interface TgWebApp {
    * `paid` | `cancelled` | `failed` | `pending`; у старого клиента метода нет.
    */
   openInvoice?(url: string, callback?: (status: string) => void): unknown
+  /** Открыть t.me-ссылку силами клиента (Bot API 6.1): окно шаринга не уводит из Mini App. */
+  openTelegramLink?(url: string): void
   onEvent?(event: string, listener: () => void): void
 }
 
@@ -138,5 +140,14 @@ export function telegramPlatform(deps: TelegramDeps = {}): Platform {
   // инвойс-ссылки нет в конфиге — карточки покупки в сборке нет вовсе (как пустой товар Яндекса)
   const invoice = invoiceUrl()
   if (invoice) platform.pay50 = () => payStars(invoice)
+  // Шаринг Telegram — t.me/share/url; клиент открывает ссылку сам, иначе окно браузера.
+  platform.share = async (text, url) => {
+    const link = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`
+    try {
+      const app = tg()
+      if (app?.openTelegramLink) { app.openTelegramLink(link); return true }
+      return window.open(link, '_blank', 'noopener') !== null
+    } catch { return false }
+  }
   return platform
 }
