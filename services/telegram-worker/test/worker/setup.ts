@@ -10,6 +10,8 @@ await applyD1Migrations(env.DB, migrations)
 // Изоляция хранилища между тестами: каждый тест начинает с пустым журналом и
 // готовым каталогом, который пишет установщик до выкладки Worker'а.
 beforeEach(async () => {
-  await env.DB.exec('DELETE FROM payments; DELETE FROM payment_conflicts; DELETE FROM settings;')
+  await env.DB.exec(
+    'DELETE FROM payments; DELETE FROM payment_conflicts; DELETE FROM settings; DELETE FROM players; DELETE FROM saves; DELETE FROM transfer_tokens;',
+  )
   await seedCatalog(env.DB)
 })

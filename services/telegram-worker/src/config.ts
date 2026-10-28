@@ -1,6 +1,22 @@
 export const DEFAULT_API_BASE = 'https://api.telegram.org'
 export const GAME_URL_DEFAULT = 'https://t.me/alik_where_money_bot/game?mode=compact'
 export const SUPPORT_URL_DEFAULT = 'https://github.com/enikey87'
+export const BOT_USERNAME_DEFAULT = 'alik_where_money_bot'
+
+/**
+ * Откуда Mini App зовёт `/mini/*`. Подпись initData — единственная защита данных,
+ * origin нужен только браузеру: чужой странице браузер не даст прочитать ответ.
+ */
+export const CLIENT_ORIGINS_DEFAULT = 'https://enikey87.github.io'
+
+/** Сохранение игры больше платёжного update: 150 сообщений партии не влезают в 16 КБ webhook. */
+export const SAVE_MAX_BYTES_DEFAULT = 512 * 1024
+
+/** Одноразовая ссылка переноса живёт час (условие задачи), дальше — только новый /load. */
+export const TRANSFER_TTL_MS = 60 * 60 * 1000
+
+/** initData живёт вместе с открытым Mini App: сутки — предел доверия к подписи. */
+export const INIT_DATA_TTL_MS = 24 * 60 * 60 * 1000
 
 /** Товар один: «Чашка хаша для Алика» — добровольная поддержка, без цифровых обещаний. */
 export const PRODUCT_ID = 'hash-cup'
@@ -66,6 +82,34 @@ export function precheckoutBudgetMsFrom(raw: string | undefined): number {
 
 export function maxBodyBytesFrom(raw: string | undefined): number {
   return intFrom(raw, MAX_BODY_BYTES_DEFAULT, 1024, 1024 * 1024)
+}
+
+export function saveMaxBytesFrom(raw: string | undefined): number {
+  return intFrom(raw, SAVE_MAX_BYTES_DEFAULT, 1024, 1024 * 1024)
+}
+
+/** Список origin'ов через запятую; пустой ввод — значение по умолчанию, а не «пускать всех». */
+export function originsFrom(raw: string | undefined): string[] {
+  const list = String(raw ?? '')
+    .split(',')
+    .map((item) => item.trim().replace(/\/+$/, ''))
+    .filter(Boolean)
+  return list.length > 0 ? list : CLIENT_ORIGINS_DEFAULT.split(',')
+}
+
+/**
+ * Имя бота для ссылки `t.me/<бот>?startapp=<токен>`. Берётся из явной настройки,
+ * иначе — из GAME_URL: у установщика уже есть одно имя, второго источника правды не заводим.
+ */
+export function botUsernameFrom(gameUrl: string, raw: string | undefined): string {
+  const explicit = String(raw ?? '').trim().replace(/^@/, '')
+  if (explicit) return explicit
+  try {
+    const url = new URL(gameUrl)
+    const name = url.pathname.split('/').filter(Boolean)[0] ?? ''
+    if (url.host === 't.me' && /^[a-z0-9_]{4,32}$/i.test(name)) return name
+  } catch { /* нераспознанная ссылка — имя по умолчанию */ }
+  return BOT_USERNAME_DEFAULT
 }
 
 export function apiBaseFrom(raw: string | undefined): string {

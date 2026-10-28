@@ -11,6 +11,9 @@
     "GAME_URL": "https://t.me/alik_where_money_bot/game?mode=compact",
     "SUPPORT_URL": "https://github.com/enikey87"
   },
+  "triggers": {
+    "crons": ["0 12 * * *"]
+  },
   "d1_databases": [
     {
       "binding": "DB",

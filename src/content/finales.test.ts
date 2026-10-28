@@ -388,7 +388,7 @@ describe('концовки игры', () => {
     expect(texts, 'убранное условие — квесты — в тексте').not.toMatch(/квест|quests/i)
     expect(texts, 'называет вежливость').toMatch(/вежлив/)
     expect(texts, 'не называет суд').toMatch(/суд/)
-    expect(texts, 'вторая дверь — поимки — не названа').toMatch(/поимк/)
+    expect(texts, 'вторая дверь — записи противоречий — не названа').toMatch(/поимк|записи[^.]*противоречий/)
   })
   it('каждую концовку можно получить', async () => {
     const setups: Record<string, (g: Game) => void | Record<string, unknown>> = {
