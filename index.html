@@ -16,8 +16,10 @@
   <meta name="twitter:description" content="SMS с генподрядчиком Аликом: вежливо просишь деньги — получаешь отмазку. Иногда «Мууууу».">
   <meta name="theme-color" content="#d9dde3" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0b0e12" media="(prefers-color-scheme: dark)">
-  <!-- Шелл холодной загрузки (#1443): первый кадр без JS и без внешних файлов. Это инлайн-копия рамки
-       телефона, шапки чата и пузыря «печатает…» из src/styles.css — палитру и размеры менять вместе.
+  <!-- Шелл холодной загрузки (#1443, #1476): первый кадр без JS и без внешних файлов. Первое окно — уровень
+       на фоне темы (до титр и во время): чата ещё нет, и метафора набора соврала бы про сцену. Второе окно —
+       «Алик печатает…», его включает src/intro/shell.ts концом титр; отказ сети — строка вместо вечного индикатора.
+       Цвета — палитра src/styles.css, копия инлайном (сторож: src/tools/boot-shell.test.ts).
        Интерфейс стирает содержимое #root при монтировании, поэтому шелл исчезает сам (тест: tests/e2e/boot-shell.spec.ts).
        Ниже — титры интро (#1444): блок intro-css дословно повторяет правила src/styles.css, чтобы экран
        блокировки рисовался до прихода пакета; рамку #intro-frame создаёт вход страницы (src/intro/shell.ts). -->
@@ -28,42 +30,32 @@
       background: #d9dde3; color: #111418;
       font: 15px/1.35 -apple-system, "Segoe UI", Roboto, sans-serif;
     }
-    #boot {
-      display: flex; flex-direction: column; overflow: hidden;
-      width: 400px; height: min(820px, 100vh);
-      background: #e7ebe4; border: 10px solid #111; border-radius: 36px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, .35);
-    }
-    #boot .boot-head { display: flex; align-items: center; gap: 10px; padding: 10px; background: #fff; }
-    #boot .boot-ava {
-      width: 40px; height: 40px; border-radius: 50%;
-      background: linear-gradient(135deg, #f0a24a, #d2553a); color: #fff;
-      display: grid; place-items: center; font-weight: 700; font-size: 18px;
-    }
-    #boot .boot-name { font-weight: 700; }
-    #boot .boot-status { font-size: 12px; color: #2f9e5c; }
-    #boot .boot-bubble {
-      align-self: flex-start; display: flex; gap: 4px;
-      margin: 12px 10px; padding: 10px 14px;
-      background: #fff; border-radius: 14px;
-    }
-    #boot .boot-bubble i { width: 7px; height: 7px; border-radius: 50%; background: #7b8591; animation: boot-blink 1.2s infinite; }
-    #boot .boot-bubble i:nth-child(2) { animation-delay: .2s; }
-    #boot .boot-bubble i:nth-child(3) { animation-delay: .4s; }
-    @keyframes boot-blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
-    @media (prefers-reduced-motion: reduce) { #boot .boot-bubble i { animation: none; opacity: 1; } }
-    @media (max-width: 500px) {
-      #boot {
-        width: 100%; height: 100dvh; border: 0; border-radius: 0;
-        padding-top: env(safe-area-inset-top, 0px);
-      }
-    }
-    @media (prefers-color-scheme: dark) {
-      body { background: #0b0e12; color: #e9edf1; }
-      #boot { background: #0f1a1f; }
-      #boot .boot-head, #boot .boot-bubble { background: #17212b; }
-      #boot .boot-status { color: #5fc98a; }
-      #boot .boot-bubble i { background: #8a97a4; }
+    /* Шелл холодной загрузки (#1443, #1476): состояние — класс на #boot из src/intro/shell.ts. */
+    /* уровень: пузырёк выставляется к центру с перелётами */
+    #boot .lvl{position:relative;overflow:hidden;width:216px;height:38px;border-radius:19px;background:#fff;border:2px solid #7b8591}
+    #boot .lvl::before,#boot .lvl::after{content:"";position:absolute;top:6px;bottom:6px;width:2px;border-radius:1px;background:#7b8591}
+    #boot .lvl::before{left:calc(50% - 6px)}#boot .lvl::after{left:calc(50% + 4px)}
+    #boot .spr{position:absolute;top:5px;bottom:5px;left:10px;width:58px;border-radius:14px;background:radial-gradient(circle at 35% 30%,#d9dde3,#7b8591);box-shadow:0 1px 3px rgba(0,0,0,.25),inset 0 -2px 4px rgba(0,0,0,.12);animation:hunt 3.2s ease-in-out infinite}
+    @keyframes hunt{0%{left:10px}42%{left:71px}58%{left:84px}74%{left:76px}100%{left:10px}}
+    /* второе окно: титры кончились, пакет ещё едет */
+    #boot .wt{display:none;align-items:center;gap:8px;padding:10px 14px;border-radius:14px;background:#fff;color:#7b8591;font-size:13px}
+    #boot .wt i{width:7px;height:7px;border-radius:50%;background:#7b8591;animation:blink 1.2s infinite}
+    #boot .wt i:nth-child(2){animation-delay:.2s}#boot .wt i:nth-child(3){animation-delay:.4s}
+    @keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
+    /* отказ сети: строка вместо вечного индикатора */
+    #boot .fl{display:none;max-width:260px;text-align:center;font-size:13px}
+    #boot.waiting .lvl,#boot.failed .lvl{display:none}
+    #boot.waiting .wt{display:flex}
+    #boot.failed .fl{display:block}
+    @media (prefers-reduced-motion:reduce){#boot .spr{animation:none;left:calc(50% - 29px)}#boot .wt i{animation:none;opacity:1}}
+    @media (prefers-color-scheme:dark){
+      body{background:#0b0e12;color:#e9edf1}
+      #boot .lvl{background:#0b0e12;border-color:#8a97a4}
+      #boot .lvl::before,#boot .lvl::after{background:#8a97a4}
+      #boot .spr{background:radial-gradient(circle at 35% 30%,#e9edf1,#8a97a4)}
+      #boot .wt{background:#17212b;color:#8a97a4}
+      #boot .wt i{background:#8a97a4}
+      #boot .fl{color:#e9edf1}
     }
     /* Рамка титров шелла (#1444): та же, что у .phone из src/styles.css — приложение грузится параллельно
        и появляется ровно в этой коробке. Копия рамки, менять вместе с .phone. */
@@ -140,18 +132,9 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐄</text></svg>">
 </head>
 <body>
-  <!-- Шелл холодной загрузки (#1443): виден, пока грузится и не смонтировался основной пакет. -->
+  <!-- Шелл холодной загрузки (#1443, #1476): виден, пока грузится и не смонтировался основной пакет. -->
   <div id="root">
-    <div id="boot" role="status">
-      <div class="boot-head">
-        <div class="boot-ava" aria-hidden="true">А</div>
-        <div>
-          <div class="boot-name">Алик</div>
-          <div class="boot-status">печатает…</div>
-        </div>
-      </div>
-      <div class="boot-bubble" aria-hidden="true"><i></i><i></i><i></i></div>
-    </div>
+    <div id="boot" role="status"><div class="lvl" aria-hidden="true"><span class="spr"></span></div><div class="wt"><i></i><i></i><i></i><span>Алик печатает…</span></div><div class="fl">Алик не дозвонился. Проверьте сеть и обновите страницу.</div></div>
   </div>
   <script type="module" src="/src/intro/shell.ts"></script>
 </body>
