@@ -195,12 +195,13 @@ export const DIRECT: Record<string, DirectCase> = {
     },
   },
   // #1435: вторая дверь «Настоящих денег» — вежливость и три поимки вместо заседания; бот до неё не доходит.
-  // `caught = 3` здесь — не откат #729: поимки снова часть условия real, но второй дверью (saint И (court ИЛИ caught≥3))
+  // `caughtUnique = 3` здесь — не откат #729: поимки снова часть условия real, но второй дверью (saint И (court ИЛИ 3 разных поимки));
+  // тотальный `caught` условие не читает с #1481 — три нажатия на одной паре второй двери не открывают
   Payday_real_detective: {
     event: 'PaydayOutcome',
     setup: (g) => {
       g.S.ach.saint = 1
-      g.S.mem.caught = 3
+      g.S.mem.caughtUnique = 3
     },
   },
   Quiet_PaydayOpen_AlikAway: { event: 'AlikAway', setup: paydayOpen },
