@@ -1,7 +1,7 @@
 import type { Game } from '../engine/game'
 import { DEBT0, isLate, type GameState, type Msg, type PromiseRec } from '../engine/state'
 import type { UiState } from '../engine/ui-state'
-import { ACH } from '../content/achievements'
+import { ACH, achHidden } from '../content/achievements'
 import { ARCS } from '../content/arcs'
 import { ENDINGS, type EndingId } from '../content/finales'
 import { STARTS } from '../content/quests'
@@ -75,7 +75,7 @@ const promiseState = (p: PromiseRec, day: number): PromiseState =>
 export type ArcRow = { id: string; title: string; state: string; done: boolean; locked: boolean }
 /** `day` — день партии, в который концовка открылась в этой партии; null — отметка устройства без дня (#1437). */
 export type EndingRow = { id: string; title: string; icon: string; got: boolean; day: number | null }
-export type AchRow = { id: string; title: string; desc: string; got: boolean }
+export type AchRow = { id: string; title: string; desc: string; got: boolean; hidden: boolean }
 export type FinaleRow = { id: string; title: string; finale: string }
 /** Строка «Акта сверки» — сухая фиксация числа; текст фиксированный (не пул), голос системных сообщений. */
 export type ActRow = { text: string }
@@ -188,7 +188,7 @@ export const viewOf = (u: GameUi): View => {
     endings,
     sharePath: sharePath(S),
     items: S.items,
-    ach: Object.entries(ACH).map(([k, [title, desc]]) => ({ id: k, title, desc: typeof desc === 'function' ? desc(S) : desc, got: !!S.ach[k] })),
+    ach: Object.entries(ACH).map(([k, [title, desc]]) => ({ id: k, title, desc: typeof desc === 'function' ? desc(S) : desc, got: !!S.ach[k], hidden: achHidden(k) })),
     achGot: Object.keys(S.ach).length,
     achTotal: Object.keys(ACH).length,
   }

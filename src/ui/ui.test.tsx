@@ -10,6 +10,7 @@ import { makeGame, setMoney, memStorage, flush } from '../test/helpers'
 import { SAVE_KEY, loadState, DEBT0, type Msg } from '../engine/state'
 import { nextTransfer } from '../content/memkeys'
 import { ENDING_MIN_DAY, ENDINGS } from '../content/finales'
+import { ACH } from '../content/achievements'
 import { fmtDate } from '../engine/time'
 import { mooClock } from '../engine/moo'
 import type { Game } from '../engine/game'
@@ -615,6 +616,8 @@ describe('App', () => {
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByText(/завтра — всё отдам/)).toBeInTheDocument()
     expect(within(dialog).getByText(/серия 3\/10/)).toBeInTheDocument()
+    // счётчик ачивок живёт на вкладке коллекции (#1538)
+    fireEvent.click(screen.getByRole('tab', { name: 'Коллекция' }))
     expect(within(dialog).getByText(/^1\//)).toBeInTheDocument()
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     fireEvent.click(within(dialog).getByText('Начать заново'))
@@ -687,6 +690,7 @@ describe('App', () => {
     renderApp(game)
     fireEvent.click(screen.getByTitle('Обещания и ачивки'))
     const dialog = screen.getByRole('dialog')
+    fireEvent.click(screen.getByRole('tab', { name: 'Коллекция' }))
 
     // полученная концовка — плитка с иконкой и названием, а не строка списка
     const endings = document.getElementById('endings')!
@@ -717,7 +721,8 @@ describe('App', () => {
     expect(within(dialog).getByText('1/16')).toBeInTheDocument() // счётчики — в заголовках секций
     expect(document.getElementById('achCount')!.textContent).toBe('1/' + document.querySelectorAll('#achList .tile').length)
 
-    // журнал обещаний и сериалы — по-прежнему список строк
+    // журнал обещаний и сериалы — по-прежнему список строк (на вкладке партии)
+    fireEvent.click(screen.getByRole('tab', { name: 'Алик' }))
     const promises = document.getElementById('promises')!
     expect(promises.matches('.list')).toBe(true)
     expect(promises.querySelectorAll('li')).toHaveLength(1)
@@ -734,6 +739,7 @@ describe('App', () => {
     const { game } = makeGame({ storage })
     renderApp(game)
     fireEvent.click(screen.getByTitle('Обещания и ачивки'))
+    fireEvent.click(screen.getByRole('tab', { name: 'Коллекция' }))
     const endings = document.getElementById('endings')!
     const got = within(endings).getByText('Породнились').closest('.tile')!
     expect(got.className).toBe('tile')
@@ -752,6 +758,7 @@ describe('App', () => {
     const info = screen.getByTitle('Обещания и ачивки')
     await userEvent.setup().click(info)
     const dialog = screen.getByRole('dialog', { name: 'Досье на Алика' })
+    fireEvent.click(screen.getByRole('tab', { name: 'Коллекция' }))
     expect(document.querySelectorAll('.tile').length).toBe(document.querySelectorAll('#endings .tile').length + document.querySelectorAll('#achList .tile').length)
     // плитка целиком — не управляющий элемент: кнопка шаринга живёт внутри и только у открытой концовки
     for (const tile of document.querySelectorAll('.tile')) {
@@ -765,6 +772,120 @@ describe('App', () => {
     expect(dialog.contains(document.activeElement)).toBe(true)
     reset.focus()
     expect(document.activeElement).toBe(reset)
+  })
+
+  it('досье: две вкладки — партия «Алик» и мета-прогресс «Коллекция» (#1538)', () => {
+    const { game } = makeGame()
+    game.recordPromise({ text: 'завтра — всё отдам', d: 1 })
+    game.S.arcs.boris = { i: 3, last: 0 }
+    game.S.items.push('баран')
+    game.S.endings.family = game.S.day
+    game.unlock('first')
+    renderApp(game)
+    fireEvent.click(screen.getByTitle('Обещания и ачивки'))
+
+    const alik = screen.getByRole('tab', { name: 'Алик' })
+    const collection = screen.getByRole('tab', { name: 'Коллекция' })
+    expect(screen.getAllByRole('tab')).toHaveLength(2)
+    // дефолт при открытии — «Алик»: что сейчас с Аликом
+    expect(alik).toHaveAttribute('aria-selected', 'true')
+    expect(collection).toHaveAttribute('aria-selected', 'false')
+    expect(screen.getByRole('tabpanel').id).toBe(alik.getAttribute('aria-controls'))
+    expect(screen.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', alik.id)
+    for (const id of ['promises', 'act', 'arcs', 'items']) expect(document.getElementById(id), id).not.toBeNull()
+    for (const id of ['endings', 'achList']) expect(document.getElementById(id), id).toBeNull()
+
+    // «Коллекция» — накопленное навсегда: концовки и ачивки; партии там нет
+    fireEvent.click(collection)
+    expect(collection).toHaveAttribute('aria-selected', 'true')
+    expect(alik).toHaveAttribute('aria-selected', 'false')
+    expect(screen.getByRole('tabpanel').id).toBe(collection.getAttribute('aria-controls'))
+    for (const id of ['endings', 'achList']) expect(document.getElementById(id), id).not.toBeNull()
+    expect(document.getElementById('endCount')!.textContent).toBe(`1/${ENDINGS.length}`)
+    expect(document.getElementById('achCount')!.textContent).toBe(`1/${Object.keys(ACH).length}`)
+    for (const id of ['promises', 'act', 'arcs', 'items']) expect(document.getElementById(id), id).toBeNull()
+
+    // подвал — под обеими вкладками
+    for (const tab of [collection, alik]) {
+      fireEvent.click(tab)
+      expect(screen.getByRole('link', { name: 'О игре и приватности' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Начать заново' })).toBeInTheDocument()
+    }
+  })
+
+  it('досье: переключение вкладки поднимает лист наверх (#1538)', () => {
+    const { game } = makeGame()
+    renderApp(game)
+    fireEvent.click(screen.getByTitle('Обещания и ачивки'))
+    const sheet = document.querySelector('.sheet-inner') as HTMLElement
+    let top = 420
+    Object.defineProperty(sheet, 'scrollTop', { configurable: true, get: () => top, set: (v: number) => { top = v } })
+    expect(top).toBe(420)
+    fireEvent.click(screen.getByRole('tab', { name: 'Коллекция' }))
+    expect(top).toBe(0)
+    top = 300
+    fireEvent.click(screen.getByRole('tab', { name: 'Алик' }))
+    expect(top).toBe(0)
+  })
+
+  it('досье: вкладки с клавиатуры — стрелки, Home/End, один таб-стоп на полосу (#1538)', () => {
+    const { game } = makeGame()
+    renderApp(game)
+    fireEvent.click(screen.getByTitle('Обещания и ачивки'))
+    const alik = screen.getByRole('tab', { name: 'Алик' })
+    const collection = screen.getByRole('tab', { name: 'Коллекция' })
+    expect(alik).toHaveAttribute('tabindex', '0')
+    expect(collection).toHaveAttribute('tabindex', '-1')
+    alik.focus()
+    fireEvent.keyDown(alik, { key: 'ArrowRight' })
+    expect(collection).toHaveAttribute('aria-selected', 'true')
+    expect(collection).toHaveAttribute('tabindex', '0')
+    expect(document.activeElement).toBe(collection)
+    expect(document.getElementById('endings')).not.toBeNull()
+    // кольцо: с последней вкладки — на первую
+    fireEvent.keyDown(collection, { key: 'ArrowRight' })
+    expect(alik).toHaveAttribute('aria-selected', 'true')
+    fireEvent.keyDown(alik, { key: 'ArrowLeft' })
+    expect(collection).toHaveAttribute('aria-selected', 'true')
+    fireEvent.keyDown(collection, { key: 'Home' })
+    expect(alik).toHaveAttribute('aria-selected', 'true')
+    fireEvent.keyDown(alik, { key: 'End' })
+    expect(collection).toHaveAttribute('aria-selected', 'true')
+    // прочие клавиши вкладку не трогают
+    fireEvent.keyDown(collection, { key: 'a' })
+    expect(collection).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('досье: скрытая ачивка не спойлерит, полученная называет себя (#1538)', () => {
+    const { game } = makeGame()
+    game.unlock('arc_beton')
+    renderApp(game)
+    fireEvent.click(screen.getByTitle('Обещания и ачивки'))
+    fireEvent.click(screen.getByRole('tab', { name: 'Коллекция' }))
+    const ach = document.getElementById('achList')!
+
+    // скрытая неполученная — замок и «???»: ни имени, ни условия в DOM
+    expect(within(ach).queryByText('Декрет')).toBeNull()
+    expect(within(ach).queryByText('Узнал всё о бухгалтерии Алика')).toBeNull()
+    expect(within(ach).queryByText('Бее')).toBeNull()
+    expect(within(ach).queryByText('Хаш в счёт долга')).toBeNull()
+    expect(within(ach).queryByText('💍 Породнились')).toBeNull()
+    const silhouette = within(ach).getAllByText('???')[0].closest('.tile')!
+    expect(silhouette.className).toBe('tile locked')
+    expect(silhouette.querySelector('.tile-icon')!.textContent).toBe('🔒')
+    expect(silhouette.querySelector('.tile-desc')).toBeNull()
+
+    // скрытая полученная — имя и условие, как у всех полученных
+    const gotHidden = within(ach).getByText('Клад').closest('.tile')!
+    expect(gotHidden.className).toBe('tile')
+    expect(gotHidden.querySelector('.tile-desc')!.textContent).toBe('Узнал, где лежат твои деньги')
+
+    // видимая неполученная остаётся целью-приманкой: имя и условие
+    expect(within(ach).getByText('Брат джан')).toBeInTheDocument()
+    expect(within(ach).getByText('Алик назвал тебя «брат джан»')).toBeInTheDocument()
+
+    // счётчик считает все ачивки, включая скрытые
+    expect(document.getElementById('achCount')!.textContent).toBe(`1/${Object.keys(ACH).length}`)
   })
 
   it('концовка без Web Share API: мёртвой «Поделиться» нет, постер сохраняется кнопкой', () => {
@@ -804,6 +925,7 @@ describe('App', () => {
       game.S.endings.family = 245
       renderApp(game)
       fireEvent.click(screen.getByTitle('Обещания и ачивки'))
+      fireEvent.click(screen.getByRole('tab', { name: 'Коллекция' }))
       const endings = document.getElementById('endings')!
       const got = within(endings).getByText('Породнились').closest('.tile')!
       const locked = within(endings).getAllByText('???')[0].closest('.tile')!
@@ -913,6 +1035,8 @@ describe('App', () => {
     fireEvent.click(screen.getByTitle('Обещания и ачивки'))
     const dialog = screen.getByRole('dialog', { name: 'Досье на Алика' })
     expect(within(dialog).getByText(/финал «Жених»/)).toBeInTheDocument()
+    // концовки — на вкладке коллекции (#1538)
+    fireEvent.click(screen.getByRole('tab', { name: 'Коллекция' }))
     expect(within(dialog).getByText('Породнились')).toBeInTheDocument()
     expect(within(dialog).getByText('1/16')).toBeInTheDocument()
   })
