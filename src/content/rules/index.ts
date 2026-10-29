@@ -14,5 +14,6 @@ import { paydayRules } from './payday'
 import { endgameRules } from './endgame'
 import { billRules } from './bills'
 import { creditRules } from './credit'
+import { enmityRules } from './enmity'
 
-export const allRules: Rule<ContentApi, GameEvent, Offer>[] = [...toneRules, ...storyRules, ...ignoreRules, ...periodRules, ...turnRules, ...idleRules, ...awayRules, ...replyRules, ...choiceRules, ...worldRules, ...finaleRules, ...endingRules, ...rudeRules, ...rudeSaysRules, ...crewRules, ...courtRules, ...paydayRules, ...endgameRules, ...billRules, ...creditRules]
+export const allRules: Rule<ContentApi, GameEvent, Offer>[] = [...toneRules, ...storyRules, ...ignoreRules, ...periodRules, ...turnRules, ...idleRules, ...awayRules, ...replyRules, ...choiceRules, ...worldRules, ...finaleRules, ...endingRules, ...rudeRules, ...rudeSaysRules, ...crewRules, ...courtRules, ...paydayRules, ...endgameRules, ...billRules, ...creditRules, ...enmityRules]

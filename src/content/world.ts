@@ -1,7 +1,7 @@
 // Тексты для новых возможностей системы правил: обещания, которые наступают, хор персонажей,
 // состояния мира со сроком (свадьба, болезнь Бориса, «Алик умер»).
 import { type Criterion, type Line, type Entry, named, exists, is, eq, gte, ne, missing, set, gate } from './fact'
-import { arsenTrack, asmikCard, cryptoHodl, courtVerdict, garikConcrete, garikCut, garikDenied, grandpaDying, grantPaid, intro, karineKnowsDebt, karineThinksTax, met, mourning, moustacheStakeSaid, nivaAway, nivaPlayer, nuneDekretOver, payday, saidFriday, saidGrantEnvelope, saidMoneyMoustache, saidStrasburg, saidTomorrow, alikShaved, wedding, collectorsRecruited, collectorsTea, collectorsTurned, rubikBath } from './memkeys'
+import { arsenTrack, asmikCard, cryptoHodl, courtVerdict, garikConcrete, garikCut, garikDenied, grandpaDying, grantPaid, intro, karineKnowsDebt, karineThinksTax, met, mourning, moustacheStakeSaid, nivaAway, nivaPlayer, nuneDekretOver, payday, saidFriday, saidGrantEnvelope, saidMoneyMoustache, saidStrasburg, saidTomorrow, alikShaved, wedding, collectorsRecruited, collectorsTea, collectorsTurned, rubikBath, vendetta } from './memkeys'
 import type { WhoId } from './ids'
 
 // Мир последователен: кто и что есть в истории и в каком оно положении — факты, их ставит серия (remember), ступень суда
@@ -87,6 +87,7 @@ export const WORLD = {
   nivaAway: named('nivaAway', is(nivaAway)),
   /** «Нива» у игрока после финала «Нива выбрала тебя». */
   nivaPlayer: named('nivaPlayer', is(nivaPlayer)),
+
   /** Игрок оставил деньги в «Лаваш-коине», и его ещё не продали в День выплаты. */
   lavashHeld: named('lavashHeld', is(cryptoHodl), missing(payday.chain)),
   /** Коллекторы вошли в историю (написали сами). */
@@ -103,6 +104,13 @@ export const WORLD = {
   borisPlayer: named('borisPlayer', is('has.boris')),
   /** Борис ещё живёт у Алика: сметы, квитанции и замки страдают у него, а не у игрока. */
   borisHome: named('borisHome', missing('has.boris')),
+  /**
+   * Режим мира «вражда» (#1558): род объявил сход, и ситком сжался. Вход — `vendetta` (15-й крик, #1556),
+   * единственный выход — извинение игрока; время и давление семьи режим не снимают. В режиме: новые
+   * сериалы не стартуют, начатые стоят (движок, `availableArcs`/`arcCanAdvance`), семья посредничает,
+   * а жизнь Алика доходит слухами от третьих лиц. Одна запись на все поверхности режима.
+   */
+  enmity: named('enmity', is(vendetta)),
 } satisfies Record<string, Criterion>
 export type WorldKey = keyof typeof WORLD
 export const needs = (...keys: WorldKey[]) => gate(...keys.map((k) => WORLD[k]))
