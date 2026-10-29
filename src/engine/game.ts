@@ -3104,13 +3104,14 @@ export class Game {
     const lines = again ? LEND50_ASK_AGAIN : LEND50_ASK
     for (const text of lines) await this.endgameLine(text)
     await this.sleep(500)
-    // одна карточка вместо двух системных плашек: фраза игры, сумма и кнопка «Перевести» (#616)
-    // на витрине внешняя ссылка запрещена: у VK карточка ведёт в сообщество (п. 2.6.2), у Яндекса —
-    // инап-покупка через SDK (п. 1.13), у Telegram — Stars-инвойс (#1239, #1241, #1235)
-    if (this.externalPay) this.push({ kind: 'lend50', text: LEND50_SYS, link: LEND50_LINK })
-    else if (this.joinGroup) this.push({ kind: 'lend50', text: LEND50_VK_SYS, join: true })
+    // карточки просьбы вместо серых плашек .sys: фраза игры, сумма и кнопка (#616). Сначала карточка
+    // площадки — вступление у VK (п. 2.6.2), инап-покупка у Яндекса (п. 1.13), Stars-инвойс у Telegram
+    // (#1239, #1241, #1235), — затем внешняя ссылка DonationAlerts там, где она разрешена. В Telegram
+    // обе: решение оператора 29.10 (#1533), Stars остаются для iOS и не-RU.
+    if (this.joinGroup) this.push({ kind: 'lend50', text: LEND50_VK_SYS, join: true })
     else if (this.pay50 === 'yandex') this.push({ kind: 'lend50', text: LEND50_YA_SYS, buy: true })
     else if (this.pay50 === 'telegram') this.push({ kind: 'lend50', text: LEND50_TG_SYS, stars: true })
+    if (this.externalPay) this.push({ kind: 'lend50', text: LEND50_SYS, link: LEND50_LINK })
     // воронка «займи 50»: карточка добавлена в ленту — одна цель на партию (#1483)
     if (this.externalPay || this.joinGroup || this.pay50) track('lend50_shown', { platform: this.platformId })
     this.storage?.setItem(LEND50_SEEN_KEY, '1') // отметка устройства, а не партии: она только выбирает текст

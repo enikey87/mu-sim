@@ -57,6 +57,29 @@ describe('воронка «займи 50»: показ → нажатие → п
     expect(funnel(goals)).toEqual([['lend50_clicked', { platform: 'web' }]])
   })
 
+  it('Telegram: две карточки — один показ, а нажатие DA остаётся только нажатием (#1533)', async () => {
+    const openLink = vi.fn(() => true)
+    adoptPlatform({ ...webPlatform(), id: 'telegram', externalPay: true, openLink })
+    try {
+      const { goals } = setup()
+      const { game } = makeGame({ seed: 2, platformId: 'telegram', externalPay: true, pay50: 'telegram' })
+      game.S.ending = 'payday_default'
+      game.S.endings.payday_default = game.S.day
+      await act(async () => { await game.closeEnding(); await flush() })
+      expect(funnel(goals), 'показ — один, хотя карточек в ленте две').toEqual([['lend50_shown', { platform: 'telegram' }]])
+
+      renderApp(game)
+      fireEvent.click(screen.getByRole('link', { name: 'Перевести' }))
+      expect(openLink, 'ссылка идёт входом клиента').toHaveBeenCalledWith(LEND50_LINK)
+      expect(funnel(goals), 'внешний донат — только клик: оплату игра не подтверждает').toEqual([
+        ['lend50_shown', { platform: 'telegram' }],
+        ['lend50_clicked', { platform: 'telegram' }],
+      ])
+    } finally {
+      adoptPlatform(webPlatform())
+    }
+  })
+
   it('VK: подтверждённое вступление — нажатие и покупка', async () => {
     const joinGroup = vi.fn(async () => true)
     adoptPlatform({ ...webPlatform(), id: 'vk', externalPay: false, joinGroup })
