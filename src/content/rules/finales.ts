@@ -1,7 +1,8 @@
 // Финалы сериалов (ArcFinale { arc }) и концовки игры (CheckEnding после каждого хода).
 // Обычный финал — правило только с условием на сериал; частные финалы специфичнее и перекрывают его.
 import type { ContentApi } from '../../engine/game'
-import { type Rule, eq } from '../fact'
+import { type Rule, eq, missing } from '../fact'
+import { alikDead } from '../memkeys'
 import type { GameEvent, Offer } from './events'
 import { ARCS } from '../arcs'
 import { FINALES, ENDINGS, type Finale } from '../finales'
@@ -21,8 +22,10 @@ export const finaleRules: R[] = Object.keys(ARCS).flatMap((arc) => [
 ])
 
 // Концовка — один раз за игру; самая специфичная (редкое сочетание) побеждает.
+// Окно смерти откладывает развязку, как и сюжетные биты (#1545): гейт стоит здесь, на классе,
+// а не в каждой концовке; `once` отдаёт её первым же CheckEnding после снятия alik_dead.
 export const endingRules: R[] = ENDINGS.map((e) => ({
-  name: `Ending_${e.id}`, event: 'CheckEnding', when: e.when, once: true, priority: 'system',
+  name: `Ending_${e.id}`, event: 'CheckEnding', when: [...e.when, missing(alikDead)], once: true, priority: 'system',
   // концовка эндгейма обязана перекрыть Endgame_NoEnding (специфичность 100)
   ...(e.inEndgame ? { specificity: 101 } : {}),
   respond: ({ game }) => game.reachEnding(e.id),
