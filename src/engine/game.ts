@@ -98,6 +98,11 @@ interface PromiseInput {
   t?: string
 }
 
+/** Срок без точной даты — увёртка, праздник или «когда-нибудь»: по этому роду отговорка «я обещал
+ *  „примерно“» отличает своё обещание от точного (#1568). */
+const isVaguePromise = (p: { d: number | null; kind?: WhenKind }): boolean =>
+  p.d === null || p.kind === 'dodge' || p.kind === 'holiday'
+
 export interface GameOptions {
   storage?: Storage | null
   rng?: Rng
@@ -2475,7 +2480,7 @@ export class Game {
       ? due ?? undefined
       : this.horizonAt({ t: p.text, d: p.d, kind: p.kind, due: p.due, condition: p.condition, est: p.est, holiday: p.holiday, state: p.state }, due)
     const days = whenAt === undefined ? undefined : Math.max(0, whenAt - this.S.day)
-    this.S.promises.push({ t: p.text, made: this.S.day, due, days, daysNamed: this.namedInDays(p) ? true : undefined, condition: p.condition, stake: p.stake })
+    this.S.promises.push({ t: p.text, made: this.S.day, due, days, daysNamed: this.namedInDays(p) ? true : undefined, condition: p.condition, stake: p.stake, vague: isVaguePromise(p) ? true : undefined })
     // «сегодня» (due === day) тоже планируем — иначе d:0 молчит (#307)
     if (due !== null && due >= this.S.day) this.scheduleEvent(due, 'PromiseDue', { promise: this.S.promises.length - 1 })
     if (this.S.promises.length >= 20) this.unlock('promises20')

@@ -639,6 +639,8 @@ D.SHORTQ = [
 D.SORRY_A = ['Ладно, прощаю.', 'Эх, ну что с тебя взять.', 'Вот, другое дело.', 'Я отходчивый.', 'Мама сказала простить.'];
 D.SORRY_B = ['Но деньги теперь в понедельник.', 'Давай забудем. И про деньги тоже?', 'Обнимаю, брат.', { t: 'Приходи на хаш, помиримся.', remember: [set(saidHash, true)] }, 'Сердце у меня большое, карман маленький.'];
 D.PING_A = ['Я не читал, это телефон сам.', 'Прочитал, думал, как ответить красиво.', 'Это жена прочитала.', 'Случайно открыл, брат, пальцем.', 'Смотрел на твоё сообщение и грустил.'];
+/** Строки «я обещал „примерно“»: про срок без точной даты, поэтому точному обещанию не достаются (#1568). */
+const VAGUE_ONLY = /примерно/
 D.PREV_A = [
   'Тот раз не считается,', 'Брат, я помню,', 'Ара, это был другой я,', 'Так я же сказал примерно,',
   'Джан, тогда были другие обстоятельства,', 'Это не считается, брат,', 'Слушай, ну ты вспомнил,', 'Эээ, так это давно было,',
@@ -921,13 +923,15 @@ export function make(draw: DrawFn, getTier: () => number = () => 0, rng: Rng = m
     sorry: () => { sorryMark = undefined; return `${g('SORRY_A')} ${spoken(g('SORRY_B'))}` },
     pullSorryMark: (): FactOp[] | undefined => { const m = sorryMark; sorryMark = undefined; return m },
     ping: () => { const p = promise(); return { text: `${g('PING_A')} ${g('OATH')}, ${p.text}.`, p }; },
-    prev: (q?: { made?: number; illAt?: number }) => {
+    prev: (q?: { made?: number; illAt?: number; vague?: boolean }) => {
       const p = promise()
       // «тогда Борис заболел» — только когда цитата сделана не раньше болезни Бориса (#859): иначе Алик
       // датирует болезнь временем, когда барана в истории ещё не было
-      const { made, illAt } = q ?? {}
+      const { made, illAt, vague } = q ?? {}
       const ok = (e: Entry<unknown>): boolean => valueOf(e) !== BORIS_ILL || (made !== undefined && illAt !== undefined && made >= illAt)
-      return { text: `${g('PREV_A')} ${draw('PREV_B', D.PREV_B, false, ok)} А вот теперь — ${p.text}.`, p }
+      // «я обещал „примерно“» — про увёртку, праздник и «когда-нибудь»: у точного срока своего «примерно» нет (#1568)
+      const vagueOk = (e: Entry<unknown>): boolean => vague === true || !VAGUE_ONLY.test(String(valueOf(e)))
+      return { text: `${draw('PREV_A', D.PREV_A, false, vagueOk)} ${draw('PREV_B', D.PREV_B, false, (e) => vagueOk(e) && ok(e))} А вот теперь — ${p.text}.`, p }
     },
   };
 }

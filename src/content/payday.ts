@@ -2,7 +2,7 @@
 // Анонс → утро (линии партии отдают деньги) → все в сборе → дележ (сумма тает) → великая отмазка из событий партии →
 // перевёртыш (деньги приходят в невозможной форме) → кнопка на следующий день.
 // Реплики — пулы с условиями и приоритетом (game.line): звучит то, что было в этой партии.
-import { type Facts, type Line, type LineSpec, type Entry, is, eq, ne, exists, gte, lte, gate, missing, set } from './fact'
+import { type Facts, type Line, type LineSpec, type Entry, is, eq, ne, exists, gte, lt, lte, gate, missing, set } from './fact'
 import type { Scene, SceneNode } from './scenes'
 import { needs, samvelLine, WORLD } from './world'
 import { actSigned, bathAsked, bathAnswered, caughtUnique, court, cryptoHodl, garikConcrete, intro, judgeApology, karineKnowsDebt, met, payday, rubikFined, taxFrozen, taxThawed } from './memkeys'
@@ -124,8 +124,9 @@ export const COINS_BRIDGE_CATCHES = 2
  *  Сумма при этом не тает: срезы не прошли вовсе, а не вернулись потом. */
 export interface DetectiveLine extends LineSpec { w?: string }
 export const DETECTIVE_CLAIMS: Entry<string | DetectiveLine>[] = [
-  // сказанное игроком на узле дележа родня слышит по-своему; в этот раз вычесть не смеет
-  gate(is(payday.refused))('Ты сказал «ни рубля». Родня, как всегда, услышала «по рублю». Но сегодня у неё перед глазами твои записи — и «по рублю» не прошло. Впервые.'),
+  // сказанное игроком на узле дележа родня слышит по-своему; в этот раз вычесть не смеет.
+  // Сама строка «по рублю» — в узле отказа (#1568): она отвечает на выбор «Ни рубля никому!»
+  // и не спорит с той же строкой дефолтного пути.
   gate(missing(payday.refused))('Доли я отменил сам. Родня видела твои записи — никто не хочет быть в них следующим. Я бы поспорил, но ты ведь и это запишешь.'),
   { w: 'mama', t: 'А мне на лекарства… Нет, не надо мне ничего. Я видела твои записи. Забирай, сынок. Лекарства от совести всё равно нет.' },
   needs('goar')({ w: 'goar', t: 'А коза? …Коза сама виновата. Ничего не беру: ты же всё записал, а я женщина верующая.', when: [is('ach.q_goat')] }),
@@ -333,7 +334,11 @@ export const PAYDAY_SCENE: Scene = {
       gate(missing(bathAsked), is(met('karine')), is(karineKnowsDebt))('Ни рубля? А нашу ванную кто переложит? Переложишь нам — считай, отдал. Остальные, занимайте очередь.'),
       gate(missing(bathAsked), is(met('karine')), missing(karineKnowsDebt))('Ни рубля? А нашу ванную кто переложит? Остальные, занимайте очередь.'),
       gate(missing(bathAsked), missing(met('karine')), WORLD.karineHome)('Я жена Алика, если что. Ни рубля? А нашу ванную кто переложит? Остальные, занимайте очередь.'),
-    ], a2: ['Брат, ты сказал «ни рубля» — родня услышала «по рублю». Я бессилен.'], hook: 'claims' },
+    ], a2: [
+      // «по рублю» — одна реплика на выбор: дефолтная или следовательская, если родня уже видела записи (#1568)
+      gate(lt(caughtUnique, DETECTIVE_CATCHES))('Брат, ты сказал «ни рубля» — родня услышала «по рублю». Я бессилен.'),
+      gate(gte(caughtUnique, DETECTIVE_CATCHES))('Ты сказал «ни рубля». Родня, как всегда, услышала «по рублю». Но сегодня у неё перед глазами твои записи — и «по рублю» не прошло. Впервые.'),
+    ], hook: 'claims' },
     grand: {
       a: [GRAND_OPEN], hook: 'grand',
       opts: [

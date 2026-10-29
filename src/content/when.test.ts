@@ -93,6 +93,9 @@ describe('календарь праздников и сезонов', () => {
     expect(holidayDays('easter', easter26 + 1)).toBe(dayOf(2027, 3, 28) - (easter26 + 1)) // 2027-й: 28 марта
     expect(holidayDays('easter', dayOf(2028, 4, 16)), '2028-й').toBe(0)
     expect(holidayDays('easter', dayOf(2027, 5, 2)), 'юлианская (православная) дата 2027-го').toBeGreaterThan(30)
+    // «к Пасхе» от 22.09.2026 — 187 дней до западной Пасхи-2027 (28 марта): армянская церковь и её Вардавар
+    // (Пасха + 98 = 4 июля) идут по григорианскому счёту, православное 2 мая игрой не считается (#861, #1568)
+    expect(holidayDays('easter', dayOf(2026, 9, 22))).toBe(dayOf(2027, 3, 28) - dayOf(2026, 9, 22))
     expect(holidayDays('vardavar', dayOf(2026, 7, 12))).toBe(0) // Пасха + 98: 12 июля 2026
     expect(holidayDays('vardavar', dayOf(2027, 7, 4))).toBe(0) // реальный Вардавар 2027
     expect(holidayDays('navasard', dayOf(2026, 8, 1))).toBe(10)
