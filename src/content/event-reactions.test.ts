@@ -13,7 +13,7 @@ import { turnRules } from './rules/turn'
 import { FINALES } from './finales'
 import { COURT_LAWYER_AGAIN } from './quests'
 import { RUDE_CALLS_VOICE, MAMA_VOICE_CRY } from './rude'
-import { count, collectorsRecruited, court, crewPaid, crewPaidAt, HEAT, internAt, lawyerAt, debutWho, debutAt, arsenTrack, arsenTrackAt, saidStrasburg, saidGrantEnvelope, grantTileAt, grantHouseAt, mamaMarketAt, tileAdAt, tamadaDoneAt, borisAskAt, mamaVoiceAt, mamaCalls, samvelDivorceAt, tileSlipAt, tileCourtAt, tileLawyerAt, tileMonumentAt, legendOf, nivaAway, nivaBack, nivaBackAt, saleAt, saleWhat, alikDead, paydayScene, seryogaAskAt, grantBathAt, offendedAskAt, intro, kettleAt, carGone, dachaAskAt, evictAt, collectorsEchoAt, threatGovAt, fraudCardAt, hhJobAt, seryogaLoanAt, vacancyAt, evicted, fraudLoan } from './memkeys'
+import { count, collectorsRecruited, court, crewPaid, crewPaidAt, HEAT, internAt, lawyerAt, debutWho, debutAt, arsenTrack, arsenTrackAt, saidStrasburg, saidGrantEnvelope, grantTileAt, grantHouseAt, mamaMarketAt, tileAdAt, tamadaDoneAt, borisAskAt, mamaVoiceAt, mamaCalls, samvelDivorceAt, tileSlipAt, tileCourtAt, tileLawyerAt, tileMonumentAt, legendOf, nivaAway, nivaBack, nivaBackAt, saleAt, saleWhat, alikDead, paydayScene, seryogaAskAt, grantBathAt, offendedAskAt, intro, kettleAt, carGone, dachaAskAt, evictAt, collectorsEchoAt, threatGovAt, fraudCardAt, hhJobAt, seryogaLoanAt, vacancyAt, evicted, fraudLoan, moneyPoor } from './memkeys'
 import { valueOf, type Line } from './fact'
 import type { Choice } from '../engine/state'
 
@@ -1864,6 +1864,65 @@ describe('свип карточек ленты (#1487): окно отклика 
     const { game } = makeGame()
     showCard(game, DACHA_CARD)
     expect(game.S.mem[dachaAskAt], 'карточка прозвучала без проданной дачи').toBeUndefined()
+  })
+
+  it.each([
+    { poor: false, received: 45000, settled: false },
+    { poor: true, received: 8000, settled: false },
+    { poor: false, received: 45000, settled: true },
+  ])('помощь с дачи остаётся игроку: денежное дно = $poor, долг выплачен = $settled', async ({ poor, received, settled }) => {
+    const { game } = makeGame()
+    setMoney(game, 1000)
+    game.S.mem[moneyPoor] = poor
+    game.S.mem[momHelp('pension')] = true
+    game.S.mem[momHelp('pickles')] = true
+    game.tryMomHelp()
+    expect(game.S.mem[momHelp('dacha')]).toBe(true)
+    expect(game.S.money).toBe(1000 + received)
+    game.S.day += 30
+    if (settled) {
+      game.S.ach.saint = 1
+      game.S.ach.court = 1
+      await game.fire('PaydayOutcome')
+      expect(game.debt).toBe(0)
+    }
+    const money = game.S.money
+    const debt = game.debt
+    showCard(game, DACHA_CARD)
+    expect(game.S.mem[dachaAskAt]).toBe(game.S.stats.sent)
+    const answers = new Set<string>()
+    for (let i = 0; i < DACHA_ASK_B.length; i++) {
+      game.S.mem[dachaAskAt] = game.S.stats.sent
+      const from = game.S.msgs.length
+      await game.fire('PlayerSays', { intent: 'dachaAsk' })
+      const said = game.S.msgs.slice(from).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : []))
+      expect(said.length).toBeGreaterThan(0)
+      said.forEach((s) => answers.add(s))
+      expect(said.join(' ')).not.toMatch(/деньги ушли мне/)
+      if (settled) expect(said.join(' ')).not.toMatch(/я всё равно должен/)
+      expect(game.S.money).toBe(money)
+      expect(game.debt).toBe(debt)
+      expect(game.S.mem[dachaAskAt]).toBeUndefined()
+    }
+    expect(answers.size).toBe(DACHA_ASK_B.length)
+  })
+
+  it.each([184, 1600])('регистрация заявления не задаёт номер дела или сравнение сроков: день %i', (day) => {
+    const { game } = makeGame()
+    game.S.day = day
+    game.S.mem[count.threat] = 1
+    showCard(game, GOV_CARD)
+    const at = Number(game.S.mem[threatGovAt])
+    expect(at).toBe(game.S.stats.sent)
+    const offered: string[] = []
+    for (let i = 0; i < P_THREAT_GOV.length; i++) {
+      game.S.stats.sent = at + i
+      const choice = has(game, 'threatGov')
+      expect(choice).toBeDefined()
+      offered.push(choice!.text)
+    }
+    expect(new Set(offered).size).toBe(P_THREAT_GOV.length)
+    expect(offered.join(' ')).not.toMatch(/меньше, чем я жду|номер дела/)
   })
 
   it('выселение открывает окно один раз: повторная карточка выселения невозможна (факт `evicted`)', () => {
