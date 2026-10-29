@@ -109,6 +109,7 @@ test('галерея: делиться можно только открытой 
   const days = await day(page)
   await page.locator('#endingContinue').click()
   await page.getByTitle('Обещания и ачивки').click()
+  await page.getByRole('tab', { name: 'Коллекция' }).click()
 
   const endings = page.locator('#endings')
   const got = endings.locator('.tile').filter({ hasText: 'Породнились' })

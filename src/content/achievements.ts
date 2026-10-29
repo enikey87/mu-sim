@@ -108,3 +108,28 @@ export const ACH: Record<string, Achievement> = {
   ...Object.fromEntries(Object.entries(FINALES).flatMap(([arc, fs]) => fs.map((f) => [`fin_${arc}_${f.id}`, [f.title, `Другой финал: «${ARCS[arc].title}»`] as const]))),
   ...Object.fromEntries(ENDINGS.map((e) => [`end_${e.id}`, [`${e.icon} ${e.title}`, 'Концовка игры'] as const])),
 }
+
+/** Скрытая ачивка прячет неполученную плитку за «🔒 ???»: её имя и условие спойлерят будущее партии
+ *  (событие, сцену, арку, концовку). Видимая неполученная — цель-приманка: описывает поведение игрока
+ *  или наблюдение. Классификация — данные (`docs/design/dossier.md`, #1538), полноту реестра держит
+ *  `achievements.test.ts`. */
+export const ACH_HIDDEN = [
+  'legend', 'ram', 'shaved', 'meet', 'cafe', 'hash', 'redo', 'customer', 'nephew', 'wife', 'sorry',
+  'forgive', 'invoice', 'loan', 'heir', 'threat', 'lend', 'lend50', 'group', 'wrong',
+  'blocked', 'tribunal', 'vendetta', 'cowpeace', 'countersuit', 'blood_brother', 'habit',
+  'payday', 'court', 'strasbourg',
+] as const satisfies readonly AchId[]
+
+export const ACH_VISIBLE = [
+  'first', 'brat', 'night', 'moo10', 'fifty5', 'fence', 'rude', 'saint', 'floor', 'year', 'cow',
+  'promises20', 'amnesty', 'card', 'barter', 'toast', 'newjob', 'choice', 'tier1', 'tier2', 'tier3',
+  'idle', 'deleted', 'edited', 'typo', 'sticker', 'fwd', 'react', 'dead', 'away', 'nightowl',
+  'memory', 'liar', 'liar3',
+] as const satisfies readonly AchId[]
+
+/** Динамические ключи: серии, финалы и концовки — сплошь будущее партии, мини-квесты — невиданные сцены. */
+export const ACH_HIDDEN_PREFIX = ['arc_', 'fin_', 'end_', 'q_'] as const
+
+const hiddenSet = new Set<string>(ACH_HIDDEN)
+
+export const achHidden = (id: string): boolean => hiddenSet.has(id) || ACH_HIDDEN_PREFIX.some((p) => id.startsWith(p))
