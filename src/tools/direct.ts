@@ -7,7 +7,7 @@ import type { Game } from '../engine/game'
 import type { Facts } from '../engine/rules'
 import { during } from '../engine/rules'
 import { START_DAY, ARC_MARINATION_DAYS } from '../engine/state'
-import { HEAT, arsenTrackAt, borisAskAt, evictAt, legendDay, legendId, muenAt, nuneKeyPassed, payday, rubikProposalAt, sorryAt } from '../content/memkeys'
+import { HEAT, arsenTrackAt, borisAskAt, evictAt, fraudCardAt, legendDay, legendId, muenAt, nuneKeyPassed, payday, rubikProposalAt, sorryAt } from '../content/memkeys'
 import { ENDING_MIN_DAY, CHRONIC_RUDE_AFTER_VENDETTA } from '../content/finales'
 
 export type DirectCase = { event: string; facts?: Facts; target?: string; setup?: (g: Game) => void }
@@ -140,6 +140,14 @@ export const DIRECT: Record<string, DirectCase> = {
   Finale_rubik_karine: { event: 'ArcFinale', facts: { arc: 'rubik' }, setup: (g) => { g.S.ach.wife = 1 } },
   Payday_notyou: { event: 'PaydayOutcome', setup: (g) => { g.S.mem['finale.razmik'] = 'default' } },
   Payday_strasbourg: { event: 'PaydayOutcome', setup: (g) => { g.S.ach.strasbourg = 1 } },
+  // #1548: сюжетные классы поимки сдвинули розыгрыш выборок — эти два правила в них больше не доходят;
+  // правила целы, держим прямыми случаями (как #826/#926), факты ставим те же, что ставят их окна
+  Payday_coins: { event: 'PaydayOutcome', setup: (g) => { g.S.mem[payday.caught] = true } },
+  Says_fraudCard: { event: 'PlayerSays', facts: { intent: 'fraudCard' }, setup: (g) => { g.S.mem[fraudCardAt] = g.S.stats.sent } },
+  Says_catchLie_lieKind_envelopes: {
+    event: 'PlayerSays', facts: { intent: 'catchLie' },
+    setup: (g) => { g.noteClaims(['samvel_envelopes']); g.noteClaims(['samvel_envelopes_given']) },
+  },
   Quiet_Blocked_PromiseDue: { event: 'PromiseDue', facts: { promise: 0 }, setup: (g) => { g.S.mem.blocked = true; g.recordPromise({ text: 'в пятницу', d: 1 }); g.S.day += 1 } },
   Says_sorry_blocked_hinted: {
     event: 'PlayerSays', facts: { intent: 'sorry' },

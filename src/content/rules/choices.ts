@@ -9,7 +9,7 @@ import { talkPairs, talkId, rubikProposalPairs } from '../talk'
 import { ARCS, WRONG_Q } from '../arcs'
 import * as L from '../life'
 import { GROUP_Q } from '../misc'
-import { P_LIE } from '../lies'
+import { P_LIE, LIE_PLAYER_POOLS } from '../lies'
 import { TOPICS } from '../topics'
 import { P_CREW_PAID, CREW_FRESH_TURNS } from '../crew'
 import { MONEY_ASK, moneyPlaceOf, moneyAskOwn } from '../money-ask'
@@ -164,7 +164,12 @@ export const choiceRules: R[] = [
     name: 'CatchLie',
     when: [is('lieOpen'), missing(blocked), missing(alikDead), missing(phoneKarine), eq('offline', false)],
     act: 'catchLie', tone: 'neutral', bonus: 6,
-    text: (g) => { const l = g.lie()!; return g.playerLine(() => g.X.fill(g.draw('P_LIE', P_LIE), { old: l.old.say, new: l.new.say })) },
+    // у сюжетных противоречий арок свой пул реплик (#1548): денежный вопрос к «Ниве» или конвертам звучит невпопад
+    text: (g) => {
+      const l = g.lie()!
+      const pool = LIE_PLAYER_POOLS[l.kind] ?? P_LIE
+      return g.playerLine(() => g.X.fill(g.draw(`P_LIE_${l.kind}`, pool), { old: l.old.say, new: l.new.say }))
+    },
   }),
   // упрёк по звонку с объекта: пул живёт только под фактом звонка, в окнах молчания — молчит (#577).
   // Факт звонка постоянный, а кнопка возвращается после перерыва — значит, пул долгоживущий: окно повтора

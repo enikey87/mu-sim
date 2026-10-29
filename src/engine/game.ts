@@ -25,8 +25,8 @@ import {
 } from '../content/credit'
 import { allRules } from '../content/rules'
 import type { GameEvent, Offer } from '../content/rules/events'
-import { CLAIMS, claimByKey, CALLBACK_OPEN, type Claim } from '../content/lies'
-import { CLAIM_LEDGER, activeClaim, caughtPairs, claimKeyOf, closeEpisode, currentEpisode, publishClaim, publishRetraction, publishTransition, type EpisodeRec } from '../content/ledger'
+import { CLAIMS, claimByKey, CALLBACK_OPEN, PROMISE_UNPAID, type Claim } from '../content/lies'
+import { CLAIM_LEDGER, activeClaim, caughtPairs, claimKeyOf, closeEpisode, currentEpisode, publishClaim, publishRetraction, publishTransition, type ClaimRec, type EpisodeRec } from '../content/ledger'
 import { isWhoId, type ClaimKey } from '../content/ids'
 import { type LedgerEvent, type LineSpec as ContentLineSpec, type Said, saidClaims, saidJoin, saidText } from '../content/fact-types'
 import * as memkeys from '../content/memkeys'
@@ -139,7 +139,7 @@ export const FESTIVE = /свадьб|крестин|юбилей|обручен|
 
 export type SayItem = Said | { w?: string; t: string; claims?: LedgerEvent[]; stamp?: string; remember?: FactOp[] }
 /** Тема эпизода противоречия — выбирает предметный ответ Алика. */
-export type LieKind = 'money' | 'grandpa' | 'customer'
+export type LieKind = 'money' | 'grandpa' | 'customer' | 'niva' | 'promise' | 'envelopes'
 /** Что пришло, пока игрока не было: виды сообщений пачки непрочитанных. */
 export type AwayKind = 'text' | 'sticker' | 'fwd' | 'deleted' | 'voice' | 'transfer' | 'excuse' | 'formality' | 'coldWar' | 'offended'
 
@@ -475,12 +475,29 @@ export class Game {
   promiseIndexOf(p: PromiseRec): number { return this.S.promises.indexOf(p) }
   /** «Припомнил» обещание (спросили о сроке). Единственная точка записи promises из контента. */
   promiseAsked(i: number): void { const p = this.S.promises[i]; if (p) p.asked = true }
+  /**
+   * «Условие «{t}» выполнено. Денег это почему-то не добавило» (#1548): реплика назвала обе версии сразу —
+   * срок обещания и признание, что денег он не добавил. Знание появляется вместе с показанной репликой.
+   */
+  promiseUnpaid(i: number): void {
+    const p = this.S.promises[i]
+    if (!p?.condition) return
+    const meta = { source: 'alik' as const, day: this.S.day }
+    publishClaim(this.S.ledger, 'promise.due', `open:${i}`, { ...meta, claimKey: 'promise_due', say: p.t })
+    publishClaim(this.S.ledger, 'promise.due', `unpaid:${i}`, { ...meta, claimKey: 'promise_unpaid', say: PROMISE_UNPAID })
+  }
   /** Сдержал слово переводом в срок: asked + kept. */
-  promiseKept(i: number): void { const p = this.S.promises[i]; if (p) { p.asked = true; p.kept = true } }
+  promiseKept(i: number): void { const p = this.S.promises[i]; if (p) { p.asked = true; p.kept = true; this.promisePaid(i) } }
   /** Сдержал ставку («усы») переводом: asked + kept + ставка сыграла. */
-  promiseStakeKept(i: number): void { const p = this.S.promises[i]; if (p) { p.asked = true; p.kept = true; p.stakeDone = true } }
+  promiseStakeKept(i: number): void { const p = this.S.promises[i]; if (p) { p.asked = true; p.kept = true; p.stakeDone = true; this.promisePaid(i) } }
   /** Ставка сыграла без денег — усы сбриты. */
   promiseStakeDone(i: number): void { const p = this.S.promises[i]; if (p) p.stakeDone = true }
+  /** Деньги по обещанию пришли — «условие выполнено, денег не добавило» объяснено тем же обещанием (#1548). */
+  private promisePaid(i: number): void {
+    const value = `unpaid:${i}`
+    if (!this.S.ledger.claims.some((c) => c.subject === 'promise.due' && c.value === value)) return
+    publishRetraction(this.S.ledger, 'promise.due', value, { source: 'alik', day: this.S.day })
+  }
 
   /** Сериал начат (есть запись о прогрессе). */
   arcStarted(id: string): boolean { return !!this.S.arcs[id] }
@@ -2126,11 +2143,17 @@ export class Game {
     // контекстные варианты — правила события BuildChoices (самые специфичные первыми)
     const facts = this.facts()
     const out: Choice[] = []
+    const lie = this.lie()
+    /** Сюжетная поимка (#1548): у вопроса про сериал свой слот, а поимка встаёт вариантом ниже. */
+    const plotLie = !!lie && (lie.kind === 'niva' || lie.kind === 'promise' || lie.kind === 'envelopes')
+    const collected = this.rules.collect({ event: 'BuildChoices' }, facts)
     // тема блока (#887): два вопроса про одно и то же (фундамент и follow бетона) в одной сборке не стоят —
     // повтор темы пропускаем, слот занимает следующий пул; общее число вариантов не меняется
     const topics = new Set<string>()
-    for (const r of this.rules.collect({ event: 'BuildChoices' }, facts)) {
+    for (const r of collected) {
       if (out.length >= 2) break
+      // сюжетная поимка вопрос про сериал не вытесняет: её слот ниже, после контекстных вариантов
+      if (r.name === 'Opt_CatchLie' && plotLie) continue
       const c = r.offer?.(this.rules.ctx(this, r, { event: 'BuildChoices' }, facts))
       if (!c) continue
       if (c.topic && topics.has(c.topic)) continue
@@ -2138,6 +2161,12 @@ export class Game {
       out.push(c)
       // перерыв оффера считается от показа, а не от нажатия: кнопку увидели — пауза пошла (#789)
       if (r.cooldown) this.rules.commit(r, { event: 'BuildChoices' })
+    }
+    // поимка сюжетного противоречия — добавочный вариант: обещает поимку и не отнимает вопрос у сериала
+    if (plotLie) {
+      const r = collected.find((x) => x.name === 'Opt_CatchLie')
+      const catchOpt = r?.offer?.(this.rules.ctx(this, r, { event: 'BuildChoices' }, facts))
+      if (catchOpt) out.push(catchOpt)
     }
     const P2 = (a: string, b: string) => this.playerLine(() => `${this.draw(a, D[a])} ${this.draw(b, D[b])}`)
     const one = (key: string, arr: readonly Entry<string>[]) => this.playerLine(() => this.draw(key, arr))
@@ -2783,13 +2812,18 @@ export class Game {
     const a = this.S.ledger.claims.find((c) => c.id === ep.aClaim)
     const b = this.S.ledger.claims.find((c) => c.id === ep.bClaim)
     if (!a || !b) return null
-    const ok = a.claimKey ?? claimKeyOf(a.subject, a.value)
-    const nk = b.claimKey ?? claimKeyOf(b.subject, b.value)
-    const o = ok ? claimByKey(ok) : undefined, n = nk ? claimByKey(nk) : undefined
-    if (!ok || !nk || !o || !n) return null
-    const kind: LieKind = ep.subject === 'grandpa.life' ? 'grandpa' : ep.subject === 'customer.payment' ? 'customer' : 'money'
-    // «сначала/теперь» — день первого введения версии, не день последнего клейма (#987)
-    const intro = (key: string) => {
+    const o = this.claimVersion(a), n = this.claimVersion(b)
+    if (o === null || n === null) return null
+    const kind: LieKind = ep.subject === 'grandpa.life' ? 'grandpa'
+      : ep.subject === 'customer.payment' ? 'customer'
+        : ep.subject === 'niva.state' ? 'niva'
+          : ep.subject === 'samvel.envelopes' ? 'envelopes'
+            : ep.subject === 'promise.due' ? 'promise' : 'money'
+    // «сначала/теперь» — день первого введения версии, не день последнего клейма (#987).
+    // У обещания первая версия — сама запись: у каждого срока свой номер, искать по ключу нечего
+    const intro = (rec: ClaimRec) => {
+      if (rec.subject === 'promise.due') return { day: rec.day, id: rec.id, source: rec.source }
+      const key = rec.claimKey ?? claimKeyOf(rec.subject, rec.value)
       let best: { day: number; id: number; source: string } | undefined
       for (const c of this.S.ledger.claims) {
         const k = c.claimKey ?? claimKeyOf(c.subject, c.value)
@@ -2798,10 +2832,17 @@ export class Game {
       }
       return best
     }
-    const ia = intro(ok), ib = intro(nk)
+    const ia = intro(a), ib = intro(b)
     const aFirst = !ia || !ib || ia.day < ib.day || (ia.day === ib.day && ia.id <= ib.id)
     // «вы же говорили» — про того, кто эту раннюю версию ввёл; гейт пула не меняется
     return { old: aFirst ? o : n, new: aFirst ? n : o, kind, alikOld: (aFirst ? ia?.source : ib?.source) === 'alik' }
+  }
+  /** Версия эпизода: текст из записи партии (обещание), иначе — пересказ утверждения из контента. */
+  private claimVersion(rec: ClaimRec): Claim | null {
+    const key = rec.claimKey ?? claimKeyOf(rec.subject, rec.value)
+    if (!key) return null
+    const say = rec.say ?? claimByKey(key)?.say
+    return say ? { key, say } : null
   }
   async caught(line: string): Promise<void> {
     const ep = currentEpisode(this.S.ledger)
@@ -3739,7 +3780,7 @@ export type ContentApi = Pick<Game,
   | 'setSceneVar'
   // обещания
   | 'recordPromise' | 'promiseLine' | 'ctxFromPromise' | 'latePromises' | 'promiseAt' | 'promiseIndexOf'
-  | 'promiseAsked' | 'promiseKept' | 'promiseStakeKept' | 'promiseStakeDone'
+  | 'promiseAsked' | 'promiseKept' | 'promiseStakeKept' | 'promiseStakeDone' | 'promiseUnpaid'
   // деньги, долги и вещи
   | 'adjustDebt' | 'adjustMoney' | 'moneySealed' | 'moneyReply' | 'chargeBill' | 'chargeCredit'
   | 'billEventLive' | 'creditEventLive' | 'fillMoney' | 'giveItem' | 'sealOpenJobs'
