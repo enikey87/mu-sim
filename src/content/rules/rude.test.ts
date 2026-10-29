@@ -581,6 +581,9 @@ describe('холодная война после вендетты', () => {
     const { game } = makeGame()
     await vendetta(game)
     heat(game, 0) // ссора остыла — извинение принимается текстом, без ритуала
+    // #1570: первое прямое «прости» только называет цену, режим снимает следующее
+    expect((await says(game, 'sorry')).r).toBe('Says_sorry_vendetta_price')
+    expect(game.S.mem[coldWar], 'отказ снял режим').toBe(true)
     expect((await says(game, 'sorry')).r).toMatch(/^Says_sorry/)
     expect(game.S.mem[coldWar], 'принятое извинение не сняло режим').toBe(false)
     const after = await fire(game, 'rude')

@@ -59,6 +59,9 @@ describe('режим мира «вражда» (#1558)', () => {
     game.S.day = 250
     Object.assign(game.S.mem, { vendetta: true, coldWar: true })
 
+    // #1570: цена выхода — два извинения; первое только называет её и мир не возвращает
+    await game.fire('PlayerSays', { intent: 'sorry', tone: 'polite' })
+    expect(game.S.mem.vendetta, 'первое «прости» сняло сход').toBe(true)
     await game.fire('PlayerSays', { intent: 'sorry', tone: 'polite' })
     expect(game.S.mem.vendetta, 'сход снят').toBe(false)
     expect(game.availableArcs().length, 'сериалы снова доступны').toBeGreaterThan(0)

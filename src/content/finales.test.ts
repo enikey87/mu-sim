@@ -554,6 +554,9 @@ describe('ранний финал «Кровный враг»', () => {
     await toVendetta(game)
     const chronicle = game.S.mem['count.rudeAfterVendetta']
     game.S.mem['rude.heat'] = 0 // ссора остыла: извинение принимается текстом, а не ритуалом
+    // #1570: одно «прости» цену только называет — вражда снимается следующим (или посредником)
+    await game.send({ text: 'Прости, брат', tone: 'polite', act: 'sorry' })
+    expect(game.S.mem.vendetta, 'первое «прости» сняло сход').toBe(true)
     await game.send({ text: 'Прости, брат', tone: 'polite', act: 'sorry' })
     expect(game.S.mem['count.sorry'], 'извинение записано').toBe(1)
     expect(game.S.mem.vendetta, 'сход снят извинением').toBe(false)

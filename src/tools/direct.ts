@@ -7,7 +7,7 @@ import type { Game } from '../engine/game'
 import type { Facts } from '../engine/rules'
 import { during } from '../engine/rules'
 import { START_DAY, ARC_MARINATION_DAYS } from '../engine/state'
-import { HEAT, arsenTrackAt, borisAskAt, evictAt, fraudCardAt, legendDay, legendId, muenAt, nuneKeyPassed, payday, rubikProposalAt, sorryAt } from '../content/memkeys'
+import { HEAT, arsenTrackAt, borisAskAt, evictAt, fraudCardAt, legendDay, legendId, muenAt, nuneKeyPassed, payday, rubikProposalAt, sorryAt, vendettaPrice } from '../content/memkeys'
 import { ENDING_MIN_DAY, CHRONIC_RUDE_AFTER_VENDETTA } from '../content/finales'
 
 export type DirectCase = { event: string; facts?: Facts; target?: string; setup?: (g: Game) => void }
@@ -78,7 +78,10 @@ export const DIRECT: Record<string, DirectCase> = {
   Beat_EnmityFamily: { event: 'StoryBeat', setup: (g) => { g.S.mem.vendetta = true } },
   Beat_EnmityRumor: { event: 'StoryBeat', setup: (g) => { g.S.mem.vendetta = true } },
   // #1565: прямое извинение в живом сходе и кнопки посредника в нём — бот уходит ими сразу после вендетты
-  Says_sorry_vendetta: { event: 'PlayerSays', facts: { intent: 'sorry' }, setup: (g) => { g.S.mem.vendetta = true } },
+  Says_sorry_vendetta: { event: 'PlayerSays', facts: { intent: 'sorry' }, setup: (g) => { g.S.mem.vendetta = true; g.S.mem[vendettaPrice] = true } },
+  // #1570: первое прямое «прости» в сходе цену только называет — отказ держится прямым случаем,
+  // иначе бот, уходящий посредником, его не покажет
+  Says_sorry_vendetta_price: { event: 'PlayerSays', facts: { intent: 'sorry' }, setup: (g) => { g.S.mem.vendetta = true } },
   Opt_Via_mama_enmity: { event: 'BuildChoices', setup: (g) => { g.S.mem.vendetta = true } },
   Opt_Via_boris_enmity: { event: 'BuildChoices', setup: (g) => { g.S.mem.vendetta = true; g.S.arcs.boris = { i: 4, last: 0 } } },
   Turn_WhileDead: { event: 'AlikTurn', setup: (g) => { g.S.mem.alik_dead = true } },

@@ -2,7 +2,7 @@
 // что сделать Алику — принимает система правил (engine/rules/, content/rules/*).
 import { make, D, TRANSFER_FRESH_TURNS, PHOTO_FRESH_TURNS, EVENT_FRESH_TURNS, low, cap, type ExcuseApi, type Promise3, type PromiseCondition, type Rel, type When, type WhenKind } from '../content/excuses'
 import { makeScenes, invKey, type Scene, type Line } from '../content/scenes'
-import { BLOCK_LIFTED, COLD_WAR, COLD_WAR_TURNS, COLD_WAR_WINDOW, TRIBUNAL } from '../content/rude'
+import { BLOCK_LIFTED, COLD_WAR, COLD_WAR_TURNS, COLD_WAR_WINDOW, FEUD_LIFTED, FEUD_LIFTED_STICKER, TRIBUNAL } from '../content/rude'
 import { MIRROR, MIRROR_AGAIN, MIRROR_OPEN, MIRROR_REPLY, type Mirror } from '../content/mirror'
 import { PAYDAY_HOOKS } from '../content/rules/payday'
 import { QUEST_WHEN } from '../content/rules/world'
@@ -2284,6 +2284,9 @@ export class Game {
     const o: Choice = told?.intent === 'sorry' && !told.request ? { ...raw, act: 'sorry' } : raw
     if (this.ui.busy || this.battery.dead || this.disposed || !o.text.trim()) return
     const S = this.S
+    // снятие вражды слышно (#1570): метка перехода, а не список мест выхода — снимает любой канал
+    // (прямое извинение, посредник, ритуал), и каждый говорит одно и то же. Читается в конце этого же хода.
+    const feudBefore = S.mem[memkeys.vendetta] === true
     this.ui.busy = true
     this.inPlayerTurn = true
     this.dayMovedInTurn = false
@@ -2379,6 +2382,18 @@ export class Game {
         await this.alikTurn(tone, o.category, o.arg)
       }
       if (this.disposed) return
+
+      // сход снят в этом ходу — выход звучит так же громко, как вход (#1570): системная строка и стикер
+      // перемирия вместо объявившего вражду 🗡️. Сразу после реплики, до смены даты, и до статуса:
+      // подпись профиля читает тот же ход.
+      if (feudBefore && !S.mem[memkeys.vendetta]) {
+        S.mem[memkeys.vendettaLifted] = true
+        if (!this.alikSilent()) {
+          await this.sticker(FEUD_LIFTED_STICKER)
+          if (this.disposed) return
+        }
+        this.sys(FEUD_LIFTED)
+      }
 
       // блок ставит правило посреди хода: веха читается здесь, до смены календаря (#1483)
       this.noteBlocked()

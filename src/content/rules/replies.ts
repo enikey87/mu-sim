@@ -17,10 +17,11 @@ import { moneyPlaceOf, moneyAskOwn, stampMoneyPlace } from '../money-ask'
 import { ARCS, NO_NEWS_A, NO_NEWS_B, GROUP_SEEN_A, GROUP_SEEN_B, WRONG_A, WRONG_B } from '../arcs'
 import * as L from '../life'
 import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, PROMISE_PENCIL, PROMISE_FAR, PROMISE_YEARS, KONAK_LINE, WHEELS_NEVER } from '../misc'
+import { FEUD_PRICE } from '../rude'
 import { CREW_PAID } from '../crew'
 import { HOLIDAY_MONEY, type Holiday } from '../holidays'
 import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_THIRD, LIE_NOCRED, LIE_NIVA, LIE_PROMISE, LIE_ENVELOPES } from '../lies'
-import { HEAT, alikShaved, arsenTrackAt, avitoReviewAt, bathAnswered, bathAskedAt, blocked, borisAskAt, borisSaleAt, coldWar, endgame, vendetta, collectorsAskAt, collectorsEpAt, countersuitAt, courtVerdictAt, tileCourtAt, tileLawyerAt, tileMonumentAt, tileSlipAt, nivaBackAt, saleAt, crewPaidAt, debutAt, grantBathAt, grantTileAt, inhDoneAt, internAccepted, internAt, internDeclined, kettleAt, lawyerAt, moustacheAskAt, offendedAskAt, ramPhotoAt, rubikAskAt, rubikHoleAt, moustachePhotoAt, photoAt, tileAdAt, tamadaDoneAt, mamaMarketAt, mamaVoiceAt, samvelDivorceAt, grantHouseAt, seryogaAskAt, transferAt, vacancyAt, muenAnswered, hhJobAt, seryogaLoanAt, dachaAskAt, evictAt, collectorsEchoAt, threatGovAt, fraudCardAt, inhRefused, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, saidKonak, stateAt, topic, topicLast, topicMute, topicRun, whenYears } from '../memkeys'
+import { HEAT, alikShaved, arsenTrackAt, avitoReviewAt, bathAnswered, bathAskedAt, blocked, borisAskAt, borisSaleAt, coldWar, endgame, vendetta, vendettaPrice, collectorsAskAt, collectorsEpAt, countersuitAt, courtVerdictAt, tileCourtAt, tileLawyerAt, tileMonumentAt, tileSlipAt, nivaBackAt, saleAt, crewPaidAt, debutAt, grantBathAt, grantTileAt, inhDoneAt, internAccepted, internAt, internDeclined, kettleAt, lawyerAt, moustacheAskAt, offendedAskAt, ramPhotoAt, rubikAskAt, rubikHoleAt, moustachePhotoAt, photoAt, tileAdAt, tamadaDoneAt, mamaMarketAt, mamaVoiceAt, samvelDivorceAt, grantHouseAt, seryogaAskAt, transferAt, vacancyAt, muenAnswered, hhJobAt, seryogaLoanAt, dachaAskAt, evictAt, collectorsEchoAt, threatGovAt, fraudCardAt, inhRefused, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, saidKonak, stateAt, topic, topicLast, topicMute, topicRun, whenYears } from '../memkeys'
 import type { ArcId, TopicId } from '../ids'
 import { BATH_ANSWER } from './player-choice-pools'
 import { PROMISE_SHAVE_ASK, BORIS_MEMORY_B, MOUSTACHE_PHOTO_B, MAMA_MARKET_B, TILE_AD_B, TAMADA_DONE_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, GRANT_HOUSE_B, COURT_VERDICT_B, TILE_SLIP_B, TILE_COURT_B, TILE_LAWYER_B, TILE_MONUMENT_B, NIVA_BACK_B, SOLD_B, RAM_PHOTO, BORIS_SALE, VACANCY, VACANCY_START_B, VACANCY_SOON_B, SERYOGA_B, GRANT_BATH_B, OFFENDED_ASK_B, BATH_ASK_B, MUEN_ASK_B, INH_BURNED_B, INH_REFUSED_B, AVITO_REVIEW, RUBIK_ASK, KETTLE, CREW_CALL_B, LAWYER_B, COLLECTORS_ASK_B, COLLECTORS_EP_B, INTERN_B, HOLE_B, COUNTERSUIT_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, DEBUT_BORIS_B, DEBUT_NIVA_B, NUNE_DEBUT_B, DEBUT_GRANT_B, GRANT_TILE_B, HH_JOB_B, SERYOGA_LOAN_B, DACHA_ASK_B, EVICT_B, COLLECTORS_ECHO_B, THREAT_GOV_B, FRAUD_CARD_B, KONVERTY_B } from '../world'
@@ -102,10 +103,24 @@ export const replyRules: R[] = [
     },
   }, [gte('sorrySwing', 3)]),
 
+  // Цена выхода (#1570): первое прямое извинение в живом сходе вражду не снимает — вражда держится
+  // родом, а не ссорой, и одного слова мало. Отказ называет оба настоящих пути (посредник, повтор)
+  // и оставляет контекст обиды, иначе кнопка «Sorry» исчезает и выход снова не найти.
+  says('sorry', {
+    name: 'Says_sorry_vendetta_price',
+    specificity: 40,
+    remember: [set(vendettaPrice, true)],
+    respond: async ({ game }) => {
+      await game.say([game.line('FEUD_PRICE', FEUD_PRICE) ?? valueOf(FEUD_PRICE[0])])
+      game.setCtx({ offended: true })
+    },
+  }, [is(vendetta), missing(vendettaPrice), missing(endgame.vendetta), missing(endgame.active)]),
+
   // Примирение в живом сходе (#1565): пока экран «Вендетты» не сыгран, прямое извинение принимается
   // как обычное и перекрывает ритуал (после серии криков текст не принимается), подсказки посредника
   // и прочие ответы — иначе у режима вражды нет выхода, который видит игрок. Третье извинение за шесть
-  // ходов остаётся «качелями» (строка SWING), но мир наступает и там.
+  // ходов остаётся «качелями» (строка SWING), но мир наступает и там. С #1570 это второе извинение:
+  // цену первое уже назвало (`vendettaPrice`).
   says('sorry', {
     name: 'Says_sorry_vendetta',
     specificity: 40, // выше Says_sorry_ritual (5) и подсказок блока (5–9)
@@ -126,7 +141,7 @@ export const replyRules: R[] = [
       }
       await sorry(game, line)
     },
-  }, [is(vendetta), missing(endgame.vendetta), missing(endgame.active)]),
+  }, [is(vendetta), is(vendettaPrice), missing(endgame.vendetta), missing(endgame.active)]),
 
   // ответ на реплику легенды / персонажа / воспоминание: отвечает тот, к кому обратились
   says('talk', {

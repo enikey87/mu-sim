@@ -109,6 +109,11 @@ describe('«Вендетта» — терминальный финал груб�
     const { game } = makeGame()
     Object.assign(game.S.mem, { vendetta: true, coldWar: true, 'rude.heat': 0 })
 
+    // #1570: первое прямое «прости» в сходе цену только называет — вражда держится родом
+    await game.fire('PlayerSays', { intent: 'sorry', tone: 'polite' })
+    expect(game.S.mem.vendetta, 'первое «прости» сняло сход').toBe(true)
+    expect(game.S.mem.coldWar, 'первое «прости» кончило холодную войну').toBe(true)
+
     await game.fire('PlayerSays', { intent: 'sorry', tone: 'polite' })
 
     expect(game.S.mem.vendetta, 'сход снят').toBe(false)
@@ -132,6 +137,8 @@ describe('«Вендетта» — терминальный финал груб�
     const { game } = makeGame()
     game.S.mem.vendetta = true
     game.S.mem['count.rudeAfterVendetta'] = CHRONIC_RUDE_AFTER_VENDETTA - 1
+    // #1570: цена выхода оплачена дважды — первое «прости» только называет её
+    await game.fire('PlayerSays', { intent: 'sorry', tone: 'polite' })
     await game.fire('PlayerSays', { intent: 'sorry', tone: 'polite' })
 
     for (let i = 0; i < 3; i++) await game.send({ text: 'АЛИК!!! ТЫ ВРЁШЬ!!!', tone: 'rude' })
