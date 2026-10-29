@@ -287,8 +287,8 @@ export class Game {
     }
     // Незаконченные вступление/просьба — до пачки непрочитанных: иначе opening рвётся away-burst (#248/#358).
     // Просьба «займи 50» есть у обеих групп: в выплате её говорит Алик, во вражде — мама (#1557).
-    if (this.S.mem[memkeys.endgame.active]
-      && (!this.S.mem[memkeys.endgame.intro] || !this.S.mem[memkeys.lend50.asked])) {
+    const opening = !this.S.mem[memkeys.endgame.intro] || !this.S.mem[memkeys.lend50.asked]
+    if (this.S.mem[memkeys.endgame.active] && opening) {
       this.ui.busy = true
       this.S.choices = []
       const outcome = String(this.S.mem[memkeys.paydayScene] ?? 'default')
