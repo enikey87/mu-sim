@@ -2165,8 +2165,8 @@ export class Game {
     // поимка сюжетного противоречия — добавочный вариант: обещает поимку и не отнимает вопрос у сериала
     if (plotLie) {
       const r = collected.find((x) => x.name === 'Opt_CatchLie')
-      const c = r?.offer?.(this.rules.ctx(this, r, { event: 'BuildChoices' }, facts))
-      if (c) out.push(c)
+      const catchOpt = r?.offer?.(this.rules.ctx(this, r, { event: 'BuildChoices' }, facts))
+      if (catchOpt) out.push(catchOpt)
     }
     const P2 = (a: string, b: string) => this.playerLine(() => `${this.draw(a, D[a])} ${this.draw(b, D[b])}`)
     const one = (key: string, arr: readonly Entry<string>[]) => this.playerLine(() => this.draw(key, arr))
@@ -2813,7 +2813,7 @@ export class Game {
     const b = this.S.ledger.claims.find((c) => c.id === ep.bClaim)
     if (!a || !b) return null
     const o = this.claimVersion(a), n = this.claimVersion(b)
-    if (!o || !n) return null
+    if (o === null || n === null) return null
     const kind: LieKind = ep.subject === 'grandpa.life' ? 'grandpa'
       : ep.subject === 'customer.payment' ? 'customer'
         : ep.subject === 'niva.state' ? 'niva'
