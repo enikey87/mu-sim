@@ -33,7 +33,9 @@ import * as memkeys from '../content/memkeys'
 import {
   ARCHIVE_FRESH_DAYS,
   ENDGAME_ARCH, ENDGAME_ARCH_LIE, ENDGAME_CHOICES, ENDGAME_FALLBACK, ENDGAME_FORMALITIES, ENDGAME_GROUP, ENDGAME_INTRO, ENDGAME_JUBILEES,
-  ENDGAME_LEAVE, ENDGAME_MONEY, ENDGAME_MUTE, ENDGAME_OPEN, ENDGAME_RENAMES, ENDGAME_RETURNER_LINES, ENDGAME_RETURNERS, ENDGAME_VENDETTA, ENDGAME_ALIK_BACK,
+  ENDGAME_LEAVE, ENDGAME_MONEY, ENDGAME_MUTE, ENDGAME_OPEN, ENDGAME_RENAMES, ENDGAME_RETURNER_LINES, ENDGAME_RETURNERS, ENDGAME_ALIK_BACK,
+  ENDGAME_VENDETTA_APOLOGY, ENDGAME_VENDETTA_CHOICES, ENDGAME_VENDETTA_FORMALITIES, ENDGAME_VENDETTA_GROUP, ENDGAME_VENDETTA_LEAVE,
+  ENDGAME_VENDETTA_OPEN, ENDGAME_VENDETTA_RENAMES,
   EPILOGUE_BANNER,
   LEND50_ASK, LEND50_ASK_AGAIN, LEND50_CHOICES, LEND50_LINK, LEND50_MEMORY, LEND50_NO, LEND50_NUNE, LEND50_RENAME, LEND50_SERIOUS, LEND50_SERIOUS_ELSE, LEND50_SYS, LEND50_TG_SYS, LEND50_VK_SYS, LEND50_YA_SYS, LEND50_YES,
 } from '../content/endgame'
@@ -284,8 +286,10 @@ export class Game {
       this.S.mem[memkeys.endgame.intro] = true
     }
     // Незаконченные вступление/просьба — до пачки непрочитанных: иначе opening рвётся away-burst (#248/#358).
+    // В эпилоге вражды просьбы «займи 50» нет: вступление кончается на репликах группы (#1556).
     if (this.S.mem[memkeys.endgame.active]
-      && (!this.S.mem[memkeys.endgame.intro] || !this.S.mem[memkeys.lend50.asked])) {
+      && (!this.S.mem[memkeys.endgame.intro]
+        || (!this.S.mem[memkeys.endgame.vendetta] && !this.S.mem[memkeys.lend50.asked]))) {
       this.ui.busy = true
       this.S.choices = []
       const outcome = String(this.S.mem[memkeys.paydayScene] ?? 'default')
@@ -2120,8 +2124,11 @@ export class Game {
     // «займи 50»: кнопки — факт сцены (asked без answer), а не разовая запись в S.choices (#219)
     if (S.mem[memkeys.endgame.active]) {
       // Ни обычные действия группы, ни ответы на просьбу не появляются раньше её системной пометки (#358).
-      if (!S.mem[memkeys.endgame.intro] || !S.mem[memkeys.lend50.asked]) return []
-      if (S.mem[memkeys.lend50.asked] && !S.mem[memkeys.lend50.answer]) return LEND50_CHOICES.map((c) => ({ ...c }))
+      if (!S.mem[memkeys.endgame.intro]) return []
+      // Эпилог вражды (#1556): своя группа и свой цикл, просьбы «займи 50» в нём нет.
+      if (S.mem[memkeys.endgame.vendetta]) return ENDGAME_VENDETTA_CHOICES.map((c) => ({ ...c }))
+      if (!S.mem[memkeys.lend50.asked]) return []
+      if (!S.mem[memkeys.lend50.answer]) return LEND50_CHOICES.map((c) => ({ ...c }))
       return ENDGAME_CHOICES.map((c) => ({ ...c }))
     }
     if (S.scene) {
@@ -3046,32 +3053,57 @@ export class Game {
     this.S.ending = null
     // вход в эндгейм: вступление, потом просьба «займи 50»; формальности — AlikAway/Idle при висящей просьбе (#321)
     const outcome = id === null ? null : paydayOutcome(id)
-    if (outcome && !this.S.mem[memkeys.endgame.active]) {
+    // «Вендетта» — терминальная концовка грубого пути (#1556): свой эпилог вражды вместо Дня выплаты
+    if (id === 'vendetta' && !this.S.mem[memkeys.endgame.active]) {
+      try { await this.startVendettaEndgame() } catch (e) { this.swallowDisposed(e) }
+    } else if (outcome && !this.S.mem[memkeys.endgame.active]) {
       try { await this.startEndgame(outcome) } catch (e) { this.swallowDisposed(e) }
     }
     this.save()
     this.emit()
   }
 
-  private async startEndgame(outcome: PaydayId): Promise<void> {
+  /** Заморозка мира на входе в эндгейм — общая для всех исходов: события сняты, сцена забыта, простоя нет. */
+  private freezeWorld(): void {
     const S = this.S
+    S.mem[memkeys.endgame.active] = true
+    S.mem[memkeys.endgame.started] = S.day
+    S.mem[memkeys.endgame.forms] = 0
+    S.mem[memkeys.endgame.exits] = 0
+    S.mem[memkeys.endgame.mutes] = 0
+    S.mem[memkeys.endgame.renames] = 0
+    this.clearScene(true)
+    S.offlineDays = 0
+    S.rules.schedule = S.rules.schedule.filter((item) => item.kind !== 'event')
+    S.choices = [] // до системной пометки просьбы кнопок нет
+    this.save()
+    this.emit()
+  }
+
+  private async startEndgame(outcome: PaydayId): Promise<void> {
     track('endgame', { outcome })
     // Пока вступление и просьба — busy: иначе кнопки эндгейма и таймеры вклиниваются в цепочку.
     this.ui.busy = true
     try {
-      S.mem[memkeys.endgame.active] = true
-      S.mem[memkeys.endgame.started] = S.day
-      S.mem[memkeys.endgame.forms] = 0
-      S.mem[memkeys.endgame.exits] = 0
-      S.mem[memkeys.endgame.mutes] = 0
-      S.mem[memkeys.endgame.renames] = 0
-      this.clearScene(true)
-      S.offlineDays = 0
-      S.rules.schedule = S.rules.schedule.filter((item) => item.kind !== 'event')
-      S.choices = [] // до системной пометки просьбы кнопок нет
+      this.freezeWorld()
+      await this.completeEndgameOpening(outcome)
+    } finally {
+      if (!this.disposed) this.ui.busy = false
       this.save()
       this.emit()
-      await this.completeEndgameOpening(outcome)
+    }
+  }
+
+  /**
+   * Эпилог вражды (#1556): терминальный, без Дня выплаты и его группы. Мир заморожен той же
+   * заморозкой, а поток свой — группа «ВРАЖДА ЗАКРЫТА» и пулы вражды вместо финансовых.
+   */
+  private async startVendettaEndgame(): Promise<void> {
+    this.ui.busy = true
+    try {
+      this.S.mem[memkeys.endgame.vendetta] = true
+      this.freezeWorld()
+      await this.completeEndgameOpening('vendetta')
     } finally {
       if (!this.disposed) this.ui.busy = false
       this.save()
@@ -3095,6 +3127,7 @@ export class Game {
   }
 
   private async completeEndgameOpening(outcome: string): Promise<void> {
+    if (this.S.mem[memkeys.endgame.vendetta]) return this.completeVendettaOpening()
     if (!this.S.mem[memkeys.endgame.intro]) {
       this.stripIncompleteEndgameIntro()
       await this.deliverEndgameIntro(outcome)
@@ -3125,8 +3158,35 @@ export class Game {
     await this.sleep(500)
     this.sys('Алик добавил вас')
     this.save()
-    const intro = S.endings.vendetta ? ENDGAME_VENDETTA : ENDGAME_INTRO[outcome] ?? ENDGAME_FALLBACK
+    const intro = ENDGAME_INTRO[outcome] ?? ENDGAME_FALLBACK
     for (const text of [...ENDGAME_OPEN, intro]) await this.endgameLine(text)
+    S.mem[memkeys.endgame.intro] = true
+    S.choices = []
+    this.save()
+  }
+
+  /** Вступление эпилога вражды: та же цепочка (баннер, группа, добавление) и свои реплики (#1556). */
+  private async completeVendettaOpening(): Promise<void> {
+    if (!this.S.mem[memkeys.endgame.intro]) {
+      this.stripIncompleteEndgameIntro()
+      await this.deliverVendettaIntro()
+      await this.sleep(1500)
+    }
+    // null, а не []: buildChoices отдаст кнопки группы вражды (просьбы «займи 50» здесь нет)
+    this.S.choices = null
+  }
+
+  private async deliverVendettaIntro(): Promise<void> {
+    const S = this.S
+    this.sys(EPILOGUE_BANNER)
+    this.save()
+    await this.sleep(500)
+    this.sys(`Алик создал группу «${ENDGAME_VENDETTA_GROUP}»`)
+    this.save()
+    await this.sleep(500)
+    this.sys('Алик добавил вас')
+    this.save()
+    for (const text of ENDGAME_VENDETTA_OPEN) await this.endgameLine(text)
     S.mem[memkeys.endgame.intro] = true
     S.choices = []
     this.save()
@@ -3164,7 +3224,8 @@ export class Game {
   /** Убрать незавершённое вступление целиком: при повторе оно не дублируется и не остаётся оборванным. */
   private stripIncompleteEndgameIntro(): void {
     if (this.S.mem[memkeys.endgame.intro]) return
-    const marker = `Алик создал группу «${ENDGAME_GROUP}»`
+    const group = this.S.mem[memkeys.endgame.vendetta] ? ENDGAME_VENDETTA_GROUP : ENDGAME_GROUP
+    const marker = `Алик создал группу «${group}»`
     let at = -1
     for (let i = this.S.msgs.length - 1; i >= 0; i--) {
       const m = this.S.msgs[i]
@@ -3235,8 +3296,11 @@ export class Game {
 
   async endgameAction(action: 'money' | 'mute' | 'leave'): Promise<void> {
     const S = this.S
+    const vendetta = !!S.mem[memkeys.endgame.vendetta]
     S.ctx = null
     if (action === 'money') {
+      // в группе вражды вопроса о деньгах нет: «Где деньги?» звучит «Где извинения?» (#1556)
+      if (vendetta) { await this.say([this.draw('ENDGAME_VENDETTA_APOLOGY', ENDGAME_VENDETTA_APOLOGY)]); return }
       await this.say([this.archiveLine() ?? this.draw('ENDGAME_MONEY', ENDGAME_MONEY)])
       return
     }
@@ -3245,7 +3309,8 @@ export class Game {
       S.mem[memkeys.endgame.mutes] = mutes
       this.sys(mutes === 1 ? 'Вы отключили уведомления' : 'Уведомления снова включены. Кем — неизвестно. Вы отключили их ещё раз')
       await this.say([this.draw('ENDGAME_MUTE', ENDGAME_MUTE)])
-      const name = this.draw('ENDGAME_RENAMES', ENDGAME_RENAMES)
+      const renames = vendetta ? ENDGAME_VENDETTA_RENAMES : ENDGAME_RENAMES
+      const name = this.draw(vendetta ? 'ENDGAME_VENDETTA_RENAMES' : 'ENDGAME_RENAMES', renames)
       S.mem[memkeys.endgame.renames] = Number(S.mem[memkeys.endgame.renames] ?? 0) + 1
       this.sys(`Алик изменил название группы на «${name}»`)
       return
@@ -3253,6 +3318,12 @@ export class Game {
 
     S.mem[memkeys.endgame.exits] = Number(S.mem[memkeys.endgame.exits] ?? 0) + 1
     this.sys('Вы покинули группу')
+    // в группе вражды возвращателей-родни нет: держит не семья, а сама вражда (#1556)
+    if (vendetta) {
+      this.sys('Алик добавил вас обратно')
+      await this.say([this.draw('ENDGAME_VENDETTA_LEAVE', ENDGAME_VENDETTA_LEAVE)])
+      return
+    }
     const back = this.decks.pick('ENDGAME_RETURNERS', ENDGAME_RETURNERS, this.lineFacts())
     // noRefill: реплика возвращателя звучит один раз; исчерпав свой запас, он перестаёт возвращать
     const line = back ? this.decks.tryDraw(`ENDGAME_RETURNER.${back.who}`, ENDGAME_RETURNER_LINES[back.who], true) : null
@@ -3322,6 +3393,11 @@ export class Game {
   formalityLines(): Said[] {
     const n = Number(this.S.mem[memkeys.endgame.forms] ?? 0) + 1
     this.S.mem[memkeys.endgame.forms] = n
+    // эпилог вражды закрывается своими актами: архива Дня выплаты и юбилеев «формальностей» в нём нет (#1556)
+    if (this.S.mem[memkeys.endgame.vendetta]) {
+      const memory = this.line('LEND50_MEMORY', LEND50_MEMORY)
+      return [this.draw('ENDGAME_VENDETTA_FORMALITIES', ENDGAME_VENDETTA_FORMALITIES), ...(memory ? [memory] : [])]
+    }
     const archive = this.archiveLine()
     const jubilee = ENDGAME_JUBILEES[n]
     const memory = this.line('LEND50_MEMORY', LEND50_MEMORY)

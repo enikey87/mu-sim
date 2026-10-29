@@ -303,7 +303,8 @@ export const rudeSaysRules: R[] = [
   },
   // извинение через посредника, которого игрок выбрал (arg)
   ...([['boris', T.VIA_BORIS], ['karine', T.VIA_KARINE], ['mama', T.VIA_MAMA]] as const).map(([who, lines]): R => ({
-    name: 'Says_via_' + who, event: 'PlayerSays', when: [eq('intent', 'via'), eq('arg', who)], remember: [set(blocked, false), add(count.sorry), set(coldWar, false)],
+    // извинение через посредника — полный выход из вражды: снимает и холодную войну, и сход (#1556)
+    name: 'Says_via_' + who, event: 'PlayerSays', when: [eq('intent', 'via'), eq('arg', who)], remember: [set(blocked, false), add(count.sorry), set(coldWar, false), set(vendetta, false)],
     respond: async ({ game }) => { cooldown(game, 1); for (const [w, said] of lines) await game.say([w === 'alik' ? said : { w, t: saidText(said), claims: saidClaims(said) }]); game.sys('Алик Воздухонесян разблокировал вас'); game.setCtx(null) },
   })),
   {

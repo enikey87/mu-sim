@@ -547,13 +547,16 @@ describe('ранний финал «Кровный враг»', () => {
     await game.fire('CheckEnding')
     expect(game.S.ending).toBe('vendetta')
   })
-  it('извинение после схода остаётся выходом: хроника не даёт раннего финала', async () => {
+  it('извинение после схода — полный выход: вражда снята, хроника не растёт, развязки нет (#1556)', async () => {
     const { game } = makeGame()
     await toVendetta(game)
+    const chronicle = game.S.mem['count.rudeAfterVendetta']
+    game.S.mem['rude.heat'] = 0 // ссора остыла: извинение принимается текстом, а не ритуалом
     await game.send({ text: 'Прости, брат', tone: 'polite', act: 'sorry' })
     expect(game.S.mem['count.sorry'], 'извинение записано').toBe(1)
+    expect(game.S.mem.vendetta, 'сход снят извинением').toBe(false)
     await cry(game, CHRONIC_RUDE_AFTER_VENDETTA + 2)
-    expect(game.S.mem['count.rudeAfterVendetta']).toBeGreaterThan(CHRONIC_RUDE_AFTER_VENDETTA)
+    expect(game.S.mem['count.rudeAfterVendetta'], 'без схода хронике не с чего расти').toBe(chronicle)
     expect(game.S.ending, 'извинился — развязки нет').toBeNull()
   })
   it('без схода хроника не копится: сколько угодно криков — раннего финала нет', async () => {

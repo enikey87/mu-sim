@@ -64,7 +64,7 @@ localhost, `vite preview`, e2e, vitest и бот до этого условия 
 | `ending` | экран концовки открылся (`reachEnding`, `src/engine/game.ts`) | `id` — идентификатор из `ENDINGS`, не заголовок и не текст |
 | `collection` | новая для устройства концовка открылась | `n` — размер коллекции, как его считает досье; `id` концовки |
 | `copied` | нажата «Скопировать великую отмазку» (`src/ui/Overlays.tsx`) | `id` концовки |
-| `endgame` | группа после Дня выплаты создана (`startEndgame`) | `outcome` — тот же хвост, что у `payday_*` |
+| `endgame` | группа после Дня выплаты создана (`startEndgame`) | `outcome` — тот же хвост, что у `payday_*`. Эпилог вражды (`endgame.vendetta`, #1556) этой целью не считается: выплаты в нём не было, партию уже назвал `ending` с `id: vendetta` |
 | `left` | вкладка скрылась или страница закрывается, один раз, пока снова не показали | `phase`: `intro`, `chat`, `payday`, `endgame`; `day`; `turns`; `sec` — секунды, пока вкладка была видна; `total` — сумма таких секунд в этом браузере |
 | `crash` | падение отрисовки (граница в `src/ui/App.tsx`) или глобальная ошибка страницы (`window.onerror`/`unhandledrejection` в `src/main.tsx`) | `kind`: `ui` или `global`; `name` — имя ошибки; `stack` — кадры стека без первой строки, до 2 КБ; `day`; `platform` |
 | `lend50_shown` | карточка «займи 50» добавлена в ленту, одна на партию | `platform`: `web`, `yandex`, `vk`, `telegram` |

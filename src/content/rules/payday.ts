@@ -3,7 +3,7 @@ import type { ContentApi } from '../../engine/game'
 import { type Rule, eq, gte, is, exists, missing, set, during, lt } from '../fact'
 import type { GameEvent, Offer } from './events'
 import { SOURCES, SOURCES_TOPUP, ROLL, CLAIMS, COINS_BRIDGE_CATCHES, DETECTIVE_CLAIMS, DETECTIVE_CHAIN, DETECTIVE_CATCHES, detectiveDue, GRAND, GRAND_FALLBACK, SLOTS, CONTRADICTIONS, MORNING_CONTRA, OUTCOME, LEAD, type Source, type Call, type Claim, type Lead } from '../payday'
-import { alikDead, caughtUnique, cryptoHodl, payday as pd, paydayScene, taxFrozen, taxThawed } from '../memkeys'
+import { alikDead, caughtUnique, cryptoHodl, payday as pd, paydayScene, taxFrozen, taxThawed, vendetta } from '../memkeys'
 import { samvelLine } from '../world'
 
 type R = Rule<ContentApi, GameEvent, Offer>
@@ -183,39 +183,41 @@ async function sayLead(game: ContentApi, first: boolean): Promise<boolean> {
 export const paydayRules: R[] = [
   // подводка (#893): перед анонсом — два штриха из идущих линий, по одному в день. Пути повторяют
   // пути анонса: раньше третьего акта штрихов нет, а объявление выплаты — не раньше двух штрихов.
+  // Объявленная вражда (`vendetta`) закрывает весь День выплаты: грубый путь кончается «Вендеттой»
+  // и своим эпилогом, деньги род не возвращает (#1556). Извинение снимает вражду и возвращает выплату.
   {
-    name: 'Beat_PaydayLead_First', event: 'StoryBeat', when: [gte('day', 330), gte('arcsDone', 3), missing(pd.lead), missing(pd.at), missing(paydayScene), missing(alikDead)],
+    name: 'Beat_PaydayLead_First', event: 'StoryBeat', when: [gte('day', 330), gte('arcsDone', 3), missing(pd.lead), missing(pd.at), missing(paydayScene), missing(alikDead), missing(vendetta)],
     priority: 'chatter', respond: ({ game }) => sayLead(game, true),
   },
   {
-    name: 'Beat_PaydayLead_Late', event: 'StoryBeat', when: [gte('day', 420), gte('sent', 150), missing(pd.lead), missing(pd.at), missing(paydayScene), missing(alikDead)],
+    name: 'Beat_PaydayLead_Late', event: 'StoryBeat', when: [gte('day', 420), gte('sent', 150), missing(pd.lead), missing(pd.at), missing(paydayScene), missing(alikDead), missing(vendetta)],
     priority: 'chatter', respond: ({ game }) => sayLead(game, true),
   },
   // дедлайн (#1119): за два дня до PAYDAY_HARD_DAY подводка стартует без условий — ни арок, ни 150 сообщений не нужно
   {
-    name: 'Beat_PaydayLead_Deadline', event: 'StoryBeat', when: [gte('day', PAYDAY_HARD_DAY - 2), missing(pd.lead), missing(pd.at), missing(paydayScene), missing(alikDead)],
+    name: 'Beat_PaydayLead_Deadline', event: 'StoryBeat', when: [gte('day', PAYDAY_HARD_DAY - 2), missing(pd.lead), missing(pd.at), missing(paydayScene), missing(alikDead), missing(vendetta)],
     priority: 'chatter', respond: async ({ game }) => { game.applyFacts([set(pd.surrender, true)]); await sayLead(game, true) },
   },
   {
-    name: 'Beat_PaydayLead_Second', event: 'StoryBeat', when: [exists(pd.lead), lt(pd.signs, 2), missing(pd.signToday), missing(pd.at), missing(paydayScene), missing(alikDead)],
+    name: 'Beat_PaydayLead_Second', event: 'StoryBeat', when: [exists(pd.lead), lt(pd.signs, 2), missing(pd.signToday), missing(pd.at), missing(paydayScene), missing(alikDead), missing(vendetta)],
     priority: 'chatter', respond: ({ game }) => sayLead(game, false),
   },
   // запуск: третий акт — когда сошлись линии (3+ законченных сериала после 330-го дня) или просто поздно,
   // но только после подводки: два штриха уже сыграны
   {
-    name: 'Beat_Payday', event: 'StoryBeat', when: [gte('day', 330), gte('arcsDone', 3), missing(paydayScene), missing(pd.at), missing(alikDead), gte(pd.signs, 2)], bonus: 10, once: true, priority: 'cinematic',
+    name: 'Beat_Payday', event: 'StoryBeat', when: [gte('day', 330), gte('arcsDone', 3), missing(paydayScene), missing(pd.at), missing(alikDead), gte(pd.signs, 2), missing(vendetta)], bonus: 10, once: true, priority: 'cinematic',
     respond: ({ game }) => resumePayday(game),
   },
   // условия Дня выплаты — в when, а не в respond: промолчавшее правило остаётся в пуле (разовый шанс
   // не тратится) и после выплаты перехватывало бы каждый StoryBeat, ничего не говоря
   {
-    name: 'Beat_Payday_Late', event: 'StoryBeat', when: [gte('day', 420), gte('sent', 150), missing(alikDead), missing(paydayScene), missing(pd.at), gte(pd.signs, 2)], bonus: 9, once: true, priority: 'cinematic',
+    name: 'Beat_Payday_Late', event: 'StoryBeat', when: [gte('day', 420), gte('sent', 150), missing(alikDead), missing(paydayScene), missing(pd.at), gte(pd.signs, 2), missing(vendetta)], bonus: 9, once: true, priority: 'cinematic',
     respond: ({ game }) => resumePayday(game),
   },
   // дедлайн (#1119): безусловный запуск после двух штрихов — инвариант «партия не длиннее PAYDAY_HARD_DAY (+окно подводки)»;
   // бонус 11 выше красивых путей: если сошлись оба, говорит капитуляция
   {
-    name: 'Beat_Payday_Deadline', event: 'StoryBeat', when: [gte('day', PAYDAY_HARD_DAY), gte(pd.signs, 2), missing(alikDead), missing(paydayScene), missing(pd.at)], bonus: 11, once: true, priority: 'cinematic',
+    name: 'Beat_Payday_Deadline', event: 'StoryBeat', when: [gte('day', PAYDAY_HARD_DAY), gte(pd.signs, 2), missing(alikDead), missing(paydayScene), missing(pd.at), missing(vendetta)], bonus: 11, once: true, priority: 'cinematic',
     respond: ({ game }) => resumePayday(game),
   },
   // иерархия исходов — бонусами специфичности, а не числом условий:
