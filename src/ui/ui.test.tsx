@@ -1988,15 +1988,38 @@ describe('усы: аватар без усов, пока верен факт с�
     expect(avatar().textContent).toBe('А')
   })
 
-  it('баран важнее: на аватаре-баране сбритие не показывается', () => {
+  it('бритьё перекрывает барана: оба факта — на аватаре «без усов» (#1547)', () => {
     const { game } = makeGame()
     game.S.ram = true
     game.S.mem['alik.shaved'] = true
+    const view = renderApp(game)
+    expect(avatar().className).toContain('shaved')
+    expect(avatar().className).not.toContain('ram')
+    expect(avatar().querySelector('.shaved-cap')!.textContent).toBe('без усов')
+    expect(avatar().textContent).toBe('Абез усов')
+    expect(avatar()).toHaveAttribute('aria-label', 'Алик без усов')
+    view.unmount()
+    delete game.S.mem['alik.shaved']
     renderApp(game)
     expect(avatar().className).toContain('ram')
     expect(avatar().className).not.toContain('shaved')
     expect(avatar().querySelector('.shaved-cap')).toBeNull()
     expect(avatar().textContent).toBe('🐏')
+    expect(avatar()).not.toHaveAttribute('aria-label')
+  })
+
+  it('поздний баран не перекрывает бритьё: факт бритья старше в партии, аватар всё равно «без усов» (#1547)', () => {
+    const { game } = makeGame()
+    game.S.mem['alik.shaved'] = true
+    const view = renderApp(game)
+    view.unmount()
+    game.S.ram = true
+    game.S.mem['ram.photoAt'] = game.S.stats.sent + 1
+    renderApp(game)
+    expect(avatar().className).toContain('shaved')
+    expect(avatar().className).not.toContain('ram')
+    expect(avatar().querySelector('.shaved-cap')).not.toBeNull()
+    expect(avatar().textContent).not.toBe('🐏')
   })
 })
 

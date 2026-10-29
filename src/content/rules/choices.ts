@@ -4,7 +4,7 @@ import type { ContentApi } from '../../engine/game'
 import type { Choice, Tone } from '../../engine/state'
 import { type Rule, type Facts, type Criterion, type Entry, type Line, eq, ne, is, exists, missing, gt, gte, lte, isOpen, spec, valueOf, sinceWithin } from '../fact'
 import type { GameEvent, Offer } from './events'
-import { D, cap, WHEN_YEARS, EVENT_FRESH_TURNS, PHOTO_FRESH_TURNS } from '../excuses'
+import { D, cap, WHEN_YEARS, WHEELS_ASK, EVENT_FRESH_TURNS, PHOTO_FRESH_TURNS } from '../excuses'
 import { talkPairs, talkId, rubikProposalPairs } from '../talk'
 import { ARCS, WRONG_Q } from '../arcs'
 import * as L from '../life'
@@ -26,6 +26,7 @@ import {
   P_CREW_CALL, P_LAWYER, P_COLLECTORS_ASK, P_INTERN, P_HOLE, P_COUNTERSUIT,
   P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_BORIS, P_DEBUT_NIVA, P_NUNE_DEBUT, P_DEBUT_GRANT, P_GRANT_TILE, P_MOUSTACHE_PHOTO, P_MAMA_MARKET, P_TILE_AD, P_TAMADA_DONE, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_COURT_VERDICT, P_TILE_SLIP, P_TILE_COURT, P_TILE_LAWYER, P_TILE_MONUMENT, P_NIVA_BACK, P_SOLD, P_GRANT_HOUSE, P_BORIS_MEMORY, P_SERYOGA, P_GRANT_BATH, P_OFFENDED_ASK, P_BATH_ASK, P_MUEN, P_INH_BURNED, P_INH_REFUSED,
   P_HH_JOB, P_SERYOGA_LOAN, P_DACHA_ASK, P_EVICT, P_COLLECTORS_ECHO, P_THREAT_GOV, P_FRAUD_CARD,
+  P_KONVERTY,
 } from './player-choice-pools'
 
 type R = Rule<ContentApi, GameEvent, Offer>
@@ -474,6 +475,10 @@ export const choiceRules: R[] = [
       when({ name: 'WhenFar', when: [...term, eq('ctx.whenHorizon', 'veryFar')], act: 'promiseFar', tone: 'neutral', text: (g, f) => fromD(g, 'P_WHEN_FAR', args(f)), arg: (_g, f) => String(f['ctx.when']) }),
       ...(['never', 'absurd'] as const).map((kind) => {
         let years = false
+        // колёсный вопрос (#1549): ответ ищется по показанной строке, а не по тексту обещания —
+        // так же, как «Лет двадцать?» (#951/#1022). Новой строке пула нужен свой ответ, иначе её
+        // получает философский пул «никогда».
+        let wheels = false
         return when({
           name: `When_${kind}`, when: [...term, eq('ctx.whenKind', kind)], act: 'promiseNever', tone: 'neutral',
           text: (g, f) => {
@@ -486,9 +491,10 @@ export const choiceRules: R[] = [
             // оставляла её ответ на совсем другой реплике — никогда-эхо получало ответ про двадцать лет (#1022).
             // Украшение реплики (обращение спереди, суффикс сзади) строку не отменяет — отсюда сверка по вхождению.
             years = line.toLowerCase().includes(WHEN_YEARS.toLowerCase())
+            wheels = line.toLowerCase().includes(WHEELS_ASK.toLowerCase())
             return line
           },
-          arg: (_g, f) => (years ? 'years' : String(f['ctx.when'])),
+          arg: (_g, f) => (wheels ? 'wheels' : years ? 'years' : String(f['ctx.when'])),
         })
       }),
       // плавающий событийный срок (#1002): достижимое событие мира — свои варианты вместо never-эха
@@ -563,6 +569,18 @@ export const choiceRules: R[] = [
     text: (g, f) => { const key = 'F_' + f['ctx.arc']; const arr = ARCS[String(f['ctx.arc'])].follow; return g.freshPlayer(key, arr) ?? '' }, arg: (_g, f) => String(f['ctx.arc']),
     topic: (_g, f) => `arc:${String(f['ctx.arc'])}`,
   }),
+  // конвертный вопрос свадьбы Самвела (#1549): строка ссылается на живой факт легенды, поэтому ответ —
+  // пара к строке (`KONVERTY_B`), а не следующая серия. Специфичность выше Arc: пока окно строки открыто,
+  // блок берёт вопрос с ответом; окно прошло — слот возвращается обычному «как там».
+  ...(() => {
+    let arg = ''
+    return [offer({
+      name: 'Konverty', when: [eq('ctx.arc', 'samvel'), is('heard.samvel_envelopes'), missing(alikDead)],
+      act: 'konverty', tone: 'neutral', bonus: 2, topic: () => 'arc:samvel',
+      text: (g) => freshFromArrNum(g, 'P_KONVERTY', P_KONVERTY, (i) => { arg = String(i) }),
+      arg: () => arg,
+    })]
+  })(),
   // дело в суде открыто — игрок может его продолжить (угроза двигает линию суда);
   // выбранная строка «до самого Страсбурга» уходит с arg — судовая ветка ставит по ней факт оглашения (#982)
   ...(() => {
