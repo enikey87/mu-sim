@@ -455,14 +455,24 @@ describe('«Займи 50»', () => {
     expect(game.S.mem['lend50.answer']).toBeUndefined()
   })
 
-  it('Telegram: карточка Stars-покупки без ссылки и без рублёвой суммы, спонсорское имя по успеху (#1235)', async () => {
-    const { game } = makeGame({ externalPay: false, pay50: 'telegram' })
+  it('Telegram: Stars-карточка и следом донат-карточка DA, спонсорское имя по успеху Stars (#1235, #1533)', async () => {
+    const { game } = makeGame({ externalPay: true, pay50: 'telegram' })
     const from = await enter(game)
-    const card = cards(game, from)[0]
-    expect(card).toMatchObject({ text: LEND50_TG_SYS, stars: true })
-    expect(card.link, 'внешней платёжной ссылки в Telegram нет').toBeUndefined()
-    expect(card.buy, 'инап-карточка Яндекса — не telegram').toBeUndefined()
-    expect(JSON.stringify(game.S.msgs.slice(from)), 'в Telegram внешней ссылки DonationAlerts нет').not.toContain('donationalerts')
+    // решение оператора 29.10 (#1533): Stars «как теперь» и следом донат-карточка с внешней ссылкой
+    const list = cards(game, from)
+    expect(list).toHaveLength(2)
+    const [stars, donate] = list
+    expect(stars).toMatchObject({ text: LEND50_TG_SYS, stars: true })
+    expect(stars.link, 'Stars-карточка — кнопка инвойса, без ссылки').toBeUndefined()
+    expect(stars.buy, 'инап-карточка Яндекса — не telegram').toBeUndefined()
+    expect(donate).toMatchObject({ text: LEND50_SYS, link: LEND50_LINK })
+    expect(donate.stars, 'донат-карточка — не Stars-покупка').toBeUndefined()
+    // лента не рвётся: карточки идут подряд, и текст каждой — свой
+    const first = atOf(game, (m) => m.kind === 'lend50', from)
+    expect(game.S.msgs[first], 'первой — Stars, как было').toBe(stars)
+    expect(game.S.msgs[first + 1], 'донат-карточка идёт следом, без разрыва ленты').toBe(donate)
+    expect(new Set(list.map((m) => m.text)).size, 'дублей текста нет').toBe(2)
+    expect(sysTexts(game, from)).not.toContain(LEND50_SYS)
     expect(game.S.mem['lend50.answer'], 'покупка — не ответ на шутку').toBeUndefined()
     expect(game.choices.map((c) => c.act)).toEqual(['lend50Yes', 'lend50Serious', 'lend50No'])
 

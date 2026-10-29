@@ -143,15 +143,26 @@ export const Message = memo(function Message({ m }: { m: Msg }) {
   )
 })
 
-/** Честная просьба поддержать автора: одна карточка в цвете перевода, кнопка-ссылка вместо голого адреса (#616).
- *  Текст — голос игры (не пузырь Алика), сумма — крупно, как в переводе; адрес видно мелким текстом. */
+/** Честная просьба поддержать автора: карточка в цвете перевода, кнопка-ссылка вместо голого адреса (#616).
+ *  Текст — голос игры (не пузырь Алика), сумма — крупно, как в переводе; адрес видно мелким текстом.
+ *  В Telegram рядом стоит Stars-карточка, а донат-ссылка идёт санкционированным входом клиента (#1533). */
 function Lend50Card({ m, link }: { m: Extract<Msg, { kind: 'lend50' }>; link: string }) {
+  /** Клик — единственный след доната: ссылка ведёт наружу, оплату игра не подтверждает и не знает (#1533). */
+  const click = (e: ReactMouseEvent<HTMLAnchorElement>) => {
+    const p = platform()
+    track('lend50_clicked', { platform: p.id })
+    // в Mini App обычный переход по ссылке клиент не открывает: открываем входом клиента, а без моста —
+    // окном браузера. На вебе моста нет, и ссылка работает как обычная.
+    if (!p.openLink) return
+    e.preventDefault()
+    if (!p.openLink(link)) window.open(link, '_blank', 'noopener')
+  }
   return (
     <div className="lend50 transfer" data-testid="lend50-card">
       <div className="sum">50 ₽</div>
       <div>{m.text}</div>
       <a className="lend50-btn" href={link} target="_blank" rel="noopener"
-        onClick={() => track('lend50_clicked', { platform: platform().id })}>Перевести</a>
+        onClick={click}>Перевести</a>
       <div className="lend50-url">{link}</div>
     </div>
   )

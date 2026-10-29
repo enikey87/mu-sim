@@ -46,7 +46,7 @@ describe('адаптер Telegram Mini App (#1234)', () => {
     expect(disableVerticalSwipes, 'свайп вниз не должен закрывать игру посреди хода').toHaveBeenCalledOnce()
     expect(requestFullscreen).toHaveBeenCalledOnce()
     expect(p.id).toBe('telegram')
-    expect(p.externalPay, 'внешняя платёжная ссылка в Telegram запрещена').toBe(false)
+    expect(p.externalPay, 'внешняя ссылка DonationAlerts — решение оператора 29.10 (#1533)').toBe(true)
   })
 
   it('WebApp уже есть — скрипт не грузится вовсе', async () => {
@@ -93,12 +93,14 @@ describe('адаптер Telegram Mini App (#1234)', () => {
     expect(document.documentElement.dataset.theme).toBe('dark')
   })
 
-  it('скрипт не доехал или клиент старый — старт не падает и внешней ссылки не возвращает', async () => {
+  it('скрипт не доехал или клиент старый — старт не падает', async () => {
     const p = telegramPlatform({ load: async () => { throw new Error('blocked by network') } })
     await expect(p.init(), 'блокировщик не оставляет белый экран').resolves.toBeUndefined()
     expect(() => { p.ready(); p.gameplayStart(); p.gameplayStop() }).not.toThrow()
     expect(p.id).toBe('telegram')
-    expect(p.externalPay).toBe(false)
+    // донат-карточка в сборке есть и без SDK: ссылку откроет окно браузера, а не клиент (#1533)
+    expect(p.externalPay).toBe(true)
+    expect(p.openLink?.('https://www.donationalerts.com/r/enikey87'), 'моста нет — фолбэк окна браузера').toBe(false)
 
     // клиент без новых методов (Bot API < 7.7): необязательные вызовы не бросают
     tg({ colorScheme: 'dark', ready: () => { throw new Error('closed') } })
@@ -111,7 +113,7 @@ describe('адаптер Telegram Mini App (#1234)', () => {
     const done = p.init()
     await vi.advanceTimersByTimeAsync(8000)
     await expect(done).resolves.toBeUndefined()
-    expect(p.externalPay).toBe(false)
+    expect(p.externalPay).toBe(true)
   })
 
   it('уже фуллскрин — второй раз не просим', async () => {
@@ -203,6 +205,30 @@ describe('адаптер Telegram Mini App (#1234)', () => {
     }
   })
 
+  it('внешняя ссылка — санкционированным входом клиента, а не окном из WebView (#1533)', async () => {
+    const link = 'https://www.donationalerts.com/r/enikey87'
+    const openLink = vi.fn()
+    tg({ openLink })
+    const p = telegramPlatform({ load: async () => {} })
+    await p.init()
+    expect(p.openLink?.(link)).toBe(true)
+    expect(openLink, 'точный адрес ссылки, без пересборки').toHaveBeenCalledWith(link)
+    expect(openLink.mock.contexts[0], 'вызов — у клиента, а не отвязанной функцией').toEqual({ openLink })
+  })
+
+  it('без openLink, на старом клиенте или при отказе — фолбэк окна браузера (#1533)', async () => {
+    const link = 'https://www.donationalerts.com/r/enikey87'
+    // старый клиент (до Bot API 6.1): метода нет
+    tg({})
+    expect(telegramPlatform({ load: async () => {} }).openLink?.(link)).toBe(false)
+    // клиент отказал на вызове — отказ не всплывает
+    tg({ openLink: () => { throw new Error('closed by client') } })
+    expect(telegramPlatform({ load: async () => {} }).openLink?.(link)).toBe(false)
+    // SDK не доехал вовсе: Telegram.WebApp нет
+    delete (window as unknown as { Telegram?: unknown }).Telegram
+    expect(telegramPlatform({ load: async () => {} }).openLink?.(link)).toBe(false)
+  })
+
   it('VITE_PLATFORM=telegram выбирает сборку Mini App', async () => {
     tg({ colorScheme: 'dark' })
     vi.resetModules()
@@ -212,7 +238,7 @@ describe('адаптер Telegram Mini App (#1234)', () => {
       const p = await fresh.bootPlatform()
       expect(p.id).toBe('telegram')
       expect(fresh.platform().id).toBe('telegram')
-      expect(p.externalPay).toBe(false)
+      expect(p.externalPay).toBe(true)
     } finally {
       vi.unstubAllEnvs()
       vi.resetModules()

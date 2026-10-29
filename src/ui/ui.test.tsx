@@ -479,7 +479,7 @@ describe('App', () => {
       renderApp(game)
       const card = screen.getByTestId('lend50-card')
       expect(within(card).getByText(LEND50_TG_SYS)).toBeInTheDocument()
-      expect(within(card).queryByRole('link'), 'внешней платёжной ссылки в Telegram нет').toBeNull()
+      expect(within(card).queryByRole('link'), 'Stars-карточка — кнопка инвойса, без внешней ссылки').toBeNull()
       expect(within(card).queryByText(/donationalerts/i)).toBeNull()
       expect(within(card).queryByText('50 ₽'), 'платят звёздами, а не рублями — суммы в рублях на карточке нет').toBeNull()
 
@@ -508,6 +508,55 @@ describe('App', () => {
       expect(game.S.mem['lend50.sponsor']).toBeUndefined()
       expect(screen.queryByText(`Алик изменил название группы на «${LEND50_RENAME}»`)).toBeNull()
       expect(screen.getByRole('button', { name: 'Купить «Чашку хаша»' })).toBeInTheDocument()
+    } finally {
+      adoptPlatform(webPlatform())
+    }
+  })
+
+  it('Telegram: обе карточки — Stars и донат, DA-клик идёт openLink и остаётся только кликом (#1533)', async () => {
+    const openLink = vi.fn(() => true)
+    const pay50 = vi.fn(async () => 'closed' as const)
+    adoptPlatform({ ...webPlatform(), id: 'telegram', externalPay: true, pay50, openLink })
+    try {
+      const { game } = makeGame()
+      // лента эндгейма TG: Stars-карточка и следом донат-карточка (решение оператора 29.10, #1533)
+      game.push({ kind: 'lend50', text: LEND50_TG_SYS, stars: true })
+      game.push({ kind: 'lend50', text: LEND50_SYS, link: LEND50_LINK })
+      renderApp(game)
+      const feed = screen.getAllByTestId('lend50-card')
+      expect(feed, 'в Mini App обе карточки: Stars и донат').toHaveLength(2)
+      expect(within(feed[0]).getByRole('button', { name: 'Купить «Чашку хаша»' })).toBeInTheDocument()
+      expect(within(feed[0]).queryByRole('link'), 'Stars — кнопка инвойса, внешней ссылки нет').toBeNull()
+      const link = within(feed[1]).getByRole('link', { name: 'Перевести' })
+      expect(link).toHaveAttribute('href', LEND50_LINK)
+
+      const open = vi.spyOn(window, 'open').mockReturnValue(null)
+      try {
+        await act(async () => { fireEvent.click(link) })
+        expect(openLink, 'ссылка открывается входом клиента, а не переходом WebView').toHaveBeenCalledWith(LEND50_LINK)
+        expect(open, 'мост клиента сработал — окно браузера не нужно').not.toHaveBeenCalled()
+        expect(pay50, 'донат — внешняя ссылка, покупку Stars клик не зовёт').not.toHaveBeenCalled()
+        expect(screen.queryByText('Спасибо! Оплата прошла'), 'оплату DA игра не подтверждает').toBeNull()
+        expect(game.S.mem['lend50.sponsor'], 'клик не выдаёт спонсорское имя').toBeUndefined()
+      } finally { open.mockRestore() }
+    } finally {
+      adoptPlatform(webPlatform())
+    }
+  })
+
+  it('Telegram без SDK: DA-клик уходит в окно браузера, а не теряется (#1533)', async () => {
+    const openLink = vi.fn(() => false)
+    adoptPlatform({ ...webPlatform(), id: 'telegram', externalPay: true, openLink })
+    try {
+      const { game } = makeGame()
+      game.push({ kind: 'lend50', text: LEND50_SYS, link: LEND50_LINK })
+      renderApp(game)
+      const open = vi.spyOn(window, 'open').mockReturnValue(null)
+      try {
+        await act(async () => { fireEvent.click(screen.getByRole('link', { name: 'Перевести' })) })
+        expect(openLink).toHaveBeenCalledWith(LEND50_LINK)
+        expect(open, 'фолбэк — окно браузера').toHaveBeenCalledWith(LEND50_LINK, '_blank', 'noopener')
+      } finally { open.mockRestore() }
     } finally {
       adoptPlatform(webPlatform())
     }
