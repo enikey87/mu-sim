@@ -4,6 +4,7 @@ import { makeGame, alikTexts } from '../test/helpers'
 import { ARCS, ARC_DONE, CAST } from './arcs'
 import { ACH } from './achievements'
 import { FINALES, ENDINGS, DEFAULT_FINALE, ENDING_MIN_DAY, CHRONIC_RUDE_AFTER_VENDETTA } from './finales'
+import { endingRules } from './rules/finales'
 import type { Game } from '../engine/game'
 import { valueOf } from '../engine/rules'
 import { NOTIF } from './life'
@@ -367,6 +368,21 @@ describe('концовки игры', () => {
     expect(await check(game), 'концовка до третьего акта').toBeNull()
     game.nextDay(1)
     expect(await check(game), 'третий акт начался — развязка ждать больше нечего').toBe('ram')
+  })
+  // #1545: окно смерти откладывает развязку, как и сюжетные биты (Beat_Payday* и др.) — смерть сильнее готовности
+  it('окно смерти откладывает концовку: при alikDead развязка не приходит (#1545)', async () => {
+    const { game } = late()
+    game.S.mem['finale.grant'] = 'ally'
+    game.S.mem.alik_dead = true
+    expect(await check(game), 'живой тон посреди окна смерти').toBeNull()
+    expect(game.S.endings.honest, 'экран концовки не показывался').toBeUndefined()
+    // НК: убрать missing(alikDead) из endingRules — здесь снова 'honest'
+    game.S.mem.alik_dead = false // эп. 4 арки «понял, что жив» снимает факт
+    expect(await check(game), 'окно закрылось — `once` отдаёт концовку сразу').toBe('honest')
+  })
+  it('гейт окна смерти стоит у каждой концовки — на классе, а не выборочно (#1545)', () => {
+    const open = endingRules.filter((r) => !r.when.some((c) => c.key === 'alik_dead' && c.op === '!exist'))
+    expect(open.map((r) => r.name), 'концовка без гейта обходит окно').toEqual([])
   })
   it('«Честные деньги» — один факт Гранта: ни Бориса, ни «Нивы»; сумма — из финала', async () => {
     const { game } = late()
