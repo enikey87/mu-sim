@@ -19,7 +19,7 @@ import * as L from '../life'
 import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, PROMISE_PENCIL, PROMISE_FAR, PROMISE_YEARS, KONAK_LINE } from '../misc'
 import { CREW_PAID } from '../crew'
 import { HOLIDAY_MONEY, type Holiday } from '../holidays'
-import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_THIRD, LIE_NOCRED } from '../lies'
+import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_THIRD, LIE_NOCRED, LIE_NIVA, LIE_PROMISE, LIE_ENVELOPES } from '../lies'
 import { HEAT, alikShaved, arsenTrackAt, avitoReviewAt, bathAnswered, bathAskedAt, borisAskAt, borisSaleAt, coldWar, collectorsAskAt, collectorsEpAt, countersuitAt, courtVerdictAt, tileCourtAt, tileLawyerAt, tileMonumentAt, tileSlipAt, nivaBackAt, saleAt, crewPaidAt, debutAt, grantBathAt, grantTileAt, inhDoneAt, internAccepted, internAt, internDeclined, kettleAt, lawyerAt, moustacheAskAt, offendedAskAt, ramPhotoAt, rubikAskAt, rubikHoleAt, moustachePhotoAt, photoAt, tileAdAt, tamadaDoneAt, mamaMarketAt, mamaVoiceAt, samvelDivorceAt, grantHouseAt, seryogaAskAt, transferAt, vacancyAt, muenAnswered, hhJobAt, seryogaLoanAt, dachaAskAt, evictAt, collectorsEchoAt, threatGovAt, fraudCardAt, inhRefused, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, saidKonak, stateAt, topic, topicLast, topicMute, topicRun, whenYears } from '../memkeys'
 import type { ArcId, TopicId } from '../ids'
 import { BATH_ANSWER } from './player-choice-pools'
@@ -785,6 +785,10 @@ export const replyRules: R[] = [
   }),
   says('catchLie', { remember: [add(caughtCount)], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_GRANDPA', LIE_GRANDPA))) }, [eq('lieKind', 'grandpa')]),
   says('catchLie', { remember: [add(caughtCount)], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_CUSTOMER', LIE_CUSTOMER))) }, [eq('lieKind', 'customer')]),
+  // сюжетные противоречия арок (#1548): ответ про «Ниву», срок или конверты, а не про место денег
+  says('catchLie', { remember: [add(caughtCount)], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_NIVA', LIE_NIVA))) }, [eq('lieKind', 'niva')]),
+  says('catchLie', { remember: [add(caughtCount)], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_PROMISE', LIE_PROMISE))) }, [eq('lieKind', 'promise')]),
+  says('catchLie', { remember: [add(caughtCount)], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_ENVELOPES', LIE_ENVELOPES))) }, [eq('lieKind', 'envelopes')]),
   // третий раз пойман — признаётся (по-своему); дальше — Алику уже никто не верит
   { ...says('catchLie', { remember: [add(caughtCount)], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_THIRD', LIE_THIRD))) }, [gte(caughtCount, 2)]), bonus: 1 },
   { ...says('catchLie', { remember: [add(caughtCount)], respond: ({ game }) => game.caught(game.uniq(() => game.draw('LIE_NOCRED', LIE_NOCRED))) }, [gte(caughtCount, 3)]), bonus: 2 },

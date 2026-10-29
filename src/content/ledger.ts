@@ -15,7 +15,7 @@ export type MoneyLocation =
   /** Наследство дяди Тиграна из Глендейла (#1439): деньги «уже в пути», пока нотариус берёт своё. */
   | 'inheritance'
 
-/** Предметы и значения MVP. Первые три взаимоисключающи; остальные — знания без противоречий. */
+/** Предметы и значения. Взаимоисключающие перечислены в `CONFLICTING`; остальные — знания без противоречий. */
 export interface LedgerValueMap {
   'money.location': MoneyLocation
   /** Курс «Лаваш-коина»: хвастовство Алика против честного пересчёта (#815). */
@@ -29,14 +29,36 @@ export interface LedgerValueMap {
   'beton.mood': 'offended'
   'crane.where': 'wedding'
   'salary.eagle': 'taken'
-  /** Свадебные конверты Самвела (#1016): Алик рассказал, где они; не место денег, а событие свадьбы. */
-  'samvel.envelopes': 'at_samvel'
+  /** Свадебные конверты Самвела (#1016, #1548): где они и что Самвел их уже раздал — противоположные версии. */
+  'samvel.envelopes': 'at_samvel' | 'given_out'
+  /** «Нива» (#1548): её ищут/не заводится против её собственного письма и возвращения. */
+  'niva.state': 'away' | 'writes' | 'back'
+  /** Обещание на условии (#1548): `<состояние>:<номер записи>` — `open:3` против `unpaid:3` у одного обещания. */
+  'promise.due': string
 }
 export type LedgerSubject = keyof LedgerValueMap
 type LedgerPoint = { [S in LedgerSubject]: { subject: S; value: LedgerValueMap[S] } }[LedgerSubject]
 
 /** Предметы, у которых два разных известных значения — противоречие. */
-const CONFLICTING: ReadonlySet<LedgerSubject> = new Set(['money.location', 'grandpa.life', 'customer.payment', 'money.rate'])
+const CONFLICTING: ReadonlySet<LedgerSubject> = new Set([
+  'money.location', 'grandpa.life', 'customer.payment', 'money.rate', 'samvel.envelopes', 'niva.state', 'promise.due',
+])
+
+/** Версии, которые спорят не всегда. «Пишет сама» и «вернулась» — одна история, а не две. */
+const COMPATIBLE: Partial<Record<LedgerSubject, readonly [string, string][]>> = {
+  'niva.state': [['back', 'writes']],
+}
+
+/** Номер записи обещания в версии предмета `promise.due`: пары образуются только внутри одной записи. */
+const promisePayload = (value: string): string => value.slice(value.indexOf(':') + 1)
+
+/** Две известные версии предмета несовместимы? Одинаковые — никогда. */
+export function conflicts(subject: LedgerSubject, a: string, b: string): boolean {
+  if (a === b) return false
+  if (subject === 'promise.due') return promisePayload(a) === promisePayload(b)
+  if (COMPATIBLE[subject]?.some(([x, y]) => (x === a && y === b) || (x === b && y === a))) return false
+  return CONFLICTING.has(subject)
+}
 
 export type ClaimSource = 'alik' | WhoId
 
@@ -52,6 +74,8 @@ export interface ClaimRec {
   msgId?: number
   /** Ключ утверждения контента (или перенесённый из старого сохранения). */
   claimKey?: ClaimKey
+  /** Как версия звучала для игрока, когда её текст — из записи партии (обещание), а не из контента. */
+  say?: string
 }
 
 export interface TransitionRec {
@@ -97,6 +121,8 @@ export interface PublishMeta {
   day: number
   msgId?: number
   claimKey?: ClaimKey
+  /** Текст версии, если он известен только партии (обещание): пересказ в кнопке — из него. */
+  say?: string
 }
 
 /** Опубликовать утверждение: знание появляется только после реально показанной реплики. */
@@ -161,10 +187,14 @@ export function closeEpisode(l: LedgerState, id: number, how: Exclude<EpisodeSta
 
 function maybeConflict(l: LedgerState, rec: ClaimRec): void {
   if (!CONFLICTING.has(rec.subject)) return
-  // активная версия — последняя запись предмета ДО этой публикации
+  // активная версия — последняя запись предмета ДО этой публикации: у обещаний — той же записи
   let active: ClaimRec | undefined
-  for (const c of l.claims) if (c.subject === rec.subject && c.id < rec.id && (!active || c.id > active.id)) active = c
-  if (!active || active.value === rec.value) return
+  for (const c of l.claims) {
+    if (c.subject !== rec.subject || c.id >= rec.id) continue
+    if (rec.subject === 'promise.due' && promisePayload(c.value) !== promisePayload(rec.value)) continue
+    if (!active || c.id > active.id) active = c
+  }
+  if (!active || !conflicts(rec.subject, active.value, rec.value)) return
   if (l.transitions.some((t) => t.subject === rec.subject && t.to === null && t.from === active.value && t.id > active.id && t.id < rec.id)) return
   if (explained(l, rec.subject, active, rec.value, rec.id)) return
   const pair = pairKey(active.value, rec.value)
@@ -212,6 +242,10 @@ export const CLAIM_LEDGER: Record<ClaimKey, LedgerPoint> = {
   money_foundation: point('money.location', 'foundation'),
   money_niva: point('money.location', 'niva'),
   money_inheritance: point('money.location', 'inheritance'),
+  // «Нива» (#1548): её ищут — она пишет сама, она вернулась
+  niva_away: point('niva.state', 'away'),
+  niva_writes: point('niva.state', 'writes'),
+  niva_back: point('niva.state', 'back'),
   sent: point('money.sent', 'transferred'),
   no_money: point('money.none', 'gone'),
   grandpa_dead: point('grandpa.life', 'dead'),
@@ -222,6 +256,10 @@ export const CLAIM_LEDGER: Record<ClaimKey, LedgerPoint> = {
   crane_wedding: point('crane.where', 'wedding'),
   eagle: point('salary.eagle', 'taken'),
   samvel_envelopes: point('samvel.envelopes', 'at_samvel'),
+  samvel_envelopes_given: point('samvel.envelopes', 'given_out'),
+  // обещание на условии (#1548): значение несёт номер записи, поэтому литералы здесь — только имена состояний
+  promise_due: point('promise.due', 'open'),
+  promise_unpaid: point('promise.due', 'unpaid'),
 }
 
 /**
@@ -251,7 +289,7 @@ export function selfConflict(events: readonly unknown[]): string | null {
     const p = CLAIM_LEDGER[key]
     if (!CONFLICTING.has(p.subject)) continue
     const was = state.get(p.subject)
-    if (was !== undefined && was !== p.value) return `две версии ${p.subject}: ${was} и ${p.value}`
+    if (was !== undefined && conflicts(p.subject, was, p.value)) return `две версии ${p.subject}: ${was} и ${p.value}`
     state.set(p.subject, p.value)
   }
   return null

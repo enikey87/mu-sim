@@ -172,27 +172,27 @@ describe('рассказанные переходы и отзывы (#436)', () 
   const catchChoice = (game: ReturnType<typeof makeGame>['game']) =>
     game.buildChoices().some((c) => c.act === 'catchLie')
 
-  it('«Нива» с деньгами возвращается пустой, затем конверт падает в фундамент: кнопки нет', async () => {
+  it('«Нива» с деньгами возвращается пустой, затем конверт падает в фундамент: кнопки про деньги нет', async () => {
     const { game, storage } = makeGame()
     for (const ep of ARCS.niva.eps.slice(0, 6)) await game.playEpisode(ep, 'niva')
     expect(game.S.ledger.claims.some((c) => c.value === 'niva')).toBe(true)
     expect(game.S.ledger.transitions).toContainEqual(expect.objectContaining({ subject: 'money.location', from: 'niva', to: null }))
     await game.playEpisode(ARCS.beton.eps[0], 'beton')
     expect(game.S.ledger.claims.some((c) => c.value === 'foundation')).toBe(true)
-    expect(openEpisodes(game.S.ledger)).toHaveLength(0)
-    expect(catchChoice(game)).toBe(false)
+    // серия «вернулась» и её же «ищем» — сюжетная пара «Нивы» (#1548), а не денежная: место денег отзыв закрыл
+    expect(openEpisodes(game.S.ledger, 'money.location')).toHaveLength(0)
+    expect(openEpisodes(game.S.ledger).every((e) => e.subject === 'niva.state')).toBe(true)
     game.save()
     const { game: loaded } = makeGame({ storage })
     expect(loaded.S.ledger.transitions).toHaveLength(game.S.ledger.transitions.length)
-    expect(catchChoice(loaded)).toBe(false)
+    expect(openEpisodes(loaded.S.ledger)).toHaveLength(openEpisodes(game.S.ledger).length)
   })
 
   it('отзыв «деньги в Ниве» сам по себе разрешает следующую версию', async () => {
     const { game } = makeGame()
     for (const ep of ARCS.niva.eps.slice(0, 6)) await game.playEpisode(ep, 'niva')
     game.alikMsg({ kind: 'text', from: 'alik', text: 'Деньги в сейфе.' }, ['money_safe'])
-    expect(catchChoice(game)).toBe(false)
-    expect(openEpisodes(game.S.ledger)).toHaveLength(0)
+    expect(openEpisodes(game.S.ledger, 'money.location')).toHaveLength(0)
   })
 
   it('объяснение конверта связывает любую услышанную активную версию с фундаментом', async () => {

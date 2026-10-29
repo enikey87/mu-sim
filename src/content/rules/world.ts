@@ -142,7 +142,12 @@ export const promiseRules: R[] = [
   },
   {
     name: 'Condition_Met', event: 'PromiseConditionMet', when: [live, missing(alikDead)], priority: 'chatter',
-    respond: async ({ game, facts }) => { await game.say([dueLine(game, facts, 'MET', PROMISE_MET)]) },
+    // реплика сама признаёт, что условие выполнено, а денег это не добавило: с этого хода игрок может
+    // поймать Алика на неисполненном обещании (#1548) — знание публикуется вместе с показанной строкой
+    respond: async ({ game, facts }) => {
+      await game.say([dueLine(game, facts, 'MET', PROMISE_MET)])
+      game.promiseUnpaid(Number(facts.promise))
+    },
   },
 ]
 
