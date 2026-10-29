@@ -34,8 +34,8 @@ import {
   ARCHIVE_FRESH_DAYS,
   ENDGAME_ARCH, ENDGAME_ARCH_LIE, ENDGAME_CHOICES, ENDGAME_FALLBACK, ENDGAME_FORMALITIES, ENDGAME_GROUP, ENDGAME_INTRO, ENDGAME_JUBILEES,
   ENDGAME_LEAVE, ENDGAME_MONEY, ENDGAME_MUTE, ENDGAME_OPEN, ENDGAME_RENAMES, ENDGAME_RETURNER_LINES, ENDGAME_RETURNERS, ENDGAME_ALIK_BACK,
-  ENDGAME_VENDETTA_APOLOGY, ENDGAME_VENDETTA_CHOICES, ENDGAME_VENDETTA_FORMALITIES, ENDGAME_VENDETTA_GROUP, ENDGAME_VENDETTA_LEAVE,
-  ENDGAME_VENDETTA_OPEN, ENDGAME_VENDETTA_RENAMES,
+  ENDGAME_VENDETTA_ACT, ENDGAME_VENDETTA_ACT_SIGNED, ENDGAME_VENDETTA_APOLOGY, ENDGAME_VENDETTA_ASK, ENDGAME_VENDETTA_CHOICES,
+  ENDGAME_VENDETTA_FORMALITIES, ENDGAME_VENDETTA_GROUP, ENDGAME_VENDETTA_LEAVE, ENDGAME_VENDETTA_MUTE, ENDGAME_VENDETTA_OPEN, ENDGAME_VENDETTA_RENAMES,
   EPILOGUE_BANNER,
   LEND50_ASK, LEND50_ASK_AGAIN, LEND50_CHOICES, LEND50_LINK, LEND50_MEMORY, LEND50_NO, LEND50_NUNE, LEND50_RENAME, LEND50_SERIOUS, LEND50_SERIOUS_ELSE, LEND50_SYS, LEND50_TG_SYS, LEND50_VK_SYS, LEND50_YA_SYS, LEND50_YES,
 } from '../content/endgame'
@@ -287,10 +287,9 @@ export class Game {
       this.S.mem[memkeys.endgame.intro] = true
     }
     // Незаконченные вступление/просьба — до пачки непрочитанных: иначе opening рвётся away-burst (#248/#358).
-    // В эпилоге вражды просьбы «займи 50» нет: вступление кончается на репликах группы (#1556).
-    if (this.S.mem[memkeys.endgame.active]
-      && (!this.S.mem[memkeys.endgame.intro]
-        || (!this.S.mem[memkeys.endgame.vendetta] && !this.S.mem[memkeys.lend50.asked]))) {
+    // Просьба «займи 50» есть у обеих групп: в выплате её говорит Алик, во вражде — мама (#1557).
+    const opening = !this.S.mem[memkeys.endgame.intro] || !this.S.mem[memkeys.lend50.asked]
+    if (this.S.mem[memkeys.endgame.active] && opening) {
       this.ui.busy = true
       this.S.choices = []
       const outcome = String(this.S.mem[memkeys.paydayScene] ?? 'default')
@@ -2137,10 +2136,11 @@ export class Game {
     if (S.mem[memkeys.endgame.active]) {
       // Ни обычные действия группы, ни ответы на просьбу не появляются раньше её системной пометки (#358).
       if (!S.mem[memkeys.endgame.intro]) return []
-      // Эпилог вражды (#1556): своя группа и свой цикл, просьбы «займи 50» в нём нет.
-      if (S.mem[memkeys.endgame.vendetta]) return ENDGAME_VENDETTA_CHOICES.map((c) => ({ ...c }))
       if (!S.mem[memkeys.lend50.asked]) return []
+      // «Займи 50» есть в обеих группах: в выплате просит Алик, во вражде — мама (#1557)
       if (!S.mem[memkeys.lend50.answer]) return LEND50_CHOICES.map((c) => ({ ...c }))
+      // Эпилог вражды (#1556): своя группа и свой цикл — «Где извинения?» вместо «Где деньги?»
+      if (S.mem[memkeys.endgame.vendetta]) return ENDGAME_VENDETTA_CHOICES.map((c) => ({ ...c }))
       return ENDGAME_CHOICES.map((c) => ({ ...c }))
     }
     if (S.scene) {
@@ -3164,11 +3164,12 @@ export class Game {
     if (!this.S.mem[memkeys.lend50.asked]) await this.deliverLend50Ask()
   }
 
-  /** Одна точная реплика Алика: typing, сообщение, сохранение видимого шага, пауза. */
-  private async endgameLine(text: string): Promise<void> {
+  /** Одна точная реплика Алика: typing, сообщение, сохранение видимого шага, пауза.
+   *  `who` — реплика от имени участника (мама в просьбе эпилога вражды, #1557), без опечаток: это сцена. */
+  private async endgameLine(text: string, who?: string): Promise<void> {
     await this.typingFor(600 + text.length * 22)
     if (this.disposed) throw new GameDisposed()
-    this.alikMsg({ kind: 'text', from: 'alik', text })
+    this.alikMsg({ kind: 'text', from: 'alik', text, ...(who ? { who } : {}) })
     this.save()
     // та же пауза между пузырями, что в say: в ?fast не короче пола чтения (#1370)
     await this.sleep(this.readFloor(250, READ_FLOOR_BUBBLE_MS))
@@ -3193,14 +3194,15 @@ export class Game {
     this.save()
   }
 
-  /** Вступление эпилога вражды: та же цепочка (баннер, группа, добавление) и свои реплики (#1556). */
+  /** Вступление эпилога вражды: та же цепочка (баннер, группа, добавление), акт обид и просьба (#1556/#1557). */
   private async completeVendettaOpening(): Promise<void> {
     if (!this.S.mem[memkeys.endgame.intro]) {
       this.stripIncompleteEndgameIntro()
       await this.deliverVendettaIntro()
       await this.sleep(1500)
     }
-    // null, а не []: buildChoices отдаст кнопки группы вражды (просьбы «займи 50» здесь нет)
+    if (!this.S.mem[memkeys.lend50.asked]) await this.deliverVendettaAsk()
+    // null, а не []: buildChoices отдаст ответы просьбы, а после ответа — кнопки группы вражды
     this.S.choices = null
   }
 
@@ -3215,8 +3217,29 @@ export class Game {
     this.sys('Алик добавил вас')
     this.save()
     for (const text of ENDGAME_VENDETTA_OPEN) await this.endgameLine(text)
+    // акт приёма-передачи обид: подпись — системной строкой игры, после неё — реплика «вражда навсегда» (#1557)
+    for (const text of ENDGAME_VENDETTA_ACT) await this.endgameLine(text)
+    this.sys('Вы подписали акт приёма-передачи обид')
+    await this.endgameLine(ENDGAME_VENDETTA_ACT_SIGNED)
     S.mem[memkeys.endgame.intro] = true
     S.choices = []
+    this.save()
+  }
+
+  /**
+   * Просьба «займи 50» в группе вражды (#1557): механика и карточка те же, что в группе выплаты,
+   * но просит мама Алика — сам он из гордости не пишет. Отметка устройства не ставится: она выбирает
+   * второй текст просьбы выплаты, а здесь обрамление своё с первого раза.
+   */
+  private async deliverVendettaAsk(): Promise<void> {
+    const S = this.S
+    if (!S.mem[memkeys.endgame.active] || S.mem[memkeys.lend50.asked]) return
+    this.stripIncompleteLend50()
+    for (const text of ENDGAME_VENDETTA_ASK) await this.endgameLine(text, 'mama')
+    await this.sleep(500)
+    this.pushLend50Card()
+    S.mem[memkeys.lend50.asked] = true
+    S.choices = null // buildChoices отдаст LEND50_CHOICES
     this.save()
   }
 
@@ -3233,20 +3256,26 @@ export class Game {
     const lines = again ? LEND50_ASK_AGAIN : LEND50_ASK
     for (const text of lines) await this.endgameLine(text)
     await this.sleep(500)
-    // карточки просьбы вместо серых плашек .sys: фраза игры, сумма и кнопка (#616). Сначала карточка
-    // площадки — вступление у VK (п. 2.6.2), инап-покупка у Яндекса (п. 1.13), Stars-инвойс у Telegram
-    // (#1239, #1241, #1235), — затем внешняя ссылка DonationAlerts там, где она разрешена. В Telegram
-    // обе: решение оператора 29.10 (#1533), Stars остаются для iOS и не-RU.
+    this.pushLend50Card()
+    this.storage?.setItem(LEND50_SEEN_KEY, '1') // отметка устройства, а не партии: она только выбирает текст
+    S.mem[memkeys.lend50.asked] = true
+    S.choices = null // buildChoices отдаст LEND50_CHOICES
+    this.save()
+  }
+
+  /**
+   * Карточки просьбы вместо серых плашек .sys: фраза игры, сумма и кнопка (#616). Сначала карточка
+   * площадки — вступление у VK (п. 2.6.2), инап-покупка у Яндекса (п. 1.13), Stars-инвойс у Telegram
+   * (#1239, #1241, #1235), — затем внешняя ссылка DonationAlerts там, где она разрешена. В Telegram
+   * обе: решение оператора 29.10 (#1533), Stars остаются для iOS и не-RU.
+   */
+  private pushLend50Card(): void {
     if (this.joinGroup) this.push({ kind: 'lend50', text: LEND50_VK_SYS, join: true })
     else if (this.pay50 === 'yandex') this.push({ kind: 'lend50', text: LEND50_YA_SYS, buy: true })
     else if (this.pay50 === 'telegram') this.push({ kind: 'lend50', text: LEND50_TG_SYS, stars: true })
     if (this.externalPay) this.push({ kind: 'lend50', text: LEND50_SYS, link: LEND50_LINK })
     // воронка «займи 50»: карточка добавлена в ленту — одна цель на партию (#1483)
     if (this.externalPay || this.joinGroup || this.pay50) track('lend50_shown', { platform: this.platformId })
-    this.storage?.setItem(LEND50_SEEN_KEY, '1') // отметка устройства, а не партии: она только выбирает текст
-    S.mem[memkeys.lend50.asked] = true
-    S.choices = null // buildChoices отдаст LEND50_CHOICES
-    this.save()
   }
 
   /** Убрать незавершённое вступление целиком: при повторе оно не дублируется и не остаётся оборванным. */
@@ -3267,10 +3296,10 @@ export class Game {
     this.touchMsgs(at)
   }
 
-  /** Убрать хвост просьбы без asked — перед воспроизведением с начала; карточка идёт после реплик и снимается вместе с ними (#616). */
+  /** Убрать хвост просьбы без asked — перед воспроизведением с начала; карточка идёт после реплик и снимается вместе с ними (#616/#1557). */
   private stripIncompleteLend50(): void {
     if (this.S.mem[memkeys.lend50.asked]) return
-    const pool = new Set<string>([...LEND50_ASK, ...LEND50_ASK_AGAIN])
+    const pool = new Set<string>([...LEND50_ASK, ...LEND50_ASK_AGAIN, ...ENDGAME_VENDETTA_ASK])
     let at = -1
     for (let i = this.S.msgs.length - 1; i >= 0; i--) {
       const m = this.S.msgs[i]
@@ -3336,7 +3365,10 @@ export class Game {
       const mutes = Number(S.mem[memkeys.endgame.mutes] ?? 0) + 1
       S.mem[memkeys.endgame.mutes] = mutes
       this.sys(mutes === 1 ? 'Вы отключили уведомления' : 'Уведомления снова включены. Кем — неизвестно. Вы отключили их ещё раз')
-      await this.say([this.draw('ENDGAME_MUTE', ENDGAME_MUTE)])
+      // у группы вражды своя колода: тёплые соседи группы выплаты там не звучат (#1557)
+      await this.say([vendetta
+        ? this.draw('ENDGAME_VENDETTA_MUTE', ENDGAME_VENDETTA_MUTE)
+        : this.draw('ENDGAME_MUTE', ENDGAME_MUTE)])
       const renames = vendetta ? ENDGAME_VENDETTA_RENAMES : ENDGAME_RENAMES
       const name = this.draw(vendetta ? 'ENDGAME_VENDETTA_RENAMES' : 'ENDGAME_RENAMES', renames)
       S.mem[memkeys.endgame.renames] = Number(S.mem[memkeys.endgame.renames] ?? 0) + 1
@@ -3421,10 +3453,10 @@ export class Game {
   formalityLines(): Said[] {
     const n = Number(this.S.mem[memkeys.endgame.forms] ?? 0) + 1
     this.S.mem[memkeys.endgame.forms] = n
-    // эпилог вражды закрывается своими актами: архива Дня выплаты и юбилеев «формальностей» в нём нет (#1556)
+    // эпилог вражды закрывается своими актами: архива Дня выплаты, юбилеев «формальностей» и памяти
+    // про «займи 50» в нём нет — просьбу там говорила мама, и братского воспоминания не будет (#1556/#1557)
     if (this.S.mem[memkeys.endgame.vendetta]) {
-      const memory = this.line('LEND50_MEMORY', LEND50_MEMORY)
-      return [this.draw('ENDGAME_VENDETTA_FORMALITIES', ENDGAME_VENDETTA_FORMALITIES), ...(memory ? [memory] : [])]
+      return [this.draw('ENDGAME_VENDETTA_FORMALITIES', ENDGAME_VENDETTA_FORMALITIES)]
     }
     const archive = this.archiveLine()
     const jubilee = ENDGAME_JUBILEES[n]
