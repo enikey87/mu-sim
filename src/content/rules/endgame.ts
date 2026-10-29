@@ -57,4 +57,11 @@ export const endgameRules: R[] = [
   ...(['AlikAway', 'AlikIdle', 'StoryBeat', 'PeriodLine', 'PromiseDue', 'Mentioned'] as GameEvent[]).map((event): R => ({
     name: 'Quiet_PaydayOpen_' + event, event, when: [paydayOpen], specificity: 100, priority: 'system', respond: () => {},
   })),
+  // терминальные эпилоги обещают полную тишину после своего экрана (#1585): суточная реплика Алика
+  // и хор родни идут мимо AlikTurn — по тому же событию, что и в живом мире, поэтому молчат quiet-правилами
+  ...([['Vendetta', endgame.vendetta], ['Bloodfeud', endgame.bloodfeud]] as const).flatMap(([suffix, key]) =>
+    (['PeriodLine', 'Mentioned'] as GameEvent[]).map((event): R => ({
+      name: `Quiet_Terminal_${suffix}_${event}`, event, when: [active, is(key)], specificity: 100, priority: 'system', respond: () => {},
+    })),
+  ),
 ]

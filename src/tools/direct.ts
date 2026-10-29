@@ -7,7 +7,7 @@ import type { Game } from '../engine/game'
 import type { Facts } from '../engine/rules'
 import { during } from '../engine/rules'
 import { START_DAY, ARC_MARINATION_DAYS } from '../engine/state'
-import { HEAT, arsenTrackAt, borisAskAt, evictAt, fraudCardAt, legendDay, legendId, muenAt, nuneKeyPassed, payday, rubikProposalAt, sorryAt, vendettaPrice } from '../content/memkeys'
+import { HEAT, arsenTrackAt, borisAskAt, endgame, evictAt, fraudCardAt, legendDay, legendId, muenAt, nuneKeyPassed, payday, rubikProposalAt, sorryAt, vendettaPrice } from '../content/memkeys'
 import { ENDING_MIN_DAY, CHRONIC_RUDE_AFTER_VENDETTA } from '../content/finales'
 
 export type DirectCase = { event: string; facts?: Facts; target?: string; setup?: (g: Game) => void }
@@ -22,6 +22,9 @@ const paydayOpen = (g: Game) => {
 const phone = (g: Game) => { g.rules.applyOps([during('phone.karine', 1)], {}) }
 const dead = (g: Game) => { g.S.mem.alik_dead = true }
 const blocked = (g: Game) => { g.S.mem.blocked = true }
+/** Терминальный эпилог (#1585): «Вендетта» и «Кровный враг» — бот в выборках до них не доходит, факты ставим те же, что ставит заморозка. */
+const terminalVendetta = (g: Game) => { g.S.mem[endgame.active] = true; g.S.mem[endgame.vendetta] = true }
+const terminalBloodfeud = (g: Game) => { g.S.mem[endgame.active] = true; g.S.mem[endgame.bloodfeud] = true }
 /** Режим холодной войны после вендетты (#1424): бот в выборках не доходит до вендетты, факт ставим тот же, что она. */
 const coldWarMode = (g: Game) => { g.S.mem.coldWar = true }
 const offended = (g: Game) => { g.S.mem[HEAT] = 1; g.S.ctx = { offended: true } }
@@ -235,6 +238,12 @@ export const DIRECT: Record<string, DirectCase> = {
   Quiet_PaydayOpen_AlikAway: { event: 'AlikAway', setup: paydayOpen },
   Quiet_PaydayOpen_PeriodLine: { event: 'PeriodLine', setup: paydayOpen },
   Quiet_PaydayOpen_StoryBeat: { event: 'StoryBeat', setup: (g) => { paydayOpen(g); g.S.stats.sent = 5; g.S.day = 340 } },
+  // #1585: тишина терминальных эпилогов — вендетта и «Кровный враг» в выборках бота не наступают,
+  // поэтому обе глушилки держатся прямыми случаями; цель хора — знакомый персонаж с живым пулом
+  Quiet_Terminal_Vendetta_PeriodLine: { event: 'PeriodLine', setup: terminalVendetta },
+  Quiet_Terminal_Vendetta_Mentioned: { event: 'Mentioned', target: 'samvel', setup: (g) => { terminalVendetta(g); g.S.mem['intro.samvel'] = true } },
+  Quiet_Terminal_Bloodfeud_PeriodLine: { event: 'PeriodLine', setup: terminalBloodfeud },
+  Quiet_Terminal_Bloodfeud_Mentioned: { event: 'Mentioned', target: 'samvel', setup: (g) => { terminalBloodfeud(g); g.S.mem['intro.samvel'] = true } },
   // #927 (реакции на системные события сдвинули розыгрыш) — правило ушло из выборок, прямой случай вернулся.
   // До этого случай снимали (#889: в CI правило играло в 8 партиях, порог 7) — качели гейта решает замер.
   // #953 (окна вопроса Рубика и чайника) снова сдвинула розыгрыш — в 7 партиях (порог 7), гейт видит сам.

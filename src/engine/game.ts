@@ -1566,6 +1566,10 @@ export class Game {
     const m = this.S.mem
     return !!(m[memkeys.blocked] || m[memkeys.alikDead] || m[memkeys.phoneKarine] || this.S.offlineDays > 0)
   }
+  /** Терминальный эпилог (#1556/#1571): после своего экрана мир молчит, пишет только колода эпилога (#1585). */
+  private terminalEpilogue(): boolean {
+    return !!(this.S.mem[memkeys.endgame.vendetta] || this.S.mem[memkeys.endgame.bloodfeud])
+  }
   /** Молчание могло начаться посреди хода (блок, «смерть»): шапка не остаётся «прочитано»/«в сети» до его конца (#308). */
   private quietHeader(): void {
     if (!this.alikSilent()) return
@@ -2750,6 +2754,8 @@ export class Game {
   }
 
   async deletedMsg(): Promise<void> {
+    // терминальный эпилог обещает тишину: «удалёнок» после его экрана нет ни по шансу хода, ни по Idle (#1585)
+    if (this.terminalEpilogue()) return
     await this.typingFor(700)
     const text = this.seen.pickFresh(() => this.draw('DELETED', L.DELETED), (x) => x)
     this.seen.mark(text)
