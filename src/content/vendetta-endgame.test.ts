@@ -241,6 +241,22 @@ describe('эпилог вражды: акт обид и донат через п
     expect(messages(game, from).join(' ')).not.toMatch(/50 давал/)
   })
 
+  it('двадцать ходов бота во вражде: цикл живёт, выплаты и тёплых строк нет', async () => {
+    const { game } = makeGame()
+    await toVendettaEpilogue(game)
+    await answerVendettaAsk(game)
+    const from = game.S.msgs.length
+
+    const { botTurn } = await import('../tools/bot')
+    for (let i = 0; i < 20; i++) await botTurn(game)
+
+    const text = messages(game, from).join(' ')
+    expect(text).not.toMatch(/как родн|разойдёмся|теплот|обним|помири|прощаем/i)
+    expect(text).not.toMatch(/Пятьдесят рублей|День выплаты/)
+    expect(game.S.mem['endgame.vendetta']).toBe(true)
+    expect(game.choices.map((c) => c.act)).toEqual(['endgameMoney', 'endgameMute', 'endgameLeave'])
+  })
+
   it('перезагрузка посреди просьбы вражды доигрывает её: обрывок мамы снят, карточка одна', async () => {
     const storage = memStorage()
     const { game } = makeGame({ storage })
