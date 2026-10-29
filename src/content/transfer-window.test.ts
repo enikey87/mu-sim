@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest'
 import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
 import { D, TRANSFER_FRESH_TURNS } from './excuses'
-import { creditOffer, moneyAt, paydayScene, transferAt } from './memkeys'
+import { alikShaved, creditOffer, moneyAt, paydayScene, transferAt } from './memkeys'
 import { ARCS } from './arcs'
 
 const findReply = (game: Game) => { game.S.choices = null; return game.buildChoices().find((c) => c.act === 'transferQ') }
@@ -151,5 +151,30 @@ describe('новейшее денежное событие гасит окно �
     sealed.S.mem[paydayScene] = true
     await sealed.enterNode('meet', 'cafe3')
     expect(sealed.S.mem[moneyAt], 'запечатанный долг штампанул денежный ход').toBeUndefined()
+  })
+})
+
+// Слот-конкуренция (#1530): сборщик даёт контекстным офферам два слота по специфичности, а окно
+// перевода несло bonus 3 (специфичность 4) при конвенции окон событий 5 (#1314). Любые два оффера
+// выше — событийное окно (6) и долгоживущая кнопка усов (5) — забирали слоты, и перевод в блок не
+// попадал: в партиях 506117:785 («часть первая из тысячи») и seed-8:1002 окно отклика сгорело целиком.
+describe('окно перевода в слот-конкуренции (#1530)', () => {
+  const pool = (D.P_TRANSFER as string[]).map((t) => t.split('{amount}').join('50'))
+
+  it('два оффера выше конвенции окон не вытесняют реакцию на перевод из блока', async () => {
+    const { game } = makeGame()
+    await game.transfer()
+    // конкуренты того же кадра, что в партии 506117: вопрос «ты обиделся?» (событийное окно) и
+    // стоячая кнопка «а усы?» — при bonus 3 обе забирали слоты, перевода в блоке не было
+    game.S.mem[alikShaved] = true
+    game.S.ach.shaved = game.S.day - 1
+    game.S.ctx = { offended: true }
+    const open = game.rules.collect({ event: 'BuildChoices' }, game.facts()).map((r) => r.name)
+    expect(open, 'событие-конкурент не открыто — проверка пустеет').toContain('Opt_Sorry')
+    expect(open, 'кнопка усов не открыта — проверка пустеет').toContain('Opt_Moustache')
+    game.S.choices = null
+    const btn = game.buildChoices().find((c) => c.act === 'transferQ')
+    expect(btn, 'перевод вытеснен из блока офферами выше конвенции окон').toBeTruthy()
+    expect(pool, 'кнопка не из пула реакций на перевод').toContain(btn!.text)
   })
 })

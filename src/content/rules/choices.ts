@@ -430,7 +430,9 @@ export const choiceRules: R[] = [
   // дальше. Пул один на все переводы, поэтому он долгоживущий: окно события (2 хода) строку между
   // переводами не держало и возвращало её дословно через 12–17 ходов (#1299) — окно повтора (#824)
   // и молчание исчерпанного пула (#1078), как у «Мууу» (#1291). Окно самого события не трогаем.
-  offer({ name: 'Transfer', when: [is('transferFresh')], act: 'transferQ', tone: 'neutral', bonus: 3, text: (g, f) => freshFromD(g, 'P_TRANSFER', { amount: String(f['transferAmount'] ?? 50) }) }),
+  // bonus 5 — конвенция окон событий (#1314): при 3 (специфичность 4) два оффера выше забирали оба слота
+  // блока и окно сгорало целиком, не показав ни одной реакции (партии 506117:785, seed-8:1002, #1530).
+  offer({ name: 'Transfer', when: [is('transferFresh')], act: 'transferQ', tone: 'neutral', bonus: 5, text: (g, f) => freshFromD(g, 'P_TRANSFER', { amount: String(f['transferAmount'] ?? 50) }) }),
   offer({ name: 'Ping', when: [eq('ctx.type', 'readonly')], act: 'ping', tone: 'neutral', bonus: 3, text: (g) => fromD(g, 'P_PING') }),
   // «Завтра» → «это когда?», а «Брат, в пути» → «А подробнее?»
   offer({
