@@ -132,7 +132,7 @@ export const asmikCard = 'asmik.card'
 /** Алик хоть раз назвал сроком «завтра» / пятницу — на это слово можно ссылаться. */
 export const saidTomorrow = 'said.tomorrow'
 export const saidFriday = 'said.friday'
-/** Алик сравнил срок с коньяком («созревает. Как коньяк») — только после этого игрок называет число «Лет двадцать?» (#918). */
+/** Алик сравнил срок с коньяком («созревает. Как коньяк») — только после этого игрок называет число «Лет через двадцать?» (#918). */
 export const saidKonak = 'said.konak'
 /** Хаш уже прозвучал в партии: вводящие строки пишут факт, угроза «пойду на хаш» ждёт его (#1143). */
 export const saidHash = 'said.hash'
@@ -229,7 +229,7 @@ export const collectorsTurned = 'collectors.turned'
 export const collectorsTea = 'collectors.tea'
 /** Ход эпизода, который поставил факт арки (чай, вербовка, разворот): отклик в этом ходе, не в каденсе follow (#1192). */
 export const collectorsEpAt = 'collectors.epAt'
-/** Игрок уже спросил «Лет двадцать?»: ответ один, повтор той же фразы Алика запрещён симуляцией. */
+/** Игрок уже спросил «Лет через двадцать?»: ответ один, повтор той же фразы Алика запрещён симуляцией. */
 export const whenYears = 'when.years'
 /** Звонок с объекта состоялся: «всех рассчитали, кроме игрока» (#325, docs/design/crew-call.md). */
 export const crewPaid = 'crew.paid'
