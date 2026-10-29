@@ -8,10 +8,12 @@ import type { GameEvent, Offer } from './events'
 import { WORLD, speaks } from '../world'
 import * as T from '../rude'
 import { RUDE_AGAIN } from '../misc'
-import { HEAT, alikDead, blocked, blockedHint, coldWar, count, countersuitAt, mamaCalls, mamaVoiceAt, phoneKarine, polite, ritualCount, statusHidden, vendetta, vendettaAt } from '../memkeys'
+import { HEAT, alikDead, blocked, blockedHint, coldWar, count, countersuitAt, endgame, mamaCalls, mamaVoiceAt, phoneKarine, polite, ritualCount, statusHidden, vendetta, vendettaAt } from '../memkeys'
 
 type R = Rule<ContentApi, GameEvent, Offer>
 const rude = eq('tone', 'rude')
+/** Терминальный эпилог закрывает лестницу (#1576): мир заморожен, на крик отвечает колода эпилога, а не ступень ссоры. */
+const live = missing(endgame.active)
 const cools = [add(count.rude), add(HEAT)]
 // остывание — отложенное событие, а не отложенное «−1»: после примирения (температура = 0) старые остывания не уводят её в минус
 const cool: R['trigger'] = [{ event: 'RudeCool', delay: 20 }]
@@ -74,7 +76,8 @@ async function offended(game: ContentApi, text?: string, away = true): Promise<v
 
 const family = (who: string): R => ({
   // «может ли писать» — ворота, а не частный случай: ступень лестницы та же, что у остальной родни
-  name: `Rude_Family_${who}`, event: 'PlayerMessage', when: [rude, gte(HEAT, 1), ...speakerWhen(who)], specificity: 3, cooldown: { days: 4 }, remember: cools, trigger: cool,
+  // ступень S1 держится выше повтора обиды (S0) числом, а не длиной when: гейт эпилога (#1576) — тоже условие
+  name: `Rude_Family_${who}`, event: 'PlayerMessage', when: [live, rude, gte(HEAT, 1), ...speakerWhen(who)], specificity: 4, cooldown: { days: 4 }, remember: cools, trigger: cool,
   respond: async ({ game }) => {
     game.mood(-1)
     // у родственника кончились новые фразы — пишет сам Алик
@@ -89,27 +92,27 @@ const family = (who: string): R => ({
 export const rudeRules: R[] = [
   // Реальные угрозы не превращаем в судебную шутку: они ускоряют ссору и получают отдельный ответ.
   {
-    name: 'Tone_ViolentThreat', event: 'PlayerMessage', when: [eq('category', 'violent-threat')], bonus: 6,
+    name: 'Tone_ViolentThreat', event: 'PlayerMessage', when: [live, eq('category', 'violent-threat')], bonus: 6,
     remember: [add(count.rude), add(count.violence), add(HEAT, 2)],
     trigger: [{ event: 'RudeCool', delay: 20 }, { event: 'RudeCool', delay: 40 }],
     respond: ({ game }) => offended(game, game.uniq(() => game.draw('VIOLENT_THREAT', T.VIOLENT_THREAT)), false),
   },
   {
-    name: 'Tone_Intimidation', event: 'PlayerMessage', when: [eq('category', 'intimidation')], bonus: 6,
+    name: 'Tone_Intimidation', event: 'PlayerMessage', when: [live, eq('category', 'intimidation')], bonus: 6,
     remember: [add(count.rude), add(count.intimidation), add(HEAT)], trigger: cool,
     respond: ({ game }) => offended(game, game.uniq(() => game.draw('INTIMIDATION', T.INTIMIDATION)), false),
   },
   // S0 — обида (как раньше, но коротко); второй крик за игру Алик помнит
-  { name: 'Tone_Rude', event: 'PlayerMessage', when: [rude], remember: cools, trigger: cool, respond: ({ game }) => offended(game) },
+  { name: 'Tone_Rude', event: 'PlayerMessage', when: [live, rude], remember: cools, trigger: cool, respond: ({ game }) => offended(game) },
   {
-    name: 'Tone_Rude_Again', event: 'PlayerMessage', when: [rude, gte(count.rude, 2)], remember: cools, trigger: cool,
+    name: 'Tone_Rude_Again', event: 'PlayerMessage', when: [live, rude, gte(count.rude, 2)], remember: cools, trigger: cool,
     respond: async ({ game }) => { game.unlock('memory'); await offended(game, freshOr(game, 'RUDE_AGAIN', RUDE_AGAIN, game.X.offended), false) },
   },
   // S1 — вместо Алика пишет родня (одна из трёх, у каждой свой перерыв)
   ...Object.keys(T.RUDE_FAMILY).map(family),
   // S2 — пропущенные от мамы и голосовое с «расшифровкой»
   {
-    name: 'Rude_Calls', event: 'PlayerMessage', when: [rude, gte(HEAT, 2)], bonus: 2, cooldown: { days: 5 }, remember: cools, trigger: cool,
+    name: 'Rude_Calls', event: 'PlayerMessage', when: [live, rude, gte(HEAT, 2)], bonus: 2, cooldown: { days: 5 }, remember: cools, trigger: cool,
     respond: async ({ game, facts }) => {
       game.mood(-1)
       // счётчик пропущенных только растёт: он копится за партию, а не выдумывается каждый раз
@@ -128,7 +131,7 @@ export const rudeRules: R[] = [
   // S3 — блок на 4 дня; Алик всё равно отвечает — с телефона Бориса, «Нивы», домофона.
   // Каждый следующий блок другого вкуса (#1423): второй — пишет мама, третий — канцелярия, четвёртый — тишина
   {
-    name: 'Rude_Block', event: 'PlayerMessage', when: [rude, gte(HEAT, 3)], bonus: 3, cooldown: { days: 10 },
+    name: 'Rude_Block', event: 'PlayerMessage', when: [live, rude, gte(HEAT, 3)], bonus: 3, cooldown: { days: 10 },
     remember: [...cools, set(blocked, true, { forDays: 4 }), set(blockedHint, false), set(statusHidden, false), add(count.block)], trigger: cool,
     respond: async ({ game }) => {
       game.mood(-2)
@@ -141,12 +144,12 @@ export const rudeRules: R[] = [
   },
   {
     // блок важнее суда: суд — когда разблокирует
-    name: 'Rude_WhileBlocked', event: 'PlayerMessage', when: [rude, is(blocked)], bonus: 7, remember: cools, trigger: cool,
+    name: 'Rude_WhileBlocked', event: 'PlayerMessage', when: [live, rude, is(blocked)], bonus: 7, remember: cools, trigger: cool,
     respond: async ({ game }) => { game.sys(T.NOT_DELIVERED); await game.sleep(900); await sayBlocked(game); game.setCtx({ offended: true }) },
   },
   // в чёрном списке не доходит ничего: ни вежливое, ни «Мууу», ни вопрос — Алик пишет с чужих номеров, не отвечая на сказанное
   {
-    name: 'Tone_WhileBlocked', event: 'PlayerMessage', when: [is(blocked)], bonus: 6,
+    name: 'Tone_WhileBlocked', event: 'PlayerMessage', when: [live, is(blocked)], bonus: 6,
     respond: async ({ game }) => { game.sys(T.NOT_DELIVERED); await game.sleep(900); await sayBlocked(game) },
   },
   {
@@ -154,16 +157,16 @@ export const rudeRules: R[] = [
     respond: async ({ game }) => { game.sys(T.NOT_DELIVERED); await game.sleep(900); await sayBlocked(game) },
   },
   // S4 — семейный суд в групповом чате, один раз за игру
-  { name: 'Rude_Tribunal', event: 'PlayerMessage', when: [rude, gte(HEAT, 4)], bonus: 6, once: true, priority: 'cinematic', remember: cools, trigger: cool, respond: ({ game }) => game.tribunal() },
+  { name: 'Rude_Tribunal', event: 'PlayerMessage', when: [live, rude, gte(HEAT, 4)], bonus: 6, once: true, priority: 'cinematic', remember: cools, trigger: cool, respond: ({ game }) => game.tribunal() },
   // S5 — после суда 10 дней вежливости: на крик — ответ «в рамках регламента»
   {
-    name: 'Rude_Polite', event: 'PlayerMessage', when: [rude, is(polite)], bonus: 8, remember: [add(count.rude)],
+    name: 'Rude_Polite', event: 'PlayerMessage', when: [live, rude, is(polite)], bonus: 8, remember: [add(count.rude)],
     respond: async ({ game }) => { await game.say([line(game, 'POLITE_RUDE', T.POLITE_RUDE)]) },
   },
   // финал — вендетта: серия криков за игру и ни одного извинения.
   // Порог читается до remember текущего крика, поэтому 14 здесь — это 15-й крик, число из шпаргалки (#742)
   {
-    name: 'Rude_Vendetta', event: 'PlayerMessage', when: [rude, gte(count.rude, 14), lte(count.sorry, 0)], bonus: 8, once: true, priority: 'cinematic',
+    name: 'Rude_Vendetta', event: 'PlayerMessage', when: [live, rude, gte(count.rude, 14), lte(count.sorry, 0)], bonus: 8, once: true, priority: 'cinematic',
     remember: [add(count.rude), set(vendetta, true), set(coldWar, true)],
     respond: async ({ game }) => {
       // ход объявления — начало окна примирения (#1565): экран схода ждёт его, а не встаёт этим же ходом
@@ -178,7 +181,7 @@ export const rudeRules: R[] = [
   // Грубость, требования и собственные инициативы Алика говорят из холодных пулов; снимает режим
   // принятое извинение (ритуал примирения, посредник, обычное sorry).
   {
-    name: 'ColdWar_Rude', event: 'PlayerMessage', when: [is(coldWar), eq('tone', 'rude'), missing(blocked)], specificity: 30,
+    name: 'ColdWar_Rude', event: 'PlayerMessage', when: [live, is(coldWar), eq('tone', 'rude'), missing(blocked)], specificity: 30,
     remember: cools, trigger: cool,
     respond: async ({ game }) => {
       game.mood(-2)
@@ -187,7 +190,7 @@ export const rudeRules: R[] = [
     },
   },
   {
-    name: 'ColdWar_Request', event: 'PlayerMessage', when: [is(coldWar), eq('category', 'request'), missing(blocked)], specificity: 30,
+    name: 'ColdWar_Request', event: 'PlayerMessage', when: [live, is(coldWar), eq('category', 'request'), missing(blocked)], specificity: 30,
     respond: async ({ game }) => { await coldWarLine(game, 'CW_REPLY', T.COLD_WAR_ALL) },
   },
   // Алик пишет сам только формально: расписания и напоминания о документах, без «ты поел?»
@@ -205,7 +208,7 @@ export const rudeRules: R[] = [
 
   // ветка: угроза судом, пока ссора горячая — встречный иск, суд мирит
   {
-    name: 'Tone_Threat_Hot', event: 'PlayerMessage', when: [eq('tone', 'threat'), gte(HEAT, 2)], bonus: 2, once: true,
+    name: 'Tone_Threat_Hot', event: 'PlayerMessage', when: [live, eq('tone', 'threat'), gte(HEAT, 2)], bonus: 2, once: true,
     // суд мирит — значит, и холодная война кончена: «Мир, брат» не бывает половиной мира (#1424)
     remember: [add(count.threat), set(HEAT, 0), set(coldWar, false)],
     respond: async ({ game, facts }) => {
@@ -217,14 +220,14 @@ export const rudeRules: R[] = [
   },
   {
     // встречный иск уже был — теперь апелляции; суд немного остужает
-    name: 'Tone_Threat_Hot_Again', event: 'PlayerMessage', when: [eq('tone', 'threat'), gte(HEAT, 2)], bonus: 1, remember: [add(count.threat)],
+    name: 'Tone_Threat_Hot_Again', event: 'PlayerMessage', when: [live, eq('tone', 'threat'), gte(HEAT, 2)], bonus: 1, remember: [add(count.threat)],
     respond: async ({ game }) => { cooldown(game, 1); await game.say([freshOr(game, 'APPEAL', T.APPEAL, game.X.threat)]) },
   },
   // ветка: кричал всю игру и вдруг вежлив — Алику не хватает крика
   {
     // ссора остыла (давно не кричал), но за игру накричал много. Официальное обращение в суд (#1435) — не
     // «вдруг вежлив»: оно ведёт своё дело, и отклик «не хватает крика» его не съедает
-    name: 'Tone_MissRude', event: 'PlayerMessage', when: [ne('tone', 'rude'), ne('tone', 'threat'), ne('category', 'threat'), gte(count.rude, 15), lte(HEAT, 0), gte('sinceRude', 8), missing(coldWar)], odds: 0.35, cooldown: { turns: 8 },
+    name: 'Tone_MissRude', event: 'PlayerMessage', when: [live, ne('tone', 'rude'), ne('tone', 'threat'), ne('category', 'threat'), gte(count.rude, 15), lte(HEAT, 0), gte('sinceRude', 8), missing(coldWar)], odds: 0.35, cooldown: { turns: 8 },
     respond: async ({ game }) => { const t = game.line('MISS_RUDE', T.MISS_RUDE); if (!t) return game.turnRoll(); await game.say([t]); game.unlock('habit'); await game.turnRoll() },
   },
 
