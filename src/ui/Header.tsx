@@ -50,14 +50,16 @@ export function StatusBar() {
 export function ChatHeader({ onInfo }: { onInfo: () => void }) {
   const game = useGame()
   const v = viewOf(game)
+  // Бритьё перекрывает барана: оба факта остаются в партии (ачивки, досье), а на аватаре — «без усов».
+  const look = v.shaved ? 'shaved' : v.ram ? 'ram' : ''
   return (
     <header className="chat-head">
       <div
-        className={'avatar' + (v.ram ? ' ram' : v.shaved ? ' shaved' : '')}
+        className={'avatar' + (look ? ' ' + look : '')}
         id="avatar"
-        aria-label={v.shaved && !v.ram ? 'Алик без усов' : undefined}
+        aria-label={look === 'shaved' ? 'Алик без усов' : undefined}
       >
-        {v.ram ? '🐏' : v.shaved ? <><span className="shaved-letter">А</span><span className="shaved-cap">без усов</span></> : 'А'}
+        {look === 'ram' ? '🐏' : look === 'shaved' ? <><span className="shaved-letter">А</span><span className="shaved-cap">без усов</span></> : 'А'}
       </div>
       <div className="who">
         <div className="name">Алик Воздухонесян</div>
