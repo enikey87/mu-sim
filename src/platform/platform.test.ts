@@ -257,14 +257,31 @@ describe('адаптер витрины (#688)', () => {
     }
   })
 
-  it('Telegram: без инвойса в конфиге и без openInvoice покупки нет (#1235)', async () => {
-    vi.stubEnv('VITE_TELEGRAM_INVOICE_URL', '')
+  it('Telegram: пустая переменная сборки — карточка платит по константе-фолбэку (#1534)', async () => {
+    const openInvoice = vi.fn((_url: string, cb?: (status: string) => void) => { cb?.('paid') })
+    ;(window as unknown as { Telegram?: unknown }).Telegram = { WebApp: { openInvoice } }
     try {
-      expect(telegramPlatform({ load: async () => {} }).pay50, 'пустой инвойс — карточки покупки нет').toBeUndefined()
+      for (const empty of ['', '   ']) {
+        vi.stubEnv('VITE_TELEGRAM_INVOICE_URL', empty)
+        const p = telegramPlatform({ load: async () => {} })
+        expect(p.pay50, 'пустая переменная не убирает покупку из сборки').toBeTypeOf('function')
+        await expect(p.pay50?.(), 'фолбэк-инвойс живой — оплата идёт как обычно').resolves.toBe('paid')
+        expect(openInvoice).toHaveBeenLastCalledWith('https://t.me/$jIaNPQkrGUtzFQAAE6CCLTqkr0Y', expect.any(Function))
+      }
 
+      // непустая переменная главнее фолбэка: она первоисточник ссылки
       vi.stubEnv('VITE_TELEGRAM_INVOICE_URL', 'https://t.me/$hash-cup')
-      // старый клиент (до Bot API 6.1) метода не знает: карточка есть, окно не открывается
-      ;(window as unknown as { Telegram?: unknown }).Telegram = { WebApp: {} }
+      await expect(telegramPlatform({ load: async () => {} }).pay50?.(), 'переменная выигрывает у константы').resolves.toBe('paid')
+      expect(openInvoice).toHaveBeenLastCalledWith('https://t.me/$hash-cup', expect.any(Function))
+    } finally {
+      delete (window as unknown as { Telegram?: unknown }).Telegram
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it('Telegram: старый клиент без openInvoice — карточка есть, окно не открывается (#1235)', async () => {
+    ;(window as unknown as { Telegram?: unknown }).Telegram = { WebApp: {} }
+    try {
       const p = telegramPlatform({ load: async () => {} })
       await p.init()
       await expect(p.pay50?.(), 'клиент без openInvoice — оплаты нет, партия не меняется').resolves.toBe('closed')
