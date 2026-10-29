@@ -1,5 +1,6 @@
 // Плейтест для поиска несостыковок: бот со своим seeded-генератором играет партию, каждое действие записывается.
 // Та же версия кода + тот же seed = та же партия; запись действий проигрывается заново (replay) и сверяется.
+// Форсированные сценарии играет `driver` (src/tools/scenarios.test.ts): ход решает тест, а не профиль бота.
 import { Game } from '../engine/game'
 import { manualClock } from '../engine/clock'
 import { seededRng, type Rng } from '../engine/rng'
@@ -10,7 +11,7 @@ import { NOTIF } from '../content/life'
 import { PLAYER_PREFIX, PLAYER_SUFFIX } from '../content/misc'
 import { alikDead } from '../content/memkeys'
 import { type Criterion, type Rule } from '../engine/rules'
-import type { Choice, Msg, NewMsg, PhoneEvent } from '../engine/state'
+import type { Choice, Msg, NewMsg, PhoneEvent, Tone } from '../engine/state'
 import { mooClock } from '../engine/moo'
 import { RUDE_SHOUTS } from './shouts'
 
@@ -26,11 +27,23 @@ const HOURS = [14, 20, 9, 2, 17, 12]
 /** Что бот сделал за ход: выбрал вариант i из offered, ответил на допработу, зарядил телефон, промолчал.
  *  `free` — свободный текст вместо кнопки (грубый профиль); тогда `i` = -1. */
 export type Act =
-  | { kind: 'send'; i: number; offered: string[]; at: number; free?: string }
+  | { kind: 'send'; i: number; offered: string[]; at: number; free?: string; tone?: Tone }
   | { kind: 'job'; yes: boolean | 'mirror'; at?: number }
   | { kind: 'card'; pick: 'take' | 'sell' | 'later' }
   | { kind: 'charge' }
   | { kind: 'idle' }
+
+/** Ход сценарного драйвера: за игрока решает тест, а не профиль бота. */
+export type DriverAct =
+  | { kind: 'send'; i: number }
+  | { kind: 'free'; text: string; tone?: Tone }
+  | { kind: 'job'; yes: boolean | 'mirror' }
+  | { kind: 'card'; pick: 'take' | 'sell' | 'later' }
+  | { kind: 'charge' }
+  | { kind: 'idle' }
+
+/** Драйвер форсированного сценария: `undefined` — ход отдаётся боту профиля (обычная партия харнесса). */
+export type Driver = (game: Game, turn: number) => DriverAct | undefined | Promise<DriverAct | undefined>
 
 /** Что игрок видит и слышит вне чата («Мууу» на фоне, уведомления телефона): at — индекс сообщения, перед которым. */
 export interface Aside { at: number; text: string }
@@ -179,8 +192,9 @@ export function attachSpeechAttribution(game: Game): {
   return { ruleOf, clearRule: () => { lastRule = null } }
 }
 
-/** Сыграть партию ботом (или повторить записанные действия replay); watch — посмотреть на игру до первого хода. */
-export async function playtest(seed: number, turns: number, replay?: Act[], watch?: (game: Game) => void | Promise<void>, profile: PlayProfile = 'neutral'): Promise<Played> {
+/** Сыграть партию ботом (или повторить записанные действия replay); watch — посмотреть на игру до первого хода.
+ *  `driver` — форсированный сценарий: каждый ход решает тест, а `undefined` возвращает ход боту профиля. */
+export async function playtest(seed: number, turns: number, replay?: Act[], watch?: (game: Game) => void | Promise<void>, profile: PlayProfile = 'neutral', driver?: Driver): Promise<Played> {
   const style = STYLES[seed % STYLES.length]
   const hour = HOURS[seed % HOURS.length]
   const clock = manualClock(Date.parse('2026-09-14T12:00:00Z') + (seed % 7) * 864e5)
@@ -270,8 +284,35 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
     const free = i < 0 ? pickShout(bot, acts.flatMap((a) => (a.kind === 'send' && a.free !== undefined ? [a.free] : []))) : undefined
     return { kind: 'send', i, offered, free, at: game.S.msgs.length }
   }
+  /** Ход драйвера → запись партии: предложенные варианты и позиция снимаются с текущего кадра, а не угадываются тестом. */
+  const fromDriver = (d: DriverAct): Act => {
+    switch (d.kind) {
+      case 'send':
+        if (!game.choices[d.i]) throw new Error(`драйвер выбрал вариант ${d.i}, а в кадре ${game.choices.length} — контент сдвинулся: обновите шаги или сдвиньте сид`)
+        return { kind: 'send', i: d.i, offered: game.choices.map((c) => c.text), at: game.S.msgs.length }
+      case 'free': return { kind: 'send', i: -1, offered: game.choices.map((c) => c.text), at: game.S.msgs.length, free: d.text, tone: d.tone ?? 'rude' }
+      case 'job': return { kind: 'job', yes: d.yes, at: game.S.msgs.length }
+      case 'card': return { kind: 'card', pick: d.pick }
+      case 'charge': return { kind: 'charge' }
+      case 'idle': return { kind: 'idle' }
+    }
+  }
   for (let k = 0; k < (replay?.length ?? turns); k++) {
-    const a = replay ? replay[k] : next()
+    let a: Act
+    if (replay) a = replay[k]
+    else {
+      let decided: DriverAct | undefined
+      if (driver) {
+        try {
+          decided = await driver(game, k)
+        } catch (e) {
+          // расхождение сценария — не тихая другая партия: хвост переписки тут же, а не отдельным прогоном PLAYTEST_OUT
+          const tail = game.S.msgs.slice(-40).map(line).join('\n')
+          throw new Error(`${(e as Error).message}\n\nсценарий разошёлся на ходу ${k} (сид ${seed}); последние сообщения:\n${tail}`)
+        }
+      }
+      a = decided ? fromDriver(decided) : next()
+    }
     clearRule() // речь до первого выбора правила в этом ходе — ничья
     if (a.kind === 'send' && replay) {
       const now = game.choices.map((c) => c.text)
@@ -283,7 +324,7 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
     else if (a.kind === 'card') game.answerCard(openOffer(game)!.id, a.pick)
     else if (a.kind === 'idle') await game.onIdle()
     else {
-      await game.send(a.free !== undefined ? { text: a.free, tone: 'rude' } : game.choices[a.i])
+      await game.send(a.free !== undefined ? { text: a.free, tone: a.tone ?? 'rude' } : game.choices[a.i])
       // перед репликой игрока может встать разделитель дня — варианты привязываем к самой реплике
       if (!replay) a.at = game.S.msgs.findIndex((m, i) => i >= a.at && m.kind === 'text' && m.from === 'me')
     }
