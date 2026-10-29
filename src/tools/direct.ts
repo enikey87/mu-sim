@@ -70,7 +70,17 @@ export const DIRECT: Record<string, DirectCase> = {
   // #1424: до вендетты бот в выборках не доходит — требование и пачка «пока тебя не было» в режиме
   // холодной войны держатся прямыми случаями (факт ставит сама Вендетта)
   ColdWar_Request: { event: 'PlayerMessage', facts: { tone: 'neutral', category: 'request' }, setup: coldWarMode },
+  ColdWar_Rude: { event: 'PlayerMessage', facts: { tone: 'rude' }, setup: coldWarMode },
+  // #1565: в сходе видна кнопка посредника, и бот выборок уходит ею в первый же кадр — режим и его
+  // строки до экрана почти не звучат; правила целы, держим их прямыми случаями
+  ColdWar_Idle: { event: 'AlikIdle', setup: coldWarMode },
   ColdWar_Away: { event: 'AlikAway', setup: coldWarMode },
+  Beat_EnmityFamily: { event: 'StoryBeat', setup: (g) => { g.S.mem.vendetta = true } },
+  Beat_EnmityRumor: { event: 'StoryBeat', setup: (g) => { g.S.mem.vendetta = true } },
+  // #1565: прямое извинение в живом сходе и кнопки посредника в нём — бот уходит ими сразу после вендетты
+  Says_sorry_vendetta: { event: 'PlayerSays', facts: { intent: 'sorry' }, setup: (g) => { g.S.mem.vendetta = true } },
+  Opt_Via_mama_enmity: { event: 'BuildChoices', setup: (g) => { g.S.mem.vendetta = true } },
+  Opt_Via_boris_enmity: { event: 'BuildChoices', setup: (g) => { g.S.mem.vendetta = true; g.S.arcs.boris = { i: 4, last: 0 } } },
   Turn_WhileDead: { event: 'AlikTurn', setup: (g) => { g.S.mem.alik_dead = true } },
   // гарантия первой серии (#636): к 12-му сообщению шанс Turn_ArcFirst мог промахнуться всю посадку
   Turn_ArcGuarantee: { event: 'AlikTurn', setup: (g) => { g.S.stats.sent = 12; g.S.day = START_DAY + ARC_MARINATION_DAYS } },

@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest'
 import { makeGame, alikTexts } from '../test/helpers'
 import { ARCS, ARC_DONE, CAST } from './arcs'
 import { ACH } from './achievements'
-import { FINALES, ENDINGS, DEFAULT_FINALE, ENDING_MIN_DAY, CHRONIC_RUDE_AFTER_VENDETTA } from './finales'
+import { FINALES, ENDINGS, DEFAULT_FINALE, ENDING_MIN_DAY, CHRONIC_RUDE_AFTER_VENDETTA, VENDETTA_GRACE_TURNS } from './finales'
 import { endingRules } from './rules/finales'
 import type { Game } from '../engine/game'
 import { valueOf } from '../engine/rules'
@@ -449,13 +449,15 @@ describe('концовки игры', () => {
     type Step = (g: Game) => Promise<void>
     // сход объявляется своим путём: двадцать пятый крик за партию без извинений
     const toVendetta = async (g: Game) => { Object.assign(g.S.mem, { 'count.rude': 25, 'rude.heat': 5 }); await g.send({ text: 'АЛИК!!! ТЫ ВРЁШЬ!!!', tone: 'rude' }); expect(g.S.mem.vendetta).toBe(true) }
+    // #1565: сход объявлен не экраном, а окном примирения — экран ждёт, пока окно кончится
+    const grace = async (g: Game) => { for (let i = 0; i < VENDETTA_GRACE_TURNS; i++) await g.send({ text: 'Понял. Молчу.', tone: 'neutral' }) }
     const SCENARIO: Record<string, Step[]> = {
       family: [finale('samvel.groom')],
       heir: [finale('alik_death.will')],
       ram: [finale('boris.toyou')],
       alik: [finale('garik.cutter')],
       honest: [finale('grant.ally')],
-      vendetta: [toVendetta],
+      vendetta: [toVendetta, grace],
       // ранний финал хроники (#1425): сход объявляется своим путём, порог криков после него добирается
       // настоящим грубым ходом — счётчик ставит движок, а не поле в памяти
       bloodfeud: [

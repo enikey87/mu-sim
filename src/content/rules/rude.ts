@@ -8,7 +8,7 @@ import type { GameEvent, Offer } from './events'
 import { WORLD, speaks } from '../world'
 import * as T from '../rude'
 import { RUDE_AGAIN } from '../misc'
-import { HEAT, alikDead, blocked, blockedHint, coldWar, count, countersuitAt, mamaCalls, mamaVoiceAt, phoneKarine, polite, ritualCount, statusHidden, vendetta } from '../memkeys'
+import { HEAT, alikDead, blocked, blockedHint, coldWar, count, countersuitAt, mamaCalls, mamaVoiceAt, phoneKarine, polite, ritualCount, statusHidden, vendetta, vendettaAt } from '../memkeys'
 
 type R = Rule<ContentApi, GameEvent, Offer>
 const rude = eq('tone', 'rude')
@@ -166,6 +166,8 @@ export const rudeRules: R[] = [
     name: 'Rude_Vendetta', event: 'PlayerMessage', when: [rude, gte(count.rude, 14), lte(count.sorry, 0)], bonus: 8, once: true, priority: 'cinematic',
     remember: [add(count.rude), set(vendetta, true), set(coldWar, true)],
     respond: async ({ game }) => {
+      // ход объявления — начало окна примирения (#1565): экран схода ждёт его, а не встаёт этим же ходом
+      game.applyFacts([set(vendettaAt, Number(game.facts().sent ?? 0))])
       await game.sticker({ e: '🗡️', c: 'Вендетта' })
       for (const [w, said] of T.VENDETTA) await game.say([w === 'alik' ? said : { w, t: saidText(said), claims: saidClaims(said) }])
       game.unlock('vendetta')

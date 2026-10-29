@@ -586,13 +586,15 @@ describe('холодная война после вендетты', () => {
     const after = await fire(game, 'rude')
     expect(after.r).not.toBe('ColdWar_Rude')
   })
-  it('ритуал примирения (хаш) тоже снимает режим', async () => {
+  it('ритуал примирения (хаш) — тот же выход: его хаш снимает и режим, и сход', async () => {
     const { game } = makeGame()
     await vendetta(game)
-    heat(game, 3) // извинение после серии криков — только ритуалом
-    expect((await says(game, 'sorry')).r).toBe('Says_sorry_ritual')
+    // в живом сходе текст принимается напрямую (#1565), поэтому сцену ритуала проверяем входом:
+    // её хаш обязан снять оба флага, а не половину (#1556)
+    await game.enterNode('ritual', 'ask')
     await game.send(fresh(game).find((c) => c.go === 'hash')!)
     expect(game.S.mem[coldWar]).toBe(false)
+    expect(game.S.mem.vendetta).toBe(false)
   })
   it('мир кончает режим: встречный иск и «Мууу» — мир целиком, а не половина', async () => {
     const a = makeGame().game

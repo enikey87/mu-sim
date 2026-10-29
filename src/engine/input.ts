@@ -8,6 +8,8 @@ export interface ClassifiedInput {
   intent?: 'request' | 'sorry' | 'moo' | 'arc'
   /** Сериал вопроса «как там X». */
   arg?: string
+  /** Текст просит денег или возврата: вежливое «извините, что беспокою» перед просьбой — не извинение (#1565). */
+  request?: boolean
 }
 
 const normalize = (text: string): string => text.trim().toLocaleLowerCase('ru-RU').replaceAll('ё', 'е')
@@ -74,7 +76,7 @@ const ANGER_PHRASES = [
   'заткнись', 'пошел ты', 'пошел вон', 'пошел нах', 'пошел на хуй',
   'иди к черту', 'иди нах', 'иди на хуй', 'отвали', 'хватит врать', 'катись',
 ]
-const APOLOGY = ['извин', 'прости', 'прощен', 'виноват', 'погорячил', 'сорян']
+const APOLOGY = ['извин', 'прости', 'прощен', 'виноват', 'погорячил', 'перегну', 'сорян']
 const GRATITUDE = ['спасиб', 'благодар', 'спс']
 const GREETING = ['привет', 'здравств', 'добр', 'здаров', 'салам']
 const COURTESY = ['пожалуйст', 'пожалст', 'будьте', 'будь', 'плиз']
@@ -175,7 +177,7 @@ export function classifyUserInput(text: string, mentions: ReadonlyArray<readonly
     : arcId ? 'arc'
     : undefined
 
-  return { category, tone, ...(intent ? { intent } : {}), ...(arcId ? { arg: arcId } : {}) }
+  return { category, tone, ...(intent ? { intent } : {}), ...(arcId ? { arg: arcId } : {}), ...(request ? { request } : {}) }
 }
 
 export type LegalClaim = 'court' | 'police' | 'statement' | 'prosecutor' | 'lawyer' | 'collectors' | 'tax'
