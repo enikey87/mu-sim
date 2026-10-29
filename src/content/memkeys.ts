@@ -181,6 +181,8 @@ export const endgame = {
   exits: 'endgame.exits', mutes: 'endgame.mutes', renames: 'endgame.renames',
   /** Какие факты архива дела уже прозвучали в группе — одна ссылка на факт, а не на партию (#608). */
   arch: 'endgame.arch',
+  /** Терминальный эпилог вражды (#1556): та же заморозка мира, но своя группа и свой цикл, а не День выплаты. */
+  vendetta: 'endgame.vendetta',
 } as const
 
 /** Праздник, который партия уже поздравила: «newYear@2026» — год начала окна (#255). */

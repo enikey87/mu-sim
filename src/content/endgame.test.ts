@@ -3,6 +3,7 @@ import { makeGame , setMoney} from '../test/helpers'
 import {
   ENDGAME_ALIK_BACK, ENDGAME_ARCH, ENDGAME_ARCH_LIE, ENDGAME_FORMALITIES, ENDGAME_LEAVE, ENDGAME_MONEY,
   ENDGAME_MUTE, ENDGAME_RENAMES, ENDGAME_RETURNER_LINES, ENDGAME_RETURNERS,
+  ENDGAME_VENDETTA_APOLOGY, ENDGAME_VENDETTA_FORMALITIES, ENDGAME_VENDETTA_LEAVE, ENDGAME_VENDETTA_RENAMES,
 } from './endgame'
 import { valueOf } from '../engine/rules'
 import { saidText } from './fact'
@@ -55,13 +56,15 @@ describe('бесконечная группа после Дня выплаты',
     expect(game.S.msgs).toHaveLength(count)
   })
 
-  it('учитывает вендетту только во вступлении', async () => {
+  it('вендетта не подменяет вступление Дня выплаты: у неё свой эпилог и своя группа (#1556)', async () => {
+    // старое сохранение: партия уже в группе выплаты, но в досье лежит концовка вендетты
     const { game } = makeGame()
     game.S.endings.vendetta = game.S.day - 1
 
     await enterGame(game)
 
-    expect(messages(game).join(' ')).toMatch(/вне политики/)
+    expect(messages(game).join(' ')).toMatch(/ВЫПЛАТА ЗАКРЫТА/)
+    expect(messages(game).join(' '), 'группы вражды в потоке выплаты нет').not.toMatch(/ВРАЖДА ЗАКРЫТА/)
     expect(game.choices.map((c) => c.act)).toEqual(['endgameMoney', 'endgameMute', 'endgameLeave'])
   })
 
@@ -151,12 +154,22 @@ describe('бесконечная группа после Дня выплаты',
       ['renames', ENDGAME_RENAMES, 30],
       ['archive', ENDGAME_ARCH.map((e) => saidText(valueOf(e).line)), 30],
       ['archive-lie', ENDGAME_ARCH_LIE, 4],
+      ['vendetta-apology', ENDGAME_VENDETTA_APOLOGY, 8],
+      ['vendetta-formalities', ENDGAME_VENDETTA_FORMALITIES, 10],
+      ['vendetta-leave', ENDGAME_VENDETTA_LEAVE, 6],
+      ['vendetta-renames', ENDGAME_VENDETTA_RENAMES, 6],
     ]
     for (const [name, pool, min] of pools) {
       expect(new Set(pool).size, name).toBe(pool.length)
       expect(pool.length, name).toBeGreaterThanOrEqual(min)
     }
     expect(ENDGAME_FORMALITIES.join(' ')).not.toMatch(/№/)
+  })
+
+  it('формальности вражды не говорят о выплате: деньги остались за Днём выплаты (#1556)', () => {
+    const pools = [ENDGAME_VENDETTA_FORMALITIES, ENDGAME_VENDETTA_LEAVE, ENDGAME_VENDETTA_RENAMES]
+    const money = pools.flat().filter((l) => /выплат|деньг|денег|рубл/i.test(l))
+    expect(money).toEqual([])
   })
 
   it('одна шутка — один раз: ни одна пара строк не делит общий кусок ≥ 30 символов', () => {
@@ -170,6 +183,10 @@ describe('бесконечная группа после Дня выплаты',
       ['alik-back', ENDGAME_ALIK_BACK],
       ['archive', ENDGAME_ARCH.map((e) => saidText(valueOf(e).line))],
       ['archive-lie', ENDGAME_ARCH_LIE],
+      ['vendetta-apology', ENDGAME_VENDETTA_APOLOGY],
+      ['vendetta-formalities', ENDGAME_VENDETTA_FORMALITIES],
+      ['vendetta-leave', ENDGAME_VENDETTA_LEAVE],
+      ['vendetta-renames', ENDGAME_VENDETTA_RENAMES],
     ]
     // куски по 30 символов вместо перебора всех подстрок каждой пары: общий кусок ≥ 30 — это общий
     // ровно-30-символьный, поэтому проверка та же, а 17 700 пар находятся за один проход

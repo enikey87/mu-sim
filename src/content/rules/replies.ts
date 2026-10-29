@@ -20,7 +20,7 @@ import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, PROMISE_PENCIL,
 import { CREW_PAID } from '../crew'
 import { HOLIDAY_MONEY, type Holiday } from '../holidays'
 import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_THIRD, LIE_NOCRED, LIE_NIVA, LIE_PROMISE, LIE_ENVELOPES } from '../lies'
-import { HEAT, alikShaved, arsenTrackAt, avitoReviewAt, bathAnswered, bathAskedAt, borisAskAt, borisSaleAt, coldWar, collectorsAskAt, collectorsEpAt, countersuitAt, courtVerdictAt, tileCourtAt, tileLawyerAt, tileMonumentAt, tileSlipAt, nivaBackAt, saleAt, crewPaidAt, debutAt, grantBathAt, grantTileAt, inhDoneAt, internAccepted, internAt, internDeclined, kettleAt, lawyerAt, moustacheAskAt, offendedAskAt, ramPhotoAt, rubikAskAt, rubikHoleAt, moustachePhotoAt, photoAt, tileAdAt, tamadaDoneAt, mamaMarketAt, mamaVoiceAt, samvelDivorceAt, grantHouseAt, seryogaAskAt, transferAt, vacancyAt, muenAnswered, hhJobAt, seryogaLoanAt, dachaAskAt, evictAt, collectorsEchoAt, threatGovAt, fraudCardAt, inhRefused, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, saidKonak, stateAt, topic, topicLast, topicMute, topicRun, whenYears } from '../memkeys'
+import { HEAT, alikShaved, arsenTrackAt, avitoReviewAt, bathAnswered, bathAskedAt, borisAskAt, borisSaleAt, coldWar, vendetta, collectorsAskAt, collectorsEpAt, countersuitAt, courtVerdictAt, tileCourtAt, tileLawyerAt, tileMonumentAt, tileSlipAt, nivaBackAt, saleAt, crewPaidAt, debutAt, grantBathAt, grantTileAt, inhDoneAt, internAccepted, internAt, internDeclined, kettleAt, lawyerAt, moustacheAskAt, offendedAskAt, ramPhotoAt, rubikAskAt, rubikHoleAt, moustachePhotoAt, photoAt, tileAdAt, tamadaDoneAt, mamaMarketAt, mamaVoiceAt, samvelDivorceAt, grantHouseAt, seryogaAskAt, transferAt, vacancyAt, muenAnswered, hhJobAt, seryogaLoanAt, dachaAskAt, evictAt, collectorsEchoAt, threatGovAt, fraudCardAt, inhRefused, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, saidKonak, stateAt, topic, topicLast, topicMute, topicRun, whenYears } from '../memkeys'
 import type { ArcId, TopicId } from '../ids'
 import { BATH_ANSWER } from './player-choice-pools'
 import { PROMISE_SHAVE_ASK, BORIS_MEMORY_B, MOUSTACHE_PHOTO_B, MAMA_MARKET_B, TILE_AD_B, TAMADA_DONE_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, GRANT_HOUSE_B, COURT_VERDICT_B, TILE_SLIP_B, TILE_COURT_B, TILE_LAWYER_B, TILE_MONUMENT_B, NIVA_BACK_B, SOLD_B, RAM_PHOTO, BORIS_SALE, VACANCY, VACANCY_START_B, VACANCY_SOON_B, SERYOGA_B, GRANT_BATH_B, OFFENDED_ASK_B, BATH_ASK_B, MUEN_ASK_B, INH_BURNED_B, INH_REFUSED_B, AVITO_REVIEW, RUBIK_ASK, KETTLE, CREW_CALL_B, LAWYER_B, COLLECTORS_ASK_B, COLLECTORS_EP_B, INTERN_B, HOLE_B, COUNTERSUIT_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, DEBUT_BORIS_B, DEBUT_NIVA_B, NUNE_DEBUT_B, DEBUT_GRANT_B, GRANT_TILE_B, HH_JOB_B, SERYOGA_LOAN_B, DACHA_ASK_B, EVICT_B, COLLECTORS_ECHO_B, THREAT_GOV_B, FRAUD_CARD_B, KONVERTY_B } from '../world'
@@ -41,8 +41,9 @@ function takeSorryMark(game: ContentApi): void {
 async function sorry(game: ContentApi, line: string): Promise<void> {
   cooldown(game, 1) // извинение остужает ссору
   game.mood(3)
-  // принятое извинение кончает холодную войну: ритуал примирения остаётся выходом из режима (`coldWar`)
-  game.applyFacts([set(coldWar, false)])
+  // принятое извинение кончает холодную войну: ритуал примирения остаётся выходом из режима (`coldWar`).
+  // Вражда (`vendetta`) — тот же режим, и снимает её только извинение: иначе сход неотвратим (#1556).
+  game.applyFacts([set(coldWar, false), set(vendetta, false)])
   game.unlock('sorry')
   game.forgiveOffline()
   await game.say([line])
@@ -89,7 +90,7 @@ export const replyRules: R[] = [
   }, [gte(count.sorry, 2)]),
   // третий «мир» за 6 ходов — «качели»: Алик замечает, и ссору это уже не остужает
   says('sorry', {
-    remember: [add(count.sorry), set(coldWar, false)], bonus: 3,
+    remember: [add(count.sorry), set(coldWar, false), set(vendetta, false)], bonus: 3,
     respond: async ({ game }) => {
       game.unlock('memory')
       game.mood(1) // мир всё-таки, хоть и качели

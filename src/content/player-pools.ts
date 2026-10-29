@@ -13,7 +13,7 @@ import { GROUP_Q, JOB_YES_P, JOB_NO_P } from './misc'
 import { IDLE_Q, STICKER_Q, FWD_Q, REACT_Q, DEL_Q } from './life'
 import { P_CREW_PAID } from './crew'
 import { P_HOLIDAY, type Holiday } from './holidays'
-import { ENDGAME_CHOICES, LEND50_CHOICES } from './endgame'
+import { ENDGAME_CHOICES, ENDGAME_VENDETTA_CHOICES, LEND50_CHOICES } from './endgame'
 import { MONEY_ASK } from './money-ask'
 import {
   P_VIA_BORIS, P_VIA_KARINE, P_VIA_MAMA, P_MOO, P_MOUSTACHE, P_COURT, P_COLLECTORS_DEBUT,
@@ -163,6 +163,7 @@ put('scene choice.ask ABSURD', D.ABSURD as PlayerLinePool)
 /** Choice[] пулы эндгейма — отдельный вид, в корпус как .text. */
 export const PLAYER_CHOICE_POOLS: Record<string, readonly Choice[]> = {
   ENDGAME_CHOICES,
+  ENDGAME_VENDETTA_CHOICES,
   LEND50_CHOICES,
 }
 
