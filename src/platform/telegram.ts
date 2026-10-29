@@ -7,10 +7,19 @@ const SCRIPT = 'https://telegram.org/js/telegram-web-app.js'
 const INIT_MS = 8000
 
 /**
- * Ссылка на Stars-инвойс «Чашка хаша для Алика» из `.env.telegram` (её создаёт оператор один раз в
- * BotFather/`createInvoiceLink`); пусто — покупки в сборке нет, как пустой `VITE_YANDEX_PRODUCT_ID`.
+ * Последний известный боевой Stars-инвойс «Чашка хаша для Алика» (25 Stars, воркер
+ * alik-stars-worker.gorecode.workers.dev). Рабочий источник ссылки — `VITE_TELEGRAM_INVOICE_URL`:
+ * смена цены → re-deploy воркера → новая ссылка → переменная репо. Константа — страховка от
+ * пустой переменной, а заодно тот же боевой инвойс; при смене цены обновляется тем же PR (#1534).
  */
-const invoiceUrl = (): string => String(import.meta.env.VITE_TELEGRAM_INVOICE_URL ?? '').trim()
+const FALLBACK_INVOICE_URL = 'https://t.me/$jIaNPQkrGUtzFQAAE6CCLTqkr0Y'
+
+/**
+ * Ссылка на Stars-инвойс «Чашка хаша для Алика»: переменная сборки (первоисточник) главнее,
+ * пустая — фолбэк-константа, чтобы карточка не пропадала (#1534).
+ */
+const invoiceUrl = (): string =>
+  String(import.meta.env.VITE_TELEGRAM_INVOICE_URL ?? '').trim() || FALLBACK_INVOICE_URL
 
 /**
  * Адрес воркера бота с `/mini/*` (#1488): сохранение и перенос партии. Пусто — переноса нет,
@@ -159,9 +168,8 @@ export function telegramPlatform(deps: TelegramDeps = {}): Platform {
     gameplayStart() {},
     gameplayStop() {},
   }
-  // инвойс-ссылки нет в конфиге — карточки покупки в сборке нет вовсе (как пустой товар Яндекса)
-  const invoice = invoiceUrl()
-  if (invoice) platform.pay50 = () => payStars(invoice)
+  // ссылка есть всегда: пустая переменная сборки уходит в константу-фолбэк (#1534)
+  platform.pay50 = () => payStars(invoiceUrl())
   // Шаринг Telegram — t.me/share/url; клиент открывает ссылку сам, иначе окно браузера.
   platform.share = async (text, url) => {
     const link = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`
