@@ -3,215 +3,44 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Пикабу: превью анонс-поста</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;700&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<title>Алик, где деньги? — макет анонса</title>
 <style>
-:root{--bg:#f6f4ef;--surface:#fdfcf9;--ink:#1d2129;--muted:#5d6470;--line:#ddd9cf;--code:#efece4;--acc:#b4531f;--acc-bg:#f6e6da;--ok:#1e7a3c;--ok-bg:#e3f1e6;--warn:#8a6d00;--warn-bg:#f7efd2;color-scheme:light}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#131416;--surface:#1b1c1e;--ink:#e8e6e1;--muted:#a4a9b0;--line:#2f3237;--code:#25282c;--acc:#ec9a6a;--acc-bg:#3a2519;--ok:#6fcf8c;--ok-bg:#1c3324;--warn:#e0c46a;--warn-bg:#3a3117;color-scheme:dark}}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:16.5px/1.6 "IBM Plex Sans",system-ui,sans-serif;padding:28px 16px 72px}
-.wrap{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
-h1,h2,h3{font-family:"Archivo Narrow","Arial Narrow",sans-serif;margin:0;line-height:1.15;text-wrap:balance}
-h1{font-size:clamp(28px,5vw,40px)} h2{font-size:24px;padding-bottom:6px;border-bottom:1px solid var(--line)} h3{font-size:17px}
-p{margin:0;max-width:72ch} ul,ol{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:6px;max-width:74ch}
-code{font-family:"IBM Plex Mono",monospace;font-size:.84em;background:var(--code);padding:1px 5px;border-radius:4px}
-.lead{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-.chip{display:inline-block;font:500 12px "IBM Plex Mono",monospace;padding:3px 9px;border-radius:999px;white-space:nowrap}
-.c-acc{color:var(--acc);background:var(--acc-bg)} .c-ok{color:var(--ok);background:var(--ok-bg)} .c-warn{color:var(--warn);background:var(--warn-bg)}
-.cols{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:26px;align-items:start}
-@media (max-width:860px){.cols{grid-template-columns:1fr}}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:22px 22px 26px;display:flex;flex-direction:column;gap:16px}
-.post-title{font:700 clamp(24px,3.6vw,32px)/1.15 "Archivo Narrow",sans-serif;margin:0}
-.byline{font-size:13.5px;color:var(--muted)}
-.body{display:flex;flex-direction:column;gap:14px}
-.tagline{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
-.tag{font:500 12.5px "IBM Plex Mono",monospace;color:var(--acc);background:var(--acc-bg);padding:3px 8px;border-radius:5px}
-.shots{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin:4px 0}
-.shots.single{max-width:330px}
-.side table{min-width:0}
-.side td.num{white-space:normal}
-figure{margin:0;display:flex;flex-direction:column;gap:7px}
-figcaption{font:500 11.5px "IBM Plex Mono",monospace;letter-spacing:.04em;color:var(--muted);text-transform:uppercase}
-.phone{border-radius:20px;background:#0c0d10;padding:7px;box-shadow:0 6px 18px rgba(0,0,0,.18)}
-.screen{background:#e9e6de;border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:7px;min-height:196px;color:#1d2129;font-size:12.5px;line-height:1.35}
-.sys{font:500 11px/1.35 "IBM Plex Mono",monospace;color:#5d6470;text-align:center;background:#dcd8cf;border-radius:7px;padding:6px 8px}
-.msg{border-radius:12px 12px 12px 3px;background:#fff;padding:7px 10px;max-width:94%;box-shadow:0 1px 1px rgba(0,0,0,.06)}
-.msg .who{display:block;font-size:10.5px;color:#7a6a53;font-weight:600;margin-bottom:1px}
-.msg.me{align-self:flex-end;border-radius:12px 12px 3px 12px;background:#d8ecc9}
-.moo{font-style:italic;color:#6b6250;text-align:center;font-size:12px}
-.opts{display:flex;flex-direction:column;gap:4px}
-.opt{background:#fff;border:1px solid #cdc7bb;border-radius:9px;padding:5px 9px;font-size:12px}
-.opt.on{border-color:#b4531f;background:#fbf1e8;font-weight:600}
-.mini{font-size:12.5px;color:var(--muted)}
-.side{display:flex;flex-direction:column;gap:16px}
-.box{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:9px}
-.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
-table{border-collapse:collapse;width:100%;min-width:420px;font-size:14px}
-th,td{text-align:left;vertical-align:top;padding:7px 10px;border-bottom:1px solid var(--line)}
-th{font:500 11px "IBM Plex Mono",monospace;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);background:var(--bg)}
-tr:last-child td{border-bottom:0}
-td.num{font-family:"IBM Plex Mono",monospace;font-size:12.5px;white-space:nowrap}
-.eyebrow{font:500 12px "IBM Plex Mono",monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+:root{color-scheme:light dark;font-family:system-ui,sans-serif;line-height:1.6}
+body{max-width:760px;margin:32px auto;padding:0 20px 48px}
+a{color:light-dark(#125da8,#8ec5ff)}
+.notice,figure{border:1px solid light-dark(#ccc,#555);border-radius:12px;padding:16px;margin:20px 0}
+.notice{background:light-dark(#fff5d6,#392f16)}
+blockquote{margin:12px 0;white-space:normal}
+figcaption{font-weight:700}.note{font-size:.9em;color:light-dark(#555,#bbb)}
 </style>
 </head>
 <body>
-<div class="wrap">
-
-  <header style="display:flex;flex-direction:column;gap:8px">
-    <span class="eyebrow">#1238 · превью, а не публикация</span>
-    <h1>Черновик анонс-поста на Пикабу</h1>
-    <p>Так пост будет выглядеть в ленте: заголовок, теги, текст и пять кадров из партии. Текст — из
-      <code>docs/marketing/pikabu-post.md</code>, кадры — из <code>docs/marketing/pikabu-cut.md</code>.
-      Кадры в этой странице — макет переписки, снятые скриншоты ставит оператор.</p>
-    <div class="lead">
-      <span class="chip c-warn">ждите: TG-ссылка после #1237</span>
-      <span class="chip c-warn">кадры снимает оператор</span>
-      <span class="chip c-ok">координаты проверены ботом</span>
-    </div>
-  </header>
-
-  <div class="cols">
-    <article class="card">
-      <h2 class="post-title">«Алик, где деньги?» — игра про плиточника, которому полгода не отдают зарплату</h2>
-      <div class="byline">оператор · сегодня · теги: [моё], Игры, Юмор, длиннопост, текст</div>
-
-      <div class="body">
-        <p>Полгода назад я доделал игру про плиточника, который сдал объект и ждёт двести сорок тысяч
-          рублей. Денег ему не отдают. Вся игра — это переписка: он спрашивает «Алик, где деньги?», а
-          генподрядчик Алик Воздухонесян придумывает новый ответ.</p>
-
-        <p>Экран — телефон, в нём чат. Реплику можно выбрать из готовых или написать своими словами:
-          игра различает, просишь ты, угрожаешь, извиняешься, шутишь или просто мычишь. Отмазок у Алика
-          тысячи комбинаций и сто одна легендарная, и повторяться он не любит: деньги то в бетоне, то в
-          банке с огурцами, то в Дубае, то ли в Арарате.</p>
-
-        <div class="shots single">
-          <figure>
-            <div class="phone"><div class="screen">
-              <div class="sys">Алик Воздухонесян сменил фото профиля. На фото — баран</div>
-              <div class="opts">
-                <div class="opt on">Алик, это ты на фото? Или баран?</div>
-                <div class="opt">«На днях» — значит, 6 ноября. Держу вас за слово.</div>
-              </div>
-            </div></div>
-            <figcaption>кадр 1 · 296117:255, 266</figcaption>
-          </figure>
-        </div>
-
-        <p>Алик не злодей. Он обаятельный, щедрый на тосты, зовёт тебя братом и врёт вдохновенно. В его
-          жизни есть бухгалтер Нуне, которая ушла в декрет вместе с ключом от сейфа, баран Борис, суд по
-          плитке и родня, готовая решить за тебя всё. Отдельная радость — игра помнит твою партию: хаш,
-          на который ты ездил, свадьбу, где ты был тамадой, пойманную ложь и День выплаты.</p>
-
-        <div class="shots">
-          <figure>
-            <div class="phone"><div class="screen">
-              <div class="msg"><span class="who">Нуне (бухгалтер)</span>Здравствуйте. Я Нуне. Я в декрете. Ключ у меня. Не пишите Алику, он нервничает.</div>
-              <div class="opts">
-                <div class="opt on">Декрет — это надолго? Как и мой долг?</div>
-                <div class="opt">Ау. Давайте без легенд. Просто цифру.</div>
-              </div>
-            </div></div>
-            <figcaption>кадр 2 · 296117:82</figcaption>
-          </figure>
-          <figure>
-            <div class="phone"><div class="screen">
-              <div class="msg"><span class="who">Алик</span>Слушай сюда, не пиши сейчас, у тёщи коза в лифте застряла. Слово Воздухонесяна, перееду, после Евровидения.</div>
-              <div class="msg"><span class="who">Алик</span>*переведу. Телефон новый.</div>
-            </div></div>
-            <figcaption>кадр 3 · 296117:803, 804</figcaption>
-          </figure>
-        </div>
-
-        <p>Играется в браузере, на телефоне и на компьютере, бесплатно. Я сделал её один, без издателя,
-          рекламного бюджета и маркетингового плана. Единственная валюта, которая здесь ходит, —
-          терпение. (Пятьдесят рублей в финале — не опечатка.)</p>
-
-        <div class="shots">
-          <figure>
-            <div class="phone"><div class="screen">
-              <div class="moo">(на фоне кто-то протяжно: «Мууууу»)</div>
-              <div class="opts">
-                <div class="opt on">Мне бы вашу корову — она хоть что-то производит.</div>
-                <div class="opt">Алик, ты издеваешься?! ВЕРНИ ДЕНЬГИ!!!</div>
-              </div>
-            </div></div>
-            <figcaption>кадр 4 · 296117:174, 177</figcaption>
-          </figure>
-          <figure>
-            <div class="phone"><div class="screen">
-              <div class="sys">К выплате: 50 ₽</div>
-              <div class="msg"><span class="who">Алик</span>Вот. Пятьдесят рублей. Остаток. Остальное — в следующий День выплаты. Через год. Я уже жду.</div>
-              <div class="sys">Алик Воздухонесян перевёл вам 50 ₽. Назначение: «Остаток».</div>
-            </div></div>
-            <figcaption>кадр 5 · 296117:1531, 1542, 1543</figcaption>
-          </figure>
-        </div>
-
-        <p>Если вам знакомо обещание «на днях», которое длится второй квартал, — заходите:
-          <a href="https://enikey87.github.io/mu-sim/">enikey87.github.io/mu-sim</a>.
-          Версию для Telegram Mini App запущу отдельно и добавлю ссылку в этот же пост.
-          <span class="chip c-warn">t.me/&lt;бот&gt;/&lt;app&gt; — после #1237</span></p>
-
-        <p>И да: в игре есть корова. Мууууу.</p>
-      </div>
-
-      <div class="tagline">
-        <span class="tag">[моё]</span><span class="tag">Игры</span><span class="tag">Юмор</span>
-        <span class="tag">длиннопост</span><span class="tag">текст</span>
-      </div>
-    </article>
-
-    <aside class="side">
-      <div class="box">
-        <span class="eyebrow">что здесь макет</span>
-        <ul>
-          <li>кадры — схема переписки, а не скриншоты: их снимает оператор по координатам;</li>
-          <li>обвязка Пикабу (шрифты, обрезка превью, лента) намеренно не воспроизводится;</li>
-          <li>ссылка на Telegram — плейсхолдер до запуска #1237.</li>
-        </ul>
-      </div>
-
-      <div class="box">
-        <span class="eyebrow">моменты и строки</span>
-        <div class="tbl">
-          <table>
-            <thead><tr><th>сид</th><th>строки</th><th>момент</th></tr></thead>
-            <tbody>
-              <tr><td class="num">296117</td><td class="num">255, 266</td><td>фото профиля: баран</td></tr>
-              <tr><td class="num">296117</td><td class="num">82</td><td>дебют Нуне</td></tr>
-              <tr><td class="num">296117</td><td class="num">803, 804</td><td>клятва и автозамена</td></tr>
-              <tr><td class="num">296117</td><td class="num">174, 177</td><td>«Мууууу» и корова</td></tr>
-              <tr><td class="num">296117</td><td class="num">1531, 1533, 1542, 1543</td><td>День выплаты: 50 ₽</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <p class="mini">Проверка: <code>node scripts/marketing-moments.mjs</code> — переигрывает сид ботом и
-          сверяет каждую строку. Пять «✓» и «Моменты сошлись: 5 из 5, строк 11».</p>
-      </div>
-
-      <div class="box">
-        <span class="eyebrow">чего не хватает до публикации</span>
-        <ol>
-          <li>вычитка текста оператором (правки — в <code>pikabu-post.md</code>);</li>
-          <li>боевая TG-ссылка — после запуска #1237;</li>
-          <li>пять кадров по сценарию;</li>
-          <li>решение по хабу: проверить «Своё» в интерфейсе, иначе `[моё]` + одно сообщество.</li>
-        </ol>
-      </div>
-
-      <div class="box">
-        <span class="eyebrow">документы</span>
-        <ul>
-          <li><a href="pikabu-post.md">pikabu-post.md</a> — черновик текста;</li>
-          <li><a href="pikabu-cut.md">pikabu-cut.md</a> — сценарий нарезки;</li>
-          <li><a href="pikabu-publication.md">pikabu-publication.md</a> — хаб, окна, правила, чек-лист;</li>
-          <li><a href="pikabu-moments.json">pikabu-moments.json</a> — координаты для проверки.</li>
-        </ul>
-      </div>
-    </aside>
-  </div>
-
-</div>
+<h1>«Алик, где деньги?» — макет анонса</h1>
+<p class="notice">Черновик · 29.10.2026. Ниже текст и цитаты, а не снятые скриншоты.
+Для Пикабу разрешение размещения не получено. Текущий запуск — Telegram и веб.</p>
+<p>Исходник: <a href="pikabu-post.md">подробный анонс</a>.
+<a href="telegram-posts.md">Короткие тексты</a> · <a href="pikabu-cut.md">сценарий кадров</a> ·
+<a href="launch-plan.md">план запуска</a>.</p>
+<article>
+<p>Ты положил плитку. Полгода спустя денег всё ещё нет.</p>
+<p>Я сделал «Алик, где деньги?» — игру в переписку с подрядчиком, который должен тебе за работу. Ты спрашиваешь про оплату, Алик находит очередную причину подождать. Сможешь забрать своё?</p>
+<p>Вся игра выглядит как чат на телефоне. Выбираешь реплики или пишешь своими словами: можно просить, спорить, шутить и ловить Алика на противоречиях.</p>
+<p>[Здесь настоящий кадр с отмазкой и вариантами ответа.]</p>
+<p>Алик зовёт тебя братом и обещает рассчитаться. Потом в переписке появляются другие люди, новые обстоятельства и ещё больше причин, почему деньги придётся подождать.</p>
+<p>[Здесь кадр с неожиданным собеседником; затем короткий обмен репликами или видео.]</p>
+<p>Играть можно бесплатно в Telegram и в браузере: Telegram — https://t.me/alik_where_money_bot/game?mode=compact Браузер — https://enikey87.github.io/mu-sim/</p>
+<p>Если попробуете, расскажите: какую отмазку от должника вы слышали в жизни?</p>
+</article>
+<section aria-label="Текстовые макеты трёх кадров">
+<h2>Моменты для съёмки</h2>
+<figure><figcaption>Сегодня тот самый день</figcaption><blockquote>[12:01] Алик: Ара, сегодня тот самый день. Я даже встал пораньше. Посидел. Лёг обратно.<br>Уважаемый Алик! Я не тороплю. Я просто очень медленно худею.</blockquote><p class="note">Текстовый макет. Здесь нужен настоящий кадр.</p></figure>
+<figure><figcaption>Чайносу заплатили</figcaption><blockquote>[12:01] Тарон (чайнос): Тарон. Я чай носил. Звонил — ты не взял, поэтому пишу. Всех рассчитали, брат. Штукатур получил, электрик получил, водитель с бетоном — получил. Мне заплатили. Я чай носил. Тебя в списке нет.<br>Значит, я последний в очереди. Очередь из одного. Меня.</blockquote><p class="note">Текстовый макет. Здесь нужен настоящий кадр.</p></figure>
+<figure><figcaption>Это бетономешалка</figcaption><blockquote>(на фоне кто-то протяжно: «Мууууу»)<br>Алик, у вас кто-то стонет. Днём. Регулярно.<br>[12:02] Я: Алик, у вас кто-то стонет. Днём. Регулярно.<br>[12:04] Алик: Какая корова? Это бетономешалка, армянская модель.</blockquote><p class="note">Текстовый макет. Здесь нужен настоящий кадр.</p></figure>
+</section>
+<p><a href="https://t.me/alik_where_money_bot/game?mode=compact">Играть в Telegram</a> ·
+<a href="https://enikey87.github.io/mu-sim/">Играть в браузере</a></p>
+<p class="note">Сверка цитат: <code>node scripts/marketing-moments.mjs</code>.
+Она проверяет расшифровку партии, не готовность изображений. После правки анонса или манифеста
+обновить этот макет: текст и цитаты должны совпадать с исходниками.</p>
 </body>
 </html>
