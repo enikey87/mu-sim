@@ -39,6 +39,8 @@ interface TgWebApp {
    * `paid` | `cancelled` | `failed` | `pending`; у старого клиента метода нет.
    */
   openInvoice?(url: string, callback?: (status: string) => void): unknown
+  /** Открыть внешнюю ссылку силами клиента (Bot API 6.1): санкционированный вход с подтверждением. */
+  openLink?(url: string): void
   /** Открыть t.me-ссылку силами клиента (Bot API 6.1): окно шаринга не уводит из Mini App. */
   openTelegramLink?(url: string): void
   onEvent?(event: string, listener: () => void): void
@@ -116,10 +118,28 @@ export function telegramPlatform(deps: TelegramDeps = {}): Platform {
     } catch { done('failed') }
   })
 
+  /**
+   * Внешняя ссылка (донат DonationAlerts, #1533): `openLink` — санкционированный вход клиента с окном
+   * подтверждения, в Mini App обычный переход по ссылке не открывается. Нет метода, старый клиент или
+   * отказ клиента — `false`: интерфейс откроет окно браузера сам.
+   */
+  const openExternal = (url: string): boolean => {
+    const app = tg()
+    const open = app?.openLink
+    if (!app || !open) return false
+    try {
+      open.call(app, url)
+      return true
+    } catch { return false }
+  }
+
   const platform: Platform = {
     id: 'telegram',
-    // цифровые товары в Telegram продаются только за Stars: внешней ссылки на DonationAlerts здесь нет
-    externalPay: false,
+    // Внешняя ссылка DonationAlerts разрешена решением оператора 29.10 (#1533): риск политики Mini App
+    // («цифровые товары только за Stars») ограничен ботом, ущерб принят. Stars-путь остаётся рядом —
+    // для iOS и не-RU, где Stars покупаются.
+    externalPay: true,
+    openLink: openExternal,
     /**
      * Перенос партии: нужны и адрес воркера, и подпись захода. Пустой конфиг — `null`,
      * и интерфейс даже не спрашивает про восстановление.

@@ -238,7 +238,7 @@ describe('адаптер витрины (#688)', () => {
       ;(window as unknown as { Telegram?: unknown }).Telegram = { WebApp: { openInvoice } }
       const p = telegramPlatform({ load: async () => {} })
       await p.init()
-      expect(p.externalPay, 'внешняя платёжная ссылка в Telegram запрещена').toBe(false)
+      expect(p.externalPay, 'внешняя ссылка DonationAlerts — решение оператора 29.10 (#1533)').toBe(true)
       await expect(p.pay50?.(), 'paid — деньги списаны').resolves.toBe('paid')
       expect(openInvoice, 'ссылка инвойса — из конфига, не из кода').toHaveBeenCalledWith('https://t.me/$hash-cup', expect.any(Function))
 
