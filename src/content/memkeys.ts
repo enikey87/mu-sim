@@ -22,6 +22,13 @@ export const vendetta = 'vendetta'
 /** Ход, на котором сход объявлен (15-й крик, #1565): окно примирения у поздней вендетты читается
  *  по нему. Штамп ставит сама `Rude_Vendetta` — `remember` пишет только константы, а ход меняется. */
 export const vendettaAt = 'vendettaAt'
+/** Сход снят извинением (#1570): метку ставит движок в ходу перехода `vendetta: true → false`,
+ *  а не список мест снятия — иначе новый канал выхода молчал бы. Статус профиля «Не враг. Пока»
+ *  читает её один раз за партию. */
+export const vendettaLifted = 'vendetta.lifted'
+/** Первое прямое «прости» в живом сходе уже отклонено (#1570): цена выхода названа, мир даёт
+ *  только посредник или следующее извинение. Ставит отказ, читает правило принятия. */
+export const vendettaPrice = 'vendetta.price'
 /** Режим холодной войны после вендетты: Алик говорит сухо и формально, тёплые пулы недоступны.
  *  Ставит сама Вендетта, снимает принятое извинение (ритуал примирения, посредник, обычный sorry)
  *  и объявленный мир — «Мууу» и встречный иск. */
@@ -424,7 +431,7 @@ export type ActorKey = (typeof ACTOR_KEY_LIST)[number]
 export const ACTOR_KEYS: ReadonlySet<string> = new Set(ACTOR_KEY_LIST)
 
 export const MEM_KEYS: ReadonlySet<string> = new Set([
-  HEAT, muenAt, muenAsked, muenAnswered, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, evicted, vendetta, vendettaAt, coldWar, court, courtVerdict, courtPolite,
+  HEAT, muenAt, muenAsked, muenAnswered, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, evicted, vendetta, vendettaAt, vendettaLifted, vendettaPrice, coldWar, court, courtVerdict, courtPolite,
   ritualCount, ritualCut, caughtCount, caughtUnique, caughtAt, garikDenied, garikCode, cryptoHodl, bathAsked, bathAskedAt, bathAnswered, mamaCalls, phoneKarine, karineKnowsDebt, karineThinksTax, alikShaved, moustacheKept, moustacheAskAt, alikDay, mooAt, sorryAt, courtReferral, judgeApology, saidStrasburg,
   rudeAt, thanksAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway, nivaPlayer, carGone,
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, borisForeman, taxFrozen, taxThawed,

@@ -17,6 +17,9 @@ const lastAlik = (game: Game): string => {
   const m = [...game.S.msgs].reverse().find((x) => x.kind === 'text' && x.from === 'alik')
   return m && m.kind === 'text' ? m.text : ''
 }
+/** Правило, которое ответило на последнюю реплику игрока (в трассе свежие записи первыми). */
+const lastSays = (game: Game): string[] | undefined =>
+  game.ui.trace.find((t) => t.event === 'PlayerSays')?.chosen
 /** Сход объявлен своим путём: 15-й крик за партию без извинений. */
 const toVendetta = async (game: Game): Promise<void> => {
   Object.assign(game.S.mem, { 'count.rude': 14, 'rude.heat': 5 })
@@ -35,9 +38,15 @@ describe('примирение в живом сходе (#1565)', () => {
     await toVendetta(game)
     game.S.mem[HEAT] = 3 // в старой лестнице такой жар отправлял извинение в ритуал
 
+    // #1570: первое прямое «прости» в сходе только называет цену выхода
+    await game.send(APOLOGY)
+    expect(lastSays(game), 'первое «прости» ушло в принятие').toEqual(['Says_sorry_vendetta_price'])
+    expect(game.S.mem.vendetta, 'первое «прости» сняло сход').toBe(true)
+    expect(game.S.mem.coldWar, 'первое «прости» кончило холодную войну').toBe(true)
+
     await game.send(APOLOGY)
 
-    expect(game.ui.trace.find((t) => t.event === 'PlayerSays')?.chosen, 'извинение ушло не в принятие').toEqual(['Says_sorry_vendetta'])
+    expect(lastSays(game), 'извинение ушло не в принятие').toEqual(['Says_sorry_vendetta'])
     expect(game.S.mem.vendetta, 'сход снят').toBe(false)
     expect(game.S.mem.coldWar, 'холодная война кончена').toBe(false)
     expect(game.facts()[HEAT], 'мир погасил лестницу').toBe(0)
@@ -52,7 +61,10 @@ describe('примирение в живом сходе (#1565)', () => {
     game.S.mem.coldWar = true
     game.S.mem[HEAT] = 3
 
-    // вариант из P_SORRY, отправленный как кнопка без act (драйвер плейтеста терял act): текст — извинение
+    // вариант из P_SORRY, отправленный как кнопка без act (драйвер плейтеста терял act): текст — извинение.
+    // Первый клик называет цену (#1570), второй — принимается
+    await game.send({ text: 'Ладно, я перегнул.', tone: 'polite' })
+    expect(game.S.mem.vendetta, 'первый клик снял сход').toBe(true)
     await game.send({ text: 'Ладно, я перегнул.', tone: 'polite' })
 
     expect(game.S.mem.vendetta, 'клик по извинению не снял сход').toBe(false)
@@ -74,6 +86,11 @@ describe('примирение в живом сходе (#1565)', () => {
     game.S.mem.blocked = true
     game.S.mem[HEAT] = 3
 
+    // отказ цену называет, но не притворяется принятым: блок остаётся, «не доставлено» не спорит с миром
+    expect((await game.fire('PlayerSays', { intent: 'sorry' }))?.name).toBe('Says_sorry_vendetta_price')
+    expect(game.S.mem.blocked, 'отказ снял блок').toBe(true)
+    expect(game.S.mem.vendetta).toBe(true)
+
     expect((await game.fire('PlayerSays', { intent: 'sorry' }))?.name).toBe('Says_sorry_vendetta')
     expect(game.S.mem.blocked, 'блок остался при принятом мире').toBe(false)
     expect(game.S.mem.vendetta).toBe(false)
@@ -85,6 +102,7 @@ describe('примирение в живом сходе (#1565)', () => {
     game.S.mem.vendetta = true
     game.S.mem.coldWar = true
     game.S.mem[HEAT] = 3
+    game.S.mem['vendetta.price'] = true // цену первое извинение уже назвало (#1570)
     game.S.stats.sent = 10
     game.S.mem['sorryAt'] = '8,9,10' // три извинения в окне шести ходов
 
@@ -133,8 +151,10 @@ describe('примирение в живом сходе (#1565)', () => {
     expect(game.S.mem[vendettaAt], 'ход объявления схода не записан').toBe(game.S.stats.sent)
     expect(game.S.ending, 'экран схода встал в ход объявления').toBeNull()
 
-    for (let i = 0; i < VENDETTA_GRACE_TURNS - 1; i++) await game.send(calmer)
-    expect(game.S.ending, 'окно примирения уже кончилось').toBeNull()
+    // #1570: цена выхода — два хода игрока (отказ и принятие), и оба обязаны влезть в окно
+    await game.send(APOLOGY)
+    for (let i = 0; i < VENDETTA_GRACE_TURNS - 3; i++) await game.send(calmer)
+    expect(game.S.ending, 'экран встал, пока окно ещё шло').toBeNull()
 
     await game.send(APOLOGY)
     expect(game.S.mem.vendetta, 'извинение в окне не спасло').toBe(false)

@@ -2,7 +2,7 @@
 import { type Line, during, eq, gate, gte, is, missing, of, type Entry } from './fact'
 import { type ClaimKey } from './ids'
 import { needs, WORLD } from './world'
-import { alikDead, bloodGiven, court, endgame, judgeApology, polite, sick, threatClaim, wedding } from './memkeys'
+import { alikDead, bloodGiven, court, endgame, judgeApology, polite, sick, threatClaim, vendettaLifted, wedding } from './memkeys'
 import { sold } from './credit'
 /** Плата за сдачу крови на дне (#339): комедийный масштаб под MONEY_BOTTOM, через adjustMoney. */
 export const BLOOD_PAY = 1000
@@ -223,6 +223,9 @@ export const ALIK_STATUS: Line[] = [
   needs('niva')({ t: 'Ищу «Ниву». Видели — звоните', when: [WORLD.nivaAway], prio: 1 }),
   needs('razmik')({ t: 'Снимаю Размика с крана. Не отвлекать, высоко', when: [WORLD.razmikUp], prio: 1 }),
   { t: 'Уважаемые клиенты! Ваше обращение очень важно для нас', when: [is(polite)], prio: 1 },
+  // снятый сход отвечает на объявленную вражду (#1570): факт перехода, а не «вражды нет» —
+  // «Не враг» ниже по приоритету объявленного статуса и выше нейтрального нет
+  { t: 'Не враг. Пока', when: [is(vendettaLifted)], prio: 1 },
   // Карине меняет подпись, пока Алик «мёртв»; тон — временность, не настоящая смерть (#353)
   { t: 'Покинул нас. Временно', when: [is(alikDead)], prio: 1 },
 ]
