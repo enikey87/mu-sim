@@ -5,7 +5,7 @@ import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
 import type { Criterion } from '../engine/rules'
 import { spec } from '../engine/rules/lines'
-import { ANNOUNCE, CLAIMS, COINS_BRIDGE_CATCHES, DETECTIVE_CHAIN, LEAD, MORNING_CONTRA, OUTCOME, ROLL, SOURCES, type Claim, type Lead } from './payday'
+import { ANNOUNCE, CLAIMS, COINS_BRIDGE_CATCHES, DETECTIVE_CHAIN, LEAD, MORNING_CONTRA, OUTCOME, PAYDAY_SCENE, ROLL, SOURCES, type Claim, type Lead } from './payday'
 import { ENDINGS } from './finales'
 import { LEGENDS } from './legends'
 import { CLAIM_LEDGER } from './ledger'
@@ -190,6 +190,32 @@ describe('День выплаты', () => {
     expect(out).not.toMatch(/К выплате: 50 ₽/)
     expect(game.S.mem.payday).toBe('detective')
     expect(game.S.debt).toBe(0)
+  })
+  it('Следователь: «по рублю» звучит один раз — дефолтная «я бессилен» молчит (#1568)', async () => {
+    // узел отказа выбирает ровно одну из двух строк: дефолтную или следовательскую
+    const a2 = PAYDAY_SCENE.nodes.refuse.a2 as Entry<string>[]
+    const probe = (caught: number) => { const { game } = makeGame(); game.S.mem.caughtUnique = caught; return game.open(a2) }
+    expect(probe(3)).toEqual([expect.stringMatching(/не прошло/)])
+    expect(probe(0)).toEqual([expect.stringMatching(/Я бессилен/)])
+    const play = async (caught: number) => {
+      const { game } = makeGame()
+      rich(game)
+      game.S.mem.caughtUnique = caught
+      await game.enterNode('payday', 'announce')
+      await choose(game, 'bag')
+      const n = game.S.msgs.length
+      await choose(game, 'refuse')
+      return game.S.msgs.slice(n).filter((m) => m.kind === 'text').map((m) => m.text)
+    }
+    const detective = await play(3)
+    const bits = detective.filter((t) => t.includes('услышала «по рублю»'))
+    expect(bits, 'один бит «по рублю» — дважды').toHaveLength(1)
+    expect(bits[0]).toMatch(/не прошло/)
+    expect(detective.join('\n'), 'дефолтная «я бессилен» осталась рядом со следовательской').not.toMatch(/Я бессилен/)
+    // дефолтный путь: та же сцена без трёх поимок оставляет свою строку, «Следователя» в ней нет
+    const plain = await play(0)
+    expect(plain.join('\n')).toMatch(/Я бессилен/)
+    expect(plain.join('\n')).not.toMatch(/не прошло/)
   })
   it('Следователь: с двумя поимками исход недоступен, с тремя — выигрывает у «Нивы» (#1434)', async () => {
     const pick = async (caught: number) => {

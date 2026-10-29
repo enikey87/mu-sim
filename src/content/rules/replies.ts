@@ -736,8 +736,9 @@ export const replyRules: R[] = [
       game.promiseAsked(i)
       // дата цитаты против дня болезни Бориса: отмазка «тогда Борис заболел» не ставит событие раньше самого барана (#859)
       const made = game.promiseAt(i)?.made
+      const vague = game.promiseAt(i)?.vague === true
       const illAt = Number(game.mem()[stateAt(sick, 'boris')])
-      const r = game.uniq(() => game.X.prev({ made, illAt: Number.isFinite(illAt) ? illAt : undefined }))
+      const r = game.uniq(() => game.X.prev({ made, illAt: Number.isFinite(illAt) ? illAt : undefined, vague }))
       game.recordPromise(r.p)
       await game.say([r.text])
       game.setCtx(game.ctxFromPromise(r.p))

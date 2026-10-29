@@ -292,6 +292,32 @@ describe('ответы Алика (PlayerSays)', () => {
     expect(await ask(illDay - 3), 'цитата от 17 октября — барана ещё нет').not.toContain(BORIS_ILL)
     expect(await ask(illDay), 'цитата не раньше болезни — отмазка выпадает').toContain(BORIS_ILL)
   })
+  it('«я обещал примерно» — только про срок без точной даты: точное обещание такой отговорки не имеет (#1568)', async () => {
+    const { game } = makeGame()
+    // журнал помнит род срока: увёртка, праздник и «когда-нибудь» — без точной даты, «в среду утром» — точная
+    const rec = (p: { text: string; d: number | null; kind: 'dodge' | 'holiday' | 'never' | 'clear' }) => {
+      game.recordPromise(p)
+      return game.S.promises.at(-1)!
+    }
+    expect(rec({ text: 'на днях', d: 2, kind: 'dodge' }).vague).toBe(true)
+    expect(rec({ text: 'к Пасхе', d: null, kind: 'holiday' }).vague).toBe(true)
+    expect(rec({ text: 'когда Арарат вернут', d: null, kind: 'never' }).vague).toBe(true)
+    expect(rec({ text: 'в среду утром', d: 2, kind: 'clear' }).vague).toBeUndefined()
+    // колода отдаёт ровно строки «примерно»: видно, берёт ли их фильтр по роду цитаты, а не удача перетасовки
+    const A = D.PREV_A.findIndex((e: unknown) => valueOf(e) === 'Так я же сказал примерно,')
+    const B = D.PREV_B.findIndex((e: unknown) => valueOf(e) === 'я обещал «примерно», а примерно — это не точно.')
+    expect(A, 'строка «примерно» — в пуле PREV_A').toBeGreaterThanOrEqual(0)
+    expect(B, 'строка «примерно» — в пуле PREV_B').toBeGreaterThanOrEqual(0)
+    const ask = async (p: { t: string; made: number; due: number | null; vague?: true }) => {
+      game.S.promises.push(p)
+      game.S.bags.PREV_A = { n: D.PREV_A.length, left: [A], last: -1 }
+      game.S.bags.PREV_B = { n: D.PREV_B.length, left: [B], last: -1 }
+      const t = await reply(game, { text: 'Вы обещали…', tone: 'neutral', act: 'prev', arg: game.S.promises.length - 1 })
+      return t.join(' ')
+    }
+    expect(await ask({ t: 'в среду утром', made: game.S.day, due: game.S.day + 2 }), 'точному обещанию досталось «примерно»').not.toMatch(/примерно/)
+    expect(await ask({ t: 'на днях', made: game.S.day, due: game.S.day + 2, vague: true }), 'увёртке не досталось её отговорки').toMatch(/примерно/)
+  })
   it('ирония на срок «никогда» — честный ответ в образе', async () => {
     const { game } = makeGame()
     game.S.ctx = game.ctxFromPromise({ t: 'когда Арарат вернут', d: null, kind: 'never', text: 'когда Арарат вернут' })
