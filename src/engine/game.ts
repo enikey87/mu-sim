@@ -725,14 +725,34 @@ export class Game {
    * бы под пальцем. Выбор держится до конца хода; новый ход — новый выбор.
    */
   freshPlayerTurn(key: string, arr: readonly Entry<string>[]): string | null {
-    const last = this.freshTurnPick.get(key)
-    if (last && last.at === this.S.stats.sent) {
-      const entry = arr.find((e) => valueOf(e) === last.line)
-      if (entry && isOpen(entry, this.lineFacts()) && !this.seen.has(last.line)) return last.line
-    }
+    const held = this.turnHeld(key, arr, false)
+    if (held !== null) return held
     const line = this.freshPlayer(key, arr)
     if (line !== null) this.freshTurnPick.set(key, { line, at: this.S.stats.sent })
     return line
+  }
+  /**
+   * Долгоживущий пул, который не молчит (#1590): окно повтора (#824) держит строку 20 ходов, но когда
+   * все строки прозвучали внутри него, отдаётся самая давняя открытая — дисциплина via-пула (#1270),
+   * а не пустой текст. Иначе кластер переводов сжигал реакцию целиком: строки на 20/54/55/56, на 59
+   * `freshPlayerEntry` → null, оффер не собирался (538117, 537117; seed-16:458). Лейбл повторяется,
+   * но не подряд: следующей берётся следующая по давности показа. Выбор держится до конца хода (#826).
+   */
+  freshPlayerTurnOrOldest(key: string, arr: readonly Entry<string>[]): string | null {
+    const held = this.turnHeld(key, arr, true)
+    if (held !== null) return held
+    const line = this.freshPlayer(key, arr) ?? this.oldestShown(arr)
+    this.freshTurnPick.set(key, { line, at: this.S.stats.sent })
+    return line
+  }
+  /** Выбор того же хода (#826): пересборка вариантов не листает пул. `keepSeen` — исчерпанный пул
+   *  возвращает уже показанную строку лейблом (#1590), и её отказ сломал бы стабильность кнопки. */
+  private turnHeld(key: string, arr: readonly Entry<string>[], keepSeen: boolean): string | null {
+    const last = this.freshTurnPick.get(key)
+    if (!last || last.at !== this.S.stats.sent) return null
+    const entry = arr.find((e) => valueOf(e) === last.line)
+    if (!entry || !isOpen(entry, this.lineFacts())) return null
+    return keepSeen || !this.seen.has(last.line) ? last.line : null
   }
   /** Последняя строка долгоживущего пула по ключу: пересчёт того же хода не двигает выбор (#826). */
   private freshTurnPick = new Map<string, { line: string; at: number }>()
@@ -4081,7 +4101,7 @@ export type ContentApi = Pick<Game,
   // колоды и реплики
   | 'draw' | 'open' | 'uniq' | 'pair' | 'line' | 'linePicked' | 'lines' | 'seen' | 'decks' | 'X'
   | 'recentLines' | 'noteLine'
-  | 'addrSaidLine' | 'playerLine' | 'actionLabel' | 'freshPlayer' | 'freshPlayerTurn' | 'windowLine' | 'oldestShown' | 'offeredInWindow' | 'rememberShown' | 'rnd' | 'chance' | 'bagOf' | 'restoreBag'
+  | 'addrSaidLine' | 'playerLine' | 'actionLabel' | 'freshPlayer' | 'freshPlayerTurn' | 'freshPlayerTurnOrOldest' | 'windowLine' | 'oldestShown' | 'offeredInWindow' | 'rememberShown' | 'rnd' | 'chance' | 'bagOf' | 'restoreBag'
   // контекст последней реплики
   | 'ctx' | 'setCtx'
   // режимы
