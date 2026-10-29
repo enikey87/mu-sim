@@ -178,3 +178,52 @@ describe('окно перевода в слот-конкуренции (#1530)',
     expect(pool, 'кнопка не из пула реакций на перевод').toContain(btn!.text)
   })
 })
+
+// Кластер переводов (#1590): пул в четыре строки прозвучал внутри 20-ходового окна повтора — и у
+// следующего перевода реакции не было вовсе: `freshPlayerEntry` отдавал null (все строки в окне),
+// `freshFromD` — пустой текст, оффер не собирался. Живые случаи r195: 538117:~658 (строки показаны на
+// 20/54/55/56, на 59 пул null при открытом `transferFresh`), 537117:~1084, seed-16:458, seed-24:349.
+// Дисциплина — via-пул (#1270): исчерпанный в окне пул отдаёт самую давнюю открытую строку лейблом.
+describe('кластер переводов не сжигает окно отклика (#1590)', () => {
+  const pool = (D.P_TRANSFER as string[]).map((t) => t.split('{amount}').join('50'))
+
+  it('у каждого перевода кластера есть реакция, даже когда весь пул прозвучал в окне повтора', async () => {
+    const { game } = makeGame()
+    // тратим пул целиком: четыре перевода на соседних ходах — все строки внутри 20-ходового окна
+    const spent: string[] = []
+    for (let turn = 1; turn <= D.P_TRANSFER.length; turn++) {
+      game.S.stats.sent = turn
+      await game.transfer()
+      const btn = findReply(game)
+      expect(btn, `перевод на ходу ${turn}: реакции нет`).toBeDefined()
+      spent.push(btn!.text)
+    }
+    expect(new Set(spent).size, 'пул не потратился — проверка пустеет').toBe(D.P_TRANSFER.length)
+    // кластер: три перевода подряд в пределах шести ходов (Due_Kept 54–55 в 538117)
+    const cluster: string[] = []
+    for (const turn of [6, 8, 11]) {
+      game.S.stats.sent = turn
+      await game.transfer()
+      const btn = findReply(game)
+      expect(btn, `перевод на ходу ${turn}: исчерпанный пул сжёг окно`).toBeDefined()
+      cluster.push(btn!.text)
+    }
+    // исчерпанный пул отдаёт самую давнюю строку: соседние переводы не повторяют формулировку
+    expect(cluster, `соседние переводы кластера повторяют формулировку: ${cluster.join(' → ')}`).toEqual([...new Set(cluster)])
+    expect(cluster.filter((t) => !pool.includes(t)), 'реакция не из пула переводов').toEqual([])
+  })
+
+  it('выбор исчерпанного пула держится до конца хода — кнопка не меняется под пальцем (#826)', async () => {
+    const { game } = makeGame()
+    for (let turn = 1; turn <= D.P_TRANSFER.length; turn++) {
+      game.S.stats.sent = turn
+      await game.transfer()
+      findReply(game)
+    }
+    game.S.stats.sent = 6
+    await game.transfer()
+    const texts = new Set<string>()
+    for (let i = 0; i < 10; i++) { const b = findReply(game); if (b) texts.add(b.text) }
+    expect([...texts].length, `пересборка хода листает исчерпанный пул: ${[...texts].join(' → ')}`).toBe(1)
+  })
+})
