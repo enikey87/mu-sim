@@ -15,7 +15,7 @@ import {
   RAM_PHOTO, BORIS_SALE, VACANCY, AVITO_REVIEW, RUBIK_ASK, KETTLE,
   CREW_CALL_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, GRANT_TILE_B, DEBUT_NIVA_B, DEBUT_BORIS_B, MOUSTACHE_PHOTO_B, MAMA_MARKET_B, TILE_AD_B, TAMADA_DONE_B, BORIS_MEMORY_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, GRANT_HOUSE_B, COURT_VERDICT_B, TILE_SLIP_B, TILE_COURT_B, TILE_LAWYER_B, TILE_MONUMENT_B, NIVA_BACK_B, NUNE_DEBUT_B, DEBUT_GRANT_B, SOLD_B,
   LAWYER_B, COLLECTORS_ASK_B, COLLECTORS_EP_B, INTERN_B, HOLE_B, COUNTERSUIT_B, VACANCY_START_B, VACANCY_SOON_B, SERYOGA_B, GRANT_BATH_B, OFFENDED_ASK_B, BATH_ASK_B, MUEN_ASK_B, INH_BURNED_B, INH_REFUSED_B,
-  HH_JOB_B, SERYOGA_LOAN_B, DACHA_ASK_B, EVICT_B, COLLECTORS_ECHO_B, THREAT_GOV_B, FRAUD_CARD_B,
+  HH_JOB_B, SERYOGA_LOAN_B, DACHA_ASK_B, EVICT_B, COLLECTORS_ECHO_B, THREAT_GOV_B, FRAUD_CARD_B, KONVERTY_B,
 } from './world'
 
 /** Метки линтера: имена персонажей и объекты классов #970/#974/#982. Список узкий и осознанный —
@@ -127,6 +127,9 @@ const WINDOWS: Window[] = [
   // развод дяди Самвела (#1037): конверт введён легендой свадьбы (#1016) — строки с ним несут гейт
   { pool: 'P_SAMVEL_DIVORCE', lines: PP.P_SAMVEL_DIVORCE, marks: { конверт: 'heard.samvel_envelopes' } },
   { pool: 'SAMVEL_DIVORCE_B', lines: SAMVEL_DIVORCE_B, marks: { конверт: 'heard.samvel_envelopes' } },
+  // конвертный вопрос свадьбы Самвела (#1549): конверты и Самвела вводит легенда свадьбы — строки под фактом
+  { pool: 'P_KONVERTY', lines: PP.P_KONVERTY, marks: { Самвел: 'intro.samvel', конверт: 'heard.samvel_envelopes' } },
+  { pool: 'KONVERTY_B', lines: KONVERTY_B, marks: { Самвел: 'intro.samvel', конверт: 'heard.samvel_envelopes', тамад: 'intro.tamada' } },
   // вердикт суда (#1058): строки вердиктов под собственным фактом, меток персонажей в пулах нет
   { pool: 'P_COURT_VERDICT', lines: PP.P_COURT_VERDICT, marks: {} },
   { pool: 'COURT_VERDICT_B', lines: COURT_VERDICT_B, marks: {} },
