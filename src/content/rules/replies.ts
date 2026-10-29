@@ -16,14 +16,14 @@ import { LEGENDS } from '../legends'
 import { moneyPlaceOf, moneyAskOwn, stampMoneyPlace } from '../money-ask'
 import { ARCS, NO_NEWS_A, NO_NEWS_B, GROUP_SEEN_A, GROUP_SEEN_B, WRONG_A, WRONG_B } from '../arcs'
 import * as L from '../life'
-import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, PROMISE_PENCIL, PROMISE_FAR, PROMISE_YEARS, KONAK_LINE } from '../misc'
+import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, PROMISE_PENCIL, PROMISE_FAR, PROMISE_YEARS, KONAK_LINE, WHEELS_NEVER } from '../misc'
 import { CREW_PAID } from '../crew'
 import { HOLIDAY_MONEY, type Holiday } from '../holidays'
 import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_THIRD, LIE_NOCRED } from '../lies'
 import { HEAT, alikShaved, arsenTrackAt, avitoReviewAt, bathAnswered, bathAskedAt, borisAskAt, borisSaleAt, coldWar, collectorsAskAt, collectorsEpAt, countersuitAt, courtVerdictAt, tileCourtAt, tileLawyerAt, tileMonumentAt, tileSlipAt, nivaBackAt, saleAt, crewPaidAt, debutAt, grantBathAt, grantTileAt, inhDoneAt, internAccepted, internAt, internDeclined, kettleAt, lawyerAt, moustacheAskAt, offendedAskAt, ramPhotoAt, rubikAskAt, rubikHoleAt, moustachePhotoAt, photoAt, tileAdAt, tamadaDoneAt, mamaMarketAt, mamaVoiceAt, samvelDivorceAt, grantHouseAt, seryogaAskAt, transferAt, vacancyAt, muenAnswered, hhJobAt, seryogaLoanAt, dachaAskAt, evictAt, collectorsEchoAt, threatGovAt, fraudCardAt, inhRefused, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, saidKonak, stateAt, topic, topicLast, topicMute, topicRun, whenYears } from '../memkeys'
 import type { ArcId, TopicId } from '../ids'
 import { BATH_ANSWER } from './player-choice-pools'
-import { PROMISE_SHAVE_ASK, BORIS_MEMORY_B, MOUSTACHE_PHOTO_B, MAMA_MARKET_B, TILE_AD_B, TAMADA_DONE_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, GRANT_HOUSE_B, COURT_VERDICT_B, TILE_SLIP_B, TILE_COURT_B, TILE_LAWYER_B, TILE_MONUMENT_B, NIVA_BACK_B, SOLD_B, RAM_PHOTO, BORIS_SALE, VACANCY, VACANCY_START_B, VACANCY_SOON_B, SERYOGA_B, GRANT_BATH_B, OFFENDED_ASK_B, BATH_ASK_B, MUEN_ASK_B, INH_BURNED_B, INH_REFUSED_B, AVITO_REVIEW, RUBIK_ASK, KETTLE, CREW_CALL_B, LAWYER_B, COLLECTORS_ASK_B, COLLECTORS_EP_B, INTERN_B, HOLE_B, COUNTERSUIT_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, DEBUT_BORIS_B, DEBUT_NIVA_B, NUNE_DEBUT_B, DEBUT_GRANT_B, GRANT_TILE_B, HH_JOB_B, SERYOGA_LOAN_B, DACHA_ASK_B, EVICT_B, COLLECTORS_ECHO_B, THREAT_GOV_B, FRAUD_CARD_B } from '../world'
+import { PROMISE_SHAVE_ASK, BORIS_MEMORY_B, MOUSTACHE_PHOTO_B, MAMA_MARKET_B, TILE_AD_B, TAMADA_DONE_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, GRANT_HOUSE_B, COURT_VERDICT_B, TILE_SLIP_B, TILE_COURT_B, TILE_LAWYER_B, TILE_MONUMENT_B, NIVA_BACK_B, SOLD_B, RAM_PHOTO, BORIS_SALE, VACANCY, VACANCY_START_B, VACANCY_SOON_B, SERYOGA_B, GRANT_BATH_B, OFFENDED_ASK_B, BATH_ASK_B, MUEN_ASK_B, INH_BURNED_B, INH_REFUSED_B, AVITO_REVIEW, RUBIK_ASK, KETTLE, CREW_CALL_B, LAWYER_B, COLLECTORS_ASK_B, COLLECTORS_EP_B, INTERN_B, HOLE_B, COUNTERSUIT_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, DEBUT_BORIS_B, DEBUT_NIVA_B, NUNE_DEBUT_B, DEBUT_GRANT_B, GRANT_TILE_B, HH_JOB_B, SERYOGA_LOAN_B, DACHA_ASK_B, EVICT_B, COLLECTORS_ECHO_B, THREAT_GOV_B, FRAUD_CARD_B, KONVERTY_B } from '../world'
 
 type R = Rule<ContentApi, GameEvent, Offer>
 const says = (intent: string, rest: Partial<R> & Pick<R, 'respond'>, extra: R['when'] = []): R => ({
@@ -331,13 +331,26 @@ export const replyRules: R[] = [
   }, [matches('ctx.whenKind', /^(event|floating)$/)]),
   says('promiseNever', {
     remember: [set(whenYears, true)],
+    bonus: 1,
     respond: async ({ game }) => {
       await game.say([PROMISE_YEARS])
       game.setCtx(null)
     },
   }, [eq('arg', 'years')]),
-  // карандаш, горизонт и ирония на «никогда» — у каждой кнопки свой акт и свой пул
-  ...([['promisePencil', 'PROMISE_PENCIL', PROMISE_PENCIL], ['promiseFar', 'PROMISE_FAR', PROMISE_FAR], ['promiseNever', 'PROMISE_NEVER', PROMISE_NEVER]] as const).map(([act, key, pool]) => says(act, {
+  // колёсный вопрос «Нивы» (#1549): строка спрашивает про колёса и рассрочку — ответ про них,
+  // а не философия пула «никогда». Пара держится строкой вопроса (`arg: 'wheels'` ставит оффер);
+  // имя правила задано явно: у общего «никогда» тот же ключ arg со значением-исключением.
+  { ...says('promiseNever', {
+    bonus: 1,
+    respond: async ({ game, facts }) => {
+      const t = String(facts['ctx.when'] ?? '')
+      await game.say([game.uniq(() => game.X.fill(game.draw('WHEELS_NEVER', WHEELS_NEVER), { t, T: cap(t) }))])
+      game.setCtx(null)
+    },
+  }, [eq('arg', 'wheels')]), name: 'Says_promiseNever_wheels' },
+  // карандаш, горизонт и ирония на «никогда» — у каждой кнопки свой акт и свой пул.
+  // Философский пул «никогда» отвечает только на упрёк про сам срок: колёсный вопрос получает свой ответ выше (#1549).
+  ...([['promisePencil', 'PROMISE_PENCIL', PROMISE_PENCIL, []], ['promiseFar', 'PROMISE_FAR', PROMISE_FAR, []], ['promiseNever', 'PROMISE_NEVER', PROMISE_NEVER, [ne('arg', 'wheels')]]] as const).map(([act, key, pool, extra]) => says(act, {
     respond: async ({ game, facts }) => {
       const t = String(facts['ctx.when'] ?? '')
       const days = fmtDays(Number(facts['ctx.whenDays'] ?? 0))
@@ -349,7 +362,7 @@ export const replyRules: R[] = [
       await game.say([line])
       game.setCtx(null)
     },
-  })),
+  }, [...extra])),
 
   // упрёк по звонку с объекта (#577): отнекивается, перекладывает, винит чай. Голой колодой, без uniq:
   // uniq на пуле таком длины при частых нажатиях вырождается в повторы подряд — колода сама не даёт
@@ -713,6 +726,19 @@ export const replyRules: R[] = [
       await game.promiseLine(game.uniq(() => game.draw('PREV_MANY', PREV_MANY)))
     },
   }, [ThickJournal]),
+
+  // конвертный вопрос свадьбы Самвела (#1549): ответ — пара к выбранной строке (`KONVERTY_B` того же
+  // номера), как у дебюта Арсена (#1500), а не следующая серия свадьбы. Факт конвертов ставит легенда;
+  // оффер Opt_Konverty открыт только под ним.
+  says('konverty', {
+    respond: async ({ game, facts }) => {
+      const i = Number(facts.arg)
+      const line = Number.isInteger(i) ? KONVERTY_B[i] : undefined
+      const answer = line && isOpen(line, game.lineFacts()) ? valueOf(line) : game.draw('KONVERTY_B', KONVERTY_B)
+      await game.say([answer])
+      game.setCtx(null)
+    },
+  }),
 
   says('arc', {
     respond: async ({ game, facts }) => {
