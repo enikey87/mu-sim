@@ -66,7 +66,7 @@ describe('пулы ответов', () => {
 
   it('ирония «никогда» получает ответ в образе: «Никогда — это тоже срок»', () => {
     expect(PROMISE_NEVER.map(valueOf)).toContain('Никогда — это тоже срок, брат. Самый надёжный.')
-    expect(PROMISE_NEVER.map(valueOf).join('\n')).not.toMatch(/лет двадцать/i)
+    expect(PROMISE_NEVER.map(valueOf).join('\n')).not.toMatch(/лет через двадцать/i)
   })
 })
 
@@ -138,7 +138,7 @@ describe('матрица: каждая кнопка каждого срока �
   })
 })
 
-describe('«Лет двадцать?» — пара со своим ответом', () => {
+describe('«Лет через двадцать?» — пара со своим ответом', () => {
   /** Алик называет сравнение с коньяком настоящим путём: игрок жмёт кнопку «никогда», пока ирония не выпадет (#918). */
   const konak = async (g: Game): Promise<void> => {
     const fresh = () => { g.S.ctx = g.ctxFromPromise({ ...byText('после таможни'), text: 'после таможни — отдам' }) }
@@ -160,13 +160,13 @@ describe('«Лет двадцать?» — пара со своим ответо
     // сравнение с коньяком уже звучало (настоящим путём его доводит тест выше): пул открыт целиком
     g.S.mem['said.konak'] = true
     // кнопки берём у самих правил: окно повтора и добор незасвеченного — часть `playerLine`, и именно
-    // оно ставило флаг «это «Лет двадцать?»» по промежуточной карте колоды (#1022)
+    // оно ставило флаг «это «Лет через двадцать?»» по промежуточной карте колоды (#1022)
     const shown = buttons(g, 12).filter((b) => b.act === 'promiseNever')
     expect(shown.length, 'кнопок «никогда» нет — проверка пустеет').toBeGreaterThan(3)
     for (const b of shown) {
-      expect(b.arg === 'years', `«${b.text}» → arg ${String(b.arg)}`).toBe(/лет двадцать\?/i.test(b.text))
+      expect(b.arg === 'years', `«${b.text}» → arg ${String(b.arg)}`).toBe(/лет через двадцать\?/i.test(b.text))
     }
-    const echo = shown.find((b) => !/лет двадцать\?/i.test(b.text))!
+    const echo = shown.find((b) => !/лет через двадцать\?/i.test(b.text))!
     expect(echo, 'никогда-эха в пуле нет — проверка пустеет').toBeDefined()
     const n = g.S.msgs.length
     await g.send({ text: echo.text, tone: 'neutral', act: 'promiseNever', arg: echo.arg ?? undefined })
@@ -182,17 +182,17 @@ describe('«Лет двадцать?» — пара со своим ответо
     let other = undefined as ReturnType<Game['buildChoices']>[number] | undefined
     for (let i = 0; i < 80 && !other; i++) {
       g.S.choices = null
-      for (const c of g.buildChoices()) if (c.act === 'promiseNever' && !/лет двадцать\?/i.test(c.text)) other = c
+      for (const c of g.buildChoices()) if (c.act === 'promiseNever' && !/лет через двадцать\?/i.test(c.text)) other = c
     }
-    expect(other, 'кроме «Лет двадцать?» в пуле ничего нет').toBeDefined()
+    expect(other, 'кроме «Лет через двадцать?» в пуле ничего нет').toBeDefined()
     await konak(g)
     expect(g.open(D.P_WHEN_NEVER), 'после сравнения с коньяком эхо вернулось').toContain(WHEN_YEARS)
     let years = undefined as ReturnType<Game['buildChoices']>[number] | undefined
     for (let i = 0; i < 80 && !years; i++) {
       g.S.choices = null
-      for (const c of g.buildChoices()) if (c.act === 'promiseNever' && /лет двадцать\?/i.test(c.text)) years = c
+      for (const c of g.buildChoices()) if (c.act === 'promiseNever' && /лет через двадцать\?/i.test(c.text)) years = c
     }
-    expect(years, 'кнопки «Лет двадцать?» нет').toBeDefined()
+    expect(years, 'кнопки «Лет через двадцать?» нет').toBeDefined()
     expect(years!.arg).toBe('years')
     const n = g.S.msgs.length
     await g.send(years!)

@@ -260,8 +260,10 @@ describe('PLAYTEST_PROFILE=agreeable', () => {
     // партии ровно на барана только на 20 (на 1, 12, 13, 16 и 18 — на микрозайм, на 19 — на оба).
     // #1524 (окно дебюта коллекторов держится ход и не тратит лишнюю строку пула) сдвинул розыгрыш —
     // замер 1–30: баран только у согласника на 19, 28 и 29; берём наименьший — 19.
+    // #1546 (строка ёмкости в follow Бориса и monthEnd-дука) сдвинул розыгрыш — замер 1–40:
+    // баран только у согласника на 1, 13 и 35; берём наименьший — 1.
     const neutral = await playtest(2, 300)
-    const agree = await playtest(19, 300, undefined, undefined, 'agreeable')
+    const agree = await playtest(1, 300, undefined, undefined, 'agreeable')
     const deeper = facts(agree.game).filter((k) => !facts(neutral.game).includes(k))
     expect(deeper).toEqual(['has.boris'])
   }, 60_000)

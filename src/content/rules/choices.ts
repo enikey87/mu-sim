@@ -4,7 +4,7 @@ import type { ContentApi } from '../../engine/game'
 import type { Choice, Tone } from '../../engine/state'
 import { type Rule, type Facts, type Criterion, type Entry, type Line, eq, ne, is, exists, missing, gt, gte, lte, isOpen, spec, valueOf, sinceWithin } from '../fact'
 import type { GameEvent, Offer } from './events'
-import { D, cap, WHEN_YEARS, WHEELS_ASK, EVENT_FRESH_TURNS, PHOTO_FRESH_TURNS } from '../excuses'
+import { D, cap, WHEN_YEARS, WHEELS_ASK, EVENT_FRESH_TURNS, PHOTO_FRESH_TURNS, MONTH_END_TERM } from '../excuses'
 import { talkPairs, talkId, rubikProposalPairs } from '../talk'
 import { ARCS, WRONG_Q } from '../arcs'
 import * as L from '../life'
@@ -467,11 +467,14 @@ export const choiceRules: R[] = [
       // карандашом — только у срока с датой: у события с одной служебной оценкой `est` дня нет,
       // кнопка числа не называет (#1255)
       when({ name: 'WhenPencil', when: [...term, eq('ctx.whenHorizon', 'far')], act: 'promisePencil', tone: 'neutral', text: (g, f) => fromD(g, f['ctx.whenEst'] ? 'P_WHEN_PENCIL_GUESS' : 'P_WHEN_PENCIL', args(f)) }),
-      when({ name: 'WhenFar', when: [...term, eq('ctx.whenHorizon', 'veryFar')], act: 'promiseFar', tone: 'neutral', text: (g, f) => fromD(g, 'P_WHEN_FAR', args(f)), arg: (_g, f) => String(f['ctx.when']) }),
+      // monthEnd-дука называет конец месяца, а не число дней: «„в следующем месяце“? Это 45 дней»
+      // читалось как «в месяце 45 дней» (#1546)
+      when({ name: 'WhenFarMonth', when: [...term, eq('ctx.whenHorizon', 'veryFar'), eq('ctx.when', MONTH_END_TERM)], act: 'promiseFar', tone: 'neutral', text: (g, f) => fromD(g, 'P_WHEN_FAR_MONTH', args(f)), arg: (_g, f) => String(f['ctx.when']) }),
+      when({ name: 'WhenFar', when: [...term, eq('ctx.whenHorizon', 'veryFar'), ne('ctx.when', MONTH_END_TERM)], act: 'promiseFar', tone: 'neutral', text: (g, f) => fromD(g, 'P_WHEN_FAR', args(f)), arg: (_g, f) => String(f['ctx.when']) }),
       ...(['never', 'absurd'] as const).map((kind) => {
         let years = false
         // колёсный вопрос (#1549): ответ ищется по показанной строке, а не по тексту обещания —
-        // так же, как «Лет двадцать?» (#951/#1022). Новой строке пула нужен свой ответ, иначе её
+        // так же, как «Лет через двадцать?» (#951/#1022). Новой строке пула нужен свой ответ, иначе её
         // получает философский пул «никогда».
         let wheels = false
         return when({
@@ -480,9 +483,9 @@ export const choiceRules: R[] = [
             const map = args(f)
             requirePlayerPool('D.P_WHEN_NEVER', D.P_WHEN_NEVER)
             const line = g.playerLine(() => g.X.fill(g.draw('P_WHEN_NEVER', D.P_WHEN_NEVER), map))
-            // «Лет двадцать?» — единственная строка пула со своим ответом (#951). Флаг ставится по тому,
+            // «Лет через двадцать?» — единственная строка пула со своим ответом (#951). Флаг ставится по тому,
             // что игрок реально увидит, а не по промежуточным доборам колоды: `playerLine` бросает колоду
-            // до восьми раз (окно повтора, добор незасвеченного), и старая отметка «добор был «Лет двадцать?»»
+            // до восьми раз (окно повтора, добор незасвеченного), и старая отметка «добор был «Лет через двадцать?»»
             // оставляла её ответ на совсем другой реплике — никогда-эхо получало ответ про двадцать лет (#1022).
             // Украшение реплики (обращение спереди, суффикс сзади) строку не отменяет — отсюда сверка по вхождению.
             years = line.toLowerCase().includes(WHEN_YEARS.toLowerCase())

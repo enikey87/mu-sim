@@ -354,7 +354,7 @@ export const replyRules: R[] = [
     respond: async ({ game, facts }) => {
       const t = String(facts['ctx.when'] ?? '')
       const days = fmtDays(Number(facts['ctx.whenDays'] ?? 0))
-      // сравнение с коньяком — источник эха «Лет двадцать?» (#918): факт ставит та же реплика, что и обещает его;
+      // сравнение с коньяком — источник эха «Лет через двадцать?» (#918): факт ставит та же реплика, что и обещает его;
       // сравнение — с сырым текстом из колоды, декор Алика его не касается
       let raw = ''
       const line = game.uniq(() => (raw = game.X.fill(game.draw(key, pool), { t, T: cap(t), days })))

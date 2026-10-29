@@ -19,7 +19,7 @@ export type MoneyLocation =
 export interface LedgerValueMap {
   'money.location': MoneyLocation
   /** Курс «Лаваш-коина»: хвастовство Алика против честного пересчёта (#815). */
-  'money.rate': 'one_to_one' | 'two_to_three'
+  'money.rate': 'one_to_one' | 'three_to_two'
   'grandpa.life': 'alive' | 'dead'
   'customer.payment': 'owes' | 'paid'
   /** «Всё перевёл» — знание/материал воспоминаний, не несовместимое состояние. */
@@ -203,7 +203,7 @@ export const CLAIM_LEDGER: Record<ClaimKey, LedgerPoint> = {
   money_deposit: point('money.location', 'deposit'),
   money_wall: point('money.location', 'wall'),
   money_mattress: point('money.location', 'mattress'),
-  lavash_rate_up: point('money.rate', 'two_to_three'),
+  lavash_rate_up: point('money.rate', 'three_to_two'),
   lavash_rate_same: point('money.rate', 'one_to_one'),
   money_crypto: point('money.location', 'crypto'),
   money_garni: point('money.location', 'garni'),

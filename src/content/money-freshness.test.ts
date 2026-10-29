@@ -43,8 +43,8 @@ const ALLOW: ReadonlyArray<readonly [string, string, string]> = [
   ['ARCS.niva.follow', '«Нива» нашлась?', NV],
   ['ARCS.niva.follow', '«Нива» уехала, а долг остался у тебя.', NV],
   ['ARCS.niva.follow', '«Нива» мне всё звонит, а платить всё равно Алику.', NV],
-  ['ARCS.niva.follow', 'Где «Нива»?', NV],
-  ['ARCS.niva.follow', 'Алик, как там «Нива»? Долг за ней катается.', NV],
+  ['ARCS.niva.follow', 'Где «Нива»? В которой деньги?', NV],
+  ['ARCS.niva.follow', 'Алик, как там «Нива»? Долг в ней катается.', NV],
 ]
 
 /** Вопрос-состояние: несёт окно своего места (#955/#962/#986/#995). */

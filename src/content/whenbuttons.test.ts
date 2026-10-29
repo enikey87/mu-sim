@@ -1,7 +1,7 @@
 // Кнопки игрока на срок обещания по роду и горизонту (docs/design/deadline-replies.md, MVP 2, #164): пулы, матрица по всем срокам, дата срока.
 import { describe, it, expect, vi } from 'vitest'
 import { makeGame } from '../test/helpers'
-import { D, WHEN_YEARS, type When } from './excuses'
+import { D, WHEN_YEARS, MONTH_END_TERM, type When } from './excuses'
 import * as L from './life'
 import { LEGENDS } from './legends'
 import { valueOf, type Entry } from './fact'
@@ -62,6 +62,24 @@ describe('пулы кнопок на срок', () => {
     for (const k of ['P_WHEN', 'P_WHEN_OK_EVENT', 'P_WHEN_PENCIL', 'P_WHEN_PENCIL_GUESS', 'P_WHEN_FAR', 'P_WHEN_NEVER', 'P_WHEN_CALENDAR', 'P_WHEN_EVENT']) for (const s of pool(k)) expect(s, `${k}: ${s}`).not.toContain('{date}')
     for (const k of ['P_WHEN_PENCIL', 'P_WHEN_FAR']) for (const s of pool(k)) expect(s, `${k}: ${s}`).toContain('{days}')
     for (const k of ['P_WHEN', 'P_WHEN_OK', 'P_WHEN_OK_EVENT', 'P_WHEN_PENCIL_GUESS', 'P_WHEN_NEVER', 'P_WHEN_CALENDAR', 'P_WHEN_EVENT']) for (const s of pool(k)) expect(s, `${k}: ${s}`).not.toContain('{days}')
+  })
+
+  it('monthEnd-дука называет конец месяца и дату, а не число дней (#1546)', async () => {
+    // «„в следующем месяце“? Это 45 дней» читалось как «в месяце 45 дней» (плейтест оператора 29.10)
+    expect(pool('P_WHEN_FAR_MONTH').length, 'пул monthEnd').toBeGreaterThanOrEqual(3)
+    for (const s of pool('P_WHEN_FAR_MONTH')) {
+      expect(s, s).toContain('{date}')
+      expect(s, s).not.toContain('{days}')
+    }
+    const g = await said(byText(MONTH_END_TERM))
+    const items = buttons(g)
+    const far = items.filter((b) => b.act === 'promiseFar')
+    expect(far.some((b) => b.rule === 'Opt_WhenFarMonth'), 'кнопки monthEnd нет — проверка пустеет').toBe(true)
+    for (const b of far) {
+      expect(b.text, b.text).not.toMatch(/\d+ (день|дня|дней)/)
+      expect(b.text, `${b.text}: срок назван концом месяца`).toMatch(/месяц/)
+      expect(b.text, `${b.text}: дата срока из факта`).toMatch(MONTHS)
+    }
   })
 })
 
@@ -143,14 +161,15 @@ describe('матрица: кнопка по роду и горизонту — �
       const expected = w.kind === 'never' || w.kind === 'absurd' ? [`Opt_When_${w.kind}`]
         : w.kind === 'floating' ? ['Opt_When_Floating'] // плавающий событийный срок (#1002) — своя кнопка
         : f['ctx.whenHorizon'] === 'near' ? ['Opt_WhenCheck', 'Opt_WhenOk']
-        : f['ctx.whenHorizon'] === 'far' ? ['Opt_WhenPencil'] : ['Opt_WhenFar']
+        : f['ctx.whenHorizon'] === 'far' ? ['Opt_WhenPencil']
+        : w.t === MONTH_END_TERM ? ['Opt_WhenFarMonth'] : ['Opt_WhenFar']
       expect(names, at).toEqual(expected)
       // дальше недели «принять всерьёз» не собирается ни при каком сроке
       if (f['ctx.whenHorizon'] === 'far' || f['ctx.whenHorizon'] === 'veryFar' || w.kind === 'never' || w.kind === 'absurd' || w.kind === 'floating') expect(names, at).not.toContain('Opt_WhenOk')
       seen.add(expected.join('+'))
     }
     // не пустая проверка: сроки есть на каждом из четырёх горизонтов и у обоих родов без даты
-    expect([...seen].sort()).toEqual(['Opt_WhenCheck+Opt_WhenOk', 'Opt_WhenFar', 'Opt_WhenPencil', 'Opt_When_Floating', 'Opt_When_absurd', 'Opt_When_never'])
+    expect([...seen].sort()).toEqual(['Opt_WhenCheck+Opt_WhenOk', 'Opt_WhenFar', 'Opt_WhenFarMonth', 'Opt_WhenPencil', 'Opt_When_Floating', 'Opt_When_absurd', 'Opt_When_never'])
   })
 
   it('тексты кнопок: без «Запомнил» у «никогда» и абсурда, без «по-русски» у ясного срока, дата — только у ясного срока и увёртки', async () => {
@@ -183,7 +202,7 @@ describe('матрица: кнопка по роду и горизонту — �
     const acts: Record<string, Set<string>> = {}
     for (const [, w] of terms()) for (const b of buttons(await said(w), 2)) (acts[b.rule] ??= new Set()).add(String(b.act))
     expect(Object.fromEntries(Object.entries(acts).map(([rule, a]) => [rule, [...a]]))).toEqual({
-      Opt_WhenOk: ['promiseOk'], Opt_WhenCheck: ['promiseCheck'], Opt_WhenPencil: ['promisePencil'], Opt_WhenFar: ['promiseFar'],
+      Opt_WhenOk: ['promiseOk'], Opt_WhenCheck: ['promiseCheck'], Opt_WhenPencil: ['promisePencil'], Opt_WhenFar: ['promiseFar'], Opt_WhenFarMonth: ['promiseFar'],
       Opt_When_never: ['promiseNever'], Opt_When_absurd: ['promiseNever'], Opt_When_Floating: ['promiseCheck'],
     })
   })
@@ -227,7 +246,7 @@ async function shownWhen(w: When, tune?: (g: Game) => void, n = 80): Promise<str
 }
 
 describe('риторика по роду: календарь — праздник, событие — «при чём», «никогда» — без календаря', () => {
-  it('в пуле «никогда» нет календаря и хвоста «Это ответ.»; «Лет двадцать?» — строка игрока', () => {
+  it('в пуле «никогда» нет календаря и хвоста «Это ответ.»; «Лет через двадцать?» — строка игрока', () => {
     for (const s of pool('P_WHEN_NEVER')) {
       expect(s, s).not.toMatch(/календарь/i)
       expect(s, s).not.toMatch(/Это ответ\./)
@@ -292,6 +311,7 @@ describe('игрок видит кнопки настоящим путём', () 
       ['после футбола', ['P_WHEN_OK_EVENT', 'P_WHEN_EVENT'], 'близкое событие'],
       ['после полнолуния', ['P_WHEN_PENCIL'], 'далёкий: 15 дней'],
       ['до Нового года', ['P_WHEN_FAR'], 'очень далёкий'],
+      ['в следующем месяце', ['P_WHEN_FAR_MONTH'], 'очень далёкий monthEnd'],
       ['когда рак на Арагаце свистнет', ['P_WHEN_NEVER'], '«никогда»'],
       ['в следующем веке, в начале', ['P_WHEN_NEVER'], 'абсурд'],
     ]
