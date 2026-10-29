@@ -2093,26 +2093,41 @@ describe('режим рецензирования (#872)', () => {
     expect(JSON.parse(sessionStorage.getItem('review_notes') ?? '[]')).toHaveLength(1)
   })
 
-  it('без ?review интерфейс обычный: ни меню, ни бейджей', async () => {
+  it('без ?review режима нет вовсе: ни секции в досье, ни меню, ни бейджей', async () => {
     sessionStorage.clear()
     at('/')
+    // заметка в хранилище есть — но без параметра режим недостижим, и бейджа тоже нет
+    sessionStorage.setItem('review_notes', JSON.stringify([{
+      id: 1, msg: 2, day: 1, turn: 0, type: 'несостыковка',
+      target: { kind: 'alik_message', text: 'Отмазка', offered: [], who: 'alik' },
+      note: 'чужая заметка',
+    }]))
     const { game } = makeGame({ seed: 2 })
     renderApp(game)
     expect(document.querySelector('.review-badge')).toBeNull()
     await act(async () => { fireEvent.contextMenu(alikBubble()) })
     expect(document.querySelector('.review-menu'), 'меню рецензента без режима не открывается').toBeNull()
-    expect(sessionStorage.getItem('review_notes')).toBeNull()
+    await act(async () => { fireEvent.click(document.getElementById('infoBtn')!) })
+    // секции «Рецензирование» в досье нет: включить режим игроку нечем
+    expect(document.getElementById('reviewToggle'), 'тумблера рецензирования нет').toBeNull()
+    expect(document.getElementById('reviewExport'), 'кнопки экспорта нет').toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Рецензирование' })).toBeNull()
   })
 
-  it('режим включается кнопкой в досье — без перезагрузки', async () => {
+  it('?review: тумблер в досье выключает и снова включает режим без перезагрузки', async () => {
     sessionStorage.clear()
-    at('/')
+    at('/?review')
     const { game } = makeGame({ seed: 2 })
     renderApp(game)
     await act(async () => { fireEvent.click(document.getElementById('infoBtn')!) })
-    expect(document.getElementById('reviewToggle')?.textContent).toContain('выкл')
-    await act(async () => { fireEvent.click(document.getElementById('reviewToggle')!) })
     expect(document.getElementById('reviewToggle')?.textContent).toContain('вкл')
+    await act(async () => { fireEvent.click(document.getElementById('reviewToggle')!) })
+    expect(document.getElementById('reviewToggle')?.textContent).toContain('выкл')
+    await act(async () => { fireEvent.click(document.getElementById('closeSheet')!) })
+    await act(async () => { fireEvent.contextMenu(alikBubble()) })
+    expect(document.querySelector('.review-menu'), 'режим выключен — меню не открывается').toBeNull()
+    await act(async () => { fireEvent.click(document.getElementById('infoBtn')!) })
+    await act(async () => { fireEvent.click(document.getElementById('reviewToggle')!) })
     await act(async () => { fireEvent.click(document.getElementById('closeSheet')!) })
     await act(async () => { fireEvent.contextMenu(alikBubble()) })
     expect(document.querySelector('.review-menu'), 'режим включён — меню работает').toBeInTheDocument()

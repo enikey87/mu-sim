@@ -41,7 +41,10 @@ export function App({ game, onReset, debug = false, intro = false, introGate = f
   const hardReset = () => { clearNotes(); ui.reset(); onReset() }
 
   // --- режим живого рецензирования (#872): заметки в sessionStorage, партия не тронута ---
-  const [reviewOn, setReviewOn] = useState(() => reviewRequested(window.location.search))
+  // Вход в режим — только `?review` на момент загрузки (#1537): без параметра контекста в дереве нет,
+  // поэтому игрок не видит ни секции в досье, ни меню заметки, ни бейджей и включить режим ему нечем.
+  const [reviewGate] = useState(() => reviewRequested(window.location.search))
+  const [reviewOn, setReviewOn] = useState(reviewGate)
   const [notes, setNotes] = useState<ReviewNote[]>(() => loadNotes())
   const [menuFor, setMenuFor] = useState<{ msg?: number; day: number; turn: number; meAt?: number; target: ReviewTarget } | null>(null)
   const [draft, setDraft] = useState<ReviewDraft | null>(null)
@@ -78,6 +81,8 @@ export function App({ game, onReset, debug = false, intro = false, introGate = f
       URL.revokeObjectURL(url)
     },
   }), [reviewOn, notes, game])
+  // без `?review` режима нет вовсе: контекст пуст, компоненты ведут себя как в обычной игре (#1537)
+  const reviewApi = reviewGate ? review : null
 
   const saveDraft = (d: ReviewDraft) => {
     const note: ReviewNote = { id: d.editId ?? nextNoteId(notes), msg: d.msg, day: d.day, turn: d.turn, meAt: d.meAt, type: d.type, target: d.target, note: d.note }
@@ -90,7 +95,7 @@ export function App({ game, onReset, debug = false, intro = false, introGate = f
   return (
     <Crash game={game} onReset={hardReset}>
       <GameContext.Provider value={ui}>
-        <ReviewProvider value={review}>
+        <ReviewProvider value={reviewApi}>
           {debug ? (
             <div className="debug-layout"><Phone onReset={onReset} intro={intro} introGate={introGate} /><DebugPanel game={game} /></div>
           ) : (
