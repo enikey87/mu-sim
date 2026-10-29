@@ -31,7 +31,7 @@ describe('прямые случаи гейта покрытия', () => {
   it('у глушилки за экраном концовки есть кого глушить', () => {
     const empty: string[] = []
     for (const [name, c] of Object.entries(DIRECT)) {
-      if (!name.startsWith('Quiet_PaydayOpen_')) continue
+      if (!/^Quiet_(PaydayOpen|Terminal)_/.test(name)) continue
       let spoke = false
       for (let seed = 1; seed <= 40 && !spoke; seed++) {
         const { game } = makeGame({ seed })
