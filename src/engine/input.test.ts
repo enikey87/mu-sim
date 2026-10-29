@@ -5,8 +5,9 @@ import { ARC_MENTIONS, ARCS } from '../content/arcs'
 import { makeGame } from '../test/helpers'
 
 const mentions = ARC_MENTIONS
-const expectClass = (text: string, category: InputCategory, tone: Tone, intent?: 'request' | 'sorry' | 'moo' | 'arc', arg?: string) => {
-  expect(classifyUserInput(text, mentions)).toEqual({ category, tone, ...(intent ? { intent } : {}), ...(arg ? { arg } : {}) })
+const expectClass = (text: string, category: InputCategory, tone: Tone, intent?: 'request' | 'sorry' | 'moo' | 'arc', arg?: string, request = intent === 'request') => {
+  // `request` — сырое «просит денег»: intent request без него не бывает, а у вежливой просьбы с извинением он true (#1565)
+  expect(classifyUserInput(text, mentions)).toEqual({ category, tone, ...(intent ? { intent } : {}), ...(arg ? { arg } : {}), ...(request ? { request: true } : {}) })
 }
 
 describe('classifyUserInput', () => {
@@ -67,6 +68,7 @@ describe('classifyUserInput', () => {
     ['Верните деньги, пожалуйста', 'request', 'polite', 'request'],
     ['Где моя зарплата?', 'request', 'neutral', 'request'],
     ['Извини, я погорячился', 'apology', 'polite', 'sorry'],
+    ['Ладно, я перегнул', 'apology', 'polite', 'sorry'],
     ['Сорян, брат', 'apology', 'polite', 'sorry'],
     ['Спасибо за ответ', 'gratitude', 'polite', undefined],
     ['Спс', 'gratitude', 'polite', undefined],
@@ -80,8 +82,13 @@ describe('classifyUserInput', () => {
     expectClass(text, category, tone, intent)
   })
 
+  it('вежливое «извините» перед просьбой о деньгах помечается как просьба (#1565)', () => {
+    expectClass('Извините за беспокойство, когда деньги?', 'apology', 'polite', 'sorry', undefined, true)
+    expectClass('Алик, простите, что снова пишу. Не подскажете, когда ждать расчёт?', 'apology', 'polite', 'sorry', undefined, true)
+  })
+
   it('выбирает наиболее опасный смысл составной реплики', () => {
-    expectClass('Пожалуйста, верните деньги, иначе подам иск', 'threat', 'threat')
+    expectClass('Пожалуйста, верните деньги, иначе подам иск', 'threat', 'threat', undefined, undefined, true)
     expectClass('Извини, но я тебя найду и убью', 'violent-threat', 'rude')
     expectClass('Спасибо, мошенник', 'accusation', 'rude')
   })

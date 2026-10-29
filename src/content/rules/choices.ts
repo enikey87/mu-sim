@@ -16,7 +16,7 @@ import { MONEY_ASK, moneyPlaceOf, moneyAskOwn } from '../money-ask'
 import { P_HOLIDAY, holidayBefore, type Holiday } from '../holidays'
 import { WORLD, SPEAKS } from '../world'
 import { fmtDayMonth, fmtDays } from '../../engine/time'
-import { HEAT, alikDead, alikShaved, inhBurned, inhRefused, intro, moustacheAskAt, blocked, court, mourning, phoneKarine, crewPaid, endgame, collectorsTea, collectorsRecruited, collectorsTurned, paydayScene, bathAsked, muenAnswered } from '../memkeys'
+import { HEAT, alikDead, alikShaved, inhBurned, inhRefused, intro, moustacheAskAt, blocked, court, mourning, phoneKarine, crewPaid, endgame, collectorsTea, collectorsRecruited, collectorsTurned, paydayScene, bathAsked, muenAnswered, vendetta } from '../memkeys'
 import { collectorsEpPool, requirePlayerPool } from '../player-pools'
 import { isEventWindow } from '../first-windows'
 import {
@@ -200,6 +200,12 @@ export const choiceRules: R[] = [
   offer({ name: 'Via_boris', slot: 'via', when: [is(blocked), SPEAKS.boris], act: 'via', arg: () => 'boris', tone: 'polite', bonus: 7, text: (g) => viaFromArr(g, 'P_VIA_BORIS', P_VIA_BORIS) }),
   offer({ name: 'Via_karine', slot: 'via', when: [is(blocked), WORLD.karineHome, WORLD.karine], act: 'via', arg: () => 'karine', tone: 'polite', bonus: 6, text: (g) => viaFromArr(g, 'P_VIA_KARINE', P_VIA_KARINE) }),
   offer({ name: 'Via_mama', slot: 'via', when: [is(blocked)], act: 'via', arg: () => 'mama', tone: 'polite', bonus: 6, text: (g) => viaFromArr(g, 'P_VIA_MAMA', P_VIA_MAMA) }),
+  // видимое окно посредника в живом сходе (#1565): выход «извиниться через посредника» существовал
+  // только кнопкой при блоке, и в режиме вражды его не находили. Пока сход жив, кнопка возвращается
+  // не реже раза в пять ходов (перерыв от показа) — один посредник на слот, лучший из доступных.
+  offer({ name: 'Via_boris_enmity', slot: 'via', specificity: 12, cooldown: { turns: 4 }, when: [is(vendetta), SPEAKS.boris], act: 'via', arg: () => 'boris', tone: 'polite', text: (g) => viaFromArr(g, 'P_VIA_BORIS', P_VIA_BORIS) }),
+  offer({ name: 'Via_karine_enmity', slot: 'via', specificity: 11, cooldown: { turns: 4 }, when: [is(vendetta), WORLD.karineHome, WORLD.karine], act: 'via', arg: () => 'karine', tone: 'polite', text: (g) => viaFromArr(g, 'P_VIA_KARINE', P_VIA_KARINE) }),
+  offer({ name: 'Via_mama_enmity', slot: 'via', specificity: 10, cooldown: { turns: 4 }, when: [is(vendetta)], act: 'via', arg: () => 'mama', tone: 'polite', text: (g) => viaFromArr(g, 'P_VIA_MAMA', P_VIA_MAMA) }),
   offer({ name: 'Moo', when: [is('ctx.offended'), gte(HEAT, 1)], odds: 0.5, act: 'moo', tone: 'neutral', bonus: 4, text: (g) => fromArr(g, 'P_MOO', P_MOO) }),
 
   // пока усы отрастают — подколоть Алика (#352); не чаще раза в 5 дней после вопроса,

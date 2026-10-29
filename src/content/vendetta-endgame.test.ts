@@ -117,13 +117,10 @@ describe('«Вендетта» — терминальный финал груб�
 
   it('ритуал примирения — тот же выход: мир снимает вражду, а не половину её', async () => {
     const { game } = makeGame()
-    game.S.mem.vendetta = true
-    await game.fire('PlayerSays', { intent: 'sorry', tone: 'polite' })
-    game.S.mem.vendetta = true // сход вернули: проверяем именно ритуал
-    game.S.mem['rude.heat'] = 4 // жар ссоры: текстом извинение не принимается
-    await game.fire('PlayerSays', { intent: 'sorry', tone: 'polite' })
-    expect(game.S.scene?.id, 'извинение после серии криков ведёт в ритуал').toBe('ritual')
-
+    // в живом сходе текст принимается напрямую (#1565); сцена ритуала проверяется своим входом:
+    // её выход обязан снять оба флага, а не половину (#1556)
+    Object.assign(game.S.mem, { vendetta: true, coldWar: true })
+    await game.enterNode('ritual', 'ask')
     game.S.choices = null
     await game.send(game.choices.find((c) => c.go === 'moo')!)
 

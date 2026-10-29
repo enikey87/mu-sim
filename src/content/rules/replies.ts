@@ -2,7 +2,7 @@
 // Общее правило по intent + более специфичные для частных случаев (память, контекст).
 import type { ContentApi } from '../../engine/game'
 import { fmtDays } from '../../engine/time'
-import { type Rule, eq, ne, is, gte, add, set, matches, spec, valueOf, isOpen } from '../fact'
+import { type Rule, eq, ne, is, gte, add, set, missing, matches, spec, valueOf, isOpen } from '../fact'
 import { muenTurn } from './muen'
 import type { GameEvent, Offer } from './events'
 import { AlikOffline, ThickJournal } from './criteria'
@@ -20,7 +20,7 @@ import { SORRY_AGAIN, CONDOLE_REVIVED, PREV_MANY, PROMISE_NEVER, PROMISE_PENCIL,
 import { CREW_PAID } from '../crew'
 import { HOLIDAY_MONEY, type Holiday } from '../holidays'
 import { LIE_OPEN, LIE_EXPLAIN, LIE_GRANDPA, LIE_CUSTOMER, LIE_THIRD, LIE_NOCRED, LIE_NIVA, LIE_PROMISE, LIE_ENVELOPES } from '../lies'
-import { HEAT, alikShaved, arsenTrackAt, avitoReviewAt, bathAnswered, bathAskedAt, borisAskAt, borisSaleAt, coldWar, vendetta, collectorsAskAt, collectorsEpAt, countersuitAt, courtVerdictAt, tileCourtAt, tileLawyerAt, tileMonumentAt, tileSlipAt, nivaBackAt, saleAt, crewPaidAt, debutAt, grantBathAt, grantTileAt, inhDoneAt, internAccepted, internAt, internDeclined, kettleAt, lawyerAt, moustacheAskAt, offendedAskAt, ramPhotoAt, rubikAskAt, rubikHoleAt, moustachePhotoAt, photoAt, tileAdAt, tamadaDoneAt, mamaMarketAt, mamaVoiceAt, samvelDivorceAt, grantHouseAt, seryogaAskAt, transferAt, vacancyAt, muenAnswered, hhJobAt, seryogaLoanAt, dachaAskAt, evictAt, collectorsEchoAt, threatGovAt, fraudCardAt, inhRefused, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, saidKonak, stateAt, topic, topicLast, topicMute, topicRun, whenYears } from '../memkeys'
+import { HEAT, alikShaved, arsenTrackAt, avitoReviewAt, bathAnswered, bathAskedAt, blocked, borisAskAt, borisSaleAt, coldWar, endgame, vendetta, collectorsAskAt, collectorsEpAt, countersuitAt, courtVerdictAt, tileCourtAt, tileLawyerAt, tileMonumentAt, tileSlipAt, nivaBackAt, saleAt, crewPaidAt, debutAt, grantBathAt, grantTileAt, inhDoneAt, internAccepted, internAt, internDeclined, kettleAt, lawyerAt, moustacheAskAt, offendedAskAt, ramPhotoAt, rubikAskAt, rubikHoleAt, moustachePhotoAt, photoAt, tileAdAt, tamadaDoneAt, mamaMarketAt, mamaVoiceAt, samvelDivorceAt, grantHouseAt, seryogaAskAt, transferAt, vacancyAt, muenAnswered, hhJobAt, seryogaLoanAt, dachaAskAt, evictAt, collectorsEchoAt, threatGovAt, fraudCardAt, inhRefused, asked, caughtCount, count, doneAsked, finaleOf, nextTransfer, sick, saidKonak, stateAt, topic, topicLast, topicMute, topicRun, whenYears } from '../memkeys'
 import type { ArcId, TopicId } from '../ids'
 import { BATH_ANSWER } from './player-choice-pools'
 import { PROMISE_SHAVE_ASK, BORIS_MEMORY_B, MOUSTACHE_PHOTO_B, MAMA_MARKET_B, TILE_AD_B, TAMADA_DONE_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, GRANT_HOUSE_B, COURT_VERDICT_B, TILE_SLIP_B, TILE_COURT_B, TILE_LAWYER_B, TILE_MONUMENT_B, NIVA_BACK_B, SOLD_B, RAM_PHOTO, BORIS_SALE, VACANCY, VACANCY_START_B, VACANCY_SOON_B, SERYOGA_B, GRANT_BATH_B, OFFENDED_ASK_B, BATH_ASK_B, MUEN_ASK_B, INH_BURNED_B, INH_REFUSED_B, AVITO_REVIEW, RUBIK_ASK, KETTLE, CREW_CALL_B, LAWYER_B, COLLECTORS_ASK_B, COLLECTORS_EP_B, INTERN_B, HOLE_B, COUNTERSUIT_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, DEBUT_BORIS_B, DEBUT_NIVA_B, NUNE_DEBUT_B, DEBUT_GRANT_B, GRANT_TILE_B, HH_JOB_B, SERYOGA_LOAN_B, DACHA_ASK_B, EVICT_B, COLLECTORS_ECHO_B, THREAT_GOV_B, FRAUD_CARD_B, KONVERTY_B } from '../world'
@@ -101,6 +101,32 @@ export const replyRules: R[] = [
       game.setCtx(null)
     },
   }, [gte('sorrySwing', 3)]),
+
+  // Примирение в живом сходе (#1565): пока экран «Вендетты» не сыгран, прямое извинение принимается
+  // как обычное и перекрывает ритуал (после серии криков текст не принимается), подсказки посредника
+  // и прочие ответы — иначе у режима вражды нет выхода, который видит игрок. Третье извинение за шесть
+  // ходов остаётся «качелями» (строка SWING), но мир наступает и там.
+  says('sorry', {
+    name: 'Says_sorry_vendetta',
+    specificity: 40, // выше Says_sorry_ritual (5) и подсказок блока (5–9)
+    remember: [add(count.sorry), set(coldWar, false), set(vendetta, false)],
+    respond: async ({ game }) => {
+      game.unlock('memory')
+      game.X.pullSorryMark()
+      const swing = Number(game.facts().sorrySwing ?? 0) >= 3
+      const line = swing ? game.line('SWING', SWING, { fallback: game.X.sorry })! : game.uniq(game.X.sorry)
+      takeSorryMark(game)
+      // принятое извинение гасит лестницу целиком: иначе следующий «прости» снова упирается в ритуал,
+      // и мир остаётся половиной — вражды нет, а выйти из ссоры нельзя
+      game.applyFacts([set(HEAT, 0)])
+      // блок — отдельная стена: принятый мир его снимает, иначе «принято» и «не доставлено» спорят
+      if (game.mem()[blocked]) {
+        game.applyFacts([set(blocked, false)])
+        game.sys('Алик Воздухонесян разблокировал вас')
+      }
+      await sorry(game, line)
+    },
+  }, [is(vendetta), missing(endgame.vendetta), missing(endgame.active)]),
 
   // ответ на реплику легенды / персонажа / воспоминание: отвечает тот, к кому обратились
   says('talk', {

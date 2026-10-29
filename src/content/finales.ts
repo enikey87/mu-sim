@@ -2,7 +2,7 @@
 // Последнюю серию сериала выбирают правила события ArcFinale: обычный финал (последний эпизод из arcs.ts)
 // побеждает по умолчанию, частный — если игрок выполнил его условия (он специфичнее).
 // Выбранный финал пишется в память: finale.boris = 'brigadir' — его видят концовки и ответы «Как там Борис?».
-import { type Criterion, type Entry, is, gte, lte, eq, set, gate, missing } from './fact'
+import { type Criterion, type Entry, is, gte, lte, eq, set, gate, missing, named } from './fact'
 import type { Episode } from './arcs'
 import { needs, meet } from './world'
 import { HEAT, caughtCount, count, court, garikConcrete, grantPaid, houseOnGarik, internAccepted, internAt, internDeclined, intro, karineKnowsDebt, nivaAway, nivaPlayer, paydayScene, rubikFined, tileCornerRemoved, vendetta, wedding, endgame } from './memkeys'
@@ -244,6 +244,11 @@ const late = gte('day', ENDING_MIN_DAY)
  *  Вендетта — 15-й крик за партию; ещё столько же после неё — уже не вспыльчивость, а хроника. */
 export const CHRONIC_RUDE_AFTER_VENDETTA = 15
 
+/** Окно примирения после объявленного схода (#1565), в ходах игрока. Сход, объявленный в третьем акте,
+ *  раньше ставил флаг и терминальный экран одним ходом — извиниться было физически некогда. Теперь
+ *  экран «Вендетты» ждёт это окно; раннюю вендетту по-прежнему держит гейт третьего акта (`late`). */
+export const VENDETTA_GRACE_TURNS = 6
+
 export const ENDINGS: Ending[] = [
   {
     id: 'family', title: 'Породнились', icon: '💍', when: [late, eq('finale.samvel', 'groom')],
@@ -273,7 +278,9 @@ export const ENDINGS: Ending[] = [
   {
     // терминальная концовка грубого пути (#1556): после её экрана идёт свой эпилог вражды,
     // День выплаты для этой партии не наступает — «Параллельная вселенная» ниже закрыта по той же причине
-    id: 'vendetta', title: 'Вендетта', icon: '🗡️', when: [late, is(vendetta)],
+    // «сход состоялся» — одно условие, а не два: специфичность остаётся ниже «Кровного врага» (#1425),
+    // иначе в третьем акте обе концовки равны и решает розыгрыш (#1565)
+    id: 'vendetta', title: 'Вендетта', icon: '🗡️', when: [late, named('vendettaFallen', is(vendetta), is('vendettaFall'))],
     m: [{ w: 'samvel', t: 'Сход объявлен. Род Воздухонесянов не платит твоему роду. Навечно. Коньяк за наш счёт — единственный раз.' }],
     text: 'Ты кричал так долго и ни разу не извинился, что стал кровным врагом рода. Денег ты не вернул — зато обрёл врага навсегда. По-аликовски это дороже. Дня выплаты не будет: разговор теперь только в группе вражды.',
   },

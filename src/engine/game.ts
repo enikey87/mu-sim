@@ -9,7 +9,7 @@ import { QUEST_WHEN } from '../content/rules/world'
 import { LEGENDS } from '../content/legends'
 import { moneyPlaceOf, moneyPlaceOfClaim, stampMoneyPlace } from '../content/money-ask'
 import { TOPICS, P_NEU_B_LATE, P_RUDE_BLOCKED, P_RUDE_POLITE, P_POL_POLITE, P_NIGHT, P_FRIDAY, P_MONEY, P_DESPERATE, DESPERATE_REPLY, MONEY_REPLY_POLITE, MONEY_REPLY_NEUTRAL, MONEY_REPLY_REGIMENT } from '../content/topics'
-import { FINALES, ENDINGS, DEFAULT_FINALE, paydayOutcome, type Finale, type PaydayId } from '../content/finales'
+import { FINALES, ENDINGS, DEFAULT_FINALE, VENDETTA_GRACE_TURNS, paydayOutcome, type Finale, type PaydayId } from '../content/finales'
 import { ARCS, ARC_DONE, ARC_MENTIONS, CAST, type Episode, GROUP, GROUP_OOPS, WRONG_TO, WRONG_WHAT, WRONG_OOPS } from '../content/arcs'
 import * as L from '../content/life'
 import { ACH } from '../content/achievements'
@@ -1967,6 +1967,9 @@ export class Game {
       muenFresh: S.stats.sent - Number(S.mem[memkeys.muenAt] ?? -99) <= EVENT_FRESH_TURNS,
       // сколько раз игрок извинялся за последние 6 ходов («крик → мир → крик → мир»)
       sorrySwing: String(S.mem[memkeys.sorryAt] ?? '').split(',').filter((n) => n && S.stats.sent - Number(n) <= 6).length,
+      // сход объявлен, а окно примирения после него ещё идёт (#1565): экран «Вендетты» ждёт его конца.
+      // Без штампа (старое сохранение, тесты, ставящие флаг руками) окна уже нет — поведение как раньше.
+      vendettaFall: S.stats.sent - Number(S.mem[memkeys.vendettaAt] ?? -99) >= VENDETTA_GRACE_TURNS,
       // температура ссоры не уходит ниже нуля (после примирения ещё тикают отложенные «остывания»)
       [memkeys.HEAT]: Math.max(0, Number(S.mem[memkeys.HEAT] ?? 0)),
       'has.boris': S.items.some((n) => /Борис/.test(n)),
@@ -2265,9 +2268,15 @@ export class Game {
 
   private async sendTurn(opt: Choice | string): Promise<void> {
     const parsed = typeof opt === 'string' ? this.classifyInput(opt) : null
-    const o: Choice = parsed
+    const raw: Choice = parsed
       ? { text: opt as string, tone: parsed.tone, category: parsed.category, act: parsed.intent, arg: parsed.arg }
       : opt as Choice
+    // Кнопка без своего намерения читается той же классификацией, что и набранный текст (#1565):
+    // «Ладно, я перегнул» — извинение, а не просто вежливая реплика. Тон не пересчитываем — капс
+    // в готовом варианте ходом грубости не делает (#583); из намерений берём только извинение и только
+    // когда просьбы в тексте нет: «извините, что беспокою. Когда деньги?» остаётся просьбой.
+    const told = !raw.act && !raw.scene ? this.classifyInput(raw.text) : null
+    const o: Choice = told?.intent === 'sorry' && !told.request ? { ...raw, act: 'sorry' } : raw
     if (this.ui.busy || this.battery.dead || this.disposed || !o.text.trim()) return
     const S = this.S
     this.ui.busy = true

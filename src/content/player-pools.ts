@@ -3,7 +3,7 @@ import type { Entry } from '../engine/rules'
 import type { Choice } from '../engine/state'
 import { D } from './excuses'
 import { TOPICS, P_NIGHT, P_FRIDAY, P_NEU_B_LATE, P_RUDE_BLOCKED, P_RUDE_POLITE, P_POL_POLITE, P_MONEY, P_DESPERATE } from './topics'
-import { P_LIE } from './lies'
+import { P_LIE, LIE_PLAYER_POOLS } from './lies'
 import { ARCS, WRONG_Q } from './arcs'
 import { spec } from './fact'
 import { collectorsRecruited, collectorsTea, collectorsTurned } from './memkeys'
@@ -63,6 +63,9 @@ put('P_MONEY.bottom.neutral', P_MONEY.bottom.neutral)
 put('P_DESPERATE.low', P_DESPERATE.low)
 put('P_DESPERATE.bottom', P_DESPERATE.bottom)
 put('P_LIE', P_LIE)
+// пулы поимки по классам (#1548): у сюжетных противоречий свои реплики — значит, и свои ключи в реестре,
+// иначе сторож прошлого их не видит (бот дошёл до «Нивы» — и сторож промолчал)
+for (const [kind, arr] of Object.entries(LIE_PLAYER_POOLS)) if (arr) put(`P_LIE_${kind.toUpperCase()}`, arr)
 
 for (const [k, t] of Object.entries(TOPICS)) {
   put(`TOPICS.${k}.p`, t.p as PlayerLinePool)
