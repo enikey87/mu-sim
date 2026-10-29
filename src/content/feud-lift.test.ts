@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest'
 import { makeGame } from '../test/helpers'
 import type { Game } from '../engine/game'
-import { ENDINGS, CHRONIC_RUDE_AFTER_VENDETTA } from './finales'
+import { CHRONIC_RUDE_AFTER_VENDETTA } from './finales'
 import { FEUD_LIFTED, FEUD_PRICE } from './rude'
 import { valueOf } from './fact'
 import { vendettaLifted, vendettaPrice } from './memkeys'
@@ -18,8 +18,6 @@ const stickers = (g: Game): string[] => g.S.msgs.flatMap((m) => (m.kind === 'sti
 const feud = (g: Game): void => { Object.assign(g.S.mem, { vendetta: true, coldWar: true }) }
 /** Экран «Кровного врага» по его собственному условию: сход, хроника и ни одного извинения. */
 const chronicle = (g: Game): void => { Object.assign(g.S.mem, { vendetta: true, 'count.rudeAfterVendetta': CHRONIC_RUDE_AFTER_VENDETTA }) }
-const ending = (id: string) => ENDINGS.find((e) => e.id === id)!
-const texts = (id: string): string => [ending(id).text, ...ending(id).m.map((m) => valueOf(m))].join('\n')
 
 describe('снятие вражды слышно (#1570)', () => {
   it('второе прямое извинение: системная строка снятия, стикер перемирия и статус «Не враг. Пока»', async () => {
@@ -123,26 +121,23 @@ describe('цена выхода: одно «прости» вражду не с�
   })
 })
 
-describe('чекпоинт «Кровный враг» — окно, а не приговор (#1570)', () => {
-  it('финальная строка называет окно выхода', () => {
-    expect(texts('bloodfeud')).toContain('если извинишься — разговор другой')
-  })
-
-  it('текст чекпоинта не объявляет конец пути', () => {
-    expect(texts('bloodfeud')).not.toMatch(/конец пути|Дня выплаты не будет/)
-    expect(texts('bloodfeud')).toMatch(/не финал/)
-  })
-
-  it('НК: терминальная «Вендетта» рамки окна не получает — она и есть навсегда', () => {
-    expect(texts('vendetta')).not.toContain('если извинишься — разговор другой')
-    expect(texts('vendetta')).not.toMatch(/не финал/)
-  })
-
-  it('экран «Кровного врага» встаёт по-прежнему, а снятый сход его снимает', async () => {
+describe('терминальная «Кровный враг» закрывает окно, а не обещает возврат (#1571)', () => {
+  it('экран встаёт по своему условию и остаётся терминальным: метки снятия нет', async () => {
     const { game } = makeGame()
     chronicle(game)
     await game.fire('CheckEnding')
     expect(game.S.ending).toBe('bloodfeud')
     expect(game.S.mem[vendettaLifted], 'метка снятия появилась без снятия').toBeUndefined()
+  })
+
+  it('цена не отнимает последний шанс: извинение до экрана по-прежнему снимает вражду', async () => {
+    const { game } = makeGame()
+    Object.assign(game.S.mem, { vendetta: true, coldWar: true, 'count.rudeAfterVendetta': CHRONIC_RUDE_AFTER_VENDETTA - 1 })
+    await game.send('Прости, Алик, я погорячился')
+    await game.send('Прости, Алик, я погорячился')
+    expect(game.S.mem.vendetta).toBe(false)
+    game.S.mem['count.rudeAfterVendetta'] = CHRONIC_RUDE_AFTER_VENDETTA
+    await game.fire('CheckEnding')
+    expect(game.S.ending, 'снятая вражда всё равно дала терминальный экран').toBeNull()
   })
 })

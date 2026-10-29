@@ -139,6 +139,9 @@ export const DIRECT: Record<string, DirectCase> = {
     event: 'CheckEnding',
     setup: (g) => { g.S.mem.vendetta = true; g.S.mem['count.rudeAfterVendetta'] = CHRONIC_RUDE_AFTER_VENDETTA },
   },
+  // #1571: эпилог отлучения терминален, бот в выборках до него не доходит (извиняется или не добирает хроники);
+  // извинение после экрана — тот же факт `endgame.bloodfeud`, что ставит startBloodfeudEndgame
+  Says_sorry_bloodfeud: { event: 'PlayerSays', facts: { intent: 'sorry' }, setup: (g) => { g.S.mem['endgame.bloodfeud'] = true } },
   Ending_heir: { event: 'CheckEnding', setup: (g) => { g.S.day = ENDING_MIN_DAY; g.S.mem['finale.alik_death'] = 'will' } },
   Says_via_boris: { event: 'PlayerSays', facts: { intent: 'via', arg: 'boris' }, setup: (g) => { g.S.mem.blocked = true } },
   // с колкостями (#683) PromiseDue в открытом экране выплаты ловят сами выборки — случай снят по порогу гейта

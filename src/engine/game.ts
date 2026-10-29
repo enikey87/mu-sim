@@ -34,6 +34,9 @@ import {
   ARCHIVE_FRESH_DAYS,
   ENDGAME_ARCH, ENDGAME_ARCH_LIE, ENDGAME_CHOICES, ENDGAME_FALLBACK, ENDGAME_FORMALITIES, ENDGAME_GROUP, ENDGAME_INTRO, ENDGAME_JUBILEES,
   ENDGAME_LEAVE, ENDGAME_MONEY, ENDGAME_MUTE, ENDGAME_OPEN, ENDGAME_RENAMES, ENDGAME_RETURNER_LINES, ENDGAME_RETURNERS, ENDGAME_ALIK_BACK,
+  ENDGAME_BLOODFEUD_APOLOGY, ENDGAME_BLOODFEUD_CHOICES, ENDGAME_BLOODFEUD_DONATE, ENDGAME_BLOODFEUD_FORMALITIES,
+  ENDGAME_BLOODFEUD_GROUP, ENDGAME_BLOODFEUD_LEAVE, ENDGAME_BLOODFEUD_LEAVERS, ENDGAME_BLOODFEUD_MUTE, ENDGAME_BLOODFEUD_OPEN,
+  ENDGAME_BLOODFEUD_RENAMES,
   ENDGAME_VENDETTA_ACT, ENDGAME_VENDETTA_ACT_SIGNED, ENDGAME_VENDETTA_APOLOGY, ENDGAME_VENDETTA_ASK, ENDGAME_VENDETTA_CHOICES,
   ENDGAME_VENDETTA_FORMALITIES, ENDGAME_VENDETTA_GROUP, ENDGAME_VENDETTA_LEAVE, ENDGAME_VENDETTA_MUTE, ENDGAME_VENDETTA_OPEN, ENDGAME_VENDETTA_RENAMES,
   EPILOGUE_BANNER,
@@ -2145,6 +2148,9 @@ export class Game {
       // Ни обычные действия группы, ни ответы на просьбу не появляются раньше её системной пометки (#358).
       if (!S.mem[memkeys.endgame.intro]) return []
       if (!S.mem[memkeys.lend50.asked]) return []
+      // Эпилог отлучения (#1571): просьбы нет — донат-слот обрамляет игра, а Алик ничего не просит.
+      // Кнопки группы доступны сразу: ответа на просьбу у этой концовки не существует.
+      if (S.mem[memkeys.endgame.bloodfeud]) return ENDGAME_BLOODFEUD_CHOICES.map((c) => ({ ...c }))
       // «Займи 50» есть в обеих группах: в выплате просит Алик, во вражде — мама (#1557)
       if (!S.mem[memkeys.lend50.answer]) return LEND50_CHOICES.map((c) => ({ ...c }))
       // Эпилог вражды (#1556): своя группа и свой цикл — «Где извинения?» вместо «Где деньги?»
@@ -3110,9 +3116,12 @@ export class Game {
     this.S.ending = null
     // вход в эндгейм: вступление, потом просьба «займи 50»; формальности — AlikAway/Idle при висящей просьбе (#321)
     const outcome = id === null ? null : paydayOutcome(id)
-    // «Вендетта» — терминальная концовка грубого пути (#1556): свой эпилог вражды вместо Дня выплаты
+    // «Вендетта» и «Кровный враг» — терминальные концовки грубого пути (#1556, #1571): свой эпилог
+    // вместо Дня выплаты, у каждой свой поток — вражда и отлучение
     if (id === 'vendetta' && !this.S.mem[memkeys.endgame.active]) {
       try { await this.startVendettaEndgame() } catch (e) { this.swallowDisposed(e) }
+    } else if (id === 'bloodfeud' && !this.S.mem[memkeys.endgame.active]) {
+      try { await this.startBloodfeudEndgame() } catch (e) { this.swallowDisposed(e) }
     } else if (outcome && !this.S.mem[memkeys.endgame.active]) {
       try { await this.startEndgame(outcome) } catch (e) { this.swallowDisposed(e) }
     }
@@ -3169,6 +3178,24 @@ export class Game {
   }
 
   /**
+   * Эпилог отлучения (#1571): «Кровный враг» — терминальная концовка, как «Вендетта», но свой
+   * поток. Мир заморожен той же заморозкой; в группе нет ни войны, ни просьбы — род вычеркнул
+   * игрока и ушёл, остаётся типовая формальность и донат-слот автора.
+   */
+  private async startBloodfeudEndgame(): Promise<void> {
+    this.ui.busy = true
+    try {
+      this.S.mem[memkeys.endgame.bloodfeud] = true
+      this.freezeWorld()
+      await this.completeEndgameOpening('bloodfeud')
+    } finally {
+      if (!this.disposed) this.ui.busy = false
+      this.save()
+      this.emit()
+    }
+  }
+
+  /**
    * Продолжить opening после перезагрузки, а затем только пустить пачку непрочитанных.
    * Незавершённая часть перед повтором удаляется, поэтому в ленте нет дублей и обрывков (#358).
    */
@@ -3185,6 +3212,7 @@ export class Game {
 
   private async completeEndgameOpening(outcome: string): Promise<void> {
     if (this.S.mem[memkeys.endgame.vendetta]) return this.completeVendettaOpening()
+    if (this.S.mem[memkeys.endgame.bloodfeud]) return this.completeBloodfeudOpening()
     if (!this.S.mem[memkeys.endgame.intro]) {
       this.stripIncompleteEndgameIntro()
       await this.deliverEndgameIntro(outcome)
@@ -3272,6 +3300,49 @@ export class Game {
     this.save()
   }
 
+  /** Вступление эпилога отлучения: та же цепочка, финальный блок Алика, уход рода и донат-слот автора (#1571). */
+  private async completeBloodfeudOpening(): Promise<void> {
+    if (!this.S.mem[memkeys.endgame.intro]) {
+      this.stripIncompleteEndgameIntro()
+      await this.deliverBloodfeudIntro()
+      await this.sleep(1500)
+    }
+    if (!this.S.mem[memkeys.lend50.asked]) await this.deliverBloodfeudDonate()
+    // null, а не []: buildChoices отдаст кнопки группы отлучения
+    this.S.choices = null
+  }
+
+  private async deliverBloodfeudIntro(): Promise<void> {
+    const S = this.S
+    this.sys(EPILOGUE_BANNER)
+    this.save()
+    await this.sleep(500)
+    this.sys(`Алик создал группу «${ENDGAME_BLOODFEUD_GROUP}»`)
+    this.save()
+    await this.sleep(500)
+    this.sys('Алик добавил вас')
+    this.save()
+    for (const text of ENDGAME_BLOODFEUD_OPEN) await this.endgameLine(text)
+    for (const text of ENDGAME_BLOODFEUD_LEAVERS) this.sys(text)
+    S.mem[memkeys.endgame.intro] = true
+    S.choices = []
+    this.save()
+  }
+
+  /** Донат-слот отлучения: Алик ничего не просит, карточку обрамляет игра — ответов на просьбу нет (#1571). */
+  private async deliverBloodfeudDonate(): Promise<void> {
+    const S = this.S
+    if (!S.mem[memkeys.endgame.active] || S.mem[memkeys.lend50.asked]) return
+    this.stripIncompleteBloodfeudDonate()
+    for (const text of ENDGAME_BLOODFEUD_DONATE) this.sys(text)
+    this.save()
+    await this.sleep(500)
+    this.pushLend50Card()
+    S.mem[memkeys.lend50.asked] = true
+    S.choices = null
+    this.save()
+  }
+
   /**
    * Просьба «займи 50» идёт реплика за репликой с typing; карточку перевода завершает цепочку.
    * asked ставится только после карточки, поэтому кнопки не могут появиться у неполной просьбы (#219/#248/#358).
@@ -3310,7 +3381,9 @@ export class Game {
   /** Убрать незавершённое вступление целиком: при повторе оно не дублируется и не остаётся оборванным. */
   private stripIncompleteEndgameIntro(): void {
     if (this.S.mem[memkeys.endgame.intro]) return
-    const group = this.S.mem[memkeys.endgame.vendetta] ? ENDGAME_VENDETTA_GROUP : ENDGAME_GROUP
+    const group = this.S.mem[memkeys.endgame.vendetta]
+      ? ENDGAME_VENDETTA_GROUP
+      : this.S.mem[memkeys.endgame.bloodfeud] ? ENDGAME_BLOODFEUD_GROUP : ENDGAME_GROUP
     const marker = `Алик создал группу «${group}»`
     let at = -1
     for (let i = this.S.msgs.length - 1; i >= 0; i--) {
@@ -3321,6 +3394,21 @@ export class Game {
     // баннер эпилога — первая строка вступления: обрыв после него снимается вместе с группой (#797)
     const prev = this.S.msgs[at - 1]
     if (prev && prev.kind === 'sys' && prev.text === EPILOGUE_BANNER) at--
+    this.S.msgs.splice(at)
+    this.touchMsgs(at)
+  }
+
+  /** Рамка донат-слота отлучения без карточки: при повторе вступления она не двоится (#1571). */
+  private stripIncompleteBloodfeudDonate(): void {
+    if (this.S.mem[memkeys.lend50.asked]) return
+    const pool = new Set<string>(ENDGAME_BLOODFEUD_DONATE)
+    let at = -1
+    for (let i = this.S.msgs.length - 1; i >= 0; i--) {
+      const m = this.S.msgs[i]
+      if (m.kind === 'sys' && pool.has(m.text)) at = i
+      else if (at >= 0) break
+    }
+    if (at < 0) return
     this.S.msgs.splice(at)
     this.touchMsgs(at)
   }
@@ -3356,7 +3444,10 @@ export class Game {
     const S = this.S
     S.mem[memkeys.lend50.sponsor] = true
     S.mem[memkeys.endgame.renames] = Number(S.mem[memkeys.endgame.renames] ?? 0) + 1
-    this.sys(`Алик изменил название группы на «${LEND50_RENAME}»`)
+    // в группе отлучения Алика нет: переименование называет игра, а не он (#1571)
+    this.sys(S.mem[memkeys.endgame.bloodfeud]
+      ? `Группа переименована в «${LEND50_RENAME}»`
+      : `Алик изменил название группы на «${LEND50_RENAME}»`)
   }
 
   /** Ответ на «займи 50»: реплики и ачивка — без движения денег и долга; без опечаток (#248). */
@@ -3383,8 +3474,11 @@ export class Game {
   async endgameAction(action: 'money' | 'mute' | 'leave'): Promise<void> {
     const S = this.S
     const vendetta = !!S.mem[memkeys.endgame.vendetta]
+    const bloodfeud = !!S.mem[memkeys.endgame.bloodfeud]
     S.ctx = null
     if (action === 'money') {
+      // в группе отлучения извинения закрыты вместе с окном: «Где извинения?» — «не согласовано» (#1571)
+      if (bloodfeud) { this.sys(this.draw('ENDGAME_BLOODFEUD_APOLOGY', ENDGAME_BLOODFEUD_APOLOGY)); return }
       // в группе вражды вопроса о деньгах нет: «Где деньги?» звучит «Где извинения?» (#1556)
       if (vendetta) { await this.say([this.draw('ENDGAME_VENDETTA_APOLOGY', ENDGAME_VENDETTA_APOLOGY)]); return }
       await this.say([this.archiveLine() ?? this.draw('ENDGAME_MONEY', ENDGAME_MONEY)])
@@ -3394,6 +3488,14 @@ export class Game {
       const mutes = Number(S.mem[memkeys.endgame.mutes] ?? 0) + 1
       S.mem[memkeys.endgame.mutes] = mutes
       this.sys(mutes === 1 ? 'Вы отключили уведомления' : 'Уведомления снова включены. Кем — неизвестно. Вы отключили их ещё раз')
+      // у группы отлучения колода тишины: в ней никого не осталось, писать некому (#1571)
+      if (bloodfeud) {
+        this.sys(this.draw('ENDGAME_BLOODFEUD_MUTE', ENDGAME_BLOODFEUD_MUTE))
+        const name = this.draw('ENDGAME_BLOODFEUD_RENAMES', ENDGAME_BLOODFEUD_RENAMES)
+        S.mem[memkeys.endgame.renames] = Number(S.mem[memkeys.endgame.renames] ?? 0) + 1
+        this.sys(`Группа переименована в «${name}»`)
+        return
+      }
       // у группы вражды своя колода: тёплые соседи группы выплаты там не звучат (#1557)
       await this.say([vendetta
         ? this.draw('ENDGAME_VENDETTA_MUTE', ENDGAME_VENDETTA_MUTE)
@@ -3407,6 +3509,12 @@ export class Game {
 
     S.mem[memkeys.endgame.exits] = Number(S.mem[memkeys.endgame.exits] ?? 0) + 1
     this.sys('Вы покинули группу')
+    // в группе отлучения возвращателей-родни нет: вернуть может только сама группа (#1571)
+    if (bloodfeud) {
+      this.sys('Группа добавила вас обратно')
+      this.sys(this.draw('ENDGAME_BLOODFEUD_LEAVE', ENDGAME_BLOODFEUD_LEAVE))
+      return
+    }
     // в группе вражды возвращателей-родни нет: держит не семья, а сама вражда (#1556)
     if (vendetta) {
       this.sys('Алик добавил вас обратно')
@@ -3493,6 +3601,12 @@ export class Game {
     return [archive ?? this.draw('ENDGAME_FORMALITIES', ENDGAME_FORMALITIES), ...(memory ? [memory] : []), ...(jubilee ? [jubilee] : [])]
   }
   async endgameFormality(): Promise<void> {
+    // в группе отлучения формальность говорит игра, а не Алик: род ушёл, писать некому (#1571)
+    if (this.S.mem[memkeys.endgame.bloodfeud]) {
+      this.sys(this.draw('ENDGAME_BLOODFEUD_FORMALITIES', ENDGAME_BLOODFEUD_FORMALITIES))
+      this.S.ctx = null
+      return
+    }
     for (const text of this.formalityLines()) await this.say([text])
     this.S.ctx = null
   }
@@ -3775,7 +3889,11 @@ export class Game {
         this.S.mem[memkeys.transferAmount] = 50
         deliver({ kind: 'transfer', from: 'alik', text: this.draw('TRANSFER_NOTE', D.TRANSFER_NOTE), amount: 50 })
         return
-      case 'formality': for (const text of this.formalityLines()) deliver({ kind: 'text', from: 'alik', text: saidText(text) }, saidClaims(text)); return
+      case 'formality':
+        // в группе отлучения формальность говорит игра: род ушёл, писать некому (#1571)
+        if (this.S.mem[memkeys.endgame.bloodfeud]) { this.sys(this.draw('ENDGAME_BLOODFEUD_FORMALITIES', ENDGAME_BLOODFEUD_FORMALITIES)); return }
+        for (const text of this.formalityLines()) deliver({ kind: 'text', from: 'alik', text: saidText(text) }, saidClaims(text))
+        return
       case 'coldWar': {
         // те же общие ворота окна, что у правила Idle_ColdWar (#1441): инициатива и ответ делят одну строку
         const blocked = this.recentLines(COLD_WAR_WINDOW, COLD_WAR, COLD_WAR_TURNS)
