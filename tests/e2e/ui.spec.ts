@@ -76,6 +76,21 @@ test('досье: модальность с клавиатуры, фон нед�
   await expect(page.locator('.phone-surface')).not.toHaveAttribute('inert')
 })
 
+test('режим рецензирования существует только по ?review', async ({ page }) => {
+  await page.getByTitle('Обещания и ачивки').click()
+  const dialog = page.getByRole('dialog', { name: 'Досье на Алика' })
+  await expect(dialog).toBeVisible()
+  // без параметра режима нет: ни секции, ни тумблера — включить его игроку нечем
+  await expect(page.locator('#reviewToggle')).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeHidden()
+
+  await page.goto('/?review&fast&nointro')
+  await expect(page.locator('.chat-head .name')).toHaveText('Алик Воздухонесян')
+  await page.getByTitle('Обещания и ачивки').click()
+  await expect(page.locator('#reviewToggle')).toBeVisible()
+})
+
 test('поле сообщения имеет enterKeyHint=send', async ({ page }) => {
   await expect(page.getByLabel('Сообщение')).toHaveAttribute('enterkeyhint', 'send')
 })
