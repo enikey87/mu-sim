@@ -48,6 +48,7 @@ import {
   type Criterion, type Entry, type FactOp, type Facts, type Resolver, type Rule, type Query, type Priority, type Line as PoolLine, type LineOpts, type Picked,
 } from './rules'
 import { MENTION_RE, WORLD } from '../content/world'
+import { ENMITY_FAMILY, ENMITY_RUMORS } from '../content/enmity'
 import { type Clock, type GameTimer, type WallTimer, realClock, isManualClock, wallClock } from './clock'
 import { type Audio, silentAudio } from './audio'
 import { makeMooPhrase, mooOf, pinnedMooPhrase } from './moo'
@@ -1733,6 +1734,13 @@ export class Game {
   }
 
   // ---------- факты для правил ----------
+  /**
+   * Режим мира «вражда» (#1558): одна точка входа для движка — тот же факт `vendetta`, что и у
+   * `WORLD.enmity` в контенте. В режиме сериалы стоят: новые не стартуют, начатые не идут.
+   */
+  private inEnmity(): boolean {
+    return this.S.mem[memkeys.vendetta] === true
+  }
   /** Маринование первой арки (#1004): пока не начат ни один сериал, первые дни — только шаблонные отмазки;
    *  считает окно в одном месте: сериал ждёт (`availableArcs`) и родня не пишет (факт `arcsMature`). */
   private marinating(): boolean {
@@ -1743,6 +1751,8 @@ export class Game {
     const { mem, day } = this.S
     // маринование первой арки (#1004): первые дни — шаблонные отмазки, сериал ждёт; задержка — здесь, в одном месте
     if (this.marinating()) return []
+    // вражда (#1558): пока сход не отменён извинением, новых сериалов нет — канал занимают семья и слухи
+    if (this.inEnmity()) return []
     const fact = (key: string) => key === 'day' ? day : Object.prototype.propertyIsEnumerable.call(mem, key) ? mem[key] : undefined
     return Object.keys(ARCS).filter((id) => {
       const a = ARCS[id]
@@ -1770,6 +1780,8 @@ export class Game {
   }
   /** Вопрос «Как там…?» к чему-то приведёт: сериал не закончен и сегодня по вопросу ещё не показывали серию. */
   arcCanAdvance(id: string, asked = false): boolean {
+    // вражда (#1558): начатые сериалы стоят до исхода окна — извинение снимет режим, сход закроет партию
+    if (this.inEnmity()) return false
     const st = this.S.arcs[id]
     // серия в тот же день, что предыдущая, — каша («Свадьба. Третий день» и тут же «Десятый день»):
     // по вопросу игрока — назавтра, сама — через три дня
@@ -2684,6 +2696,22 @@ export class Game {
     this.unlock('fwd')
     if (this.chance(0.5)) await this.say([this.uniq(() => this.draw('FWD_NOTE', L.FWD_NOTE))])
     this.S.ctx = { type: 'fwd' }
+  }
+
+  /**
+   * Семья-посредник в холодной войне (#1558): зовёт к извинению — единственному выходу из режима.
+   * Строку выбирает пул: у каждой свой факт знакомства, мама пишет и без него.
+   */
+  async enmityFamily(): Promise<void> {
+    await this.say([this.draw('ENMITY_FAMILY', ENMITY_FAMILY)])
+  }
+
+  /** Слух за стеклом (#1558): жизнь Алика пересказывает третье лицо — сериал от этого не начинается. */
+  async enmityRumor(): Promise<void> {
+    const r = this.draw('ENMITY_RUMOR', ENMITY_RUMORS)
+    await this.typingFor(700)
+    this.alikMsg({ kind: 'fwd', from: 'alik', f: r.f, text: r.t })
+    this.unlock('fwd')
   }
 
   async deletedMsg(): Promise<void> {
@@ -3849,7 +3877,7 @@ export type ContentApi = Pick<Game,
   // ход и события
   | 'fire' | 'scheduleEvent' | 'turnRoll' | 'alikTurn' | 'excuseTurn' | 'nextDay'
   | 'goOffline' | 'period' | 'periodLine' | 'tribunal' | 'endgameAction' | 'endgameFormality'
-  | 'endgameLend50' | 'reachEnding' | 'playFinale'
+  | 'endgameLend50' | 'reachEnding' | 'playFinale' | 'enmityFamily' | 'enmityRumor'
   // сериалы, сцены, квесты
   | 'playArc' | 'nextArc' | 'arcCanAdvance' | 'arcDoneLines' | 'arcStarted' | 'arcByAsk'
   | 'startScene' | 'enterNode' | 'resumeNode' | 'scenes' | 'questAllowed' | 'takeQuest' | 'setLegend'
