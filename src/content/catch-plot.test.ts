@@ -70,6 +70,9 @@ describe('класс «Нива»: пишет/вернулась сама про
     const lie = game.lie()!
     expect(c.text, 'обе версии в реплике игрока').toContain(lie.old.say)
     expect(c.text).toContain(lie.new.say)
+    // пул окна может выпасть повторно на следующем ходу: та же версия не плодит второй эпизод
+    await game.say([spec])
+    expect(openEpisodes(game.S.ledger, 'niva.state')).toHaveLength(2)
   })
   it('поимка сюжетного противоречия не вытесняет вопрос про сериал', async () => {
     const { game } = makeGame()
