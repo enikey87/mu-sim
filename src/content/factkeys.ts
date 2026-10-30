@@ -15,7 +15,7 @@ import type { AchId, ArcId, CastId, ClaimKey, TopicId, WhoId } from './ids'
 import { invoiceItems, invKey } from './scenes'
 import {
   ACTOR_KEYS, EVENT_KEYS, MEM_KEYS, type EventKey, type ActorKey,
-  HEAT, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, evicted,
+  HEAT, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, deathAnnAt, evicted,
   vendetta, vendettaAt, vendettaLifted, vendettaPrice, coldWar, court, courtVerdict, courtPolite, courtReferral, judgeApology, saidStrasburg, ritualCount, ritualCut, caughtCount, caughtUnique, caughtAt, garikDenied, garikCode, cryptoHodl,
   bathAsked, bathAskedAt, bathAnswered, mamaCalls, phoneKarine, karineKnowsDebt, karineThinksTax, alikShaved, moustacheKept, moustacheAskAt, alikDay, mooAt, muenAt, muenAsked, muenAnswered, sorryAt, rudeAt, thanksAt, topicRun, topicLast,
   legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway, nivaPlayer, carGone,
@@ -49,7 +49,7 @@ export type BillField = 'dueAt' | 'due' | 'unpaid' | 'streak'
 /** Точные ключи памяти мира (константы memkeys). */
 export type MemExactKey =
   | typeof HEAT | typeof blocked | typeof blockedHint | typeof statusHidden | typeof polite | typeof bloodGiven
-  | typeof alikDead | typeof mourning | typeof evicted | typeof vendetta | typeof vendettaAt | typeof vendettaLifted | typeof vendettaPrice | typeof coldWar | typeof court | typeof courtVerdict
+  | typeof alikDead | typeof mourning | typeof deathAnnAt | typeof evicted | typeof vendetta | typeof vendettaAt | typeof vendettaLifted | typeof vendettaPrice | typeof coldWar | typeof court | typeof courtVerdict
   | typeof courtPolite | typeof courtReferral | typeof judgeApology | typeof saidStrasburg | typeof ritualCount | typeof ritualCut | typeof caughtCount | typeof caughtUnique | typeof caughtAt | typeof garikDenied | typeof garikCode | typeof cryptoHodl
   | typeof bathAsked | typeof bathAskedAt | typeof bathAnswered | typeof mamaCalls | typeof phoneKarine | typeof karineKnowsDebt | typeof karineThinksTax | typeof alikShaved | typeof moustacheKept | typeof moustacheAskAt | typeof alikDay | typeof mooAt | typeof muenAt | typeof muenAsked | typeof muenAnswered | typeof sorryAt
   | typeof rudeAt | typeof thanksAt | typeof topicRun | typeof topicLast | typeof legendPromiseAt

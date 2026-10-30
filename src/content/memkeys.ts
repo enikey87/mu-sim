@@ -17,6 +17,10 @@ export const statusHidden = 'status.hidden'
 export const polite = 'polite'
 export const alikDead = 'alik_dead'
 export const mourning = 'mourning'
+/** Ход объявления «Алик умер» (эпизод 1 сериала alik_death, #1610): по нему открывается окно отклика —
+ *  прямое соболезнование в первом блоке вариантов. Штамп ставит сама строка объявления (пишет Карине
+ *  или мама), а не `remember`: тот пишет только константы, а ход меняется. */
+export const deathAnnAt = 'death.annAt'
 export const evicted = 'evicted'
 export const vendetta = 'vendetta'
 /** Ход, на котором сход объявлен (15-й крик, #1565): окно примирения у поздней вендетты читается
@@ -415,7 +419,7 @@ export const EVENT_KEY_LIST = [
   'day', 'dow', 'month', 'dom', 'holiday', 'sent', 'moo', 'tier', 'mood', 'patience', 'money', 'debt', 'fifty', 'paid',
   'moneyNormal', 'moneyLow', 'moneyBottom', 'paymentDueTomorrow',
   'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sinceCrew', 'sorrySwing', 'vendettaFall', 'promiseLive', 'promisePassed', 'promiseStake',
-  'debutWho', 'debutFresh', 'arsenTrackFresh', 'bathAskFresh', 'transferFresh', 'transferAmount',
+  'debutWho', 'debutFresh', 'arsenTrackFresh', 'bathAskFresh', 'transferFresh', 'transferAmount', 'deathAnnFresh',
   'ramPhotoFresh', 'borisSaleFresh', 'vacancyFresh', 'avitoReviewFresh', 'rubikAskFresh', 'kettleFresh',
   'lawyerFresh', 'collectorsAskFresh', 'collectorsEpFresh', 'internFresh', 'rubikHoleFresh', 'rubikProposalFresh', 'countersuitFresh', 'grantTileFresh', 'moustachePhotoFresh', 'mamaMarketFresh', 'mamaVoiceFresh', 'photoFresh', 'tileAdFresh', 'inhDoneFresh', 'tamadaDoneFresh', 'samvelDivorceFresh', 'courtVerdictFresh', 'tileSlipFresh', 'tileCourtFresh', 'tileLawyerFresh', 'tileMonumentFresh', 'nivaBackFresh', 'saleFresh', 'saleItem', 'grantHouseFresh', 'borisAskFresh', 'seryogaFresh', 'grantBathFresh', 'offendedAskFresh', 'muenFresh',
   'hhJobFresh', 'seryogaLoanFresh', 'dachaAskFresh', 'evictFresh', 'collectorsEchoFresh', 'threatGovFresh', 'fraudCardFresh',
@@ -431,7 +435,7 @@ export type ActorKey = (typeof ACTOR_KEY_LIST)[number]
 export const ACTOR_KEYS: ReadonlySet<string> = new Set(ACTOR_KEY_LIST)
 
 export const MEM_KEYS: ReadonlySet<string> = new Set([
-  HEAT, muenAt, muenAsked, muenAnswered, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, evicted, vendetta, vendettaAt, vendettaLifted, vendettaPrice, coldWar, court, courtVerdict, courtPolite,
+  HEAT, muenAt, muenAsked, muenAnswered, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, deathAnnAt, evicted, vendetta, vendettaAt, vendettaLifted, vendettaPrice, coldWar, court, courtVerdict, courtPolite,
   ritualCount, ritualCut, caughtCount, caughtUnique, caughtAt, garikDenied, garikCode, cryptoHodl, bathAsked, bathAskedAt, bathAnswered, mamaCalls, phoneKarine, karineKnowsDebt, karineThinksTax, alikShaved, moustacheKept, moustacheAskAt, alikDay, mooAt, sorryAt, courtReferral, judgeApology, saidStrasburg,
   rudeAt, thanksAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway, nivaPlayer, carGone,
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, borisForeman, taxFrozen, taxThawed,
