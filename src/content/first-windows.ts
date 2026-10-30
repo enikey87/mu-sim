@@ -3,7 +3,7 @@
 // участник, умеющий писать сам (SPEAKS), обязан быть здесь или в исключениях с причиной — новый
 // участник красит сюит на месте, а не в плейтесте через раунд. Офферы и потребление окна ответом —
 // как были (#951), тексты пулов не менялись.
-import { arsenTrackAt, avitoReviewAt, bathAskedAt, borisAskAt, borisSaleAt, collectorsAskAt, collectorsEpAt, countersuitAt, courtVerdictAt, crewPaidAt, grantBathAt, grantHouseAt, grantTileAt, inhDoneAt, internAt, kettleAt, lawyerAt, mamaMarketAt, mamaVoiceAt, mooAt, muenAt, moustachePhotoAt, nivaBackAt, offendedAskAt, photoAt, ramPhotoAt, rubikAskAt, rubikHoleAt, rubikProposalAt, samvelDivorceAt, saleAt, seryogaAskAt, tamadaDoneAt, tileAdAt, tileCourtAt, tileLawyerAt, tileMonumentAt, tileSlipAt, transferAt, vacancyAt, hhJobAt, seryogaLoanAt, dachaAskAt, evictAt, collectorsEchoAt, threatGovAt, fraudCardAt } from './memkeys'
+import { arsenTrackAt, avitoReviewAt, bathAskedAt, borisAskAt, borisSaleAt, collectorsAskAt, collectorsEpAt, countersuitAt, courtVerdictAt, crewPaidAt, deathAnnAt, grantBathAt, grantHouseAt, grantTileAt, inhDoneAt, internAt, kettleAt, lawyerAt, mamaMarketAt, mamaVoiceAt, mooAt, muenAt, moustachePhotoAt, nivaBackAt, offendedAskAt, photoAt, ramPhotoAt, rubikAskAt, rubikHoleAt, rubikProposalAt, samvelDivorceAt, saleAt, seryogaAskAt, tamadaDoneAt, tileAdAt, tileCourtAt, tileLawyerAt, tileMonumentAt, tileSlipAt, transferAt, vacancyAt, hhJobAt, seryogaLoanAt, dachaAskAt, evictAt, collectorsEchoAt, threatGovAt, fraudCardAt } from './memkeys'
 import type { Criterion } from '../engine/rules'
 
 /**
@@ -137,4 +137,8 @@ export const EVENT_SOURCES: readonly EventSource[] = [
   { source: 'коллекторы «Он нам тоже должен. Давайте дружить» (карточка-эхо арки, stamp)', at: collectorsEchoAt, offer: 'CollectorsEcho', pool: 'P_COLLECTORS_ECHO' },
   { source: 'Госуслуги «Ваша угроза зарегистрирована» (карточка, stamp)', at: threatGovAt, offer: 'ThreatGov', pool: 'P_THREAT_GOV' },
   { source: 'банк «Кредит на ваше имя: остаток 300 000» (карточка, stamp)', at: fraudCardAt, offer: 'FraudCard', pool: 'P_FRAUD_CARD' },
+  // объявление смерти Алика (#1610): заметное событие, а прямой отклик раньше приходил через 1–3 дня —
+  // Mourn шёл с odds 0.5, Condole требовал ctx.rel и ctx.sad. Штамп ставит сама строка объявления
+  // (Карине или мама), поэтому окно не зависит от того, кто пишет
+  { source: 'объявление смерти Алика (эпизод 1 сериала alik_death, stamp строки)', at: deathAnnAt, offer: 'DeathCondole', pool: 'D.P_CONDOLE' },
 ]
