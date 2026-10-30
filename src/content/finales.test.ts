@@ -478,12 +478,12 @@ describe('концовки игры', () => {
       payday_notyou: [async (g) => { toLast(g, 'razmik'); await g.playArc('razmik'); g.S.mem['count.rude'] = 8 }, payday(false)],
       payday_real: [
         async (g) => { Object.assign(g.S.ach, { saint: 190, court: 200, q_hash: 1, q_mama: 1, q_goat: 1, q_parking: 1, q_photo: 1 }); g.S.mem.caughtUnique = 3 },
-        // три поимки сокращают сцену дележа (#1434) — «Настоящие деньги» всё равно специфичнее «Следователя»
+        // три поимки — вторая дверь real (#1595 её не поднимал); следовательского дележа при трёх нет, real специфичнее
         async (g) => { await g.enterNode('payday', 'announce'); await choose(g, 'bag'); await choose(g, 'share') },
       ],
-      // «Следователь» (#1434, #1481): три РАЗНЫЕ поимки — дележ уже не режет, поэтому и выбора «поймать/принять» нет
+      // «Следователь» (#1434, #1481, порог 4 — #1595): четыре РАЗНЫЕ поимки — дележ уже не режет, поэтому и выбора «поймать/принять» нет
       payday_detective: [
-        async (g) => { g.S.mem.caughtUnique = 3 },
+        async (g) => { g.S.mem.caughtUnique = 4 },
         async (g) => { await g.enterNode('payday', 'announce'); await choose(g, 'bag'); await choose(g, 'share') },
       ],
     }

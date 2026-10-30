@@ -2,7 +2,7 @@
 import type { ContentApi } from '../../engine/game'
 import { type Rule, eq, gte, is, exists, missing, set, during, lt } from '../fact'
 import type { GameEvent, Offer } from './events'
-import { SOURCES, SOURCES_TOPUP, ROLL, CLAIMS, COINS_BRIDGE_CATCHES, DETECTIVE_CLAIMS, DETECTIVE_CHAIN, DETECTIVE_CATCHES, detectiveDue, GRAND, GRAND_FALLBACK, SLOTS, CONTRADICTIONS, MORNING_CONTRA, OUTCOME, LEAD, type Source, type Call, type Claim, type Lead } from '../payday'
+import { SOURCES, SOURCES_TOPUP, ROLL, CLAIMS, COINS_BRIDGE_CATCHES, REAL_CATCHES, DETECTIVE_CLAIMS, DETECTIVE_CHAIN, DETECTIVE_CATCHES, detectiveDue, GRAND, GRAND_FALLBACK, SLOTS, CONTRADICTIONS, MORNING_CONTRA, OUTCOME, LEAD, type Source, type Call, type Claim, type Lead } from '../payday'
 import { alikDead, caughtUnique, cryptoHodl, payday as pd, paydayScene, taxFrozen, taxThawed, vendetta } from '../memkeys'
 import { samvelLine } from '../world'
 
@@ -72,10 +72,13 @@ export const PAYDAY_HOOKS: Record<string, (game: ContentApi) => Promise<void>> =
   // дележ: каждый требует долю, счётчик тает до 50 ₽
   claims: async (game) => {
     let sum = Number(game.mem()[pd.sum] ?? game.debt)
-    // Следователь (#1434, #1481): три разных поимки — родня видела записи, доли не проходят и «по рублю» не работает.
+    // Следователь (#1434, #1481, порог 4 — #1595): четыре разных поимки — родня видела записи, доли не проходят и «по рублю» не работает.
+    // «Настоящие деньги» второй дверью (#1435): saint и три разных поимки — тот же повод не резать доли; без этой ветки
+    // поимка в самой сцене отнимала бы у партии уже заслуженный real (#1595).
     // Срезы — шаг общей сцены, поэтому ветка стоит здесь, а не в правиле исхода: отмазка после такого дележа
     // не нужна, потому что оставшаяся сумма не «остаток», а весь долг.
-    if (detectiveDue(game.mem())) {
+    const realDue = game.holds(is('ach.saint')) && Number(game.mem()[caughtUnique] ?? 0) >= REAL_CATCHES
+    if (detectiveDue(game.mem()) || realDue) {
       for (const l of game.open(DETECTIVE_CLAIMS)) await game.say([typeof l === 'string' ? l : l.w ? { w: l.w, t: l.t } : l.t])
       // отмазки не будет, но её место в памяти — метка «выплата началась», её читают амнистия, отклик памяти и лаваш
       game.applyFacts([set(pd.chain, DETECTIVE_CHAIN)])
@@ -222,18 +225,21 @@ export const paydayRules: R[] = [
   },
   // иерархия исходов — бонусами специфичности, а не числом условий:
   // real 4 > lavash 3 = detective 3 > coins 2 = niva 2 > strasbourg/notyou 1 > default 0
+  // Лестница поимок (#1595): 0–1 — дефолт, 2–3 — мост «Мешка», 4+ — «Следователь».
   outcome('real', [is('ach.saint'), is('ach.court')], { bonus: 2 }),
   // «Настоящие деньги» вежливому следователю (#1435): saint И (court ИЛИ detective). Критерии контента — только
   // конъюнкция, поэтому «ИЛИ» здесь — второе правило того же исхода с тем же бонусом 2; заседание важнее счётчика.
   // Счётчик — уникальные пары (#1481): три РАЗНЫХ эпизода лжи, а не три нажатия на одной и той же паре.
-  outcome('real', [is('ach.saint'), gte(caughtUnique, DETECTIVE_CATCHES), missing('ach.court'), missing(pd.caught)], { name: 'Payday_real_detective', bonus: 2 }),
-  // три разных поимки (#1434, #1481): выше «Мешка мелочи» и «Нивы», ниже «Настоящих денег»; поимка в самой сцене
+  // Порог 3 — свой (REAL_CATCHES): подъём «Следователя» до 4 его не касался (#1595).
+  outcome('real', [is('ach.saint'), gte(caughtUnique, REAL_CATCHES), missing('ach.court'), missing(pd.caught)], { name: 'Payday_real_detective', bonus: 2 }),
+  // четыре разных поимки (#1434, #1481, порог #1595): выше «Мешка мелочи» и «Нивы», ниже «Настоящих денег»; поимка в самой сцене
   // остаётся за coins — она требует missing(pd.caught), поэтому момент выплаты detective не вытесняет
   outcome('detective', [gte(caughtUnique, DETECTIVE_CATCHES), missing(pd.caught)], { bonus: 1 }),
   // поимка и «Нива выбрала тебя» — заслуга игрока: важнее исходов «по стилю партии»; между собой жребий допустим
   outcome('coins', [is(pd.caught)], { bonus: 1 }),
-  // мост поимок (#1433): две РАЗНЫЕ поимки отдают мешок и без поимки в самой сцене. Специфичность 1 — самая
-  // нижняя из заслуженных: сцена (2), «Нива» (2), «Следователь» (3), «Лаваш» (3), «Настоящие» (4) остаются выше,
+  // мост поимок (#1433, диапазон #1595): две-три РАЗНЫЕ поимки отдают мешок и без поимки в самой сцене; на четвёртой
+  // мост перекрывает «Следователем» (специфичность 3 против 1) — диапазон держит лестница, а не условие правила.
+  // Специфичность 1 — самая нижняя из заслуженных: сцена (2), «Нива» (2), «Следователь» (3), «Лаваш» (3), «Настоящие» (4) остаются выше,
   // а со «Страсбургом» и «Не тебе» мост не спорит вовсе — их исключают условия. Выше только default (0).
   outcome('coins', [gte(caughtUnique, COINS_BRIDGE_CATCHES), missing(pd.caught), missing('ach.strasbourg'), missing('finale.razmik')], { name: 'Payday_coinsByCatch', specificity: 1 }),
   outcome('lavash', [is(cryptoHodl)], { bonus: 2 }),
