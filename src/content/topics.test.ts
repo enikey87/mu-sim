@@ -1,13 +1,13 @@
 // Ответы по теме, «Это корова?» только сразу после «Мууу», реплики по стадии игры.
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { makeGame } from '../test/helpers'
 import { valueOf } from '../engine/rules'
-import { Gated } from './fact'
+import { Gated, type Entry } from './fact'
 import { needs } from './world'
 import { wedding } from './memkeys'
 import { TOPICS, P_RUDE_BLOCKED, P_RUDE_POLITE, TOPIC_OBSESSED, P_NIGHT, DESPERATE_PAIRS } from './topics'
-import { NOTIF } from './life'
-import { D, make, type DrawFn } from './excuses'
+import * as L from './life'
+import { D, make, type DrawFn, type When } from './excuses'
 import type { Game } from '../engine/game'
 
 /** Словарь цитат: регулярки rneed всех тем — то, что игра уже считает «словами Алика». Ведётся не руками: он и есть rneed. */
@@ -258,6 +258,45 @@ describe('ответ по теме', () => {
     expect(offered(game, (c) => c.act === 'topic' && String(c.arg).startsWith('food:'))).toBe(false)
     expect(offered(game, (c) => /поесть\?|ЕШЬ МЕНЬШЕ|Приятного аппетита|Вы всё время едите/i.test(c.text))).toBe(false)
   })
+  it('правка срока убирает из темы слово, которого игрок не видел: «Алик, при чём тут ООН?» не выходит (#1617)', async () => {
+    // эскалация тира 1: «когда ООН решит» — абсурд #1002, а не плавающий срок
+    const oon = (D.WHEN1 as Entry<When>[]).map(valueOf).find((w) => w.t === 'когда ООН решит')!
+    const year = (L.EDIT_WHEN as Entry<When>[]).map(valueOf).find((w) => w.t === 'в следующем году')!
+    expect(oon, 'пул эскалации знает «когда ООН решит»').toBeTruthy()
+    expect(year, 'пул правок знает «в следующем году»').toBeTruthy()
+    const draw: DrawFn = (key, arr) => {
+      if (key === 'LEGROLL') return 1 as never
+      if (key === 'TPL') return valueOf(arr[1]) as never
+      if (key === 'ADDR') return 'Брат' as never
+      if (key === 'ESC1') return 'Прораб ушёл в горы искать себя' as never
+      if (key === 'WHEN1') return oon as never
+      if (key === 'VERB') return 'сразу скину' as never
+      if (key === 'EDIT_WHEN') return year as never
+      return valueOf(arr[0])
+    }
+    const { game } = makeGame()
+    game.X.excuse = make(draw, () => 1, { random: () => 0.1 }).excuse
+    const ex = game.X.excuse()
+    game.recordPromise(ex.p)
+    const said = await game.say(ex.texts)
+    game.markTopical(said, ex.topicTexts)
+    const shown = said.at(-1)
+    expect(shown?.kind === 'text' && shown.text, 'до правки срок виден — вариант законен').toContain('когда ООН решит')
+    const orig = game.draw
+    vi.spyOn(game, 'draw').mockImplementation(((key: string, arr: readonly Entry<unknown>[]) => (key === 'EDIT_WHEN' ? year : orig(key, arr))) as unknown as typeof game.draw)
+    await game.editLast(shown, ex.p)
+    const edited = game.S.msgs.find((m) => m.id === shown?.id)
+    expect(edited?.kind === 'text' && edited.edited, 'правка состоялась').toBe(true)
+    expect(edited?.kind === 'text' && edited.text, 'показанный текст срока «ООН» больше не называет').not.toContain('ООН')
+    expect(game.topicOfLast(), 'тема не берётся из текста до правки').toBeUndefined()
+    expect(offered(game, (c) => c.text === 'Алик, при чём тут ООН?'), 'фантомного вопроса нет').toBe(false)
+  })
+  it('видимое слово по-прежнему даёт вопрос: «рассматривает ООН» — повод для темы таможни (#1617)', () => {
+    const { game } = makeGame()
+    game.alikMsg({ kind: 'text', from: 'alik', text: 'Дорогой, твой вопрос про деньги рассматривает ООН — не я.', topical: true })
+    expect(game.topicOfLast()).toBe('customs')
+    expect(offered(game, (c) => c.text === 'Алик, при чём тут ООН?'), 'вопрос по видимому слову жив').toBe(true)
+  })
   it('срок — не тема и при повторном вызове: шаблон срока кэширован, поиск не продолжается с прошлого места', () => {
     const { game } = makeGame()
     game.recordPromise({ text: 'после обеда, но не сегодняшнего — рассчитаюсь до копейки', d: 1 })
@@ -367,7 +406,7 @@ describe('«соболезнования» — только от настоящ�
     expect(ask, 'банк не присылал соболезнований — такой карточки нет').not.toMatch(/прислал соболезнован/i)
     expect(ask, 'настоящее списание — карточка, которая есть в любой партии').toMatch(/списани/i)
     expect(answer).toMatch(/списани/i)
-    const bank = NOTIF.filter((n) => n.app === 'Банк' && /списани/i.test(n.t))
+    const bank = L.NOTIF.filter((n) => n.app === 'Банк' && /списани/i.test(n.t))
     expect(bank.length, 'карточка «Списание» пропала — проверка пустеет').toBeGreaterThan(0)
     expect(bank.some((n) => n.repeat), 'без repeat она не «в любой партии»').toBe(true)
   })

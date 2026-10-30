@@ -290,6 +290,8 @@ export class Game {
 
     if (!this.S.msgs.length) this.seed()
     else { this.restoreDueEvents(); this.scheduleBills(); this.scheduleCredits(); this.migrateCreditSave() }
+    // Старое сохранение до #1618 метки не знает: банковскую карточку в ленте игрок уже видел — восстанавливаем по ней
+    if (this.S.msgs.some((m) => m.kind === 'card' && m.app === 'Банк')) this.S.mem[memkeys.bankSeen] = true
     // Старое сохранение с готовой просьбой уже прошло вступление; новый маркер появился позже (#358).
     if (this.S.mem[memkeys.endgame.active] && this.S.mem[memkeys.lend50.asked] && !this.S.mem[memkeys.endgame.intro]) {
       this.S.mem[memkeys.endgame.intro] = true
@@ -1471,6 +1473,8 @@ export class Game {
     if (msg.kind === 'voice' && !msg.moo) msg.moo = pinnedMooPhrase(msg.id, msg.feast)
     // день показа — на карточке: ответ с числами верен для своего дня, не дня показа (#553)
     if (msg.kind === 'card' && msg.day === undefined) msg.day = this.S.day
+    // банк вошёл в историю: игрок увидел его карточку — сводку, предложение, отказ, предупреждение (#1618)
+    if (msg.kind === 'card' && msg.app === 'Банк') this.S.mem[memkeys.bankSeen] = true
     this.quietHeader()
     this.S.msgs.push(msg)
     this.touchMsgs(this.S.msgs.length - 1)
@@ -2810,12 +2814,19 @@ export class Game {
     const term = this.draw('EDIT_WHEN', L.EDIT_WHEN)
     const w = term.t
     // срок может стоять в начале фразы с заглавной — ищем без учёта регистра, регистр сохраняем
+    const swap = (s: string): string => {
+      if (!p) return s
+      const i = s.toLowerCase().indexOf(p.t.toLowerCase())
+      if (i < 0) return s
+      return s.slice(0, i) + (s[i] !== s[i].toLowerCase() ? cap(w) : w) + s.slice(i + p.t.length)
+    }
     const at = p ? m.text.toLowerCase().indexOf(p.t.toLowerCase()) : -1
     let text = m.text
+    let topicText = m.topicText
     if (p && at >= 0) {
-      const orig = m.text.slice(at, at + p.t.length)
-      const repl = orig[0] !== orig[0].toLowerCase() ? cap(w) : w
-      text = m.text.slice(0, at) + repl + m.text.slice(at + p.t.length)
+      text = swap(m.text)
+      // тема — из текста, который игрок видит: срока, заменённого правкой, в нём больше нет (#1617)
+      if (topicText !== undefined) topicText = swap(topicText)
       // род и горизонт правленого срока — от разметки термина (#923): «в следующем году» — дата, а не «никогда»
       const due = this.promiseDue(term)
       const named = this.horizonAt(term, due)
@@ -2834,7 +2845,7 @@ export class Game {
     } else {
       text = m.text.replace(/[.!]?$/, this.draw('EDIT_SUFFIX', L.EDIT_SUFFIX) + '.')
     }
-    this.replaceMsg(m, { text, edited: true })
+    this.replaceMsg(m, topicText === undefined ? { text, edited: true } : { text, edited: true, topicText })
     this.unlock('edited')
     this.emit()
   }

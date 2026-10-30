@@ -371,6 +371,10 @@ export const courtVerdictAt = 'court.verdictAt'
 /** Мошеннический кредит на имя игрока (#1069): сцена `loan` объявляет остаток 300 000 ₽ — состояние
  *  мира остаётся на доске, чтобы банк напомнил о нём после сцены (факт-состояние, не штамп хода). */
 export const fraudLoan = 'bank.fraudLoan'
+/** Игрок видел карточку банка (#1618): первая сводка, предложение, отказ, «остаток критический» или
+ *  предупреждение о списании. Реплики, ссылающиеся на банк, молчат до неё: в интро «деньги наличными,
+ *  в конверте» банк входит в историю только этой карточкой. */
+export const bankSeen = 'bank.seen'
 
 /** Первая серия плиточной арки (#1059): заказчик поскользнулся на плитке игрока — ход строки,
  *  ход и три после которого живёт окно отклика (следующие серии отвечают только с arc.tile ≥ 2). */
@@ -444,6 +448,6 @@ export const MEM_KEYS: ReadonlySet<string> = new Set([
   creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, collectorsTurned, collectorsTea, collectorsEpAt, criticalAt, creditOfferSum, momDachaAt, crewPaid, crewPaidAt, crewAllPaid, rubikBath, whenYears, ...Object.values(moneyAskAt), transferAt, transferAmount, moneyAt, moustachePhotoAt, moustacheStakeSaid, mamaMarketAt, mamaVoiceAt, samvelDivorceAt, courtVerdictAt, tileSlipAt, tileCourtAt, tileLawyerAt, tileMonumentAt, nivaBackAt, saleAt, saleWhat, fraudLoan, blockLifted, internDeclined, internAccepted, grantHouseAt, photoAt, tileAdAt, inhDoneAt, inhBurned, inhRefused, tamadaDoneAt, borisAskAt, debutWho, debutAt, arsenTrack, arsenTrackAt,
   ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt, rubikProposalAt, countersuitAt, grantTileAt,
   seryogaAskAt, grantBathAt, offendedAskAt,
-  hhJobAt, seryogaLoanAt, dachaAskAt, evictAt, collectorsEchoAt, threatGovAt, fraudCardAt,
+  hhJobAt, seryogaLoanAt, dachaAskAt, evictAt, collectorsEchoAt, threatGovAt, fraudCardAt, bankSeen,
   ...Object.values(payday), ...Object.values(count), ...Object.values(endgame), ...Object.values(lend50),
 ])
