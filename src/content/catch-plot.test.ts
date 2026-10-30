@@ -36,7 +36,8 @@ describe('класс «Нива»: пишет/вернулась сама про
     expect(currentEpisode(game.S.ledger)?.subject).toBe('niva.state')
     expect(game.facts().lieKind).toBe('niva')
     const c = catchChoice(game)!
-    expect(lines(P_LIE_NIVA).some((t) => c.text.includes(t))).toBe(true)
+    const lie = game.lie()!
+    expect(lines(P_LIE_NIVA).some((t) => c.text.includes(game.X.fill(t, { old: lie.old.say, new: lie.new.say })))).toBe(true)
     expect(oneOf(LIE_NIVA, await catchLie(game))).toBe(true)
   })
   it('возвращение «Нивы» объясняет «искали → вернулась»: пара не рождается, а поздняя «задержка» ловится', async () => {
