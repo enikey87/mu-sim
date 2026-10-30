@@ -94,7 +94,8 @@ const REQUEST_VERBS = new Set([
   'рассчитайся', 'рассчитайтесь', 'рассчитаться', 'кинь', 'киньте', 'скинь', 'скиньте',
 ])
 
-const isShouting = (text: string): boolean => /[A-ZА-ЯЁ]{4,}/u.test(text) || /!\s*!/u.test(text)
+/** Текст реплики буквально кричит: капс от четырёх букв или «!!». Тон от этого не зависит (#583). */
+export const isShouting = (text: string): boolean => /[A-ZА-ЯЁ]{4,}/u.test(text) || /!\s*!/u.test(text)
 
 /** КАПС/`!!` на коротком окрике без просьбы о деньгах — не грубость. */
 const isBenignShout = (tokens: readonly string[], shouting: boolean, askingMoney: boolean): boolean =>

@@ -7,7 +7,7 @@ import { type Rule, type Line, type Entry, eq, ne, gte, lte, is, add, set, missi
 import type { GameEvent, Offer } from './events'
 import { WORLD, speaks } from '../world'
 import * as T from '../rude'
-import { RUDE_AGAIN } from '../misc'
+import { RUDE_AGAIN, RUDE_AGAIN_CALM } from '../misc'
 import { HEAT, alikDead, blocked, blockedHint, coldWar, count, countersuitAt, endgame, mamaCalls, mamaVoiceAt, phoneKarine, polite, ritualCount, statusHidden, vendetta, vendettaAt } from '../memkeys'
 
 type R = Rule<ContentApi, GameEvent, Offer>
@@ -106,7 +106,15 @@ export const rudeRules: R[] = [
   { name: 'Tone_Rude', event: 'PlayerMessage', when: [live, rude], remember: cools, trigger: cool, respond: ({ game }) => offended(game) },
   {
     name: 'Tone_Rude_Again', event: 'PlayerMessage', when: [live, rude, gte(count.rude, 2)], remember: cools, trigger: cool,
-    respond: async ({ game }) => { game.unlock('memory'); await offended(game, freshOr(game, 'RUDE_AGAIN', RUDE_AGAIN, game.X.offended), false) },
+    // Крик — по тексту этой реплики, а не по тону (#1633): спокойная строка грубого слота не даёт
+    // Алику утверждать капс, которого в ней нет (#583 тон кнопки не переклассифицирует).
+    respond: async ({ game, facts }) => {
+      game.unlock('memory')
+      const shout = facts.shout === true
+      await offended(game, shout
+        ? freshOr(game, 'RUDE_AGAIN', RUDE_AGAIN, game.X.offended)
+        : freshOr(game, 'RUDE_AGAIN', RUDE_AGAIN_CALM, game.X.offended), false)
+    },
   },
   // S1 — вместо Алика пишет родня (одна из трёх, у каждой свой перерыв)
   ...Object.keys(T.RUDE_FAMILY).map(family),
