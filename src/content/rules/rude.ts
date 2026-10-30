@@ -289,6 +289,14 @@ export const rudeSaysRules: R[] = [
     },
   },
   { name: 'Says_moo', event: 'PlayerSays', when: [eq('intent', 'moo')], respond: async ({ game }) => { await game.say([freshOr(game, 'MOO_ODD', T.MOO_ODD, game.X.cow)]); game.setCtx(null) } },
+  // #1594: вежливое напоминание в живом сходе («простите, что снова пишу») — не извинение: цену выхода
+  // не платит и вражду не снимает, но и не тонет. Ответ — канцелярит окна холодной войны, тот же пул,
+  // что у ответа на требование (#1441).
+  {
+    name: 'Says_courtesy_vendetta', event: 'PlayerSays', when: [eq('intent', 'courtesy'), is(vendetta), missing(endgame.active), missing(blocked), missing('offline')],
+    specificity: 40,
+    respond: async ({ game }) => { await coldWarLine(game, 'CW_REPLY', T.COLD_WAR_ALL) },
+  },
   // заблокирован — извинение не доходит; подсказывает посредник: Борис, Карине, иначе мама (Карине и мама — раз за блок)
   {
     name: 'Says_sorry_blocked_boris', event: 'PlayerSays', when: [eq('intent', 'sorry'), is(blocked), WORLD.borisWrites], bonus: 7,

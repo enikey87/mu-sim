@@ -27,6 +27,8 @@ const terminalVendetta = (g: Game) => { g.S.mem[endgame.active] = true; g.S.mem[
 const terminalBloodfeud = (g: Game) => { g.S.mem[endgame.active] = true; g.S.mem[endgame.bloodfeud] = true }
 /** Режим холодной войны после вендетты (#1424): бот в выборках не доходит до вендетты, факт ставим тот же, что она. */
 const coldWarMode = (g: Game) => { g.S.mem.coldWar = true }
+/** Живой сход без терминального экрана (#1594): оба факта ставит сама Вендетта, экран ещё не сыгран. */
+const feudMode = (g: Game) => { g.S.mem.vendetta = true; g.S.mem.coldWar = true }
 const offended = (g: Game) => { g.S.mem[HEAT] = 1; g.S.ctx = { offended: true } }
 /** Три сюжетных сериала закончены — ворота третьего акта (тот же setup, что `rich` в payday.test.ts). */
 const thirdAct = (g: Game) => {
@@ -78,6 +80,9 @@ export const DIRECT: Record<string, DirectCase> = {
   // строки до экрана почти не звучат; правила целы, держим их прямыми случаями
   ColdWar_Idle: { event: 'AlikIdle', setup: coldWarMode },
   ColdWar_Away: { event: 'AlikAway', setup: coldWarMode },
+  // #1594: вежливое напоминание в живом сходе — ответ окна холодной войны; бот выборок до вендетты
+  // не доходит, поэтому факты схода ставим напрямую, intent — тот же, что даёт гейт sendTurn
+  Says_courtesy_vendetta: { event: 'PlayerSays', facts: { intent: 'courtesy' }, setup: feudMode },
   Beat_EnmityFamily: { event: 'StoryBeat', setup: (g) => { g.S.mem.vendetta = true } },
   Beat_EnmityRumor: { event: 'StoryBeat', setup: (g) => { g.S.mem.vendetta = true } },
   // #1565: прямое извинение в живом сходе и кнопки посредника в нём — бот уходит ими сразу после вендетты

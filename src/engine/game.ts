@@ -57,7 +57,7 @@ import { type Audio, silentAudio } from './audio'
 import { makeMooPhrase, mooOf, pinnedMooPhrase } from './moo'
 import { typo } from './typo'
 import { UiState, type Moo, type Notif, type SendFeel } from './ui-state'
-import { classifyUserInput, legalClaim, type ClassifiedInput } from './input'
+import { classifyUserInput, courtesyApology, legalClaim, type ClassifiedInput } from './input'
 import { track, left, shown, PROGRESS_DAYS, type Beat, type Phase, type PlatformId } from '../analytics/metrics'
 import { holidayOf, holidayGreetKey, holidayDays, HOLIDAY_EXCUSES } from '../content/holidays'
 import { dueIn, dateOf, fmtDate, fmtDayMonth, fmtShortDate, fmtTime, weekOf, nightHour, periodOf, tierOf, TIERS, type Due, type Period } from './time'
@@ -2310,8 +2310,17 @@ export class Game {
     // «Ладно, я перегнул» — извинение, а не просто вежливая реплика. Тон не пересчитываем — капс
     // в готовом варианте ходом грубости не делает (#583); из намерений берём только извинение и только
     // когда просьбы в тексте нет: «извините, что беспокою. Когда деньги?» остаётся просьбой.
-    const told = !raw.act && !raw.scene ? this.classifyInput(raw.text) : null
-    const o: Choice = told?.intent === 'sorry' && !told.request ? { ...raw, act: 'sorry' } : raw
+    const told = parsed ?? (!raw.act && !raw.scene ? this.classifyInput(raw.text) : null)
+    // #1594: при живом (нетерминальном) сходе вежливое напоминание («простите, что снова пишу») —
+    // не извинение, даже без денежной просьбы: цену выхода оно не платит и вражду не снимает. Алик отвечает окном.
+    const feudLive = this.S.mem[memkeys.vendetta] === true && !this.S.mem[memkeys.endgame.active]
+    let o: Choice = raw
+    if (told?.intent === 'sorry') {
+      const courtesy = feudLive && (!!told.request || courtesyApology(raw.text))
+      // вне схода свободный текст идёт прежним путём (#1565): капс и просьбу разбирает сам классификатор
+      const requestOnly = !parsed && !!told.request
+      o = courtesy ? { ...raw, act: 'courtesy' } : requestOnly ? { ...raw, act: undefined } : { ...raw, act: 'sorry' }
+    }
     if (this.ui.busy || this.battery.dead || this.disposed || !o.text.trim()) return
     const S = this.S
     // снятие вражды слышно (#1570): метка перехода, а не список мест выхода — снимает любой канал

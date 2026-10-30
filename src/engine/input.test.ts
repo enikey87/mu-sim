@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { InputCategory, Tone } from './state'
-import { classifyUserInput } from './input'
+import { classifyUserInput, courtesyApology } from './input'
 import { ARC_MENTIONS, ARCS } from '../content/arcs'
 import { makeGame } from '../test/helpers'
 
@@ -85,6 +85,24 @@ describe('classifyUserInput', () => {
   it('вежливое «извините» перед просьбой о деньгах помечается как просьба (#1565)', () => {
     expectClass('Извините за беспокойство, когда деньги?', 'apology', 'polite', 'sorry', undefined, true)
     expectClass('Алик, простите, что снова пишу. Не подскажете, когда ждать расчёт?', 'apology', 'polite', 'sorry', undefined, true)
+  })
+
+  it('отделяет вежливое напоминание от извинения за ссору (#1594)', () => {
+    for (const t of [
+      'Алик, простите, что снова пишу.',
+      'Алик, извините, что беспокою.',
+      'Извините за беспокойство, когда деньги?',
+      'Алик, извините за настойчивость.',
+      'Алик, простите, что часто.',
+      'АЛИК, ПРОСТИТЕ, ЧТО СНОВА ПИШУ!',
+    ]) expect(courtesyApology(t), `не признано напоминанием: ${t}`).toBe(true)
+    for (const t of [
+      'Прости, Алик, я погорячился',
+      'Алик, простите, погорячился.',
+      'Алик, простите, я не со зла.',
+      'Извините меня, нервы.',
+      'Ладно, я перегнул.',
+    ]) expect(courtesyApology(t), `принято за напоминание: ${t}`).toBe(false)
   })
 
   it('выбирает наиболее опасный смысл составной реплики', () => {
