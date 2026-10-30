@@ -15,8 +15,8 @@ import { ARCS } from './arcs'
 import { is, spec as lineSpec, valueOf, type Entry } from './fact'
 
 const texts = (g: Game, n = 0) => g.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' || m.kind === 'sys' ? [m.text] : []))
-/** Утверждение о числе поимок (#1456): так выглядели захардкоженные строки — «трижды» и «три поимки». */
-const COUNT_CLAIM = /трижды|три (?:твои )?поимки/i
+/** Утверждение о числе поимок (#1456, #1612): так выглядели захардкоженные строки — «трижды», «пять поимок», «ровно шесть». */
+const COUNT_CLAIM = /трижды|(?:два|три|четыре|пять|шесть|семь|восемь|девять|десять|\d+)\s+(?:раз[а]?\s+)?(?:твои\s+)?поим|ровно\s+(?:\d+|два|три|четыре|пять|шесть|семь|восемь|девять|десять)(?!\p{L})/iu
 const choose = async (g: Game, go: string) => { g.S.choices = null; const c = g.choices.find((x) => x.go === go); expect(c, go).toBeDefined(); await g.send(c!) }
 const rich = (g: Game) => {
   g.S.day = 340
@@ -148,11 +148,11 @@ describe('День выплаты', () => {
     expect((await game.fire('StoryBeat'))?.name).not.toBe('Beat_Payday')
     expect(game.S.scene).toBeNull()
   })
-  // #1434/#1595: четыре мидгейм-поимки — свой исход Дня выплаты; срезы родни не проходят, «по рублю» отменяется
-  it('Следователь: четыре поимки — доли не срезают, долг приходит целиком (#1434, #1595)', async () => {
+  // #1434/#1612: шесть мидгейм-поимок — свой исход Дня выплаты; срезы родни не проходят, «по рублю» отменяется
+  it('Следователь: шесть поимок — доли не срезают, долг приходит целиком (#1434, #1612)', async () => {
     const { game } = makeGame()
     rich(game)
-    game.S.mem.caughtUnique = 4
+    game.S.mem.caughtUnique = 6
     await game.enterNode('payday', 'announce')
     await choose(game, 'witness')
     const debt = game.debt
@@ -174,10 +174,10 @@ describe('День выплаты', () => {
     await game.fire('CheckEnding')
     expect(game.S.ending).toBe('payday_detective')
   })
-  it('Следователь: «по рублю» отменяется — отказ делиться не удваивает срезы (#1434, #1595)', async () => {
+  it('Следователь: «по рублю» отменяется — отказ делиться не удваивает срезы (#1434, #1612)', async () => {
     const { game } = makeGame()
     rich(game)
-    game.S.mem.caughtUnique = 4
+    game.S.mem.caughtUnique = 6
     await game.enterNode('payday', 'announce')
     await choose(game, 'bag')
     const debt = game.debt
@@ -195,7 +195,8 @@ describe('День выплаты', () => {
     // узел отказа выбирает ровно одну из двух строк: дефолтную или следовательскую
     const a2 = PAYDAY_SCENE.nodes.refuse.a2 as Entry<string>[]
     const probe = (caught: number) => { const { game } = makeGame(); game.S.mem.caughtUnique = caught; return game.open(a2) }
-    expect(probe(4)).toEqual([expect.stringMatching(/не прошло/)])
+    expect(probe(6)).toEqual([expect.stringMatching(/не прошло/)])
+    expect(probe(5)).toEqual([expect.stringMatching(/Я бессилен/)])
     expect(probe(3)).toEqual([expect.stringMatching(/Я бессилен/)])
     expect(probe(0)).toEqual([expect.stringMatching(/Я бессилен/)])
     const play = async (caught: number) => {
@@ -208,30 +209,30 @@ describe('День выплаты', () => {
       await choose(game, 'refuse')
       return game.S.msgs.slice(n).filter((m) => m.kind === 'text').map((m) => m.text)
     }
-    const detective = await play(4)
+    const detective = await play(6)
     const bits = detective.filter((t) => t.includes('услышала «по рублю»'))
     expect(bits, 'один бит «по рублю» — дважды').toHaveLength(1)
     expect(bits[0]).toMatch(/не прошло/)
     expect(detective.join('\n'), 'дефолтная «я бессилен» осталась рядом со следовательской').not.toMatch(/Я бессилен/)
-    // дефолтный путь: та же сцена без трёх поимок оставляет свою строку, «Следователя» в ней нет
+    // дефолтный путь: та же сцена без шести поимок оставляет свою строку, «Следователя» в ней нет
     const plain = await play(0)
     expect(plain.join('\n')).toMatch(/Я бессилен/)
     expect(plain.join('\n')).not.toMatch(/не прошло/)
   })
-  it('Следователь: с тремя поимками исход недоступен, с четырьмя — выигрывает у «Нивы» (#1434, #1595)', async () => {
+  it('Следователь: с пятью поимками исход недоступен, с шестью — выигрывает у «Нивы» (#1434, #1612)', async () => {
     const pick = async (caught: number) => {
       const { game } = makeGame()
       game.S.mem.caughtUnique = caught
       game.S.mem['finale.niva'] = 'chose' // у «Нивы» 2 — следователь (3) обязан её обойти
       return (await game.fire('PaydayOutcome'))?.name
     }
-    // на трёх поимках мост «Мешка» (1) «Ниву» не обходит: мешок берётся только без заслуженной «Нивы»
-    expect(await pick(3)).toBe('Payday_niva')
-    expect(await pick(4)).toBe('Payday_detective')
+    // на пяти поимках мост «Мешка» (1) «Ниву» не обходит: мешок берётся только без заслуженной «Нивы»
+    expect(await pick(5)).toBe('Payday_niva')
+    expect(await pick(6)).toBe('Payday_detective')
   })
   it('Следователь не вытесняет поимку в самой сцене: она остаётся за coins (#1434)', async () => {
     const { game } = makeGame()
-    game.S.mem.caughtUnique = 4
+    game.S.mem.caughtUnique = 6
     game.S.mem['payday.caught'] = true
     expect((await game.fire('PaydayOutcome'))?.name).toBe('Payday_coins')
   })
@@ -240,7 +241,7 @@ describe('День выплаты', () => {
     const play = async (setup: (g: Game) => void) => {
       const { game } = makeGame()
       rich(game)
-      game.S.mem.caughtUnique = 4
+      game.S.mem.caughtUnique = 6
       setup(game)
       await game.enterNode('payday', 'announce')
       await choose(game, 'witness')
@@ -265,43 +266,52 @@ describe('День выплаты', () => {
     expect(stranger.match(REPENT), 'покаяние без знакомства с Карине').toHaveLength(1)
     expect(stranger).toMatch(/Ты ловил меня на слове/)
   })
-  // #1456/#1481: условие исхода — gte(caughtUnique, DETECTIVE_CATCHES), и счётчик разных пар растёт без «трижды», поэтому ни одна строка
-  // «Следователя» не называет числа: уже на четвёртой поимке «трижды» противоречило бы записям
-  it('Следователь: строки исхода не называют число поимок — при 4+ им нечего опровергать (#1456)', async () => {
+  // #1456/#1481/#1612: условие исхода — gte(caughtUnique, DETECTIVE_CATCHES), и счётчик разных пар растёт без «трижды», поэтому ни одна строка
+  // исходов на границах 4–8 не называет числа: уже на шестой поимке «трижды» противоречило бы записям
+  it('исходы Дня выплаты не называют число поимок — при uniq 4–8 им нечего опровергать (#1456, #1612)', async () => {
     const play = async (caught: number) => {
       const { game } = makeGame()
       rich(game)
+      // «Нива» (2) выше моста (1): для проверки текстов «Мешка» убираем её, у «Следователя» она и так проигрывает
+      if (caught < 6) delete game.S.mem['finale.niva']
       game.S.mem.caughtUnique = caught
       await game.enterNode('payday', 'announce')
       await choose(game, 'witness')
       const debt = game.debt
       const n = game.S.msgs.length
       await choose(game, 'share')
+      // у «Мешка» после дележа есть шаг «принять», у «Следователя» его нет: исход в обеих ветках должен сыграть
+      if (game.choices?.some((c) => c.go === 'accept')) await choose(game, 'accept')
       await game.fire('CheckEnding')
       const dossier = ENDINGS.find((e) => e.id === game.S.ending)
       expect(dossier, `экран концовки для ${game.S.ending}`).toBeDefined()
       return { game, debt, out: texts(game, n).join('\n'), chain: String(game.S.mem['payday.chain']), dossier: dossier!.text }
     }
-    const six = await play(6)
-    expect(six.game.S.mem.payday).toBe('detective')
-    // выплата честная, как и на границе порога: число поимок на неё не влияет
-    expect(six.game.S.debt).toBe(0)
-    expect(six.game.S.money).toBeGreaterThanOrEqual(six.debt)
-    // строки исхода действительно сыграли — иначе запрет на число был бы вакуумным
-    expect(six.out).toContain('Назначение: «Слово. Поимки. Долг»')
-    expect(six.out).toContain('Не раз и не два я врал — и ты записывал.')
-    // ни в переводе, ни в репликах, ни в отмазке, ни в досье нет числа, которого в партии не было
-    for (const [where, text] of [['перевод и реплики', six.out], ['отмазка', six.chain], ['досье', six.dossier]] as const) {
-      expect(text, `число поимок в тексте: ${where}`).not.toMatch(COUNT_CLAIM)
+    for (const caught of [4, 5, 6, 7, 8]) {
+      const p = await play(caught)
+      // граница #1612: до шести поимок — мост «Мешка», с шести — «Следователь»
+      expect(p.game.S.mem.payday, `${caught} уникальных`).toBe(caught < 6 ? 'coins' : 'detective')
+      // выплата честная, как и на границе порога: число поимок на неё не влияет
+      expect(p.game.S.debt, `${caught} уникальных: долг`).toBe(0)
+      expect(p.game.S.money, `${caught} уникальных: деньги`).toBeGreaterThanOrEqual(p.debt)
+      // строки исхода действительно сыграли — иначе запрет на число был бы вакуумным
+      if (caught < 6) expect(p.out, `${caught} уникальных: мост не сыграл`).toMatch(/мешок монет/)
+      else expect(p.out, `${caught} уникальных: покаяние не сыграло`).toContain('Не раз и не два я врал — и ты записывал.')
+      // ни в переводе, ни в репликах, ни в отмазке, ни в досье нет числа, которого в партии не было
+      for (const [where, text] of [['перевод и реплики', p.out], ['отмазка', p.chain], ['досье', p.dossier]] as const) {
+        expect(text, `${caught} уникальных: число поимок в тексте (${where})`).not.toMatch(COUNT_CLAIM)
+      }
     }
     // строки на месте: перевод с назначением, покаяние (одно — при Карине дома обращённое, #1472), отмазка-метка
-    const four = await play(4)
-    expect(four.game.S.mem.payday).toBe('detective')
-    expect(four.out).toContain('Назначение: «Слово. Поимки. Долг»')
-    expect(four.out).toContain('Не раз и не два я врал — и ты записывал.')
-    expect(four.out, 'при Карине дома звучит и общая версия покаяния').not.toContain('Ты ловил меня на слове — и не раз, брат.')
-    expect(four.chain).toBe(DETECTIVE_CHAIN)
-    expect(four.out, 'на первой допустимой поимке число в тексте').not.toMatch(COUNT_CLAIM)
+    const six = await play(6)
+    expect(six.out).toContain('Назначение: «Слово. Поимки. Долг»')
+    expect(six.out, 'при Карине дома звучит и общая версия покаяния').not.toContain('Ты ловил меня на слове — и не раз, брат.')
+    expect(six.chain).toBe(DETECTIVE_CHAIN)
+    // сторож не пустой: новые формулировки границ ловятся, честная строка «не раз и не два» — нет
+    expect('пять поимок').toMatch(COUNT_CLAIM)
+    expect('ровно шесть').toMatch(COUNT_CLAIM)
+    expect('3 поимки').toMatch(COUNT_CLAIM)
+    expect('Не раз и не два я врал — и ты записывал.').not.toMatch(COUNT_CLAIM)
   })
   // #1456: «Настоящие деньги» вежливому следователю (#1435) — та же причина: числа в тексте нет
   it('Настоящие деньги через поимки: реплика не называет их число — при 4+ (тоже #1456)', async () => {
@@ -355,8 +365,8 @@ describe('День выплаты', () => {
     expect(await pick(1)).toBe('Payday_default')
     expect(await pick(COINS_BRIDGE_CATCHES)).toBe('Payday_coinsByCatch')
   })
-  // #1595: лестница по уникальным поимкам — 0–1 дефолт, 2–3 мост «Мешка», 4+ «Следователь»
-  it('лестница исходов по уникальным поимкам: 0–1 — 50 ₽, 2–3 — мешок, 4+ — следователь (#1595)', async () => {
+  // #1612: лестница по уникальным поимкам — 0–1 дефолт, 2–5 мост «Мешка», 6+ «Следователь»
+  it('лестница исходов по уникальным поимкам: 0–1 — 50 ₽, 2–5 — мешок, 6+ — следователь (#1612)', async () => {
     const pick = async (caught: number) => {
       const { game } = makeGame()
       game.S.mem.caughtUnique = caught
@@ -364,12 +374,10 @@ describe('День выплаты', () => {
     }
     expect(await pick(0)).toBe('Payday_default')
     expect(await pick(1)).toBe('Payday_default')
-    expect(await pick(2)).toBe('Payday_coinsByCatch')
-    expect(await pick(3)).toBe('Payday_coinsByCatch')
-    expect(await pick(4)).toBe('Payday_detective')
-    expect(await pick(6)).toBe('Payday_detective')
+    for (const caught of [2, 3, 4, 5]) expect(await pick(caught), `uniq ${caught}`).toBe('Payday_coinsByCatch')
+    for (const caught of [6, 7, 8]) expect(await pick(caught), `uniq ${caught}`).toBe('Payday_detective')
   })
-  it('с тремя поимками доли ещё срезают: мешок берётся после дележа, а не вместо него (#1595)', async () => {
+  it('с тремя поимками доли ещё срезают: мешок берётся после дележа, а не вместо него (#1612)', async () => {
     const { game } = makeGame()
     game.S.mem.caughtUnique = 3
     await game.enterNode('payday', 'announce')
@@ -386,7 +394,7 @@ describe('День выплаты', () => {
     expect(game.S.debt).toBe(0)
     expect(game.S.money).toBeGreaterThanOrEqual(debt)
   })
-  it('Мост поимок не спорит с заслуженным: Страсбург, «Не тебе», «Нива», Следователь (#1433, #1595)', async () => {
+  it('Мост поимок не спорит с заслуженным: Страсбург, «Не тебе», «Нива», Следователь (#1433, #1612)', async () => {
     const pick = async (caught: number, setup: (g: Game) => void) => {
       const { game } = makeGame()
       game.S.mem.caughtUnique = caught
@@ -396,8 +404,9 @@ describe('День выплаты', () => {
     expect(await pick(2, (g) => { g.S.ach.strasbourg = 1 })).toBe('Payday_strasbourg')
     expect(await pick(2, (g) => { g.S.mem['finale.razmik'] = 'default' })).toBe('Payday_notyou')
     expect(await pick(2, (g) => { g.S.mem['finale.niva'] = 'chose' })).toBe('Payday_niva')
-    // четыре поимки — уже «Следователь»: мост уступает и ему
-    expect(await pick(4, () => {})).toBe('Payday_detective')
+    // пять поимок — ещё мост; шесть — уже «Следователь»: мост уступает и ему
+    expect(await pick(5, () => {})).toBe('Payday_coinsByCatch')
+    expect(await pick(6, () => {})).toBe('Payday_detective')
   })
 
   // #1435: «Настоящие деньги» — saint И (court ИЛИ detective). Критерии — только конъюнкция, дверь с поимками — своё правило
@@ -422,14 +431,16 @@ describe('День выплаты', () => {
     expect(out).toMatch(/дошёл до суда/)
     expect(out, 'вежливому с заседанием назвали поимки').not.toMatch(/ловил меня на слове/)
   })
-  it('без вежливости поимки дают «Следователя», «Настоящие деньги» ждут трёх со «Святым» (#1435, #1595)', async () => {
+  it('без вежливости поимки дают «Следователя», «Настоящие деньги» ждут трёх со «Святым» (#1435, #1612)', async () => {
     const pick = async (saint: boolean, caught: number) => {
       const { game } = makeGame()
       if (saint) game.S.ach.saint = 1
       game.S.mem.caughtUnique = caught
       return (await game.fire('PaydayOutcome'))?.name
     }
-    expect(await pick(false, 4)).toBe('Payday_detective')
+    expect(await pick(false, 6)).toBe('Payday_detective')
+    // пять поимок без «Святого» — ещё мост «Мешка», не «Следователь» и не «Настоящие»
+    expect(await pick(false, 5)).toBe('Payday_coinsByCatch')
     // три поимки без «Святого» — мост «Мешка», не «Следователь» и не «Настоящие»
     expect(await pick(false, 3)).toBe('Payday_coinsByCatch')
     // две поимки дают «мешок» мостом #1433, но не «Настоящие деньги»: вторая дверь требует трёх

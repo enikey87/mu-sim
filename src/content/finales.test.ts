@@ -481,9 +481,9 @@ describe('концовки игры', () => {
         // три поимки — вторая дверь real (#1595 её не поднимал); следовательского дележа при трёх нет, real специфичнее
         async (g) => { await g.enterNode('payday', 'announce'); await choose(g, 'bag'); await choose(g, 'share') },
       ],
-      // «Следователь» (#1434, #1481, порог 4 — #1595): четыре РАЗНЫЕ поимки — дележ уже не режет, поэтому и выбора «поймать/принять» нет
+      // «Следователь» (#1434, #1481, порог 6 — #1612): шесть РАЗНЫХ поимок — дележ уже не режет, поэтому и выбора «поймать/принять» нет
       payday_detective: [
-        async (g) => { g.S.mem.caughtUnique = 4 },
+        async (g) => { g.S.mem.caughtUnique = 6 },
         async (g) => { await g.enterNode('payday', 'announce'); await choose(g, 'bag'); await choose(g, 'share') },
       ],
     }
