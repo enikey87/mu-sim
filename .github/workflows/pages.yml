@@ -112,6 +112,7 @@ jobs:
         env:
           VITE_PLATFORM: telegram
           VITE_TELEGRAM_INVOICE_URL: ${{ vars.VITE_TELEGRAM_INVOICE_URL }}
+          VITE_TELEGRAM_WORKER_URL: ${{ vars.VITE_TELEGRAM_WORKER_URL }}
           VITE_METRIKA_COUNTER: ${{ vars.VITE_METRIKA_COUNTER }}
           VITE_POSTHOG_KEY: ${{ vars.VITE_POSTHOG_KEY }}
           VITE_UMAMI_WEBSITE_ID: ${{ vars.VITE_UMAMI_WEBSITE_ID }}
