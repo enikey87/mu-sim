@@ -10,6 +10,16 @@ import type { Game } from '../engine/game'
 
 const alikTexts = (game: Game) => game.S.msgs.filter((m) => m.kind === 'text' && m.from === 'alik')
 const deleted = (game: Game) => game.S.msgs.filter((m) => m.kind === 'text' && m.deleted)
+const lifeCards = (game: Game) => game.S.msgs.filter((m) => m.kind === 'card' && m.event === 'life')
+
+/** Карточка мирной жизни выходит — производитель randomNotif жив до экрана; иначе проверка после пустеет. */
+function proveLifeCards(game: Game): number {
+  for (let i = 0; i < 200; i++) {
+    game.randomNotif()
+    if (lifeCards(game).length) break
+  }
+  return lifeCards(game).length
+}
 
 /** Экран «Вендетты» сыгран и закрыт — партия в терминальном эпилоге вражды. */
 async function enterVendetta(game: Game): Promise<void> {
@@ -134,5 +144,44 @@ describe('терминальные эпилоги держат полную ти
       game.S.stats.sent += RULE_TURNS
     }
     expect(spoke, 'тишина терминальных эпилогов не распространяется на выплату').toBe(true)
+  })
+})
+
+// #1614: терминальный эпилог запечатан и для телефона. randomNotif — единственный производитель мирных
+// карточек (`event: 'life'`); его зовёт шанс хода 12% и Idle_Notif, и в замороженном мире на 268 ходов
+// это давало 30 карточек при почти нулевом знаменателе реплик (notif_share 0,42–0,60 при лимите 0,25).
+describe('терминальный эпилог молчит и в телефоне (#1614)', () => {
+  it.each(TERMINALS)('«$title»: мирная карточка телефона не выходит после экрана', async ({ enter }) => {
+    const { game } = makeGame({ seed: 13 })
+    expect(proveLifeCards(game), 'randomNotif молчит и до экрана — проверка после пустеет').toBeGreaterThan(0)
+
+    await enter(game)
+    const before = game.S.msgs.length
+    for (let i = 0; i < 300; i++) game.randomNotif()
+    expect(game.S.msgs.slice(before), 'мирная карточка телефона пережила терминальный экран').toEqual([])
+  })
+
+  // тишина эпилога — про мир Алика, а не про устройство игрока: батарея и непрочитанные остаются
+  it.each(TERMINALS)('«$title»: батарея и непрочитанные живут', async ({ enter }) => {
+    const { game } = makeGame({ seed: 3 })
+    await enter(game)
+    expect(game.notify('⚠️', 'Система', 'Низкий заряд батареи: 19%', { event: 'battery' }), 'батарею заглушила тишина эпилога').toBe(true)
+    expect(game.ui.notif?.app, 'баннер батареи не показан').toBe('Система')
+    game.dismissNotif()
+    expect(game.notify('💬', 'Алик Воздухонесян', '5 новых сообщений', { event: 'unread' }), 'непрочитанные заглушила тишина эпилога').toBe(true)
+    expect(game.ui.notif?.app, 'баннер непрочитанных не показан').toBe('Алик Воздухонесян')
+  })
+
+  // гейт стоит на терминальных фактах, а не на всём эндгейме: нейтральный эпилог выплаты телефон не глушит
+  it('обычный эпилог выплаты не заглушён: мирные карточки телефона там выходят', async () => {
+    const { game } = makeGame({ seed: 13 })
+    game.S.mem.payday = 'default'
+    game.S.ending = 'payday_default'
+    game.S.endings.payday_default = game.S.day
+    await game.closeEnding()
+    await flush()
+    expect(game.S.mem['endgame.active'], 'эндгейм выплаты').toBe(true)
+    expect([game.S.mem['endgame.vendetta'], game.S.mem['endgame.bloodfeud']], 'терминальных фактов нет').toEqual([undefined, undefined])
+    expect(proveLifeCards(game), 'тишина терминальных эпилогов распространилась на выплату').toBeGreaterThan(0)
   })
 })

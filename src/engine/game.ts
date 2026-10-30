@@ -1727,6 +1727,8 @@ export class Game {
     else this.emit()
   }
   randomNotif(): void {
+    // терминальный эпилог обещает тишину и для телефона: мирные карточки после его экрана не выходят (#1614)
+    if (this.terminalEpilogue()) return
     // remember после notify: плейтест судит when до факта строки (#339)
     const p = this.lines.pick('NOTIF', L.NOTIF, this.lineFacts())
     if (!p) return
