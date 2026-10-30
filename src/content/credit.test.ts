@@ -93,7 +93,7 @@ describe('кредитная лестница', () => {
     expect(game.S.money).toBe(1000 + MOM_HELPS[0].amount)
   })
 
-  it('отказ платежа по микрозайму — credit.broke и СМС', () => {
+  it('отказ платежа по микрозайму — credit.broke и СМС с остатком', () => {
     const { game } = makeGame()
     game.S.mem[loanTaken('micro')] = true
     game.S.mem[creditStage] = 3
@@ -101,8 +101,25 @@ describe('кредитная лестница', () => {
     game.chargeCredit('micro')
     expect(game.S.mem[creditBroke]).toBe(true)
     expect(game.S.mem[creditStage]).toBe(4)
+    expect(cards(game, 'МФО').map((c) => c.text)).toContainEqual(expect.stringMatching(/^Не прошло: Платёж МФО «Деньги-Ара», 16\s000 ₽\. Мы не злимся\. Мы записываем\. Баланс: 100 ₽\.$/))
     // мама на том же тике перебивает последнюю СМС — сам факт broke важнее
     expect(game.S.mem[momHelp('pension')]).toBe(true)
+  })
+
+  it('отказ по займу называет фактический остаток — не баланс прошлой сводки (#1605)', () => {
+    const { game } = makeGame()
+    const said: string[] = []
+    const orig = game.notify.bind(game)
+    game.notify = (icon, app, text, card) => { said.push(text); return orig(icon, app, text, card) }
+    game.S.mem[creditStage] = 3 // лестница исчерпана: отказ — карточка, а не предложение
+    game.S.mem[loanTaken('consumer')] = true
+    game.S.mem[loanPayment('consumer')] = 2_550 // платёж, посильный прошлой неделе
+    setMoney(game, 2_550) // та же сумма, что игрок видел в сводке прошлой недели
+    game.chargeBill('phone') // 400 ₽ этого дня в сводку ещё не попали
+    expect(game.S.money).toBe(2_150)
+    game.chargeCredit('consumer') // платёж 2 550 ₽ при 2 150 ₽
+    expect(game.S.money, 'отказ денег не тратит').toBe(2_150)
+    expect(said.at(-1)).toMatch(/^Не прошло: Платёж по кредиту «Всё будет», 2\s550 ₽\. Недостаточно средств\. Баланс: 2\s150 ₽\.$/)
   })
 
   it('отказ по займу не эхо: банк говорит один раз за полосу (#184)', () => {
@@ -300,7 +317,7 @@ describe('карточка банка с кнопками (#287)', () => {
 
   it('причина рядом с предложением', () => {
     const { card } = bottom()
-    expect(card.text).toMatch(/^Не прошло: Коммуналка, 2\s500 ₽\. Вам одобрен кредит «Всё будет»/)
+    expect(card.text).toMatch(/^Не прошло: Коммуналка, 2\s500 ₽\. Баланс: 100 ₽\. Вам одобрен кредит «Всё будет»/)
     expect(card.offer?.take).toBe('Взять кредит «Всё будет»')
   })
 

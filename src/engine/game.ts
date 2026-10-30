@@ -1123,10 +1123,12 @@ export class Game {
     // неоплата — факт и последствия, а не ежедневное эхо: банк говорит один раз за полосу (#184/#178)
     this.refused(`Не прошло: ${bill.label}, ${this.rub(bill.amount)}`, 'Недостаточно средств. Достоинство не принимается.', streak === 1)
   }
-  /** Отказ платежа: карточка с причиной — или сразу предложение кредита с ней же (#287). */
+  /** Остаток в карточке отказа: последняя видимая игроку сумма могла быть балансом прошлой сводки (#1605). */
+  private balanceText(): string { return `Баланс: ${this.rub(this.S.money)}` }
+  /** Отказ платежа: карточка с причиной и фактическим остатком — или сразу предложение кредита с ней же (#287). */
   private refused(why: string, tail: string, say: boolean): void {
-    if (say && this.loanOffer() && this.newFall()) { this.maybeCreditOffer(why); return }
-    if (say) this.bankCard(`${why}. ${tail}`, { event: 'bank.refusal' })
+    if (say && this.loanOffer() && this.newFall()) { this.maybeCreditOffer(`${why}. ${this.balanceText()}`); return }
+    if (say) this.bankCard(`${why}. ${tail} ${this.balanceText()}.`, { event: 'bank.refusal' })
     if (this.moneyLevel() === 'bottom' && this.newFall()) this.maybeCreditOffer()
   }
   /** Расписание платежей по взятым кредитам. */
@@ -1172,7 +1174,7 @@ export class Game {
     const why = `Не прошло: ${loan.label}, ${this.rub(payment)}`
     if (id === 'micro' && !this.S.mem[creditBroke]) {
       this.rules.applyOps([set(creditBroke, true), set(creditStage, 4)], {})
-      this.notify('🏦', 'МФО', `${why}. Мы не злимся. Мы записываем`, { event: 'bank.refusal' })
+      this.notify('🏦', 'МФО', `${why}. Мы не злимся. Мы записываем. ${this.balanceText()}.`, { event: 'bank.refusal' })
       if (this.moneyLevel() === 'bottom' && this.newFall()) this.maybeCreditOffer()
       return
     }
@@ -3688,7 +3690,7 @@ export class Game {
     const paid = !pays || this.adjustMoney(fx.money!, 'По карте')
     // запечатано — тишина; мало денег — «недостаточно» (#252)
     if (pays && !paid && !this.moneySealed()) {
-      this.notify('🏦', 'Банк', `Не прошло: недостаточно средств. Перевод ${Math.abs(fx.money!).toLocaleString('ru-RU')} ₽ не ушёл.`, { event: 'bank.refusal' })
+      this.notify('🏦', 'Банк', `Не прошло: недостаточно средств. Перевод ${Math.abs(fx.money!).toLocaleString('ru-RU')} ₽ не ушёл. ${this.balanceText()}.`, { event: 'bank.refusal' })
     }
     if (!pays && fx.money) this.adjustMoney(fx.money, 'По карте')
     let debtMoved = !!fx.debt && paid && this.adjustDebt(fx.debt)
