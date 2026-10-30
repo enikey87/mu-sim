@@ -7,6 +7,7 @@ import { makeGame, alikTexts, botTurn } from '../test/helpers'
 import type { Game } from '../engine/game'
 import type { ClaimKey } from './ids'
 import { ARCS } from './arcs'
+import { NIVA_BACK_B } from './world'
 import { SOURCES } from './payday'
 import { valueOf } from '../engine/rules'
 
@@ -40,7 +41,7 @@ describe('класс «Нива»: пишет/вернулась сама про
     expect(lines(P_LIE_NIVA).some((t) => c.text.includes(game.X.fill(t, { old: lie.old.say, new: lie.new.say })))).toBe(true)
     expect(oneOf(LIE_NIVA, await catchLie(game))).toBe(true)
   })
-  it('возвращение «Нивы» объясняет «искали → вернулась»: пара не рождается, а поздняя «задержка» ловится', async () => {
+  it('возвращение «Нивы» объясняет «искали → вернулась»: пара не рождается, а поздняя ложь «всё ещё в Тбилиси» ловится', async () => {
     const { game } = makeGame()
     for (const ep of ARCS.niva.eps.slice(0, 6)) await game.playEpisode(ep, 'niva')
     // эпизод один — «ищем всем селом» против её письма; «вернулась» пришла переходом, а не второй версией
@@ -50,6 +51,25 @@ describe('класс «Нива»: пишет/вернулась сама про
     hear(game, ['niva_away'])
     expect(openEpisodes(game.S.ledger, 'niva.state')).toHaveLength(2)
     expect(game.facts().lieKind).toBe('niva')
+  })
+  it('ложь после возврата называет нынешнее отсутствие, а не прошедшую задержку (#1627)', async () => {
+    const { game } = makeGame()
+    for (const ep of ARCS.niva.eps.slice(0, 6)) await game.playEpisode(ep, 'niva')
+    const line = NIVA_BACK_B.find((l) => {
+      const v = valueOf(l)
+      return typeof v !== 'string' && v.claims?.includes('niva_away')
+    })
+    expect(line, 'строка-ложь пула помечена niva_away').toBeDefined()
+    const spec = valueOf(line!)
+    const text = typeof spec === 'string' ? spec : spec.t
+    // «задержалась» объясняет номера уже вернувшейся машины и нынешнего отсутствия не утверждает
+    expect(text, `прошедшее время вместо нынешнего отсутствия: ${text}`).toMatch(/всё ещё|до сих пор|сейчас|так и стоит/i)
+    await game.say([spec])
+    expect(currentEpisode(game.S.ledger), 'поимка back/away').toMatchObject({ subject: 'niva.state', a: 'back', b: 'away' })
+    const c = catchChoice(game)!
+    const lie = game.lie()!
+    expect(c.text, 'обе версии в реплике игрока').toContain(lie.old.say)
+    expect(c.text).toContain(lie.new.say)
   })
   it('поимка сюжетного противоречия не вытесняет вопрос про сериал', async () => {
     const { game } = makeGame()
