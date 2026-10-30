@@ -27,7 +27,9 @@ const HOURS = [14, 20, 9, 2, 17, 12]
 /** Что бот сделал за ход: выбрал вариант i из offered, ответил на допработу, зарядил телефон, промолчал.
  *  `free` — свободный текст вместо кнопки (грубый профиль); тогда `i` = -1. */
 export type Act =
-  | { kind: 'send'; i: number; offered: string[]; at: number; free?: string; tone?: Tone }
+  // `scene` — метка сцены каждого варианта (параллельно offered): логический разбор (logic-review.ts)
+  // отличает кнопки сцен (легальный повтор, класс r174+) от пулов с окном повтора #824
+  | { kind: 'send'; i: number; offered: string[]; at: number; free?: string; tone?: Tone; scene?: (string | null)[] }
   | { kind: 'job'; yes: boolean | 'mirror'; at?: number }
   | { kind: 'card'; pick: 'take' | 'sell' | 'later' }
   | { kind: 'charge' }
@@ -282,15 +284,15 @@ export async function playtest(seed: number, turns: number, replay?: Act[], watc
     const i = pickChoice(bot, style, game.choices, profile)
     // -1 от грубого профиля: грубой кнопки нет — свободный крик, пул помнит окно повтора
     const free = i < 0 ? pickShout(bot, acts.flatMap((a) => (a.kind === 'send' && a.free !== undefined ? [a.free] : []))) : undefined
-    return { kind: 'send', i, offered, free, at: game.S.msgs.length }
+    return { kind: 'send', i, offered, free, at: game.S.msgs.length, scene: game.choices.map((c) => c.scene ?? null) }
   }
   /** Ход драйвера → запись партии: предложенные варианты и позиция снимаются с текущего кадра, а не угадываются тестом. */
   const fromDriver = (d: DriverAct): Act => {
     switch (d.kind) {
       case 'send':
         if (!game.choices[d.i]) throw new Error(`драйвер выбрал вариант ${d.i}, а в кадре ${game.choices.length} — контент сдвинулся: обновите шаги или сдвиньте сид`)
-        return { kind: 'send', i: d.i, offered: game.choices.map((c) => c.text), at: game.S.msgs.length }
-      case 'free': return { kind: 'send', i: -1, offered: game.choices.map((c) => c.text), at: game.S.msgs.length, free: d.text, tone: d.tone ?? 'rude' }
+        return { kind: 'send', i: d.i, offered: game.choices.map((c) => c.text), at: game.S.msgs.length, scene: game.choices.map((c) => c.scene ?? null) }
+      case 'free': return { kind: 'send', i: -1, offered: game.choices.map((c) => c.text), at: game.S.msgs.length, free: d.text, tone: d.tone ?? 'rude', scene: game.choices.map((c) => c.scene ?? null) }
       case 'job': return { kind: 'job', yes: d.yes, at: game.S.msgs.length }
       case 'card': return { kind: 'card', pick: d.pick }
       case 'charge': return { kind: 'charge' }
