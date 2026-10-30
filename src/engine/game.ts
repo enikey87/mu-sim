@@ -57,7 +57,7 @@ import { type Audio, silentAudio } from './audio'
 import { makeMooPhrase, mooOf, pinnedMooPhrase } from './moo'
 import { typo } from './typo'
 import { UiState, type Moo, type Notif, type SendFeel } from './ui-state'
-import { classifyUserInput, courtesyApology, legalClaim, type ClassifiedInput } from './input'
+import { classifyUserInput, courtesyApology, isShouting, legalClaim, type ClassifiedInput } from './input'
 import { track, left, shown, PROGRESS_DAYS, type Beat, type Phase, type PlatformId } from '../analytics/metrics'
 import { holidayOf, holidayGreetKey, holidayDays, HOLIDAY_EXCUSES } from '../content/holidays'
 import { dueIn, dateOf, fmtDate, fmtDayMonth, fmtShortDate, fmtTime, weekOf, nightHour, periodOf, tierOf, TIERS, type Due, type Period } from './time'
@@ -2071,6 +2071,8 @@ export class Game {
       // слоты события: всегда в снимке (сверка EVENT_KEYS без ручной подстановки в тестах)
       intent: extra.intent ?? false,
       tone: extra.tone ?? false,
+      // буквальный крик реплики этого хода (#1633): тон кнопки его не подменяет (#583)
+      shout: extra.shout ?? false,
       arg: extra.arg ?? false,
       category: extra.category ?? false,
       arc: extra.arc ?? false,
@@ -2426,10 +2428,10 @@ export class Game {
         await this.fire('PlayerSays', this.saysFacts(o))
       } else if (S.scene) {
         this.clearScene() // свой текст посреди сцены — сцена прерывается
-        await this.alikTurn(tone, o.category)
+        await this.alikTurn(tone, o.category, undefined, isShouting(o.text))
       } else {
         // arg варианта (кнопка без act, например угроза судом) едет в факты PlayerMessage: по нему реплика называет себя (#982)
-        await this.alikTurn(tone, o.category, o.arg)
+        await this.alikTurn(tone, o.category, o.arg, isShouting(o.text))
       }
       if (this.disposed) return
 
@@ -2646,7 +2648,7 @@ export class Game {
   }
 
   // ---------- ход Алика ----------
-  async alikTurn(tone: Tone, category?: Choice['category'], arg?: Choice['arg']): Promise<void> {
+  async alikTurn(tone: Tone, category?: Choice['category'], arg?: Choice['arg'], shout = false): Promise<void> {
     const S = this.S
     S.ctx = null
     // обычный +1…3 — в конце хода (после хора); здесь только возврат из пропажи
@@ -2657,7 +2659,7 @@ export class Game {
       S.offlineDays = 0
       await this.say([this.uniq(this.X.back)])
     }
-    await this.fire('PlayerMessage', { tone, category, arg })
+    await this.fire('PlayerMessage', { tone, category, arg, shout })
   }
 
   /** Обычный ход: иногда «прочитано и молчит», иногда реплика по времени суток, потом взвешенный выбор. */
