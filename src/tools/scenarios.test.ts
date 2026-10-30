@@ -6,10 +6,11 @@
 // а упавшая проверка печатает полную расшифровку партии — разбор без повторного прогона.
 import { describe, expect, it } from 'vitest'
 import { openOffer, playtest, transcript, type Driver, type DriverAct, type Played, type WorldFrame } from './playtest'
+import { makeGame } from '../test/helpers'
 import { RUDE_SHOUTS } from './shouts'
 import { CHRONIC_RUDE_AFTER_VENDETTA, ENDING_MIN_DAY } from '../content/finales'
-import { FEUD_LIFTED, FEUD_LIFTED_STICKER, FEUD_PRICE } from '../content/rude'
-import { count, endgame, vendettaLifted } from '../content/memkeys'
+import { COLD_WAR_ALL, FEUD_LIFTED, FEUD_LIFTED_STICKER, FEUD_PRICE } from '../content/rude'
+import { count, endgame, vendettaPrice, vendettaLifted } from '../content/memkeys'
 import { valueOf, type Entry, type Line } from '../content/fact'
 import {
   ENDGAME_BLOODFEUD_FORMALITIES, ENDGAME_BLOODFEUD_LEAVERS, ENDGAME_BLOODFEUD_OPEN,
@@ -214,4 +215,45 @@ describe('сценарии грубого пути (#1580)', () => {
       expect(sys.some((t) => t.startsWith('Алик добавил вас в группу «ДЕНЬ ВЫПЛАТЫ')), 'группа выплаты не открылась').toBe(true)
     })
   }, 120_000)
+})
+
+/** Последняя реплика Алика в ленте. */
+const lastAlikLine = (p: { game: Played['game'] }): string => {
+  const m = [...p.game.S.msgs].reverse().find((x) => x.kind === 'text' && x.from === 'alik')
+  return m && m.kind === 'text' ? m.text : ''
+}
+
+// #1594: решение оператора 30.10 по вопроснику #1579 — «ужесточить». В живом сходе извинение даёт
+// только чистое «прости» (P_SORRY, посредник, свободный текст без просьбы о деньгах); вежливое
+// напоминание «простите, что снова пишу» — вежливость, а не извинение: цену выхода не платит,
+// вражду не снимает, но и не тонет — отвечает строка окна холодной войны.
+describe('напоминание с «простите» в сходе (#1594)', () => {
+  const PING = 'Алик, простите, что снова пишу. Когда будет удобно рассчитаться?'
+  const PING_NO_ASK = 'Алик, простите, что снова пишу.'
+
+  for (const [form, text] of [['кнопка', PING], ['свободный текст', PING], ['кнопка без просьбы', PING_NO_ASK]] as const) {
+    it(`${form}: три раза в живом сходе не снимают вражду и не платят цену`, async () => {
+      const { game } = makeGame({ seed: 11 })
+      game.S.mem.vendetta = true
+      game.S.mem.coldWar = true
+
+      for (let i = 1; i <= 3; i++) {
+        await game.send(form === 'свободный текст' ? text : { text, tone: 'polite' })
+        expect(game.S.mem.vendetta, `напоминание №${i} сняло вражду`).toBe(true)
+        expect(game.S.mem[vendettaPrice], `напоминание №${i} заплатило цену выхода`).toBeUndefined()
+        expect(Number(game.S.mem[count.sorry] ?? 0), `напоминание №${i} зачтено извинением`).toBe(0)
+      }
+      // не игнор: Алик признаёт вежливость строкой окна холодной войны, а не молчит
+      expect(lines(COLD_WAR_ALL), 'напоминание осталось без ответа окна').toContain(lastAlikLine({ game }))
+    })
+  }
+
+  it('в мирной партии напоминание с «простите» остаётся прежней вежливостью', async () => {
+    const { game } = makeGame({ seed: 11 })
+    await game.send(PING)
+    expect(game.S.mem.vendetta, 'мирная партия объявила сход').toBeFalsy()
+    expect(Number(game.S.mem[count.sorry] ?? 0), 'мирное напоминание перестало читаться извинением').toBe(1)
+    expect(game.S.mem[vendettaPrice], 'мирное напоминание заплатило цену выхода').toBeUndefined()
+    expect(lastAlikLine({ game }), 'на мирное напоминание не ответили').not.toBe('')
+  })
 })
