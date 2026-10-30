@@ -26,7 +26,7 @@ import {
   collectorsTurned, collectorsTea, collectorsEpAt,
   criticalAt, creditOfferSum, crewPaid, crewPaidAt, crewAllPaid, moneyAskAt, rubikBath, whenYears, ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt, countersuitAt, grantTileAt, transferAt, transferAmount, moneyAt, moustachePhotoAt, moustacheStakeSaid, mamaMarketAt, mamaVoiceAt, samvelDivorceAt, courtVerdictAt, tileSlipAt, tileCourtAt, tileLawyerAt, tileMonumentAt, nivaBackAt, saleAt, saleWhat, fraudLoan, blockLifted, internDeclined, internAccepted, grantHouseAt, photoAt, tileAdAt, inhDoneAt, inhBurned, inhRefused, tamadaDoneAt, borisAskAt, seryogaAskAt, grantBathAt, offendedAskAt,
   debutWho, debutAt, arsenTrack, arsenTrackAt,
-  hhJobAt, seryogaLoanAt, dachaAskAt, evictAt, collectorsEchoAt, threatGovAt, fraudCardAt,
+  hhJobAt, seryogaLoanAt, dachaAskAt, evictAt, collectorsEchoAt, threatGovAt, fraudCardAt, bankSeen,
 } from './memkeys'
 import { momDachaAt, momDachaDays, type LoanId, type MomId, type ThingId } from './credit'
 import { valueOf } from '../engine/rules'
@@ -67,7 +67,7 @@ export type MemExactKey =
   | typeof ramPhotoAt | typeof borisSaleAt | typeof vacancyAt | typeof avitoReviewAt
   | typeof rubikAskAt | typeof kettleAt | typeof lawyerAt | typeof collectorsAskAt | typeof internAt | typeof rubikHoleAt | typeof countersuitAt | typeof grantTileAt | typeof moustachePhotoAt | typeof moustacheStakeSaid | typeof mamaMarketAt | typeof mamaVoiceAt | typeof samvelDivorceAt | typeof courtVerdictAt | typeof tileSlipAt | typeof tileCourtAt | typeof tileLawyerAt | typeof tileMonumentAt | typeof nivaBackAt | typeof saleAt | typeof saleWhat | typeof fraudLoan | typeof blockLifted | typeof internDeclined | typeof internAccepted | typeof grantHouseAt | typeof photoAt | typeof tileAdAt | typeof tamadaDoneAt | typeof borisAskAt
   | typeof seryogaAskAt | typeof grantBathAt | typeof offendedAskAt | typeof inhDoneAt | typeof inhBurned | typeof inhRefused
-  | typeof hhJobAt | typeof seryogaLoanAt | typeof dachaAskAt | typeof evictAt | typeof collectorsEchoAt | typeof threatGovAt | typeof fraudCardAt
+  | typeof hhJobAt | typeof seryogaLoanAt | typeof dachaAskAt | typeof evictAt | typeof collectorsEchoAt | typeof threatGovAt | typeof fraudCardAt | typeof bankSeen
   | typeof payday[keyof typeof payday] | typeof count[keyof typeof count]
   | typeof endgame[keyof typeof endgame] | typeof lend50[keyof typeof lend50]
 

@@ -290,6 +290,8 @@ export class Game {
 
     if (!this.S.msgs.length) this.seed()
     else { this.restoreDueEvents(); this.scheduleBills(); this.scheduleCredits(); this.migrateCreditSave() }
+    // Старое сохранение до #1618 метки не знает: банковскую карточку в ленте игрок уже видел — восстанавливаем по ней
+    if (this.S.msgs.some((m) => m.kind === 'card' && m.app === 'Банк')) this.S.mem[memkeys.bankSeen] = true
     // Старое сохранение с готовой просьбой уже прошло вступление; новый маркер появился позже (#358).
     if (this.S.mem[memkeys.endgame.active] && this.S.mem[memkeys.lend50.asked] && !this.S.mem[memkeys.endgame.intro]) {
       this.S.mem[memkeys.endgame.intro] = true
@@ -1471,6 +1473,8 @@ export class Game {
     if (msg.kind === 'voice' && !msg.moo) msg.moo = pinnedMooPhrase(msg.id, msg.feast)
     // день показа — на карточке: ответ с числами верен для своего дня, не дня показа (#553)
     if (msg.kind === 'card' && msg.day === undefined) msg.day = this.S.day
+    // банк вошёл в историю: игрок увидел его карточку — сводку, предложение, отказ, предупреждение (#1618)
+    if (msg.kind === 'card' && msg.app === 'Банк') this.S.mem[memkeys.bankSeen] = true
     this.quietHeader()
     this.S.msgs.push(msg)
     this.touchMsgs(this.S.msgs.length - 1)
