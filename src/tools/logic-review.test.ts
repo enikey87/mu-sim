@@ -3,10 +3,12 @@
 // (REVIEW_PROMPT.md, категории 1/3/6/12); здесь он работает на каждом PR, а не раз в цикл.
 // Негативные контроли: каждая проверка доказана красной на подсаженном дефекте ниже.
 import { describe, it, expect } from 'vitest'
-import { playtest } from './playtest'
-import { logicReview, logicFindings, PERSON_RE, sumsIn, type Ev, type OfferRec } from './logic-review'
+import { playtest, type WorldFrame } from './playtest'
+import { logicReview, logicFindings, PERSON_RE, sumsIn, windowDebuts, type Ev, type OfferRec } from './logic-review'
+import { PLAYER_SUFFIX } from '../content/misc'
+import { valueOf } from '../engine/rules'
 import { P_VIA_MAMA } from '../content/rules/player-choice-pools'
-import { CAST } from '../content/arcs'
+import { ARCS, CAST } from '../content/arcs'
 import { EXTRAS } from '../content/ids'
 
 const ev = (at: number, side: Ev['side'], text: string, who?: string, sys?: boolean): Ev => ({ at, side, text, who, sys })
@@ -109,6 +111,37 @@ describe('логический разбор: самопроверка на по�
     expect(logicReview([ev(0, 'me', 'Где деньги?'), ev(1, 'game', 'Алик, ты меня не видел', 'garik')], [])).toMatchObject([{ id: 'stranger-speaker' }])
   })
 
+  it('реплика-дебют с окном отклика не stranger-speaker; без окна — ловится (grantTileAt #983)', () => {
+    // живой seed-22: реплика Гранта — первое сообщение участника с собственным окном (P_GRANT_TILE)
+    const debut = 'Молодой человек, ваша плитка — орудие. Мой адвокат с вами свяжется.'
+    const msgs = [{ kind: 'text', from: 'me' }, { kind: 'text', from: 'alik', who: 'grant' }]
+    const frame = (fired: WorldFrame['fired']): WorldFrame => ({
+      turn: 1, at: 2, day: 14, before: {}, mem: {}, fired, said: [], sys: [], asides: [], away: [], notif: [],
+    })
+    // окно дебюта выбрано в блоке — сообщение дебютное, а не из ниоткуда
+    expect(windowDebuts([frame([{ event: 'BuildChoices', chosen: ['Opt_GrantTile'] }])], msgs)).toEqual(new Set([1]))
+    const stream = [ev(0, 'game', 'Привет. Денег нет', 'alik'), ev(1, 'game', debut, 'grant')]
+    expect(logicReview(stream, [offer(1, 2, ['Это вы мне?'])], undefined, windowDebuts([frame([{ event: 'BuildChoices', chosen: ['Opt_GrantTile'] }])], msgs))).toEqual([])
+    // контроль: окно не собиралось — та же строка по-прежнему пишет из ниоткуда
+    expect(windowDebuts([frame([])], msgs)).toEqual(new Set())
+    expect(logicReview(stream, [])).toMatchObject([{ id: 'stranger-speaker' }])
+  })
+
+  it('follow-строка арки через oldestShown — задуманный повтор #824; обычный пул — ловится', () => {
+    const intro = [ev(0, 'game', 'Денег нет', 'alik')]
+    const line = valueOf(ARCS.alik_death.follow.at(-1)!)
+    const tail = PLAYER_SUFFIX.find((s) => s.includes('Жду'))!
+    // живой seed-10: исчерпанный follow арки смерти возвращает самую давнюю строку с хвостом игрока
+    expect(logicReview(intro, [offer(0, 1, [line + tail]), offer(3, 2, [line + tail])])).toEqual([])
+    expect(logicReview(intro, [offer(0, 1, [line]), offer(3, 2, [line])])).toEqual([])
+    // контроль: та же длина окна, но строка не из follow-пула — repeat-window
+    const plain = 'Алик, я услышал твою последнюю отмазку и хочу обсудить детали'
+    expect(logicReview(intro, [offer(0, 1, [plain]), offer(3, 2, [plain])])).toMatchObject([{ id: 'repeat-window' }])
+    // контроль: хвост сам по себе не делает строку follow-строкой
+    const other = 'Сколько можно ждать?' + tail
+    expect(logicReview(intro, [offer(0, 1, [other]), offer(3, 2, [other])])).toMatchObject([{ id: 'repeat-window' }])
+  })
+
   it('фото платёжки показывает барана — реакция «тут баран» не фантом', () => {
     const stream = [ev(0, 'game', 'Вот платёжка', 'alik'), { at: 1, side: 'game' as const, text: 'Вот, смотри, платёжка (на снимке — баран на фоне Арарата)', who: 'alik' }]
     // журнал строится из playerStream (визуал фото — там); здесь проверяем детектор baran на подписи
@@ -168,6 +201,13 @@ describe('логический разбор живых партий: кажда�
     const f = await party(72, 140, 'rude')
     expect(f, f.map((x) => `${x.id}#${x.turn}: ${x.text} — ${x.why}`).join('\n')).toEqual([])
   }, 60_000)
+
+  it('живые seed-22 и seed-10: дебют с окном и follow-повтор арки не находки (r198)', async () => {
+    for (const seed of [22, 10]) {
+      const f = await party(seed, 300, 'neutral')
+      expect(f, `seed ${seed}: ${f.map((x) => `${x.id}#${x.turn}: ${x.text} — ${x.why}`).join('\n')}`).toEqual([])
+    }
+  }, 120_000)
 })
 
 // Широкий свип для ручной калибровки (не CI): LOGIC_SWEEP=1 LOGIC_SEEDS=1-40 — печатает находки
