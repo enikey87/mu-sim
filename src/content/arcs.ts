@@ -4,7 +4,7 @@ import { type Entry, type FactOp, type Criterion, type FactKey, type Said, set, 
 import { type ClaimKey } from './ids'
 import type { LedgerEvent } from './fact-types'
 import { needs, meet, WORLD, MENTION_RE } from './world'
-import { actSigned, alikDead, betonSet, borisForeman, borisMarried, collectorsAskAt, collectorsEpAt, collectorsRecruited, collectorsTea, collectorsTurned, creditBroke, endgame, garikConcrete, garikCut, grandpaDying, grantBathAt, grantHouseAt, grantPaid, grantTileAt, houseOnGarik, internAt, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nivaBackAt, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, rubikHoleAt, rubikProposalAt, saidNuneNoWrite, samvelDivorceAt, sick, taxFrozen, tileCourtAt, tileLawyerAt, tileMonumentAt, tileSlipAt, wedding, wrote } from './memkeys'
+import { actSigned, alikDead, betonSet, borisForeman, borisMarried, collectorsAskAt, collectorsEpAt, collectorsRecruited, collectorsTea, collectorsTurned, creditBroke, deathAnnAt, endgame, garikConcrete, garikCut, grandpaDying, grantBathAt, grantHouseAt, grantPaid, grantTileAt, houseOnGarik, internAt, intro, karineKnowsDebt, met, mourning, nivaAway, nivaBack, nivaBackAt, nuneDekretOver, nuneKeyPassed, razmikMarried, rubikAskAt, rubikBath, rubikHoleAt, rubikProposalAt, saidNuneNoWrite, samvelDivorceAt, sick, taxFrozen, tileCourtAt, tileLawyerAt, tileMonumentAt, tileSlipAt, wedding, wrote } from './memkeys'
 import { stateQuestion } from './money-ask'
 
 export type ArcMsg = Said | { w: string; t: string; claims?: LedgerEvent[]; remember?: FactOp[]; stamp?: string } | { t: string; claims: LedgerEvent[]; remember?: FactOp[]; stamp?: string }
@@ -340,7 +340,7 @@ export const ARCS: Record<string, Arc> = {
     eps: [
       // Карине ушла к Рубику — вместо неё пишет мама Алика
       {
-        m: [needs('karineHome')({ w: 'karine', t: 'Это Карине. Алик умер. Больше не пишите.' }), needs('karineGone')({ w: 'mama', t: 'Это мама Алика. Алик умер. Больше не пишите. Сынок, ты покушай хоть.' })],
+        m: [needs('karineHome')({ w: 'karine', t: 'Это Карине. Алик умер. Больше не пишите.', stamp: deathAnnAt }), needs('karineGone')({ w: 'mama', t: 'Это мама Алика. Алик умер. Больше не пишите. Сынок, ты покушай хоть.', stamp: deathAnnAt })],
         // до серии «понял, что жив» — без срока: иначе «с того света» пишет уже живой Алик
         remember: [set(mourning, true), set(alikDead, true)], legend: 'dead',
       },

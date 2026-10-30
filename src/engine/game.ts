@@ -1904,6 +1904,9 @@ export class Game {
       'ctx.topic': this.topicOfLast(),
       // «Мууу» прозвучало после последнего сообщения игрока — только тогда про корову и спрашивают
       mooFresh: S.mem[memkeys.mooAt] === S.stats.sent,
+      // объявление «Алик умер» (#1610): заметное событие — прямое соболезнование в первом блоке вариантов.
+      // Окно то же, что у остальных событий: ход объявления и три после
+      deathAnnFresh: S.stats.sent - Number(S.mem[memkeys.deathAnnAt] ?? -99) <= EVENT_FRESH_TURNS,
       // заметные системные события (#927): реакция живёт ход события и 1–3 хода после него
       ramPhotoFresh: S.stats.sent - Number(S.mem[memkeys.ramPhotoAt] ?? -99) <= EVENT_FRESH_TURNS,
       borisSaleFresh: S.stats.sent - Number(S.mem[memkeys.borisSaleAt] ?? -99) <= EVENT_FRESH_TURNS,

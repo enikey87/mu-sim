@@ -536,6 +536,10 @@ export const choiceRules: R[] = [
   offer({ name: 'Congrats', slot: 'rel', specificity: 2, weight: 1, when: [exists('ctx.rel'), is('ctx.festive')], act: 'congrats', tone: 'polite', text: (g) => fromD(g, 'P_CONGRATS') }),
   offer({ name: 'Condole', slot: 'rel', specificity: 2, weight: 1, when: [exists('ctx.rel'), is('ctx.sad')], act: 'condole', tone: 'polite', text: (g) => fromD(g, 'P_CONDOLE') }),
   offer({ name: 'Mourn', when: [is(mourning)], odds: 0.5, act: 'condole', tone: 'polite', bonus: 1, text: (g) => fromD(g, 'P_CONDOLE') }),
+  // объявление смерти — заметное событие со своим окном (#1610): прямое соболезнование в первом блоке
+  // вариантов, а не через 1–3 дня по odds Mourn. Своего бонуса мало: в том же блоке стоит вопрос
+  // сериала ArcDeath (2 условия + bonus 5), поэтому окно идёт выше него
+  offer({ name: 'DeathCondole', when: [is('deathAnnFresh'), is(mourning)], act: 'condole', tone: 'polite', bonus: 6, text: (g) => windowFromD(g, 'P_CONDOLE', EVENT_FRESH_TURNS) }),
 
   offer({ name: 'Doubt', when: [is('ctx.constr')], act: 'defend', tone: 'neutral', bonus: 1, text: (g) => fromD(g, 'P_DOUBT') }),
 

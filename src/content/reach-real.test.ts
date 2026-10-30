@@ -70,8 +70,10 @@ async function drive(seed: number, mode: 'court' | 'catches'): Promise<Driven> {
       continue
     }
     if (!game.choices.length) { await game.onIdle(); continue }
-    // вежливый игрок: сначала кнопка с вежливым тоном, иначе первая предложенная
-    const c = game.choices.find((x) => x.tone === 'polite') ?? game.choices[0]
+    // вежливый игрок: сначала кнопка с вежливым тоном, иначе первая предложенная. Соболезнование —
+    // не давление по деньгам: траурная кнопка окна объявления смерти (#1610) уводит скрипт с его цели,
+    // поэтому вежливый выбор её пропускает (утверждения партии те же)
+    const c = game.choices.find((x) => x.tone === 'polite' && x.act !== 'condole') ?? game.choices[0]
     sent.push({ kind: 'choice', text: c.text, tone: c.tone, act: c.act })
     await game.send(c)
   }
