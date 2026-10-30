@@ -365,7 +365,7 @@ describe('уникальные пары — валюта концовок (#1481
     expect(game.S.ach.liar3, 'ачивка настойчивости переехала на уникальные').toBeDefined()
     expect((await game.fire('PaydayOutcome'))?.name, 'одна уникальная пара открыла концовку').toBe('Payday_default')
   })
-  it('три РАЗНЫЕ пары — три уникальные: на трёх «Следователю» мало, мост «Мешка» (#1595)', async () => {
+  it('три РАЗНЫЕ пары — три уникальные: на трёх «Следователю» мало, мост «Мешка» (#1612)', async () => {
     const { game } = makeGame()
     await catchSame(game)
     hear(game, ['money_noah'])
@@ -375,7 +375,7 @@ describe('уникальные пары — валюта концовок (#1481
     expect(Number(game.S.mem[caughtUnique]), 'три разные пары').toBe(3)
     expect((await game.fire('PaydayOutcome'))?.name).toBe('Payday_coinsByCatch')
   })
-  it('четыре РАЗНЫЕ пары — четыре уникальные, «Следователь» открыт (#1595)', async () => {
+  it('пять РАЗНЫХ пар — пять уникальных, всё ещё мост «Мешка» (#1612)', async () => {
     const { game } = makeGame()
     await catchSame(game)
     hear(game, ['money_noah'])
@@ -384,7 +384,25 @@ describe('уникальные пары — валюта концовок (#1481
     await catchLie(game)
     hear(game, ['money_foundation'])
     await catchLie(game)
-    expect(Number(game.S.mem[caughtUnique]), 'четыре разные пары').toBe(4)
+    hear(game, ['money_apricots'])
+    await catchLie(game)
+    expect(Number(game.S.mem[caughtUnique]), 'пять разных пар').toBe(5)
+    expect((await game.fire('PaydayOutcome'))?.name).toBe('Payday_coinsByCatch')
+  })
+  it('шесть РАЗНЫХ пар — шесть уникальных, «Следователь» открыт (#1612)', async () => {
+    const { game } = makeGame()
+    await catchSame(game)
+    hear(game, ['money_noah'])
+    await catchLie(game)
+    hear(game, ['money_wife'])
+    await catchLie(game)
+    hear(game, ['money_foundation'])
+    await catchLie(game)
+    hear(game, ['money_apricots'])
+    await catchLie(game)
+    hear(game, ['money_deposit'])
+    await catchLie(game)
+    expect(Number(game.S.mem[caughtUnique]), 'шесть разных пар').toBe(6)
     expect((await game.fire('PaydayOutcome'))?.name).toBe('Payday_detective')
   })
   it('две разные пары — мост «Мешка мелочи», «Следователю» мало', async () => {
