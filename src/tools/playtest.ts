@@ -113,7 +113,7 @@ const SORRY_RE = /^(извин|прости|сорри|sorry)/
 const isApology = (c: Choice): boolean => c.act === 'sorry' || SORRY_RE.test(buttonStem(c.text))
 
 /** Обращение и хвост прячут основу: «Алик, согласен… 🙏» и «Беру!» — одна и та же кнопка. */
-function buttonStem(text: string): string {
+export function buttonStem(text: string): string {
   let t = text.trim()
   for (let i = 0; i < 6; i++) {
     const suf = PLAYER_SUFFIX.find((s) => t.endsWith(s))
