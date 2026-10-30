@@ -1405,7 +1405,7 @@ describe('Game: деньги на карте', () => {
     expect(game.S.ach.lend).toBeUndefined()
     expect(game.S.msgs.some((m) => m.kind === 'sys' && /Вы перевели Алику/.test(m.text))).toBe(false)
     expect(game.S.msgs.some((m) => m.kind === 'text' && m.from === 'alik' && /святой|Вот это брат/i.test(m.text))).toBe(false)
-    expect(cards(game, 'Банк').at(-1)?.text).toMatch(/^Не прошло/)
+    expect(cards(game, 'Банк').at(-1)?.text).toMatch(/^Не прошло: недостаточно средств\. Перевод 5\s000 ₽ не ушёл\. Баланс: 1\s000 ₽\.$/)
 
     // те же деньги есть — перевод идёт, и всё, что он обещает, случается
     const { game: paid } = makeGame()
