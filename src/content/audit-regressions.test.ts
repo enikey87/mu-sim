@@ -7,7 +7,7 @@ import { CHORUS_LEGEND, LEGENDS } from './legends'
 import { COURT_SCENE, QUESTS } from './quests'
 import { turnRules } from './rules/turn'
 import { dateOf } from '../engine/time'
-import { Gated, isOpen, test, valueOf, type Entry } from '../engine/rules'
+import { Gated, isOpen, spec, test, valueOf, type Entry } from '../engine/rules'
 import type { LineSpec } from './fact'
 import { playtest, transcript } from '../tools/playtest'
 import { CHORUS, PROMISE_DUE_KEPT, PROMISE_MET } from './world'
@@ -607,5 +607,13 @@ describe('дебют Нивы: бардачок (#1201)', () => {
     let shown = false
     for (let i = 0; i < 6 && !shown; i++) { told.S.choices = null; shown = seen(told) }
     expect(shown, 'строки нет в блоке после ввода').toBe(true)
+  })
+})
+
+describe('редакторский контракт RUDE_AGAIN (#1629)', () => {
+  it('строка про запись обещаний не обрывается без сказуемого', () => {
+    const line = MISC.RUDE_AGAIN.map((l) => spec(l).t).find((t) => t.startsWith('Ты уже в который раз кричишь'))
+    expect(line, 'строка не найдена — проверка пустеет').toBeDefined()
+    expect(line, 'вторая фраза обрывается на «мои обещания» без сказуемого').toMatch(/как ты мои обещания выполняешь/)
   })
 })
