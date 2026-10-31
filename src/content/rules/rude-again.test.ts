@@ -31,6 +31,17 @@ const CALM_TEXT = 'Свадьба за свадьбой. Музыкант за �
 const SHOUT_TEXT = 'ХВАТИТ СВАДЕБ!!! Мне есть нечего!!!'
 
 describe('повторный грубый ход: ответ по тексту, а не по тону слота (#1633)', () => {
+  it('репутация по спокойной грубости не доказывает прежних криков', async () => {
+    const { game } = makeGame()
+    game.S.mem[count.rude] = 2
+    for (const [i, text] of CALM_TEXTS.entries()) {
+      if (i !== 2) game.lines.mark(lineId('RUDE_AGAIN', text))
+    }
+    const answer = await turn(game, CALM_TEXT)
+    expect(hits([CALM_TEXTS[2]!], answer), 'проверяемая строка не выбрана').toBe(true)
+    expect(answer).not.toMatch(/ты кричишь чаще|твой капс|опять кричишь/i)
+  })
+
   it('спокойная строка грубого слота не падает в пул крика, даже когда репутация кончилась', async () => {
     const { game } = makeGame()
     game.S.mem[count.rude] = 2
