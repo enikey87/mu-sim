@@ -28,6 +28,23 @@ const windowTexts = (game: Game, at: number): string[] => {
 }
 
 describe('пул окна «ты обиделся?» (#1620)', () => {
+  it('оба окна оставляют игрока кредитором Алика', () => {
+    const { game } = makeGame()
+    expect(game.S.debt).toBeGreaterThan(0)
+    const debt = game.S.debt
+    game.S.stats.sent = 100
+    game.awayMsg('offended')
+    const first = windowTexts(game, 100)
+    game.S.stats.sent = 104
+    game.awayMsg('offended')
+    const second = windowTexts(game, 104)
+    const offered = [...first, ...second]
+    expect(offered).toHaveLength(8)
+    expect(new Set(offered.map(buttonStem)).size).toBe(8)
+    for (const text of offered) expect(text).not.toMatch(/на мне\s*[—-]\s*долг|я тебе должен|я должен тебе/i)
+    expect(game.S.debt).toBe(debt)
+  })
+
   it('в пуле 6–8 строк, все уникальны по стеблю и не называют персонажа или сумму', () => {
     const lines = poolTexts()
     expect(lines.length, `пул короче двух окон: ${lines.length}`).toBeGreaterThanOrEqual(6)
