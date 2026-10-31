@@ -13,7 +13,7 @@ import { intro } from './memkeys'
 import * as W from './world'
 import {
   RAM_PHOTO, BORIS_SALE, VACANCY, AVITO_REVIEW, RUBIK_ASK, KETTLE,
-  CREW_CALL_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, GRANT_TILE_B, DEBUT_NIVA_B, DEBUT_BORIS_B, MOUSTACHE_PHOTO_B, MAMA_MARKET_B, TILE_AD_B, TAMADA_DONE_B, BORIS_MEMORY_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, GRANT_HOUSE_B, COURT_VERDICT_B, TILE_SLIP_B, TILE_COURT_B, TILE_LAWYER_B, TILE_MONUMENT_B, NIVA_BACK_B, NUNE_DEBUT_B, DEBUT_GRANT_B, SOLD_B,
+  CREW_CALL_B, DEBUT_ARSEN_B, DEBUT_SAMVEL_B, GRANT_TILE_B, DEBUT_NIVA_B, DEBUT_BORIS_B, MOUSTACHE_PHOTO_B, MAMA_MARKET_B, TILE_AD_B, TAMADA_DONE_B, BORIS_MEMORY_B, ITEM_MEMORY_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, GRANT_HOUSE_B, COURT_VERDICT_B, TILE_SLIP_B, TILE_COURT_B, TILE_LAWYER_B, TILE_MONUMENT_B, NIVA_BACK_B, NUNE_DEBUT_B, DEBUT_GRANT_B, SOLD_B,
   LAWYER_B, COLLECTORS_ASK_B, COLLECTORS_EP_B, INTERN_B, HOLE_B, COUNTERSUIT_B, VACANCY_START_B, VACANCY_SOON_B, SERYOGA_B, GRANT_BATH_B, OFFENDED_ASK_B, BATH_ASK_B, MUEN_ASK_B, INH_BURNED_B, INH_REFUSED_B,
   HH_JOB_B, SERYOGA_LOAN_B, DACHA_ASK_B, EVICT_B, COLLECTORS_ECHO_B, THREAT_GOV_B, FRAUD_CARD_B, KONVERTY_B,
 } from './world'
@@ -149,9 +149,11 @@ const WINDOWS: Window[] = [
   // сама серия; имени «Нива» в пулах нет, поэтому меток пул не требует
   { pool: 'P_NIVA_BACK', lines: PP.P_NIVA_BACK, marks: {} },
   { pool: 'NIVA_BACK_B', lines: NIVA_BACK_B, marks: {} },
-  // вопрос о баране по памяти партии (#1252): имя вводит сама реплика вопроса, пул реакции его не повторяет
-  { pool: 'P_BORIS_MEMORY', lines: PP.P_BORIS_MEMORY, marks: {} },
+  // вопрос о предмете по памяти партии (#1252, любой предмет — #1655): имя вводит сама реплика вопроса,
+  // пул реакции его не повторяет
+  { pool: 'P_ITEM_MEMORY', lines: PP.P_ITEM_MEMORY, marks: {} },
   { pool: 'BORIS_MEMORY_B', lines: BORIS_MEMORY_B, marks: {} },
+  { pool: 'ITEM_MEMORY_B', lines: ITEM_MEMORY_B, marks: {} },
   // продажа имущества (#1084): ход и вещь называет сама карточка продажи — меток пул не требует
   { pool: 'P_SOLD', lines: PP.P_SOLD, marks: {} },
   { pool: 'SOLD_B', lines: SOLD_B, marks: {} },

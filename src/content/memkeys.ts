@@ -347,10 +347,11 @@ export const grantHouseAt = 'grant.houseAt'
 /** Фото «платёжки» от Алика (#1017): заметное событие — ход фото, ход и PHOTO_FRESH_TURNS после
  *  которого кнопка отклика жива; окно потребляет ответ игрока. */
 export const photoAt = 'photo.photoAt'
-/** Прямой вопрос Алика о баране по памяти партии (#1252): «Помнишь, я отдал тебе «баран Борис»?
- *  Всё ещё у тебя?» — заметное событие с окном отклика (ход вопроса и три после), окно потребляет
- *  ответ игрока. Штамп ставит сама строка памяти, а не ход Алика: другие воспоминания окна не открывают. */
-export const borisAskAt = 'boris.askAt'
+/** Прямой вопрос Алика о предмете по памяти партии (#1252, любой предмет — #1655): «Помнишь, я отдал
+ *  тебе «три коробки остатков плитки»? Всё ещё у тебя?» — заметное событие с окном отклика (ход вопроса
+ *  и три после), окно потребляет ответ игрока. Штамп ставит сама строка памяти, а не ход Алика: другие
+ *  воспоминания окна не открывают. */
+export const itemAskAt = 'item.askAt'
 /** Развод дяди Самвела на свадьбе (#1037): заметное событие серии — ход строки серии, ход и три
  *  после которого кнопка отклика жива; окно потребляет ответ игрока. */
 export const samvelDivorceAt = 'samvel.divorceAt'
@@ -425,7 +426,7 @@ export const EVENT_KEY_LIST = [
   'items', 'latestItem', 'legend', 'mooFresh', 'sinceRude', 'sinceCrew', 'sorrySwing', 'vendettaFall', 'promiseLive', 'promisePassed', 'promiseStake',
   'debutWho', 'debutFresh', 'arsenTrackFresh', 'bathAskFresh', 'transferFresh', 'transferAmount', 'deathAnnFresh',
   'ramPhotoFresh', 'borisSaleFresh', 'vacancyFresh', 'avitoReviewFresh', 'rubikAskFresh', 'kettleFresh',
-  'lawyerFresh', 'collectorsAskFresh', 'collectorsEpFresh', 'internFresh', 'rubikHoleFresh', 'rubikProposalFresh', 'countersuitFresh', 'grantTileFresh', 'moustachePhotoFresh', 'mamaMarketFresh', 'mamaVoiceFresh', 'photoFresh', 'tileAdFresh', 'inhDoneFresh', 'tamadaDoneFresh', 'samvelDivorceFresh', 'courtVerdictFresh', 'tileSlipFresh', 'tileCourtFresh', 'tileLawyerFresh', 'tileMonumentFresh', 'nivaBackFresh', 'saleFresh', 'saleItem', 'grantHouseFresh', 'borisAskFresh', 'seryogaFresh', 'grantBathFresh', 'offendedAskFresh', 'muenFresh',
+  'lawyerFresh', 'collectorsAskFresh', 'collectorsEpFresh', 'internFresh', 'rubikHoleFresh', 'rubikProposalFresh', 'countersuitFresh', 'grantTileFresh', 'moustachePhotoFresh', 'mamaMarketFresh', 'mamaVoiceFresh', 'photoFresh', 'tileAdFresh', 'inhDoneFresh', 'tamadaDoneFresh', 'samvelDivorceFresh', 'courtVerdictFresh', 'tileSlipFresh', 'tileCourtFresh', 'tileLawyerFresh', 'tileMonumentFresh', 'nivaBackFresh', 'saleFresh', 'saleItem', 'grantHouseFresh', 'itemAskFresh', 'seryogaFresh', 'grantBathFresh', 'offendedAskFresh', 'muenFresh',
   'hhJobFresh', 'seryogaLoanFresh', 'dachaAskFresh', 'evictFresh', 'collectorsEchoFresh', 'threatGovFresh', 'fraudCardFresh',
   'period', 'night', 'offline', 'scene', 'sinceAlik', 'lateCount', 'arcAvailable',
   'arcsStarted', 'arcsDone', 'arcsMature', 'quests', 'callbackReady', 'lieOpen', 'lieKind', 'lieAlikOld', 'deathCanAdvance', 'collectorsCanAdvance',
@@ -445,7 +446,7 @@ export const MEM_KEYS: ReadonlySet<string> = new Set([
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, borisForeman, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, nuneKeyPassed, nuneDekretOver, grandpaDying, betonSet, cardSent, asmikCard, paydayScene, threatClaim, saidTomorrow, saidFriday, saidKonak, saidHash, saidOath, saidNuneNoWrite, saidGrantEnvelope, saidMoneyMoustache, saidRegiment,
   lightOff, netRation, phoneWarn, holidayGreeted,
-  creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, collectorsTurned, collectorsTea, collectorsEpAt, criticalAt, creditOfferSum, momDachaAt, crewPaid, crewPaidAt, crewAllPaid, rubikBath, whenYears, ...Object.values(moneyAskAt), transferAt, transferAmount, moneyAt, moustachePhotoAt, moustacheStakeSaid, mamaMarketAt, mamaVoiceAt, samvelDivorceAt, courtVerdictAt, tileSlipAt, tileCourtAt, tileLawyerAt, tileMonumentAt, nivaBackAt, saleAt, saleWhat, fraudLoan, blockLifted, internDeclined, internAccepted, grantHouseAt, photoAt, tileAdAt, inhDoneAt, inhBurned, inhRefused, tamadaDoneAt, borisAskAt, debutWho, debutAt, arsenTrack, arsenTrackAt,
+  creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited, collectorsTurned, collectorsTea, collectorsEpAt, criticalAt, creditOfferSum, momDachaAt, crewPaid, crewPaidAt, crewAllPaid, rubikBath, whenYears, ...Object.values(moneyAskAt), transferAt, transferAmount, moneyAt, moustachePhotoAt, moustacheStakeSaid, mamaMarketAt, mamaVoiceAt, samvelDivorceAt, courtVerdictAt, tileSlipAt, tileCourtAt, tileLawyerAt, tileMonumentAt, nivaBackAt, saleAt, saleWhat, fraudLoan, blockLifted, internDeclined, internAccepted, grantHouseAt, photoAt, tileAdAt, inhDoneAt, inhBurned, inhRefused, tamadaDoneAt, itemAskAt, debutWho, debutAt, arsenTrack, arsenTrackAt,
   ramPhotoAt, borisSaleAt, vacancyAt, avitoReviewAt, rubikAskAt, kettleAt, lawyerAt, collectorsAskAt, internAt, rubikHoleAt, rubikProposalAt, countersuitAt, grantTileAt,
   seryogaAskAt, grantBathAt, offendedAskAt,
   hhJobAt, seryogaLoanAt, dachaAskAt, evictAt, collectorsEchoAt, threatGovAt, fraudCardAt, bankSeen,

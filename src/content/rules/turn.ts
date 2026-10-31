@@ -8,7 +8,7 @@ import { IDLE, IDLE_ASK } from '../life'
 import { MEMORY } from '../memory'
 import { LEGENDS } from '../legends'
 import { moneyPlaceOf, stampMoneyPlace } from '../money-ask'
-import { count, creditBroke, endgame, offendedAskAt, payday, polite, thanksAt, vendetta, nivaPlayer, alikDead, borisAskAt } from '../memkeys'
+import { count, creditBroke, endgame, offendedAskAt, payday, polite, thanksAt, vendetta, nivaPlayer, alikDead, itemAskAt } from '../memkeys'
 import { GREET, GREET_MORNING, GREET_NIGHT, THANKS, THANKS_THIRD } from '../misc'
 import { muenTurn } from './muen'
 
@@ -161,9 +161,10 @@ export const turnRules: R[] = [
       const pool = gated ? [gated, ...MEMORY] : MEMORY
       const t = game.line('MEMORY', pool)
       if (t) {
-        // вопрос именно о баране — заметное событие с окном отклика (#1252): штампуем ход здесь,
-        // как узлы квестов штампуют свой бит; другие воспоминания окна не открывают
-        if (itemLine && /Борис/.test(item) && t === itemLine.t) game.applyFacts([set(borisAskAt, Number(facts.sent))])
+        // вопрос именно о предмете — заметное событие с окном отклика (#1252): штампуем ход здесь,
+        // как узлы квестов штампуют свой бит; другие воспоминания окна не открывают. Предмет —
+        // последний в досье, поэтому отклик в пуле не называет его имени (#1655)
+        if (itemLine && t === itemLine.t) game.applyFacts([set(itemAskAt, Number(facts.sent))])
         await game.say([t])
         game.unlock('memory')
       } else await game.excuseTurn()
