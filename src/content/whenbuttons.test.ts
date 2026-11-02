@@ -280,7 +280,7 @@ describe('риторика по роду: календарь — праздни�
       expect(g.facts().somedayCount).toBeGreaterThanOrEqual(2)
     }
     const texts = await shownWhen(byText('как ключ выйдет'), tune)
-    expect(texts.some((t) => /малыша ключом вниз/.test(t)), texts.join(' | ')).toBe(true)
+    expect(texts.some((t) => /малыша головой вниз/.test(t)), texts.join(' | ')).toBe(true)
     for (const text of texts) {
       expect(text, text).not.toMatch(/когда-нибудь/)
       expect(text, text).not.toMatch(/МЧС/)
