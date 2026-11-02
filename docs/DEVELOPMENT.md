@@ -118,5 +118,4 @@ CI — [.github/workflows/pages.yml](../.github/workflows/pages.yml). Тесты
 | [src/sw](../src/sw/) | Service worker: app-shell кэш, офлайн и повторный визит (#1446). |
 
 [DESIGN.md](../DESIGN.md) описывает механики игры; [docs/design](design/README.md) — отдельные решения.
-Аудиты: [архитектура](ARCHITECTURE_AUDIT.md), [движок правил](RULES_ENGINE_AUDIT.md),
-[технические дефекты](TECH_DEFECTS.md).
+История разработки — [HISTORY.md](../HISTORY.md). Журналы находок — [audit-log.md](audit-log.md) и [PLAYTEST_ISSUES.md](PLAYTEST_ISSUES.md).
