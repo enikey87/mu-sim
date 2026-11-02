@@ -24,7 +24,7 @@ import {
   STRASBOURG_THREAT,
   P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE,
   P_CREW_CALL, P_LAWYER, P_COLLECTORS_ASK, P_INTERN, P_HOLE, P_COUNTERSUIT,
-  P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_BORIS, P_DEBUT_NIVA, P_NUNE_DEBUT, P_DEBUT_GRANT, P_GRANT_TILE, P_MOUSTACHE_PHOTO, P_MAMA_MARKET, P_TILE_AD, P_TAMADA_DONE, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_COURT_VERDICT, P_TILE_SLIP, P_TILE_COURT, P_TILE_LAWYER, P_TILE_MONUMENT, P_NIVA_BACK, P_SOLD, P_GRANT_HOUSE, P_BORIS_MEMORY, P_SERYOGA, P_GRANT_BATH, P_OFFENDED_ASK, P_BATH_ASK, P_MUEN, P_INH_BURNED, P_INH_REFUSED,
+  P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_BORIS, P_DEBUT_NIVA, P_NUNE_DEBUT, P_DEBUT_GRANT, P_GRANT_TILE, P_MOUSTACHE_PHOTO, P_MAMA_MARKET, P_TILE_AD, P_TAMADA_DONE, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_COURT_VERDICT, P_TILE_SLIP, P_TILE_COURT, P_TILE_LAWYER, P_TILE_MONUMENT, P_NIVA_BACK, P_SOLD, P_GRANT_HOUSE, P_ITEM_MEMORY, P_SERYOGA, P_GRANT_BATH, P_OFFENDED_ASK, P_BATH_ASK, P_MUEN, P_INH_BURNED, P_INH_REFUSED,
   P_HH_JOB, P_SERYOGA_LOAN, P_DACHA_ASK, P_EVICT, P_COLLECTORS_ECHO, P_THREAT_GOV, P_FRAUD_CARD,
   P_KONVERTY,
 } from './player-choice-pools'
@@ -348,10 +348,11 @@ export const choiceRules: R[] = [
   // финал квеста-тамады (#1222): узел `yes` квеста `q_tamada` — заметное событие, отклик в окне события
   // (ход и три после). bonus 5: рядом стоят вопросы общего блока — реакция должна попасть в слот
   offer({ name: 'TamadaDone', when: [is('tamadaDoneFresh')], act: 'tamadaDone', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_TAMADA_DONE', P_TAMADA_DONE) }),
-  // вопрос о баране по памяти партии (#1252): Turn_Memory спрашивает «Всё ещё у тебя?» — отклик в окне
-  // события (ход вопроса и три после). bonus 5: рядом стоят общие вопросы блока — реакция должна попасть в слот.
+  // вопрос о предмете по памяти партии (#1252; любой предмет — #1655): Turn_Memory спрашивает
+  // «Всё ещё у тебя?» — отклик в окне события (ход вопроса и три после). bonus 5: рядом стоят общие
+  // вопросы блока — реакция должна попасть в слот.
   // Мёртвому не отвечают (#1293): вопрос зависшего собеседника не должен висеть в пуле после alikDead
-  offer({ name: 'BorisMemory', when: [is('borisAskFresh'), missing(alikDead)], act: 'borisMemory', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_BORIS_MEMORY', P_BORIS_MEMORY) }),
+  offer({ name: 'ItemMemory', when: [is('itemAskFresh'), missing(alikDead)], act: 'itemMemory', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_ITEM_MEMORY', P_ITEM_MEMORY) }),
   // голосовое-плач мамы (#1085): событие серии звонков — отклик в окне события (ход и три после).
   // bonus 5: рядом стоят извинение и мычание (6) — событийная реакция обязана попасть в блок
   offer({ name: 'MamaVoice', when: [is('mamaVoiceFresh')], act: 'mamaVoice', tone: 'neutral', bonus: 5, text: (g) => windowFromArr(g, 'P_MAMA_VOICE', P_MAMA_VOICE) }),

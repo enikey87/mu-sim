@@ -7,7 +7,7 @@ import type { Game } from '../engine/game'
 import type { Facts } from '../engine/rules'
 import { during } from '../engine/rules'
 import { START_DAY, ARC_MARINATION_DAYS } from '../engine/state'
-import { HEAT, arsenTrackAt, borisAskAt, endgame, evictAt, fraudCardAt, legendDay, legendId, muenAt, nuneKeyPassed, payday, rubikProposalAt, sorryAt, vendettaPrice } from '../content/memkeys'
+import { HEAT, arsenTrackAt, itemAskAt, endgame, evictAt, fraudCardAt, legendDay, legendId, muenAt, nuneKeyPassed, payday, rubikProposalAt, sorryAt, vendettaPrice } from '../content/memkeys'
 import { ENDING_MIN_DAY, CHRONIC_RUDE_AFTER_VENDETTA } from '../content/finales'
 
 export type DirectCase = { event: string; facts?: Facts; target?: string; setup?: (g: Game) => void }
@@ -42,17 +42,17 @@ export const DIRECT: Record<string, DirectCase> = {
   // #926: гейты follow Бориса сдвинули розыгрыш обратно — тон в блоке снова в выборках (7 партий,
   // порог 7) — прямой случай снят
   Says_catchLie_lieKind_grandpa: { event: 'PlayerSays', facts: { intent: 'catchLie' }, setup: (g) => { g.noteClaims(['grandpa_dead']); g.noteClaims(['grandpa_alive']) } },
-  // #1306: окно возврата «Нивы» сдвинуло розыгрыш — вопрос о баране по памяти партии (Turn_Memory) в CI-выборках
+  // #1306: окно возврата «Нивы» сдвинуло розыгрыш — вопрос о предмете по памяти партии (Turn_Memory) в CI-выборках
   // больше не звучит, и отклик на него ни разу не сыграл; правило цело, держим прямым случаем (как #826/#926)
-  Says_borisMemory: { event: 'PlayerSays', facts: { intent: 'borisMemory' } },
+  Says_itemMemory: { event: 'PlayerSays', facts: { intent: 'itemMemory' } },
   // #1321: тот же вопрос в кнопках — окно живёт три хода после «Всё ещё у тебя?», и в семье +2000 бот до него не
   // доходит (0 партий, в +4000/+6000 — по одной): единое условие такую запись не отпускает, второй гейт требует страховку.
-  // Штамп и предмет — те же, что ставит Turn_Memory: барана спрашивают только по досье, иначе пул окна пуст.
-  Opt_BorisMemory: {
+  // Штамп и предмет — те же, что ставит Turn_Memory; предмет не баран: окно открывается для любого (#1655)
+  Opt_ItemMemory: {
     event: 'BuildChoices',
     setup: (g) => {
-      g.S.items.push('баран Борис')
-      g.S.mem[borisAskAt] = g.S.stats.sent
+      g.S.items.push('три коробки остатков плитки')
+      g.S.mem[itemAskAt] = g.S.stats.sent
     },
   },
   // #426: sys-claim Гранта («всё заплатил») противоречит «заказчик мне не платит» — бот ловит это сам, 34 партии

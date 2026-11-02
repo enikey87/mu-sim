@@ -5,16 +5,16 @@ import type { Game } from '../engine/game'
 import { NOTIF, IDLE } from './life'
 import { D } from './excuses'
 import { momHelp, momDachaAt, sold } from './credit'
-import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_NIVA, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE, P_DEBUT_GRANT, P_MAMA_MARKET, P_TILE_AD, P_TAMADA_DONE, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_GRANT_HOUSE, P_TILE_SLIP, P_TILE_COURT, P_TILE_LAWYER, P_TILE_MONUMENT, P_NIVA_BACK, P_SOLD, P_BORIS_MEMORY, P_SERYOGA, P_GRANT_BATH, P_OFFENDED_ASK, P_HH_JOB, P_SERYOGA_LOAN, P_DACHA_ASK, P_EVICT, P_COLLECTORS_ECHO, P_THREAT_GOV, P_FRAUD_CARD } from './rules/player-choice-pools'
-import { BORIS_MEMORY_B, BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, DEBUT_GRANT_B, GRANT_HOUSE_B, INTERN_B, HOLE_B, AVITO_REVIEW, MAMA_MARKET_B, TILE_AD_B, TAMADA_DONE_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, TILE_SLIP_B, TILE_COURT_B, TILE_LAWYER_B, TILE_MONUMENT_B, NIVA_BACK_B, SOLD_B, VACANCY, VACANCY_START_B, VACANCY_SOON_B, SERYOGA_B, GRANT_BATH_B, OFFENDED_ASK_B, DEBUT_ARSEN_B, HH_JOB_B, SERYOGA_LOAN_B, DACHA_ASK_B, EVICT_B, COLLECTORS_ECHO_B, THREAT_GOV_B, FRAUD_CARD_B } from './world'
+import { P_RAM_PHOTO, P_BORIS_SALE, P_VACANCY, P_AVITO_REVIEW, P_RUBIK_ASK, P_KETTLE, P_COLLECTORS_ASK, P_LAWYER, P_DEBUT_ARSEN, P_DEBUT_SAMVEL, P_DEBUT_NIVA, P_INTERN, P_HOLE, STRASBOURG_THREAT, P_GRANT_TILE, P_DEBUT_GRANT, P_MAMA_MARKET, P_TILE_AD, P_TAMADA_DONE, P_MAMA_VOICE, P_SAMVEL_DIVORCE, P_GRANT_HOUSE, P_TILE_SLIP, P_TILE_COURT, P_TILE_LAWYER, P_TILE_MONUMENT, P_NIVA_BACK, P_SOLD, P_ITEM_MEMORY, P_SERYOGA, P_GRANT_BATH, P_OFFENDED_ASK, P_HH_JOB, P_SERYOGA_LOAN, P_DACHA_ASK, P_EVICT, P_COLLECTORS_ECHO, P_THREAT_GOV, P_FRAUD_CARD } from './rules/player-choice-pools'
+import { BORIS_MEMORY_B, ITEM_MEMORY_B, BORIS_SALE, RUBIK_ASK, KETTLE, COUNTERSUIT_B, GRANT_TILE_B, DEBUT_GRANT_B, GRANT_HOUSE_B, INTERN_B, HOLE_B, AVITO_REVIEW, MAMA_MARKET_B, TILE_AD_B, TAMADA_DONE_B, MAMA_VOICE_B, SAMVEL_DIVORCE_B, TILE_SLIP_B, TILE_COURT_B, TILE_LAWYER_B, TILE_MONUMENT_B, NIVA_BACK_B, SOLD_B, VACANCY, VACANCY_START_B, VACANCY_SOON_B, SERYOGA_B, GRANT_BATH_B, OFFENDED_ASK_B, DEBUT_ARSEN_B, HH_JOB_B, SERYOGA_LOAN_B, DACHA_ASK_B, EVICT_B, COLLECTORS_ECHO_B, THREAT_GOV_B, FRAUD_CARD_B } from './world'
 import { TOPICS } from './topics'
 import { ARCS } from './arcs'
 import { turnRules } from './rules/turn'
 import { FINALES } from './finales'
 import { COURT_LAWYER_AGAIN } from './quests'
 import { RUDE_CALLS_VOICE, MAMA_VOICE_CRY } from './rude'
-import { count, collectorsRecruited, court, crewPaid, crewPaidAt, HEAT, internAt, lawyerAt, debutWho, debutAt, arsenTrack, arsenTrackAt, saidStrasburg, saidGrantEnvelope, grantTileAt, grantHouseAt, mamaMarketAt, tileAdAt, tamadaDoneAt, borisAskAt, mamaVoiceAt, mamaCalls, samvelDivorceAt, tileSlipAt, tileCourtAt, tileLawyerAt, tileMonumentAt, legendOf, nivaAway, nivaBack, nivaBackAt, saleAt, saleWhat, alikDead, paydayScene, seryogaAskAt, grantBathAt, offendedAskAt, intro, kettleAt, carGone, dachaAskAt, evictAt, collectorsEchoAt, threatGovAt, fraudCardAt, hhJobAt, seryogaLoanAt, vacancyAt, evicted, fraudLoan, moneyPoor } from './memkeys'
-import { valueOf, type Line } from './fact'
+import { count, collectorsRecruited, court, crewPaid, crewPaidAt, HEAT, internAt, lawyerAt, debutWho, debutAt, arsenTrack, arsenTrackAt, saidStrasburg, saidGrantEnvelope, grantTileAt, grantHouseAt, mamaMarketAt, tileAdAt, tamadaDoneAt, itemAskAt, mamaVoiceAt, mamaCalls, samvelDivorceAt, tileSlipAt, tileCourtAt, tileLawyerAt, tileMonumentAt, legendOf, nivaAway, nivaBack, nivaBackAt, saleAt, saleWhat, alikDead, paydayScene, seryogaAskAt, grantBathAt, offendedAskAt, intro, kettleAt, carGone, dachaAskAt, evictAt, collectorsEchoAt, threatGovAt, fraudCardAt, hhJobAt, seryogaLoanAt, vacancyAt, evicted, fraudLoan, moneyPoor } from './memkeys'
+import { valueOf, Gated, type Line } from './fact'
 import type { Choice } from '../engine/state'
 
 const AD = 'Новое объявление рядом: «Продаю барана Бориса, торг, умеет писать».'
@@ -1589,10 +1589,12 @@ describe('окно продажи имущества (#1084)', () => {
   })
 })
 
-describe('окно вопроса о баране по памяти партии (#1252)', () => {
+describe('окно вопроса о предмете по памяти партии (#1252, любой предмет — #1655)', () => {
   const text = (e: unknown): string => { const v = valueOf(e as never); return typeof v === 'string' ? v : (v as { t: string }).t }
   const low = (t: string) => t.charAt(0).toLowerCase() + t.slice(1)
-  const button = (game: Game) => { game.S.choices = null; return game.buildChoices().find((c) => c.act === 'borisMemory') }
+  const button = (game: Game) => { game.S.choices = null; return game.buildChoices().find((c) => c.act === 'itemMemory') }
+  /** Строки, открытые для любого предмета: барановская под гейтом о чужом предмете молчит (#1655). */
+  const generic = P_ITEM_MEMORY.filter((e) => !(e instanceof Gated)).map(text)
   /** Само правило памяти, а не розыгрыш хода: Turn_Memory — редкий гость (вес в розыгрыше), цикл AlikTurn держал бы тест на удаче сида (#327). */
   const ask = async (game: Game, item: string) => {
     game.S.items.push(item)
@@ -1601,12 +1603,41 @@ describe('окно вопроса о баране по памяти партии
     await rule.respond!(respondCtx(rule, game, { event: 'AlikTurn' }, game.facts()))
   }
 
-  it('другое воспоминание окна не открывает — негативный контроль', async () => {
+  it('вопрос о не-барановском предмете открывает окно и получает отклик (#1655)', async () => {
+    // прежний гейт «только баран» (#1252) оставлял без окна любой другой предмет бартера:
+    // плитку, ковёр, «Урал» спрашивали и не давали ответить (плейтест r213, сид 593117)
     const { game } = makeGame()
-    await ask(game, 'Место на кране (40 м)')
-    expect(game.S.msgs.some((m) => m.kind === 'text' && /отдал тебе/.test(m.text)), 'вопрос не прозвучал — проверка пустеет').toBe(true)
-    expect(game.S.mem[borisAskAt], 'чужое воспоминание штампануло окно барана').toBeUndefined()
-    expect(button(game), 'кнопка про барана без вопроса о нём').toBeUndefined()
+    await ask(game, 'три коробки остатков плитки')
+    expect(game.S.msgs.some((m) => m.kind === 'text' && /отдал тебе «три коробки остатков плитки»/.test(m.text)), 'вопрос не прозвучал — проверка пустеет').toBe(true)
+    const at = Number(game.S.mem[itemAskAt])
+    expect(at, 'строка памяти не штампанула ход вопроса').toBe(game.S.stats.sent)
+    // окно — ход вопроса и три после; на каждом есть вариант о владении, а не тишина
+    const texts = new Set<string>()
+    for (let turn = 0; turn <= 3; turn++) {
+      game.S.stats.sent = at + turn
+      game.S.choices = null
+      const b = button(game)
+      expect(b, `ход ${turn} после вопроса: колода окна пуста для не-барана`).toBeTruthy()
+      if (b) texts.add(b.text)
+    }
+    expect(texts.size, 'пул окна не прозвучал — проверка пустеет').toBeGreaterThan(0)
+    for (const t of texts) expect(generic.some((p) => t.includes(p) || t.includes(low(p))), `кнопка не из пула: ${t}`).toBe(true)
+    game.S.stats.sent = at + 4
+    expect(button(game), 'вне окна — кнопки нет').toBeUndefined()
+  })
+
+  it('ответ Алика на вопрос о другом предмете — общий, не барановский (#1655)', async () => {
+    const { game } = makeGame()
+    await ask(game, 'три коробки остатков плитки')
+    const at = Number(game.S.mem[itemAskAt])
+    game.S.stats.sent = at
+    const n = game.S.msgs.length
+    await game.fire('PlayerSays', { intent: 'itemMemory' })
+    const said = game.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : []))
+    const answers = ITEM_MEMORY_B.map(text)
+    expect(said.some((t) => answers.some((p) => t.includes(p))), `ответ не из общего пула: ${said.join(' | ')}`).toBe(true)
+    expect(game.S.mem[itemAskAt], 'ответ не потребил окно').toBeUndefined()
+    expect(button(game), 'после ответа окно закрыто').toBeUndefined()
   })
 
   it('после «смерти» Алика ответ на его вопрос в пуле не висит (#1293)', async () => {
@@ -1618,18 +1649,18 @@ describe('окно вопроса о баране по памяти партии
     game.S.mem[alikDead] = false
     expect(button(game), 'вернулся — окно снова доступно').toBeTruthy()
   })
-  it('вопрос штампует ход, кнопка в блоке, окно три хода, ответ потребляет', async () => {
+  it('вопрос о баране штампует ход, кнопка в блоке, окно три хода, ответ потребляет', async () => {
     const { game } = makeGame()
     expect(button(game), 'до вопроса кнопки нет').toBeUndefined()
     await ask(game, 'баран Борис')
     expect(game.S.msgs.some((m) => m.kind === 'text' && m.text.includes('Всё ещё у тебя?')), 'вопрос не прозвучал — проверка пустеет').toBe(true)
-    const at = Number(game.S.mem[borisAskAt])
+    const at = Number(game.S.mem[itemAskAt])
     expect(at, 'строка памяти не штампанула ход вопроса').toBe(game.S.stats.sent)
     expect(button(game), 'на ходу вопроса кнопки нет').toBeTruthy()
     // в ближайшем блоке вариант — из пула реакции на вопрос, а не общая кнопка
     const texts = new Set<string>()
     for (let i = 0; i < 60; i++) { const b = button(game); if (b) texts.add(b.text) }
-    const pool = P_BORIS_MEMORY.map(text)
+    const pool = P_ITEM_MEMORY.map(text)
     expect(texts.size, 'пул окна не прозвучал — проверка пустеет').toBeGreaterThan(0)
     for (const t of texts) expect(pool.some((p) => t.includes(p) || t.includes(low(p))), `кнопка не из пула: ${t}`).toBe(true)
     game.S.stats.sent = at + 3
@@ -1638,11 +1669,11 @@ describe('окно вопроса о баране по памяти партии
     expect(button(game), 'вне окна — кнопки нет').toBeUndefined()
     game.S.stats.sent = at
     const n = game.S.msgs.length
-    await game.fire('PlayerSays', { intent: 'borisMemory' })
+    await game.fire('PlayerSays', { intent: 'itemMemory' })
     const said = game.S.msgs.slice(n).flatMap((m) => (m.kind === 'text' && m.from === 'alik' ? [m.text] : []))
     const answers = BORIS_MEMORY_B.map(text)
     expect(said.some((t) => answers.some((p) => t.includes(p))), `ответ не из пула события: ${said.join(' | ')}`).toBe(true)
-    expect(game.S.mem[borisAskAt], 'ответ не потребил окно').toBeUndefined()
+    expect(game.S.mem[itemAskAt], 'ответ не потребил окно').toBeUndefined()
     expect(button(game), 'после ответа окно закрыто').toBeUndefined()
   })
 })

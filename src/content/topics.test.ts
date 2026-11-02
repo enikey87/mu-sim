@@ -5,7 +5,7 @@ import { valueOf } from '../engine/rules'
 import { Gated, type Entry } from './fact'
 import { needs } from './world'
 import { wedding } from './memkeys'
-import { TOPICS, P_RUDE_BLOCKED, P_RUDE_POLITE, TOPIC_OBSESSED, P_NIGHT, DESPERATE_PAIRS } from './topics'
+import { TOPICS, P_RUDE_BLOCKED, P_RUDE_POLITE, TOPIC_OBSESSED, P_NIGHT, P_FRIDAY, P_NEU_B_LATE, DESPERATE_PAIRS } from './topics'
 import * as L from './life'
 import { D, make, type DrawFn, type When } from './excuses'
 import type { Game } from '../engine/game'
@@ -221,6 +221,16 @@ describe('ответ по теме', () => {
     let hit = false
     for (let i = 0; i < 20 && !hit; i++) hit = fresh(night).some((c) => c.tone === 'neutral' && P_NIGHT.some((p) => c.text.includes(p)))
     expect(hit).toBe(true)
+  })
+  it('хвост нейтральной реплики не несёт своего обращения (#1669)', () => {
+    // хвост всегда клеится после зачина (game.ts: `${draw('P_NEU_A')} ${tail}`), а зачин сам может
+    // начинаться с «Алик,» — обращение в хвосте даёт шов двух шаблонов внутри одной кнопки
+    const heads = (D.P_NEU_A as Entry<string>[]).map((e) => valueOf(e))
+    const tails = ([...P_NEU_B_LATE, ...P_NIGHT, ...P_FRIDAY] as Entry<string>[]).map((e) => valueOf(e))
+    const composed = heads.flatMap((h) => tails.map((t) => `${h} ${t}`))
+    expect(composed.length, 'пул пуст — проверка была бы пустой').toBeGreaterThan(20)
+    const addressed = (t: string) => (t.match(/(?<![а-яё])алик/giu) ?? []).length
+    expect(composed.filter((t) => addressed(t) > 1), 'два обращения в одной кнопке').toEqual([])
   })
   it('клятвы и сроки — не тема: «Клянусь лавашом» не делает разговор про еду', () => {
     const { game } = makeGame()
