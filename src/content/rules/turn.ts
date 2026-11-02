@@ -10,7 +10,7 @@ import { LEGENDS } from '../legends'
 import { moneyPlaceOf, stampMoneyPlace } from '../money-ask'
 import { count, creditBroke, endgame, offendedAskAt, payday, polite, thanksAt, vendetta, nivaPlayer, alikDead, itemAskAt } from '../memkeys'
 import { GREET, GREET_MORNING, GREET_NIGHT, THANKS, THANKS_THIRD } from '../misc'
-import { muenTurn } from './muen'
+import { muenTurn, cowAnswer } from './muen'
 
 type R = Rule<ContentApi, GameEvent, Offer>
 
@@ -26,9 +26,10 @@ export const toneRules: R[] = [
   // грубость — лестница эскалации в rude.ts
   // угрозы судом — линия суда (court.ts): каждая угроза двигает дело на ступень
   { name: 'Tone_Cow', event: 'PlayerMessage', when: [eq('tone', 'cow')], remember: [add(count.cow)], respond: async ({ game, facts }) => {
-    // эскалация мычания (карточка mu-en) — общий хелпер с путём интента «voice»
+    // эскалация мычания (карточка mu-en) — общий хелпер с путём интента «voice»;
+    // ответ после признания держит линию курса (`cowAnswer`), а не старые версии-отрицания
     if (await muenTurn(game, facts)) return
-    await game.say([game.uniq(game.X.cow)]) } },
+    await game.say([game.uniq(() => cowAnswer(game))]) } },
   // «спасибо» / «привет» свободным текстом: ответ на это слово. В S5, вендетте и эндгейме — прежний ход;
   // блок, смерть, телефон у Карине и Tone_MissRude специфичнее и выигрывают сами.
   // Счётчик и третья реплика — внутри Tone_Thanks: отдельное правило с eq(count.thanks,2) сравнивалось бы с Tone_MissRude (#354).

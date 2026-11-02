@@ -9,6 +9,7 @@ import { WORLD, speaks } from '../world'
 import * as T from '../rude'
 import { RUDE_AGAIN, RUDE_AGAIN_CALM } from '../misc'
 import { HEAT, alikDead, blocked, blockedHint, coldWar, count, countersuitAt, endgame, mamaCalls, mamaVoiceAt, phoneKarine, polite, ritualCount, statusHidden, vendetta, vendettaAt } from '../memkeys'
+import { cowAnswer } from './muen'
 
 type R = Rule<ContentApi, GameEvent, Offer>
 const rude = eq('tone', 'rude')
@@ -292,11 +293,11 @@ export const rudeSaysRules: R[] = [
     respond: async ({ game }) => {
       cooldown(game, 2); game.mood(1)
       const p = game.linePicked('COW_PEACE', T.COW_PEACE)
-      await game.say([p ? { t: p.text, claims: p.spec.claims ?? [] } : game.uniq(game.X.cow)])
+      await game.say([p ? { t: p.text, claims: p.spec.claims ?? [] } : game.uniq(() => cowAnswer(game))])
       game.unlock('cowpeace'); game.setCtx(null)
     },
   },
-  { name: 'Says_moo', event: 'PlayerSays', when: [eq('intent', 'moo')], respond: async ({ game }) => { await game.say([freshOr(game, 'MOO_ODD', T.MOO_ODD, game.X.cow)]); game.setCtx(null) } },
+  { name: 'Says_moo', event: 'PlayerSays', when: [eq('intent', 'moo')], respond: async ({ game }) => { await game.say([freshOr(game, 'MOO_ODD', T.MOO_ODD, () => cowAnswer(game))]); game.setCtx(null) } },
   // #1594: вежливое напоминание в живом сходе («простите, что снова пишу») — не извинение: цену выхода
   // не платит и вражду не снимает, но и не тонет. Ответ — канцелярит окна холодной войны, тот же пул,
   // что у ответа на требование (#1441).
