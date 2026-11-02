@@ -57,4 +57,4 @@ npm run build      # проверка типов и сборка в dist/
 ```
 
 Подробные команды, браузерные тесты и плейтесты — в [памятке разработчика](docs/DEVELOPMENT.md).
-Механики описаны в [DESIGN.md](DESIGN.md), документы отдельных решений — в [docs/design](docs/design/README.md).
+Механики описаны в [DESIGN.md](DESIGN.md), документы отдельных решений — в [docs/design](docs/design/README.md). История разработки — в [HISTORY.md](HISTORY.md).

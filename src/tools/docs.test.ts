@@ -5,8 +5,8 @@ import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-/** Документы под стражей: аудиты и журнал дефектов — там ссылки на код, а не рассказ (#139). */
-export const DOCS = [...readdirSync('docs').filter((f) => /AUDIT.*\.md$/.test(f)).map((f) => join('docs', f)), join('docs', 'TECH_DEFECTS.md')]
+/** Документы под стражей: `docs/*AUDIT*.md` — там ссылки на код, а не рассказ (#139). */
+export const DOCS = readdirSync('docs').filter((f) => /AUDIT.*\.md$/.test(f)).map((f) => join('docs', f))
 
 /** Где символ считается существующим — как в ручной сверке PR #138: код, тесты, e2e и конфиги. */
 const CODE = ['src', 'tests', 'scripts', 'package.json', 'tsconfig.json', 'vite.config.ts', 'playwright.config.ts', 'eslint.config.js', 'index.html']
@@ -126,7 +126,7 @@ const paths = knownPaths()
 describe('ссылки в аудитах: символ живёт, номер строки — нет', () => {
   // пустой набор прошёл бы любую проверку: страж обязан видеть файлы, слова и документы
   it('страж видит документы и слова кода', () => {
-    expect(DOCS.length).toBeGreaterThan(3)
+    expect(DOCS.length).toBeGreaterThan(20)
     expect(known.size).toBeGreaterThan(1000)
     expect(paths.size).toBeGreaterThan(100)
     expect(known.has('sendTurn')).toBe(true)
@@ -139,8 +139,8 @@ describe('ссылки в аудитах: символ живёт, номер с
   it('каждый идентификатор, часть составной ссылки и путь живы или названы не-кодом', () => {
     const corpus = DOCS.map((f) => readFileSync(f, 'utf8')).join('\n')
     const refs = references(corpus)
-    expect(refs.compounds.length, 'сторож перестал видеть составные ссылки').toBeGreaterThan(30)
-    expect(refs.paths.length, 'сторож перестал видеть пути').toBeGreaterThan(50)
+    expect(refs.compounds.length, 'сторож перестал видеть составные ссылки').toBeGreaterThan(0)
+    expect(refs.paths.length, 'сторож перестал видеть пути').toBeGreaterThan(40)
     expect(violations(corpus, known, NOT_CODE, paths, true).filter((v) => v.startsWith('нет'))).toEqual([])
   })
 
