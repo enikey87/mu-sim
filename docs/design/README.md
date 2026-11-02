@@ -85,6 +85,6 @@
 
 ## Листы чтения
 
-`arcs/` — не спецификации и не задания. Дословные реплики сериалов для вычитки; источник — `src/content/arcs.ts` и `src/content/finales.ts`. Сверено 2 ноября 2026 в обе стороны: каждая цитата листа есть в этих файлах, и каждая реплика серии, вопроса «как там» и финала есть в своём листе.
+`arcs/` — не спецификации и не задания. Дословные реплики сериалов для вычитки; источник — `src/content/arcs.ts` и `src/content/finales.ts`. Сверено 2 ноября 2026 в обе стороны: каждая цитата листа есть в этих файлах, и каждая реплика серии, вопроса follow и финала есть в своём листе.
 
 - [boris](arcs/boris.md), [beton](arcs/beton.md), [samvel](arcs/samvel.md), [niva](arcs/niva.md), [nune](arcs/nune.md), [grant](arcs/grant.md), [rubik](arcs/rubik.md), [razmik](arcs/razmik.md), [alik_death](arcs/alik_death.md), [garik](arcs/garik.md), [tile](arcs/tile.md), [grandpa](arcs/grandpa.md), [collectors](arcs/collectors.md).
