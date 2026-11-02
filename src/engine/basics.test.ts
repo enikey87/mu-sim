@@ -231,6 +231,19 @@ describe('срок по календарю', () => {
       }
     }
   })
+  it('«в следующий день недели», названный сегодня, — через неделю, а не через две (#1687)', async () => {
+    const { dueIn, dateOf } = await import('./time')
+    const on = (w: number) => [0, 1, 2, 3, 4, 5, 6].find((d) => dateOf(d).getDay() === w)!
+    const [sun, mon, tue, wed, fri] = [on(0), on(1), on(2), on(3), on(5)]
+    expect(dueIn({ weekday: 2, next: true }, tue)).toBe(7)
+    expect(dateOf(tue + dueIn({ weekday: 2, next: true }, tue)).getDay()).toBe(2)
+    expect(dueIn({ weekday: 3, next: true }, wed)).toBe(7)
+    expect(dueIn({ weekday: 2, next: true }, mon)).toBe(8) // «ближайший + неделя» с других дней недели не меняется
+    expect(dueIn({ weekday: 2, next: true }, fri)).toBe(11)
+    expect(dueIn({ weekday: 2 }, tue)).toBe(7) // без next совпавший день — тоже неделя, как раньше
+    expect(dueIn({ week: true, next: true }, sun)).toBe(7) // неделя — не день недели: горизонт прежний
+    expect(dueIn({ week: true, next: true }, mon)).toBe(13)
+  })
   it('день недели, «край — в понедельник», конец месяца, Новый год, квартал, неделя — последний день срока', async () => {
     const { dueIn, dateOf } = await import('./time')
     const day = 200
