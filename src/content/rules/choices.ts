@@ -528,18 +528,21 @@ export const choiceRules: R[] = [
     ]
   })(),
 
-  // родственник: спросить «при чём тут он» / поздравить / посочувствовать — одна кнопка на слот
+  // родственник: спросить «при чём тут он» / поздравить — одна кнопка на слот
   offer({
     name: 'WhyRel', slot: 'rel', specificity: 2, weight: 1, when: [exists('ctx.rel')], act: 'whyRel', tone: 'neutral',
     // родственник назван словами Алика («мой шофёр Гриша») — у игрока своя форма в словаре («ваш шофёр Гриша»)
     text: (g, f) => fromD(g, 'P_WHY_REL', { n: String(f['ctx.relYou']) }),
   }),
   offer({ name: 'Congrats', slot: 'rel', specificity: 2, weight: 1, when: [exists('ctx.rel'), is('ctx.festive')], act: 'congrats', tone: 'polite', text: (g) => fromD(g, 'P_CONGRATS') }),
-  offer({ name: 'Condole', slot: 'rel', specificity: 2, weight: 1, when: [exists('ctx.rel'), is('ctx.sad')], act: 'condole', tone: 'polite', text: (g) => fromD(g, 'P_CONDOLE') }),
-  offer({ name: 'Mourn', when: [is(mourning)], odds: 0.5, act: 'condole', tone: 'polite', bonus: 1, text: (g) => fromD(g, 'P_CONDOLE') }),
+  // соболезнование (#1673): кнопка живёт окном свежести бита арки, а не всем трауром. Старый Condole
+  // (`ctx.rel` + `ctx.sad`) снимал кнопку с текущей грустной отмазки — «развод соседа» получал похоронный
+  // ответ, а на неделю позже ctx оставался висеть и «Сочувствую» вставало в блок про карту (плейтест 02.11).
+  // Поводы без смерти соболезнования не получают вовсе; объявление смерти Алика — своё окно DeathCondole
+  offer({ name: 'Mourn', when: [is(mourning), is('grandpaDeathFresh')], act: 'condole', tone: 'polite', bonus: 5, text: (g) => windowFromD(g, 'P_CONDOLE', EVENT_FRESH_TURNS) }),
   // объявление смерти — заметное событие со своим окном (#1610): прямое соболезнование в первом блоке
-  // вариантов, а не через 1–3 дня по odds Mourn. Своего бонуса мало: в том же блоке стоит вопрос
-  // сериала ArcDeath (2 условия + bonus 5), поэтому окно идёт выше него
+  // вариантов. Своего бонуса 5 мало: в том же блоке стоит вопрос сериала ArcDeath (2 условия + bonus 5),
+  // поэтому окно идёт выше него
   offer({ name: 'DeathCondole', when: [is('deathAnnFresh'), is(mourning)], act: 'condole', tone: 'polite', bonus: 6, text: (g) => windowFromD(g, 'P_CONDOLE', EVENT_FRESH_TURNS) }),
 
   offer({ name: 'Doubt', when: [is('ctx.constr')], act: 'defend', tone: 'neutral', bonus: 1, text: (g) => fromD(g, 'P_DOUBT') }),

@@ -92,6 +92,9 @@ export const DIRECT: Record<string, DirectCase> = {
   Says_sorry_vendetta_price: { event: 'PlayerSays', facts: { intent: 'sorry' }, setup: (g) => { g.S.mem.vendetta = true } },
   Opt_Via_mama_enmity: { event: 'BuildChoices', setup: (g) => { g.S.mem.vendetta = true } },
   Opt_Via_boris_enmity: { event: 'BuildChoices', setup: (g) => { g.S.mem.vendetta = true; g.S.arcs.boris = { i: 4, last: 0 } } },
+  // #1673: сдвиг розыгрыша бота увёл редкую комбинацию (сход + Карине дома) из выборок гейта. Прямой
+  // случай — как у Via_mama/Via_boris_enmity: факты те же, что ставит сход и знакомство с Карине
+  Opt_Via_karine_enmity: { event: 'BuildChoices', setup: (g) => { g.S.mem.vendetta = true; g.S.mem['intro.karine'] = true } },
   Turn_WhileDead: { event: 'AlikTurn', setup: (g) => { g.S.mem.alik_dead = true } },
   // гарантия первой серии (#636): к 12-му сообщению шанс Turn_ArcFirst мог промахнуться всю посадку
   Turn_ArcGuarantee: { event: 'AlikTurn', setup: (g) => { g.S.stats.sent = 12; g.S.day = START_DAY + ARC_MARINATION_DAYS } },

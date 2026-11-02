@@ -1913,6 +1913,9 @@ export class Game {
       // объявление «Алик умер» (#1610): заметное событие — прямое соболезнование в первом блоке вариантов.
       // Окно то же, что у остальных событий: ход объявления и три после
       deathAnnFresh: S.stats.sent - Number(S.mem[memkeys.deathAnnAt] ?? -99) <= EVENT_FRESH_TURNS,
+      // «дедушка умирает» (эпизод 1 арки «Бессмертный дедушка», #1673): соболезнование — заметное событие
+      // со своим окном, как у объявления смерти. Траур висит неделями, окно — ход бита и три после
+      grandpaDeathFresh: S.stats.sent - Number(S.mem[memkeys.grandpaDeathAt] ?? -99) <= EVENT_FRESH_TURNS,
       // заметные системные события (#927): реакция живёт ход события и 1–3 хода после него
       ramPhotoFresh: S.stats.sent - Number(S.mem[memkeys.ramPhotoAt] ?? -99) <= EVENT_FRESH_TURNS,
       borisSaleFresh: S.stats.sent - Number(S.mem[memkeys.borisSaleAt] ?? -99) <= EVENT_FRESH_TURNS,

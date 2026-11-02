@@ -3,11 +3,12 @@
 // (REVIEW_PROMPT.md, категории 1/3/6/12); здесь он работает на каждом PR, а не раз в цикл.
 // Негативные контроли: каждая проверка доказана красной на подсаженном дефекте ниже.
 import { describe, it, expect } from 'vitest'
-import { playtest, type WorldFrame } from './playtest'
-import { logicReview, logicFindings, PERSON_RE, sumsIn, windowDebuts, type Ev, type OfferRec } from './logic-review'
+import { playtest, type Act, type WorldFrame } from './playtest'
+import { logicReview, logicFindings, arcRelevance, PERSON_RE, sumsIn, windowDebuts, type Ev, type OfferRec } from './logic-review'
 import { PLAYER_SUFFIX } from '../content/misc'
-import { valueOf } from '../engine/rules'
+import { valueOf, type Entry } from '../engine/rules'
 import { P_VIA_MAMA } from '../content/rules/player-choice-pools'
+import { D } from '../content/excuses'
 import { ARCS, CAST } from '../content/arcs'
 import { EXTRAS } from '../content/ids'
 
@@ -178,6 +179,34 @@ describe('логический разбор: самопроверка на по�
     for (const id of ids) {
       if (!PERSON_RE[id]) throw new Error(`персонаж без детектора: ${id} — проверка на него слепа`)
     }
+  })
+
+  it('имя с заглавной буквы ловится: «Грачик»/«Гагик» — те же персонажи, что и строчными (#1673)', () => {
+    expect(PERSON_RE.grachik.test('Дедушка Грачик умирает')).toBe(true)
+    expect(PERSON_RE.gagik.test('Гагик из Абовяна')).toBe(true)
+    expect(logicReview([ev(0, 'game', 'Привет', 'alik')], [offer(0, 1, ['Грачик, а деньги?'])])).toMatchObject([{ id: 'phantom-person', why: expect.stringContaining('grachik') }])
+  })
+
+  it('arc-relevance: соболезнование без свежего события — находка, в окне бита арки — нет (#1673)', () => {
+    const line = (D.P_CONDOLE as Entry<string>[]).map(valueOf).find((t) => !/соболезн/i.test(t))!
+    const frame = (turn: number, fresh: boolean, at: 'before' | 'mem' | 'both' = 'both'): WorldFrame => ({
+      turn, at: turn + 1, day: 250,
+      before: { mourning: true, grandpaDeathFresh: fresh && at !== 'mem', deathAnnFresh: false },
+      mem: { mourning: true, grandpaDeathFresh: fresh && at !== 'before', deathAnnFresh: false },
+      fired: [], said: [], sys: [], asides: [], away: [], notif: [],
+    })
+    const played = (fresh: boolean[], at?: 'before' | 'mem'): { acts: Act[]; world: WorldFrame[] } => ({
+      acts: fresh.map((_f, turn) => ({ kind: 'send' as const, i: 0, offered: [line, 'Алик, где деньги?'], at: turn + 1 })),
+      world: fresh.map((f, turn) => frame(turn, f, at ?? 'both')),
+    })
+    // тихая фаза: стебель соболезнования в блоке без окна — та самая кнопка в блоке про карту
+    expect(arcRelevance(played([false])), 'соболезнование без окна не поймано').toMatchObject([{ id: 'arc-relevance', cat: 17, text: line }])
+    // окно бита: штамп этого же хода (mem) и последний ход окна (before) — оба легальны
+    expect(arcRelevance(played([true]))).toEqual([])
+    expect(arcRelevance(played([true], 'mem')), 'штамп бита этого хода не признан окном').toEqual([])
+    expect(arcRelevance(played([true], 'before')), 'последний ход окна не признан окном').toEqual([])
+    // контроль полноты: обычная строка блока находкой не становится
+    expect(arcRelevance({ acts: [{ kind: 'send' as const, i: 0, offered: ['Алик, где деньги?'], at: 1 }], world: [frame(0, false)] })).toEqual([])
   })
 })
 
