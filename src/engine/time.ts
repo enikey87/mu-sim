@@ -59,8 +59,8 @@ export const tierOf = (day: number): number => TIERS.filter(([d]) => day >= d).l
 
 /**
  * Срок по календарю — последний день, когда обещание ещё не просрочено: weekday — ближайший такой день недели
- * (next — через неделю, plus — ещё дней после него: «в пятницу, край — в понедельник»), monthEnd — конец месяца
- * через N, newYear — 1 января, quarter — конец квартала, week — ближайшее воскресенье.
+ * (next — через неделю после названного дня, plus — ещё дней после него: «в пятницу, край — в понедельник»),
+ * monthEnd — конец месяца через N, newYear — 1 января, quarter — конец квартала, week — ближайшее воскресенье.
  */
 export type Due =
   | { weekday: number; next?: true; plus?: number }
@@ -71,7 +71,12 @@ export type Due =
 export function dueIn(due: Due, day: number): number {
   const now = dateOf(day)
   const until = (to: Date) => Math.max(1, Math.round((to.getTime() - now.getTime()) / 864e5))
-  if ('weekday' in due) return ((due.weekday - now.getDay() + 7) % 7 || 7) + (due.next ? 7 : 0) + (due.plus ?? 0)
+  if ('weekday' in due) {
+    // `ahead === 0` — названный день уже сегодня: «в среду» от среды — через неделю (так же считает `|| 7`),
+    // а «в следующий вторник» от вторника — та же неделя, не две: иначе «не в этот» вычитался бы дважды (#1687)
+    const ahead = (due.weekday - now.getDay() + 7) % 7
+    return (ahead || 7) + (due.next && ahead ? 7 : 0) + (due.plus ?? 0)
+  }
   // конец периода сегодня — срок в конце следующего, а не завтра: иначе коммуналка списывается и 30-го, и 1-го (#292)
   const endOf = (month: number, step: number) => {
     const d = Math.round((new Date(now.getFullYear(), month + 1, 0).getTime() - now.getTime()) / 864e5)
