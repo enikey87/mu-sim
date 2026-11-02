@@ -820,7 +820,8 @@ export const ENDGAME_ARCH: Entry<ArchiveLine>[] = [
   gate(eq(finaleOf('tile'), 'default'))({ slug: 'fin.tile.default', line: 'Суд установил: виноват пол под плиткой, а клал его я. По этой линии мы квиты.' }),
 
   gate(eq(finaleOf('grandpa'), 'revoke'))({ slug: 'fin.grandpa.revoke', line: 'Дедушка переписал завещание: мне — долги, тебе — благословение. Оформим дарение.' }),
-  gate(eq(finaleOf('grandpa'), 'default'))({ slug: 'fin.grandpa.default', line: 'Дедушка пережил хоспис и открыл в нём шаурмичную. Меню одно: «До похорон».' }),
+  // эпилог — продолжение, а не новость во второй раз (#1683): развязку арки тут переобъявляли заново
+  gate(eq(finaleOf('grandpa'), 'default'))({ slug: 'fin.grandpa.default', line: 'Шаурмичная дедушки работает. Меню одно: «До похорон».' }),
 
   gate(eq(finaleOf('rubik'), 'bribe'), WORLD.rubik)({ slug: 'fin.rubik.bribe', line: 'Рубик вычислил взяткодателя, и это ты. Я заплатил за тебя и вычел из долга — по-братски.' }),
   gate(eq(finaleOf('rubik'), 'karine'), WORLD.karine)({ slug: 'fin.rubik.karine', line: 'Карине ушла к Рубику, акт подписан, деньги у неё. Спрашивай у неё — она всё проверяет.' }),
