@@ -10,16 +10,16 @@ import { D } from '../content/excuses'
 import { EVENT_SOURCES, FIRST_WINDOWS } from '../content/first-windows'
 import { PLAYER_SUFFIX } from '../content/misc'
 import { P_VIA_BORIS, P_VIA_KARINE, P_VIA_MAMA, P_MOO } from '../content/rules/player-choice-pools'
-import { valueOf } from '../engine/rules'
+import { valueOf, type Entry } from '../engine/rules'
 import type { Msg } from '../engine/state'
 import type { Act, Aside, Played, WorldFrame } from './playtest'
 
 /** Категории рецензента, которые здесь механически доказуемы. */
-export type LogicCheck = 'dup-block' | 'repeat-window' | 'phantom-person' | 'phantom-sum' | 'stranger-speaker' | 'again-phantom'
+export type LogicCheck = 'dup-block' | 'repeat-window' | 'phantom-person' | 'phantom-sum' | 'stranger-speaker' | 'again-phantom' | 'arc-relevance'
 export interface LogicFinding {
   id: LogicCheck
-  /** Категория несостыковки из REVIEW_PROMPT.md (1/3/6/12). */
-  cat: 1 | 3 | 6 | 12
+  /** Категория несостыковки из REVIEW_PROMPT.md (1/3/6/12/17). */
+  cat: 1 | 3 | 6 | 12 | 17
   /** Номер хода партии (индекс в acts). */
   turn: number
   at: number
@@ -70,7 +70,9 @@ const CAST_RE: Record<string, RegExp> = {
   collectors: /коллектор|деньги-ара/i,
   taron: /тарон/i,
 }
-const EXTRA_ALIAS: Record<string, RegExp> = { baran: /баран/i, grachik: /грачик/, gagik: /гагик/, tamada: /тамад/i }
+// без флага `i` имена теряли заглавную форму («Грачик умирает», «Гагик из Абовяна»): детектор
+// молчал ровно на той форме, в которой имя чаще всего и стоит (#1673, НК пула соболезнований)
+const EXTRA_ALIAS: Record<string, RegExp> = { baran: /баран/i, grachik: /грачик/i, gagik: /гагик/i, tamada: /тамад/i }
 export const PERSON_RE: Record<string, RegExp> = { ...CAST_RE, ...EXTRA_ALIAS }
 
 /** Шаблон лейбла перевода: «{amount}» → цифры, остальное дословно. Части экранируются до подстановки:
@@ -323,5 +325,29 @@ export function logicReview(stream: Ev[], offers: OfferRec[], endAt?: number, de
 
 /** Разбор сыгранной партии: то, что смотрит оператор в живых плейтестах, — машиной. */
 export function logicFindings(p: Played): LogicFinding[] {
-  return logicReview(playerStream(p), offersOf(p), endingAt(p), windowDebuts(p.world, p.game.S.msgs))
+  return [...logicReview(playerStream(p), offersOf(p), endingAt(p), windowDebuts(p.world, p.game.S.msgs)), ...arcRelevance(p)]
+}
+
+/** Стебли соболезнований (#1673): кнопка отвечает на смерть в семье, и у неё своё окно свежести. */
+const CONDOLE_TEXTS = new Set<string>((D.P_CONDOLE as Entry<string>[]).map(valueOf))
+
+/** Уместность арки, которая не сводится к журналу имён и сумм: стебель блока обязан стоять рядом
+ *  со свежим событием, а не через неделю после него. Класс из плейтеста оператора 02.11: «Сочувствую»
+ *  в блоке про карту, когда повод был неделю назад и не про смерть. Стебель соболезнования без
+ *  `*Fresh`-факта окна (начало или конец хода) — находка; так класс закрыт в CI, а не в живом ревью. */
+export function arcRelevance(p: { acts: Act[]; world: WorldFrame[] }): LogicFinding[] {
+  const out: LogicFinding[] = []
+  const frames = new Map<number, WorldFrame>()
+  for (const f of p.world) frames.set(f.turn, f)
+  for (const o of offersOf(p)) {
+    const line = o.texts.find((t) => CONDOLE_TEXTS.has(withoutSuffix(t)))
+    if (!line) continue
+    const f = frames.get(o.turn)
+    // начало и конец хода вместе дают момент сборки блока: штамп мог поставить бит этого же хода
+    // (`mem`), а на последнем ходу окна — уже нет (`before`); обе проверки ложны только вне окна
+    const fresh = [f?.before, f?.mem].some((m) => m?.deathAnnFresh === true || m?.grandpaDeathFresh === true)
+    if (fresh) continue
+    out.push({ id: 'arc-relevance', cat: 17, turn: o.turn, at: o.at, text: line, why: 'соболезнование в блоке без свежего грустного события: кнопка живёт окном бита арки, а не всем трауром' })
+  }
+  return out
 }

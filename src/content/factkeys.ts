@@ -20,7 +20,7 @@ import {
   bathAsked, bathAskedAt, bathAnswered, mamaCalls, phoneKarine, karineKnowsDebt, karineThinksTax, alikShaved, moustacheKept, moustacheAskAt, alikDay, mooAt, muenAt, muenAsked, muenAnswered, sorryAt, rudeAt, thanksAt, topicRun, topicLast,
   legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway, nivaPlayer, carGone,
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, borisForeman, taxFrozen, taxThawed,
-  actSigned, grantPaid, rubikFined, threatClaim, nuneKeyPassed, nuneDekretOver, grandpaDying,
+  actSigned, grantPaid, rubikFined, threatClaim, nuneKeyPassed, nuneDekretOver, grandpaDying, grandpaDeathAt,
   betonSet, cardSent, asmikCard, saidTomorrow, saidFriday, saidKonak, saidHash, saidOath, saidNuneNoWrite, saidGrantEnvelope, saidMoneyMoustache, saidRegiment, payday, count, endgame, holidayGreeted, lend50,
   paydayScene, lightOff, netRation, phoneWarn, creditStage, creditOffer, creditBroke, momDone, creditDeclined, moneyPoor, collectorsRecruited,
   collectorsTurned, collectorsTea, collectorsEpAt,
@@ -57,7 +57,7 @@ export type MemExactKey =
   | typeof nivaAway | typeof nivaBack | typeof nivaPlayer | typeof carGone | typeof garikConcrete | typeof garikCut | typeof houseOnGarik | typeof borisMarried
   | typeof razmikMarried
   | typeof borisSmetaReady | typeof borisForeman | typeof taxFrozen | typeof taxThawed | typeof actSigned | typeof grantPaid
-  | typeof rubikFined | typeof threatClaim | typeof nuneKeyPassed | typeof nuneDekretOver | typeof grandpaDying
+  | typeof rubikFined | typeof threatClaim | typeof nuneKeyPassed | typeof nuneDekretOver | typeof grandpaDying | typeof grandpaDeathAt
   | typeof betonSet | typeof cardSent | typeof asmikCard | typeof saidTomorrow | typeof saidFriday | typeof saidKonak | typeof saidHash | typeof saidOath | typeof saidNuneNoWrite | typeof saidGrantEnvelope | typeof saidMoneyMoustache | typeof saidRegiment | typeof paydayScene
   | typeof debutWho | typeof debutAt | typeof arsenTrack | typeof arsenTrackAt | typeof transferAt | typeof transferAmount | typeof moneyAt
   | typeof lightOff | typeof netRation | typeof phoneWarn | typeof holidayGreeted

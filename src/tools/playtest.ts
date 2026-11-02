@@ -72,12 +72,16 @@ export interface Played { seed: number; style: Style; hour: number; profile: Pla
 /** Ключи мира для оракула; сериалы — из `facts()`, они живут в `S.arcs`, а не в `S.mem`. */
 const WORLD_KEYS = ['alik_dead', 'mourning', 'blood.given', 'said.friday', 'endgame.mutes', 'credit.offer'] as const
 const WORLD_PREFIXES = ['arc.', 'finale.'] as const
+/** Факты окна свежести (#1673): логический разбор судит об уместности соболезнования по ним, а не по
+ *  глазомеру — блок, предложивший стебель P_CONDOLE, обязан попасть в окно бита арки (`arc-relevance`). */
+const WORLD_FRESH_KEYS = ['deathAnnFresh', 'grandpaDeathFresh'] as const
 
 const worldFacts = (game: Game): Record<string, unknown> => {
   const facts = game.facts()
   const mem: Record<string, unknown> = {}
   for (const k of Object.keys(facts)) if (WORLD_PREFIXES.some((p) => k.startsWith(p))) mem[k] = facts[k]
   for (const k of WORLD_KEYS) if (game.S.mem[k] !== undefined) mem[k] = game.S.mem[k]
+  for (const k of WORLD_FRESH_KEYS) mem[k] = facts[k] === true
   return mem
 }
 
