@@ -17,7 +17,7 @@ import {
   ACTOR_KEYS, EVENT_KEYS, MEM_KEYS, type EventKey, type ActorKey,
   HEAT, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, deathAnnAt, evicted,
   vendetta, vendettaAt, vendettaLifted, vendettaPrice, coldWar, court, courtVerdict, courtPolite, courtReferral, judgeApology, saidStrasburg, ritualCount, ritualCut, caughtCount, caughtUnique, caughtAt, garikDenied, garikCode, cryptoHodl,
-  bathAsked, bathAskedAt, bathAnswered, mamaCalls, phoneKarine, karineKnowsDebt, karineThinksTax, alikShaved, moustacheKept, moustacheAskAt, alikDay, mooAt, muenAt, muenAsked, muenAnswered, sorryAt, rudeAt, thanksAt, topicRun, topicLast,
+  bathAsked, bathAskedAt, bathAnswered, mamaCalls, phoneKarine, karineKnowsDebt, karineThinksTax, alikShaved, moustacheKept, moustacheAskAt, alikDay, mooAt, muenAt, muenAsked, muenAnswered, sanatoriumAt, sorryAt, rudeAt, thanksAt, topicRun, topicLast,
   legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway, nivaPlayer, carGone,
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, borisForeman, taxFrozen, taxThawed,
   actSigned, grantPaid, rubikFined, threatClaim, nuneKeyPassed, nuneDekretOver, grandpaDying, grandpaDeathAt,
@@ -51,7 +51,7 @@ export type MemExactKey =
   | typeof HEAT | typeof blocked | typeof blockedHint | typeof statusHidden | typeof polite | typeof bloodGiven
   | typeof alikDead | typeof mourning | typeof deathAnnAt | typeof evicted | typeof vendetta | typeof vendettaAt | typeof vendettaLifted | typeof vendettaPrice | typeof coldWar | typeof court | typeof courtVerdict
   | typeof courtPolite | typeof courtReferral | typeof judgeApology | typeof saidStrasburg | typeof ritualCount | typeof ritualCut | typeof caughtCount | typeof caughtUnique | typeof caughtAt | typeof garikDenied | typeof garikCode | typeof cryptoHodl
-  | typeof bathAsked | typeof bathAskedAt | typeof bathAnswered | typeof mamaCalls | typeof phoneKarine | typeof karineKnowsDebt | typeof karineThinksTax | typeof alikShaved | typeof moustacheKept | typeof moustacheAskAt | typeof alikDay | typeof mooAt | typeof muenAt | typeof muenAsked | typeof muenAnswered | typeof sorryAt
+  | typeof bathAsked | typeof bathAskedAt | typeof bathAnswered | typeof mamaCalls | typeof phoneKarine | typeof karineKnowsDebt | typeof karineThinksTax | typeof alikShaved | typeof moustacheKept | typeof moustacheAskAt | typeof alikDay | typeof mooAt | typeof muenAt | typeof muenAsked | typeof muenAnswered | typeof sanatoriumAt | typeof sorryAt
   | typeof rudeAt | typeof thanksAt | typeof topicRun | typeof topicLast | typeof legendPromiseAt
   | typeof legendId | typeof legendDay | typeof legendArc | typeof nextTransfer | typeof tileCornerRemoved
   | typeof nivaAway | typeof nivaBack | typeof nivaPlayer | typeof carGone | typeof garikConcrete | typeof garikCut | typeof houseOnGarik | typeof borisMarried

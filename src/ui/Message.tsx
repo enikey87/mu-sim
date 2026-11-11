@@ -1,4 +1,4 @@
-import { memo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { memo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import bull from './bull.svg'
 import type { Msg } from '../engine/state'
 import { useGame, useGameApi } from './useGame'
@@ -115,6 +115,7 @@ export const Message = memo(function Message({ m }: { m: Msg }) {
     return platform().externalPay && m.link ? <Lend50Card m={m} link={m.link} /> : null
   }
   if (m.kind === 'muen') return <MuenCard m={m} />
+  if (m.kind === 'sanatorium') return <SanatoriumCard m={m} />
   if (m.kind === 'card') return <PhoneCard m={m} />
 
   const cls = ['msg', m.from]
@@ -168,17 +169,28 @@ function Lend50Card({ m, link }: { m: Extract<Msg, { kind: 'lend50' }>; link: st
   )
 }
 
-/** Карточка курса «Английский с Быничем» (mu-en): стиль карточки просьбы,
- *  но без суммы и платформенных гейтов — обычная внешняя ссылка, рисуется везде. */
-function MuenCard({ m }: { m: Extract<Msg, { kind: 'muen' }> }) {
+/** Карточка-ссылка голоса игры: одна строка текста и кнопка наружу, оформление — как у карточки просьбы (#616).
+ *  Общая для кросс-промо: mu-en (#1410) и «Солнышко» (#1701); отличаются иконка и подпись кнопки. */
+function LinkCard({ m, testid, art, label }: { m: { text: string; link: string }; testid: string; art: ReactNode; label: string }) {
   return (
-    <div className="lend50 transfer" data-testid="muen-card">
-      <img className="muen-bull" src={bull} alt="Бынич — бык с добрыми глазами" />
+    <div className="lend50 transfer" data-testid={testid}>
+      {art}
       <div>{m.text}</div>
-      <a className="lend50-btn" href={m.link} target="_blank" rel="noopener">Научиться</a>
+      <a className="lend50-btn" href={m.link} target="_blank" rel="noopener">{label}</a>
       <div className="lend50-url">{m.link}</div>
     </div>
   )
+}
+
+/** Карточка курса «Английский с Быничем» (mu-en): стиль карточки просьбы,
+ *  но без суммы и платформенных гейтов — обычная внешняя ссылка, рисуется везде. */
+function MuenCard({ m }: { m: Extract<Msg, { kind: 'muen' }> }) {
+  return <LinkCard m={m} testid="muen-card" art={<img className="muen-bull" src={bull} alt="Бынич — бык с добрыми глазами" />} label="Научиться" />
+}
+
+/** Карточка пансионата «Солнышко» (mu-hospital, #1701): та же внешняя ссылка, иконка вместо картинки. */
+function SanatoriumCard({ m }: { m: Extract<Msg, { kind: 'sanatorium' }> }) {
+  return <LinkCard m={m} testid="sanatorium-card" art={<div className="promo-ico" aria-hidden="true">☀️</div>} label="Отдохнуть" />
 }
 
 /** VK: внешние платежи запрещены, поэтому кнопка карточки — вступление в сообщество игры (#1239).

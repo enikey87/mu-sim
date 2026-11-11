@@ -6,6 +6,7 @@ import type { Choice } from '../../engine/state'
  */
 export type GameEvent =
   | 'PlayerSays' | 'PlayerMessage' | 'AlikTurn' | 'AlikIdle' | 'AlikAway' | 'AlikIgnores'
+  | 'OfflineReturn'
   | 'StoryBeat' | 'PickScene' | 'PickQuest' | 'ArcFinale' | 'CheckEnding'
   | 'PaydayOutcome' | 'PaydayButton' | 'PromiseDue' | 'PromiseConditionMet'
   | 'BillDue' | 'BillWarn' | 'CreditDue'

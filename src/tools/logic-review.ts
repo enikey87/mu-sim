@@ -182,7 +182,7 @@ function msgText(m: Msg): { side: 'game' | 'me'; text: string; who?: string; sys
     // фото «платёжки»: игрок видит снимок — на нём баран (визуал захардкожен в ui/review.ts, #1017);
     // пул реакции P_PHOTO гейтится на needs('baran') — журнал обязан видеть то же, что игрок
     case 'photo': return { side: 'game', text: `${m.text} (на снимке — баран на фоне Арарата)` }
-    case 'job': case 'lend50': case 'muen': return { side: 'game', text: m.text }
+    case 'job': case 'lend50': case 'muen': case 'sanatorium': return { side: 'game', text: m.text }
     default: return { side: 'game', text: '' }
   }
 }
