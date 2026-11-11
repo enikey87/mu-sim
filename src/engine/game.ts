@@ -2661,7 +2661,8 @@ export class Game {
       await this.sleep(1500)
       this.nextDay(S.offlineDays)
       S.offlineDays = 0
-      await this.say([this.uniq(this.X.back)])
+      // первый возврат за партию — акция «Солнышко» (реплика и карточка, #1701); нет правила — прежний пул возвратов
+      if (!(await this.fire('OfflineReturn'))) await this.say([this.uniq(this.X.back)])
     }
     await this.fire('PlayerMessage', { tone, category, arg, shout })
   }

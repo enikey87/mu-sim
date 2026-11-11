@@ -182,7 +182,7 @@ describe('ответы Алика (PlayerSays)', () => {
     game.S.ctx = { type: 'photo' }
     const t = await reply(game, { text: 'Это же баран.', tone: 'neutral', act: 'photo' })
     expect(game.S.day).toBeGreaterThanOrEqual(day + 4)
-    expect(oneOf(D.BACK_A, t[0])).toBe(true)
+    expect(oneOf(D.BACK_A, t[0]) || oneOf(D.SANATORIUM_A, t[0]), 'первый возврат за партию — санаторий или обычный пул').toBe(true)
     expect(game.S.offlineDays).toBe(0)
   })
   it('извинение работает и во время пропажи и сокращает её', async () => {

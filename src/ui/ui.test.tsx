@@ -20,6 +20,7 @@ import { enable, GAME_HOST } from '../analytics/metrics'
 import { EPILOGUE_BANNER, LEND50_LINK, LEND50_RENAME, LEND50_SYS, LEND50_TG_SYS, LEND50_VK_SYS, LEND50_YA_SYS } from '../content/endgame'
 import { adoptPlatform, platform, webPlatform } from '../platform'
 import { PRIVACY_URL } from './share'
+import { SANATORIUM_CARD, SANATORIUM_LINK } from '../content/excuses'
 
 function renderApp(game: Game, onReset = vi.fn()) {
   const utils = render(<App game={game} onReset={onReset} />)
@@ -580,6 +581,20 @@ describe('App', () => {
     } finally {
       adoptPlatform(webPlatform())
     }
+  })
+
+  it('карточка пансионата «Солнышко» — ссылка в mu-hospital и без суммы (#1701)', () => {
+    const { game } = makeGame()
+    game.push({ kind: 'sanatorium', text: SANATORIUM_CARD, link: SANATORIUM_LINK })
+    renderApp(game)
+    const card = screen.getByTestId('sanatorium-card')
+    expect(within(card).getByText(SANATORIUM_CARD)).toBeInTheDocument()
+    const link = within(card).getByRole('link', { name: 'Отдохнуть' })
+    expect(link).toHaveAttribute('href', SANATORIUM_LINK)
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener')
+    expect(within(card).getByText(SANATORIUM_LINK)).toHaveClass('lend50-url')
+    expect(within(card).queryByText('50 ₽')).toBeNull()
   })
 
   it('кнопки допработы отвечают и исчезают', async () => {

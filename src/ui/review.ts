@@ -127,6 +127,7 @@ export function reviewLine(m: Msg, nameOf: (who?: string) => string): string {
     }
     case 'lend50': return `${t}(карточка просьбы: 50 ₽ — ${m.text} → ${m.stars ? 'Купить за звёзды' : m.buy ? 'Купить «Чашку хаша»' : m.join ? 'Вступить в сообщество игры' : `Перевести: ${m.link ?? '—'}`})`
     case 'muen': return `${t}(карточка курса: ${m.text} → ${m.link})`
+    case 'sanatorium': return `${t}(карточка пансионата: ${m.text} → ${m.link})`
   }
 }
 

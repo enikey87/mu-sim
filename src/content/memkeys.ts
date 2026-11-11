@@ -99,6 +99,9 @@ export const muenAsked = 'muenAsked'
 /** Игрок ответил на окно курса mu-en (#1410): окно потреблено выбором, `muenAt` не стирается —
  *  иначе стёртый штамп вернул бы карточку вторым признанием. */
 export const muenAnswered = 'muen.answered'
+/** Ход первого возврата из пропажи с санаторием «Солнышко» (#1701): держит однократность акции —
+ *  реплика и карточка пансионата звучат один раз за партию, следующие возвраты идут пулом BACK. */
+export const sanatoriumAt = 'sanatoriumAt'
 export const sorryAt = 'sorryAt'
 export const rudeAt = 'rudeAt'
 /** Номер хода, на котором «спасибо» подняло настроение, — перерыв между бампами. */
@@ -445,7 +448,7 @@ export type ActorKey = (typeof ACTOR_KEY_LIST)[number]
 export const ACTOR_KEYS: ReadonlySet<string> = new Set(ACTOR_KEY_LIST)
 
 export const MEM_KEYS: ReadonlySet<string> = new Set([
-  HEAT, muenAt, muenAsked, muenAnswered, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, deathAnnAt, evicted, vendetta, vendettaAt, vendettaLifted, vendettaPrice, coldWar, court, courtVerdict, courtPolite,
+  HEAT, muenAt, muenAsked, muenAnswered, sanatoriumAt, blocked, blockedHint, statusHidden, polite, bloodGiven, alikDead, mourning, deathAnnAt, evicted, vendetta, vendettaAt, vendettaLifted, vendettaPrice, coldWar, court, courtVerdict, courtPolite,
   ritualCount, ritualCut, caughtCount, caughtUnique, caughtAt, garikDenied, garikCode, cryptoHodl, bathAsked, bathAskedAt, bathAnswered, mamaCalls, phoneKarine, karineKnowsDebt, karineThinksTax, alikShaved, moustacheKept, moustacheAskAt, alikDay, mooAt, sorryAt, courtReferral, judgeApology, saidStrasburg,
   rudeAt, thanksAt, topicRun, topicLast, legendPromiseAt, legendId, legendDay, legendArc, nextTransfer, tileCornerRemoved, nivaAway, nivaPlayer, carGone,
   garikConcrete, garikCut, houseOnGarik, borisMarried, razmikMarried, nivaBack, borisSmetaReady, borisForeman, taxFrozen, taxThawed,
