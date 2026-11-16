@@ -26,6 +26,11 @@ export interface RuleSetOptions<G = unknown> {
    * промолчавшего правила. Проверка бросает, если ответ успел что-то записать в игру.
    */
   silence?: (game: G, rule: Rule<G>) => () => void
+  /**
+   * Замороженный мир: правило, для которого true, не участвует в выборе (match), будто его нет.
+   * Так игра гасит инициативу мира в эпилоге, не трогая ни одно правило по имени (#1704).
+   */
+  mute?: (rule: Rule<G>) => boolean
 }
 
 export interface FireOptions {
@@ -53,10 +58,12 @@ export class RuleSet<G, O = unknown> {
   private now: () => Clock
 
   private silence: RuleSetOptions<G>['silence']
+  private mute: RuleSetOptions<G>['mute']
 
   constructor(o: RuleSetOptions<G>) {
     this.rng = o.rng
     this.silence = o.silence
+    this.mute = o.mute
     this.hub = o.hub
     this.state = o.state
     this.now = o.now
@@ -135,6 +142,10 @@ export class RuleSet<G, O = unknown> {
       const s = specificityOf(r)
       if (skip?.has(r.name)) {
         trace?.push({ name: r.name, specificity: s, ok: false, failed: ['уже промолчало в этом выборе'] })
+        continue
+      }
+      if (this.mute?.(r)) {
+        trace?.push({ name: r.name, specificity: s, ok: false, failed: [], blocked: 'muted' })
         continue
       }
       if (best !== -1 && s < best) {

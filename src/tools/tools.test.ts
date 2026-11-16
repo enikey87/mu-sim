@@ -103,7 +103,7 @@ describe('гейт покрытия: сработало хоть раз (#278)',
     expect(gateIssues([sample('main', {}), sample('full', {})], [rule('Late', true)], {})).toEqual([expect.stringMatching(/^Late: правило эндгейма/)])
   })
   it('правило эндгейма — по условию, а не по имени', () => {
-    expect(allRules.filter(endgameOnly).map((r) => r.name)).toContain('Endgame_Idle')
+    expect(allRules.filter(endgameOnly).map((r) => r.name)).toContain('Endgame_Turn')
     expect(allRules.filter(endgameOnly).map((r) => r.name)).toContain('Lend50_yes')
     expect(endgameOnly({ when: [] })).toBe(false)
   })

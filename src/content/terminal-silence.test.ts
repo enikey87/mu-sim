@@ -125,8 +125,19 @@ describe('терминальные эпилоги держат полную ти
     }
   })
 
-  // гейт стоит на терминальных фактах, а не на всём эндгейме: в выплате Алик жив и его реплики — формальности
-  it('обычный эпилог выплаты не заглушён: суточная реплика там звучит', async () => {
+  // решение оператора 16.11 (#1704): эпилог оконченной партии — тишина для всех исходов, выплата больше не исключение
+  it('эпилог выплаты тоже молчит: суточная реплика не звучит', async () => {
+    // канал живой вне эпилога: иначе проверка после экрана пустела бы
+    const { game: live } = makeGame({ seed: 11 })
+    let spoke = false
+    for (let i = 0; i < 60 && !spoke; i++) {
+      const before = alikTexts(live).length
+      await live.fire('PeriodLine')
+      spoke = alikTexts(live).length > before
+      live.S.stats.sent += RULE_TURNS
+    }
+    expect(spoke, 'PeriodLine не звучит и вне эпилога — проверка после пустеет').toBe(true)
+
     const { game } = makeGame({ seed: 11 })
     game.S.mem.payday = 'default'
     game.S.ending = 'payday_default'
@@ -135,15 +146,16 @@ describe('терминальные эпилоги держат полную ти
     await flush()
     expect(game.S.mem['endgame.active'], 'эндгейм выплаты').toBe(true)
     expect([game.S.mem['endgame.vendetta'], game.S.mem['endgame.bloodfeud']], 'терминальных фактов нет').toEqual([undefined, undefined])
-
-    let spoke = false
-    for (let i = 0; i < 60 && !spoke; i++) {
-      const before = alikTexts(game).length
-      await game.fire('PeriodLine')
-      spoke = alikTexts(game).length > before
+    // глушить есть кого: очередь суточной реплики открыта, а её гасит тишина эпилога
+    const period = game.rules.rules('PeriodLine').find((r) => r.name === 'PeriodLine')
+    expect(period, 'суточная реплика — правило').toBeDefined()
+    expect(period!.when.filter((c) => !game.holds(c)), 'условия суточной реплики выполнены').toEqual([])
+    for (let i = 0; i < 8; i++) {
+      const before = game.S.msgs.length
+      expect(await game.fire('PeriodLine'), 'суточную реплику гасит тишина эпилога').toBeNull()
+      expect(game.S.msgs.slice(before), 'после экрана Алик не пишет').toEqual([])
       game.S.stats.sent += RULE_TURNS
     }
-    expect(spoke, 'тишина терминальных эпилогов не распространяется на выплату').toBe(true)
   })
 })
 
@@ -172,7 +184,7 @@ describe('терминальный эпилог молчит и в телефо�
     expect(game.ui.notif?.app, 'баннер непрочитанных не показан').toBe('Алик Воздухонесян')
   })
 
-  // гейт стоит на терминальных фактах, а не на всём эндгейме: нейтральный эпилог выплаты телефон не глушит
+  // гейт стоит на тишине мира, а не на устройстве игрока: телефон выплаты не глушит
   it('обычный эпилог выплаты не заглушён: мирные карточки телефона там выходят', async () => {
     const { game } = makeGame({ seed: 13 })
     game.S.mem.payday = 'default'

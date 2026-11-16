@@ -113,7 +113,7 @@ export function startApp(opts: StartOptions = {}): Promise<AppHandle> {
       // Локальная партия остаётся источником правды: не доехало — игра идёт дальше.
       useEffect(() => {
         if (!transfer) return
-        const push = () => transfer.push(storage?.getItem(SAVE_KEY) ?? null, game.S.ending != null)
+        const push = () => transfer.push(storage?.getItem(SAVE_KEY) ?? null, game.epilogueReached())
         push()
         const onHide = () => push()
         const onVisibility = () => { if (document.hidden) push() }

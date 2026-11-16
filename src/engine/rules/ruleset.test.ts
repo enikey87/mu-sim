@@ -7,12 +7,12 @@ import { seededRng } from '../rng'
 
 type G = { log: string[] }
 
-function mk(opts: { seed?: number; world?: Facts; actors?: Record<string, Facts>; state?: RuleState } = {}) {
+function mk(opts: { seed?: number; world?: Facts; actors?: Record<string, Facts>; state?: RuleState; mute?: (r: Rule<G>) => boolean } = {}) {
   const clock: Clock = { turn: 0, day: 100 }
   const world = opts.world ?? {}
   const actors = opts.actors ?? {}
   const state = opts.state ?? freshRuleState()
-  const rs = new RuleSet<G>({ rng: seededRng(opts.seed ?? 1), hub: makeHub(world, actors), state, now: () => ({ ...clock }) })
+  const rs = new RuleSet<G>({ rng: seededRng(opts.seed ?? 1), hub: makeHub(world, actors), state, now: () => ({ ...clock }), mute: opts.mute })
   const game: G = { log: [] }
   const factsFor = (x: Facts) => ({ ...x })
   return { rs, clock, world, actors, state, game, factsFor }
@@ -156,6 +156,14 @@ describe('трассировка', () => {
     expect(by.Wrong.failed).toEqual(['a == 2'])
     expect(by.NotForYou.failed).toEqual(['sender == x', 'target == y'])
     expect(by.Lower.failed).toEqual(['проиграло по специфичности'])
+  })
+  it('mute убирает правило из выбора, как будто его нет; в трассе — «мир молчит»', () => {
+    const traces: Trace[] = []
+    const { rs } = mk({ mute: (r) => r.name === 'Muted' })
+    rs.tracer = (t) => traces.push(t)
+    rs.add(say('Muted', 'E', [eq('a', 1)], { specificity: 5 }), say('Alive', 'E', [eq('a', 1)]))
+    expect(rs.match({ event: 'E', facts: { a: 1 } })!.name).toBe('Alive')
+    expect(traces[0].candidates.find((c) => c.name === 'Muted')).toMatchObject({ ok: false, blocked: 'muted' })
   })
   it('match без победителя; collect — выбранные по порядку', () => {
     const { rs } = mk()

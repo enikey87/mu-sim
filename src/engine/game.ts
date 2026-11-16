@@ -24,7 +24,7 @@ import {
   type LoanId, type ThingId, type Loan,
 } from '../content/credit'
 import { allRules } from '../content/rules'
-import type { GameEvent, Offer } from '../content/rules/events'
+import { EVENT_SOURCE, type GameEvent, type Offer } from '../content/rules/events'
 import { CLAIMS, claimByKey, CALLBACK_OPEN, PROMISE_UNPAID, type Claim } from '../content/lies'
 import { CLAIM_LEDGER, activeClaim, caughtPairs, claimKeyOf, closeEpisode, currentEpisode, publishClaim, publishRetraction, publishTransition, type ClaimRec, type EpisodeRec } from '../content/ledger'
 import { isWhoId, type ClaimKey } from '../content/ids'
@@ -280,6 +280,7 @@ export class Game {
       state: this.S.rules,
       now: () => ({ turn: this.S.stats.sent, day: this.S.day }),
       silence: opts.strictSilence ? (_, r) => this.silenceCheck(r.name) : undefined,
+      mute: (r) => this.worldMuted(r),
     }).add(...allRules)
     if (opts.debug) {
       this.rules.tracer = (t) => {
@@ -1595,6 +1596,17 @@ export class Game {
   /** Терминальный эпилог (#1556/#1571): после своего экрана мир молчит, пишет только колода эпилога (#1585). */
   private terminalEpilogue(): boolean {
     return !!(this.S.mem[memkeys.endgame.vendetta] || this.S.mem[memkeys.endgame.bloodfeud])
+  }
+  /** Партия окончена: экран концовки открыт или эпилог уже идёт (#1704). Воркер не напоминает такому игроку. */
+  epilogueReached(): boolean {
+    return this.S.ending != null || !!this.S.mem[memkeys.endgame.active]
+  }
+  /**
+   * В активном эпилоге мир молчит (#1704): движок не берёт правила, которые затеяла игра, —
+   * остаются события самого игрока и глушилки, которые и так ничего не пишут.
+   */
+  private worldMuted(r: Rule<Game>): boolean {
+    return !!this.S.mem[memkeys.endgame.active] && EVENT_SOURCE[r.event as GameEvent] === 'world' && !r.quiet
   }
   /** Молчание могло начаться посреди хода (блок, «смерть»): шапка не остаётся «прочитано»/«в сети» до его конца (#308). */
   private quietHeader(): void {
@@ -3988,6 +4000,8 @@ export class Game {
   }
   /** Пачка «пока тебя не было»: n событий AlikAway. Мир решает, пишет ли Алик (смерть, блок, эндгейм) — заголовок и счётчик только по тому, что пришло. */
   async awayBurst(n: number, days: number, why?: string): Promise<void> {
+    // эпилог — тишина: пачки «пока тебя не было» там нет, календарь сдвинет ход самого игрока (#1704)
+    if (this.S.mem[memkeys.endgame.active]) return
     this.nextDay(days)
     const at = this.S.msgs.length
     // пришли, пока игрока не было, — до «сейчас»: иначе часы переписки убегают вперёд настоящих

@@ -245,7 +245,7 @@ export const rudeRules: R[] = [
     name: 'Phone_Karine_' + event, event, when: [is(phoneKarine)], bonus: 9,
     respond: async ({ game }) => { const t = game.line('PHONE_KARINE', T.PHONE_KARINE); if (t) await game.say([{ w: 'karine', t }]) },
   })),
-  ...(['AlikIdle', 'AlikAway', 'StoryBeat', 'PeriodLine', 'PromiseDue'] as GameEvent[]).map((event): R => ({ name: 'Quiet_PhoneKarine_' + event, event, when: [is(phoneKarine)], bonus: 9, respond: () => {} })),
+  ...(['AlikIdle', 'AlikAway', 'StoryBeat', 'PeriodLine', 'PromiseDue'] as GameEvent[]).map((event): R => ({ name: 'Quiet_PhoneKarine_' + event, event, when: [is(phoneKarine)], bonus: 9, quiet: true, respond: () => {} })),
   // состояния: блок, вежливость, вендетта перекрывают обычный ход
   {
     name: 'Turn_Blocked', event: 'AlikTurn', when: [is(blocked)],
@@ -280,7 +280,7 @@ export const rudeRules: R[] = [
     name: 'Away_ColdWar', event: 'AlikAway', when: [gte(HEAT, 1), is('ctx.offended'), ne('offline', true)], bonus: 1, odds: 0.7, cooldown: { turns: 2 },
     respond: ({ game }) => game.awayMsg('coldWar'),
   },
-  { name: 'Quiet_Offended_AlikAway', event: 'AlikAway', when: [gte(HEAT, 1), is('ctx.offended')], respond: () => {} },
+  { name: 'Quiet_Offended_AlikAway', event: 'AlikAway', when: [gte(HEAT, 1), is('ctx.offended')], quiet: true, respond: () => {} },
 ]
 
 // извинения: во время блока не доставляются; после серии криков — только ритуал

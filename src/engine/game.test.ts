@@ -1,7 +1,6 @@
 import { STARTS } from '../content/quests'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { makeGame, memStorage, alikTexts, flush, setMoney, cards } from '../test/helpers'
-import { ENDGAME_FORMALITIES, ENDGAME_JUBILEES } from '../content/endgame'
 import { silentAudio, type Audio } from './audio'
 import { mooClock, mooOf, mooPhraseDuration, type MooPhrase } from './moo'
 import { manualClock, realClock } from './clock'
@@ -513,19 +512,14 @@ describe('Game: пачка непрочитанных подчиняется м�
     expect(g2.S.msgs.filter((m) => m.kind === 'sys' && m.unread)).toEqual([])
     expect(g2.S.msgs.filter((m) => m.kind !== 'sep' && m.kind !== 'sys').length).toBe(g1.S.msgs.filter((m) => m.kind !== 'sep' && m.kind !== 'sys').length)
   })
-  it('выплата закрыта — в пачке только закрывающие акты, долг не меняется', async () => {
-    const acts = new Set([...ENDGAME_FORMALITIES, ...Object.values(ENDGAME_JUBILEES)])
-    let seen = 0
+  it('выплата закрыта — пачки нет: эпилог молчит, долг и счёт актов прежние', async () => {
     for (let seed = 1; seed <= 30; seed++) {
       const { game, msgs, debt } = await charged((g) => { g.S.mem['endgame.active'] = true }, seed)
-      const body = msgs.filter((m) => m.kind !== 'sys')
-      expect(body.length).toBeGreaterThan(0)
-      for (const m of body) expect(m.kind === 'text' && acts.has(m.text), JSON.stringify(m)).toBe(true)
+      expect(msgs, `seed ${seed}`).toEqual([])
+      expect(game.ui.unread).toBe(0)
       expect(game.S.debt).toBe(debt)
-      expect(game.S.mem['endgame.forms']).toBe(body.length)
-      seen += body.length
+      expect(game.S.mem['endgame.forms']).toBeUndefined()
     }
-    expect(seen).toBeGreaterThan(60)
   })
   it.each([['заблокировал', 'blocked'], ['телефон у Карине', 'phone.karine']])('%s — пачки нет', async (_, key) => {
     for (let seed = 1; seed <= 10; seed++) {
