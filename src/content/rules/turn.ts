@@ -233,7 +233,7 @@ export const idleRules: R[] = [
 const awayW = { text: 35, sticker: 15, fwd: 15, deleted: 10, voice: 10, transfer: 7, excuse: 8, offended: 10 }
 export const awayRules: R[] = [
   // пропал — не пишет; уведомление телефона, как у Idle_Offline, в пачке ни к чему
-  { name: 'Away_Offline', event: 'AlikAway', when: [AlikOffline], respond: () => {} },
+  { name: 'Away_Offline', event: 'AlikAway', when: [AlikOffline], quiet: true, respond: () => {} },
   ...(Object.keys(awayW) as (keyof typeof awayW)[]).map((kind): R => ({
     name: 'Away_' + kind.charAt(0).toUpperCase() + kind.slice(1), event: 'AlikAway', when: [], specificity: 0, weight: awayW[kind],
     respond: ({ game }) => game.awayMsg(kind),

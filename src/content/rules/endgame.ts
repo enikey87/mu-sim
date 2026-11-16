@@ -35,33 +35,27 @@ export const endgameRules: R[] = [
     name: 'Endgame_Turn', event: 'AlikTurn', when: [active], specificity: 100,
     respond: ({ game }) => game.endgameFormality(),
   },
-  {
-    name: 'Endgame_Idle', event: 'AlikIdle', when: [active], specificity: 100, priority: 'system',
-    respond: ({ game }) => game.endgameFormality(),
-  },
-  // пока игрока не было, в группе копятся закрывающие акты — не переводы и не отмазки: долг после выплаты не меняется
-  {
-    name: 'Endgame_Away', event: 'AlikAway', when: [active], specificity: 100, priority: 'system',
-    respond: ({ game }) => game.awayMsg('formality'),
-  },
+  // Сюжетный ход приходит только в конце хода игрока: в эпилоге он отдаёт колоду эпилога, как и ответ
+  // на реплику, а не заводит новую линию. Инициативу мира (AlikIdle, AlikAway) движок в эпилоге
+  // не проводит вовсе — EVENT_SOURCE + Game.worldMuted (#1704), поэтому правил на них здесь нет.
   {
     name: 'Endgame_Formality', event: 'StoryBeat', when: [active], specificity: 100, priority: 'cinematic',
     respond: ({ game }) => game.endgameFormality(),
   },
   {
-    name: 'Endgame_NoEnding', event: 'CheckEnding', when: [active], specificity: 100, priority: 'system',
+    name: 'Endgame_NoEnding', event: 'CheckEnding', when: [active], specificity: 100, priority: 'system', quiet: true,
     respond: () => undefined,
   },
   // за экраном концовки мир молчит: ни пачки, ни простоя, ни сюжета, ни обещаний, ни хора —
   // иначе после выплаты приходят отмазки, «переводы» и отложенные Mentioned из реплик сцены
   ...(['AlikAway', 'AlikIdle', 'StoryBeat', 'PeriodLine', 'PromiseDue', 'Mentioned'] as GameEvent[]).map((event): R => ({
-    name: 'Quiet_PaydayOpen_' + event, event, when: [paydayOpen], specificity: 100, priority: 'system', respond: () => {},
+    name: 'Quiet_PaydayOpen_' + event, event, when: [paydayOpen], specificity: 100, priority: 'system', quiet: true, respond: () => {},
   })),
   // терминальные эпилоги обещают полную тишину после своего экрана (#1585): суточная реплика Алика
   // и хор родни идут мимо AlikTurn — по тому же событию, что и в живом мире, поэтому молчат quiet-правилами
   ...([['Vendetta', endgame.vendetta], ['Bloodfeud', endgame.bloodfeud]] as const).flatMap(([suffix, key]) =>
     (['PeriodLine', 'Mentioned'] as GameEvent[]).map((event): R => ({
-      name: `Quiet_Terminal_${suffix}_${event}`, event, when: [active, is(key)], specificity: 100, priority: 'system', respond: () => {},
+      name: `Quiet_Terminal_${suffix}_${event}`, event, when: [active, is(key)], specificity: 100, priority: 'system', quiet: true, respond: () => {},
     })),
   ),
 ]

@@ -103,6 +103,12 @@ export interface Rule<G, E extends string = string, O = unknown> {
   cooldown?: Cooldown
   /** Приоритет речи; по умолчанию 'default'. */
   priority?: Priority
+  /**
+   * Сама тишина: правило ничего не пишет и не двигает, поэтому в замороженном мире эпилога оно
+   * остаётся единственным, что движок проводит (#1704). Без этой отметки правило события мира
+   * в эпилоге молчит, даже если умеет говорить.
+   */
+  quiet?: boolean
   /** Записи в память перед ответом (applyFacts): ответ видит их; при false откатываются вместе с их forDays. */
   remember?: FactOp[]
   /**
@@ -121,7 +127,7 @@ export interface Rule<G, E extends string = string, O = unknown> {
 }
 
 // ---- трассировка ----
-export type Blocked = 'odds' | 'once' | 'cooldown' | 'priority'
+export type Blocked = 'odds' | 'once' | 'cooldown' | 'priority' | 'muted'
 export interface Candidate {
   name: string
   specificity: number

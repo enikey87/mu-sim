@@ -54,7 +54,7 @@ function Entry({ t, open, onToggle }: { t: TraceEntry; open: boolean; onToggle: 
               <div key={c.name} className={'cand' + (t.chosen.includes(c.name) ? ' chosen' : c.ok ? ' ok' : '')}>
                 <span className="sp">{c.specificity}</span>
                 <span className="nm">{c.name}</span>
-                <span className="why">{c.ok ? (t.chosen.includes(c.name) ? 'выбрано' : 'подошло') : c.blocked === 'odds' ? 'не повезло (шанс)' : c.blocked === 'once' ? 'уже было (once)' : c.failed.join(' · ')}</span>
+                <span className="why">{c.ok ? (t.chosen.includes(c.name) ? 'выбрано' : 'подошло') : c.blocked === 'odds' ? 'не повезло (шанс)' : c.blocked === 'once' ? 'уже было (once)' : c.blocked === 'muted' ? 'мир молчит (эпилог)' : c.failed.join(' · ')}</span>
               </div>
             ))}
           </div>

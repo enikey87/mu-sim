@@ -338,7 +338,7 @@ describe('«Займи 50»', () => {
     expect(game.choices.map((c) => c.act)).toEqual(['lend50Yes', 'lend50Serious', 'lend50No'])
   })
 
-  it('возврат через 2 часа: просьба целиком до пачки непрочитанных (#248)', async () => {
+  it('возврат через 2 часа: просьба целиком, пачки непрочитанных в эпилоге нет (#248, #1704)', async () => {
     const storage = memStorage()
     const { game, clock } = makeGame({ storage })
     // незаконченная просьба в эндгейме + долгий уход — без готовой карточки из enter()
@@ -360,7 +360,9 @@ describe('«Займи 50»', () => {
     expect(ask0).toBeGreaterThanOrEqual(0)
     expect(again.S.msgs.slice(cardAt - 3, cardAt).flatMap((m) => (m.kind === 'text' ? [m.text] : []))).toEqual([...LEND50_ASK])
     expect(cards(again)).toHaveLength(1)
-    expect(unreadAt).toBeGreaterThan(cardAt) // пачка away — строго после просьбы
+    // #1704: эпилог молчит без хода игрока — пачки «пока не было» там больше нет вовсе,
+    // поэтому просьба не просто идёт первой, а остаётся последним сообщением возврата
+    expect(unreadAt, 'пачки непрочитанных в эпилоге нет').toBe(-1)
   })
 
   it('формальности могут прийти при висящей просьбе — кнопки остаются (#321)', async () => {
